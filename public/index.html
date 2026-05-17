@@ -17908,12 +17908,15 @@ body.ce-v241-ro #mtAccesoBtn{
     }
     let isAccess = false;
     try{ isAccess = typeof currentMaintTab !== 'undefined' && currentMaintTab === 'acceso'; }catch(_){ }
+    const card = $('mtAcceso');
+    if(!isAccess || !isGD()){
+      if(card) card.classList.remove('ce-v241-open');
+    }
     if(isGD() && isAccess){
       const wrap = $('maintenanceWrapper');
       expose(wrap);
       if(wrap) wrap.classList.remove('ce-import-only-v212');
       document.querySelectorAll('#maintenanceWrapper > .card').forEach(card => card.classList.add('hidden'));
-      const card = $('mtAcceso');
       expose(card);
       if(card) card.classList.add('ce-v241-open');
       document.querySelectorAll('.maintenance-tabs .tab').forEach(tab => tab.classList.remove('active'));
