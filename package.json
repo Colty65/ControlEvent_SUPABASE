@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v25-0-supabase-localhost",
-  "version": "25.0.0-supabase-base",
+  "name": "controlevent-v25-1-supabase-localhost",
+  "version": "25.1.0-supabase-base",
   "private": true,
   "type": "module",
   "scripts": {
