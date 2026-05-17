@@ -7,4 +7,7 @@ export function mount({root} = {}){
   if(window.__ceV252 && typeof window.__ceV252.apply === 'function'){
     window.__ceV252.apply();
   }
+  if(window.__ceV253 && typeof window.__ceV253.apply === 'function'){
+    window.__ceV253.apply();
+  }
 }
