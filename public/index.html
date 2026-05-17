@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17491,7 +17490,11 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
     const grid = document.createElement('div');
     grid.className = 'vbars-grid';
     visibleRows.forEach(r => {
-      const cols = specs.filter(s => parseNum(r[s.key]) !== 0).map(s => {
+      const cols = specs.map(s => {
+        if(parseNum(r[s.key]) === 0){
+          const tip = groupTip(pageTitle, r, s);
+          return `<div class="vbar-col ce-v24-zero-col" data-v24-kind="${s.key}" data-v24-tip="1" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="#fff" data-ce-tip-layout-v21="${s.layout}" style="display:none"></div>`;
+        }
         const h = Math.max(8, (Math.abs(parseNum(r[s.key])) / maxVal) * 170);
         const tip = groupTip(pageTitle, r, s);
         return `<div class="vbar-col" data-v24-kind="${s.key}" data-v24-tip="1" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="#fff" data-ce-tip-layout-v21="${s.layout}"><div class="vbar-value">${esc(money(r[s.key]))}</div><div class="vbar-stick" data-v24-kind="${s.key}" data-v24-tip="1" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="#fff" data-ce-tip-layout-v21="${s.layout}" style="height:${h}px;background:${s.color}"></div><div class="vbar-label">${esc(s.label)}</div></div>`;
