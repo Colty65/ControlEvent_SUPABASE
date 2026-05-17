@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v25.1</title>
-  <!-- ControlEvent v25.1 PWA / instalación móvil -->
+  <title>ControlEvent v25.2</title>
+  <!-- ControlEvent v25.2 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -331,7 +331,7 @@ body.mobile-drawer-open .mobile-drawer-backdrop,body.mobile-drawer-open .mobile-
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v25.1</span>
+          <span>ControlEvent v25.2</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -2722,7 +2722,7 @@ async function exportSeedWorkbook(){
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2814,7 +2814,7 @@ async function exportSeedWorkbook(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'ControlEvent_v25_1_descarga_datos.xlsx';
+  a.download = 'ControlEvent_v25_2_descarga_datos.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -2842,7 +2842,7 @@ async function exportExcel(){
   const tiendaRows = summaryByTiendaTicket();
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -3039,7 +3039,7 @@ async function exportExcel(){
   const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
   let r = 1;
   mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.1 - ©oltyLAB ’26');
+  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.2 - ©oltyLAB ’26');
   putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
   putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
   wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -3175,7 +3175,7 @@ async function exportExcel(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v25_1.xlsx`;
+  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v25_2.xlsx`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -4026,7 +4026,7 @@ function donorOptions(){
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
@@ -4076,7 +4076,7 @@ function donorOptions(){
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_1_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_2_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -4479,7 +4479,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v25_1-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
+    return `ControlEvent_v25_2-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
   }
   function graphData(){
     const b = budgetSummary();
@@ -5055,7 +5055,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = summaryByTiendaTicket();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -5136,7 +5136,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
     let r = 1;
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.1 - ©oltyLAB ’26');
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.2 - ©oltyLAB ’26');
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
     wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -5367,7 +5367,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   };
 
   window.socioResponsableOptions = function(){
@@ -6728,7 +6728,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
 
   exportExcel = async function(){
@@ -6755,7 +6755,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket() : [];
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6964,7 +6964,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = filenameV153;
 
@@ -6980,7 +6980,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         return;
       }
       const wb = new ExcelJS.Workbook();
-      wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+      wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
       wb.created = new Date();
 
       const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7030,7 +7030,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'ControlEvent_v25_1_descarga_datos.xlsx';
+      a.download = 'ControlEvent_v25_2_descarga_datos.xlsx';
       a.click();
       URL.revokeObjectURL(a.href);
     };
@@ -7742,7 +7742,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV160;
 
@@ -7852,7 +7852,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7907,7 +7907,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_1_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_2_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -7939,7 +7939,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.1 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.2 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -9083,7 +9083,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script>
 /* ==== V16.4 FIXES: EXCEL, GRAFICAS, COMPRAS, AGRUPACION, TICKETS ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
+  const VERSION = 'ControlEvent v25.2';
   const $v164 = id => document.getElementById(id);
   const escV164 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   const fmtMoneyV164 = v => {
@@ -9527,7 +9527,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV164;
 
@@ -9560,7 +9560,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_1_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_2_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -9704,7 +9704,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 /* ==== V17.2 FIXES: EXCEL RESUMEN, ORDENACIONES Y DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
+  const VERSION = 'ControlEvent v25.2';
   const $v171 = id => document.getElementById(id);
   const normV171 = v => String(v ?? '').trim();
   const escV171 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));
@@ -9939,7 +9939,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_2_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV171;
 
@@ -10078,7 +10078,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const hh = pad(date.getHours());
     const mi = pad(date.getMinutes());
     const ss = pad(date.getSeconds());
-    return `Emitido por “©oltyLAB ’26_ControlEvent_v25_1_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
+    return `Emitido por “©oltyLAB ’26_ControlEvent_v25_2_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
 
   async function exportExcelV171(){
@@ -10337,7 +10337,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v180-tooltips-and-grouping-script">
 /* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÓN Y AGRUPACIÓN DE DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
+  const VERSION = 'ControlEvent v25.2';
   const norm = v => String(v ?? '').trim();
   const fmt = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
@@ -10534,8 +10534,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v181-backup-tooltip-excel-script">
 /* ==== V18.1: tooltips redondeados, backup por evento y Excel INGRESOS ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const norm = v => String(v ?? '').trim();
   const normalize = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
@@ -10767,8 +10767,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v190-integrity-tooltips-export-script">
 /* ==== V19.0: globos con scroll, nombres de Excel/backup, precio € en backup e integridad al eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -11091,8 +11091,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v1911-integrity-tooltips-script">
 /* ==== V19.1.1: parte de v19.0; bloqueo real de dependencias y globos restaurados ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -11507,8 +11507,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v192-tooltip-size-bold-script">
 /* ==== V19.2: tamaño de globos y negritas en productos, donantes/personas e importes totales ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const getRawTip = el => {
@@ -11647,8 +11647,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v193-tooltip-click-sort-script">
 /* ==== V19.3: globos por clic, orden alfabético y negrita controlada ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12066,8 +12066,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v194-tooltip-excel-script">
 /* ==== V19.4: los globos no cambian al mover el cursor y el botón Excel queda cableado de forma directa ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12269,7 +12269,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v25_1/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v25_2/ig, VERSION_FILE);
     return n;
   }
   const currentAnchorClick = HTMLAnchorElement.prototype.click;
@@ -12386,8 +12386,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v1952-tooltip-excel-fix-script">
 /* ==== V19.5.2: recupera globos y Excel desde v19.4, evitando interferencias de parches antiguos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12773,8 +12773,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v196-tooltip-behavior-script">
 /* ==== V19.6: comportamiento de Por tienda y Ticket aplicado a todos los globos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13074,8 +13074,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v200-tooltip-format-delete-maint-script">
 /* ==== V20.0: formato de globos, mantenimiento robusto y avisos en eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const BLOCK_MSG = 'No autorizado. Tiene dependencias';
   const OK_MSG = 'Se puede eliminar. No hay dependencias';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
@@ -13432,8 +13432,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v201-final-fixes-script">
 /* ==== V20.1: formato fino de globos y botones mantenimiento/carga ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13732,8 +13732,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v202-final-fixes-script">
 /* ==== V20.2: toggle mantenimiento, carga sin selector automático, globos y fotos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13930,7 +13930,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v210-patch-script">
 /* ==== V21.0: producto duplicado permitido si cambia la tienda + globos estables ==== */
 (function(){
-  const VERSION='ControlEvent v25.1'; const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2'; const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13991,7 +13991,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v211-tooltip-final-script">
 /* ==== V21.1: globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v25.1'; const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2'; const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
@@ -14067,8 +14067,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v212-final-script">
 /* ==== V21.2: separación CARGA/MANTENIMIENTO, backup y globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).toUpperCase();
@@ -14251,8 +14251,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v213-final-script">
 /* ==== V21.3.1: cabeceras primero, globos reencolumnados e INFOEVENTO sin fallback; muestra error real ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14372,7 +14372,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
       return await previousExport.apply(this,arguments);
     }catch(err){
       window.__ultimoErrorInfoEvento=err;
-      console.group('ERROR INFOEVENTO - ControlEvent v25.1');
+      console.group('ERROR INFOEVENTO - ControlEvent v25.2');
       console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o código.', err);
       try{console.error('Stack:', err&&err.stack?err.stack:'Sin stack disponible');}catch(_){}
       try{console.log('Evento activo:', ev());}catch(_){}
@@ -14412,8 +14412,8 @@ var addCellNote = window.addCellNote || function(cell, text){
 };
 window.addCellNote = addCellNote;
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   function refreshVersionV2132(){
     try{ document.title = VERSION; }catch(_){ }
     try{
@@ -14453,8 +14453,8 @@ window.addCellNote = addCellNote;
 <script id="v214-donaciones-grafica-fix">
 /* ==== V21.4: donaciones duplicadas por Producto+Donante y corrección gráfico ingresos socio ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14625,7 +14625,7 @@ window.addCellNote = addCellNote;
 <script id="v2141-graph-income-socio-strict-fix">
 /* ==== V21.4.1: corrección estricta Socios Banco/Bizum/Efectivo = Número x Precio evento ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
+  const VERSION='ControlEvent v25.2';
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
     try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){}
@@ -14646,8 +14646,8 @@ window.addCellNote = addCellNote;
 <script id="v215-minimal-fix-donaciones-excel-fotos">
 /* ==== V21.5: solo corrige fotos INFOEVENTO y duplicidad Donaciones Producto+Donante ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14830,8 +14830,8 @@ window.addCellNote = addCellNote;
 <script id="v216-excel-ticket-images-protection-script">
 /* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protección reforzada ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
   function st(){ try{ if(typeof state !== 'undefined') return state; }catch(_){ } return window.state || {}; }
@@ -14964,8 +14964,8 @@ window.addCellNote = addCellNote;
 <script id="v217-final-ticket-images-book-protection-script">
 /* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protección open_excel_arrastre ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const EXCEL_PASSWORD = 'open_excel_arrastre';
   const WORKBOOK_PASSWORD_HASH = 'D184';
   const norm = v => String(v ?? '').trim();
@@ -15207,8 +15207,8 @@ window.addCellNote = addCellNote;
 <script id="v225-clean-script">
 /* ==== V22.5: corrección limpia de fotos de tickets y claves ACCESOS ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const EXCEL_PASSWORD='open_excel_arrastre';
   const DB_NAME='controlevent_ticket_images_v225';
   const DB_STORE='images';
@@ -15510,8 +15510,8 @@ window.addCellNote = addCellNote;
 <script id="v226-mobile-responsive-script">
 /* ==== v22.8: menú móvil y navegación responsive ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   function $(id){return document.getElementById(id)}
   function clickId(id){const el=$(id); if(el){el.click(); closeDrawer();}}
   function ensureMobileMenu(){
@@ -15788,8 +15788,8 @@ body.ce-role-ro.ce-event-not-finalized .mobile-menu-action[data-target="btnExpor
 <script id="v228-role-permissions-script">
 /* ==== v22.8: criterios de opciones y permisos por nivel GD/RW/RO ==== */
 (function(){
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   function $(id){return document.getElementById(id)}
   function role(){try{return String((typeof authUser!=='undefined'&&authUser&&authUser.nivel)||'').toUpperCase();}catch(_){return '';}}
   function isGD(){return role()==='GD'}
@@ -15926,8 +15926,8 @@ body.ce-role-ro.ce-event-not-finalized .mobile-menu-action[data-target="btnExpor
 /* ==== v22.9: correcciones de evento finalizado y claves ACCESOS ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const ACCESS_CACHE_KEY='controlevent_v229_access_clear_cache';
   const $=id=>document.getElementById(id);
@@ -16111,8 +16111,8 @@ body.ce-v233-final-consulta .locked,body.ce-v233-final-consulta .app-lockable.lo
 /* ==== v23.3 ESTABILIZACIÓN: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16312,8 +16312,8 @@ body.ce-v233-final-consulta .locked,body.ce-v233-final-consulta .app-lockable.lo
 /* ==== v23.4: claves, gráfico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16450,8 +16450,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4: permisos GD/RW/RO, evento finalizado consultable, fotos solo visuales y TOTAL ESTIMADO ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16574,8 +16574,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4 local: no precargar state pesado, no localStorage pesado, fotos como archivos ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const SESSION_KEY='ControlEvent_v25_1_session';
+  const VERSION='ControlEvent v25.2';
+  const SESSION_KEY='ControlEvent_v25_2_session';
   const $=id=>document.getElementById(id);
   const stateRef=()=>{ try{return state;}catch(_){return window.state||{};} };
   const eventId=()=>String(stateRef().selectedEventId||'');
@@ -16739,8 +16739,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versión Excel correcta ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const up = v => String(v ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const num = v => Number(v || 0) || 0;
   function getState(){ try{return state;}catch(_){return window.state||{};} }
@@ -16863,8 +16863,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.5 local: corrección final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   function parseNum(v){
@@ -17057,8 +17057,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.6 local: cálculo directo y único de INGRESOS por TOTAL real ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.1';
-  const VERSION_FILE='ControlEvent_v25_1';
+  const VERSION='ControlEvent v25.2';
+  const VERSION_FILE='ControlEvent_v25_2';
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const $=id=>document.getElementById(id);
@@ -17197,8 +17197,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v24.0: tienda/ticket pendiente, graficas limpias, orden ingresos y fotos INFOEVENTO ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -17777,8 +17777,8 @@ body.ce-v241-ro #mtAccesoBtn{
 
 <script id="v241-fixes">
 (function(){
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const norm = v => String(v ?? '').trim();
@@ -18146,8 +18146,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -18390,8 +18390,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.1';
-  const VERSION_FILE = 'ControlEvent_v25_1';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -18724,6 +18724,306 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
   patchExcelWriteBufferV251();
   [120, 500, 1400, 3200].forEach(ms => setTimeout(() => { applyVersionV251(); patchExcelWriteBufferV251(); try{ applyZoomColorsV251(); }catch(_){ } }, ms));
   window.__ceV251 = {version: VERSION, renderBudget: renderBudgetV251, applyZoomColors: applyZoomColorsV251, patchResumenSheet: patchResumenSheetV251};
+})();
+</script>
+
+<style id="v252-style">
+/* ==== v25.2: barras proporcionadas y zooms de donacion aislados ==== */
+#summarySegmento .vbars-card,
+#summaryDestino .vbars-card{overflow:hidden;}
+#summarySegmento .ce-v24-vbars-chart,
+#summaryDestino .ce-v24-vbars-chart{height:158px!important;min-height:158px!important;gap:8px!important;padding:8px 6px!important;align-items:flex-end!important;overflow:hidden;}
+#summarySegmento .ce-v24-vbars-chart .vbar-col,
+#summaryDestino .ce-v24-vbars-chart .vbar-col{width:auto!important;min-width:0!important;max-width:112px!important;flex:1 1 0!important;}
+#summarySegmento .ce-v24-vbars-chart .vbar-stick,
+#summaryDestino .ce-v24-vbars-chart .vbar-stick{width:100%!important;max-width:76px!important;margin:0 auto;}
+#summarySegmento .vbar-value,
+#summaryDestino .vbar-value{font-size:11px!important;min-height:24px!important;}
+#summarySegmento .vbar-label,
+#summaryDestino .vbar-label{font-size:10px!important;line-height:1.15!important;}
+#ceTooltipV21.ce-v21-layout-budgetdonationv252{background:#fff7e8!important;}
+#budgetLayout .budget-panel.donantes [data-ce-tip-v21],
+#budgetLayout .budget-panel.donantes [data-ce-tip-lazy-v250]{cursor:pointer;}
+</style>
+<script id="v252-core">
+/* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
+(function(){
+  'use strict';
+  const VERSION = 'ControlEvent v25.2';
+  const VERSION_FILE = 'ControlEvent_v25_2';
+  const CREAM = '#fff7e8';
+  const $ = id => document.getElementById(id);
+  const norm = v => String(v ?? '').trim();
+  const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const num = v => {
+    if(typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    let s = String(v ?? '').replace(/[^0-9,.-]/g,'');
+    if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
+    else if(s.includes(',')) s = s.replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const money = v => {
+    try{ if(typeof window.money === 'function') return window.money(v); }catch(_){ }
+    return num(v).toLocaleString('es-ES',{style:'currency',currency:'EUR'});
+  };
+  function st(){ try{ return (typeof state !== 'undefined' && state) || window.state || {}; }catch(_){ return window.state || {}; } }
+  function rows(k){ const s = st(); return Array.isArray(s[k]) ? s[k] : []; }
+  function currentEventId(){ try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; return String(ev?.id || st().selectedEventId || ''); }catch(_){ return String(st().selectedEventId || ''); } }
+  function byId(k,id){ return rows(k).find(x => String(x.id) === String(id)) || {}; }
+  function persona(id){ try{ return (typeof personaById === 'function' ? personaById(id) : null) || byId('personas', id); }catch(_){ return byId('personas', id); } }
+  function producto(id){ try{ return (typeof productoById === 'function' ? productoById(id) : null) || byId('productos', id); }catch(_){ return byId('productos', id); } }
+  function tienda(id){ try{ return (typeof tiendaById === 'function' ? tiendaById(id) : null) || byId('tiendas', id); }catch(_){ return byId('tiendas', id); } }
+  function compras(){
+    try{ const r = typeof comprasForEvent === 'function' ? comprasForEvent() : null; if(Array.isArray(r)) return r; }catch(_){ }
+    const ev = currentEventId();
+    return rows('compras').filter(c => String(c.eventId || '') === ev);
+  }
+  function ticket(c){ return norm(c?.ticketDonacion || c?.ticket || ''); }
+  function units(c){ return num(c?.unidades ?? c?.uds ?? 0); }
+  function price(c){ const p = producto(c?.productoId); return num(c?.precio ?? c?.precioCalc ?? p.defaultPrecio ?? p.precio ?? 0); }
+  function value(c){ return num(c?.valor ?? c?.importe) || units(c) * price(c); }
+  function productName(c){ return norm(c?.producto?.nombre || producto(c?.productoId).nombre || c?.productoNombre || 'Producto'); }
+  function storeName(c){
+    const p = producto(c?.productoId);
+    const id = c?.tiendaId || p.tiendaId || p.defaultTiendaId || '';
+    return norm(c?.tienda?.nombre || tienda(id).nombre || '') || 'Sin tienda asignada';
+  }
+  function donorName(c){
+    try{ if(typeof donorLabel === 'function' && c?.donorRef){ const v = donorLabel(c.donorRef); if(norm(v)) return norm(v); } }catch(_){ }
+    const raw = norm(c?.donorRef || c?.donante || c?.donanteNombre || '');
+    if(raw.startsWith('P:')) return norm(persona(raw.slice(2)).nombre) || 'Sin donante';
+    if(raw.startsWith('T:')) return norm(tienda(raw.slice(2)).nombre) || 'Sin donante';
+    return raw || norm(c?.responsable?.nombre) || storeName(c) || 'Sin donante';
+  }
+  function setTip(el, text, bg = '#fff', layout = 'default'){
+    if(!el || !norm(text)) return;
+    el.setAttribute('data-ce-tip-v21', text);
+    el.setAttribute('data-tip-bg-v21', bg);
+    el.setAttribute('data-ce-tip-layout-v21', layout);
+    ['title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip-lazy-v250'].forEach(a => el.removeAttribute(a));
+  }
+  function donationRows(code){
+    return compras().filter(c => ticket(c) === code).slice().sort((a,b) => donorName(a).localeCompare(donorName(b),'es') || productName(a).localeCompare(productName(b),'es'));
+  }
+  function donationTip(title, code){
+    const list = donationRows(code);
+    const total = list.reduce((a,c) => a + value(c), 0);
+    const lines = list.map(c => `${donorName(c)} | ${productName(c)} | ${units(c).toLocaleString('es-ES',{maximumFractionDigits:2})} | ${money(price(c))} | ${money(value(c))}`);
+    return `DONACION DE PRODUCTO / ${title}\nTOTAL ESTIMADO: ${money(total)}\n\nDonante | Producto | Uds | Precio estimado | Valor estimado\n${lines.length ? lines.join('\n') : 'Sin registros'}`;
+  }
+  function applyDonationTipsV252(){
+    const panel = $('#budgetLayout')?.querySelector?.('.budget-panel.donantes');
+    if(!panel) return;
+    panel.querySelectorAll('.budget-subrow').forEach(row => {
+      const label = up(row.querySelector('span')?.textContent || row.textContent || '');
+      let code = '', title = '';
+      if(label.includes('TIENDA')){ code = 'DONADO TIENDA'; title = 'TIENDAS'; }
+      else if(label.includes('SOCIOS') && !label.includes('NO SOCIOS')){ code = 'DONADO SOCIO'; title = 'SOCIOS'; }
+      else if(label.includes('NO SOCIOS') || label.includes('NO SOCIO')){ code = 'DONADO OTROS'; title = 'NO SOCIOS'; }
+      if(!code) return;
+      const tip = donationTip(title, code);
+      setTip(row, tip, CREAM, 'budgetdonationv252');
+      row.querySelectorAll('span,strong').forEach(el => setTip(el, tip, CREAM, 'budgetdonationv252'));
+    });
+    const totalRow = Array.from(panel.querySelectorAll('.budget-row')).find(row => up(row.textContent).includes('VALOR PRODUCTO DONADO'));
+    if(totalRow){
+      const tip = ['TIENDAS','SOCIOS','NO SOCIOS'].map((title, idx) => donationTip(title, ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'][idx])).join('\n\n');
+      setTip(totalRow, tip, CREAM, 'budgetdonationv252');
+      totalRow.querySelectorAll('span,strong').forEach(el => setTip(el, tip, CREAM, 'budgetdonationv252'));
+    }
+  }
+  function patchTiendaTicketDonationLabels(){
+    const prev = (typeof summaryByTiendaTicket === 'function') ? summaryByTiendaTicket : window.summaryByTiendaTicket;
+    if(prev && !prev.__v252Wrapped){
+      const wrapped = function(){
+        return (prev.apply(this, arguments) || []).map(r => {
+          if(r && r.donated) return Object.assign({}, r, {label: r.k || r.label});
+          return r;
+        });
+      };
+      wrapped.__v252Wrapped = true;
+      try{ summaryByTiendaTicket = wrapped; }catch(_){ }
+      window.summaryByTiendaTicket = wrapped;
+    }
+    document.querySelectorAll('#summaryTiendaTicket .summary-item > span:first-child').forEach(label => {
+      const txt = label.textContent || '';
+      if(txt.includes('·')) label.textContent = txt.split('·')[0].trim();
+    });
+  }
+  function resizeGroupingBarsV252(){
+    document.querySelectorAll('#summarySegmento .ce-v24-vbars-chart .vbar-stick,#summaryDestino .ce-v24-vbars-chart .vbar-stick').forEach(stick => {
+      if(stick.dataset.v252Scaled === '1') return;
+      const raw = parseFloat(stick.style.height || stick.getAttribute('style')?.match(/height:([0-9.]+)px/)?.[1] || '0');
+      if(raw > 0) stick.style.height = Math.max(7, Math.min(122, raw * 0.70)) + 'px';
+      stick.dataset.v252Scaled = '1';
+    });
+  }
+  function cellText(value){
+    if(value == null) return '';
+    if(typeof value === 'object'){
+      if(Array.isArray(value.richText)) return value.richText.map(x => x.text || '').join('');
+      if(value.text) return String(value.text);
+      if(value.result != null) return String(value.result);
+    }
+    return String(value);
+  }
+  function operativeValues(){
+    const b = (typeof budgetSummary === 'function') ? budgetSummary() : {};
+    const op = b.operativa || {};
+    const presupuesto = num(op.ingresos ?? op.presupuesto ?? b.ingresosDinero?.totalComprometido);
+    const gastosRealizados = num(op.gastosRealizados) || num(op.gastoCompras) + num(op.gastosOrganizacion);
+    const gastosPrevistos = num(op.gastosPrevistos) || gastosRealizados + num(op.pendiente);
+    const saldoActual = Number.isFinite(Number(op.saldoActual)) ? num(op.saldoActual) : num(op.ingresoDinero) - gastosRealizados;
+    const saldoOperativo = Number.isFinite(Number(op.saldoOperativo)) ? num(op.saldoOperativo) : presupuesto - gastosPrevistos;
+    const donado = num(b.donacionProducto?.valorDonado);
+    return {donado,presupuesto,gastosPrevistos,gastosRealizados,pendiente:num(op.pendiente),saldoActual,saldoOperativo,valoracion:gastosPrevistos + donado};
+  }
+  function formatResumenCell(cell, kind){
+    cell.border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
+    cell.alignment = {vertical:'middle', wrapText:true};
+    const fill = kind === 'pending' ? 'FFFFE4EC' : (kind === 'ok' ? 'FFECFDF5' : (kind === 'bad' ? 'FFFEF2F2' : 'FFFFFFFF'));
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:fill}};
+  }
+  function cleanResumenSheetV252(workbook){
+    if(!workbook || workbook.__ceV252ResumenPatched) return;
+    const ws = workbook.getWorksheet && workbook.getWorksheet('RESUMEN');
+    if(!ws) return;
+    workbook.__ceV252ResumenPatched = true;
+    const deleteLabels = new Set([
+      'DONACION DE PRODUCTO','DONACIONES DE PRODUCTO','PRESUPUESTO','GASTOS PREVISTOS','GASTOS REALIZADOS',
+      'PTE. COMPRA U OTROS GASTOS','SALDO ACTUAL','SALDO OPERATIVO','VALORACION DEL EVENTO',
+      'INGRESOS','GASTOS'
+    ]);
+    for(let r = ws.rowCount; r >= 1; r--){
+      const label = up(cellText(ws.getRow(r).getCell(1).value));
+      if(deleteLabels.has(label)) ws.spliceRows(r, 1);
+    }
+    let priceRow = 0;
+    ws.eachRow((row, n) => {
+      if(!priceRow && up(cellText(row.getCell(1).value)).includes('PRECIO EVENTO')) priceRow = n;
+    });
+    if(!priceRow) return;
+    const valueCol = [2,3,4,5].find(c => ws.getRow(priceRow).getCell(c).value !== null && ws.getRow(priceRow).getCell(c).value !== undefined) || 2;
+    const op = operativeValues();
+    const insert = [
+      null,
+      ['Donacion de producto', op.donado, 'white'],
+      null,
+      ['PRESUPUESTO', op.presupuesto, 'white'],
+      ['GASTOS PREVISTOS', op.gastosPrevistos, 'white'],
+      ['GASTOS REALIZADOS', op.gastosRealizados, 'white'],
+      ['PTE. COMPRA U OTROS GASTOS', op.pendiente, 'pending'],
+      ['SALDO ACTUAL', op.saldoActual, op.saldoActual >= 0 ? 'ok' : 'bad'],
+      ['SALDO OPERATIVO', op.saldoOperativo, op.saldoOperativo >= 0 ? 'ok' : 'bad'],
+      ['VALORACION DEL EVENTO', op.valoracion, 'white']
+    ];
+    ws.spliceRows(priceRow + 1, 0, ...insert.map(item => {
+      if(!item) return [];
+      const row = [];
+      row[1] = item[0];
+      row[valueCol] = Number(item[1] || 0);
+      return row;
+    }));
+    insert.forEach((item, i) => {
+      if(!item) return;
+      const row = ws.getRow(priceRow + 1 + i);
+      for(let c = 1; c <= Math.max(valueCol, 3); c++) formatResumenCell(row.getCell(c), item[2]);
+      row.getCell(1).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
+      row.getCell(valueCol).numFmt = '#,##0.00 [$€-C0A]';
+      row.getCell(valueCol).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
+    });
+    for(let r = 1; r <= ws.rowCount; r++){
+      for(let c = 6; c <= 30; c++) ws.getRow(r).getCell(c).value = null;
+    }
+  }
+  function patchExcelWriteBufferV252(){
+    try{
+      if(!window.ExcelJS || !ExcelJS.Workbook) return false;
+      const probe = new ExcelJS.Workbook();
+      const proto = probe.xlsx && probe.xlsx.constructor && probe.xlsx.constructor.prototype;
+      if(!proto || !proto.writeBuffer || proto.writeBuffer.__v252Wrapped) return true;
+      const prev = proto.writeBuffer;
+      proto.writeBuffer = async function(){
+        try{
+          if(this.workbook) this.workbook.__ceV251ResumenPatched = true;
+          cleanResumenSheetV252(this.workbook);
+        }catch(err){ console.warn('[v25.2] No se pudo limpiar RESUMEN', err); }
+        return await prev.apply(this, arguments);
+      };
+      proto.writeBuffer.__v252Wrapped = true;
+      return true;
+    }catch(_){ return false; }
+  }
+  const previousExportExcelV252 = (typeof exportExcel === 'function') ? exportExcel : window.exportExcel;
+  if(previousExportExcelV252 && !previousExportExcelV252.__v252Wrapped){
+    const wrappedExportExcelV252 = async function(){
+      try{ if(typeof ensureExcelJS === 'function') await ensureExcelJS(); }catch(_){ }
+      patchExcelWriteBufferV252();
+      return await previousExportExcelV252.apply(this, arguments);
+    };
+    wrappedExportExcelV252.__v252Wrapped = true;
+    try{ exportExcel = wrappedExportExcelV252; }catch(_){ }
+    window.exportExcel = wrappedExportExcelV252;
+  }
+  function applyVersionV252(){
+    try{ document.title = VERSION; }catch(_){ }
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
+      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+    });
+    try{
+      window.emittedByTextV171 = function(date = new Date()){
+        const p = n => String(n).padStart(2,'0');
+        return `Emitido por "(c)oltyLAB '26_${VERSION_FILE}_${p(date.getDate())}${p(date.getMonth()+1)}${date.getFullYear()}_${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}"`;
+      };
+      emittedByTextV171 = window.emittedByTextV171;
+    }catch(_){ }
+    try{
+      const proto = HTMLAnchorElement.prototype;
+      if(!proto.click.__v252Wrapped){
+        const old = proto.click;
+        const wrapped = function(){
+          try{ if(this.download) this.download = String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE); }catch(_){ }
+          return old.apply(this, arguments);
+        };
+        wrapped.__v252Wrapped = true;
+        proto.click = wrapped;
+      }
+    }catch(_){ }
+  }
+  function applyV252(){
+    applyVersionV252();
+    patchTiendaTicketDonationLabels();
+    applyDonationTipsV252();
+    resizeGroupingBarsV252();
+    patchExcelWriteBufferV252();
+  }
+  const oldRender = (typeof render === 'function') ? render : window.render;
+  if(oldRender && !oldRender.__v252Wrapped){
+    const wrapped = function(){
+      const ret = oldRender.apply(this, arguments);
+      [60, 220, 800, 1600, 3200].forEach(ms => setTimeout(applyV252, ms));
+      return ret;
+    };
+    wrapped.__v252Wrapped = true;
+    try{ render = wrapped; }catch(_){ }
+    window.render = wrapped;
+  }
+  const oldRenderBudget = (typeof renderBudget === 'function') ? renderBudget : window.renderBudget;
+  if(oldRenderBudget && !oldRenderBudget.__v252Wrapped){
+    const wrappedBudget = function(){
+      const ret = oldRenderBudget.apply(this, arguments);
+      [30, 180, 700].forEach(ms => setTimeout(applyV252, ms));
+      return ret;
+    };
+    wrappedBudget.__v252Wrapped = true;
+    try{ renderBudget = wrappedBudget; }catch(_){ }
+    window.renderBudget = wrappedBudget;
+  }
+  applyV252();
+  [120, 600, 1400, 3000].forEach(ms => setTimeout(applyV252, ms));
+  window.__ceV252 = {version: VERSION, apply: applyV252, cleanResumenSheet: cleanResumenSheetV252};
 })();
 </script>
 
