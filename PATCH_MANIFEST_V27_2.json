@@ -1,0 +1,40 @@
+{
+  "version": "v27.2",
+  "base": "v27.1",
+  "modified_count": 19,
+  "added_count": 4,
+  "deleted_count": 2,
+  "total_files_in_patch": 23,
+  "modified": [
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/legacy-cleanup-report.json",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/module-loader.js",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "routes/health.routes.js",
+    "scripts/dev-server-supabase.js",
+    "scripts/dev-server.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V27_2.md",
+    "README_V27_2_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v27.2.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.2.js"
+  ],
+  "deleted_recommended": [
+    "public/app/legacy/legacy-bundle-after-modules-v27.1.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.1.js"
+  ],
+  "notes": "v27.2 añade escritor ExcelJS modular real para RESUMEN en modo shadow/standalone. Borrar bundles v27.1 si existen."
+}

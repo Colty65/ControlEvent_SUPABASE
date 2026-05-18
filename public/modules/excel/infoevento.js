@@ -3,9 +3,9 @@ import { captureResumenSnapshot } from './resumen-sheet.js';
 
 export const meta = {
   name: 'infoevento',
-  version: 'v27.1',
-  mode: 'modular-public-facade-with-resumen-snapshot',
-  description: 'Controlador modular para INFOEVENTO. Antes de llamar al motor legacy captura el modelo modular de la hoja RESUMEN para validar la siguiente extracción real.'
+  version: 'v27.2',
+  mode: 'modular-public-facade-with-resumen-writer-shadow',
+  description: 'Controlador modular para INFOEVENTO. Antes de llamar al motor legacy captura el modelo modular de la hoja RESUMEN y deja preparado el escritor ExcelJS modular para sustituución progresiva.'
 };
 
 let lastResumenSnapshot = null;

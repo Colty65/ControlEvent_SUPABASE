@@ -1,14 +1,15 @@
 import { registerExcelModule } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.1';
+const RESUMEN_SHEET_VERSION = 'v27.2';
 let lastSnapshot = null;
+let lastWorksheetBuild = null;
 let installed = false;
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
-  mode: 'modular-shadow-sheet',
-  description: 'Módulo real para preparar y validar los datos de la hoja RESUMEN antes de que el motor INFOEVENTO legacy genere el Excel final.'
+  mode: 'modular-shadow-writer',
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.2 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -22,6 +23,7 @@ const num = value => {
 };
 const money = value => Number(num(value).toFixed(2));
 const arr = (obj, key) => Array.isArray(obj?.[key]) ? obj[key] : [];
+const safeName = value => String(value || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0,80) || 'evento';
 
 function app(){
   return window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
@@ -152,6 +154,129 @@ export function buildResumenRows(model = buildResumenModel()){
   ];
 }
 
+export function buildResumenSections(model = buildResumenModel()){
+  const b = model.budget;
+  return [
+    {
+      title: 'SOCIOS',
+      rows: [
+        ['SOCIOS', b.socios.personas],
+        ['IMPORTE SOCIOS', b.socios.importe],
+        ['INGRESADO SOCIOS', b.socios.ingresado],
+        ['PENDIENTE SOCIOS', b.socios.pendiente]
+      ]
+    },
+    {
+      title: 'DONANTES',
+      rows: [
+        ['DONANTES', b.donantes.personas],
+        ['IMPORTE DONANTES', b.donantes.importe],
+        ['INGRESADO DONANTES', b.donantes.ingresado],
+        ['VALOR ESTIMADO PRODUCTO DONADO', b.donacionProducto.valorDonado]
+      ]
+    },
+    {
+      title: 'OPERATIVA',
+      rows: [
+        ['SALDO GLOBAL', b.operativa.saldoActual],
+        ['COMPRADO', b.operativa.comprado],
+        ['PDTE.COMPRA', b.operativa.pendienteCompra],
+        ['SALDO OPERATIVO', b.operativa.saldoOperativo],
+        ['VALORACIÓN EVENTO', b.operativa.valoracionEvento]
+      ]
+    }
+  ];
+}
+
+function styleTitle(cell){
+  cell.font = {bold:true, size:16};
+  cell.alignment = {vertical:'middle', horizontal:'left'};
+}
+function styleHeader(cell){
+  cell.font = {bold:true};
+  cell.alignment = {vertical:'middle', horizontal:'center', wrapText:true};
+  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
+}
+function styleLabel(cell){
+  cell.font = {bold:true};
+  cell.alignment = {vertical:'middle', horizontal:'left', wrapText:true};
+  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
+}
+function styleValue(cell){
+  cell.alignment = {vertical:'middle', horizontal:'right', wrapText:true};
+  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
+  if(typeof cell.value === 'number') cell.numFmt = '#,##0.00 €;[Red]-#,##0.00 €';
+}
+function putRow(ws, rowNumber, values, styleFn){
+  const row = ws.getRow(rowNumber);
+  values.forEach((value, index) => {
+    const cell = row.getCell(index + 1);
+    cell.value = value;
+    if(styleFn) styleFn(cell, index, value);
+  });
+  row.commit?.();
+  return row;
+}
+
+export function writeResumenWorksheet(workbook, options = {}){
+  if(!workbook || typeof workbook.addWorksheet !== 'function'){
+    throw new Error('writeResumenWorksheet necesita un workbook de ExcelJS.');
+  }
+  const model = options.model || buildResumenModel(options);
+  const sheetName = options.sheetName || 'RESUMEN_MODULAR';
+  const existing = workbook.getWorksheet?.(sheetName);
+  if(existing && typeof workbook.removeWorksheet === 'function') workbook.removeWorksheet(existing.id);
+  const ws = workbook.addWorksheet(sheetName, {views:[{state:'frozen', ySplit:1}]});
+  ws.properties.defaultRowHeight = 20;
+  ws.columns = [
+    {header:'Concepto', key:'concepto', width:34},
+    {header:'Valor', key:'valor', width:22},
+    {header:'Observaciones', key:'observaciones', width:48}
+  ];
+
+  let r = 1;
+  ws.mergeCells(r,1,r,3);
+  ws.getCell(r,1).value = `RESUMEN DEL EVENTO - ${model.event.titulo}`;
+  styleTitle(ws.getCell(r,1));
+  r += 1;
+  putRow(ws, r++, ['Emitido por', `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+  putRow(ws, r++, ['Fechas', `${model.event.fechaIni || ''}${model.event.fechaFin ? ' - ' + model.event.fechaFin : ''}`, model.event.situacion], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+  putRow(ws, r++, ['Precio evento', model.event.precio, model.event.descripcion || ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+  r += 1;
+
+  buildResumenSections(model).forEach(section => {
+    ws.mergeCells(r,1,r,3);
+    ws.getCell(r,1).value = section.title;
+    styleHeader(ws.getCell(r,1));
+    r += 1;
+    section.rows.forEach(([label, value]) => {
+      putRow(ws, r++, [label, value, ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+    });
+    r += 1;
+  });
+
+  putRow(ws, r++, ['BLOQUE', 'CAMPO', 'VALOR'], styleHeader);
+  buildResumenRows(model).slice(1).forEach(row => {
+    putRow(ws, r++, row, (cell, index) => index < 2 ? styleLabel(cell) : styleValue(cell));
+  });
+
+  ws.eachRow(row => {
+    row.eachCell(cell => {
+      cell.alignment = {...(cell.alignment || {}), vertical:'middle', wrapText:true};
+    });
+  });
+  lastWorksheetBuild = {
+    builtAt: new Date().toISOString(),
+    version: RESUMEN_SHEET_VERSION,
+    sheetName,
+    eventTitle: model.event.titulo,
+    rows: ws.rowCount,
+    columns: ws.columnCount
+  };
+  window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-worksheet-built', {detail:lastWorksheetBuild}));
+  return {worksheet: ws, model, info: lastWorksheetBuild};
+}
+
 export function captureResumenSnapshot(options = {}){
   const model = buildResumenModel(options);
   const rows = buildResumenRows(model);
@@ -160,7 +285,8 @@ export function captureResumenSnapshot(options = {}){
     source: options.source || 'manual',
     model,
     rows,
-    rowCount: rows.length
+    rowCount: rows.length,
+    writerReady: typeof window.ExcelJS?.Workbook === 'function'
   };
   window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-snapshot', {detail:lastSnapshot}));
   return lastSnapshot;
@@ -172,8 +298,34 @@ export function preview(){
   return snapshot;
 }
 
+export async function downloadStandaloneResumen(options = {}){
+  const ExcelJS = window.ExcelJS;
+  if(!ExcelJS?.Workbook) throw new Error('ExcelJS no está disponible para generar RESUMEN modular.');
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`;
+  workbook.created = new Date();
+  const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', ...options});
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date();
+  const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
+  a.href = url;
+  a.download = `ControlEvent_v27_2_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return result;
+}
+
 export function getLastSnapshot(){
   return lastSnapshot;
+}
+
+export function getLastWorksheetBuild(){
+  return lastWorksheetBuild;
 }
 
 export function assertReady(){
@@ -181,7 +333,8 @@ export function assertReady(){
   const warnings = [];
   if(!snapshot.model.event.id && !snapshot.model.event.titulo) warnings.push('No hay evento activo para RESUMEN.');
   if(snapshot.rowCount < 10) warnings.push('El modelo RESUMEN contiene pocas filas.');
-  return {ok:warnings.length === 0, warnings, snapshot};
+  if(!snapshot.writerReady) warnings.push('ExcelJS no está disponible todavía; la escritura modular se probará cuando cargue vendor/exceljs.');
+  return {ok:warnings.length === 0, warnings, snapshot, lastWorksheetBuild};
 }
 
 export function installResumenSheetBridge(){
@@ -193,10 +346,14 @@ export function installResumenSheetBridge(){
     meta,
     buildModel: buildResumenModel,
     buildRows: buildResumenRows,
+    buildSections: buildResumenSections,
+    writeWorksheet: writeResumenWorksheet,
+    downloadStandalone: downloadStandaloneResumen,
     capture: captureResumenSnapshot,
     preview,
     assertReady,
-    getLastSnapshot
+    getLastSnapshot,
+    getLastWorksheetBuild
   };
   window.addEventListener('controlevent:excel-before-run', event => {
     if(event?.detail?.name === 'exportExcel'){
@@ -207,10 +364,23 @@ export function installResumenSheetBridge(){
 }
 
 export function describe(){
-  return {...meta, lastSnapshot};
+  return {...meta, lastSnapshot, lastWorksheetBuild};
 }
 
-const api = {meta, describe, run: captureResumenSnapshot, buildModel: buildResumenModel, buildRows: buildResumenRows, capture: captureResumenSnapshot, preview, assertReady, install: installResumenSheetBridge};
+const api = {
+  meta,
+  describe,
+  run: captureResumenSnapshot,
+  buildModel: buildResumenModel,
+  buildRows: buildResumenRows,
+  buildSections: buildResumenSections,
+  writeWorksheet: writeResumenWorksheet,
+  downloadStandalone: downloadStandaloneResumen,
+  capture: captureResumenSnapshot,
+  preview,
+  assertReady,
+  install: installResumenSheetBridge
+};
 registerExcelModule('resumen-sheet', api);
 registerExcelModule('resumen', api);
 
