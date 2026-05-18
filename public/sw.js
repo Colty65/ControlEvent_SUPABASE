@@ -1,10 +1,16 @@
-const CACHE_NAME = 'controlevent-shell-v26-4';
+const CACHE_NAME = 'controlevent-shell-v26-5';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/assets/icons/icon-192.png',
   '/assets/icons/icon-512.png',
-  '/assets/icons/apple-touch-icon.png'
+  '/assets/icons/apple-touch-icon.png',
+  '/app/styles/app.css',
+  '/assets/embedded/coltylab-logo.png',
+  '/assets/embedded/footer-excel.jpg',
+  '/assets/embedded/footer-importacion.jpg',
+  '/assets/embedded/footer-descarga-datos.jpg',
+  '/assets/embedded/footer-mantenimiento.png'
 ];
 
 self.addEventListener('install', event => {

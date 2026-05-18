@@ -1,7 +1,11 @@
 import { getApp } from '../app-context.js';
 import { PACKAGE_NAME, VERSION, VERSION_FILE } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v26.4';
+const DIAGNOSTICS_VERSION = 'v26.5';
+const INDEX_LINES_BEFORE_V26_5 = 21412;
+const INDEX_LINES_AFTER_V26_5 = 20393;
+const INDEX_BYTES_BEFORE_V26_5 = 1418313;
+const INDEX_BYTES_AFTER_V26_5 = 1166152;
 const DEFAULT_TIMEOUT_MS = 8000;
 let lastInspection = null;
 let lastApiCheck = null;
@@ -57,8 +61,8 @@ function collectWarnings(report){
   if(!report.modules.tickets.present) warnings.push('No se ha instalado ControlEventTickets.');
   // Mantenimiento se instala bajo demanda al activar su vista, así que no es aviso crítico al arrancar.
   if(!report.dom.mainRoots.every(item => item.ok)) warnings.push('Falta algún contenedor principal de pantalla.');
-  if(report.version.domTitle && !report.version.domTitle.includes('v26.4')) warnings.push('El título del documento no parece estar en v26.4.');
-  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v26.4')) warnings.push('body.dataset.ceVersion no coincide con v26.4.');
+  if(report.version.domTitle && !report.version.domTitle.includes('v26.5')) warnings.push('El título del documento no parece estar en v26.5.');
+  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v26.5')) warnings.push('body.dataset.ceVersion no coincide con v26.5.');
   if(!report.legacy.exportExcel) warnings.push('No se encuentra exportExcel legacy; INFOEVENTO podría fallar.');
   if(!report.legacy.saveStateNow) warnings.push('No se encuentra saveStateNow; el guardado podría depender de otro flujo.');
   return warnings;
@@ -76,6 +80,14 @@ export function inspectRuntime(){
     ok: true,
     diagnosticsVersion: DIAGNOSTICS_VERSION,
     inspectedAt: nowIso(),
+    indexHtml: {
+      linesBeforeV26_5: INDEX_LINES_BEFORE_V26_5,
+      linesAfterV26_5: INDEX_LINES_AFTER_V26_5,
+      linesReducedV26_5: INDEX_LINES_BEFORE_V26_5 - INDEX_LINES_AFTER_V26_5,
+      bytesBeforeV26_5: INDEX_BYTES_BEFORE_V26_5,
+      bytesAfterV26_5: INDEX_BYTES_AFTER_V26_5,
+      bytesReducedV26_5: INDEX_BYTES_BEFORE_V26_5 - INDEX_BYTES_AFTER_V26_5
+    },
     version: {
       expected: VERSION,
       file: VERSION_FILE,
@@ -196,7 +208,7 @@ export async function checkApi(){
 export function assertHealthy(){
   const report = inspectRuntime();
   if(!report.ok){
-    console.warn('[ControlEventDiagnostics/v26.4] Avisos detectados', report.warnings, report);
+    console.warn('[ControlEventDiagnostics/v26.5] Avisos detectados', report.warnings, report);
   }
   return report;
 }
@@ -214,7 +226,7 @@ export function print(){
     ['PWA control', report.pwa.controlled ? 'SW activo' : 'sin controlador']
   ];
   try{ console.table(rows.map(([area, estado]) => ({area, estado}))); }catch(_){ console.log(rows); }
-  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v26.4]', report.warnings);
+  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v26.5]', report.warnings);
   return report;
 }
 

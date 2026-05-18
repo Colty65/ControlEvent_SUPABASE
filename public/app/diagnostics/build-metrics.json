@@ -1,0 +1,19 @@
+{
+  "version": "ControlEvent v26.5",
+  "indexLinesBefore": 21412,
+  "indexLinesAfter": 20393,
+  "indexLinesReduced": 1019,
+  "indexBytesBefore": 1418313,
+  "indexBytesAfter": 1166152,
+  "indexBytesReduced": 252161,
+  "cssLinesExtracted": 1062,
+  "styleBlocksExtracted": 41,
+  "embeddedImagesExtracted": 5,
+  "embeddedImages": [
+    "coltylab-logo.png",
+    "footer-excel.jpg",
+    "footer-importacion.jpg",
+    "footer-descarga-datos.jpg",
+    "footer-mantenimiento.png"
+  ]
+}

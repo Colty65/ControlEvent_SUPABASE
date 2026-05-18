@@ -59,7 +59,7 @@ export function downloadBackup(options = {}){
 
 export function getInfo(){
   return {
-    version: 'v26.4',
+    version: 'v26.5',
     modules: listExcelModules(),
     lastRun,
     legacy: {
@@ -73,7 +73,7 @@ export function installExcelRuntime(){
   if(installed) return window.ControlEventExcel;
   installed = true;
   window.ControlEventExcel = {
-    version: 'v26.4',
+    version: 'v26.5',
     mode: 'legacy-bridge',
     register: registerExcelModule,
     run: runExcelAction,
