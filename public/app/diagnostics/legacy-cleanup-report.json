@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v27.0",
+  "version": "v27.0.1",
   "purpose": "Primera limpieza segura del legacy: identificar y retirar del despliegue los bundles antiguos no cargados, sin modificar la lógica operativa.",
   "mode": "safe-cleanup-report",
   "activeLegacyBundles": [
@@ -33,7 +33,9 @@
   ],
   "nextRecommendedStep": "v27.0: empezar a extraer exportación Excel real desde legacy bundle hacia módulos Excel, manteniendo puente de compatibilidad.",
   "obsoleteFiles": [
+    "public/app/legacy/legacy-bundle-after-modules-v26.9.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.0.js",
     "public/app/legacy/legacy-bundle-before-modules-v26.9.js",
-    "public/app/legacy/legacy-bundle-after-modules-v26.9.js"
+    "public/app/legacy/legacy-bundle-before-modules-v27.0.js"
   ]
 }
