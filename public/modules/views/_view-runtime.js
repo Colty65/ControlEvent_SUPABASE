@@ -32,7 +32,7 @@ export function safeStep(label, fn){
   try{
     return fn?.();
   }catch(error){
-    console.warn(`[views/v26.6] ${label}`, error);
+    console.warn(`[views/v26.7] ${label}`, error);
     return undefined;
   }
 }
@@ -40,7 +40,7 @@ export function safeStep(label, fn){
 export function setRootModule(root, name){
   if(!root || !name) return;
   root.dataset.ceModule = name;
-  root.dataset.ceModuleVersion = 'v26.6';
+  root.dataset.ceModuleVersion = 'v26.7';
 }
 
 export function markMounted(name, root){
@@ -74,7 +74,7 @@ export function renderParts(context, actionNames = []){
 
 export function createLegacyView({name, render = [], patches = false, beforeActivate, afterActivate} = {}){
   return {
-    meta: {name, version: 'v26.6', mode: 'legacy-controller'},
+    meta: {name, version: 'v26.7', mode: 'legacy-controller'},
     mount(context = {}){
       setRootModule(context.root, name);
       markMounted(name, context.root);
@@ -92,7 +92,7 @@ export function createLegacyView({name, render = [], patches = false, beforeActi
 
 if(typeof window !== 'undefined'){
   window.ControlEventViewRuntime = {
-    version: 'v26.6',
+    version: 'v26.7',
     info: viewInfo,
     callAction,
     applyVisualPatches

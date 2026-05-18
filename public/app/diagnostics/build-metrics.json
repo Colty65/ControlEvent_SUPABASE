@@ -1,11 +1,11 @@
 {
-  "version": "ControlEvent v26.6",
+  "version": "ControlEvent v26.7",
   "indexLinesBefore": 21412,
-  "indexLinesAfter": 20393,
-  "indexLinesReduced": 1019,
+  "indexLinesAfter": 447,
+  "indexLinesReduced": 20965,
   "indexBytesBefore": 1418313,
-  "indexBytesAfter": 1166152,
-  "indexBytesReduced": 252161,
+  "indexBytesAfter": 21333,
+  "indexBytesReduced": 1396980,
   "cssLinesExtracted": 1062,
   "styleBlocksExtracted": 41,
   "embeddedImagesExtracted": 5,
@@ -15,5 +15,26 @@
     "footer-importacion.jpg",
     "footer-descarga-datos.jpg",
     "footer-mantenimiento.png"
-  ]
+  ],
+  "indexLinesV26_6": 570,
+  "indexLinesReducedFromV26_6": 123,
+  "indexBytesV26_6": 27229,
+  "indexBytesReducedFromV26_6": 5896,
+  "legacyScriptsV26_6": 63,
+  "legacyBundlesV26_7": 2,
+  "legacyRequestsReduced": 61,
+  "legacyBundleBeforeModules": {
+    "file": "legacy-bundle-before-modules-v26.7.js",
+    "sourceScripts": 54
+  },
+  "legacyBundleAfterModules": {
+    "file": "legacy-bundle-after-modules-v26.7.js",
+    "sourceScripts": 9
+  },
+  "indexLinesOriginalV26_4": 21412,
+  "indexLinesV26_5": 20393,
+  "indexLinesReducedTotalFromV26_4": 20965,
+  "indexBytesOriginalV26_4": 1418313,
+  "indexBytesV26_5": 1166152,
+  "indexBytesReducedTotalFromV26_4": 1396980
 }

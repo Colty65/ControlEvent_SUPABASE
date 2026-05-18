@@ -1,4 +1,4 @@
-# ControlEvent v26.6 - Modularización de backend
+# ControlEvent v26.7 - Modularización de backend
 
 Versión generada sobre `ControlEvent v26.2`.
 
@@ -6,7 +6,7 @@ Versión generada sobre `ControlEvent v26.2`.
 
 Avanza el paso del plan:
 
-- `v26.6 - Backend más mantenible`.
+- `v26.7 - Backend más mantenible`.
 
 El frontend queda igual que en v26.2, salvo los textos/caché/versionado. La mejora principal está en el backend Supabase usado por Vercel y por `npm run dev:supabase`.
 

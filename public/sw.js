@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v26-6';
+const CACHE_NAME = 'controlevent-shell-v26-7';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -6,6 +6,11 @@ const SHELL_ASSETS = [
   '/assets/icons/icon-512.png',
   '/assets/icons/apple-touch-icon.png',
   '/app/styles/app.css',
+  '/app/version.js',
+  '/app/main.js',
+  '/app/legacy/legacy-bundle-after-modules-v26.7.js',
+  '/modules/module-loader.js',
+  '/app/legacy/legacy-bundle-before-modules-v26.7.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',
