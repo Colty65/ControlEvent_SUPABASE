@@ -3,9 +3,9 @@ import { captureResumenSnapshot } from './resumen-sheet.js';
 
 export const meta = {
   name: 'infoevento',
-  version: 'v27.4.3',
+  version: 'v27.4.4',
   mode: 'modular-public-facade-with-resumen-graficas-infoevento-audit',
-  description: 'Controlador modular para INFOEVENTO. Captura los modelos RESUMEN/GRAFICAS y, desde v27.4.3, el motor legacy añade hojas RESUMEN_MODULAR y GRAFICAS_MODULAR de auditoría al workbook para comparar sin sustituir aún las hojas legacy.'
+  description: 'Controlador modular para INFOEVENTO. Desde v27.4.4 mantiene el libro final limpio: no añade hojas RESUMEN_MODULAR/GRAFICAS_MODULAR por defecto; las herramientas modulares quedan disponibles sólo en standalone.'
 };
 
 let lastResumenSnapshot = null;

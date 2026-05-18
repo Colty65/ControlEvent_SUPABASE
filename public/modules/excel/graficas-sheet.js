@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.3';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.3:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.4';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.4:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.3 se integra en INFOEVENTO como hoja GRAFICAS_MODULAR para comparar sin sustituir todavía la hoja GRAFICAS legacy.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.4 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -32,10 +32,10 @@ function storageAvailable(){
   catch(_){ return false; }
 }
 function readAuditSetting(){
-  if(!storageAvailable()) return true;
+  if(!storageAvailable()) return false;
   const raw = window.localStorage.getItem(AUDIT_STORAGE_KEY);
-  if(raw === null || raw === '') return true;
-  return !['0','false','no','off'].includes(String(raw).toLowerCase());
+  if(raw === null || raw === '') return false;
+  return ['1','true','yes','on'].includes(String(raw).toLowerCase());
 }
 export function setInfoEventoAuditEnabled(enabled = true){
   if(storageAvailable()) window.localStorage.setItem(AUDIT_STORAGE_KEY, enabled ? '1' : '0');
@@ -284,13 +284,27 @@ export function attachGraficasToInfoEventoWorkbook(workbook, options = {}){
     return lastInfoEventoAttach;
   }
 }
+
+function keepOnlyWorksheet(workbook, worksheet){
+  try{
+    if(!workbook || !worksheet || !Array.isArray(workbook.worksheets) || typeof workbook.removeWorksheet !== 'function') return;
+    const keepId = worksheet.id;
+    [...workbook.worksheets].forEach(ws => {
+      if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
+    });
+  }catch(error){
+    console.warn('[ControlEventExcel] No se pudo limpiar hojas auxiliares del workbook standalone.', error);
+  }
+}
+
 export async function downloadStandaloneGraficas(options = {}){
   const ExcelJS = await ensureExcelJS();
   const workbook = new ExcelJS.Workbook();
   workbook.creator = `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeGraficasWorksheet(workbook, {sheetName:'GRAFICAS', ...options});
-  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.3'});
+  keepOnlyWorksheet(workbook, result.worksheet);
+  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.4'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -298,7 +312,7 @@ export async function downloadStandaloneGraficas(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_3_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_4_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

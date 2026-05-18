@@ -1,5 +1,5 @@
 {
-  "version": "v27.4.3",
+  "version": "v27.4.4",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -64,7 +64,7 @@
   "noteV27_0": "v27.0 instala fachada pública modular para exportExcel/exportSeedWorkbook y conserva motor legacy encapsulado.",
   "linesV27_0_1": 447,
   "noteV27_0_1": "Corrección de versión en nombres de fichero Excel y backup modular con lectura fresca de /api/state.",
-  "notes": "v27.4.3 protege hojas INFOEVENTO y Excel standalone modulares.",
+  "notes": "v27.4.4 protege hojas INFOEVENTO y Excel standalone modulares.",
   "indexHtmlLines": 448,
   "indexHtmlBytes": 21344,
   "updatedAt": "2026-05-19T00:00:00.000Z"
