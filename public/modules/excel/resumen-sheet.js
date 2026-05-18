@@ -2,7 +2,7 @@ import { registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'resumen-sheet',
-  version: 'v26.5',
+  version: 'v26.6',
   mode: 'sheet-boundary',
   description: 'Frontera modular documentada para separar la hoja RESUMEN en una fase posterior.'
 };

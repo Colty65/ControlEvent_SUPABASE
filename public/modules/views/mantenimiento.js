@@ -10,7 +10,7 @@ const view = createLegacyView({
   }
 });
 
-export const meta = {...view.meta, maintenance:'v26.5'};
+export const meta = {...view.meta, maintenance:'v26.6'};
 export const mount = context => view.mount(context);
 export const activate = context => view.activate(context);
 export const refresh = activate;
