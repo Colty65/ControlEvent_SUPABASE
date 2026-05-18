@@ -1,4 +1,4 @@
-# ControlEvent v27.3 - RESUMEN modular integrado en INFOEVENTO en modo auditoría
+# ControlEvent v27.4 - RESUMEN modular integrado en INFOEVENTO en modo auditoría
 
 Versión progresiva sobre v27.2.2.
 

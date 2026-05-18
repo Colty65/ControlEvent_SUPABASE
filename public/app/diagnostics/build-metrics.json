@@ -1,5 +1,5 @@
 {
-  "version": "v27.3",
+  "version": "v27.4",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -40,7 +40,7 @@
   "versionFile": "ControlEvent_v27_0",
   "indexHtml": {
     "lines": 447,
-    "notes": "index.html se mantiene como carcasa; v27.3 añade auditoría RESUMEN_MODULAR en INFOEVENTO."
+    "notes": "index.html se mantiene como carcasa; v27.4 añade auditoría GRAFICAS_MODULAR en INFOEVENTO."
   },
   "legacyAnalysis": {
     "mapFile": "public/app/diagnostics/legacy-function-map.json",
@@ -64,6 +64,6 @@
   "noteV27_0": "v27.0 instala fachada pública modular para exportExcel/exportSeedWorkbook y conserva motor legacy encapsulado.",
   "linesV27_0_1": 447,
   "noteV27_0_1": "Corrección de versión en nombres de fichero Excel y backup modular con lectura fresca de /api/state.",
-  "notes": "v27.3 integra RESUMEN modular en INFOEVENTO como hoja RESUMEN_MODULAR de auditoría, sin sustituir todavía la hoja RESUMEN legacy.",
+  "notes": "v27.4 integra GRAFICAS modular en INFOEVENTO como hoja GRAFICAS_MODULAR de auditoría, junto a RESUMEN_MODULAR.",
   "indexHtmlLines": 447
 }
