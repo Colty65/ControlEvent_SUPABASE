@@ -1,4 +1,4 @@
-# ControlEvent v26.7 - Bundle legacy y reducción de peticiones
+# ControlEvent v26.8 - Bundle legacy y reducción de peticiones
 
 Versión de optimización posterior a v26.6.
 
@@ -11,22 +11,22 @@ Reducir peticiones y archivos legacy sin cambiar la lógica funcional.
 - `index.html` pasa de cargar 63 scripts legacy individuales a cargar 2 bundles legacy.
 - Se mantiene `module-loader.js` en la misma posición relativa que tenía en v26.6.
 - Se eliminan del paquete los `legacy-inline-*.js` individuales porque ya quedan agrupados.
-- Se actualiza la caché PWA a `controlevent-shell-v26-7`.
+- Se actualiza la caché PWA a `controlevent-shell-v26-8`.
 
 ## Métricas
 
 - Líneas `index.html` v26.6: 570
-- Líneas `index.html` v26.7: 447
+- Líneas `index.html` v26.8: 447
 - Reducción: 123
 - Scripts legacy v26.6: 63
-- Bundles legacy v26.7: 2
+- Bundles legacy v26.8: 2
 - Peticiones legacy reducidas: 61
 
 ## Archivos nuevos clave
 
-- `public/app/legacy/legacy-bundle-before-modules-v26.7.js`
-- `public/app/legacy/legacy-bundle-after-modules-v26.7.js`
-- `README_V26_7_LEGACY_BUNDLES.json`
+- `public/app/legacy/legacy-bundle-before-modules-v26.8.js`
+- `public/app/legacy/legacy-bundle-after-modules-v26.8.js`
+- `README_V26_8_LEGACY_BUNDLES.json`
 
 ## Prueba recomendada
 

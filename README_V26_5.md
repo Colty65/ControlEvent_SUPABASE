@@ -1,4 +1,4 @@
-# ControlEvent v26.7 - reducción inicial de index.html
+# ControlEvent v26.8 - reducción inicial de index.html
 
 Versión basada en v26.4. Objetivo: empezar a aligerar `public/index.html` sin tocar lógica de negocio.
 
@@ -6,14 +6,14 @@ Versión basada en v26.4. Objetivo: empezar a aligerar `public/index.html` sin t
 
 - Se extraen los 41 bloques `<style>` de `public/index.html` a `public/app/styles/app.css`.
 - Se extraen 5 imágenes Base64 embebidas del HTML a `public/assets/embedded/`.
-- Se actualiza el Service Worker a `controlevent-shell-v26-7` y se cachean los nuevos assets.
+- Se actualiza el Service Worker a `controlevent-shell-v26-8` y se cachean los nuevos assets.
 - Se mantiene el orden de los estilos legacy para respetar precedencias.
-- Se actualizan cadenas de versión a `ControlEvent v26.7` / `ControlEvent_v26_7`.
+- Se actualizan cadenas de versión a `ControlEvent v26.8` / `ControlEvent_v26_8`.
 
 ## Métrica de index.html
 
 - v26.4: 21,412 líneas; 1,418,313 bytes.
-- v26.7: 20,393 líneas; 1,166,152 bytes.
+- v26.8: 20,393 líneas; 1,166,152 bytes.
 - Reducción: 1,019 líneas; 252,161 bytes.
 
 El fichero CSS extraído tiene 1,062 líneas.

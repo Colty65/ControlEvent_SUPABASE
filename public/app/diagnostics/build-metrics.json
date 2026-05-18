@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v26.7",
+  "version": "ControlEvent v26.8",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -21,14 +21,14 @@
   "indexBytesV26_6": 27229,
   "indexBytesReducedFromV26_6": 5896,
   "legacyScriptsV26_6": 63,
-  "legacyBundlesV26_7": 2,
+  "legacyBundlesV26_8": 2,
   "legacyRequestsReduced": 61,
   "legacyBundleBeforeModules": {
-    "file": "legacy-bundle-before-modules-v26.7.js",
+    "file": "legacy-bundle-before-modules-v26.8.js",
     "sourceScripts": 54
   },
   "legacyBundleAfterModules": {
-    "file": "legacy-bundle-after-modules-v26.7.js",
+    "file": "legacy-bundle-after-modules-v26.8.js",
     "sourceScripts": 9
   },
   "indexLinesOriginalV26_4": 21412,
@@ -36,5 +36,20 @@
   "indexLinesReducedTotalFromV26_4": 20965,
   "indexBytesOriginalV26_4": 1418313,
   "indexBytesV26_5": 1166152,
-  "indexBytesReducedTotalFromV26_4": 1396980
+  "indexBytesReducedTotalFromV26_4": 1396980,
+  "versionFile": "ControlEvent_v26_8",
+  "indexHtml": {
+    "linesV26_8": 447,
+    "bytesV26_8": 21333,
+    "noteV26_8": "v26.8 no adelgaza index.html; añade mapa diagnóstico del legacy para limpieza posterior."
+  },
+  "legacyAnalysis": {
+    "mapFile": "public/app/diagnostics/legacy-function-map.json",
+    "runtimeModule": "public/app/diagnostics/legacy-map.js",
+    "totalEntries": 2340,
+    "uniqueNames": 1001,
+    "duplicateNames": 332,
+    "exportedGlobalsOrActions": 292,
+    "candidateDuplicateHelpers": 246
+  }
 }

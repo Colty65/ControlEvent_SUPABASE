@@ -1,6 +1,6 @@
-# ControlEvent v26.7 — Estabilización y diagnóstico modular
+# ControlEvent v26.8 — Estabilización y diagnóstico modular
 
-Esta versión continúa después de la v26.3. El plan inicial ya dejó creadas las capas de cálculo, vistas, mantenimiento, Excel/tickets y backend modular. La v26.7 no intenta borrar todavía código del `index.html`; añade una capa de comprobación para poder seguir desmontando el monolito con menos riesgo.
+Esta versión continúa después de la v26.3. El plan inicial ya dejó creadas las capas de cálculo, vistas, mantenimiento, Excel/tickets y backend modular. La v26.8 no intenta borrar todavía código del `index.html`; añade una capa de comprobación para poder seguir desmontando el monolito con menos riesgo.
 
 ## Objetivo
 
@@ -68,6 +68,6 @@ await ControlEventModules.preloadAll()
 
 ## Modo de trabajo
 
-La v26.7 sigue siendo una versión segura. No sustituye de golpe las funciones antiguas del `index.html`; sólo mejora el control de carga de módulos y la visibilidad de errores.
+La v26.8 sigue siendo una versión segura. No sustituye de golpe las funciones antiguas del `index.html`; sólo mejora el control de carga de módulos y la visibilidad de errores.
 
 Si algo no carga, `ControlEventDiagnostics.inspect()` debe indicar qué capa falta.

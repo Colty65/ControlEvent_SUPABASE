@@ -1,6 +1,6 @@
 import { upload, remove, getImage, registerTicketModule } from './_ticket-runtime.js';
 
-export const meta = {name:'ticket-images', version:'v26.7', mode:'legacy-ui-controller'};
+export const meta = {name:'ticket-images', version:'v26.8', mode:'legacy-ui-controller'};
 
 export function uploadTicketImage(label){
   return upload(label);
