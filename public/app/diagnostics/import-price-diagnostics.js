@@ -1,6 +1,6 @@
-/* ControlEvent v27.2.1 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
+/* ControlEvent v27.2.2 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
 (function(){
-  const VERSION = 'v27.2.1';
+  const VERSION = 'v27.2.2';
   const num = v => {
     if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
     let s = String(v ?? '').replace(/[^0-9,.-]/g, '');
@@ -39,5 +39,11 @@
     console.info('[ControlEventImportPriceDiagnostics]', s);
     return s;
   }
-  window.ControlEventImportPriceDiagnostics = {version:VERSION, rows, summary, print};
+  function find(text){
+    const q = String(text || '').toLowerCase();
+    const r = rows().filter(x => String(x.nombre || '').toLowerCase().includes(q));
+    console.table(r);
+    return r;
+  }
+  window.ControlEventImportPriceDiagnostics = {version:VERSION, rows, summary, print, find};
 })();
