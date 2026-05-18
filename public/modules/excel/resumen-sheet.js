@@ -1,17 +1,17 @@
-import { registerExcelModule, ensureExcelJS } from './_excel-runtime.js';
+import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.4.2';
+const RESUMEN_SHEET_VERSION = 'v27.4.3';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
 let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.2:resumenModularAudit';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.3:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.2 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.3 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -365,6 +365,7 @@ export async function downloadStandaloneResumen(options = {}){
   workbook.creator = `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', ...options});
+  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.3'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -372,7 +373,7 @@ export async function downloadStandaloneResumen(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_2_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_3_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

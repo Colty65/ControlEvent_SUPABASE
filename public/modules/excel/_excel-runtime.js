@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.4.2';
+const EXCEL_RUNTIME_VERSION = 'v27.4.3';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -31,6 +31,53 @@ function loadExternalScript(src){
     document.head.appendChild(script);
   });
 }
+
+export const EXCEL_PROTECTION_PASSWORD = 'open_excel_arrastre';
+export const EXCEL_PROTECTION_OPTIONS = {
+  selectLockedCells:true,
+  selectUnlockedCells:true,
+  formatCells:false,
+  formatColumns:false,
+  formatRows:false,
+  insertColumns:false,
+  insertRows:false,
+  insertHyperlinks:false,
+  deleteColumns:false,
+  deleteRows:false,
+  sort:false,
+  autoFilter:false,
+  pivotTables:false
+};
+
+export async function protectWorksheet(worksheet, options = {}){
+  if(!worksheet || typeof worksheet.protect !== 'function'){
+    return {protected:false, reason:'worksheet-not-protectable', name:worksheet?.name || null};
+  }
+  try{
+    worksheet.eachRow(row => row.eachCell(cell => {
+      cell.protection = {...(cell.protection || {}), locked:true};
+    }));
+  }catch(_){ }
+  const password = options.password || EXCEL_PROTECTION_PASSWORD;
+  const protectionOptions = {...EXCEL_PROTECTION_OPTIONS, ...(options.protectionOptions || {})};
+  await worksheet.protect(password, protectionOptions);
+  return {protected:true, name:worksheet.name || null};
+}
+
+export async function protectWorkbook(workbook, options = {}){
+  const worksheets = Array.isArray(workbook?.worksheets) ? workbook.worksheets : [];
+  const results = [];
+  for(const worksheet of worksheets){
+    try{
+      results.push(await protectWorksheet(worksheet, options));
+    }catch(error){
+      results.push({protected:false, name:worksheet?.name || null, error:error?.message || String(error)});
+      if(options.throwOnError) throw error;
+    }
+  }
+  return {protected:results.filter(item => item.protected).length, total:worksheets.length, results};
+}
+
 export async function ensureExcelJS(){
   if(excelJsReady()) return window.ExcelJS;
   if(typeof window !== 'undefined' && typeof window.ensureExcelJS === 'function'){
@@ -227,7 +274,7 @@ export function getInfo(){
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4.2 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4.3 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
@@ -256,6 +303,8 @@ export function installExcelRuntime(){
     enableGraficasAudit: enabled => window.ControlEventGraficasSheet?.enableInfoEventoAudit?.(enabled),
     graficasAuditConfig: () => window.ControlEventGraficasSheet?.auditConfig?.() || null,
     invokeLegacy: invokeLegacyExcelAction,
+    protectWorkbook,
+    protectWorksheet,
     legacyInfo: getLegacyActionInfo,
     get modules(){ return listExcelModules(); }
   };
