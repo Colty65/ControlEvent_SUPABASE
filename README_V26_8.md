@@ -1,4 +1,4 @@
-# ControlEvent v26.8 - Mapa de funciones legacy y duplicados
+# ControlEvent v26.9 - Mapa de funciones legacy y duplicados
 
 Versión de análisis seguro posterior a v26.7.
 
@@ -13,8 +13,8 @@ No cambia la operativa diaria de la app. Añade un mapa estático de funciones, 
 
 ## Archivos legacy renombrados para evitar caché
 
-- `public/app/legacy/legacy-bundle-before-modules-v26.8.js`
-- `public/app/legacy/legacy-bundle-after-modules-v26.8.js`
+- `public/app/legacy/legacy-bundle-before-modules-v26.9.js`
+- `public/app/legacy/legacy-bundle-after-modules-v26.9.js`
 
 Los equivalentes `v26.7` ya no son necesarios si actualizas `index.html` y `sw.js`.
 
@@ -40,6 +40,6 @@ ControlEventDiagnostics.inspect().modules.legacyMap
 ## Líneas de index.html
 
 - v26.7: 447 líneas
-- v26.8: 447 líneas
+- v26.9: 447 líneas
 
-v26.8 no busca adelgazar `index.html`; busca identificar qué partes del legacy se pueden limpiar en v26.9 y v27.x.
+v26.9 no busca adelgazar `index.html`; busca identificar qué partes del legacy se pueden limpiar en v26.9 y v27.x.

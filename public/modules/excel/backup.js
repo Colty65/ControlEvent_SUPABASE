@@ -2,7 +2,7 @@ import { downloadBackup, registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'backup',
-  version: 'v26.8',
+  version: 'v26.9',
   mode: 'legacy-export-controller',
   description: 'Controlador modular para descarga de datos/backup.'
 };

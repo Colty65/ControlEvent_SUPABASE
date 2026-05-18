@@ -2,7 +2,7 @@ import { registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'ticket-images-sheet',
-  version: 'v26.8',
+  version: 'v26.9',
   mode: 'sheet-boundary',
   description: 'Frontera modular para la hoja CALCULOS_TIENDA_TICKET y sus imagenes.'
 };

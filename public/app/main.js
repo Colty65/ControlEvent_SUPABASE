@@ -5,6 +5,7 @@ import { installExcelModules } from '../modules/excel/index.js';
 import { installTicketModules } from '../modules/tickets/index.js';
 import { installRuntimeDiagnostics } from './diagnostics/runtime-diagnostics.js';
 import { installLegacyMap } from './diagnostics/legacy-map.js';
+import { installLegacyCleanup } from './diagnostics/legacy-cleanup.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -18,7 +19,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v26.8] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v26.9] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -27,7 +28,8 @@ function install(app){
   const excel = installExcelModules();
   const tickets = installTicketModules();
   const legacyMap = installLegacyMap();
-  const diagnostics = installRuntimeDiagnostics({app, domain, excel, tickets, legacyMap});
+  const legacyCleanup = installLegacyCleanup();
+  const diagnostics = installRuntimeDiagnostics({app, domain, excel, tickets, legacyMap, legacyCleanup});
   window.ControlEventRuntime = {
     version: VERSION,
     app,
@@ -37,6 +39,7 @@ function install(app){
     tickets,
     diagnostics,
     legacyMap,
+    legacyCleanup,
     inspect: () => diagnostics.inspect(),
     checkApi: () => diagnostics.checkApi()
   };

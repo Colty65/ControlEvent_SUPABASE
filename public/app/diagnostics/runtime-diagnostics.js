@@ -1,7 +1,7 @@
 import { getApp } from '../app-context.js';
 import { PACKAGE_NAME, VERSION, VERSION_FILE } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v26.8';
+const DIAGNOSTICS_VERSION = 'v26.9';
 const INDEX_LINES_BEFORE_V26_5 = 21412;
 const INDEX_LINES_AFTER_V26_5 = 20392;
 const INDEX_BYTES_BEFORE_V26_5 = 1418313;
@@ -15,8 +15,8 @@ const INDEX_LINES_AFTER_V26_7 = 447;
 const INDEX_BYTES_AFTER_V26_7 = 21333;
 const INDEX_LEGACY_REQUESTS_BEFORE_V26_7 = 63;
 const INDEX_LEGACY_REQUESTS_AFTER_V26_7 = 2;
-const INDEX_LINES_AFTER_V26_8 = 447;
-const INDEX_BYTES_AFTER_V26_8 = 21333;
+const INDEX_LINES_AFTER_V26_9 = 447;
+const INDEX_BYTES_AFTER_V26_9 = 21333;
 const DEFAULT_TIMEOUT_MS = 8000;
 let lastInspection = null;
 let lastApiCheck = null;
@@ -70,10 +70,11 @@ function collectWarnings(report){
   if(!report.modules.views.present) warnings.push('No se ha instalado ControlEventModules.');
   if(!report.modules.excel.present) warnings.push('No se ha instalado ControlEventExcel.');
   if(!report.modules.tickets.present) warnings.push('No se ha instalado ControlEventTickets.');
+  if(!report.modules.legacyCleanup.present) warnings.push('No se ha instalado ControlEventLegacyCleanup.');
   // Mantenimiento se instala bajo demanda al activar su vista, así que no es aviso crítico al arrancar.
   if(!report.dom.mainRoots.every(item => item.ok)) warnings.push('Falta algún contenedor principal de pantalla.');
-  if(report.version.domTitle && !report.version.domTitle.includes('v26.8')) warnings.push('El título del documento no parece estar en v26.8.');
-  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v26.8')) warnings.push('body.dataset.ceVersion no coincide con v26.8.');
+  if(report.version.domTitle && !report.version.domTitle.includes('v26.9')) warnings.push('El título del documento no parece estar en v26.9.');
+  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v26.9')) warnings.push('body.dataset.ceVersion no coincide con v26.9.');
   if(!report.legacy.exportExcel) warnings.push('No se encuentra exportExcel legacy; INFOEVENTO podría fallar.');
   if(!report.legacy.saveStateNow) warnings.push('No se encuentra saveStateNow; el guardado podría depender de otro flujo.');
   return warnings;
@@ -87,6 +88,7 @@ export function inspectRuntime(){
   const tickets = window.ControlEventTickets || null;
   const domain = window.ControlEventDomain || null;
   const legacyMap = window.ControlEventLegacyMap || null;
+  const legacyCleanup = window.ControlEventLegacyCleanup || null;
 
   const report = {
     ok: true,
@@ -113,8 +115,8 @@ export function inspectRuntime(){
       legacyRequestsBeforeV26_7: INDEX_LEGACY_REQUESTS_BEFORE_V26_7,
       legacyRequestsAfterV26_7: INDEX_LEGACY_REQUESTS_AFTER_V26_7,
       legacyRequestsReducedV26_7: INDEX_LEGACY_REQUESTS_BEFORE_V26_7 - INDEX_LEGACY_REQUESTS_AFTER_V26_7,
-      linesAfterV26_8: INDEX_LINES_AFTER_V26_8,
-      bytesAfterV26_8: INDEX_BYTES_AFTER_V26_8
+      linesAfterV26_9: INDEX_LINES_AFTER_V26_9,
+      bytesAfterV26_9: INDEX_BYTES_AFTER_V26_9
     },
     version: {
       expected: VERSION,
@@ -175,6 +177,11 @@ export function inspectRuntime(){
         present: !!legacyMap,
         version: objectVersion('ControlEventLegacyMap'),
         summary: safeCall('ControlEventLegacyMap.summary', () => legacyMap?.summary?.(), {})
+      },
+      legacyCleanup: {
+        present: !!legacyCleanup,
+        version: objectVersion('ControlEventLegacyCleanup'),
+        info: safeCall('ControlEventLegacyCleanup.info', () => legacyCleanup?.info?.(), {})
       }
     },
     dom: {
@@ -241,7 +248,7 @@ export async function checkApi(){
 export function assertHealthy(){
   const report = inspectRuntime();
   if(!report.ok){
-    console.warn('[ControlEventDiagnostics/v26.8] Avisos detectados', report.warnings, report);
+    console.warn('[ControlEventDiagnostics/v26.9] Avisos detectados', report.warnings, report);
   }
   return report;
 }
@@ -257,10 +264,11 @@ export function print(){
     ['Tickets', report.modules.tickets.present ? 'OK' : 'NO'],
     ['Legacy exportExcel', report.legacy.exportExcel ? 'OK' : 'NO'],
     ['Legacy map', report.modules.legacyMap.present ? 'OK' : 'NO'],
+    ['Legacy cleanup', report.modules.legacyCleanup.present ? 'OK' : 'NO'],
     ['PWA control', report.pwa.controlled ? 'SW activo' : 'sin controlador']
   ];
   try{ console.table(rows.map(([area, estado]) => ({area, estado}))); }catch(_){ console.log(rows); }
-  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v26.8]', report.warnings);
+  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v26.9]', report.warnings);
   return report;
 }
 

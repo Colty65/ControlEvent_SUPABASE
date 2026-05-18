@@ -1,6 +1,6 @@
-const LEGACY_MAP_VERSION = 'v26.8';
+const LEGACY_MAP_VERSION = 'v26.9';
 const LEGACY_MAP_URL = './diagnostics/legacy-function-map.json';
-const LEGACY_SUMMARY = {"bundles":["legacy-bundle-before-modules-v26.8.js","legacy-bundle-after-modules-v26.8.js"],"totalEntries":2340,"uniqueNames":1001,"duplicateNames":332,"exportedGlobalsOrActions":292,"kindCounts":{"function_decl":1475,"async_function_decl":67,"const_function":105,"arrow_function":401,"window_assignment":292},"bundleCounts":{"legacy-bundle-before-modules-v26.8.js":1880,"legacy-bundle-after-modules-v26.8.js":460},"topDuplicateNames":[{"name":"wrapped","count":56},{"name":"$","count":42},{"name":"render","count":35},{"name":"norm","count":35},{"name":"esc","count":34},{"name":"money","count":27},{"name":"refreshVersion","count":26},{"name":"st","count":25},{"name":"w","count":25},{"name":"up","count":21},{"name":"exportExcel","count":20},{"name":"ticket","count":19},{"name":"compras","count":19},{"name":"byId","count":19},{"name":"donorName","count":17},{"name":"setTip","count":17},{"name":"isCurrent","count":17},{"name":"persona","count":17},{"name":"tienda","count":16},{"name":"storeName","count":15},{"name":"graphPartsV171","count":15},{"name":"isDon","count":15},{"name":"sum","count":15},{"name":"emittedByTextV171","count":14},{"name":"value","count":14},{"name":"num","count":14},{"name":"price","count":13},{"name":"producto","count":13},{"name":"renderGraficas","count":12},{"name":"makeChartImageDataUrl","count":12}],"candidateDuplicateHelpers":246};
+const LEGACY_SUMMARY = {"bundles":["legacy-bundle-before-modules-v26.9.js","legacy-bundle-after-modules-v26.9.js"],"totalEntries":2340,"uniqueNames":1001,"duplicateNames":332,"exportedGlobalsOrActions":292,"kindCounts":{"function_decl":1475,"async_function_decl":67,"const_function":105,"arrow_function":401,"window_assignment":292},"bundleCounts":{"legacy-bundle-before-modules-v26.9.js":1880,"legacy-bundle-after-modules-v26.9.js":460},"topDuplicateNames":[{"name":"wrapped","count":56},{"name":"$","count":42},{"name":"render","count":35},{"name":"norm","count":35},{"name":"esc","count":34},{"name":"money","count":27},{"name":"refreshVersion","count":26},{"name":"st","count":25},{"name":"w","count":25},{"name":"up","count":21},{"name":"exportExcel","count":20},{"name":"ticket","count":19},{"name":"compras","count":19},{"name":"byId","count":19},{"name":"donorName","count":17},{"name":"setTip","count":17},{"name":"isCurrent","count":17},{"name":"persona","count":17},{"name":"tienda","count":16},{"name":"storeName","count":15},{"name":"graphPartsV171","count":15},{"name":"isDon","count":15},{"name":"sum","count":15},{"name":"emittedByTextV171","count":14},{"name":"value","count":14},{"name":"num","count":14},{"name":"price","count":13},{"name":"producto","count":13},{"name":"renderGraficas","count":12},{"name":"makeChartImageDataUrl","count":12}],"candidateDuplicateHelpers":246};
 let rawMap = null;
 let loadingPromise = null;
 let installed = false;
@@ -25,7 +25,7 @@ async function load(){
 
 function requireLoaded(action){
   if(rawMap) return rawMap;
-  console.warn(`[ControlEventLegacyMap/v26.8] Para usar ${action}, ejecuta antes: await ControlEventLegacyMap.load()`);
+  console.warn(`[ControlEventLegacyMap/v26.9] Para usar ${action}, ejecuta antes: await ControlEventLegacyMap.load()`);
   return null;
 }
 
@@ -100,7 +100,7 @@ async function loadAndListDuplicates(options = {}){
 function installLegacyMap(){
   const api = {
     version: LEGACY_MAP_VERSION,
-    mapVersion: 'ControlEvent v26.8',
+    mapVersion: 'ControlEvent v26.9',
     mapUrl: LEGACY_MAP_URL,
     get raw(){ return rawMap; },
     load,

@@ -1,6 +1,6 @@
-ControlEvent v26.8 - archivos legacy individuales eliminados
+ControlEvent v26.9 - archivos legacy individuales eliminados
 
-En v26.8 estos archivos ya no son necesarios porque se han agrupado en dos bundles.
+En v26.9 estos archivos ya no son necesarios porque se han agrupado en dos bundles.
 Si actualizas manualmente desde GitHub web, puedes dejarlos sin subir cambios; no se cargan desde index.html.
 Para limpiar el repositorio, elimina estos archivos:
 
