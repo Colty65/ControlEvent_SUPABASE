@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v26-2-supabase-localhost",
-  "version": "26.2-supabase-excel-tickets",
+  "name": "controlevent-v26-3-supabase-localhost",
+  "version": "26.3-supabase-backend-modular",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,3 +1,3 @@
-import app from '../scripts/dev-server-supabase.js';
+import app from '../server/app.js';
 
 export default app;

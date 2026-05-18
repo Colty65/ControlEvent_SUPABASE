@@ -1,6 +1,6 @@
 import { getImage, setImage, removeImage, stateKey, registerTicketModule } from './_ticket-runtime.js';
 
-export const meta = {name:'ticket-storage', version:'v26.2', mode:'legacy-state-controller'};
+export const meta = {name:'ticket-storage', version:'v26.3', mode:'legacy-state-controller'};
 
 export { getImage, setImage, removeImage, stateKey };
 

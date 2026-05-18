@@ -87,7 +87,7 @@ export function registerTicketModule(name, module){
 
 export function getInfo(){
   return {
-    version: 'v26.2',
+    version: 'v26.3',
     modules: Array.from(registry.keys()),
     selectedEventId: selectedEventId(),
     images: Object.keys(resolveApp()?.state?.ticketImages || window.state?.ticketImages || {}).length,
@@ -99,7 +99,7 @@ export function installTicketRuntime(){
   if(installed) return window.ControlEventTickets;
   installed = true;
   window.ControlEventTickets = {
-    version: 'v26.2',
+    version: 'v26.3',
     mode: 'legacy-bridge',
     register: registerTicketModule,
     key: stateKey,
