@@ -66,7 +66,7 @@ function scheduleActivation(entry, options = {}){
   if(!entry) return;
   window.setTimeout(() => {
     loadMenuModule(entry, options).catch(error => {
-      console.error('[modules/v26.1] No se pudo cargar modulo', entry.name, error);
+      console.error('[modules/v26.2] No se pudo cargar modulo', entry.name, error);
     });
   }, 0);
 }
@@ -88,7 +88,7 @@ export function installControlEventModules(){
   }, {once:true});
 
   window.ControlEventModules = {
-    version: 'v26.1',
+    version: 'v26.2',
     entries: menuModules,
     activate: activateMenuModule,
     refreshCurrent: refreshCurrentMenuModule,

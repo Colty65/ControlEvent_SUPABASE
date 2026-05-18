@@ -1,4 +1,4 @@
-# ControlEvent v26.1 - Modularización de mantenimiento
+# ControlEvent v26.2 - Modularización de mantenimiento
 
 Versión generada sobre la v26.0 y conservando la corrección v25.9.1 de totales Excel.
 

@@ -1,6 +1,8 @@
 import { VERSION } from './version.js';
 import { getApp, whenAppReady } from './app-context.js';
 import { installDomainCalculations } from './domain/index.js';
+import { installExcelModules } from '../modules/excel/index.js';
+import { installTicketModules } from '../modules/tickets/index.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -14,17 +16,21 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v26.1] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v26.2] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
   applyVersion();
   const domain = installDomainCalculations(app, {mode: 'shadow'});
+  const excel = installExcelModules();
+  const tickets = installTicketModules();
   window.ControlEventRuntime = {
     version: VERSION,
     app,
     modules: window.ControlEventModules || null,
-    domain
+    domain,
+    excel,
+    tickets
   };
   window.dispatchEvent(new CustomEvent('controlevent:runtime-ready', {
     detail: window.ControlEventRuntime
