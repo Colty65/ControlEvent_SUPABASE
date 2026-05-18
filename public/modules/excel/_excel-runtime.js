@@ -59,7 +59,7 @@ export function downloadBackup(options = {}){
 
 export function getInfo(){
   return {
-    version: 'v26.3',
+    version: 'v26.4',
     modules: listExcelModules(),
     lastRun,
     legacy: {
@@ -73,7 +73,7 @@ export function installExcelRuntime(){
   if(installed) return window.ControlEventExcel;
   installed = true;
   window.ControlEventExcel = {
-    version: 'v26.3',
+    version: 'v26.4',
     mode: 'legacy-bridge',
     register: registerExcelModule,
     run: runExcelAction,
@@ -83,5 +83,6 @@ export function installExcelRuntime(){
     get modules(){ return listExcelModules(); }
   };
   window.__ceV262Excel = window.ControlEventExcel;
+  window.__ceV264Excel = window.ControlEventExcel;
   return window.ControlEventExcel;
 }

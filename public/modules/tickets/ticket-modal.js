@@ -1,6 +1,6 @@
 import { registerTicketModule } from './_ticket-runtime.js';
 
-export const meta = {name:'ticket-modal', version:'v26.3', mode:'legacy-modal-boundary'};
+export const meta = {name:'ticket-modal', version:'v26.4', mode:'legacy-modal-boundary'};
 
 export function closeAll(){
   document.querySelectorAll('#ceTicketModalV234,#ceTicketImageModalV225,.ce-ticket-modal-v234,.ce-ticket-modal-v225').forEach(modal => {

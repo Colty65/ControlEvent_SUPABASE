@@ -62,11 +62,52 @@ export async function refreshCurrentMenuModule(options = {}){
   return activateMenuModule(name, {reason:'refresh-current', ...options});
 }
 
+export async function preloadAllMenuModules(options = {}){
+  const results = [];
+  for(const entry of menuModules){
+    try{
+      const module = await importMenuModule(entry);
+      results.push({name: entry.name, ok:true, meta: module?.meta || null});
+    }catch(error){
+      results.push({name: entry.name, ok:false, error:error?.message || String(error)});
+      if(!options.silent) console.warn('[modules/v26.4] No se pudo precargar modulo', entry.name, error);
+    }
+  }
+  return results;
+}
+
+export async function ensureAllMenuModules(options = {}){
+  const activate = options.activate === true;
+  const results = [];
+  for(const entry of menuModules){
+    try{
+      const module = activate ? await loadMenuModule(entry, {reason:'ensure-all', ...options}) : await importMenuModule(entry);
+      results.push({name: entry.name, ok:true, mounted: !!moduleState.get(entry.name)?.mounted, meta: module?.meta || null});
+    }catch(error){
+      results.push({name: entry.name, ok:false, error:error?.message || String(error)});
+    }
+  }
+  return results;
+}
+
+export function moduleDiagnostics(){
+  return {
+    version: 'v26.4',
+    entries: menuModules.map(entry => ({name: entry.name, viewId: entry.viewId, module: entry.module, rootExists: !!document.getElementById(entry.viewId)})),
+    loaded: Array.from(loadedModules.keys()),
+    state: Array.from(moduleState.entries()).reduce((acc, [name, info]) => {
+      acc[name] = {...info};
+      return acc;
+    }, {}),
+    current: (getApp() || window.ControlEventApp)?.navigation?.currentMainTab || 'ingresos'
+  };
+}
+
 function scheduleActivation(entry, options = {}){
   if(!entry) return;
   window.setTimeout(() => {
     loadMenuModule(entry, options).catch(error => {
-      console.error('[modules/v26.3] No se pudo cargar modulo', entry.name, error);
+      console.error('[modules/v26.4] No se pudo cargar modulo', entry.name, error);
     });
   }, 0);
 }
@@ -88,14 +129,19 @@ export function installControlEventModules(){
   }, {once:true});
 
   window.ControlEventModules = {
-    version: 'v26.3',
+    version: 'v26.4',
     entries: menuModules,
     activate: activateMenuModule,
     refreshCurrent: refreshCurrentMenuModule,
+    preloadAll: preloadAllMenuModules,
+    ensureAll: ensureAllMenuModules,
+    diagnostics: moduleDiagnostics,
+    info: moduleDiagnostics,
     loaded: loadedModules,
     state: moduleState
   };
   window.__ceV260Modules = window.ControlEventModules;
+  window.__ceV264Modules = window.ControlEventModules;
   return window.ControlEventModules;
 }
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { BACKEND_NAME } from '../server/paths.js';
+import { APP_VERSION, BACKEND_NAME } from '../server/paths.js';
 import { health } from '../repositories/supabase-state.repository.js';
 import { getDiagnostics } from '../services/state.service.js';
 
@@ -16,7 +16,7 @@ router.get('/diagnostics', asyncHandler(async (req, res) => {
 }));
 
 router.get('/version', (req, res) => {
-  res.json({ ok: true, backend: BACKEND_NAME, version: 'ControlEvent v26.3' });
+  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v26.4-stabilization-diagnostics' });
 });
 
 export default router;

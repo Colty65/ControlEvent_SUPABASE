@@ -87,7 +87,7 @@ export function registerTicketModule(name, module){
 
 export function getInfo(){
   return {
-    version: 'v26.3',
+    version: 'v26.4',
     modules: Array.from(registry.keys()),
     selectedEventId: selectedEventId(),
     images: Object.keys(resolveApp()?.state?.ticketImages || window.state?.ticketImages || {}).length,
@@ -99,7 +99,7 @@ export function installTicketRuntime(){
   if(installed) return window.ControlEventTickets;
   installed = true;
   window.ControlEventTickets = {
-    version: 'v26.3',
+    version: 'v26.4',
     mode: 'legacy-bridge',
     register: registerTicketModule,
     key: stateKey,
@@ -112,5 +112,6 @@ export function installTicketRuntime(){
     info: getInfo
   };
   window.__ceV262Tickets = window.ControlEventTickets;
+  window.__ceV264Tickets = window.ControlEventTickets;
   return window.ControlEventTickets;
 }

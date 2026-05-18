@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v26-3-supabase-localhost",
-  "version": "26.3-supabase-backend-modular",
+  "name": "controlevent-v26-4-supabase-localhost",
+  "version": "26.4-stabilization-diagnostics",
   "private": true,
   "type": "module",
   "scripts": {
