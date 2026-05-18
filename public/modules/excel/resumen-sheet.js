@@ -1,6 +1,6 @@
 import { registerExcelModule } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.2';
+const RESUMEN_SHEET_VERSION = 'v27.2.1';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
@@ -9,7 +9,7 @@ export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-shadow-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.2 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.2.1 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -312,7 +312,7 @@ export async function downloadStandaloneResumen(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_2_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_2_1_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

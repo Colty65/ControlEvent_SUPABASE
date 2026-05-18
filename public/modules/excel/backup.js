@@ -2,13 +2,13 @@ import { registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'backup',
-  version: 'v27.2',
+  version: 'v27.2.1',
   mode: 'server-backup-download-with-client-fallback',
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v27.2';
-const BACKUP_VERSION_FILE = 'ControlEvent_v27_2';
+const BACKUP_VERSION = 'ControlEvent v27.2.1';
+const BACKUP_VERSION_FILE = 'ControlEvent_v27_2_1';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -107,7 +107,7 @@ async function getBestState(){
   let state = null;
   try{ state = await fetchServerState(); }
   catch(error){
-    console.warn('[ControlEventExcel/v27.2] No se pudo leer /api/state; se usa estado de la app.', error);
+    console.warn('[ControlEventExcel/v27.2.1] No se pudo leer /api/state; se usa estado de la app.', error);
     source = 'app-fallback';
     state = fallbackState();
   }
@@ -267,13 +267,13 @@ export async function run(options = {}){
   const scoped = scopedBackupState(state, scope);
   const scopedCounts = countsFor(scoped);
   const dataCount = countRows(scoped);
-  console.info('[ControlEventExcel/v27.2] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
+  console.info('[ControlEventExcel/v27.2.1] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
   try{
     const serverResult = await downloadServerBackup(scope);
-    console.info('[ControlEventExcel/v27.2] Backup generado por servidor', serverResult);
+    console.info('[ControlEventExcel/v27.2.1] Backup generado por servidor', serverResult);
     return {...serverResult, counts, scopedCounts};
   }catch(serverError){
-    console.warn('[ControlEventExcel/v27.2] Fallback a backup cliente', serverError);
+    console.warn('[ControlEventExcel/v27.2.1] Fallback a backup cliente', serverError);
   }
   if(dataCount === 0){
     alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');
@@ -311,7 +311,7 @@ export async function run(options = {}){
   addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
-  const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
+  const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
   addRows('INGRESOS', ['EVENTO_CODIGO','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
   addRows('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
