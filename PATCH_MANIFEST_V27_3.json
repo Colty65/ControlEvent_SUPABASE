@@ -1,7 +1,10 @@
 {
   "version": "v27.3",
-  "base": "v27.2.1",
+  "base": "v27.2.2",
   "modified": [
+    "PATCH_MANIFEST_V27_2_2.json",
+    "README_V27_2_2.md",
+    "README_V27_2_2_DELETE_OLD_FILES.txt",
     "package-lock.json",
     "package.json",
     "public/app/diagnostics/build-metrics.json",
@@ -24,15 +27,19 @@
     "server/paths.js"
   ],
   "new": [
-    "PATCH_MANIFEST_V27_2_2.json",
-    "README_V27_2_2.md",
-    "README_V27_2_2_DELETE_OLD_FILES.txt",
+    "PATCH_MANIFEST_V27_3.json",
+    "README_V27_3.md",
+    "README_V27_3_DELETE_OLD_FILES.txt",
     "public/app/legacy/legacy-bundle-after-modules-v27.3.js",
     "public/app/legacy/legacy-bundle-before-modules-v27.3.js"
   ],
   "deleted": [
-    "public/app/legacy/legacy-bundle-after-modules-v27.2.1.js",
-    "public/app/legacy/legacy-bundle-before-modules-v27.2.1.js"
+    "public/app/legacy/legacy-bundle-after-modules-v27.2.2.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.2.2.js"
   ],
-  "notes": "Corrige importV92Workbook para cargar PRODUCTOS → Precio referencia desde BACKUP y añade find() al diagnóstico."
+  "obsolete_to_delete_if_present": [
+    "public/app/legacy/legacy-bundle-before-modules-v27.2.2.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.2.2.js"
+  ],
+  "notes": "Integra RESUMEN modular en INFOEVENTO como hoja RESUMEN_MODULAR de auditoría, manteniendo RESUMEN legacy."
 }

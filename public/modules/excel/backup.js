@@ -2,13 +2,13 @@ import { registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'backup',
-  version: 'v27.2.2',
+  version: 'v27.3',
   mode: 'server-backup-download-with-client-fallback',
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v27.2.2';
-const BACKUP_VERSION_FILE = 'ControlEvent_v27_2_2';
+const BACKUP_VERSION = 'ControlEvent v27.3';
+const BACKUP_VERSION_FILE = 'ControlEvent_v27_3';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -107,7 +107,7 @@ async function getBestState(){
   let state = null;
   try{ state = await fetchServerState(); }
   catch(error){
-    console.warn('[ControlEventExcel/v27.2.2] No se pudo leer /api/state; se usa estado de la app.', error);
+    console.warn('[ControlEventExcel/v27.3] No se pudo leer /api/state; se usa estado de la app.', error);
     source = 'app-fallback';
     state = fallbackState();
   }
@@ -267,13 +267,13 @@ export async function run(options = {}){
   const scoped = scopedBackupState(state, scope);
   const scopedCounts = countsFor(scoped);
   const dataCount = countRows(scoped);
-  console.info('[ControlEventExcel/v27.2.2] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
+  console.info('[ControlEventExcel/v27.3] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
   try{
     const serverResult = await downloadServerBackup(scope);
-    console.info('[ControlEventExcel/v27.2.2] Backup generado por servidor', serverResult);
+    console.info('[ControlEventExcel/v27.3] Backup generado por servidor', serverResult);
     return {...serverResult, counts, scopedCounts};
   }catch(serverError){
-    console.warn('[ControlEventExcel/v27.2.2] Fallback a backup cliente', serverError);
+    console.warn('[ControlEventExcel/v27.3] Fallback a backup cliente', serverError);
   }
   if(dataCount === 0){
     alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');

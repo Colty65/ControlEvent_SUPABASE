@@ -1,15 +1,17 @@
 import { registerExcelModule } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.2.2';
+const RESUMEN_SHEET_VERSION = 'v27.3';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
+let lastInfoEventoAttach = null;
+const AUDIT_STORAGE_KEY = 'controlevent:v27.3:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
-  mode: 'modular-shadow-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.2.2 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
+  mode: 'modular-infoevento-audit-writer',
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.3 no sustituye todavía el RESUMEN legacy del INFOEVENTO salvo prueba explícita.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -24,6 +26,30 @@ const num = value => {
 const money = value => Number(num(value).toFixed(2));
 const arr = (obj, key) => Array.isArray(obj?.[key]) ? obj[key] : [];
 const safeName = value => String(value || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0,80) || 'evento';
+
+function storageAvailable(){
+  try{ return typeof window !== 'undefined' && !!window.localStorage; }
+  catch(_){ return false; }
+}
+function readAuditSetting(){
+  if(!storageAvailable()) return true;
+  const raw = window.localStorage.getItem(AUDIT_STORAGE_KEY);
+  if(raw === null || raw === '') return true;
+  return !['0','false','no','off'].includes(String(raw).toLowerCase());
+}
+export function setInfoEventoAuditEnabled(enabled = true){
+  if(storageAvailable()) window.localStorage.setItem(AUDIT_STORAGE_KEY, enabled ? '1' : '0');
+  return getInfoEventoAuditConfig();
+}
+export function getInfoEventoAuditConfig(){
+  return {
+    version: RESUMEN_SHEET_VERSION,
+    enabled: readAuditSetting(),
+    storageKey: AUDIT_STORAGE_KEY,
+    sheetName: 'RESUMEN_MODULAR',
+    lastInfoEventoAttach
+  };
+}
 
 function app(){
   return window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
@@ -298,6 +324,41 @@ export function preview(){
   return snapshot;
 }
 
+
+export function attachResumenToInfoEventoWorkbook(workbook, options = {}){
+  if(!readAuditSetting() && options.force !== true){
+    lastInfoEventoAttach = {attached:false, skipped:true, reason:'disabled', at:new Date().toISOString(), version:RESUMEN_SHEET_VERSION};
+    return lastInfoEventoAttach;
+  }
+  try{
+    if(!workbook || typeof workbook.addWorksheet !== 'function') throw new Error('Workbook ExcelJS no disponible.');
+    const sheetName = options.sheetName || 'RESUMEN_MODULAR';
+    const result = writeResumenWorksheet(workbook, {
+      ...options,
+      sheetName,
+      source: options.source || 'infoevento-audit'
+    });
+    const ws = result.worksheet;
+    try{ ws.state = options.hidden ? 'hidden' : 'visible'; }catch(_){ }
+    lastInfoEventoAttach = {
+      attached:true,
+      skipped:false,
+      at:new Date().toISOString(),
+      version:RESUMEN_SHEET_VERSION,
+      sheetName,
+      hidden: !!options.hidden,
+      rows: ws?.rowCount || 0,
+      eventTitle: result.model?.event?.titulo || ''
+    };
+    window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-infoevento-attached', {detail:lastInfoEventoAttach}));
+    return lastInfoEventoAttach;
+  }catch(error){
+    lastInfoEventoAttach = {attached:false, skipped:false, at:new Date().toISOString(), version:RESUMEN_SHEET_VERSION, error:error?.message || String(error)};
+    console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] No se pudo añadir RESUMEN modular al INFOEVENTO. Se mantiene RESUMEN legacy.`, error);
+    return lastInfoEventoAttach;
+  }
+}
+
 export async function downloadStandaloneResumen(options = {}){
   const ExcelJS = window.ExcelJS;
   if(!ExcelJS?.Workbook) throw new Error('ExcelJS no está disponible para generar RESUMEN modular.');
@@ -312,7 +373,7 @@ export async function downloadStandaloneResumen(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_2_2_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_3_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -334,7 +395,7 @@ export function assertReady(){
   if(!snapshot.model.event.id && !snapshot.model.event.titulo) warnings.push('No hay evento activo para RESUMEN.');
   if(snapshot.rowCount < 10) warnings.push('El modelo RESUMEN contiene pocas filas.');
   if(!snapshot.writerReady) warnings.push('ExcelJS no está disponible todavía; la escritura modular se probará cuando cargue vendor/exceljs.');
-  return {ok:warnings.length === 0, warnings, snapshot, lastWorksheetBuild};
+  return {ok:warnings.length === 0, warnings, snapshot, lastWorksheetBuild, audit:getInfoEventoAuditConfig()};
 }
 
 export function installResumenSheetBridge(){
@@ -349,6 +410,9 @@ export function installResumenSheetBridge(){
     buildSections: buildResumenSections,
     writeWorksheet: writeResumenWorksheet,
     downloadStandalone: downloadStandaloneResumen,
+    attachToInfoEventoWorkbook: attachResumenToInfoEventoWorkbook,
+    enableInfoEventoAudit: setInfoEventoAuditEnabled,
+    auditConfig: getInfoEventoAuditConfig,
     capture: captureResumenSnapshot,
     preview,
     assertReady,
@@ -364,7 +428,7 @@ export function installResumenSheetBridge(){
 }
 
 export function describe(){
-  return {...meta, lastSnapshot, lastWorksheetBuild};
+  return {...meta, audit:getInfoEventoAuditConfig(), lastSnapshot, lastWorksheetBuild, lastInfoEventoAttach};
 }
 
 const api = {
@@ -376,6 +440,9 @@ const api = {
   buildSections: buildResumenSections,
   writeWorksheet: writeResumenWorksheet,
   downloadStandalone: downloadStandaloneResumen,
+  attachToInfoEventoWorkbook: attachResumenToInfoEventoWorkbook,
+  enableInfoEventoAudit: setInfoEventoAuditEnabled,
+  auditConfig: getInfoEventoAuditConfig,
   capture: captureResumenSnapshot,
   preview,
   assertReady,

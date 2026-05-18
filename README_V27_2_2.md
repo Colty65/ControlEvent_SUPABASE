@@ -1,4 +1,4 @@
-# ControlEvent v27.2.2 - Corrección definitiva Precio referencia en carga BACKUP
+# ControlEvent v27.3 - Corrección definitiva Precio referencia en carga BACKUP
 
 Versión correctiva sobre v27.2.1.
 

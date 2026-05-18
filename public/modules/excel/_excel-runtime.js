@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.2.2';
+const EXCEL_RUNTIME_VERSION = 'v27.3';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -162,21 +162,22 @@ export function getInfo(){
   captureLegacyExcelActions();
   return {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade-resumen-writer-shadow',
+    mode: 'modular-public-facade-resumen-infoevento-audit',
     modules: listExcelModules(),
     lastRun,
     busy: Object.fromEntries(Array.from(runLocks.keys()).map(name => [name, true])),
     publicFacadeInstalled,
     publicFacadeActions: Array.from(publicFacadeMarkers),
     lastFacadeInstall,
-    legacy: getLegacyActionInfo()
+    legacy: getLegacyActionInfo(),
+    resumenAudit: window.ControlEventResumenSheet?.auditConfig?.() || null
   };
 }
 
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.2.2 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.3 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
@@ -192,7 +193,7 @@ export function installExcelRuntime(){
   captureLegacyExcelActions();
   window.ControlEventExcel = {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade-resumen-writer-shadow',
+    mode: 'modular-public-facade-resumen-infoevento-audit',
     register: registerExcelModule,
     run: runExcelAction,
     info: getInfo,
@@ -200,6 +201,8 @@ export function installExcelRuntime(){
     installPublicFacade: installPublicExcelFacade,
     downloadInfoEvento,
     downloadBackup,
+    enableResumenAudit: enabled => window.ControlEventResumenSheet?.enableInfoEventoAudit?.(enabled),
+    resumenAuditConfig: () => window.ControlEventResumenSheet?.auditConfig?.() || null,
     invokeLegacy: invokeLegacyExcelAction,
     legacyInfo: getLegacyActionInfo,
     get modules(){ return listExcelModules(); }
