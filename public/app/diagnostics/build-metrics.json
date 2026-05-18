@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v26.9",
+  "version": "ControlEvent v27.0",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -24,11 +24,11 @@
   "legacyBundlesV26_9": 2,
   "legacyRequestsReduced": 61,
   "legacyBundleBeforeModules": {
-    "file": "legacy-bundle-before-modules-v26.9.js",
+    "file": "legacy-bundle-before-modules-v27.0.js",
     "sourceScripts": 54
   },
   "legacyBundleAfterModules": {
-    "file": "legacy-bundle-after-modules-v26.9.js",
+    "file": "legacy-bundle-after-modules-v27.0.js",
     "sourceScripts": 9
   },
   "indexLinesOriginalV26_4": 21412,
@@ -37,11 +37,11 @@
   "indexBytesOriginalV26_4": 1418313,
   "indexBytesV26_5": 1166152,
   "indexBytesReducedTotalFromV26_4": 1396980,
-  "versionFile": "ControlEvent_v26_9",
+  "versionFile": "ControlEvent_v27_0",
   "indexHtml": {
     "linesV26_9": 448,
     "bytesV26_9": 21333,
-    "noteV26_9": "v26.9 mantiene index.html estable; añade limpieza segura de legacy y lista de archivos obsoletos para eliminar."
+    "noteV26_9": "v27.0 mantiene index.html estable; añade limpieza segura de legacy y lista de archivos obsoletos para eliminar."
   },
   "legacyAnalysis": {
     "mapFile": "public/app/diagnostics/legacy-function-map.json",
@@ -61,5 +61,6 @@
       "legacy-bundle-v26.7",
       "legacy-inline-*"
     ]
-  }
+  },
+  "noteV27_0": "v27.0 instala fachada pública modular para exportExcel/exportSeedWorkbook y conserva motor legacy encapsulado."
 }

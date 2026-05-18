@@ -33,7 +33,7 @@ export function callLegacy(name, ...args){
   try{
     return fn(...args);
   }catch(error){
-    console.warn(`[maintenance/v26.9] Error en ${name}`, error);
+    console.warn(`[maintenance/v27.0] Error en ${name}`, error);
     return undefined;
   }
 }
@@ -42,7 +42,7 @@ export function safeStep(label, fn){
   try{
     return fn?.();
   }catch(error){
-    console.warn(`[maintenance/v26.9] ${label}`, error);
+    console.warn(`[maintenance/v27.0] ${label}`, error);
     return undefined;
   }
 }
@@ -50,7 +50,7 @@ export function safeStep(label, fn){
 export function setSectionRoot(root, name){
   if(!root || !name) return;
   root.dataset.ceMaintenanceModule = name;
-  root.dataset.ceMaintenanceVersion = 'v26.9';
+  root.dataset.ceMaintenanceVersion = 'v27.0';
 }
 
 export function currentMaintenanceName(){
@@ -133,7 +133,7 @@ export function renderMaintenanceParts(context, actionNames = []){
 
 export function createMaintenanceSection({name, render = [], afterActivate, beforeActivate} = {}){
   return {
-    meta: {name, version:'v26.9', mode:'maintenance-legacy-controller'},
+    meta: {name, version:'v27.0', mode:'maintenance-legacy-controller'},
     mount(context = {}){
       setSectionRoot(context.root, name);
       return this.activate(context);
@@ -161,7 +161,7 @@ function scheduleActivation(section, options = {}){
   if(!section) return;
   window.setTimeout(() => {
     activateMaintenanceSection(section.name, options).catch(error => {
-      console.error('[maintenance/v26.9] No se pudo activar mantenimiento', section.name, error);
+      console.error('[maintenance/v27.0] No se pudo activar mantenimiento', section.name, error);
     });
   }, 0);
 }
@@ -180,7 +180,7 @@ export function installMaintenanceModules(){
   }, true);
 
   window.ControlEventMaintenance = {
-    version:'v26.9',
+    version:'v27.0',
     sections: maintenanceSections,
     activate: activateMaintenanceSection,
     refreshCurrent: refreshCurrentMaintenance,

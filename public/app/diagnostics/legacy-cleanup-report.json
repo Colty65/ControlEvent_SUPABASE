@@ -1,10 +1,10 @@
 {
-  "version": "ControlEvent v26.9",
+  "version": "ControlEvent v27.0",
   "purpose": "Primera limpieza segura del legacy: identificar y retirar del despliegue los bundles antiguos no cargados, sin modificar la lógica operativa.",
   "mode": "safe-cleanup-report",
   "activeLegacyBundles": [
-    "public/app/legacy/legacy-bundle-before-modules-v26.9.js",
-    "public/app/legacy/legacy-bundle-after-modules-v26.9.js"
+    "public/app/legacy/legacy-bundle-before-modules-v27.0.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.0.js"
   ],
   "legacyRequestsActive": 2,
   "indexHtml": {
@@ -31,5 +31,9 @@
     "Supabase backend routes",
     "screen render logic"
   ],
-  "nextRecommendedStep": "v27.0: empezar a extraer exportación Excel real desde legacy bundle hacia módulos Excel, manteniendo puente de compatibilidad."
+  "nextRecommendedStep": "v27.0: empezar a extraer exportación Excel real desde legacy bundle hacia módulos Excel, manteniendo puente de compatibilidad.",
+  "obsoleteFiles": [
+    "public/app/legacy/legacy-bundle-before-modules-v26.9.js",
+    "public/app/legacy/legacy-bundle-after-modules-v26.9.js"
+  ]
 }

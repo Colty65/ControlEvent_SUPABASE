@@ -1,4 +1,4 @@
-const CLEANUP_VERSION = 'v26.9';
+const CLEANUP_VERSION = 'v27.0';
 const CLEANUP_REPORT_URL = './diagnostics/legacy-cleanup-report.json';
 let cleanupReport = null;
 let cleanupPromise = null;
@@ -43,9 +43,9 @@ function info(){
     reportLoaded: !!cleanupReport,
     activeLegacyScripts: activeLegacyScripts(),
     loadedLegacyVersions: loadedLegacyVersions(),
-    expectedLegacyVersion: 'v26.9',
+    expectedLegacyVersion: 'v27.0',
     activeLegacyRequestCount: activeLegacyScripts().length,
-    oldVersionLoaded: loadedLegacyVersions().some(version => version !== 'v26.9')
+    oldVersionLoaded: loadedLegacyVersions().some(version => version !== 'v27.0')
   };
 }
 
@@ -54,7 +54,7 @@ function assertClean(){
   const warnings = [];
   if(result.activeLegacyRequestCount !== 2) warnings.push(`Se esperaban 2 bundles legacy activos y hay ${result.activeLegacyRequestCount}.`);
   if(result.oldVersionLoaded) warnings.push(`Hay scripts legacy de versión antigua cargados: ${result.loadedLegacyVersions.join(', ')}`);
-  if(warnings.length) console.warn('[ControlEventLegacyCleanup/v26.9]', warnings, result);
+  if(warnings.length) console.warn('[ControlEventLegacyCleanup/v27.0]', warnings, result);
   return {ok: warnings.length === 0, warnings, ...result};
 }
 

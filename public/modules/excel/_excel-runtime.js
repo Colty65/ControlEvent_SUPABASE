@@ -1,18 +1,69 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
+const EXCEL_RUNTIME_VERSION = 'v27.0';
 const registry = new Map();
+const legacyEngines = new Map();
+const publicFacadeMarkers = new Set();
+const runLocks = new Map();
 let installed = false;
+let publicFacadeInstalled = false;
 let lastRun = null;
+let lastFacadeInstall = null;
 
 export function resolveApp(){
   return getApp() || window.ControlEventApp || window;
 }
 
-export function resolveExcelAction(name){
+function isFacadeFunction(fn, name){
+  return typeof fn === 'function' && (fn.__ceExcelFacade === true || fn.__ceExcelFacadeName === name);
+}
+
+function rememberLegacyAction(name, fn){
+  if(typeof fn !== 'function') return null;
+  if(isFacadeFunction(fn, name)) return legacyEngines.get(name) || null;
+  if(!legacyEngines.has(name)) legacyEngines.set(name, fn);
+  return legacyEngines.get(name) || fn;
+}
+
+export function captureLegacyExcelActions(){
+  ['exportExcel','exportSeedWorkbook'].forEach(name => {
+    const app = resolveApp();
+    const fromApp = app?.actions?.[name] || app?.[name];
+    const fromWindow = window[name];
+    rememberLegacyAction(name, fromWindow);
+    rememberLegacyAction(name, fromApp);
+  });
+  return getLegacyActionInfo();
+}
+
+export function getLegacyAction(name){
+  captureLegacyExcelActions();
+  return legacyEngines.get(name) || null;
+}
+
+export function getLegacyActionInfo(){
+  return Object.fromEntries(['exportExcel','exportSeedWorkbook'].map(name => {
+    const fn = legacyEngines.get(name);
+    return [name, {
+      captured: typeof fn === 'function',
+      facadePublic: isFacadeFunction(window[name], name),
+      legacyName: fn?.name || null
+    }];
+  }));
+}
+
+export function resolveExcelAction(name, {preferLegacy = false} = {}){
+  if(preferLegacy){
+    const legacy = getLegacyAction(name);
+    if(typeof legacy === 'function') return legacy;
+  }
   const app = resolveApp();
   const fromApp = app?.actions?.[name] || app?.[name];
   const fromWindow = window[name];
-  return typeof fromApp === 'function' ? fromApp : (typeof fromWindow === 'function' ? fromWindow : null);
+  if(typeof fromWindow === 'function' && !isFacadeFunction(fromWindow, name)) return fromWindow;
+  if(typeof fromApp === 'function' && !isFacadeFunction(fromApp, name)) return fromApp;
+  const legacy = getLegacyAction(name);
+  return typeof legacy === 'function' ? legacy : null;
 }
 
 export function registerExcelModule(name, module){
@@ -25,6 +76,16 @@ export function listExcelModules(){
   return Array.from(registry.keys());
 }
 
+export async function invokeLegacyExcelAction(name, args = [], options = {}){
+  const legacy = getLegacyAction(name) || resolveExcelAction(name, {preferLegacy:true});
+  if(typeof legacy !== 'function'){
+    const fallback = () => callAction(name, ...(Array.isArray(args) ? args : [args]));
+    if(typeof fallback === 'function') return fallback();
+    throw new Error(`No se ha encontrado el motor legacy Excel ${name}.`);
+  }
+  return legacy.apply(options.thisArg || window, Array.isArray(args) ? args : [args]);
+}
+
 export async function runExcelAction(name, options = {}){
   const startedAt = Date.now();
   const module = registry.get(name) || null;
@@ -32,57 +93,120 @@ export async function runExcelAction(name, options = {}){
   if(typeof action !== 'function'){
     throw new Error(`No se ha encontrado la accion Excel ${name}.`);
   }
-  window.dispatchEvent(new CustomEvent('controlevent:excel-before-run', {detail:{name, options}}));
-  try{
-    const result = await action(options);
-    lastRun = {name, ok:true, startedAt, finishedAt:Date.now(), options};
-    window.dispatchEvent(new CustomEvent('controlevent:excel-after-run', {detail:{...lastRun, result}}));
-    return result;
-  }catch(error){
-    lastRun = {name, ok:false, startedAt, finishedAt:Date.now(), options, error};
-    window.dispatchEvent(new CustomEvent('controlevent:excel-error', {detail:lastRun}));
-    throw error;
+  if(runLocks.get(name)){
+    console.warn(`[ControlEventExcel/${EXCEL_RUNTIME_VERSION}] Acción ${name} ignorada: ya hay una ejecución en curso.`);
+    return runLocks.get(name);
   }
+  const runPromise = (async () => {
+    window.dispatchEvent(new CustomEvent('controlevent:excel-before-run', {detail:{name, options, version:EXCEL_RUNTIME_VERSION}}));
+    try{
+      const result = await action(options);
+      lastRun = {name, ok:true, startedAt, finishedAt:Date.now(), options, controllerVersion:EXCEL_RUNTIME_VERSION};
+      window.dispatchEvent(new CustomEvent('controlevent:excel-after-run', {detail:{...lastRun, result}}));
+      return result;
+    }catch(error){
+      lastRun = {name, ok:false, startedAt, finishedAt:Date.now(), options, controllerVersion:EXCEL_RUNTIME_VERSION, error};
+      window.dispatchEvent(new CustomEvent('controlevent:excel-error', {detail:lastRun}));
+      throw error;
+    }finally{
+      runLocks.delete(name);
+    }
+  })();
+  runLocks.set(name, runPromise);
+  return runPromise;
 }
 
 export function downloadInfoEvento(options = {}){
-  const fn = resolveExcelAction('exportExcel') || (() => callAction('exportExcel'));
-  if(typeof fn !== 'function') throw new Error('No se ha encontrado exportExcel.');
-  return fn(options);
+  return invokeLegacyExcelAction('exportExcel', options.args || [], options);
 }
 
 export function downloadBackup(options = {}){
-  const fn = resolveExcelAction('exportSeedWorkbook') || (() => callAction('exportSeedWorkbook'));
-  if(typeof fn !== 'function') throw new Error('No se ha encontrado exportSeedWorkbook.');
-  return fn(options);
+  return invokeLegacyExcelAction('exportSeedWorkbook', options.args || [], options);
+}
+
+function makeFacade(name){
+  const facade = function controlEventExcelFacade(){
+    return runExcelAction(name, {
+      source: 'public-facade',
+      args: Array.from(arguments),
+      calledAt: new Date().toISOString()
+    });
+  };
+  Object.defineProperty(facade, '__ceExcelFacade', {value:true});
+  Object.defineProperty(facade, '__ceExcelFacadeName', {value:name});
+  Object.defineProperty(facade, '__ceExcelFacadeVersion', {value:EXCEL_RUNTIME_VERSION});
+  return facade;
+}
+
+export function installPublicExcelFacade(){
+  captureLegacyExcelActions();
+  ['exportExcel','exportSeedWorkbook'].forEach(name => {
+    const current = window[name];
+    if(!isFacadeFunction(current, name)) rememberLegacyAction(name, current);
+    const facade = makeFacade(name);
+    window[name] = facade;
+    publicFacadeMarkers.add(name);
+    try{
+      // En scripts legacy clásicos el binding global suele reflejar window[name].
+      // Se deja dentro de try para no romper módulos estrictos si el binding no existe.
+      // eslint-disable-next-line no-eval
+      window.eval(`${name} = window.${name}`);
+    }catch(_){ }
+  });
+  publicFacadeInstalled = true;
+  lastFacadeInstall = {installedAt: new Date().toISOString(), actions: Array.from(publicFacadeMarkers)};
+  return lastFacadeInstall;
 }
 
 export function getInfo(){
+  captureLegacyExcelActions();
   return {
-    version: 'v26.9',
+    version: EXCEL_RUNTIME_VERSION,
+    mode: 'modular-public-facade',
     modules: listExcelModules(),
     lastRun,
-    legacy: {
-      exportExcel: typeof (window.exportExcel || resolveExcelAction('exportExcel')) === 'function',
-      exportSeedWorkbook: typeof (window.exportSeedWorkbook || resolveExcelAction('exportSeedWorkbook')) === 'function'
-    }
+    busy: Object.fromEntries(Array.from(runLocks.keys()).map(name => [name, true])),
+    publicFacadeInstalled,
+    publicFacadeActions: Array.from(publicFacadeMarkers),
+    lastFacadeInstall,
+    legacy: getLegacyActionInfo()
   };
+}
+
+export function assertReady(){
+  const info = getInfo();
+  const warnings = [];
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.0 no está instalada.');
+  if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
+  if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
+  if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
+  if(!registry.has('exportSeedWorkbook')) warnings.push('No está registrado el módulo BACKUP.');
+  const result = {ok: warnings.length === 0, warnings, info};
+  if(warnings.length) console.warn(`[ControlEventExcel/${EXCEL_RUNTIME_VERSION}]`, warnings, info);
+  return result;
 }
 
 export function installExcelRuntime(){
   if(installed) return window.ControlEventExcel;
   installed = true;
+  captureLegacyExcelActions();
   window.ControlEventExcel = {
-    version: 'v26.9',
-    mode: 'legacy-bridge',
+    version: EXCEL_RUNTIME_VERSION,
+    mode: 'modular-public-facade',
     register: registerExcelModule,
     run: runExcelAction,
     info: getInfo,
+    assertReady,
+    installPublicFacade: installPublicExcelFacade,
     downloadInfoEvento,
     downloadBackup,
+    invokeLegacy: invokeLegacyExcelAction,
+    legacyInfo: getLegacyActionInfo,
     get modules(){ return listExcelModules(); }
   };
   window.__ceV262Excel = window.ControlEventExcel;
   window.__ceV264Excel = window.ControlEventExcel;
+  window.__ceV270Excel = window.ControlEventExcel;
+  installPublicExcelFacade();
   return window.ControlEventExcel;
 }

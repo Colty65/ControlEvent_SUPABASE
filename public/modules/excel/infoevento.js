@@ -2,9 +2,9 @@ import { downloadInfoEvento, registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'infoevento',
-  version: 'v26.9',
-  mode: 'legacy-export-controller',
-  description: 'Controlador modular para INFOEVENTO. Mantiene la exportacion legacy final como fuente de verdad.'
+  version: 'v27.0',
+  mode: 'modular-public-facade',
+  description: 'Controlador modular para INFOEVENTO. La llamada pública exportExcel ya pasa por este módulo; el motor de generación legacy se conserva como backend estable.'
 };
 
 export function run(options = {}){

@@ -2,7 +2,7 @@ import { registerExcelModule } from './_excel-runtime.js';
 
 export const meta = {
   name: 'graficas-sheet',
-  version: 'v26.9',
+  version: 'v27.0',
   mode: 'sheet-boundary',
   description: 'Frontera modular documentada para separar la hoja GRAFICAS en una fase posterior.'
 };
