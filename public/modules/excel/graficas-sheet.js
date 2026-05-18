@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.5';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.5:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.6';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.6:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.5 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.6 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -345,11 +345,12 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 export async function downloadStandaloneGraficas(options = {}){
   const ExcelJS = await ensureExcelJS();
   const workbook = new ExcelJS.Workbook();
+  workbook.__ceModularStandaloneClean = true;
   workbook.creator = `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeGraficasWorksheet(workbook, {sheetName:'GRAFICAS', ...options});
   result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.5'});
+  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.6'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -357,7 +358,7 @@ export async function downloadStandaloneGraficas(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_5_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_6_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

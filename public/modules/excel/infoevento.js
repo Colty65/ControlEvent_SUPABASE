@@ -3,9 +3,9 @@ import { captureResumenSnapshot } from './resumen-sheet.js';
 
 export const meta = {
   name: 'infoevento',
-  version: 'v27.4.5',
+  version: 'v27.4.6',
   mode: 'modular-public-facade-with-resumen-graficas-infoevento-audit',
-  description: 'Controlador modular para INFOEVENTO. Desde v27.4.5 mantiene el libro final limpio: no añade hojas RESUMEN_MODULAR/GRAFICAS_MODULAR por defecto; las herramientas modulares quedan disponibles sólo en standalone.'
+  description: 'Controlador modular para INFOEVENTO. Desde v27.4.6 mantiene el libro final limpio: no añade hojas RESUMEN_MODULAR/GRAFICAS_MODULAR por defecto; las herramientas modulares quedan disponibles sólo en standalone.'
 };
 
 let lastResumenSnapshot = null;
