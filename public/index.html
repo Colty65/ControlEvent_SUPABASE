@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v25.9</title>
-  <!-- ControlEvent v25.9 PWA / instalación móvil -->
+  <title>ControlEvent v25.9.1</title>
+  <!-- ControlEvent v25.9.1 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -331,7 +331,7 @@ body.mobile-drawer-open .mobile-drawer-backdrop,body.mobile-drawer-open .mobile-
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v25.9</span>
+          <span>ControlEvent v25.9.1</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -2720,7 +2720,7 @@ async function exportSeedWorkbook(){
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2812,7 +2812,7 @@ async function exportSeedWorkbook(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'ControlEvent_v25_9_descarga_datos.xlsx';
+  a.download = 'ControlEvent_v25_9_1_descarga_datos.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -2840,7 +2840,7 @@ async function exportExcel(){
   const tiendaRows = summaryByTiendaTicket();
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -3037,7 +3037,7 @@ async function exportExcel(){
   const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
   let r = 1;
   mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.9 - ©oltyLAB ’26');
+  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.9.1 - ©oltyLAB ’26');
   putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
   putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
   wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -3173,7 +3173,7 @@ async function exportExcel(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v25_9.xlsx`;
+  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v25_9_1.xlsx`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -4024,7 +4024,7 @@ function donorOptions(){
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
@@ -4074,7 +4074,7 @@ function donorOptions(){
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_9_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_9_1_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -4477,7 +4477,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v25_9-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
+    return `ControlEvent_v25_9_1-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
   }
   function graphData(){
     const b = budgetSummary();
@@ -5053,7 +5053,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = summaryByTiendaTicket();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -5134,7 +5134,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
     let r = 1;
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.9 - ©oltyLAB ’26');
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v25.9.1 - ©oltyLAB ’26');
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
     wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -5365,7 +5365,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   };
 
   window.socioResponsableOptions = function(){
@@ -6726,7 +6726,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
 
   exportExcel = async function(){
@@ -6753,7 +6753,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket() : [];
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6962,7 +6962,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = filenameV153;
 
@@ -6978,7 +6978,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         return;
       }
       const wb = new ExcelJS.Workbook();
-      wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+      wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
       wb.created = new Date();
 
       const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7028,7 +7028,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'ControlEvent_v25_9_descarga_datos.xlsx';
+      a.download = 'ControlEvent_v25_9_1_descarga_datos.xlsx';
       a.click();
       URL.revokeObjectURL(a.href);
     };
@@ -7740,7 +7740,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV160;
 
@@ -7850,7 +7850,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7905,7 +7905,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_9_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_9_1_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -7937,7 +7937,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v25.9 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v25.9.1 - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -9081,7 +9081,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script>
 /* ==== V16.4 FIXES: EXCEL, GRAFICAS, COMPRAS, AGRUPACION, TICKETS ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
+  const VERSION = 'ControlEvent v25.9.1';
   const $v164 = id => document.getElementById(id);
   const escV164 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   const fmtMoneyV164 = v => {
@@ -9525,7 +9525,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV164;
 
@@ -9558,7 +9558,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v25_9_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v25_9_1_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -9702,7 +9702,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 /* ==== V17.2 FIXES: EXCEL RESUMEN, ORDENACIONES Y DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
+  const VERSION = 'ControlEvent v25.9.1';
   const $v171 = id => document.getElementById(id);
   const normV171 = v => String(v ?? '').trim();
   const escV171 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));
@@ -9937,7 +9937,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v25_9_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v25_9_1_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV171;
 
@@ -10076,7 +10076,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const hh = pad(date.getHours());
     const mi = pad(date.getMinutes());
     const ss = pad(date.getSeconds());
-    return `Emitido por “©oltyLAB ’26_ControlEvent_v25_9_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
+    return `Emitido por “©oltyLAB ’26_ControlEvent_v25_9_1_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
 
   async function exportExcelV171(){
@@ -10335,7 +10335,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v180-tooltips-and-grouping-script">
 /* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÓN Y AGRUPACIÓN DE DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
+  const VERSION = 'ControlEvent v25.9.1';
   const norm = v => String(v ?? '').trim();
   const fmt = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
@@ -10532,8 +10532,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v181-backup-tooltip-excel-script">
 /* ==== V18.1: tooltips redondeados, backup por evento y Excel INGRESOS ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const norm = v => String(v ?? '').trim();
   const normalize = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
@@ -10765,8 +10765,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v190-integrity-tooltips-export-script">
 /* ==== V19.0: globos con scroll, nombres de Excel/backup, precio € en backup e integridad al eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -11089,8 +11089,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v1911-integrity-tooltips-script">
 /* ==== V19.1.1: parte de v19.0; bloqueo real de dependencias y globos restaurados ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -11505,8 +11505,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v192-tooltip-size-bold-script">
 /* ==== V19.2: tamaño de globos y negritas en productos, donantes/personas e importes totales ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const getRawTip = el => {
@@ -11645,8 +11645,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v193-tooltip-click-sort-script">
 /* ==== V19.3: globos por clic, orden alfabético y negrita controlada ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12064,8 +12064,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v194-tooltip-excel-script">
 /* ==== V19.4: los globos no cambian al mover el cursor y el botón Excel queda cableado de forma directa ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12267,7 +12267,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v25_9/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v25_9_1/ig, VERSION_FILE);
     return n;
   }
   const currentAnchorClick = HTMLAnchorElement.prototype.click;
@@ -12384,8 +12384,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v1952-tooltip-excel-fix-script">
 /* ==== V19.5.2: recupera globos y Excel desde v19.4, evitando interferencias de parches antiguos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12771,8 +12771,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 <script id="v196-tooltip-behavior-script">
 /* ==== V19.6: comportamiento de Por tienda y Ticket aplicado a todos los globos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13072,8 +13072,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v200-tooltip-format-delete-maint-script">
 /* ==== V20.0: formato de globos, mantenimiento robusto y avisos en eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const BLOCK_MSG = 'No autorizado. Tiene dependencias';
   const OK_MSG = 'Se puede eliminar. No hay dependencias';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
@@ -13430,8 +13430,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v201-final-fixes-script">
 /* ==== V20.1: formato fino de globos y botones mantenimiento/carga ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13730,8 +13730,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v202-final-fixes-script">
 /* ==== V20.2: toggle mantenimiento, carga sin selector automático, globos y fotos ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13928,7 +13928,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v210-patch-script">
 /* ==== V21.0: producto duplicado permitido si cambia la tienda + globos estables ==== */
 (function(){
-  const VERSION='ControlEvent v25.9'; const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1'; const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13989,7 +13989,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v211-tooltip-final-script">
 /* ==== V21.1: globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v25.9'; const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1'; const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
@@ -14065,8 +14065,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v212-final-script">
 /* ==== V21.2: separación CARGA/MANTENIMIENTO, backup y globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).toUpperCase();
@@ -14249,8 +14249,8 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
 <script id="v213-final-script">
 /* ==== V21.3.1: cabeceras primero, globos reencolumnados e INFOEVENTO sin fallback; muestra error real ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14370,7 +14370,7 @@ button.ce-delete-blocked-v200{outline:2px solid rgba(220,38,38,.25);}
       return await previousExport.apply(this,arguments);
     }catch(err){
       window.__ultimoErrorInfoEvento=err;
-      console.group('ERROR INFOEVENTO - ControlEvent v25.9');
+      console.group('ERROR INFOEVENTO - ControlEvent v25.9.1');
       console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o código.', err);
       try{console.error('Stack:', err&&err.stack?err.stack:'Sin stack disponible');}catch(_){}
       try{console.log('Evento activo:', ev());}catch(_){}
@@ -14410,8 +14410,8 @@ var addCellNote = window.addCellNote || function(cell, text){
 };
 window.addCellNote = addCellNote;
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   function refreshVersionV2132(){
     try{ document.title = VERSION; }catch(_){ }
     try{
@@ -14451,8 +14451,8 @@ window.addCellNote = addCellNote;
 <script id="v214-donaciones-grafica-fix">
 /* ==== V21.4: donaciones duplicadas por Producto+Donante y corrección gráfico ingresos socio ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14623,7 +14623,7 @@ window.addCellNote = addCellNote;
 <script id="v2141-graph-income-socio-strict-fix">
 /* ==== V21.4.1: corrección estricta Socios Banco/Bizum/Efectivo = Número x Precio evento ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
+  const VERSION='ControlEvent v25.9.1';
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
     try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){}
@@ -14644,8 +14644,8 @@ window.addCellNote = addCellNote;
 <script id="v215-minimal-fix-donaciones-excel-fotos">
 /* ==== V21.5: solo corrige fotos INFOEVENTO y duplicidad Donaciones Producto+Donante ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14828,8 +14828,8 @@ window.addCellNote = addCellNote;
 <script id="v216-excel-ticket-images-protection-script">
 /* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protección reforzada ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
   function st(){ try{ if(typeof state !== 'undefined') return state; }catch(_){ } return window.state || {}; }
@@ -14962,8 +14962,8 @@ window.addCellNote = addCellNote;
 <script id="v217-final-ticket-images-book-protection-script">
 /* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protección open_excel_arrastre ==== */
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const EXCEL_PASSWORD = 'open_excel_arrastre';
   const WORKBOOK_PASSWORD_HASH = 'D184';
   const norm = v => String(v ?? '').trim();
@@ -15205,8 +15205,8 @@ window.addCellNote = addCellNote;
 <script id="v225-clean-script">
 /* ==== V22.5: corrección limpia de fotos de tickets y claves ACCESOS ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const EXCEL_PASSWORD='open_excel_arrastre';
   const DB_NAME='controlevent_ticket_images_v225';
   const DB_STORE='images';
@@ -15508,8 +15508,8 @@ window.addCellNote = addCellNote;
 <script id="v226-mobile-responsive-script">
 /* ==== v22.8: menú móvil y navegación responsive ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   function $(id){return document.getElementById(id)}
   function clickId(id){const el=$(id); if(el){el.click(); closeDrawer();}}
   function ensureMobileMenu(){
@@ -15786,8 +15786,8 @@ body.ce-role-ro.ce-event-not-finalized .mobile-menu-action[data-target="btnExpor
 <script id="v228-role-permissions-script">
 /* ==== v22.8: criterios de opciones y permisos por nivel GD/RW/RO ==== */
 (function(){
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   function $(id){return document.getElementById(id)}
   function role(){try{return String((typeof authUser!=='undefined'&&authUser&&authUser.nivel)||'').toUpperCase();}catch(_){return '';}}
   function isGD(){return role()==='GD'}
@@ -15924,8 +15924,8 @@ body.ce-role-ro.ce-event-not-finalized .mobile-menu-action[data-target="btnExpor
 /* ==== v22.9: correcciones de evento finalizado y claves ACCESOS ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const ACCESS_CACHE_KEY='controlevent_v229_access_clear_cache';
   const $=id=>document.getElementById(id);
@@ -16109,8 +16109,8 @@ body.ce-v233-final-consulta .locked,body.ce-v233-final-consulta .app-lockable.lo
 /* ==== v23.3 ESTABILIZACIÓN: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16311,8 +16311,8 @@ body.ce-v233-final-consulta .locked,body.ce-v233-final-consulta .app-lockable.lo
 /* ==== v23.4: claves, gráfico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16449,8 +16449,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4: permisos GD/RW/RO, evento finalizado consultable, fotos solo visuales y TOTAL ESTIMADO ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -16573,8 +16573,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4 local: no precargar state pesado, no localStorage pesado, fotos como archivos ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const SESSION_KEY='ControlEvent_v25_9_session';
+  const VERSION='ControlEvent v25.9.1';
+  const SESSION_KEY='ControlEvent_v25_9_1_session';
   const $=id=>document.getElementById(id);
   const stateRef=()=>{ try{return state;}catch(_){return window.state||{};} };
   const eventId=()=>String(stateRef().selectedEventId||'');
@@ -16738,8 +16738,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versión Excel correcta ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const up = v => String(v ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const num = v => Number(v || 0) || 0;
   function getState(){ try{return state;}catch(_){return window.state||{};} }
@@ -16862,8 +16862,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.5 local: corrección final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   function parseNum(v){
@@ -17056,8 +17056,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v23.6.6 local: cálculo directo y único de INGRESOS por TOTAL real ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v25.9';
-  const VERSION_FILE='ControlEvent_v25_9';
+  const VERSION='ControlEvent v25.9.1';
+  const VERSION_FILE='ControlEvent_v25_9_1';
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const $=id=>document.getElementById(id);
@@ -17196,8 +17196,8 @@ body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v23
 /* ==== v24.0: tienda/ticket pendiente, graficas limpias, orden ingresos y fotos INFOEVENTO ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -17776,8 +17776,8 @@ body.ce-v241-ro #mtAccesoBtn{
 
 <script id="v241-fixes">
 (function(){
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const norm = v => String(v ?? '').trim();
@@ -18145,8 +18145,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -18389,8 +18389,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -18748,8 +18748,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -19046,8 +19046,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -19437,8 +19437,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -19806,8 +19806,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -20286,8 +20286,8 @@ body.ce-v250-no-event #maintenanceWrapper{display:none !important;}
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -20713,8 +20713,8 @@ body.ce-v257-gd #newProductoPrecio{
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -21213,24 +21213,32 @@ body.ce-v257-gd #newProductoPrecio{
     if(addImage(wb, wsRes, makeGroupingChart('destino'), r, 1, 980, 360)){ for(let rr=r; rr<r+17; rr++) wsRes.getRow(rr).height = 20; }
     const wsIng = x.sheet('INGRESOS', [34,12,18,18,18,18]);
     x.title(wsIng,1,'INGRESOS',6); x.headers(wsIng,3,['Colaborador/a','Numero','Ingreso','Importe obligatorio','Importe voluntario','Total']);
-    r = 4; collabs().forEach(c => { x.text(wsIng,r,1,c.persona?.nombre || ''); x.number(wsIng,r,2,c.numero); x.text(wsIng,r,3,c.situacion || ''); x.euro(wsIng,r,4,c.base); x.euro(wsIng,r,5,c.donation); x.euro(wsIng,r++,6,c.total, up(c.situacion)==='PENDIENTE'?'warn':'white'); });
+    const ingresoRows = collabs();
+    r = 4; ingresoRows.forEach(c => { x.text(wsIng,r,1,c.persona?.nombre || ''); x.number(wsIng,r,2,c.numero); x.text(wsIng,r,3,c.situacion || ''); x.euro(wsIng,r,4,c.base); x.euro(wsIng,r,5,c.donation); x.euro(wsIng,r++,6,c.total, up(c.situacion)==='PENDIENTE'?'warn':'white'); });
+    x.text(wsIng,r,1,'TOTAL','soft',true); x.number(wsIng,r,2,sum(ingresoRows.map(c => c.numero)),'soft',true); x.text(wsIng,r,3,'','soft',true); x.euro(wsIng,r,4,sum(ingresoRows.map(c => c.base)),'soft',true); x.euro(wsIng,r,5,sum(ingresoRows.map(c => c.donation)),'soft',true); x.euro(wsIng,r,6,sum(ingresoRows.map(c => c.total)),'soft',true); wsIng.getRow(r).height = 24;
     const wsCom = x.sheet('COMPRAS Y OTROS GASTOS', [30,12,16,16,26,28,28]);
     x.title(wsCom,1,'COMPRAS Y OTROS GASTOS',7); x.headers(wsCom,3,['Producto','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable']);
-    r = 4; compras().filter(c => !isDonation(ticket(c))).sort((a,b) => productName(a).localeCompare(productName(b),'es')).forEach(c => { x.text(wsCom,r,1,productName(c)); x.number(wsCom,r,2,units(c)); x.euro(wsCom,r,3,price(c)); x.euro(wsCom,r,4,value(c), !ticket(c)?'warn':'white'); x.text(wsCom,r,5,ticket(c)); x.text(wsCom,r,6,storeName(c)); x.text(wsCom,r++,7,c.responsable?.nombre || personName(c.responsableId)); });
+    const compraRows = compras().filter(c => !isDonation(ticket(c))).sort((a,b) => productName(a).localeCompare(productName(b),'es'));
+    r = 4; compraRows.forEach(c => { x.text(wsCom,r,1,productName(c)); x.number(wsCom,r,2,units(c)); x.euro(wsCom,r,3,price(c)); x.euro(wsCom,r,4,value(c), !ticket(c)?'warn':'white'); x.text(wsCom,r,5,ticket(c)); x.text(wsCom,r,6,storeName(c)); x.text(wsCom,r++,7,c.responsable?.nombre || personName(c.responsableId)); });
+    x.text(wsCom,r,1,'TOTAL','soft',true); x.number(wsCom,r,2,sum(compraRows.map(c => units(c))),'soft',true); x.text(wsCom,r,3,'','soft',true); x.euro(wsCom,r,4,sum(compraRows.map(c => value(c))),'soft',true); x.text(wsCom,r,5,'','soft',true); x.text(wsCom,r,6,'','soft',true); x.text(wsCom,r,7,'','soft',true); wsCom.getRow(r).height = 24;
     const wsDon = x.sheet('DONACIONES DE PRODUCTO', [30,12,16,18,22,28,28]);
     x.title(wsDon,1,'DONACIONES DE PRODUCTO',7); x.headers(wsDon,3,['Producto','Unidades','Precio','Valor estimado','Tipo de donacion','Donante','Responsable']);
-    r = 4; compras().filter(c => isDonation(ticket(c))).sort((a,b) => donorName(a).localeCompare(donorName(b),'es') || productName(a).localeCompare(productName(b),'es')).forEach(c => { x.text(wsDon,r,1,productName(c)); x.number(wsDon,r,2,units(c)); x.euro(wsDon,r,3,price(c)); x.euro(wsDon,r,4,value(c)); x.text(wsDon,r,5,ticket(c)); x.text(wsDon,r,6,donorName(c)); x.text(wsDon,r++,7,c.responsable?.nombre || personName(c.responsableId)); });
+    const donacionRows = compras().filter(c => isDonation(ticket(c))).sort((a,b) => donorName(a).localeCompare(donorName(b),'es') || productName(a).localeCompare(productName(b),'es'));
+    r = 4; donacionRows.forEach(c => { x.text(wsDon,r,1,productName(c)); x.number(wsDon,r,2,units(c)); x.euro(wsDon,r,3,price(c)); x.euro(wsDon,r,4,value(c)); x.text(wsDon,r,5,ticket(c)); x.text(wsDon,r,6,donorName(c)); x.text(wsDon,r++,7,c.responsable?.nombre || personName(c.responsableId)); });
+    x.text(wsDon,r,1,'TOTAL','soft',true); x.number(wsDon,r,2,sum(donacionRows.map(c => units(c))),'soft',true); x.text(wsDon,r,3,'','soft',true); x.euro(wsDon,r,4,sum(donacionRows.map(c => value(c))),'soft',true); x.text(wsDon,r,5,'','soft',true); x.text(wsDon,r,6,'','soft',true); x.text(wsDon,r,7,'','soft',true); wsDon.getRow(r).height = 24;
     function groupingSheet(name, title, data){
       const ws = x.sheet(name, [32,16,16,22,16]);
       x.title(ws,1,title,5); x.headers(ws,3,[title.includes('SEGMENTO')?'Segmento':'Destino','Comprado','Donado','Pte. Compra u otros gastos','Total']);
       let rr = 4; data.forEach(it => { x.text(ws,rr,1,it.label || ''); x.euro(ws,rr,2,it.comprado); x.euro(ws,rr,3,it.donado); x.euro(ws,rr,4,it.pendiente, num(it.pendiente)?'warn':'white'); x.euro(ws,rr++,5,it.total); });
+      x.text(ws,rr,1,'TOTAL GENERAL','soft',true); x.euro(ws,rr,2,sum(data.map(it => it.comprado)),'soft',true); x.euro(ws,rr,3,sum(data.map(it => it.donado)),'soft',true); x.euro(ws,rr,4,sum(data.map(it => it.pendiente)),'soft',true); x.euro(ws,rr,5,sum(data.map(it => it.total)),'soft',true); ws.getRow(rr).height = 24;
     }
     groupingSheet('CALCULOS_SEGMENTO','CALCULOS POR SEGMENTO', grouping('segmento'));
     groupingSheet('CALCULOS_DESTINO','CALCULOS POR DESTINO', grouping('destino'));
     const wsTT = x.sheet('CALCULOS_TIENDA_TICKET', [48,18,28]);
     x.title(wsTT,1,'CALCULOS POR TIENDA Y TICKET',3); x.headers(wsTT,3,['Tienda/Ticket/Donacion/Otros gastos','Importe','Imagen']);
+    const tiendaTicketData = tiendaTicketRows();
     r = 4;
-    for(const row of tiendaTicketRows()){
+    for(const row of tiendaTicketData){
       const label = norm(row.label || row.k || row.concepto || '');
       x.text(wsTT,r,1,label,row.pending?'warn':'white',!!row.pending);
       x.euro(wsTT,r,2,row.v ?? row.total ?? row.importe ?? 0,row.pending?'warn':'white');
@@ -21238,6 +21246,7 @@ body.ce-v257-gd #newProductoPrecio{
       if(img && addImage(wb, wsTT, img, r, 3, 170, 95)) wsTT.getRow(r).height = 76;
       r++;
     }
+    x.text(wsTT,r,1,'TOTAL GENERAL','soft',true); x.euro(wsTT,r,2,sum(tiendaTicketData.map(row => row.v ?? row.total ?? row.importe ?? 0)),'soft',true); x.text(wsTT,r,3,'','soft',true); wsTT.getRow(r).height = 24;
     const wsGraf = x.sheet('GRAFICAS', [28,28,28,28,28,28,28]);
     x.title(wsGraf,1,'GRAFICAS DEL EVENTO',7);
     x.text(wsGraf,2,1,'Evento','soft',true); wsGraf.mergeCells(2,2,2,7); x.text(wsGraf,2,2,ev.titulo || '','soft');
@@ -21308,8 +21317,8 @@ body.ce-v257-gd #newProductoPrecio{
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v25.9';
-  const VERSION_FILE = 'ControlEvent_v25_9';
+  const VERSION = 'ControlEvent v25.9.1';
+  const VERSION_FILE = 'ControlEvent_v25_9_1';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
