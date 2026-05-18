@@ -1,5 +1,5 @@
 {
-  "version": "v27.0.1",
+  "version": "v27.0.2",
   "purpose": "Primera limpieza segura del legacy: identificar y retirar del despliegue los bundles antiguos no cargados, sin modificar la lógica operativa.",
   "mode": "safe-cleanup-report",
   "activeLegacyBundles": [

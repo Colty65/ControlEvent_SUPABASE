@@ -7,6 +7,7 @@ import authRoutes from '../routes/auth.routes.js';
 import healthRoutes from '../routes/health.routes.js';
 import stateRoutes from '../routes/state.routes.js';
 import ticketImagesRoutes from '../routes/ticket-images.routes.js';
+import exportRoutes from '../routes/export.routes.js';
 import { BACKEND_NAME, NODE_MODULES_DIR, PUBLIC_DIR, ROOT } from './paths.js';
 
 export function createApp() {
@@ -40,6 +41,7 @@ export function createApp() {
   app.use('/api', authRoutes);
   app.use('/api', accessRoutes);
   app.use('/api', ticketImagesRoutes);
+  app.use('/api', exportRoutes);
   app.use('/api', healthRoutes);
 
   app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));

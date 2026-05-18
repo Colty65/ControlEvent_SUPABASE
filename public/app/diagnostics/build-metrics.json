@@ -1,5 +1,5 @@
 {
-  "version": "v27.0.1",
+  "version": "v27.0.2",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -39,9 +39,8 @@
   "indexBytesReducedTotalFromV26_4": 1396980,
   "versionFile": "ControlEvent_v27_0",
   "indexHtml": {
-    "linesV26_9": 448,
-    "bytesV26_9": 21333,
-    "noteV26_9": "v27.0 mantiene index.html estable; añade limpieza segura de legacy y lista de archivos obsoletos para eliminar."
+    "lines": 447,
+    "bytes": 21345
   },
   "legacyAnalysis": {
     "mapFile": "public/app/diagnostics/legacy-function-map.json",
@@ -64,5 +63,6 @@
   },
   "noteV27_0": "v27.0 instala fachada pública modular para exportExcel/exportSeedWorkbook y conserva motor legacy encapsulado.",
   "linesV27_0_1": 447,
-  "noteV27_0_1": "Corrección de versión en nombres de fichero Excel y backup modular con lectura fresca de /api/state."
+  "noteV27_0_1": "Corrección de versión en nombres de fichero Excel y backup modular con lectura fresca de /api/state.",
+  "notes": "v27.0.2 corrige BACKUP: exportación principal generada por servidor /api/export/backup."
 }

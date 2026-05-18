@@ -70,7 +70,7 @@ export async function preloadAllMenuModules(options = {}){
       results.push({name: entry.name, ok:true, meta: module?.meta || null});
     }catch(error){
       results.push({name: entry.name, ok:false, error:error?.message || String(error)});
-      if(!options.silent) console.warn('[modules/v27.0.1] No se pudo precargar modulo', entry.name, error);
+      if(!options.silent) console.warn('[modules/v27.0.2] No se pudo precargar modulo', entry.name, error);
     }
   }
   return results;
@@ -92,7 +92,7 @@ export async function ensureAllMenuModules(options = {}){
 
 export function moduleDiagnostics(){
   return {
-    version: 'v27.0.1',
+    version: 'v27.0.2',
     entries: menuModules.map(entry => ({name: entry.name, viewId: entry.viewId, module: entry.module, rootExists: !!document.getElementById(entry.viewId)})),
     loaded: Array.from(loadedModules.keys()),
     state: Array.from(moduleState.entries()).reduce((acc, [name, info]) => {
@@ -107,7 +107,7 @@ function scheduleActivation(entry, options = {}){
   if(!entry) return;
   window.setTimeout(() => {
     loadMenuModule(entry, options).catch(error => {
-      console.error('[modules/v27.0.1] No se pudo cargar modulo', entry.name, error);
+      console.error('[modules/v27.0.2] No se pudo cargar modulo', entry.name, error);
     });
   }, 0);
 }
@@ -129,7 +129,7 @@ export function installControlEventModules(){
   }, {once:true});
 
   window.ControlEventModules = {
-    version: 'v27.0.1',
+    version: 'v27.0.2',
     entries: menuModules,
     activate: activateMenuModule,
     refreshCurrent: refreshCurrentMenuModule,
