@@ -1,5 +1,5 @@
 {
-  "version": "v27.4",
+  "version": "v27.4.1",
   "purpose": "Primera limpieza segura del legacy: identificar y retirar del despliegue los bundles antiguos no cargados, sin modificar la lógica operativa.",
   "mode": "safe-cleanup-report",
   "activeLegacyBundles": [
@@ -38,5 +38,5 @@
     "public/app/legacy/legacy-bundle-before-modules-v26.9.js",
     "public/app/legacy/legacy-bundle-before-modules-v27.0.js"
   ],
-  "notes": "v27.4 integra GRAFICAS modular en INFOEVENTO como hoja GRAFICAS_MODULAR de auditoría, junto a RESUMEN_MODULAR."
+  "notes": "v27.4.1 integra GRAFICAS modular en INFOEVENTO como hoja GRAFICAS_MODULAR de auditoría, junto a RESUMEN_MODULAR."
 }

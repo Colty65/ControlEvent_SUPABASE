@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.4';
+const EXCEL_RUNTIME_VERSION = 'v27.4.1';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -9,6 +9,54 @@ let installed = false;
 let publicFacadeInstalled = false;
 let lastRun = null;
 let lastFacadeInstall = null;
+
+const EXCELJS_SOURCES = [
+  './vendor/exceljs.min.js',
+  'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
+  'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js'
+];
+let excelJsLoadPromise = null;
+
+function excelJsReady(){
+  return typeof window !== 'undefined' && !!window.ExcelJS?.Workbook;
+}
+function loadExternalScript(src){
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve(src);
+    script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+    document.head.appendChild(script);
+  });
+}
+export async function ensureExcelJS(){
+  if(excelJsReady()) return window.ExcelJS;
+  if(typeof window !== 'undefined' && typeof window.ensureExcelJS === 'function'){
+    try{
+      await window.ensureExcelJS();
+      if(excelJsReady()) return window.ExcelJS;
+    }catch(error){
+      console.warn(`[ControlEventExcel/${EXCEL_RUNTIME_VERSION}] ensureExcelJS legacy no pudo cargar ExcelJS; se prueban fuentes alternativas.`, error);
+    }
+  }
+  if(excelJsLoadPromise) return excelJsLoadPromise;
+  excelJsLoadPromise = (async () => {
+    let lastError = null;
+    for(const src of EXCELJS_SOURCES){
+      try{
+        await loadExternalScript(src);
+        if(excelJsReady()) return window.ExcelJS;
+      }catch(error){
+        lastError = error;
+      }
+    }
+    throw lastError || new Error('ExcelJS no está disponible.');
+  })().finally(() => {
+    if(!excelJsReady()) excelJsLoadPromise = null;
+  });
+  return excelJsLoadPromise;
+}
 
 export function resolveApp(){
   return getApp() || window.ControlEventApp || window;
@@ -178,7 +226,7 @@ export function getInfo(){
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4.1 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
