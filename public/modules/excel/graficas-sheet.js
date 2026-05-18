@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.4';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.4:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.5';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.5:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.4 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.5 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -209,16 +209,47 @@ function putRow(ws, rowNumber, values, styler = styleCell){
   row.commit?.();
   return row;
 }
+function styleSectionTitle(cell){
+  styleHeader(cell);
+  cell.font = {bold:true, size:13, color:{argb:'FFFFFFFF'}};
+  cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
+}
+function configureCleanWorksheet(ws){
+  try{
+    ws.views = [{state:'frozen', ySplit:1}];
+    ws.pageSetup = {
+      paperSize: 9,
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.1, footer:0.1}
+    };
+    ws.properties.defaultRowHeight = 20;
+  }catch(_){ }
+}
 function writeChartBlock(ws, startRow, title, rows, columns){
   let r = startRow;
   ws.mergeCells(r,1,r,columns.length);
   ws.getCell(r,1).value = title;
-  styleHeader(ws.getCell(r,1));
+  styleSectionTitle(ws.getCell(r,1));
   r += 1;
   putRow(ws, r++, columns, styleHeader);
   rows.forEach(row => putRow(ws, r++, row, styleCell));
   r += 1;
   return r;
+}
+function cleanTicketRow(item){
+  const isDonado = !!item.donado;
+  const isPendiente = !!item.pendiente;
+  return [
+    'TIENDA/TICKET',
+    item.label,
+    (!isDonado && !isPendiente) ? item.importe : '',
+    isDonado ? item.importe : '',
+    isPendiente ? item.importe : '',
+    item.importe
+  ];
 }
 export function writeGraficasWorksheet(workbook, options = {}){
   if(!workbook || typeof workbook.addWorksheet !== 'function') throw new Error('writeGraficasWorksheet necesita un workbook de ExcelJS.');
@@ -227,10 +258,10 @@ export function writeGraficasWorksheet(workbook, options = {}){
   const existing = workbook.getWorksheet?.(sheetName);
   if(existing && typeof workbook.removeWorksheet === 'function') workbook.removeWorksheet(existing.id);
   const ws = workbook.addWorksheet(sheetName, {views:[{state:'frozen', ySplit:1}]});
-  ws.properties.defaultRowHeight = 20;
+  configureCleanWorksheet(ws);
   ws.columns = [
     {header:'Bloque', width:18},
-    {header:'Concepto', width:38},
+    {header:'Concepto', width:42},
     {header:'Comprado', width:18},
     {header:'Donado', width:18},
     {header:'Pendiente', width:18},
@@ -240,15 +271,17 @@ export function writeGraficasWorksheet(workbook, options = {}){
   ws.mergeCells(r,1,r,6);
   ws.getCell(r,1).value = `GRAFICAS MODULARES DEL EVENTO - ${model.event.titulo}`;
   styleTitle(ws.getCell(r,1));
+  ws.getRow(r).height = 24;
   r += 1;
-  putRow(ws, r++, ['Emitido por', `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`, '', '', '', model.generatedAt], styleCell);
+  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${GRAFICAS_SHEET_VERSION}`, '', '', '', model.generatedAt], styleCell);
   putRow(ws, r++, ['Situación', model.event.situacion, '', '', '', ''], styleCell);
   r += 1;
   r = writeChartBlock(ws, r, 'RESUMEN ECONÓMICO', model.charts.resumen.map(item => ['RESUMEN', item.label, '', '', '', item.value]), ['BLOQUE','CONCEPTO','COMPRADO','DONADO','PENDIENTE','TOTAL']);
   r = writeChartBlock(ws, r, 'POR SEGMENTO', model.charts.segmento.map(item => ['SEGMENTO', item.label, item.comprado, item.donado, item.pendiente, item.total]), ['BLOQUE','SEGMENTO','COMPRADO','DONADO','PENDIENTE','TOTAL']);
   r = writeChartBlock(ws, r, 'POR DESTINO', model.charts.destino.map(item => ['DESTINO', item.label, item.comprado, item.donado, item.pendiente, item.total]), ['BLOQUE','DESTINO','COMPRADO','DONADO','PENDIENTE','TOTAL']);
-  r = writeChartBlock(ws, r, 'POR TIENDA Y TICKET', model.charts.tiendaTicket.map(item => ['TIENDA/TICKET', item.label, item.donado ? item.importe : '', item.donado ? item.importe : '', item.pendiente ? item.importe : '', item.importe]), ['BLOQUE','TIENDA/TICKET','COMPRADO','DONADO','PENDIENTE','TOTAL']);
-  lastWorksheetBuild = {builtAt:new Date().toISOString(), version:GRAFICAS_SHEET_VERSION, sheetName, eventTitle:model.event.titulo, rows:ws.rowCount, columns:ws.columnCount};
+  r = writeChartBlock(ws, r, 'POR TIENDA Y TICKET', model.charts.tiendaTicket.map(cleanTicketRow), ['BLOQUE','TIENDA/TICKET','COMPRADO','DONADO','PENDIENTE','TOTAL']);
+  try{ ws.autoFilter = {from:{row:5,column:1}, to:{row:Math.max(5, ws.rowCount), column:6}}; }catch(_){ }
+  lastWorksheetBuild = {builtAt:new Date().toISOString(), version:GRAFICAS_SHEET_VERSION, sheetName, eventTitle:model.event.titulo, rows:ws.rowCount, columns:ws.columnCount, standaloneClean:true};
   window.dispatchEvent(new CustomEvent('controlevent:excel-graficas-worksheet-built', {detail:lastWorksheetBuild}));
   return {worksheet:ws, model, info:lastWorksheetBuild};
 }
@@ -285,15 +318,27 @@ export function attachGraficasToInfoEventoWorkbook(workbook, options = {}){
   }
 }
 
-function keepOnlyWorksheet(workbook, worksheet){
+function sanitizeStandaloneWorkbook(workbook, worksheet){
   try{
-    if(!workbook || !worksheet || !Array.isArray(workbook.worksheets) || typeof workbook.removeWorksheet !== 'function') return;
+    if(!workbook || !worksheet) return {ok:false, reason:'missing-workbook-or-worksheet'};
     const keepId = worksheet.id;
-    [...workbook.worksheets].forEach(ws => {
-      if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
-    });
+    if(Array.isArray(workbook.worksheets) && typeof workbook.removeWorksheet === 'function'){
+      [...workbook.worksheets].forEach(ws => {
+        if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
+      });
+    }
+    // Los standalone modulares no usan imágenes. Se vacía cualquier resto accidental heredado por ExcelJS/legacy.
+    if(Array.isArray(workbook.media)) workbook.media.splice(0, workbook.media.length);
+    if(Array.isArray(workbook._media)) workbook._media.splice(0, workbook._media.length);
+    if(Array.isArray(worksheet.media)) worksheet.media.splice(0, worksheet.media.length);
+    if(Array.isArray(worksheet._media)) worksheet._media.splice(0, worksheet._media.length);
+    try{ worksheet._drawing = null; }catch(_){ }
+    try{ workbook.definedNames.model = []; }catch(_){ }
+    configureCleanWorksheet(worksheet);
+    return {ok:true, kept:worksheet.name, sheetCount:workbook.worksheets?.length || 0};
   }catch(error){
-    console.warn('[ControlEventExcel] No se pudo limpiar hojas auxiliares del workbook standalone.', error);
+    console.warn('[ControlEventExcel] No se pudo limpiar el workbook standalone de GRAFICAS.', error);
+    return {ok:false, error:error?.message || String(error)};
   }
 }
 
@@ -303,8 +348,8 @@ export async function downloadStandaloneGraficas(options = {}){
   workbook.creator = `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeGraficasWorksheet(workbook, {sheetName:'GRAFICAS', ...options});
-  keepOnlyWorksheet(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.4'});
+  result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
+  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.5'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -312,7 +357,7 @@ export async function downloadStandaloneGraficas(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_4_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_5_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

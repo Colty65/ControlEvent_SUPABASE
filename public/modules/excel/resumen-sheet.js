@@ -1,17 +1,17 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.4.4';
+const RESUMEN_SHEET_VERSION = 'v27.4.5';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
 let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.4:resumenModularAudit';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.5:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.4 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.5 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -244,6 +244,28 @@ function putRow(ws, rowNumber, values, styleFn){
   return row;
 }
 
+function configureCleanWorksheet(ws){
+  try{
+    ws.views = [{state:'frozen', ySplit:1}];
+    ws.pageSetup = {
+      paperSize: 9,
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.1, footer:0.1}
+    };
+    ws.properties.defaultRowHeight = 20;
+  }catch(_){ }
+}
+
+function markMoneyColumn(ws, fromRow = 1, toRow = ws.rowCount){
+  for(let r = fromRow; r <= toRow; r += 1){
+    const valueCell = ws.getCell(r, 2);
+    if(typeof valueCell.value === 'number') valueCell.numFmt = '#,##0.00 €;[Red]-#,##0.00 €';
+  }
+}
+
 export function writeResumenWorksheet(workbook, options = {}){
   if(!workbook || typeof workbook.addWorksheet !== 'function'){
     throw new Error('writeResumenWorksheet necesita un workbook de ExcelJS.');
@@ -253,19 +275,21 @@ export function writeResumenWorksheet(workbook, options = {}){
   const existing = workbook.getWorksheet?.(sheetName);
   if(existing && typeof workbook.removeWorksheet === 'function') workbook.removeWorksheet(existing.id);
   const ws = workbook.addWorksheet(sheetName, {views:[{state:'frozen', ySplit:1}]});
-  ws.properties.defaultRowHeight = 20;
+  configureCleanWorksheet(ws);
   ws.columns = [
-    {header:'Concepto', key:'concepto', width:34},
+    {header:'Concepto', key:'concepto', width:36},
     {header:'Valor', key:'valor', width:22},
-    {header:'Observaciones', key:'observaciones', width:48}
+    {header:'Observaciones', key:'observaciones', width:44}
   ];
 
   let r = 1;
   ws.mergeCells(r,1,r,3);
   ws.getCell(r,1).value = `RESUMEN DEL EVENTO - ${model.event.titulo}`;
   styleTitle(ws.getCell(r,1));
+  ws.getRow(r).height = 24;
   r += 1;
-  putRow(ws, r++, ['Emitido por', `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+
+  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   putRow(ws, r++, ['Fechas', `${model.event.fechaIni || ''}${model.event.fechaFin ? ' - ' + model.event.fechaFin : ''}`, model.event.situacion], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   putRow(ws, r++, ['Precio evento', model.event.precio, model.event.descripcion || ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   r += 1;
@@ -281,23 +305,29 @@ export function writeResumenWorksheet(workbook, options = {}){
     r += 1;
   });
 
-  putRow(ws, r++, ['BLOQUE', 'CAMPO', 'VALOR'], styleHeader);
-  buildResumenRows(model).slice(1).forEach(row => {
-    putRow(ws, r++, row, (cell, index) => index < 2 ? styleLabel(cell) : styleValue(cell));
-  });
+  if(options.includeDiagnosticRows === true){
+    r += 1;
+    putRow(ws, r++, ['BLOQUE', 'CAMPO', 'VALOR'], styleHeader);
+    buildResumenRows(model).slice(1).forEach(row => {
+      putRow(ws, r++, row, (cell, index) => index < 2 ? styleLabel(cell) : styleValue(cell));
+    });
+  }
 
   ws.eachRow(row => {
     row.eachCell(cell => {
       cell.alignment = {...(cell.alignment || {}), vertical:'middle', wrapText:true};
     });
   });
+  markMoneyColumn(ws);
+  try{ ws.autoFilter = {from:{row:5,column:1}, to:{row:Math.max(5, ws.rowCount), column:3}}; }catch(_){ }
   lastWorksheetBuild = {
     builtAt: new Date().toISOString(),
     version: RESUMEN_SHEET_VERSION,
     sheetName,
     eventTitle: model.event.titulo,
     rows: ws.rowCount,
-    columns: ws.columnCount
+    columns: ws.columnCount,
+    standaloneClean: options.includeDiagnosticRows !== true
   };
   window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-worksheet-built', {detail:lastWorksheetBuild}));
   return {worksheet: ws, model, info: lastWorksheetBuild};
@@ -360,15 +390,27 @@ export function attachResumenToInfoEventoWorkbook(workbook, options = {}){
 }
 
 
-function keepOnlyWorksheet(workbook, worksheet){
+function sanitizeStandaloneWorkbook(workbook, worksheet){
   try{
-    if(!workbook || !worksheet || !Array.isArray(workbook.worksheets) || typeof workbook.removeWorksheet !== 'function') return;
+    if(!workbook || !worksheet) return {ok:false, reason:'missing-workbook-or-worksheet'};
     const keepId = worksheet.id;
-    [...workbook.worksheets].forEach(ws => {
-      if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
-    });
+    if(Array.isArray(workbook.worksheets) && typeof workbook.removeWorksheet === 'function'){
+      [...workbook.worksheets].forEach(ws => {
+        if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
+      });
+    }
+    // Los standalone modulares no usan imágenes. Se vacía cualquier resto accidental heredado por ExcelJS/legacy.
+    if(Array.isArray(workbook.media)) workbook.media.splice(0, workbook.media.length);
+    if(Array.isArray(workbook._media)) workbook._media.splice(0, workbook._media.length);
+    if(Array.isArray(worksheet.media)) worksheet.media.splice(0, worksheet.media.length);
+    if(Array.isArray(worksheet._media)) worksheet._media.splice(0, worksheet._media.length);
+    try{ worksheet._drawing = null; }catch(_){ }
+    try{ workbook.definedNames.model = []; }catch(_){ }
+    configureCleanWorksheet(worksheet);
+    return {ok:true, kept:worksheet.name, sheetCount:workbook.worksheets?.length || 0};
   }catch(error){
-    console.warn('[ControlEventExcel] No se pudo limpiar hojas auxiliares del workbook standalone.', error);
+    console.warn('[ControlEventExcel] No se pudo limpiar el workbook standalone de RESUMEN.', error);
+    return {ok:false, error:error?.message || String(error)};
   }
 }
 
@@ -377,9 +419,9 @@ export async function downloadStandaloneResumen(options = {}){
   const workbook = new ExcelJS.Workbook();
   workbook.creator = `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
-  const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', ...options});
-  keepOnlyWorksheet(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.4'});
+  const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', includeDiagnosticRows:false, ...options});
+  result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
+  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.5'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -387,7 +429,7 @@ export async function downloadStandaloneResumen(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_4_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_5_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();
