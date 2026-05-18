@@ -1,5 +1,6 @@
-export function mount({root} = {}){
+export function mount({root, app} = {}){
   if(root) root.dataset.ceModule = 'compras';
-  if(typeof window.renderBudget === 'function') window.renderBudget();
-  if(typeof window.renderCompras === 'function') window.renderCompras();
+  const actions = app?.actions || window;
+  if(typeof actions.renderBudget === 'function') actions.renderBudget();
+  if(typeof actions.renderCompras === 'function') actions.renderCompras();
 }

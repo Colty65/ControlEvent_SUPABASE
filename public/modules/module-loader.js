@@ -1,3 +1,4 @@
+import { getApp } from '../app/app-context.js';
 import { findMenuModuleByButton, menuModules } from './menu-registry.js';
 
 const loadedModules = new Map();
@@ -13,7 +14,7 @@ async function loadMenuModule(entry){
     await module.mount({
       entry,
       root,
-      app: window.ControlEventApp || window,
+      app: getApp() || window.ControlEventApp || window,
       window
     });
   }

@@ -1,4 +1,5 @@
-export function mount({root} = {}){
+export function mount({root, app} = {}){
   if(root) root.dataset.ceModule = 'mantenimiento';
-  if(typeof window.renderMaintenance === 'function') window.renderMaintenance();
+  const actions = app?.actions || window;
+  if(typeof actions.renderMaintenance === 'function') actions.renderMaintenance();
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v1';
+const CACHE_NAME = 'controlevent-shell-v25-8';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',

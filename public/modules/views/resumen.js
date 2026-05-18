@@ -1,6 +1,7 @@
-export function mount({root} = {}){
+export function mount({root, app} = {}){
   if(root) root.dataset.ceModule = 'resumen';
-  if(typeof window.renderBudget === 'function') window.renderBudget();
+  const actions = app?.actions || window;
+  if(typeof actions.renderBudget === 'function') actions.renderBudget();
   if(window.__ceV251 && typeof window.__ceV251.applyZoomColors === 'function'){
     window.__ceV251.applyZoomColors();
   }
