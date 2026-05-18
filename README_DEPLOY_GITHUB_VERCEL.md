@@ -59,4 +59,3 @@ Las fotos no se guardan en GitHub ni Vercel. Se guardan en Supabase Storage, buc
 ```text
 ticket-images
 ```
-Deploy check v24.1

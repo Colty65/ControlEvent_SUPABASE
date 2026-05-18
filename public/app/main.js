@@ -1,5 +1,6 @@
 import { VERSION } from './version.js';
 import { getApp, whenAppReady } from './app-context.js';
+import { installDomainCalculations } from './domain/index.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -13,15 +14,17 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab).catch(error => console.warn('[v25.8] No se pudo activar modulo inicial', error));
+  modules.activate(tab).catch(error => console.warn('[v25.9] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
   applyVersion();
+  const domain = installDomainCalculations(app, {mode: 'shadow'});
   window.ControlEventRuntime = {
     version: VERSION,
     app,
-    modules: window.ControlEventModules || null
+    modules: window.ControlEventModules || null,
+    domain
   };
   window.dispatchEvent(new CustomEvent('controlevent:runtime-ready', {
     detail: window.ControlEventRuntime
