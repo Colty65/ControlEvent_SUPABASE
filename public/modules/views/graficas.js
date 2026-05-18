@@ -1,8 +1,12 @@
-export function mount({root, app} = {}){
-  if(root) root.dataset.ceModule = 'graficas';
-  const actions = app?.actions || window;
-  if(typeof actions.renderGraficas === 'function') actions.renderGraficas();
-  if(window.__ceV253 && typeof window.__ceV253.apply === 'function'){
-    window.__ceV253.apply();
-  }
-}
+import { createLegacyView } from './_view-runtime.js';
+
+const view = createLegacyView({
+  name: 'graficas',
+  render: ['renderGraficas'],
+  patches: true
+});
+
+export const meta = view.meta;
+export const mount = context => view.mount(context);
+export const activate = context => view.activate(context);
+export const refresh = activate;

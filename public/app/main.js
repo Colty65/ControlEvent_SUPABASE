@@ -14,7 +14,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab).catch(error => console.warn('[v25.9] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v26.0] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -39,4 +39,3 @@ if(document.readyState === 'loading'){
 }else{
   applyVersion();
 }
-
