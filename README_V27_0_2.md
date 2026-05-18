@@ -1,4 +1,4 @@
-# ControlEvent v27.0.2
+# ControlEvent v27.1
 
 Corrección de descarga de datos/BACKUP.
 
@@ -16,8 +16,8 @@ En v27.0.1 se corrigió la versión de INFOEVENTO, pero la descarga de datos pod
 - `GET /api/export/backup?scope=<eventId>`
 
 ## Versión esperada en ficheros
-- `ControlEvent_v27_0_2_INFOEVENTO-...xlsx`
-- `ControlEvent_v27_0_2_BACKUP_TODOS_...xlsx`
+- `ControlEvent_v27_1_INFOEVENTO-...xlsx`
+- `ControlEvent_v27_1_BACKUP_TODOS_...xlsx`
 
 ## Archivos obsoletos que pueden borrarse si existen
 - `public/app/legacy/legacy-bundle-before-modules-v27.0.1.js`

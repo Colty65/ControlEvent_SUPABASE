@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.0.2';
+const EXCEL_RUNTIME_VERSION = 'v27.1';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -162,7 +162,7 @@ export function getInfo(){
   captureLegacyExcelActions();
   return {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade',
+    mode: 'modular-public-facade-resumen-shadow',
     modules: listExcelModules(),
     lastRun,
     busy: Object.fromEntries(Array.from(runLocks.keys()).map(name => [name, true])),
@@ -176,7 +176,7 @@ export function getInfo(){
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.0.2 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.1 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
@@ -192,7 +192,7 @@ export function installExcelRuntime(){
   captureLegacyExcelActions();
   window.ControlEventExcel = {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade',
+    mode: 'modular-public-facade-resumen-shadow',
     register: registerExcelModule,
     run: runExcelAction,
     info: getInfo,
@@ -207,6 +207,7 @@ export function installExcelRuntime(){
   window.__ceV262Excel = window.ControlEventExcel;
   window.__ceV264Excel = window.ControlEventExcel;
   window.__ceV270Excel = window.ControlEventExcel;
+  window.__ceV271Excel = window.ControlEventExcel;
   installPublicExcelFacade();
   return window.ControlEventExcel;
 }

@@ -1,5 +1,5 @@
 {
-  "version": "v27.0.2",
+  "version": "v27.1",
   "indexLinesBefore": 21412,
   "indexLinesAfter": 447,
   "indexLinesReduced": 20965,
@@ -64,5 +64,6 @@
   "noteV27_0": "v27.0 instala fachada pública modular para exportExcel/exportSeedWorkbook y conserva motor legacy encapsulado.",
   "linesV27_0_1": 447,
   "noteV27_0_1": "Corrección de versión en nombres de fichero Excel y backup modular con lectura fresca de /api/state.",
-  "notes": "v27.0.2 corrige BACKUP: exportación principal generada por servidor /api/export/backup."
+  "notes": "v27.1 añade modelo modular shadow para hoja RESUMEN antes de sustituir escritura legacy del Excel.",
+  "indexHtmlLines": 447
 }
