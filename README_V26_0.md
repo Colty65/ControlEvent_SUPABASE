@@ -1,4 +1,4 @@
-# ControlEvent v26.0
+# ControlEvent v26.1
 
 ## Objetivo de esta versión
 
@@ -23,8 +23,8 @@ public/app/domain/
 - `window.ControlEventRuntime.domain` queda disponible tras el arranque.
 - `window.ControlEventDomain` queda disponible para depuración.
 - `app.calculationsV259` queda disponible junto a los cálculos legacy.
-- La versión visible pasa a `ControlEvent v26.0`.
-- El cache PWA pasa a `controlevent-shell-v26-0` para forzar actualización.
+- La versión visible pasa a `ControlEvent v26.1`.
+- El cache PWA pasa a `controlevent-shell-v26-1` para forzar actualización.
 
 ## Modo de funcionamiento
 
@@ -67,10 +67,10 @@ Cuando se pruebe esta v25.9 con datos reales:
 
 1. Validar que `ControlEventDomain.compareWithLegacy()` no muestra diferencias importantes.
 2. Revisar resumen, compras, donaciones, gráficas y Excel.
-3. Si todo coincide, preparar una v26.0 o v26.0 donde las vistas empiecen a usar `app.calculationsV259` en lugar de las funciones legacy.
+3. Si todo coincide, preparar una v26.1 o v26.1 donde las vistas empiecen a usar `app.calculationsV259` en lugar de las funciones legacy.
 
 
-## v26.0 - Modularización de pantallas de menú
+## v26.1 - Modularización de pantallas de menú
 
 Esta versión mantiene el comportamiento de la v25.9.1 y añade controladores reales para las opciones principales del menú:
 
