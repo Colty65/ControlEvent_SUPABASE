@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.1';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.1:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.2';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.2:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.1 se integra en INFOEVENTO como hoja GRAFICAS_MODULAR para comparar sin sustituir todavía la hoja GRAFICAS legacy.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.2 se integra en INFOEVENTO como hoja GRAFICAS_MODULAR para comparar sin sustituir todavía la hoja GRAFICAS legacy.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -297,7 +297,7 @@ export async function downloadStandaloneGraficas(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_1_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_2_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

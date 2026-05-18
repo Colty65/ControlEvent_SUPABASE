@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.4.1';
+const EXCEL_RUNTIME_VERSION = 'v27.4.2';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -11,6 +11,7 @@ let lastRun = null;
 let lastFacadeInstall = null;
 
 const EXCELJS_SOURCES = [
+  '/vendor/exceljs.min.js',
   './vendor/exceljs.min.js',
   'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
   'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js'
@@ -226,7 +227,7 @@ export function getInfo(){
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4.1 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.4.2 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');

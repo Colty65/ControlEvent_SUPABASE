@@ -21,11 +21,16 @@ export function createApp() {
   });
 
   app.get('/vendor/exceljs.min.js', async (req, res) => {
-    const file = path.join(NODE_MODULES_DIR, 'exceljs', 'dist', 'exceljs.min.js');
-    if (!fsSync.existsSync(file)) {
+    const candidates = [
+      path.join(PUBLIC_DIR, 'vendor', 'exceljs.min.js'),
+      path.join(NODE_MODULES_DIR, 'exceljs', 'dist', 'exceljs.min.js')
+    ];
+    const file = candidates.find(candidate => fsSync.existsSync(candidate));
+    if (!file) {
       return res.status(404).type('text/plain').send('Falta ExcelJS. Ejecuta npm install y reinicia.');
     }
     res.type('application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.sendFile(file);
   });
 
