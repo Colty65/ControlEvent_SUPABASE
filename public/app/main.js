@@ -21,7 +21,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.6] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.6.1] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -30,7 +30,7 @@ function install(app){
   const excel = installExcelModules();
   const tickets = installTicketModules();
   const hotpath = installLegacyHotpathOptimizer({mode:'mobile-safe'});
-  const activeRender = installActiveRenderOptimizer({mode:'mobile-tablet'});
+  const activeRender = installActiveRenderOptimizer({mode:'available-only', enabled:false});
   const debug = installDebugMode({app, domain, excel, tickets, hotpath, activeRender});
   const maintenanceProxy = installMaintenanceLazyProxy();
   const screenLazy = installScreenLazyRuntime({app, modules: window.ControlEventModules});

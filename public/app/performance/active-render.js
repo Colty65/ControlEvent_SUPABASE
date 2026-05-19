@@ -1,6 +1,6 @@
-/* ControlEvent v28.6 - Render activo por pantalla.
-   Objetivo móvil/tablet: evitar que el render legacy repinte todas las pantallas en cada click.
-   INFOEVENTO/BACKUP/carga de datos no se tocan. Se puede desactivar con ControlEventActiveRender.disable(). */
+/* ControlEvent v28.6.1 - ActiveRender disponible pero desactivado por defecto.
+   En v28.6 se comprobó que empeoraba iPad/Android. Se conserva sólo como herramienta experimental:
+   ControlEventActiveRender.enable() / disable(). INFOEVENTO/BACKUP/carga de datos no se tocan. */
 import { VERSION } from '../version.js';
 
 const IMPORTANT_COMMON = [
@@ -24,7 +24,7 @@ const TAB_RENDERERS = {
 const state = {
   version: VERSION,
   installed: false,
-  enabled: true,
+  enabled: false,
   originals: new Map(),
   calls: [],
   counts: {render:0, fullFallback:0, active:0, skippedGraficas:0, maintenanceDeferred:0, errors:0},
@@ -149,13 +149,13 @@ function restore(){
 }
 function install(options = {}){
   if(state.installed) return api;
-  state.enabled = options.enabled !== false;
+  state.enabled = options.enabled === true;
   state.installed = true;
   state.installedAt = iso();
-  wrap();
-  window.addEventListener('controlevent:app-ready', () => setTimeout(wrap,0));
-  window.addEventListener('controlevent:runtime-ready', () => setTimeout(wrap,0));
-  console.info(`[ControlEventActiveRender/${VERSION}] Render activo instalado.`);
+  if(state.enabled) wrap();
+  window.addEventListener('controlevent:app-ready', () => { if(state.enabled) setTimeout(wrap,0); });
+  window.addEventListener('controlevent:runtime-ready', () => { if(state.enabled) setTimeout(wrap,0); });
+  console.info(`[ControlEventActiveRender/${VERSION}] Disponible, desactivado por defecto.`);
   return api;
 }
 function enable(){ state.enabled = true; wrap(); return inspect(); }
@@ -180,7 +180,7 @@ function inspect(){
 }
 function print(){
   const report = inspect();
-  console.group(`[ControlEventActiveRender/${VERSION}] Render activo por pantalla`);
+  console.group(`[ControlEventActiveRender/${VERSION}] ActiveRender experimental`);
   console.info('Estado', {enabled: report.enabled, currentTab: report.currentTab, patched: report.patched, counts: report.counts});
   if(report.recent.length) console.table(report.recent);
   console.groupEnd();
