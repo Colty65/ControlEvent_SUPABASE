@@ -1,7 +1,7 @@
 import { getApp } from '../app-context.js';
 import { PACKAGE_NAME, VERSION, VERSION_FILE } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v27.7.1';
+const DIAGNOSTICS_VERSION = 'v27.8';
 const INDEX_LINES_BEFORE_V26_5 = 21412;
 const INDEX_LINES_AFTER_V26_5 = 20392;
 const INDEX_BYTES_BEFORE_V26_5 = 1418313;
@@ -75,10 +75,11 @@ function collectWarnings(report){
   if(!report.modules.legacyCleanup.present) warnings.push('No se ha instalado ControlEventLegacyCleanup.');
   if(!report.modules.forms.present) warnings.push('No se ha instalado ControlEventForms.');
   if(!report.modules.maintenanceDiagnostics?.present) warnings.push('No se ha instalado ControlEventMaintenanceDiagnostics.');
+  if(!report.modules.mobilePerformance?.present) warnings.push('No se ha instalado ControlEventMobilePerformance.');
   // Mantenimiento se instala bajo demanda al activar su vista, así que no es aviso crítico al arrancar.
   if(!report.dom.mainRoots.every(item => item.ok)) warnings.push('Falta algún contenedor principal de pantalla.');
-  if(report.version.domTitle && !report.version.domTitle.includes('v27.7.1')) warnings.push('El título del documento no parece estar en v27.7.1.');
-  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v27.7.1')) warnings.push('body.dataset.ceVersion no coincide con v27.7.1.');
+  if(report.version.domTitle && !report.version.domTitle.includes('v27.8')) warnings.push('El título del documento no parece estar en v27.8.');
+  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v27.8')) warnings.push('body.dataset.ceVersion no coincide con v27.8.');
   if(!report.legacy.exportExcel) warnings.push('No se encuentra exportExcel legacy; INFOEVENTO podría fallar.');
   if(!report.legacy.saveStateNow) warnings.push('No se encuentra saveStateNow; el guardado podría depender de otro flujo.');
   return warnings;
@@ -95,6 +96,7 @@ export function inspectRuntime(){
   const legacyCleanup = window.ControlEventLegacyCleanup || null;
   const forms = window.ControlEventForms || null;
   const maintenanceDiagnostics = window.ControlEventMaintenanceDiagnostics || null;
+  const mobilePerformance = window.ControlEventMobilePerformance || null;
 
   const report = {
     ok: true,
@@ -204,6 +206,12 @@ export function inspectRuntime(){
         info: safeCall('ControlEventForms.info', () => forms?.info?.(), {}),
         snapshot: safeCall('ControlEventForms.snapshot', () => forms?.snapshot?.(), {})
       },
+      mobilePerformance: {
+        present: !!mobilePerformance,
+        version: objectVersion('ControlEventMobilePerformance'),
+        mode: objectMode('ControlEventMobilePerformance'),
+        quick: safeCall('ControlEventMobilePerformance.quick', () => mobilePerformance?.quick?.(), {})
+      },
       maintenanceDiagnostics: {
         present: !!maintenanceDiagnostics,
         version: objectVersion('ControlEventMaintenanceDiagnostics'),
@@ -276,7 +284,7 @@ export async function checkApi(){
 export function assertHealthy(){
   const report = inspectRuntime();
   if(!report.ok){
-    console.warn('[ControlEventDiagnostics/v27.7.1] Avisos detectados', report.warnings, report);
+    console.warn('[ControlEventDiagnostics/v27.8] Avisos detectados', report.warnings, report);
   }
   return report;
 }
@@ -294,10 +302,11 @@ export function print(){
     ['Legacy map', report.modules.legacyMap.present ? 'OK' : 'NO'],
     ['Legacy cleanup', report.modules.legacyCleanup.present ? 'OK' : 'NO'],
     ['Forms', report.modules.forms.present ? 'OK' : 'NO'],
+    ['Mobile performance', report.modules.mobilePerformance.present ? 'OK' : 'NO'],
     ['PWA control', report.pwa.controlled ? 'SW activo' : 'sin controlador']
   ];
   try{ console.table(rows.map(([area, estado]) => ({area, estado}))); }catch(_){ console.log(rows); }
-  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v27.7.1]', report.warnings);
+  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v27.8]', report.warnings);
   return report;
 }
 

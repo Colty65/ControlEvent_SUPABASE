@@ -9,6 +9,7 @@ import { installLegacyCleanup } from './diagnostics/legacy-cleanup.js';
 import { installDataIntegrity } from './diagnostics/data-integrity.js';
 import { installFormModules } from '../modules/forms/index.js';
 import { installMaintenanceDiagnostics } from './diagnostics/maintenance-diagnostics.js';
+import { installMobilePerformanceDiagnostics } from './diagnostics/mobile-performance.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -22,7 +23,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v27.7.1] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v27.8] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -35,7 +36,8 @@ function install(app){
   const dataIntegrity = installDataIntegrity();
   const forms = installFormModules();
   const maintenanceDiagnostics = installMaintenanceDiagnostics();
-  const diagnostics = installRuntimeDiagnostics({app, domain, excel, tickets, legacyMap, legacyCleanup, dataIntegrity, forms, maintenanceDiagnostics});
+  const mobilePerformance = installMobilePerformanceDiagnostics();
+  const diagnostics = installRuntimeDiagnostics({app, domain, excel, tickets, legacyMap, legacyCleanup, dataIntegrity, forms, maintenanceDiagnostics, mobilePerformance});
   window.ControlEventRuntime = {
     version: VERSION,
     app,
@@ -49,6 +51,7 @@ function install(app){
     dataIntegrity,
     forms,
     maintenanceDiagnostics,
+    mobilePerformance,
     inspect: () => diagnostics.inspect(),
     checkApi: () => diagnostics.checkApi()
   };

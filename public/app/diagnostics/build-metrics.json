@@ -1,7 +1,8 @@
 {
-  "version": "v27.7.1",
+  "version": "v27.8",
   "indexHtmlLines": 447,
   "indexHtmlBytes": 21332,
-  "notes": "v27.7.1 ajusta ControlEventMaintenanceDiagnostics como diagnóstico no intrusivo de mantenimiento; no toca INFOEVENTO, BACKUP ni guardado.",
-  "formsDiagnostics": "diagnostic-only"
+  "notes": "v27.8 añade diagnóstico de carga móvil/rendimiento; no toca INFOEVENTO, BACKUP, carga de datos ni guardado.",
+  "mobilePerformanceDiagnostics": "diagnostic-only",
+  "stableAreas": ["INFOEVENTO", "BACKUP", "carga de datos", "formularios", "mantenimiento"]
 }
