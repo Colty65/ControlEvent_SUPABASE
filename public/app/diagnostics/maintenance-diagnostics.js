@@ -1,6 +1,7 @@
-/* ControlEvent v27.7 - Diagnóstico no intrusivo de mantenimiento.
-   No sustituye altas/modificaciones/borrados: sólo comprueba estructura, acciones y datos. */
-const VERSION = 'v27.7';
+/* ControlEvent v27.7.1 - Diagnóstico no intrusivo de mantenimiento.
+   No sustituye altas/modificaciones/borrados: sólo comprueba estructura, acciones y datos.
+   v27.7.1 corrige falso aviso de IMPORTACIÓN: clearImportStatus es opcional/no expuesta en algunas rutas. */
+const VERSION = 'v27.7.1';
 
 const SECTIONS = [
   {
@@ -24,7 +25,10 @@ const SECTIONS = [
   {
     name: 'importacion', label: 'IMPORTACIÓN', rootId: 'mtImportar', listId: 'importStatus',
     fields: ['importMode', 'importWorkbookFile', 'importTicketFiles'], buttons: ['btnStartImport', 'btnClearImportStatus'],
-    actions: ['importInitialWorkbook', 'clearImportStatus'], stateKey: null
+    actions: ['importInitialWorkbook'], optionalActions: ['clearImportStatus'], stateKey: null,
+    notesIfOptionalMissing: {
+      clearImportStatus: 'clearImportStatus no está expuesta como función global; no es problema si la carga/limpieza visual funciona.'
+    }
   },
   {
     name: 'acceso', label: 'ACCESO', rootId: 'mtAcceso', listId: 'accesoList',
@@ -73,7 +77,8 @@ function sectionReport(section){
     records: collectionSize(section.stateKey),
     fields: section.fields.map(fieldInfo),
     buttons: section.buttons.map(buttonInfo),
-    actions: section.actions.map(name => ({name, exists: actionExists(name)})),
+    actions: (section.actions || []).map(name => ({name, exists: actionExists(name), required: true})),
+    optionalActions: (section.optionalActions || []).map(name => ({name, exists: actionExists(name), required: false})),
     userLevel: currentUserLevel(),
     structuralProblems: [],
     notes: []
@@ -83,6 +88,12 @@ function sectionReport(section){
   report.fields.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe el campo ${item.id}.`); });
   report.buttons.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe el botón ${item.id}.`); });
   report.actions.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe la acción legacy ${item.name}.`); });
+  report.optionalActions.forEach(item => {
+    if(!item.exists){
+      const note = section.notesIfOptionalMissing?.[item.name] || `Acción opcional no expuesta: ${item.name}.`;
+      report.notes.push(note);
+    }
+  });
   if(section.godOnly && report.userLevel && report.userLevel !== 'GD') report.notes.push('Sección visible/usable sólo para nivel GD.');
   return report;
 }

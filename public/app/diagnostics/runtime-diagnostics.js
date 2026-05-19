@@ -1,7 +1,7 @@
 import { getApp } from '../app-context.js';
 import { PACKAGE_NAME, VERSION, VERSION_FILE } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v27.7';
+const DIAGNOSTICS_VERSION = 'v27.7.1';
 const INDEX_LINES_BEFORE_V26_5 = 21412;
 const INDEX_LINES_AFTER_V26_5 = 20392;
 const INDEX_BYTES_BEFORE_V26_5 = 1418313;
@@ -77,8 +77,8 @@ function collectWarnings(report){
   if(!report.modules.maintenanceDiagnostics?.present) warnings.push('No se ha instalado ControlEventMaintenanceDiagnostics.');
   // Mantenimiento se instala bajo demanda al activar su vista, así que no es aviso crítico al arrancar.
   if(!report.dom.mainRoots.every(item => item.ok)) warnings.push('Falta algún contenedor principal de pantalla.');
-  if(report.version.domTitle && !report.version.domTitle.includes('v27.7')) warnings.push('El título del documento no parece estar en v27.7.');
-  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v27.7')) warnings.push('body.dataset.ceVersion no coincide con v27.7.');
+  if(report.version.domTitle && !report.version.domTitle.includes('v27.7.1')) warnings.push('El título del documento no parece estar en v27.7.1.');
+  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v27.7.1')) warnings.push('body.dataset.ceVersion no coincide con v27.7.1.');
   if(!report.legacy.exportExcel) warnings.push('No se encuentra exportExcel legacy; INFOEVENTO podría fallar.');
   if(!report.legacy.saveStateNow) warnings.push('No se encuentra saveStateNow; el guardado podría depender de otro flujo.');
   return warnings;
@@ -276,7 +276,7 @@ export async function checkApi(){
 export function assertHealthy(){
   const report = inspectRuntime();
   if(!report.ok){
-    console.warn('[ControlEventDiagnostics/v27.7] Avisos detectados', report.warnings, report);
+    console.warn('[ControlEventDiagnostics/v27.7.1] Avisos detectados', report.warnings, report);
   }
   return report;
 }
@@ -297,7 +297,7 @@ export function print(){
     ['PWA control', report.pwa.controlled ? 'SW activo' : 'sin controlador']
   ];
   try{ console.table(rows.map(([area, estado]) => ({area, estado}))); }catch(_){ console.log(rows); }
-  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v27.7]', report.warnings);
+  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v27.7.1]', report.warnings);
   return report;
 }
 

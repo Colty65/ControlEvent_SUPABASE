@@ -1,7 +1,7 @@
 {
-  "version": "v27.7",
+  "version": "v27.7.1",
   "indexHtmlLines": 447,
   "indexHtmlBytes": 21332,
-  "notes": "v27.7 añade ControlEventMaintenanceDiagnostics como diagnóstico no intrusivo de mantenimiento; no toca INFOEVENTO, BACKUP ni guardado.",
+  "notes": "v27.7.1 ajusta ControlEventMaintenanceDiagnostics como diagnóstico no intrusivo de mantenimiento; no toca INFOEVENTO, BACKUP ni guardado.",
   "formsDiagnostics": "diagnostic-only"
 }
