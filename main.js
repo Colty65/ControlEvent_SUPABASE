@@ -1,305 +1,149 @@
-/* ControlEvent v28.0.1 - Diagnóstico de carga móvil/rendimiento.
-   Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
-import { VERSION } from '../version.js';
+/* ControlEvent v28.7.1 - Diagnóstico no intrusivo de mantenimiento.
+   No sustituye altas/modificaciones/borrados: sólo comprueba estructura, acciones y datos.
+   v28.0 corrige falso aviso de IMPORTACIÓN: clearImportStatus es opcional/no expuesta en algunas rutas. */
+const VERSION = 'v28.7.1';
 
-const DIAGNOSTICS_VERSION = 'v28.0.1';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v28.0.1.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v28.0.1.js';
-let lastReport = null;
-
-function nowIso(){
-  try{ return new Date().toISOString(); }catch(_){ return String(Date.now()); }
-}
-
-function number(value, fallback = 0){
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function round(value, decimals = 1){
-  const p = Math.pow(10, decimals);
-  return Math.round(number(value) * p) / p;
-}
-
-function bytesToKb(bytes){ return round(number(bytes) / 1024, 1); }
-function bytesToMb(bytes){ return round(number(bytes) / (1024 * 1024), 2); }
-
-function navInfo(){
-  const nav = navigator || {};
-  const connection = nav.connection || nav.mozConnection || nav.webkitConnection || null;
-  return {
-    userAgent: nav.userAgent || '',
-    platform: nav.platform || '',
-    language: nav.language || '',
-    online: nav.onLine,
-    hardwareConcurrency: nav.hardwareConcurrency || null,
-    deviceMemoryGb: nav.deviceMemory || null,
-    connection: connection ? {
-      effectiveType: connection.effectiveType || null,
-      downlinkMbps: connection.downlink || null,
-      rttMs: connection.rtt || null,
-      saveData: !!connection.saveData
-    } : null
-  };
-}
-
-function screenInfo(){
-  return {
-    width: window.innerWidth || 0,
-    height: window.innerHeight || 0,
-    screenWidth: window.screen?.width || 0,
-    screenHeight: window.screen?.height || 0,
-    devicePixelRatio: window.devicePixelRatio || 1,
-    orientation: window.screen?.orientation?.type || null,
-    isLikelyMobile: Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 760 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
-  };
-}
-
-function getPerformanceEntries(){
-  try{ return performance.getEntriesByType('resource') || []; }catch(_){ return []; }
-}
-
-function isSameOrigin(entry){
-  try{ return new URL(entry.name, location.href).origin === location.origin; }catch(_){ return false; }
-}
-
-function pathOf(entry){
-  try{ return new URL(entry.name, location.href).pathname; }catch(_){ return String(entry.name || ''); }
-}
-
-function sizeOf(entry){
-  return number(entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0);
-}
-
-function resourceRows(){
-  return getPerformanceEntries().map(entry => ({
-    name: entry.name,
-    path: pathOf(entry),
-    type: entry.initiatorType || '',
-    sameOrigin: isSameOrigin(entry),
-    durationMs: round(entry.duration || 0, 1),
-    transferKb: bytesToKb(entry.transferSize || 0),
-    encodedKb: bytesToKb(entry.encodedBodySize || 0),
-    decodedKb: bytesToKb(entry.decodedBodySize || 0),
-    sizeBytes: sizeOf(entry),
-    fromCacheLikely: !entry.transferSize && !!entry.decodedBodySize
-  }));
-}
-
-function groupResources(rows){
-  const totals = {all:{count:0,kb:0}, script:{count:0,kb:0}, css:{count:0,kb:0}, image:{count:0,kb:0}, fetch:{count:0,kb:0}, other:{count:0,kb:0}};
-  for(const row of rows){
-    const key = row.type === 'script' ? 'script' : row.type === 'css' || row.type === 'link' ? 'css' : row.type === 'img' ? 'image' : row.type === 'fetch' || row.type === 'xmlhttprequest' ? 'fetch' : 'other';
-    const kb = row.transferKb || row.encodedKb || row.decodedKb || 0;
-    totals.all.count += 1; totals.all.kb += kb;
-    totals[key].count += 1; totals[key].kb += kb;
-  }
-  for(const value of Object.values(totals)) value.kb = round(value.kb, 1);
-  return totals;
-}
-
-function legacyResources(rows){
-  return rows.filter(row => row.path.includes('/app/legacy/') || row.path.includes(LEGACY_BEFORE) || row.path.includes(LEGACY_AFTER));
-}
-
-function domMetrics(){
-  const inputs = document.querySelectorAll('input,select,textarea,button').length;
-  const cards = document.querySelectorAll('.card,.itemcard,.summary-card,.budget-panel').length;
-  const hidden = document.querySelectorAll('.hidden,[hidden],.collapsed-body.hidden').length;
-  const nodes = document.getElementsByTagName('*').length;
-  return {
-    nodes,
-    inputsAndButtons: inputs,
-    cards,
-    hiddenNodes: hidden,
-    mainCards: document.querySelectorAll('.main .card').length,
-    rowsRendered: document.querySelectorAll('.itemcard,.rowline,.summary-item,.budget-row').length
-  };
-}
-
-function memoryInfo(){
-  const mem = performance.memory || null;
-  if(!mem) return null;
-  return {
-    usedJsHeapMb: bytesToMb(mem.usedJSHeapSize),
-    totalJsHeapMb: bytesToMb(mem.totalJSHeapSize),
-    heapLimitMb: bytesToMb(mem.jsHeapSizeLimit)
-  };
-}
-
-function navTiming(){
-  const nav = performance.getEntriesByType?.('navigation')?.[0] || null;
-  if(nav){
-    return {
-      type: nav.type || null,
-      domInteractiveMs: round(nav.domInteractive || 0, 1),
-      domContentLoadedMs: round(nav.domContentLoadedEventEnd || 0, 1),
-      loadEventEndMs: round(nav.loadEventEnd || 0, 1),
-      responseEndMs: round(nav.responseEnd || 0, 1),
-      transferKb: bytesToKb(nav.transferSize || 0),
-      decodedKb: bytesToKb(nav.decodedBodySize || 0)
-    };
-  }
-  const timing = performance.timing || null;
-  if(!timing) return null;
-  const start = timing.navigationStart;
-  return {
-    type: 'legacy-timing',
-    domInteractiveMs: timing.domInteractive - start,
-    domContentLoadedMs: timing.domContentLoadedEventEnd - start,
-    loadEventEndMs: timing.loadEventEnd - start,
-    responseEndMs: timing.responseEnd - start
-  };
-}
-
-function scriptTags(){
-  return Array.from(document.scripts || []).map(script => ({
-    id: script.id || '',
-    src: script.src ? pathOf({name: script.src}) : '(inline)',
-    type: script.type || 'classic',
-    async: !!script.async,
-    defer: !!script.defer
-  }));
-}
-
-function estimateScore(report){
-  let score = 100;
-  const allKb = report.resources.totals.all.kb;
-  const scriptKb = report.resources.totals.script.kb;
-  const scriptCount = report.resources.totals.script.count;
-  const legacyCount = report.resources.legacy.count;
-  const domNodes = report.dom.nodes;
-  if(allKb > 2500) score -= 25; else if(allKb > 1500) score -= 15; else if(allKb > 900) score -= 8;
-  if(scriptKb > 1800) score -= 25; else if(scriptKb > 1000) score -= 15; else if(scriptKb > 700) score -= 8;
-  if(scriptCount > 25) score -= 12; else if(scriptCount > 15) score -= 7;
-  if(legacyCount > 2) score -= 10;
-  if(domNodes > 5000) score -= 18; else if(domNodes > 3000) score -= 10; else if(domNodes > 1800) score -= 5;
-  if(report.navigator.connection?.saveData) score -= 3;
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-function recommendations(report){
-  const recs = [];
-  if(report.resources.totals.script.kb > 1000) recs.push('Separar ExcelJS y legacy para cargarlos sólo cuando se usan. Impacto móvil: muy alto.');
-  if(report.resources.legacy.count >= 2) recs.push('Siguiente fase: dividir legacy por pantalla o cargar el segundo bundle bajo demanda.');
-  if(report.dom.nodes > 2500) recs.push('Reducir renderizados iniciales: listas largas sólo al abrir cada pestaña.');
-  if(report.resources.excelJs.loadedAtStart) recs.push('ExcelJS ya aparece cargado; confirmar que sólo se ha cargado tras pedir INFOEVENTO/Excel.');
-  else recs.push('ExcelJS no está cargado al inicio: correcto para móvil. Se cargará bajo demanda al generar Excel.');
-  if(report.pwa.controlled && report.resources.totals.all.kb === 0) recs.push('Muchos recursos parecen venir de caché; probar una carga en incógnito para medir peso real.');
-  if(!recs.length) recs.push('Diagnóstico sin avisos relevantes. Mantener estrategia de carga diferida por pantalla.');
-  return recs;
-}
-
-export function inspectMobilePerformance(){
-  const rows = resourceRows();
-  const legacy = legacyResources(rows);
-  const excelJs = rows.find(row => row.path.includes('exceljs')) || null;
-  const report = {
-    version: DIAGNOSTICS_VERSION,
-    appVersion: VERSION,
-    inspectedAt: nowIso(),
-    mode: 'diagnostic-only',
-    screen: screenInfo(),
-    navigator: navInfo(),
-    timing: navTiming(),
-    memory: memoryInfo(),
-    dom: domMetrics(),
-    scripts: {
-      tags: scriptTags(),
-      count: document.scripts?.length || 0
-    },
-    resources: {
-      totals: groupResources(rows),
-      count: rows.length,
-      rows,
-      legacy: {
-        count: legacy.length,
-        totalKb: round(legacy.reduce((sum, row) => sum + (row.transferKb || row.encodedKb || row.decodedKb || 0), 0), 1),
-        files: legacy.map(row => ({path: row.path, kb: row.transferKb || row.encodedKb || row.decodedKb || 0, durationMs: row.durationMs}))
-      },
-      excelJs: {
-        loadedAtStart: !!excelJs,
-        path: excelJs?.path || null,
-        kb: excelJs ? (excelJs.transferKb || excelJs.encodedKb || excelJs.decodedKb || 0) : 0,
-        globalReady: !!window.ExcelJS?.Workbook,
-        lazyInfo: window.ControlEventExcel?.excelJsInfo?.() || null
-      }
-    },
-    pwa: {
-      serviceWorkerAvailable: 'serviceWorker' in navigator,
-      controlled: !!navigator.serviceWorker?.controller,
-      controllerUrl: navigator.serviceWorker?.controller?.scriptURL || null
+const SECTIONS = [
+  {
+    name: 'personas', label: 'PERSONAS', rootId: 'mtPersonas', listId: 'personasList',
+    fields: ['newPersonaNombre', 'newPersonaRango'], buttons: ['btnAddPersona'], actions: ['addPersona'], stateKey: 'personas'
+  },
+  {
+    name: 'eventos', label: 'EVENTOS', rootId: 'mtEventos', listId: 'eventosList',
+    fields: ['newEventoTitulo', 'newEventoPrecio', 'newEventoFechaIni', 'newEventoFechaFin', 'newEventoSituacion', 'newEventoDescripcion'],
+    buttons: ['btnAddEvento'], actions: ['addEvento'], stateKey: 'eventos'
+  },
+  {
+    name: 'tiendas', label: 'TIENDAS', rootId: 'mtTiendas', listId: 'tiendasList',
+    fields: ['newTiendaNombre'], buttons: ['btnAddTienda'], actions: ['addTienda'], stateKey: 'tiendas'
+  },
+  {
+    name: 'productos', label: 'PRODUCTOS', rootId: 'mtProductos', listId: 'productosList',
+    fields: ['newProductoNombre', 'newProductoSegmento', 'newProductoDestino', 'newProductoPrecio'],
+    buttons: ['btnAddProducto'], actions: ['addProducto'], stateKey: 'productos'
+  },
+  {
+    name: 'importacion', label: 'IMPORTACIÓN', rootId: 'mtImportar', listId: 'importStatus',
+    fields: ['importMode', 'importWorkbookFile', 'importTicketFiles'], buttons: ['btnStartImport', 'btnClearImportStatus'],
+    actions: ['importInitialWorkbook'], optionalActions: ['clearImportStatus'], stateKey: null,
+    notesIfOptionalMissing: {
+      clearImportStatus: 'clearImportStatus no está expuesta como función global; no es problema si la carga/limpieza visual funciona.'
     }
+  },
+  {
+    name: 'acceso', label: 'ACCESO', rootId: 'mtAcceso', listId: 'accesoList',
+    fields: ['newAccesoIdentificacion', 'newAccesoNombre', 'newAccesoClave', 'newAccesoNivel'],
+    buttons: ['btnAddAcceso'], actions: ['saveAccessUser'], stateKey: 'accessUsers', godOnly: true
+  }
+];
+
+function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || window; }
+function state(){ return app()?.state || window.state || {}; }
+function byId(id){ return id ? document.getElementById(id) : null; }
+function exists(id){ return !!byId(id); }
+function isHidden(el){ return !!el?.classList?.contains('hidden') || !!el?.closest?.('.hidden'); }
+function actionExists(name){ return typeof window[name] === 'function' || typeof app()?.actions?.[name] === 'function'; }
+function valueOf(id){ const el = byId(id); return el?.value ?? ''; }
+function collectionSize(key){
+  if(!key) return null;
+  const src = state()?.[key] ?? window[key];
+  if(Array.isArray(src)) return src.length;
+  if(src && typeof src === 'object') return Object.keys(src).length;
+  return 0;
+}
+function currentUserLevel(){
+  return app()?.auth?.currentUser?.nivel || window.authUser?.nivel || window.currentUser?.nivel || '';
+}
+function fieldInfo(id){
+  const el = byId(id);
+  return {id, exists: !!el, disabled: !!el?.disabled, readonly: !!el?.readOnly, value: el?.type === 'password' ? (el.value ? '***' : '') : (el?.value ?? ''), tag: el?.tagName || null};
+}
+function buttonInfo(id){
+  const el = byId(id);
+  return {id, exists: !!el, disabled: !!el?.disabled, hidden: isHidden(el), text: el?.textContent?.trim?.() || ''};
+}
+function sectionReport(section){
+  const root = byId(section.rootId);
+  const report = {
+    version: VERSION,
+    name: section.name,
+    label: section.label,
+    rootId: section.rootId,
+    rootExists: !!root,
+    rootHidden: isHidden(root),
+    listId: section.listId,
+    listExists: exists(section.listId),
+    stateKey: section.stateKey,
+    records: collectionSize(section.stateKey),
+    fields: section.fields.map(fieldInfo),
+    buttons: section.buttons.map(buttonInfo),
+    actions: (section.actions || []).map(name => ({name, exists: actionExists(name), required: true})),
+    optionalActions: (section.optionalActions || []).map(name => ({name, exists: actionExists(name), required: false})),
+    userLevel: currentUserLevel(),
+    structuralProblems: [],
+    notes: []
   };
-  report.score = estimateScore(report);
-  report.recommendations = recommendations(report);
-  lastReport = report;
+  if(!report.rootExists) report.structuralProblems.push(`No existe el contenedor ${section.rootId}.`);
+  if(section.listId && !report.listExists) report.structuralProblems.push(`No existe el listado/estado ${section.listId}.`);
+  report.fields.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe el campo ${item.id}.`); });
+  report.buttons.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe el botón ${item.id}.`); });
+  report.actions.forEach(item => { if(!item.exists) report.structuralProblems.push(`No existe la acción legacy ${item.name}.`); });
+  report.optionalActions.forEach(item => {
+    if(!item.exists){
+      const note = section.notesIfOptionalMissing?.[item.name] || `Acción opcional no expuesta: ${item.name}.`;
+      report.notes.push(note);
+    }
+  });
+  if(section.godOnly && report.userLevel && report.userLevel !== 'GD') report.notes.push('Sección visible/usable sólo para nivel GD.');
   return report;
 }
-
-export function resources(){
-  const rows = resourceRows();
-  try{ console.table(rows.map(row => ({type: row.type, path: row.path, kb: row.transferKb || row.encodedKb || row.decodedKb, ms: row.durationMs, cache: row.fromCacheLikely}))); }catch(_){ console.log(rows); }
-  return rows;
+function inspect(){
+  const sections = Object.fromEntries(SECTIONS.map(section => [section.name, sectionReport(section)]));
+  const structuralProblems = Object.values(sections).flatMap(report => report.structuralProblems.map(msg => `${report.label}: ${msg}`));
+  const counts = {
+    eventos: collectionSize('eventos'),
+    personas: collectionSize('personas'),
+    tiendas: collectionSize('tiendas'),
+    productos: collectionSize('productos'),
+    accessUsers: collectionSize('accessUsers')
+  };
+  return {version: VERSION, ok: structuralProblems.length === 0, mode: 'diagnostic-only', counts, sections, structuralProblems};
 }
-
-export function scripts(){
-  const rows = scriptTags();
-  try{ console.table(rows); }catch(_){ console.log(rows); }
-  return rows;
-}
-
-export function print(){
-  const report = inspectMobilePerformance();
-  console.group(`[ControlEventMobilePerformance/${DIAGNOSTICS_VERSION}] Diagnóstico móvil/rendimiento`);
-  console.log('Resumen', {
-    score: report.score,
-    isLikelyMobile: report.screen.isLikelyMobile,
-    resourcesKb: report.resources.totals.all.kb,
-    scriptKb: report.resources.totals.script.kb,
-    scriptCount: report.resources.totals.script.count,
-    legacyKb: report.resources.legacy.totalKb,
-    domNodes: report.dom.nodes,
-    excelJsAtStart: report.resources.excelJs.loadedAtStart,
-    swControlled: report.pwa.controlled
+function print(){
+  const report = inspect();
+  console.group(`[ControlEventMaintenanceDiagnostics/${VERSION}] Diagnóstico de mantenimiento`);
+  Object.values(report.sections).forEach(section => {
+    if(section.structuralProblems.length) console.warn(`[ControlEventMaintenanceDiagnostics/${VERSION}] ${section.label}: problemas estructurales`, section.structuralProblems, section);
+    else console.info(`[ControlEventMaintenanceDiagnostics/${VERSION}] ${section.label}: OK`, {records: section.records, rootHidden: section.rootHidden, notes: section.notes});
   });
-  try{
-    console.table(Object.entries(report.resources.totals).map(([tipo, value]) => ({tipo, peticiones:value.count, kb:value.kb})));
-  }catch(_){ console.log(report.resources.totals); }
-  if(report.recommendations.length) console.info('Recomendaciones:', report.recommendations);
+  console.info(`[ControlEventMaintenanceDiagnostics/${VERSION}] Conteos`, report.counts);
   console.groupEnd();
   return report;
 }
-
-export function quick(){
-  const report = inspectMobilePerformance();
-  return {
-    version: report.version,
-    score: report.score,
-    mobile: report.screen.isLikelyMobile,
-    resourcesKb: report.resources.totals.all.kb,
-    scriptKb: report.resources.totals.script.kb,
-    scriptCount: report.resources.totals.script.count,
-    legacyKb: report.resources.legacy.totalKb,
-    domNodes: report.dom.nodes,
-    excelJsAtStart: report.resources.excelJs.loadedAtStart,
-    recommendations: report.recommendations
-  };
+function section(name){
+  const found = SECTIONS.find(item => item.name === name || item.label.toLowerCase() === String(name || '').toLowerCase());
+  return found ? sectionReport(found) : null;
 }
-
-export function installMobilePerformanceDiagnostics(){
-  const api = {
-    version: DIAGNOSTICS_VERSION,
-    mode: 'diagnostic-only',
-    inspect: inspectMobilePerformance,
-    print,
-    quick,
-    resources,
-    scripts,
-    get lastReport(){ return lastReport; }
-  };
-  window.ControlEventMobilePerformance = api;
-  window.__ceV278MobilePerformance = api;
-  window.dispatchEvent(new CustomEvent('controlevent:mobile-performance-ready', {detail: api}));
+function productPrices(){
+  const productos = state()?.productos || [];
+  const rows = (Array.isArray(productos) ? productos : Object.values(productos || {})).map(p => ({
+    id: p?.id || '',
+    nombre: p?.nombre || p?.producto || '',
+    segmento: p?.segmento || '',
+    destino: p?.destino || '',
+    precio: Number(p?.precio ?? p?.defaultPrecio ?? 0) || 0,
+    defaultPrecio: Number(p?.defaultPrecio ?? p?.precio ?? 0) || 0
+  }));
+  try{ console.table(rows); }catch(_){ }
+  return rows;
+}
+function info(){
+  return {version: VERSION, mode: 'diagnostic-only', sections: SECTIONS.map(s => s.name), note: 'No cambia mantenimiento; sólo diagnostica estructura y datos.'};
+}
+export function installMaintenanceDiagnostics(){
+  if(typeof window === 'undefined') return null;
+  const api = {version: VERSION, mode: 'diagnostic-only', info, inspect, print, section, productPrices, sections: SECTIONS};
+  window.ControlEventMaintenanceDiagnostics = api;
+  window.__ceV277MaintenanceDiagnostics = api;
   return api;
 }
