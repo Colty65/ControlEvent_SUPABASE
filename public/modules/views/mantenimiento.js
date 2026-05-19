@@ -5,13 +5,8 @@ const view = createLegacyView({
   name: 'mantenimiento',
   render: ['renderMaintenance'],
   afterActivate(){
-    const maintenance = installMaintenanceModules();
-    const scheduler = maintenance?.scheduleCurrent;
-    if(typeof scheduler === 'function'){
-      scheduler({reason:'mantenimiento-view-activate-lazy', delay:90});
-    }else{
-      refreshCurrentMaintenance({reason:'mantenimiento-view-activate'});
-    }
+    installMaintenanceModules();
+    refreshCurrentMaintenance({reason:'mantenimiento-view-activate'});
   }
 });
 

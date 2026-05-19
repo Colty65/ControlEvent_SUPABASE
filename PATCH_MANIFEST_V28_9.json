@@ -1,12 +1,17 @@
 {
   "version": "v28.9",
-  "base": "v28.0.1",
-  "modified": [
+  "basis": "v28.0.2",
+  "purpose": "rollback rendimiento a base previa a experimentos v28.1-v28.8",
+  "changed_files": [
     "package-lock.json",
     "package.json",
     "README_V28_0.md",
     "README_V28_0_1.md",
     "README_V28_0_1_DELETE_OLD_FILES.txt",
+    "README_V28_0_2.md",
+    "PATCH_MANIFEST_V28_0_2.json",
+    "README_V28_9.md",
+    "lib/supabase-normalized.js",
     "public/index.html",
     "public/sw.js",
     "routes/export.routes.js",
@@ -14,26 +19,23 @@
     "server/paths.js",
     "public/app/version.js",
     "public/app/main.js",
+    "public/modules/module-loader.js",
     "public/modules/excel/_excel-runtime.js",
     "public/modules/excel/backup.js",
     "public/modules/excel/graficas-sheet.js",
     "public/modules/excel/infoevento.js",
     "public/modules/excel/resumen-sheet.js",
+    "public/modules/maintenance/_maintenance-runtime.js",
+    "public/modules/views/mantenimiento.js",
     "public/app/diagnostics/build-metrics.json",
     "public/app/diagnostics/data-integrity.js",
     "public/app/diagnostics/import-price-diagnostics.js",
     "public/app/diagnostics/maintenance-diagnostics.js",
     "public/app/diagnostics/mobile-performance.js",
-    "public/app/diagnostics/runtime-diagnostics.js"
-  ],
-  "new": [
-    "README_V28_9.md",
+    "public/app/diagnostics/runtime-diagnostics.js",
     "public/app/legacy/legacy-bundle-before-modules-v28.9.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.9.js"
+    "public/app/legacy/legacy-bundle-after-modules-v28.9.js",
+    "public/app/debug/debug-mode.js"
   ],
-  "deleted": [
-    "public/app/legacy/legacy-bundle-before-modules-v28.0.1.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.0.1.js"
-  ],
-  "notes": "Corrección de consistencia de versión backend/export BACKUP y caché. Mantiene ExcelJS lazy y deduplicación."
+  "count": 33
 }

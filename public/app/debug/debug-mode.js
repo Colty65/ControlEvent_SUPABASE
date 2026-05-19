@@ -88,9 +88,7 @@ async function loadDiagnosticsModules(baseContext){
       dataIntegrityModule,
       formsModule,
       maintenanceDiagnosticsModule,
-      mobilePerformanceModule,
-      legacyWeightModule,
-      legacyUsageModule
+      mobilePerformanceModule
     ] = await Promise.all([
       import('../diagnostics/runtime-diagnostics.js'),
       import('../diagnostics/legacy-map.js'),
@@ -98,9 +96,7 @@ async function loadDiagnosticsModules(baseContext){
       import('../diagnostics/data-integrity.js'),
       import('../../modules/forms/index.js'),
       import('../diagnostics/maintenance-diagnostics.js'),
-      import('../diagnostics/mobile-performance.js'),
-      import('../diagnostics/legacy-weight.js'),
-      import('../diagnostics/legacy-usage.js')
+      import('../diagnostics/mobile-performance.js')
     ]);
 
     const legacyMap = legacyMapModule.installLegacyMap();
@@ -109,8 +105,6 @@ async function loadDiagnosticsModules(baseContext){
     const forms = formsModule.installFormModules();
     const maintenanceDiagnostics = maintenanceDiagnosticsModule.installMaintenanceDiagnostics();
     const mobilePerformance = mobilePerformanceModule.installMobilePerformanceDiagnostics();
-    const legacyWeight = legacyWeightModule.installLegacyWeightDiagnostics();
-    const legacyUsage = legacyUsageModule.installLegacyUsageProfiler();
     const diagnostics = runtimeDiagnostics.installRuntimeDiagnostics({
       app: baseContext.app,
       domain: baseContext.domain,
@@ -122,8 +116,6 @@ async function loadDiagnosticsModules(baseContext){
       forms,
       maintenanceDiagnostics,
       mobilePerformance,
-      legacyWeight,
-      legacyUsage,
       debugMode: window.ControlEventDebug || null
     });
 
@@ -136,9 +128,7 @@ async function loadDiagnosticsModules(baseContext){
       dataIntegrity,
       forms,
       maintenanceDiagnostics,
-      mobilePerformance,
-      legacyWeight,
-      legacyUsage
+      mobilePerformance
     };
 
     Object.assign(window.ControlEventRuntime || {}, loadedRuntime);

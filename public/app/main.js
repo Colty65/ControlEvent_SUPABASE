@@ -4,10 +4,6 @@ import { installDomainCalculations } from './domain/index.js';
 import { installExcelModules } from '../modules/excel/index.js';
 import { installTicketModules } from '../modules/tickets/index.js';
 import { installDebugMode } from './debug/debug-mode.js';
-import { installScreenLazyRuntime } from './navigation/screen-lazy.js';
-import { installMaintenanceLazyProxy } from '../modules/maintenance/lazy-proxy.js';
-import { installLegacyHotpathOptimizer } from './performance/legacy-hotpath.js';
-import { installActiveRenderOptimizer } from './performance/active-render.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -21,7 +17,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.6.1] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.9] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -29,11 +25,7 @@ function install(app){
   const domain = installDomainCalculations(app, {mode: 'shadow'});
   const excel = installExcelModules();
   const tickets = installTicketModules();
-  const hotpath = installLegacyHotpathOptimizer({mode:'mobile-safe'});
-  const activeRender = installActiveRenderOptimizer({mode:'available-only', enabled:false});
-  const debug = installDebugMode({app, domain, excel, tickets, hotpath, activeRender});
-  const maintenanceProxy = installMaintenanceLazyProxy();
-  const screenLazy = installScreenLazyRuntime({app, modules: window.ControlEventModules});
+  const debug = installDebugMode({app, domain, excel, tickets});
   window.ControlEventRuntime = {
     version: VERSION,
     mode: debug.isEnabled() ? 'debug-enabled' : 'production-lite',
@@ -43,7 +35,6 @@ function install(app){
     excel,
     tickets,
     debug,
-    screenLazy,
     inspect: () => ({
       version: VERSION,
       mode: window.ControlEventRuntime?.mode || 'production-lite',
@@ -52,11 +43,7 @@ function install(app){
       domain: !!domain,
       excel: !!excel,
       tickets: !!tickets,
-      hotpath: hotpath?.inspect?.() || null,
-      activeRender: activeRender?.inspect?.() || null,
-      debug: debug.status(),
-      screenLazy: screenLazy.info(),
-      maintenance: maintenanceProxy?.info?.() || null
+      debug: debug.status()
     }),
     checkApi: async () => window.ControlEventDiagnostics?.checkApi?.() || {disabled:true, ok:null}
   };
@@ -64,7 +51,7 @@ function install(app){
     detail: window.ControlEventRuntime
   }));
   setTimeout(() => {
-    screenLazy.activateInitial({app: getApp(), modules: window.ControlEventModules, delay: 80});
+    activateCurrentModule(getApp());
     window.ControlEventDiagnostics?.assertHealthy?.();
   }, 0);
 }

@@ -1,11 +1,6 @@
 {
-  "version": "v28.6.1",
+  "version": "v28.9",
   "indexHtmlLines": 445,
-  "notes": "v28.6.1 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
-  "mobileOptimization": "exceljs-lazy-load",
-  "focus": "legacy-hotpath-cache",
-  "excelJsLazy": true,
-  "appVersion": "ControlEvent v28.6.1",
-  "indexLines": 445,
-  "hotpathOptimizer": true
+  "notes": "v28.0 elimina la carga inicial de /vendor/exceljs.min.js. ExcelJS queda bajo demanda para INFOEVENTO/Excel, manteniendo INFOEVENTO/BACKUP/carga sin cambios funcionales.",
+  "mobileOptimization": "exceljs-lazy-load"
 }
