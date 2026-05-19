@@ -1,7 +1,8 @@
-// ControlEvent v27.6 - Runtime no intrusivo para formularios principales.
+// ControlEvent v27.6.1 - Runtime no intrusivo para formularios principales.
 // No sustituye acciones legacy: sólo lee formularios, valida y diagnostica.
+// v27.6.1: diagnóstico menos ruidoso y alineado con IDs reales de la UI.
 
-export const FORMS_VERSION = 'v27.6';
+export const FORMS_VERSION = 'v27.6.1';
 
 export function getApp(){
   return window.ControlEventApp || window.ControlEventRuntime?.app || window;
@@ -29,7 +30,16 @@ export function textOfSelected(id){
 
 export function currentEventId(){
   const app = getApp();
-  return app?.selectors?.selectedId?.() || app?.selectors?.currentEventId?.() || window.selectedId?.() || valueOf('eventSelect') || '';
+  const candidates = [];
+  try{ candidates.push(app?.selectors?.selectedId?.()); }catch(_){ }
+  try{ candidates.push(app?.selectors?.currentEventId?.()); }catch(_){ }
+  try{ candidates.push(window.selectedId?.()); }catch(_){ }
+  try{ candidates.push(window.selectedEvent?.()?.id); }catch(_){ }
+  candidates.push(getState()?.selectedEventId);
+  candidates.push(valueOf('selectedEvent'));
+  candidates.push(valueOf('eventSelect'));
+  const found = candidates.find(v => String(v || '').trim());
+  return String(found || '');
 }
 
 export function parseEuro(value){
@@ -96,24 +106,39 @@ export function formFieldInfo(ids = []){
 
 export function detectProblems(report){
   const problems = [];
+  const structuralProblems = [];
+  const dataWarnings = [];
   if(!report) return problems;
-  if(!report.eventId) problems.push('No hay evento seleccionado.');
+  if(!report.eventId) dataWarnings.push('No hay evento seleccionado.');
   (report.requiredActions || []).forEach(item => {
-    if(!item.exists) problems.push(`No existe la acción legacy ${item.name}.`);
+    if(!item.exists) structuralProblems.push(`No existe la acción legacy ${item.name}.`);
   });
   (report.requiredButtons || []).forEach(item => {
-    if(!item.exists) problems.push(`No existe el botón ${item.id}.`);
+    if(!item.exists) structuralProblems.push(`No existe el botón ${item.id}.`);
   });
   (report.requiredFields || []).forEach(item => {
-    if(!item.exists) problems.push(`No existe el campo ${item.id}.`);
+    if(!item.exists) structuralProblems.push(`No existe el campo ${item.id}.`);
   });
+  problems.push(...structuralProblems, ...dataWarnings);
+  report.structuralProblems = structuralProblems;
+  report.dataWarnings = dataWarnings;
   return problems;
 }
 
+export function addDataWarning(report, message){
+  if(!report.dataWarnings) report.dataWarnings = [];
+  if(!report.problems) report.problems = [];
+  report.dataWarnings.push(message);
+  report.problems.push(message);
+}
+
 export function printReport(title, report){
-  const problems = report?.problems || [];
-  if(problems.length){
-    console.warn(`[ControlEventForms/${FORMS_VERSION}] ${title}: avisos`, problems, report);
+  const structuralProblems = report?.structuralProblems || [];
+  const dataWarnings = report?.dataWarnings || [];
+  if(structuralProblems.length){
+    console.warn(`[ControlEventForms/${FORMS_VERSION}] ${title}: problemas estructurales`, structuralProblems, report);
+  }else if(dataWarnings.length){
+    console.info(`[ControlEventForms/${FORMS_VERSION}] ${title}: diagnóstico OK; formulario vacío o sin selección`, dataWarnings, report);
   }else{
     console.info(`[ControlEventForms/${FORMS_VERSION}] ${title}: OK`, report);
   }

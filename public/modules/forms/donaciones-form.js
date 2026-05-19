@@ -1,6 +1,6 @@
-import { FORMS_VERSION, buttonInfo, currentEventId, detectProblems, formFieldInfo, parseEuro, printReport, requiredActions, toNumber, valueOf } from './_forms-runtime.js';
+import { FORMS_VERSION, addDataWarning, buttonInfo, currentEventId, detectProblems, formFieldInfo, parseEuro, printReport, requiredActions, toNumber, valueOf } from './_forms-runtime.js';
 
-const FIELD_IDS = ['donProducto','donUnidades','donValor','donTipo','donDonante','donResponsable'];
+const FIELD_IDS = ['donProducto','donUnidades','donPrecio','donImporte','donTicket','donDonante','donResponsable'];
 const ACTIONS = ['addDonation','renderDonaciones','renderBudget'];
 
 export function read(){
@@ -8,8 +8,9 @@ export function read(){
     eventId: currentEventId(),
     productoId: valueOf('donProducto'),
     unidades: toNumber(valueOf('donUnidades'), 0),
-    valor: parseEuro(valueOf('donValor')),
-    tipo: valueOf('donTipo'),
+    precio: parseEuro(valueOf('donPrecio')),
+    importe: parseEuro(valueOf('donImporte')),
+    ticketDonacion: valueOf('donTicket'),
     donanteId: valueOf('donDonante'),
     responsableId: valueOf('donResponsable')
   };
@@ -29,9 +30,9 @@ export function read(){
 export function validate(){
   const report = read();
   const {record} = report;
-  if(!record.productoId) report.problems.push('No hay producto seleccionado.');
-  if(!record.unidades || record.unidades < 0) report.problems.push('Unidades no válidas.');
-  if(record.valor < 0) report.problems.push('Valor estimado no válido.');
+  if(!record.productoId) addDataWarning(report, 'No hay producto seleccionado.');
+  if(record.unidades < 0) addDataWarning(report, 'Unidades no válidas.');
+  if(record.precio < 0) addDataWarning(report, 'Precio/valor estimado no válido.');
   return report;
 }
 

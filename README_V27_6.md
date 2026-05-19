@@ -1,4 +1,4 @@
-# ControlEvent v27.6 - Diagnóstico de formularios principales
+# ControlEvent v27.6.1 - Diagnóstico de formularios principales
 
 Versión conservadora posterior a v27.5. No toca funcionalmente INFOEVENTO, BACKUP, carga de datos ni tickets.
 
@@ -43,4 +43,4 @@ ControlEventForms.donaciones.print()
 
 ## Siguiente paso recomendado
 
-Si v27.6 funciona bien, la siguiente versión puede empezar a usar esta capa para extraer una acción concreta de bajo riesgo, probablemente validaciones previas de COMPRAS o INGRESOS, sin tocar todavía el guardado final.
+Si v27.6.1 funciona bien, la siguiente versión puede empezar a usar esta capa para extraer una acción concreta de bajo riesgo, probablemente validaciones previas de COMPRAS o INGRESOS, sin tocar todavía el guardado final.

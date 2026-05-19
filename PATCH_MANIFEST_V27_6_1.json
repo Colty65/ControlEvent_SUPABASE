@@ -1,8 +1,10 @@
 {
   "version": "v27.6.1",
-  "base": "v27.5",
-  "description": "Diagnóstico no intrusivo de formularios principales; no toca INFOEVENTO/BACKUP.",
+  "base": "v27.6",
   "modified": [
+    "PATCH_MANIFEST_V27_6.json",
+    "README_V27_6.md",
+    "README_V27_6_DELETE_OLD_FILES.txt",
     "package-lock.json",
     "package.json",
     "public/app/diagnostics/build-metrics.json",
@@ -17,27 +19,26 @@
     "public/modules/excel/graficas-sheet.js",
     "public/modules/excel/infoevento.js",
     "public/modules/excel/resumen-sheet.js",
+    "public/modules/forms/_forms-runtime.js",
+    "public/modules/forms/compras-form.js",
+    "public/modules/forms/donaciones-form.js",
+    "public/modules/forms/ingresos-form.js",
     "public/modules/module-loader.js",
     "public/sw.js",
     "routes/export.routes.js",
     "routes/health.routes.js",
     "server/paths.js"
   ],
-  "added": [
-    "README_V27_6.md",
-    "README_V27_6_DELETE_OLD_FILES.txt",
+  "new": [
+    "README_V27_6_1.md",
+    "README_V27_6_1_DELETE_OLD_FILES.txt",
     "public/app/legacy/legacy-bundle-after-modules-v27.6.1.js",
-    "public/app/legacy/legacy-bundle-before-modules-v27.6.1.js",
-    "public/modules/forms/_forms-runtime.js",
-    "public/modules/forms/compras-form.js",
-    "public/modules/forms/donaciones-form.js",
-    "public/modules/forms/index.js",
-    "public/modules/forms/ingresos-form.js"
+    "public/app/legacy/legacy-bundle-before-modules-v27.6.1.js"
   ],
-  "deleted_from_full": [
-    "public/app/legacy/legacy-bundle-after-modules-v27.5.js",
-    "public/app/legacy/legacy-bundle-before-modules-v27.5.js"
+  "deleted_optional": [
+    "public/app/legacy/legacy-bundle-after-modules-v27.6.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.6.js"
   ],
-  "functional_file_count": 28,
-  "index_html_lines": 447
+  "functional_file_count": 30,
+  "notes": "Corrección de diagnóstico de formularios: IDs reales, evento seleccionado real y menor ruido en consola. No toca INFOEVENTO ni BACKUP."
 }

@@ -1,4 +1,4 @@
-import { FORMS_VERSION, buttonInfo, currentEventId, detectProblems, formFieldInfo, parseEuro, printReport, requiredActions, toNumber, valueOf } from './_forms-runtime.js';
+import { FORMS_VERSION, addDataWarning, buttonInfo, currentEventId, detectProblems, formFieldInfo, parseEuro, printReport, requiredActions, toNumber, valueOf } from './_forms-runtime.js';
 
 const FIELD_IDS = ['buyProducto','buyUnidades','buyPrecio','buyTicket','buyTienda','buyResponsable'];
 const ACTIONS = ['addCompra','renderCompras','renderBudget'];
@@ -29,9 +29,9 @@ export function read(){
 export function validate(){
   const report = read();
   const {record} = report;
-  if(!record.productoId) report.problems.push('No hay producto seleccionado.');
-  if(!record.unidades || record.unidades < 0) report.problems.push('Unidades no válidas.');
-  if(record.precio < 0) report.problems.push('Precio no válido.');
+  if(!record.productoId) addDataWarning(report, 'No hay producto seleccionado.');
+  if(record.unidades < 0) addDataWarning(report, 'Unidades no válidas.');
+  if(record.precio < 0) addDataWarning(report, 'Precio no válido.');
   return report;
 }
 

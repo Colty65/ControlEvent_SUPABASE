@@ -1,7 +1,7 @@
 {
-  "version": "v27.6",
+  "version": "v27.6.1",
   "indexHtmlLines": 447,
   "indexHtmlBytes": 21332,
-  "notes": "v27.6 añade ControlEventForms como diagnóstico no intrusivo de formularios principales; no toca INFOEVENTO ni BACKUP.",
+  "notes": "v27.6.1 añade ControlEventForms como diagnóstico no intrusivo de formularios principales; no toca INFOEVENTO ni BACKUP.",
   "formsDiagnostics": "diagnostic-only"
 }
