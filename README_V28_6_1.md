@@ -1,4 +1,4 @@
-# ControlEvent v28.6.1 - ActiveRender desactivado por defecto
+# ControlEvent v28.7 - ActiveRender desactivado por defecto
 
 Versión correctiva sobre v28.6.
 
@@ -11,7 +11,7 @@ En pruebas reales:
 - iPad 6ª gen y Android TCL30: `ControlEventActiveRender` empeoraba la sensación de fluidez.
 - Al ejecutar `ControlEventActiveRender.disable()`, iPad y Android mejoraban claramente.
 
-Por tanto, v28.6.1 deja `ActiveRender` **desactivado por defecto**.
+Por tanto, v28.7 deja `ActiveRender` **desactivado por defecto**.
 
 ## Qué se mantiene
 
