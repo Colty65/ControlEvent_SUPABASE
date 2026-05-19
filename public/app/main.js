@@ -3,13 +3,7 @@ import { getApp, whenAppReady } from './app-context.js';
 import { installDomainCalculations } from './domain/index.js';
 import { installExcelModules } from '../modules/excel/index.js';
 import { installTicketModules } from '../modules/tickets/index.js';
-import { installRuntimeDiagnostics } from './diagnostics/runtime-diagnostics.js';
-import { installLegacyMap } from './diagnostics/legacy-map.js';
-import { installLegacyCleanup } from './diagnostics/legacy-cleanup.js';
-import { installDataIntegrity } from './diagnostics/data-integrity.js';
-import { installFormModules } from '../modules/forms/index.js';
-import { installMaintenanceDiagnostics } from './diagnostics/maintenance-diagnostics.js';
-import { installMobilePerformanceDiagnostics } from './diagnostics/mobile-performance.js';
+import { installDebugMode } from './debug/debug-mode.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -23,7 +17,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v27.8] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v27.9] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -31,29 +25,27 @@ function install(app){
   const domain = installDomainCalculations(app, {mode: 'shadow'});
   const excel = installExcelModules();
   const tickets = installTicketModules();
-  const legacyMap = installLegacyMap();
-  const legacyCleanup = installLegacyCleanup();
-  const dataIntegrity = installDataIntegrity();
-  const forms = installFormModules();
-  const maintenanceDiagnostics = installMaintenanceDiagnostics();
-  const mobilePerformance = installMobilePerformanceDiagnostics();
-  const diagnostics = installRuntimeDiagnostics({app, domain, excel, tickets, legacyMap, legacyCleanup, dataIntegrity, forms, maintenanceDiagnostics, mobilePerformance});
+  const debug = installDebugMode({app, domain, excel, tickets});
   window.ControlEventRuntime = {
     version: VERSION,
+    mode: debug.isEnabled() ? 'debug-enabled' : 'production-lite',
     app,
     modules: window.ControlEventModules || null,
     domain,
     excel,
     tickets,
-    diagnostics,
-    legacyMap,
-    legacyCleanup,
-    dataIntegrity,
-    forms,
-    maintenanceDiagnostics,
-    mobilePerformance,
-    inspect: () => diagnostics.inspect(),
-    checkApi: () => diagnostics.checkApi()
+    debug,
+    inspect: () => ({
+      version: VERSION,
+      mode: window.ControlEventRuntime?.mode || 'production-lite',
+      appReady: !!app,
+      modules: !!window.ControlEventModules,
+      domain: !!domain,
+      excel: !!excel,
+      tickets: !!tickets,
+      debug: debug.status()
+    }),
+    checkApi: async () => window.ControlEventDiagnostics?.checkApi?.() || {disabled:true, ok:null}
   };
   window.dispatchEvent(new CustomEvent('controlevent:runtime-ready', {
     detail: window.ControlEventRuntime
