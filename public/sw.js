@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v27-5';
+const CACHE_NAME = 'controlevent-shell-v27-6';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -10,13 +10,19 @@ const SHELL_ASSETS = [
   '/app/main.js',
   '/app/diagnostics/runtime-diagnostics.js',
   '/app/diagnostics/import-price-diagnostics.js',
+  '/app/diagnostics/data-integrity.js',
+  '/modules/forms/index.js',
+  '/modules/forms/_forms-runtime.js',
+  '/modules/forms/ingresos-form.js',
+  '/modules/forms/compras-form.js',
+  '/modules/forms/donaciones-form.js',
   '/app/diagnostics/legacy-map.js',
   '/app/diagnostics/legacy-cleanup.js',
   '/app/diagnostics/legacy-cleanup-report.json',
   '/app/diagnostics/legacy-function-map.json',
-  '/app/legacy/legacy-bundle-after-modules-v27.5.js',
+  '/app/legacy/legacy-bundle-after-modules-v27.6.js',
   '/modules/module-loader.js',
-  '/app/legacy/legacy-bundle-before-modules-v27.5.js',
+  '/app/legacy/legacy-bundle-before-modules-v27.6.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',

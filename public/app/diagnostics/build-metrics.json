@@ -1,6 +1,7 @@
 {
-  "version": "v27.5",
+  "version": "v27.6",
   "indexHtmlLines": 447,
   "indexHtmlBytes": 21332,
-  "notes": "v27.5 estabiliza INFOEVENTO como exportación fiable, mantiene standalone desactivado y añade ControlEventDataIntegrity."
+  "notes": "v27.6 añade ControlEventForms como diagnóstico no intrusivo de formularios principales; no toca INFOEVENTO ni BACKUP.",
+  "formsDiagnostics": "diagnostic-only"
 }

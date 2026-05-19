@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.5';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.5:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.6';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.6:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.5 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.6 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -494,7 +494,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // v27.5: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // v27.6: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
     // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
@@ -506,7 +506,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneGraficas(options = {}){
-  const message = 'GRAFICAS standalone desactivado en v27.5: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  const message = 'GRAFICAS standalone desactivado en v27.6: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
   console.warn(`[ControlEventExcel/${GRAFICAS_SHEET_VERSION}] ${message}`, {options});
   return {ok:false, disabled:true, version:GRAFICAS_SHEET_VERSION, module:'graficas-sheet', message, recommendedAction:'exportExcel'};
 }

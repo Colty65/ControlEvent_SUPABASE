@@ -1,17 +1,17 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.5';
+const RESUMEN_SHEET_VERSION = 'v27.6';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
 let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v27.5:resumenModularAudit';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.6:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.5 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.6 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -503,7 +503,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // v27.5: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // v27.6: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
     // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
@@ -515,7 +515,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneResumen(options = {}){
-  const message = 'RESUMEN standalone desactivado en v27.5: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  const message = 'RESUMEN standalone desactivado en v27.6: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
   console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] ${message}`, {options});
   return {ok:false, disabled:true, version:RESUMEN_SHEET_VERSION, module:'resumen-sheet', message, recommendedAction:'exportExcel'};
 }
