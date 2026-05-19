@@ -1,0 +1,6 @@
+{
+  "version": "v28.0.1",
+  "indexHtmlLines": 445,
+  "notes": "v28.0 elimina la carga inicial de /vendor/exceljs.min.js. ExcelJS queda bajo demanda para INFOEVENTO/Excel, manteniendo INFOEVENTO/BACKUP/carga sin cambios funcionales.",
+  "mobileOptimization": "exceljs-lazy-load"
+}
