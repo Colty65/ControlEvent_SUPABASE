@@ -1,8 +1,8 @@
-// ControlEvent v27.6.1 - Runtime no intrusivo para formularios principales.
+// ControlEvent v27.7 - Runtime no intrusivo para formularios principales.
 // No sustituye acciones legacy: sólo lee formularios, valida y diagnostica.
-// v27.6.1: diagnóstico menos ruidoso y alineado con IDs reales de la UI.
+// v27.7: diagnóstico menos ruidoso y alineado con IDs reales de la UI.
 
-export const FORMS_VERSION = 'v27.6.1';
+export const FORMS_VERSION = 'v27.7';
 
 export function getApp(){
   return window.ControlEventApp || window.ControlEventRuntime?.app || window;
