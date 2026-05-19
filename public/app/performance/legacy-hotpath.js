@@ -1,4 +1,4 @@
-/* ControlEvent v28.7.3 - Optimizador conservador de rutas calientes legacy.
+/* ControlEvent v28.7.4 - Optimizador conservador de rutas calientes legacy.
    Objetivo móvil: reducir recalculos repetidos dentro del mismo estado sin tocar INFOEVENTO/BACKUP.
    Cachea selectores/calculos puros y se invalida ante cambios de formulario, clicks y mutaciones legacy. */
 import { VERSION } from '../version.js';
@@ -92,7 +92,8 @@ function wrapCached(name){
   if(original.__ceHotpathWrapped) return false;
   const wrapped = function ControlEventHotpathCached(...args){
     if(!state.enabled || args.length){
-      return original.apply(this,args);
+      const t = now();
+      try{return original.apply(this,args);} finally{record(name,'call',now()-t);}
     }
     const key = baseKey(name);
     if(state.cache.has(key)){
@@ -163,25 +164,18 @@ function installEventInvalidators(){
   window.addEventListener('controlevent:runtime-ready', () => clear('runtime-ready'));
   window.addEventListener('controlevent:debug-ready', () => clear('debug-ready'));
 }
-function ensureWrappers(){
+function install(options = {}){
+  if(state.installed) return api;
+  state.enabled = options.enabled !== false;
+  state.installed = true;
+  state.installedAt = iso();
   const cached = CACHEABLE.filter(wrapCached);
   const mutationCandidates = Object.getOwnPropertyNames(window).filter(name => {
     try{return shouldWrapMutation(name);}catch(_){return false;}
   });
   const mutations = mutationCandidates.filter(wrapMutation);
   installEventInvalidators();
-  return {cached: cached.length, mutations: mutations.length};
-}
-function install(options = {}){
-  if(state.installed) return api;
-  state.enabled = options.enabled === true;
-  state.installed = true;
-  state.installedAt = iso();
-  let installed = {cached:0, mutations:0};
-  if(state.enabled) installed = ensureWrappers();
-  console.info(state.enabled
-    ? `[ControlEventHotpath/${VERSION}] Optimizador instalado. Cacheados: ${installed.cached}. Invalidadores: ${installed.mutations}.`
-    : `[ControlEventHotpath/${VERSION}] Disponible, desactivado por defecto para máxima fluidez móvil.`);
+  console.info(`[ControlEventHotpath/${VERSION}] Optimizador instalado. Cacheados: ${cached.length}. Invalidadores: ${mutations.length}.`);
   return api;
 }
 function rows(){
@@ -227,7 +221,7 @@ function print(){
   console.groupEnd();
   return report;
 }
-function enable(){ state.enabled = true; ensureWrappers(); clear('enable'); return inspect(); }
+function enable(){ state.enabled = true; clear('enable'); return inspect(); }
 function disable(){ state.enabled = false; clear('disable'); return inspect(); }
 
 const api = {version: VERSION, install, clear, enable, disable, inspect, print, rows};
