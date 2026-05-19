@@ -1,4 +1,4 @@
-# ControlEvent v28.0.1
+# ControlEvent v28.0.2
 
 Corrección conservadora sobre v28.0.
 
