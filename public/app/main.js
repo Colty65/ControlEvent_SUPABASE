@@ -8,7 +8,6 @@ import { installScreenLazyRuntime } from './navigation/screen-lazy.js';
 import { installMaintenanceLazyProxy } from '../modules/maintenance/lazy-proxy.js';
 import { installLegacyHotpathOptimizer } from './performance/legacy-hotpath.js';
 import { installActiveRenderOptimizer } from './performance/active-render.js';
-import { installPerformanceStatus } from './performance/status.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -22,7 +21,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.7] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.7.1] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -32,7 +31,6 @@ function install(app){
   const tickets = installTicketModules();
   const hotpath = installLegacyHotpathOptimizer({mode:'mobile-safe'});
   const activeRender = installActiveRenderOptimizer({mode:'available-only', enabled:false});
-  const performanceStatus = installPerformanceStatus();
   const debug = installDebugMode({app, domain, excel, tickets, hotpath, activeRender});
   const maintenanceProxy = installMaintenanceLazyProxy();
   const screenLazy = installScreenLazyRuntime({app, modules: window.ControlEventModules});
@@ -56,7 +54,6 @@ function install(app){
       tickets: !!tickets,
       hotpath: hotpath?.inspect?.() || null,
       activeRender: activeRender?.inspect?.() || null,
-      performanceStatus: performanceStatus?.inspect?.() || null,
       debug: debug.status(),
       screenLazy: screenLazy.info(),
       maintenance: maintenanceProxy?.info?.() || null

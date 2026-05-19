@@ -1,70 +1,55 @@
-const CACHE_NAME = 'controlevent-shell-v28-7-1';
-const SHELL_ASSETS = [
-  '/',
-  '/manifest.webmanifest',
-  '/assets/icons/icon-192.png',
-  '/assets/icons/icon-512.png',
-  '/assets/icons/apple-touch-icon.png',
-  '/app/styles/app.css',
-  '/app/version.js',
-  '/app/main.js',
-  '/app/debug/debug-mode.js',
-  '/app/navigation/screen-lazy.js',
-  '/app/performance/legacy-hotpath.js',
-  '/app/performance/active-render.js',
-  '/modules/module-loader.js',
-  '/app/legacy/legacy-bundle-before-modules-v28.7.1.js',
-  '/app/legacy/legacy-bundle-after-modules-v28.7.1.js',
-  '/assets/embedded/coltylab-logo.png',
-  '/assets/embedded/footer-excel.jpg',
-  '/assets/embedded/footer-importacion.jpg',
-  '/assets/embedded/footer-descarga-datos.jpg',
-  '/assets/embedded/footer-mantenimiento.png'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(SHELL_ASSETS))
-      .catch(() => undefined)
-  );
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  const request = event.request;
-  if (request.method !== 'GET') return;
-
-  const url = new URL(request.url);
-  if (url.pathname.startsWith('/api/')) return;
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match('/'))
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then(cached => {
-      const network = fetch(request)
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
-});
+{
+  "version": "ControlEvent v28.7.1",
+  "kind": "patch",
+  "description": "Rollback de rendimiento: retirar status/performance de arranque y volver al comportamiento fluido de v28.6.1, manteniendo versión v28.7.1.",
+  "changed": [
+    "README_V28_6.md",
+    "README_V28_6_DELETE_OLD_FILES.txt",
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/data-integrity.js",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/legacy-usage.js",
+    "public/app/diagnostics/legacy-weight.js",
+    "public/app/diagnostics/maintenance-diagnostics.js",
+    "public/app/diagnostics/mobile-performance.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/navigation/screen-lazy.js",
+    "public/app/performance/active-render.js",
+    "public/app/performance/legacy-hotpath.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/maintenance/_maintenance-runtime.js",
+    "public/modules/maintenance/lazy-proxy.js",
+    "public/modules/module-loader.js",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "routes/health.routes.js",
+    "server/paths.js"
+  ],
+  "new": [
+    "README_V28_7_1.md",
+    "README_V28_7_1_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v28.7.1.js",
+    "public/app/legacy/legacy-bundle-before-modules-v28.7.1.js"
+  ],
+  "remove_manually": [
+    "README_V28_7.md",
+    "README_V28_7_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v28.7.js",
+    "public/app/legacy/legacy-bundle-before-modules-v28.7.js",
+    "public/app/performance/status.js"
+  ],
+  "notes": [
+    "No toca INFOEVENTO, BACKUP, carga de datos ni guardado.",
+    "ControlEventActiveRender queda desactivado por defecto.",
+    "ExcelJS sigue bajo demanda."
+  ]
+}

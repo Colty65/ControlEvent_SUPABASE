@@ -1,13 +1,11 @@
 {
-  "version": "v28.7",
-  "appVersion": "ControlEvent v28.7",
+  "version": "v28.7.1",
   "indexHtmlLines": 445,
-  "indexLines": 445,
-  "focus": "mobile-stabilization-performance-consolidation",
-  "notes": "v28.7 consolida la configuracion estable: debug bajo demanda, ExcelJS bajo demanda, Hotpath activo, ActiveRender experimental apagado y estado de rendimiento en consola.",
+  "notes": "v28.7.1 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
+  "mobileOptimization": "exceljs-lazy-load",
+  "focus": "legacy-hotpath-cache",
   "excelJsLazy": true,
-  "hotpathOptimizer": true,
-  "activeRenderDefault": false,
-  "debugOnDemand": true,
-  "performanceStatus": true
+  "appVersion": "ControlEvent v28.7.1",
+  "indexLines": 445,
+  "hotpathOptimizer": true
 }

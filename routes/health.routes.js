@@ -16,7 +16,7 @@ router.get('/diagnostics', asyncHandler(async (req, res) => {
 }));
 
 router.get('/version', (req, res) => {
-  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v28.7-mobile-stabilization-performance-status' });
+  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v28.7.1-legacy-weight-diagnostics' });
 });
 
 export default router;

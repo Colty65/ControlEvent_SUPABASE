@@ -1,4 +1,4 @@
-# ControlEvent v28.6 - Render activo por pantalla para móvil/tablet
+# ControlEvent v28.7 - Render activo por pantalla para móvil/tablet
 
 Versión conservadora para mejorar fluidez en iPad y Android.
 
@@ -13,7 +13,7 @@ El render legacy original repintaba casi todas las zonas en cada acción:
 - gráficas
 - mantenimiento
 
-En móvil/tablet esto provoca esperas al pulsar una opción. v28.6 instala `ControlEventActiveRender`, que sustituye el render global por un render activo por pantalla: mantiene cabecera, permisos y bloqueo, pero sólo repinta la pestaña visible.
+En móvil/tablet esto provoca esperas al pulsar una opción. v28.7 instala `ControlEventActiveRender`, que sustituye el render global por un render activo por pantalla: mantiene cabecera, permisos y bloqueo, pero sólo repinta la pestaña visible.
 
 ## No toca funcionalmente
 
