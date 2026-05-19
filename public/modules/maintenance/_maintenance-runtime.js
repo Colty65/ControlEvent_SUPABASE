@@ -157,6 +157,25 @@ function maintenanceInfo(){
   }, {});
 }
 
+
+function scheduleIdle(fn, delay = 90){
+  if(typeof window.requestIdleCallback === 'function'){
+    return window.requestIdleCallback(() => fn(), {timeout: Math.max(300, delay + 220)});
+  }
+  return window.setTimeout(fn, delay);
+}
+
+export function scheduleCurrentMaintenance(options = {}){
+  const name = options.name || currentMaintenanceName();
+  const delay = Number.isFinite(Number(options.delay)) ? Number(options.delay) : 90;
+  const startedAt = Date.now();
+  scheduleIdle(() => {
+    activateMaintenanceSection(name, {reason:'maintenance-lazy-current', ...options, scheduledAt: startedAt})
+      .catch(error => console.warn('[maintenance/v28.2] No se pudo activar mantenimiento diferido', name, error));
+  }, delay);
+  return {ok:true, scheduled:true, name, delay, reason: options.reason || 'maintenance-lazy-current'};
+}
+
 function scheduleActivation(section, options = {}){
   if(!section) return;
   window.setTimeout(() => {
@@ -184,11 +203,15 @@ export function installMaintenanceModules(){
     sections: maintenanceSections,
     activate: activateMaintenanceSection,
     refreshCurrent: refreshCurrentMaintenance,
+    scheduleCurrent: scheduleCurrentMaintenance,
     refreshAll: refreshAllMaintenance,
     current: currentMaintenanceName,
     loaded: loadedSections,
     state: sectionState,
+    lazyMode: 'maintenance-section-on-demand',
     info: maintenanceInfo,
+    inspect: maintenanceInfo,
+    print(){ const report = maintenanceInfo(); console.group('[ControlEventMaintenance/v28.2] Mantenimiento diferido'); console.info(report); console.groupEnd(); return report; },
     actions: {
       addPersona: () => callLegacy('addPersona'),
       addEvento: () => callLegacy('addEvento'),
