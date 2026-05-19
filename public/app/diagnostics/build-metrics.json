@@ -1,11 +1,11 @@
 {
-  "version": "v28.8",
+  "version": "v28.6.1",
   "indexHtmlLines": 445,
-  "notes": "v28.8 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
+  "notes": "v28.6.1 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
   "mobileOptimization": "exceljs-lazy-load",
   "focus": "legacy-hotpath-cache",
   "excelJsLazy": true,
-  "appVersion": "ControlEvent v28.8",
+  "appVersion": "ControlEvent v28.6.1",
   "indexLines": 445,
   "hotpathOptimizer": true
 }
