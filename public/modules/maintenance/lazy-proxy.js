@@ -1,4 +1,4 @@
-/* ControlEvent v28.2.2 - Proxy ligero para mantenimiento diferido.
+/* ControlEvent v28.3 - Proxy ligero para mantenimiento diferido.
    Evita ReferenceError si se consulta ControlEventMaintenance antes de abrir Mantenimiento. */
 import { VERSION } from '../../app/version.js';
 
@@ -23,7 +23,7 @@ function proxyInfo(){
   return {
     proxy:true,
     real:false,
-    version:'v28.2.2',
+    version:'v28.3',
     appVersion: VERSION,
     mode:'maintenance-lazy-proxy',
     installedAt,
@@ -50,7 +50,7 @@ async function ensure(options = {}){
     }).catch(error => {
       lastError = error?.message || String(error);
       loadingPromise = null;
-      console.warn('[ControlEventMaintenance/v28.2.2] No se pudo cargar mantenimiento bajo demanda', error);
+      console.warn('[ControlEventMaintenance/v28.3] No se pudo cargar mantenimiento bajo demanda', error);
       throw error;
     });
   }
@@ -63,7 +63,7 @@ export function installMaintenanceLazyProxy(){
   if(current && current.__ceMaintenanceLazyProxy === true) return current;
 
   const api = {
-    version:'v28.2.2',
+    version:'v28.3',
     appVersion: VERSION,
     __ceMaintenanceLazyProxy:true,
     mode:'maintenance-lazy-proxy',
@@ -74,7 +74,7 @@ export function installMaintenanceLazyProxy(){
     inspect: proxyInfo,
     print(){
       const report = proxyInfo();
-      console.group('[ControlEventMaintenance/v28.2.2] Proxy ligero de mantenimiento');
+      console.group('[ControlEventMaintenance/v28.3] Proxy ligero de mantenimiento');
       console.info(report);
       console.info('Para cargar el módulo real: await ControlEventMaintenance.ensure()');
       console.groupEnd();

@@ -1,10 +1,10 @@
 {
-  "version": "v28.2.2",
+  "version": "v28.3",
   "indexHtmlLines": 445,
-  "notes": "v28.2.2 corrige helpers del API real ControlEventMaintenance tras ensure()",
+  "notes": "v28.3 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
   "mobileOptimization": "exceljs-lazy-load",
   "focus": "screen lazy loading / first paint safe activation",
   "excelJsLazy": true,
-  "appVersion": "ControlEvent v28.2.2",
+  "appVersion": "ControlEvent v28.3",
   "indexLines": 445
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v28-2-2';
+const CACHE_NAME = 'controlevent-shell-v28-3';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -11,8 +11,8 @@ const SHELL_ASSETS = [
   '/app/debug/debug-mode.js',
   '/app/navigation/screen-lazy.js',
   '/modules/module-loader.js',
-  '/app/legacy/legacy-bundle-before-modules-v28.2.2.js',
-  '/app/legacy/legacy-bundle-after-modules-v28.2.2.js',
+  '/app/legacy/legacy-bundle-before-modules-v28.3.js',
+  '/app/legacy/legacy-bundle-after-modules-v28.3.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',
