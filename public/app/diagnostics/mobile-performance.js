@@ -1,10 +1,10 @@
-/* ControlEvent v27.9 - Diagnóstico de carga móvil/rendimiento.
+/* ControlEvent v28.0 - Diagnóstico de carga móvil/rendimiento.
    Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
 import { VERSION } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v27.9';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v27.9.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v27.9.js';
+const DIAGNOSTICS_VERSION = 'v28.0';
+const LEGACY_BEFORE = 'legacy-bundle-before-modules-v28.0.js';
+const LEGACY_AFTER = 'legacy-bundle-after-modules-v28.0.js';
 let lastReport = null;
 
 function nowIso(){
@@ -183,7 +183,8 @@ function recommendations(report){
   if(report.resources.totals.script.kb > 1000) recs.push('Separar ExcelJS y legacy para cargarlos sólo cuando se usan. Impacto móvil: muy alto.');
   if(report.resources.legacy.count >= 2) recs.push('Siguiente fase: dividir legacy por pantalla o cargar el segundo bundle bajo demanda.');
   if(report.dom.nodes > 2500) recs.push('Reducir renderizados iniciales: listas largas sólo al abrir cada pestaña.');
-  if(report.resources.excelJs.loadedAtStart) recs.push('ExcelJS está cargando al inicio; mover a carga bajo demanda para INFOEVENTO/BACKUP.');
+  if(report.resources.excelJs.loadedAtStart) recs.push('ExcelJS ya aparece cargado; confirmar que sólo se ha cargado tras pedir INFOEVENTO/Excel.');
+  else recs.push('ExcelJS no está cargado al inicio: correcto para móvil. Se cargará bajo demanda al generar Excel.');
   if(report.pwa.controlled && report.resources.totals.all.kb === 0) recs.push('Muchos recursos parecen venir de caché; probar una carga en incógnito para medir peso real.');
   if(!recs.length) recs.push('Diagnóstico sin avisos relevantes. Mantener estrategia de carga diferida por pantalla.');
   return recs;
@@ -219,7 +220,9 @@ export function inspectMobilePerformance(){
       excelJs: {
         loadedAtStart: !!excelJs,
         path: excelJs?.path || null,
-        kb: excelJs ? (excelJs.transferKb || excelJs.encodedKb || excelJs.decodedKb || 0) : 0
+        kb: excelJs ? (excelJs.transferKb || excelJs.encodedKb || excelJs.decodedKb || 0) : 0,
+        globalReady: !!window.ExcelJS?.Workbook,
+        lazyInfo: window.ControlEventExcel?.excelJsInfo?.() || null
       }
     },
     pwa: {

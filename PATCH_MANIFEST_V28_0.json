@@ -1,0 +1,36 @@
+{
+  "version": "v28.0",
+  "base": "v27.9",
+  "changed": [
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/data-integrity.js",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/maintenance-diagnostics.js",
+    "public/app/diagnostics/mobile-performance.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/sw.js"
+  ],
+  "added": [
+    "README_V28_0.md",
+    "README_V28_0_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v28.0.js",
+    "public/app/legacy/legacy-bundle-before-modules-v28.0.js"
+  ],
+  "deleted_in_full_not_removed_by_patch": [
+    "public/app/legacy/legacy-bundle-after-modules-v27.8.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.9.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.8.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.9.js"
+  ],
+  "notes": "v28.0 elimina carga inicial de /vendor/exceljs.min.js y deja ExcelJS bajo demanda para INFOEVENTO/Excel. No toca funcionalmente INFOEVENTO/BACKUP/carga/guardado."
+}

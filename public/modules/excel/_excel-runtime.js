@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v27.7.1';
+const EXCEL_RUNTIME_VERSION = 'v28.0';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();
@@ -17,6 +17,7 @@ const EXCELJS_SOURCES = [
   'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js'
 ];
 let excelJsLoadPromise = null;
+let excelJsLoadInfo = {loaded:false, source:null, startedAt:null, loadedAt:null, error:null, mode:'lazy'};
 
 function excelJsReady(){
   return typeof window !== 'undefined' && !!window.ExcelJS?.Workbook;
@@ -81,24 +82,37 @@ export async function protectWorkbook(workbook, options = {}){
 }
 
 export async function ensureExcelJS(){
-  if(excelJsReady()) return window.ExcelJS;
+  if(excelJsReady()){
+    excelJsLoadInfo = {...excelJsLoadInfo, loaded:true, source:excelJsLoadInfo.source || 'already-present', loadedAt:excelJsLoadInfo.loadedAt || new Date().toISOString(), error:null};
+    return window.ExcelJS;
+  }
   if(typeof window !== 'undefined' && typeof window.ensureExcelJS === 'function'){
     try{
+      excelJsLoadInfo = {...excelJsLoadInfo, startedAt: excelJsLoadInfo.startedAt || new Date().toISOString(), source:'legacy-ensureExcelJS'};
       await window.ensureExcelJS();
-      if(excelJsReady()) return window.ExcelJS;
+      if(excelJsReady()){
+        excelJsLoadInfo = {...excelJsLoadInfo, loaded:true, source:'legacy-ensureExcelJS', loadedAt:new Date().toISOString(), error:null};
+        return window.ExcelJS;
+      }
     }catch(error){
+      excelJsLoadInfo = {...excelJsLoadInfo, error:error?.message || String(error)};
       console.warn(`[ControlEventExcel/${EXCEL_RUNTIME_VERSION}] ensureExcelJS legacy no pudo cargar ExcelJS; se prueban fuentes alternativas.`, error);
     }
   }
   if(excelJsLoadPromise) return excelJsLoadPromise;
   excelJsLoadPromise = (async () => {
     let lastError = null;
+    excelJsLoadInfo = {...excelJsLoadInfo, startedAt: new Date().toISOString(), source:null, error:null};
     for(const src of EXCELJS_SOURCES){
       try{
         await loadExternalScript(src);
-        if(excelJsReady()) return window.ExcelJS;
+        if(excelJsReady()){
+          excelJsLoadInfo = {loaded:true, source:src, startedAt:excelJsLoadInfo.startedAt, loadedAt:new Date().toISOString(), error:null, mode:'lazy'};
+          return window.ExcelJS;
+        }
       }catch(error){
         lastError = error;
+        excelJsLoadInfo = {...excelJsLoadInfo, error:error?.message || String(error)};
       }
     }
     throw lastError || new Error('ExcelJS no está disponible.');
@@ -106,6 +120,16 @@ export async function ensureExcelJS(){
     if(!excelJsReady()) excelJsLoadPromise = null;
   });
   return excelJsLoadPromise;
+}
+
+export function getExcelJsLoadInfo(){
+  return {
+    ...excelJsLoadInfo,
+    ready: excelJsReady(),
+    hasGlobal: typeof window !== 'undefined' && !!window.ExcelJS,
+    hasWorkbook: excelJsReady(),
+    sources: [...EXCELJS_SOURCES]
+  };
 }
 
 export function resolveApp(){
@@ -214,7 +238,8 @@ export async function runExcelAction(name, options = {}){
   return runPromise;
 }
 
-export function downloadInfoEvento(options = {}){
+export async function downloadInfoEvento(options = {}){
+  await ensureExcelJS();
   return invokeLegacyExcelAction('exportExcel', options.args || [], options);
 }
 
@@ -260,7 +285,7 @@ export function getInfo(){
   captureLegacyExcelActions();
   return {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade-resumen-graficas-infoevento-audit',
+    mode: 'modular-public-facade-exceljs-lazy',
     modules: listExcelModules(),
     lastRun,
     busy: Object.fromEntries(Array.from(runLocks.keys()).map(name => [name, true])),
@@ -268,6 +293,7 @@ export function getInfo(){
     publicFacadeActions: Array.from(publicFacadeMarkers),
     lastFacadeInstall,
     legacy: getLegacyActionInfo(),
+    excelJs: getExcelJsLoadInfo(),
     resumenAudit: window.ControlEventResumenSheet?.auditConfig?.() || null,
     graficasAudit: window.ControlEventGraficasSheet?.auditConfig?.() || null
   };
@@ -276,7 +302,7 @@ export function getInfo(){
 export function assertReady(){
   const info = getInfo();
   const warnings = [];
-  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v27.7 no está instalada.');
+  if(!info.publicFacadeInstalled) warnings.push('La fachada pública Excel v28.0 no está instalada.');
   if(!info.legacy.exportExcel.captured) warnings.push('No se ha capturado motor legacy exportExcel.');
   if(!info.legacy.exportSeedWorkbook.captured) warnings.push('No se ha capturado motor legacy exportSeedWorkbook.');
   if(!registry.has('exportExcel')) warnings.push('No está registrado el módulo INFOEVENTO.');
@@ -292,7 +318,7 @@ export function installExcelRuntime(){
   captureLegacyExcelActions();
   window.ControlEventExcel = {
     version: EXCEL_RUNTIME_VERSION,
-    mode: 'modular-public-facade-resumen-graficas-infoevento-audit',
+    mode: 'modular-public-facade-exceljs-lazy',
     register: registerExcelModule,
     run: runExcelAction,
     info: getInfo,
@@ -307,6 +333,8 @@ export function installExcelRuntime(){
     invokeLegacy: invokeLegacyExcelAction,
     protectWorkbook,
     protectWorksheet,
+    ensureExcelJS,
+    excelJsInfo: getExcelJsLoadInfo,
     legacyInfo: getLegacyActionInfo,
     get modules(){ return listExcelModules(); }
   };
