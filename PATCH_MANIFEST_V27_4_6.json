@@ -1,5 +1,5 @@
 {
-  "version": "v27.4.7",
+  "version": "v27.4.8",
   "base": "v27.4.5",
   "modified": [
     "package-lock.json",
@@ -23,8 +23,8 @@
   "added": [
     "README_V27_4_6.md",
     "README_V27_4_6_DELETE_OLD_FILES.txt",
-    "public/app/legacy/legacy-bundle-after-modules-v27.4.7.js",
-    "public/app/legacy/legacy-bundle-before-modules-v27.4.7.js"
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.8.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.8.js"
   ],
   "delete_manually": [
     "public/app/legacy/legacy-bundle-before-modules-v27.4.5.js",

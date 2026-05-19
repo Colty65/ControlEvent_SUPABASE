@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.7';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.7:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.8';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.8:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.7 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.8 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -494,7 +494,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // v27.4.7: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // v27.4.8: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
     // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
@@ -506,29 +506,11 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneGraficas(options = {}){
-  const ExcelJS = await ensureExcelJS();
-  const workbook = new ExcelJS.Workbook();
-  workbook.__ceModularStandaloneClean = true;
-  workbook.creator = `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`;
-  workbook.created = new Date();
-  const result = writeGraficasWorksheet(workbook, {sheetName:'GRAFICAS', ...options});
-  result.chart = addGraficasChartImage(workbook, result.worksheet, result.model);
-  result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.7'});
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const date = new Date();
-  const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
-  a.href = url;
-  a.download = `ControlEvent_v27_4_7_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return result;
+  const message = 'GRAFICAS standalone desactivado en v27.4.8: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  console.warn(`[ControlEventExcel/${GRAFICAS_SHEET_VERSION}] ${message}`, {options});
+  return {ok:false, disabled:true, version:GRAFICAS_SHEET_VERSION, module:'graficas-sheet', message, recommendedAction:'exportExcel'};
 }
+
 export function getLastSnapshot(){ return lastSnapshot; }
 export function getLastWorksheetBuild(){ return lastWorksheetBuild; }
 export function assertReady(){

@@ -16,7 +16,7 @@ router.get('/diagnostics', asyncHandler(async (req, res) => {
 }));
 
 router.get('/version', (req, res) => {
-  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v27.4.7-stabilization-diagnostics' });
+  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v27.4.8-stabilization-diagnostics' });
 });
 
 export default router;

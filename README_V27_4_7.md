@@ -1,4 +1,4 @@
-# ControlEvent v27.4.7
+# ControlEvent v27.4.8
 
 Corrección específica de los Excel standalone modulares generados desde consola.
 

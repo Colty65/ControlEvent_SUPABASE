@@ -1,5 +1,5 @@
 {
-  "version": "v27.4.7",
+  "version": "v27.4.8",
   "base": "v27.4.6",
   "modified": [
     "PATCH_MANIFEST_V27_4_6.json",
@@ -23,10 +23,10 @@
     "server/paths.js"
   ],
   "added": [
-    "README_V27_4_7.md",
-    "README_V27_4_7_DELETE_OLD_FILES.txt",
-    "public/app/legacy/legacy-bundle-after-modules-v27.4.7.js",
-    "public/app/legacy/legacy-bundle-before-modules-v27.4.7.js"
+    "README_V27_4_8.md",
+    "README_V27_4_8_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.8.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.8.js"
   ],
   "removed": [
     "public/app/legacy/legacy-bundle-after-modules-v27.4.6.js",

@@ -1,17 +1,17 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.4.7';
+const RESUMEN_SHEET_VERSION = 'v27.4.8';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
 let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.7:resumenModularAudit';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.8:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.7 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.8 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -503,7 +503,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // v27.4.7: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // v27.4.8: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
     // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
@@ -515,28 +515,9 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneResumen(options = {}){
-  const ExcelJS = await ensureExcelJS();
-  const workbook = new ExcelJS.Workbook();
-  workbook.__ceModularStandaloneClean = true;
-  workbook.creator = `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`;
-  workbook.created = new Date();
-  const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', includeDiagnosticRows:false, ...options});
-  result.chart = addResumenChartImage(workbook, result.worksheet, result.model);
-  result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.7'});
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const date = new Date();
-  const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
-  a.href = url;
-  a.download = `ControlEvent_v27_4_7_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return result;
+  const message = 'RESUMEN standalone desactivado en v27.4.8: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] ${message}`, {options});
+  return {ok:false, disabled:true, version:RESUMEN_SHEET_VERSION, module:'resumen-sheet', message, recommendedAction:'exportExcel'};
 }
 
 export function getLastSnapshot(){
