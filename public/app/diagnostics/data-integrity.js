@@ -1,5 +1,5 @@
-/* ControlEvent v28.3 - Diagnostico de integridad de datos sin tocar operativa */
-const VERSION = 'v28.3';
+/* ControlEvent v28.4 - Diagnostico de integridad de datos sin tocar operativa */
+const VERSION = 'v28.4';
 
 function app(){ return window.ControlEventApp || null; }
 function state(){ return app()?.state || window.state || {}; }
