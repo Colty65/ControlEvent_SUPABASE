@@ -1,4 +1,4 @@
-# ControlEvent v28.0.2
+# ControlEvent v28.1
 
 Optimización móvil: ExcelJS bajo demanda.
 

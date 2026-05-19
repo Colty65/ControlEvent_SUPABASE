@@ -4,6 +4,7 @@ import { installDomainCalculations } from './domain/index.js';
 import { installExcelModules } from '../modules/excel/index.js';
 import { installTicketModules } from '../modules/tickets/index.js';
 import { installDebugMode } from './debug/debug-mode.js';
+import { installScreenLazyRuntime } from './navigation/screen-lazy.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -17,7 +18,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.0.2] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.1] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -26,6 +27,7 @@ function install(app){
   const excel = installExcelModules();
   const tickets = installTicketModules();
   const debug = installDebugMode({app, domain, excel, tickets});
+  const screenLazy = installScreenLazyRuntime({app, modules: window.ControlEventModules});
   window.ControlEventRuntime = {
     version: VERSION,
     mode: debug.isEnabled() ? 'debug-enabled' : 'production-lite',
@@ -35,6 +37,7 @@ function install(app){
     excel,
     tickets,
     debug,
+    screenLazy,
     inspect: () => ({
       version: VERSION,
       mode: window.ControlEventRuntime?.mode || 'production-lite',
@@ -43,7 +46,8 @@ function install(app){
       domain: !!domain,
       excel: !!excel,
       tickets: !!tickets,
-      debug: debug.status()
+      debug: debug.status(),
+      screenLazy: screenLazy.info()
     }),
     checkApi: async () => window.ControlEventDiagnostics?.checkApi?.() || {disabled:true, ok:null}
   };
@@ -51,7 +55,7 @@ function install(app){
     detail: window.ControlEventRuntime
   }));
   setTimeout(() => {
-    activateCurrentModule(getApp());
+    screenLazy.activateInitial({app: getApp(), modules: window.ControlEventModules, delay: 80});
     window.ControlEventDiagnostics?.assertHealthy?.();
   }, 0);
 }
