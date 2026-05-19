@@ -1,5 +1,5 @@
 {
-  "version": "v28.1",
+  "version": "v28.1.1",
   "base": "v28.0.2",
   "modified": [
     "package-lock.json",
@@ -32,8 +32,8 @@
   "new": [
     "README_V28_1.md",
     "PATCH_MANIFEST_V28_1.json",
-    "public/app/legacy/legacy-bundle-before-modules-v28.1.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.1.js",
+    "public/app/legacy/legacy-bundle-before-modules-v28.1.1.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.1.1.js",
     "public/app/navigation/screen-lazy.js"
   ],
   "deleted": [

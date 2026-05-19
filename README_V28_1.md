@@ -1,4 +1,4 @@
-# ControlEvent v28.1
+# ControlEvent v28.1.1
 
 Fase de optimización móvil: carga diferida por pantalla.
 
