@@ -1,4 +1,4 @@
-/* ControlEvent v28.7.5 - Optimizador conservador de rutas calientes legacy.
+/* ControlEvent v28.7.6 - Optimizador conservador de rutas calientes legacy.
    Objetivo móvil: reducir recalculos repetidos dentro del mismo estado sin tocar INFOEVENTO/BACKUP.
    Cachea selectores/calculos puros y se invalida ante cambios de formulario, clicks y mutaciones legacy. */
 import { VERSION } from '../version.js';

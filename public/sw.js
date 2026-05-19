@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v28-7-5';
+const CACHE_NAME = 'controlevent-shell-v28-7-6';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -7,14 +7,14 @@ const SHELL_ASSETS = [
   '/assets/icons/apple-touch-icon.png',
   '/app/styles/app.css',
   '/app/version.js',
-  '/app/main-v28.7.5.js',
+  '/app/main.js',
   '/app/debug/debug-mode.js',
   '/app/navigation/screen-lazy.js',
   '/app/performance/legacy-hotpath.js',
   '/app/performance/active-render.js',
   '/modules/module-loader.js',
-  '/app/legacy/legacy-bundle-before-modules-v28.7.5.js',
-  '/app/legacy/legacy-bundle-after-modules-v28.7.5.js',
+  '/app/legacy/legacy-bundle-before-modules-v28.7.6.js',
+  '/app/legacy/legacy-bundle-after-modules-v28.7.6.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',
@@ -49,23 +49,6 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match('/'))
-    );
-    return;
-  }
-
-  const isJsAsset = url.pathname.endsWith('.js') || url.pathname.startsWith('/app/') || url.pathname.startsWith('/modules/');
-
-  if (isJsAsset) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
     );
     return;
   }
