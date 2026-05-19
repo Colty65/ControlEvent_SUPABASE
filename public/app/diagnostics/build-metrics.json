@@ -1,10 +1,10 @@
 {
-  "version": "v28.2",
+  "version": "v28.2.1",
   "indexHtmlLines": 445,
-  "notes": "v28.2 mantenimiento diferido por sección y ExcelJS bajo demanda preservado",
+  "notes": "v28.2.1 proxy ligero ControlEventMaintenance para evitar ReferenceError antes de abrir Mantenimiento",
   "mobileOptimization": "exceljs-lazy-load",
   "focus": "screen lazy loading / first paint safe activation",
   "excelJsLazy": true,
-  "appVersion": "ControlEvent v28.2",
+  "appVersion": "ControlEvent v28.2.1",
   "indexLines": 445
 }

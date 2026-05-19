@@ -5,6 +5,7 @@ import { installExcelModules } from '../modules/excel/index.js';
 import { installTicketModules } from '../modules/tickets/index.js';
 import { installDebugMode } from './debug/debug-mode.js';
 import { installScreenLazyRuntime } from './navigation/screen-lazy.js';
+import { installMaintenanceLazyProxy } from '../modules/maintenance/lazy-proxy.js';
 
 function applyVersion(){
   document.title = VERSION;
@@ -18,7 +19,7 @@ function activateCurrentModule(app){
   const modules = window.ControlEventModules;
   if(!modules || typeof modules.activate !== 'function') return;
   const tab = app?.navigation?.currentMainTab || 'ingresos';
-  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.2] No se pudo activar modulo inicial', error));
+  modules.activate(tab, {reason:'app-main-initial'}).catch(error => console.warn('[v28.2.1] No se pudo activar modulo inicial', error));
 }
 
 function install(app){
@@ -27,6 +28,7 @@ function install(app){
   const excel = installExcelModules();
   const tickets = installTicketModules();
   const debug = installDebugMode({app, domain, excel, tickets});
+  const maintenanceProxy = installMaintenanceLazyProxy();
   const screenLazy = installScreenLazyRuntime({app, modules: window.ControlEventModules});
   window.ControlEventRuntime = {
     version: VERSION,
@@ -47,7 +49,8 @@ function install(app){
       excel: !!excel,
       tickets: !!tickets,
       debug: debug.status(),
-      screenLazy: screenLazy.info()
+      screenLazy: screenLazy.info(),
+      maintenance: maintenanceProxy?.info?.() || null
     }),
     checkApi: async () => window.ControlEventDiagnostics?.checkApi?.() || {disabled:true, ok:null}
   };

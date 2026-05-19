@@ -1,7 +1,7 @@
-/* ControlEvent v28.2 - Carga diferida por pantalla sin tocar operativa estable */
+/* ControlEvent v28.2.1 - Carga diferida por pantalla sin tocar operativa estable */
 import { VERSION } from '../version.js';
 
-const SCREEN_LAZY_VERSION = 'v28.2';
+const SCREEN_LAZY_VERSION = 'v28.2.1';
 const state = {
   version: SCREEN_LAZY_VERSION,
   mode: 'screen-lazy-safe',
@@ -42,7 +42,7 @@ async function activateScreen(name, options = {}){
     state.lastError = error?.message || String(error);
     const item = {name, ok:false, startedAt, finishedAt: now(), ms: now() - startedAt, error: state.lastError, reason: options.reason || 'manual'};
     state.activations.push(item);
-    console.warn('[ControlEventScreenLazy/v28.2] No se pudo activar pantalla', name, error);
+    console.warn('[ControlEventScreenLazy/v28.2.1] No se pudo activar pantalla', name, error);
     return item;
   }
 }
@@ -82,7 +82,7 @@ function info(){
     initialActivated: state.initialActivated,
     current: currentScreen(window.ControlEventApp),
     loadedScreens: modules?.diagnostics?.().loaded || [],
-    maintenanceLazy: window.ControlEventMaintenance ? {version: window.ControlEventMaintenance.version, lazyMode: window.ControlEventMaintenance.lazyMode || null, state: window.ControlEventMaintenance.info?.() || {}} : null,
+    maintenanceLazy: window.ControlEventMaintenance ? {version: window.ControlEventMaintenance.version, mode: window.ControlEventMaintenance.mode || null, lazyMode: window.ControlEventMaintenance.lazyMode || null, state: window.ControlEventMaintenance.info?.() || {}} : null,
     moduleState: modules?.diagnostics?.().state || {},
     activationCount: state.activations.length,
     activations: state.activations.slice(-12),
@@ -91,7 +91,7 @@ function info(){
 }
 function print(){
   const report = info();
-  console.group('[ControlEventScreenLazy/v28.2] Carga diferida por pantalla');
+  console.group('[ControlEventScreenLazy/v28.2.1] Carga diferida por pantalla');
   console.info('Resumen', report);
   if(report.activations?.length) console.table(report.activations);
   console.groupEnd();
