@@ -16,7 +16,7 @@ router.get('/diagnostics', asyncHandler(async (req, res) => {
 }));
 
 router.get('/version', (req, res) => {
-  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v28.2.1-maintenance-lazy-proxy-fix' });
+  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v28.2.2-maintenance-real-api-helpers-fix' });
 });
 
 export default router;
