@@ -1,4 +1,4 @@
-# ControlEvent v28.7.2
+# ControlEvent v28.7.3
 
 Versión de rollback de rendimiento basada funcionalmente en v28.6.1, que fue la última confirmada como fluida en PC, iPad, Android e iPhone.
 
