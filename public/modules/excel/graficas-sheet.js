@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const GRAFICAS_SHEET_VERSION = 'v27.4.6';
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.6:graficasModularAudit';
+const GRAFICAS_SHEET_VERSION = 'v27.4.7';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.7:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
@@ -11,7 +11,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.6 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v27.4.7 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -214,6 +214,173 @@ function styleSectionTitle(cell){
   cell.font = {bold:true, size:13, color:{argb:'FFFFFFFF'}};
   cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
 }
+
+
+function formatEuro(value){
+  try{
+    return `${money(value).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2})} €`;
+  }catch(_){
+    return `${money(value).toFixed(2).replace('.', ',')} €`;
+  }
+}
+function roundedRect(ctx, x, y, width, height, radius){
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+function drawStackedBar(ctx, x, y, width, height, parts, maxValue){
+  ctx.fillStyle = '#f3f4f6';
+  roundedRect(ctx, x, y, width, height, height / 2);
+  ctx.fill();
+  const totalAbs = Math.max(0, ...parts.map(part => Math.abs(num(part.value))));
+  const scaleBase = Math.max(maxValue || 1, totalAbs || 1);
+  let cursor = x;
+  parts.forEach(part => {
+    const value = Math.abs(num(part.value));
+    if(!value) return;
+    const partWidth = Math.max(3, Math.round(width * (value / scaleBase)));
+    ctx.fillStyle = part.color;
+    roundedRect(ctx, cursor, y, Math.min(partWidth, x + width - cursor), height, height / 2);
+    ctx.fill();
+    cursor += partWidth;
+  });
+}
+function makeGraficasChartImage(model){
+  if(typeof document === 'undefined') return null;
+  const sections = [
+    {
+      title:'POR SEGMENTO',
+      rows:(model.charts?.segmento || []).slice(0, 8).map(row => ({
+        label: row.label,
+        values: [
+          {label:'Comprado', value:row.comprado, color:'#ef4444'},
+          {label:'Donado', value:row.donado, color:'#f59e0b'},
+          {label:'Pte.', value:row.pendiente, color:'#fb7185'}
+        ],
+        total: row.total
+      }))
+    },
+    {
+      title:'POR DESTINO',
+      rows:(model.charts?.destino || []).slice(0, 8).map(row => ({
+        label: row.label,
+        values: [
+          {label:'Comprado', value:row.comprado, color:'#ef4444'},
+          {label:'Donado', value:row.donado, color:'#f59e0b'},
+          {label:'Pte.', value:row.pendiente, color:'#fb7185'}
+        ],
+        total: row.total
+      }))
+    },
+    {
+      title:'POR TIENDA Y TICKET',
+      rows:(model.charts?.tiendaTicket || []).slice(0, 9).map(row => ({
+        label: row.label,
+        values: [
+          {label:'Importe', value:row.importe, color:row.pendiente ? '#fb7185' : (row.donado ? '#f59e0b' : '#0ea5e9')}
+        ],
+        total: row.importe
+      }))
+    }
+  ];
+  const width = 1120;
+  const height = 880;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return null;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,width,height);
+  ctx.fillStyle = '#111827';
+  ctx.font = '700 28px system-ui, -apple-system, Segoe UI, Arial';
+  ctx.fillText(`GRAFICAS MODULARES - ${model.event?.titulo || ''}`.slice(0, 70), 28, 44);
+  ctx.font = '500 14px system-ui, -apple-system, Segoe UI, Arial';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('Comprado · Donado · Pendiente / Total por agrupación', 28, 70);
+  const allTotals = sections.flatMap(section => section.rows.map(row => Math.abs(num(row.total))));
+  const maxValue = Math.max(1, ...allTotals);
+  let y = 108;
+  sections.forEach(section => {
+    ctx.fillStyle = '#111827';
+    roundedRect(ctx, 28, y - 24, width - 56, 30, 8);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 17px system-ui, -apple-system, Segoe UI, Arial';
+    ctx.fillText(`${section.title}`, 42, y - 4);
+    y += 18;
+    section.rows.forEach(row => {
+      const label = String(row.label || 'Sin clasificar');
+      ctx.fillStyle = '#111827';
+      ctx.font = '700 14px system-ui, -apple-system, Segoe UI, Arial';
+      ctx.fillText(label.slice(0, 34), 42, y + 15);
+      drawStackedBar(ctx, 315, y, 560, 20, row.values, maxValue);
+      ctx.textAlign = 'right';
+      ctx.font = '700 13px system-ui, -apple-system, Segoe UI, Arial';
+      ctx.fillStyle = '#111827';
+      ctx.fillText(formatEuro(row.total), width - 44, y + 16);
+      ctx.textAlign = 'left';
+      y += 31;
+    });
+    if(!section.rows.length){
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '500 14px system-ui, -apple-system, Segoe UI, Arial';
+      ctx.fillText('Sin datos', 42, y + 14);
+      y += 31;
+    }
+    y += 26;
+  });
+  const legendY = height - 44;
+  const legend = [
+    ['Comprado', '#ef4444'],
+    ['Donado', '#f59e0b'],
+    ['Pendiente', '#fb7185'],
+    ['Tienda/Ticket', '#0ea5e9']
+  ];
+  let x = 28;
+  legend.forEach(([label, color]) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, legendY - 12, 12, 12);
+    ctx.fillStyle = '#374151';
+    ctx.font = '600 13px system-ui, -apple-system, Segoe UI, Arial';
+    ctx.fillText(label, x + 18, legendY - 2);
+    x += 125;
+  });
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText(`©oltyLAB ’26_ControlEvent_${GRAFICAS_SHEET_VERSION}`, width - 28, legendY - 2);
+  ctx.textAlign = 'left';
+  return canvas.toDataURL('image/png');
+}
+function addGraficasChartImage(workbook, worksheet, model){
+  try{
+    if(!workbook || !worksheet || typeof workbook.addImage !== 'function' || typeof worksheet.addImage !== 'function') return {added:false, reason:'exceljs-image-api-unavailable'};
+    const base64 = makeGraficasChartImage(model);
+    if(!base64) return {added:false, reason:'canvas-unavailable'};
+    const imageId = workbook.addImage({base64, extension:'png'});
+    worksheet.addImage(imageId, {
+      tl: {col: 7.1, row: 1.0},
+      ext: {width: 840, height: 660},
+      editAs: 'oneCell'
+    });
+    for(let c = 8; c <= 18; c += 1) worksheet.getColumn(c).width = 13;
+    for(let r = 2; r <= 36; r += 1) worksheet.getRow(r).height = Math.max(worksheet.getRow(r).height || 20, 21);
+    return {added:true, imageId, width:840, height:660};
+  }catch(error){
+    console.warn(`[ControlEventExcel/${GRAFICAS_SHEET_VERSION}] No se pudo añadir gráfico standalone de GRAFICAS.`, error);
+    return {added:false, error:error?.message || String(error)};
+  }
+}
+
 function configureCleanWorksheet(ws){
   try{
     ws.views = [{state:'frozen', ySplit:1}];
@@ -327,12 +494,8 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // Los standalone modulares no usan imágenes. Se vacía cualquier resto accidental heredado por ExcelJS/legacy.
-    if(Array.isArray(workbook.media)) workbook.media.splice(0, workbook.media.length);
-    if(Array.isArray(workbook._media)) workbook._media.splice(0, workbook._media.length);
-    if(Array.isArray(worksheet.media)) worksheet.media.splice(0, worksheet.media.length);
-    if(Array.isArray(worksheet._media)) worksheet._media.splice(0, worksheet._media.length);
-    try{ worksheet._drawing = null; }catch(_){ }
+    // v27.4.7: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
     return {ok:true, kept:worksheet.name, sheetCount:workbook.worksheets?.length || 0};
@@ -349,8 +512,9 @@ export async function downloadStandaloneGraficas(options = {}){
   workbook.creator = `ControlEvent ${GRAFICAS_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeGraficasWorksheet(workbook, {sheetName:'GRAFICAS', ...options});
+  result.chart = addGraficasChartImage(workbook, result.worksheet, result.model);
   result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.6'});
+  await protectWorkbook(workbook, {source:'standalone-graficas-v27.4.7'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -358,7 +522,7 @@ export async function downloadStandaloneGraficas(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_6_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_7_GRAFICAS_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

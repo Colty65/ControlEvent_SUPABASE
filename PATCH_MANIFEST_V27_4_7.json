@@ -1,7 +1,9 @@
 {
   "version": "v27.4.7",
-  "base": "v27.4.5",
+  "base": "v27.4.6",
   "modified": [
+    "PATCH_MANIFEST_V27_4_6.json",
+    "README_V27_4_6.md",
     "package-lock.json",
     "package.json",
     "public/app/diagnostics/build-metrics.json",
@@ -21,18 +23,18 @@
     "server/paths.js"
   ],
   "added": [
-    "README_V27_4_6.md",
-    "README_V27_4_6_DELETE_OLD_FILES.txt",
+    "README_V27_4_7.md",
+    "README_V27_4_7_DELETE_OLD_FILES.txt",
     "public/app/legacy/legacy-bundle-after-modules-v27.4.7.js",
     "public/app/legacy/legacy-bundle-before-modules-v27.4.7.js"
   ],
-  "delete_manually": [
-    "public/app/legacy/legacy-bundle-before-modules-v27.4.5.js",
-    "public/app/legacy/legacy-bundle-after-modules-v27.4.5.js"
+  "removed": [
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.6.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.6.js"
   ],
-  "notes": [
-    "Protección de objetos/dibujos Excel activada usando objects:false y scenarios:false en ExcelJS, lo que genera objects=\"1\"/scenarios=\"1\" en OOXML.",
-    "Los Excel standalone modulares se marcan con __ceModularStandaloneClean para evitar parches legacy de writeBuffer.",
-    "INFOEVENTO se mantiene sin hojas MODULAR."
-  ]
+  "delete_old_files": [
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.6.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.6.js"
+  ],
+  "notes": "Corrige standalone RESUMEN/GRAFICAS: conserva drawings/media y añade gráficos PNG protegidos. INFOEVENTO no cambia funcionalmente."
 }

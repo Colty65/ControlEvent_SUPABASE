@@ -1,17 +1,17 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
-const RESUMEN_SHEET_VERSION = 'v27.4.6';
+const RESUMEN_SHEET_VERSION = 'v27.4.7';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
 let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v27.4.6:resumenModularAudit';
+const AUDIT_STORAGE_KEY = 'controlevent:v27.4.7:resumenModularAudit';
 
 export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.6 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v27.4.7 queda disponible como herramienta standalone; no se añade al INFOEVENTO por defecto para mantener el Excel limpio.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -266,6 +266,110 @@ function markMoneyColumn(ws, fromRow = 1, toRow = ws.rowCount){
   }
 }
 
+
+function formatEuro(value){
+  try{
+    return `${money(value).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2})} €`;
+  }catch(_){
+    return `${money(value).toFixed(2).replace('.', ',')} €`;
+  }
+}
+function roundedRect(ctx, x, y, width, height, radius){
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+function makeResumenChartImage(model){
+  if(typeof document === 'undefined') return null;
+  const b = model.budget || {};
+  const items = [
+    {label:'Importe socios', value:b.socios?.importe, color:'#2563eb'},
+    {label:'Ingresado socios', value:b.socios?.ingresado, color:'#059669'},
+    {label:'Pendiente socios', value:b.socios?.pendiente, color:'#dc2626'},
+    {label:'Comprado', value:b.operativa?.comprado, color:'#ef4444'},
+    {label:'Pendiente compra', value:b.operativa?.pendienteCompra, color:'#f59e0b'},
+    {label:'Saldo actual', value:b.operativa?.saldoActual, color:'#0f766e'},
+    {label:'Saldo operativo', value:b.operativa?.saldoOperativo, color:'#0891b2'},
+    {label:'Valoración evento', value:b.operativa?.valoracionEvento, color:'#111827'}
+  ].map(item => ({...item, value:money(item.value)}));
+  const width = 980;
+  const height = 520;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return null;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,width,height);
+  ctx.fillStyle = '#111827';
+  ctx.font = '700 28px system-ui, -apple-system, Segoe UI, Arial';
+  ctx.fillText(`RESUMEN VISUAL - ${model.event?.titulo || ''}`.slice(0, 62), 28, 44);
+  ctx.font = '500 15px system-ui, -apple-system, Segoe UI, Arial';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('Gráfico modular generado desde los datos del evento', 28, 70);
+  const max = Math.max(1, ...items.map(item => Math.abs(item.value)));
+  const labelX = 30;
+  const barX = 300;
+  const valueX = 860;
+  const top = 105;
+  const rowH = 47;
+  items.forEach((item, index) => {
+    const y = top + index * rowH;
+    ctx.font = '700 16px system-ui, -apple-system, Segoe UI, Arial';
+    ctx.fillStyle = '#111827';
+    ctx.fillText(item.label, labelX, y + 23);
+    ctx.fillStyle = '#f3f4f6';
+    roundedRect(ctx, barX, y + 6, 520, 22, 11);
+    ctx.fill();
+    const ratio = Math.min(1, Math.abs(item.value) / max);
+    const barW = Math.max(item.value === 0 ? 0 : 4, Math.round(520 * ratio));
+    if(barW > 0){
+      ctx.fillStyle = item.value < 0 ? '#b91c1c' : item.color;
+      roundedRect(ctx, barX, y + 6, barW, 22, 11);
+      ctx.fill();
+    }
+    ctx.font = '700 15px system-ui, -apple-system, Segoe UI, Arial';
+    ctx.fillStyle = item.value < 0 ? '#b91c1c' : '#111827';
+    ctx.textAlign = 'right';
+    ctx.fillText(formatEuro(item.value), valueX + 90, y + 23);
+    ctx.textAlign = 'left';
+  });
+  ctx.fillStyle = '#e5e7eb';
+  ctx.fillRect(28, height - 44, width - 56, 1);
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '500 13px system-ui, -apple-system, Segoe UI, Arial';
+  ctx.fillText(`©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, 28, height - 18);
+  return canvas.toDataURL('image/png');
+}
+function addResumenChartImage(workbook, worksheet, model){
+  try{
+    if(!workbook || !worksheet || typeof workbook.addImage !== 'function' || typeof worksheet.addImage !== 'function') return {added:false, reason:'exceljs-image-api-unavailable'};
+    const base64 = makeResumenChartImage(model);
+    if(!base64) return {added:false, reason:'canvas-unavailable'};
+    const imageId = workbook.addImage({base64, extension:'png'});
+    worksheet.addImage(imageId, {
+      tl: {col: 3.2, row: 1.0},
+      ext: {width: 760, height: 405},
+      editAs: 'oneCell'
+    });
+    for(let c = 4; c <= 12; c += 1) worksheet.getColumn(c).width = 14;
+    for(let r = 2; r <= 22; r += 1) worksheet.getRow(r).height = Math.max(worksheet.getRow(r).height || 20, 22);
+    return {added:true, imageId, width:760, height:405};
+  }catch(error){
+    console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] No se pudo añadir gráfico standalone de RESUMEN.`, error);
+    return {added:false, error:error?.message || String(error)};
+  }
+}
+
 export function writeResumenWorksheet(workbook, options = {}){
   if(!workbook || typeof workbook.addWorksheet !== 'function'){
     throw new Error('writeResumenWorksheet necesita un workbook de ExcelJS.');
@@ -399,12 +503,8 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
         if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
       });
     }
-    // Los standalone modulares no usan imágenes. Se vacía cualquier resto accidental heredado por ExcelJS/legacy.
-    if(Array.isArray(workbook.media)) workbook.media.splice(0, workbook.media.length);
-    if(Array.isArray(workbook._media)) workbook._media.splice(0, workbook._media.length);
-    if(Array.isArray(worksheet.media)) worksheet.media.splice(0, worksheet.media.length);
-    if(Array.isArray(worksheet._media)) worksheet._media.splice(0, worksheet._media.length);
-    try{ worksheet._drawing = null; }catch(_){ }
+    // v27.4.7: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
+    // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
     try{ workbook.definedNames.model = []; }catch(_){ }
     configureCleanWorksheet(worksheet);
     return {ok:true, kept:worksheet.name, sheetCount:workbook.worksheets?.length || 0};
@@ -421,8 +521,9 @@ export async function downloadStandaloneResumen(options = {}){
   workbook.creator = `ControlEvent ${RESUMEN_SHEET_VERSION} - ©oltyLAB ’26`;
   workbook.created = new Date();
   const result = writeResumenWorksheet(workbook, {sheetName:'RESUMEN', includeDiagnosticRows:false, ...options});
+  result.chart = addResumenChartImage(workbook, result.worksheet, result.model);
   result.cleanup = sanitizeStandaloneWorkbook(workbook, result.worksheet);
-  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.6'});
+  await protectWorkbook(workbook, {source:'standalone-resumen-v27.4.7'});
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
@@ -430,7 +531,7 @@ export async function downloadStandaloneResumen(options = {}){
   const date = new Date();
   const stamp = `${String(date.getDate()).padStart(2,'0')}${String(date.getMonth()+1).padStart(2,'0')}${date.getFullYear()}_${String(date.getHours()).padStart(2,'0')}_${String(date.getMinutes()).padStart(2,'0')}_${String(date.getSeconds()).padStart(2,'0')}`;
   a.href = url;
-  a.download = `ControlEvent_v27_4_6_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
+  a.download = `ControlEvent_v27_4_7_RESUMEN_MODULAR-${safeName(result.model.event.titulo)}_${stamp}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();
