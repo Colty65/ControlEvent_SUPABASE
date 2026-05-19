@@ -1,13 +1,25 @@
-import { VERSION } from './version.js';
-import { getApp, whenAppReady } from './app-context.js';
-import { installDomainCalculations } from './domain/index.js';
-import { installExcelModules } from '../modules/excel/index.js';
-import { installTicketModules } from '../modules/tickets/index.js';
-import { installDebugMode } from './debug/debug-mode.js';
-import { installScreenLazyRuntime } from './navigation/screen-lazy.js';
-import { installMaintenanceLazyProxy } from '../modules/maintenance/lazy-proxy.js';
-import { installLegacyHotpathOptimizer } from './performance/legacy-hotpath.js';
-import { installActiveRenderOptimizer } from './performance/active-render.js';
+import { VERSION } from './version.js?v=v28.7.5';
+import { getApp, whenAppReady } from './app-context.js?v=v28.7.5';
+import { installDomainCalculations } from './domain/index.js?v=v28.7.5';
+import { installExcelModules } from '../modules/excel/index.js?v=v28.7.5';
+import { installTicketModules } from '../modules/tickets/index.js?v=v28.7.5';
+import { installDebugMode } from './debug/debug-mode.js?v=v28.7.5';
+import { installScreenLazyRuntime } from './navigation/screen-lazy.js?v=v28.7.5';
+import { installMaintenanceLazyProxy } from '../modules/maintenance/lazy-proxy.js?v=v28.7.5';
+import { installLegacyHotpathOptimizer } from './performance/legacy-hotpath.js?v=v28.7.5';
+import { installActiveRenderOptimizer } from './performance/active-render.js?v=v28.7.5';
+
+
+const CACHE_KEEP = 'controlevent-shell-v28-7-5';
+function cleanupOldCaches(){
+  if(typeof caches === 'undefined' || !caches.keys) return;
+  caches.keys()
+    .then(keys => Promise.all(keys
+      .filter(key => /^controlevent-shell-/i.test(key) && key !== CACHE_KEEP)
+      .map(key => caches.delete(key))))
+    .catch(() => undefined);
+}
+cleanupOldCaches();
 
 function applyVersion(){
   document.title = VERSION;
