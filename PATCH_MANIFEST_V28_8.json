@@ -1,0 +1,46 @@
+{
+  "from": "v28.7.6",
+  "to": "v28.8",
+  "changed": [
+    "package-lock.json",
+    "package.json",
+    "public/index.html",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "routes/health.routes.js",
+    "server/paths.js",
+    "public/app/version.js",
+    "public/app/main.js",
+    "public/modules/module-loader.js",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/maintenance/_maintenance-runtime.js",
+    "public/modules/maintenance/lazy-proxy.js",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/data-integrity.js",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/maintenance-diagnostics.js",
+    "public/app/diagnostics/mobile-performance.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/diagnostics/legacy-weight.js",
+    "public/app/diagnostics/legacy-usage.js",
+    "public/app/navigation/screen-lazy.js",
+    "public/app/performance/legacy-hotpath.js",
+    "public/app/performance/active-render.js"
+  ],
+  "new": [
+    "README_V28_8.md",
+    "public/app/legacy/legacy-bundle-before-modules-v28.8.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.8.js",
+    "public/app/styles/mobile-lite.css",
+    "public/app/performance/mobile-lite.js"
+  ],
+  "deleted_not_required": [
+    "public/app/legacy/legacy-bundle-before-modules-v28.7.6.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.7.6.js"
+  ],
+  "note": "No es necesario borrar archivos antiguos; index.html carga los nuevos v28.8."
+}
