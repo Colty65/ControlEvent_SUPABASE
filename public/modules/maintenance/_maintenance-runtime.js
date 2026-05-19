@@ -33,7 +33,7 @@ export function callLegacy(name, ...args){
   try{
     return fn(...args);
   }catch(error){
-    console.warn(`[maintenance/v28.4] Error en ${name}`, error);
+    console.warn(`[maintenance/v28.5] Error en ${name}`, error);
     return undefined;
   }
 }
@@ -42,7 +42,7 @@ export function safeStep(label, fn){
   try{
     return fn?.();
   }catch(error){
-    console.warn(`[maintenance/v28.4] ${label}`, error);
+    console.warn(`[maintenance/v28.5] ${label}`, error);
     return undefined;
   }
 }
@@ -50,7 +50,7 @@ export function safeStep(label, fn){
 export function setSectionRoot(root, name){
   if(!root || !name) return;
   root.dataset.ceMaintenanceModule = name;
-  root.dataset.ceMaintenanceVersion = 'v28.4';
+  root.dataset.ceMaintenanceVersion = 'v28.5';
 }
 
 export function currentMaintenanceName(){
@@ -133,7 +133,7 @@ export function renderMaintenanceParts(context, actionNames = []){
 
 export function createMaintenanceSection({name, render = [], afterActivate, beforeActivate} = {}){
   return {
-    meta: {name, version:'v28.4', mode:'maintenance-legacy-controller'},
+    meta: {name, version:'v28.5', mode:'maintenance-legacy-controller'},
     mount(context = {}){
       setSectionRoot(context.root, name);
       return this.activate(context);
@@ -171,7 +171,7 @@ export function scheduleCurrentMaintenance(options = {}){
   const startedAt = Date.now();
   scheduleIdle(() => {
     activateMaintenanceSection(name, {reason:'maintenance-lazy-current', ...options, scheduledAt: startedAt})
-      .catch(error => console.warn('[maintenance/v28.4] No se pudo activar mantenimiento diferido', name, error));
+      .catch(error => console.warn('[maintenance/v28.5] No se pudo activar mantenimiento diferido', name, error));
   }, delay);
   return {ok:true, scheduled:true, name, delay, reason: options.reason || 'maintenance-lazy-current'};
 }
@@ -180,7 +180,7 @@ function scheduleActivation(section, options = {}){
   if(!section) return;
   window.setTimeout(() => {
     activateMaintenanceSection(section.name, options).catch(error => {
-      console.error('[maintenance/v28.4] No se pudo activar mantenimiento', section.name, error);
+      console.error('[maintenance/v28.5] No se pudo activar mantenimiento', section.name, error);
     });
   }, 0);
 }
@@ -199,7 +199,7 @@ export function installMaintenanceModules(){
   }, true);
 
   window.ControlEventMaintenance = {
-    version:'v28.4',
+    version:'v28.5',
     __ceMaintenanceReal: true,
     sections: maintenanceSections,
     activate: activateMaintenanceSection,
@@ -218,7 +218,7 @@ export function installMaintenanceModules(){
     },
     info: maintenanceInfo,
     inspect: maintenanceInfo,
-    print(){ const report = maintenanceInfo(); console.group('[ControlEventMaintenance/v28.4] Mantenimiento diferido'); console.info(report); console.groupEnd(); return report; },
+    print(){ const report = maintenanceInfo(); console.group('[ControlEventMaintenance/v28.5] Mantenimiento diferido'); console.info(report); console.groupEnd(); return report; },
     actions: {
       addPersona: () => callLegacy('addPersona'),
       addEvento: () => callLegacy('addEvento'),
