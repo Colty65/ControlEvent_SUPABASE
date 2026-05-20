@@ -1,4 +1,4 @@
-/* ControlEvent v29.4 - LowResourceLegacyPatch
+/* ControlEvent v30.0 - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
    - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
@@ -7,7 +7,7 @@
 (function(){
   'use strict';
   const root = window.ControlEventLowResource;
-  const VERSION = 'ControlEvent v29.4';
+  const VERSION = 'ControlEvent v30.0';
   if(!root || !root.enabled){
     window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
     return;
@@ -134,6 +134,7 @@
     show($('tabIngresosBtn'), !ro);
     show($('tabDonacionesBtn'), !ro);
     show($('tabComprasBtn'), !ro);
+    show($('tabMapaBtn'), gd || rw || ro);
     show($('tabResumenBtn'), gd || rw || ro);
     show($('tabGraficasBtn'), gd || rw || ro);
 
@@ -148,6 +149,7 @@
     if(accCard) accCard.classList.toggle('hidden-by-role', !gd);
 
     ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn'].forEach(t => hideMobileTarget(t, !ro));
+    hideMobileTarget('tabMapaBtn', gd || rw || ro);
     hideMobileTarget('tabResumenBtn', gd || rw || ro);
     hideMobileTarget('tabGraficasBtn', gd || rw || ro);
     hideMobileTarget('btnExportExcel', (gd || rw || ro) && (!ro || isFinalized()));
@@ -225,7 +227,7 @@
       call('renderAuthUI');
       if(!hasAuth()) return undefined;
 
-      // Punto clave v29.4: primer render autenticado y cambio real de evento no se recortan.
+      // Punto clave v30.0: primer render autenticado y cambio real de evento no se recortan.
       // Así no quedan menús GD ocultos ni paneles vacíos tras login/selección de evento.
       if(needsFullBootstrap()){
         return runFullBootstrap(this, arguments, 'auth-or-event-change');
@@ -244,6 +246,8 @@
         call('renderCompras');
       }else if(tab === 'donaciones'){
         call('renderDonaciones');
+      }else if(tab === 'mapa'){
+        call('renderMapaProductos');
       }else if(tab === 'resumen'){
         call('renderBudget');
       }else if(tab === 'graficas'){
@@ -318,6 +322,7 @@
       actions.render = (...args) => window.render(...args);
       actions.renderBudget = (...args) => window.renderBudget(...args);
       actions.renderGraficas = (...args) => window.renderGraficas(...args);
+      if(window.renderMapaProductos) actions.renderMapaProductos = (...args) => window.renderMapaProductos(...args);
       actions.renderMaintenance = (...args) => window.renderMaintenance(...args);
     }catch(_){ }
     try{ applyCriticalRoleUi(); }catch(_){ }
@@ -342,6 +347,7 @@
         ingresos: isVisible('tabIngresos'),
         compras: isVisible('tabCompras'),
         donaciones: isVisible('tabDonaciones'),
+        mapa: isVisible('tabMapaProductos'),
         resumen: isVisible('tabResumen'),
         graficas: isVisible('tabGraficas'),
         mantenimiento: isVisible('maintenanceWrapper')
@@ -351,7 +357,7 @@
   }
   function print(){
     const report = inspect();
-    console.group('[ControlEventLowResourceLegacy/ControlEvent v29.4]');
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v30.0]');
     console.info(report);
     try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
@@ -367,5 +373,5 @@
     activateCurrentModule
   };
   window.__ceV294RoleSync = applyCriticalRoleUi;
-  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v29.4] Render legacy recortado + bootstrap post-login activado.'); }catch(_){ }
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v30.0] Render legacy recortado + Mapa de productos activado.'); }catch(_){ }
 })();

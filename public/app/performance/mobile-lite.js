@@ -1,4 +1,4 @@
-/* ControlEvent v29.4 - MobileLite: render visible-only conservador.
+/* ControlEvent v30.0 - MobileLite: render visible-only conservador.
    Objetivo: mejorar iPad/Android sin volver al ActiveRender de v28.6.
    No cambia datos, INFOEVENTO, BACKUP ni carga inicial: sólo evita repintar pantallas ocultas. */
 import { VERSION } from '../version.js';
@@ -159,6 +159,7 @@ function refreshCurrent(){
     ingresos: ['renderIngresosSummary','renderColabs'],
     compras: ['renderCompras'],
     donaciones: ['renderDonaciones'],
+    mapa: ['renderMapaProductos'],
     resumen: ['renderBudget'],
     graficas: ['renderGraficas']
   };
@@ -176,6 +177,7 @@ function inspect(){
       ingresos: isVisible('tabIngresos'),
       compras: isVisible('tabCompras'),
       donaciones: isVisible('tabDonaciones'),
+      mapa: isVisible('tabMapaProductos'),
       resumen: isVisible('tabResumen'),
       graficas: isVisible('tabGraficas'),
       mantenimiento: isVisible('maintenanceWrapper')

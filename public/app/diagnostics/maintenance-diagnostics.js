@@ -1,7 +1,7 @@
-/* ControlEvent v29.4 - Diagnóstico no intrusivo de mantenimiento.
+/* ControlEvent v30.0 - Diagnóstico no intrusivo de mantenimiento.
    No sustituye altas/modificaciones/borrados: sólo comprueba estructura, acciones y datos.
    v28.0 corrige falso aviso de IMPORTACIÓN: clearImportStatus es opcional/no expuesta en algunas rutas. */
-const VERSION = 'v29.4';
+const VERSION = 'v30.0';
 
 const SECTIONS = [
   {

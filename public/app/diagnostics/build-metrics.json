@@ -1,11 +1,7 @@
 {
-  "version": "v29.4",
-  "indexHtmlLines": 445,
-  "notes": "v29.4 conserva el rendimiento LITE/turbo y corrige bootstrap post-login/cambio de evento en iPad y Android.",
-  "mobileOptimization": "low-resource-lite-with-auth-event-bootstrap",
-  "focus": "low-resource-post-login-bootstrap",
-  "excelJsLazy": true,
-  "appVersion": "ControlEvent v29.4",
-  "indexLines": 445,
-  "hotpathOptimizer": true
+  "version": "v30.0",
+  "appVersion": "ControlEvent v30.0",
+  "notes": "v30.0 parte de la V29.4 estable y añade la opción funcional Mapa de productos: compras + donaciones por tienda y producto.",
+  "generatedAt": "2026-05-20",
+  "base": "ControlEvent v29.4"
 }

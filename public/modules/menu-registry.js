@@ -18,6 +18,12 @@ export const menuModules = [
     module: './views/compras.js'
   },
   {
+    name: 'mapa',
+    buttonId: 'tabMapaBtn',
+    viewId: 'tabMapaProductos',
+    module: './views/mapa-productos.js'
+  },
+  {
     name: 'resumen',
     buttonId: 'tabResumenBtn',
     viewId: 'tabResumen',

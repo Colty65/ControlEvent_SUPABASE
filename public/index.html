@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v29.4</title>
-  <!-- ControlEvent v29.4 PWA / instalación móvil -->
+  <title>ControlEvent v30.0</title>
+  <!-- ControlEvent v30.0 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -72,7 +72,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v29.4</span>
+          <span>ControlEvent v30.0</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -90,6 +90,7 @@
         <button type="button" class="tab active" id="tabIngresosBtn" title="Colaboradores económicos"><span class="tabicon">🤝</span></button>
         <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
         <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
+        <button type="button" class="tab" id="tabMapaBtn" title="Mapa de productos"><span class="tabicon">🧭</span></button>
         <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
       </div>
@@ -248,6 +249,21 @@
           </div>
           <div class="separator"></div>
           <div id="donacionesList"></div>
+        </div>
+      </div>
+
+      <div id="tabMapaProductos" class="hidden app-lockable">
+        <div class="card mapa-productos-card">
+          <div class="section-title">
+            <div class="icon-badge">🧭</div>
+            <div>
+              <h2>Mapa de productos</h2>
+              <p>Vista conjunta de compras y donaciones para ver la necesidad real del evento por tienda y producto.</p>
+            </div>
+          </div>
+          <div id="mapaProductosSummary" class="mapa-summary-grid"></div>
+          <div class="separator"></div>
+          <div id="mapaProductosList"></div>
         </div>
       </div>
 
@@ -435,10 +451,11 @@
 
 <script src="./app/performance/low-resource-boot.js"></script>
 <script src="/api/bootstrap.js"></script>
-<script id="legacy-bundle-before-modules-v294" src="./app/legacy/legacy-bundle-before-modules-v29.4.js"></script>
+<script id="legacy-bundle-before-modules-v300" src="./app/legacy/legacy-bundle-before-modules-v30.0.js"></script>
 
 <script type="module" src="./modules/module-loader.js"></script>
-<script id="legacy-bundle-after-modules-v294" src="./app/legacy/legacy-bundle-after-modules-v29.4.js"></script>
+<script id="legacy-bundle-after-modules-v300" src="./app/legacy/legacy-bundle-after-modules-v30.0.js"></script>
+<script src="./app/features/mapa-productos.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
 

@@ -1,9 +1,9 @@
-/* ControlEvent v29.4 - LowResourceBoot
+/* ControlEvent v30.0 - LowResourceBoot
    Modo tactil/turbo para iPad/Android modestos.
    En produccion trabaja sin indicador visible; el panel aparece solo con ?ceDiag=1. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v29.4';
+  const VERSION = 'ControlEvent v30.0';
   const params = new URLSearchParams(location.search || '');
   const ua = navigator.userAgent || '';
   const platform = navigator.platform || '';
@@ -53,7 +53,7 @@
     if(value >= 30000) return value;
     stats.intervalsAdjusted += 1;
     // En v29.1 se multiplicaban; en equipos antiguos seguia habiendo barridos cada pocos segundos.
-    // En v29.4 los intervalos legacy repetitivos pasan a modo "vigilancia", no a modo "repintado".
+    // En v30.0 los intervalos legacy repetitivos pasan a modo "vigilancia", no a modo "repintado".
     if(value <= 2500) return 45000;
     if(value <= 10000) return Math.max(45000, value * 4);
     return Math.max(30000, value);
@@ -205,7 +205,7 @@
         <div><b>LowResource</b><br>${enabled ? 'ACTIVO' : 'NO activo'}<br><small>${esc(reason)}</small></div>
         <div><b>MobileLite</b><br>${lite?.installed ? 'INSTALADO' : 'No instalado'} / ${lite?.enabled ? 'ON' : 'OFF'}<br><small>envueltas: ${wrapped}</small></div>
         <div><b>Render visible-only</b><br>ejecutados: ${executed}<br>ocultos evitados: ${skipped}</div>
-        <div><b>Legacy Turbo v29.4</b><br>${legacy?.installed ? 'ACTIVO' : 'no instalado'}<br><small>render ligero: ${esc(legacy?.liteRenderCalls || 0)}</small></div>
+        <div><b>Legacy Turbo v30.0</b><br>${legacy?.installed ? 'ACTIVO' : 'no instalado'}<br><small>render ligero: ${esc(legacy?.liteRenderCalls || 0)}</small></div>
         <div><b>Saltos legacy</b><br>budget: ${esc(legacySkips.budget || 0)} · gráficas: ${esc(legacySkips.graficas || 0)} · mant.: ${esc(legacySkips.maintenance || 0)}</div>
         <div><b>Tab actual</b><br>${esc(lite?.currentTab || legacy?.currentTab || lazy?.current || 'sin dato')}<br><small>pantallas cargadas: ${esc((lazy?.loadedScreens || []).join(', ') || '—')}</small></div>
         <div><b>Intervalos rebajados</b><br>${esc(stats.intervalsAdjusted)}<br><small>los barridos cortos pasan a ~45 s</small></div>
