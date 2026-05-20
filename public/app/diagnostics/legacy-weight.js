@@ -1,8 +1,8 @@
-/* ControlEvent v30.9.2 - Diagnóstico de peso legacy y preparación de limpieza.
+/* ControlEvent v30.7 - Diagnóstico de peso legacy y preparación de limpieza.
    Sólo diagnóstico bajo demanda. No modifica la operativa. */
-const VERSION = 'v30.9.2';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.9.2.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.9.2.js';
+const VERSION = 'v30.7';
+const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.7.js';
+const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.7.js';
 const LEGACY_PATHS = [
   `/app/legacy/${LEGACY_BEFORE}`,
   `/app/legacy/${LEGACY_AFTER}`

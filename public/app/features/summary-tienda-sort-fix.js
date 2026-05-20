@@ -1,8 +1,8 @@
-/* ControlEvent v30.9.2 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
+/* ControlEvent v30.7 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
    Evita depender del onclick inline, que en algunas capas antiguas no se ejecutaba. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.9.2';
+  const VERSION = 'ControlEvent v30.7';
   const ROOT_ID = 'summaryTiendaTicket';
 
   function $(id){ return document.getElementById(id); }
@@ -13,7 +13,7 @@
   function renderBudgetSafe(){
     try{ if(typeof renderBudget === 'function') return renderBudget(); }catch(_){ }
     try{ if(typeof window.renderBudget === 'function') return window.renderBudget(); }catch(_){ }
-    try{ window.ControlEventModules?.activate?.('resumen', {reason:'summary-sort-v309'}); }catch(_){ }
+    try{ window.ControlEventModules?.activate?.('resumen', {reason:'summary-sort-v307'}); }catch(_){ }
     return null;
   }
   function normalizeText(value){
@@ -52,7 +52,7 @@
     root.querySelectorAll('.hint a, .hint button, [data-ce-summary-sort]').forEach(el => {
       const m = modeFromTarget(el);
       if(!m) return;
-      el.classList.add('ce-sort-link-v309');
+      el.classList.add('ce-sort-link-v307');
       el.setAttribute('role','button');
       el.setAttribute('tabindex','0');
       el.setAttribute('data-ce-summary-sort', m);

@@ -1,9 +1,9 @@
-/* ControlEvent v30.9.2 - Estabilizador de vistas
+/* ControlEvent v30.7 - Estabilizador de vistas
    Refuerza el refresco de Colaboradores/Ingresos, Donaciones y Compras tras login,
    cambio de evento y cambio de pestaña. No cambia datos: sólo repinta la vista activa. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.9.2';
+  const VERSION = 'ControlEvent v30.7';
   const stats = {version:VERSION, installed:true, schedules:0, hydrations:0, forced:0, errors:[], last:null};
   const $ = id => document.getElementById(id);
   const TAB_BY_BUTTON = {

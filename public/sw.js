@@ -1,4 +1,5 @@
-const CACHE_NAME = 'controlevent-shell-v30-9-3';
+const CACHE_NAME = 'controlevent-shell-v30-10-rescate';
+// V30.10 rescate: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -13,19 +14,18 @@ const SHELL_ASSETS = [
   '/app/performance/legacy-hotpath.js',
   '/app/performance/active-render.js',
   '/app/performance/mobile-lite.js',
-  '/app/features/login-input-guard-v30.9.3.js',
   '/app/performance/low-resource-boot.js',
   '/app/performance/low-resource-legacy-patch.js',
-  '/app/features/mapa-recursos-v30.9.3.js',
+  '/app/features/mapa-productos.js',
   '/app/features/view-refresh-stabilizer.js',
-  '/app/features/budget-tooltips-lite-v30.9.3.js',
+  '/app/features/budget-tooltips-lite.js',
   '/app/features/summary-tienda-sort-fix.js',
   '/modules/module-loader.js',
   '/modules/menu-registry.js',
   '/modules/views/_view-runtime.js',
   '/modules/views/mapa-productos.js',
-  '/app/legacy/legacy-bundle-before-modules-v30.9.3.js',
-  '/app/legacy/legacy-bundle-after-modules-v30.9.3.js',
+  '/app/legacy/legacy-bundle-before-modules-v30.7.js',
+  '/app/legacy/legacy-bundle-after-modules-v30.7.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',
