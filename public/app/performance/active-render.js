@@ -1,4 +1,4 @@
-/* ControlEvent v29.0 - ActiveRender disponible pero desactivado por defecto.
+/* ControlEvent v29.1 - ActiveRender disponible pero desactivado por defecto.
    En v28.6 se comprobó que empeoraba iPad/Android. Se conserva sólo como herramienta experimental:
    ControlEventActiveRender.enable() / disable(). INFOEVENTO/BACKUP/carga de datos no se tocan. */
 import { VERSION } from '../version.js';
