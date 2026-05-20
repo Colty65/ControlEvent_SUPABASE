@@ -1,9 +1,15 @@
-/* ControlEvent v30.0 - Mapa de productos
-   Pantalla informativa que cruza COMPRAS + DONACIONES por Tienda + Producto. */
+/* ControlEvent v30.1 - Mapa de productos
+   Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
+   v30.1 convierte el mapa en pantalla propia para que no dependa del render heredado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.0';
+  const VERSION = 'ControlEvent v30.1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
+  const TAB_NAME = 'mapa';
+  const PANEL_ID = 'tabMapaProductos';
+  const BUTTON_ID = 'tabMapaBtn';
+  const KNOWN_PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabResumen','tabGraficas'];
+  const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabResumenBtn','tabGraficasBtn'];
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -14,8 +20,10 @@
     const value = st()[name];
     return Array.isArray(value) ? value : [];
   }
-  function selectedId(){
-    return String(st().selectedEventId || '');
+  function selectedId(){ return String(st().selectedEventId || ''); }
+  function hasEvent(){
+    const id = selectedId();
+    return !!id && arr('eventos').some(e => String(e.id) === id);
   }
   function currentTab(){
     try{ if(typeof currentMainTab !== 'undefined') return String(currentMainTab || 'ingresos'); }catch(_){ }
@@ -24,10 +32,6 @@
   function setCurrentTab(value){
     try{ if(typeof currentMainTab !== 'undefined') currentMainTab = value; }catch(_){ }
     try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = value; }catch(_){ }
-  }
-  function hasEvent(){
-    const id = selectedId();
-    return !!id && arr('eventos').some(e => String(e.id) === id);
   }
   function esc(value){
     try{ if(typeof escapeHtml === 'function') return escapeHtml(value); }catch(_){ }
@@ -39,12 +43,9 @@
   }
   function qtyFmt(value){
     const n = Number(value || 0);
-    const s = new Intl.NumberFormat('es-ES',{minimumFractionDigits:0, maximumFractionDigits:2}).format(n);
-    return s;
+    return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0, maximumFractionDigits:2}).format(n);
   }
-  function normText(value){
-    return String(value || '').trim() || 'Sin definir';
-  }
+  function normText(value){ return String(value || '').trim() || 'Sin definir'; }
   function isDonation(value){
     try{ if(typeof isDonationTicket === 'function') return isDonationTicket(value); }catch(_){ }
     return DONATION_TYPES.includes(String(value || ''));
@@ -74,9 +75,7 @@
     if(isDonation(row?.ticketDonacion) && row?.tiendaId) return storeName(row.tiendaId) || 'Sin donante';
     return row?.donante || row?.donor || 'Sin donante';
   }
-  function responsibleName(row){
-    return personName(row?.responsableId) || '';
-  }
+  function responsibleName(row){ return personName(row?.responsableId) || ''; }
   function unitPrice(row){
     const p = productOf(row) || {};
     const candidates = [row?.precio, p.precio, p.defaultPrecio];
@@ -90,11 +89,11 @@
   function productName(row){ return productOf(row)?.nombre || row?.producto || 'Producto sin nombre'; }
   function segmentName(row){ return productOf(row)?.segmento || 'Sin segmento'; }
   function destinoName(row){ return productOf(row)?.destino || 'Sin destino'; }
-
   function comprasRaw(){
     const eventId = selectedId();
     return arr('compras').filter(c => String(c.eventId || '') === eventId);
   }
+
   function buildMapaProductos(){
     const rows = comprasRaw();
     const buys = rows.filter(row => !isDonation(row.ticketDonacion));
@@ -192,7 +191,7 @@
     if(!items.length) return '<div class="mapa-donation-empty">Sin donaciones registradas de este producto.</div>';
     return `<div class="mapa-donation-list">${items.map(item => `
       <div class="mapa-donation-row">
-        <div><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}</span></div>
+        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}</span></div>
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>uds.</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
         <div><strong>${esc(item.responsable || '—')}</strong><span>resp.</span></div>
@@ -203,6 +202,22 @@
     if(!entries.length) return 'Sin ticket';
     return entries.map(([ticket, unidades]) => `${ticket}: ${qtyFmt(unidades)} uds.`).join(' · ');
   }
+  function pct(part, total){
+    const n = total > 0 ? Math.max(0, Math.min(100, (Number(part || 0) / total) * 100)) : 0;
+    return String(Math.round(n * 10) / 10).replace(',', '.');
+  }
+  function renderNeedStrip(group){
+    const total = Number(group.necesidadUnidades || 0);
+    const compraPct = pct(group.unidadesCompra, total);
+    const donadoPct = pct(group.unidadesDonadas, total);
+    return `
+      <div class="mapa-need-strip" aria-label="Necesidad del producto">
+        <div class="mapa-need-title"><strong>Necesidad del evento</strong><span>${esc(qtyFmt(total))} uds.</span></div>
+        <div class="mapa-need-bar"><i class="buy" style="width:${compraPct}%"></i><i class="don" style="width:${donadoPct}%"></i></div>
+        <div class="mapa-need-legend"><span><i class="buy"></i>Pendiente comprar: ${esc(qtyFmt(group.unidadesCompra))}</span><span><i class="don"></i>Donado: ${esc(qtyFmt(group.unidadesDonadas))}</span></div>
+      </div>`;
+  }
+
   function renderMapaProductos(){
     const wrap = $('mapaProductosList');
     const summary = $('mapaProductosSummary');
@@ -218,9 +233,9 @@
     const productsWithDonations = new Set(data.donations.map(row => String(row.productoId || ''))).size;
     summary.innerHTML = [
       renderMetric('Necesidad valorada', moneyFmt(totalCompra + totalDonado), 'Compras previstas + donaciones', 'ok'),
-      renderMetric('A comprar / gastos', moneyFmt(totalCompra), `${data.groups.length} tienda-producto`, 'warn'),
+      renderMetric('Pendiente comprar', moneyFmt(totalCompra), `${data.groups.length} tienda-producto`, 'warn'),
       renderMetric('Donado producto', moneyFmt(totalDonado), `${productsWithDonations} productos con donación`, 'ok'),
-      renderMetric('Sin compra planificada', String(data.onlyDonations.length), 'Productos solo donados', '')
+      renderMetric('Solo donación', String(data.onlyDonations.length), 'Sin compra planificada', '')
     ].join('');
 
     if(!data.groups.length && !data.onlyDonations.length){
@@ -229,16 +244,17 @@
     }
 
     const cards = data.groups.map(group => `
-      <div class="mapa-product-card">
+      <article class="mapa-product-card">
         <div class="mapa-product-head">
           <div><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
           <div class="mapa-tags"><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
         </div>
-        <div class="mapa-product-kpis">
-          <div><span>A comprar</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds.</strong></div>
-          <div><span>Importe compra</span><strong>${esc(moneyFmt(group.importeCompra))}</strong></div>
-          <div><span>Necesidad evento</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds.</strong></div>
-          <div><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(moneyFmt(group.valorDonado))}</strong></div>
+        ${renderNeedStrip(group)}
+        <div class="mapa-product-kpis" role="list">
+          <div role="listitem"><span>A comprar</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds.</strong></div>
+          <div role="listitem"><span>Importe compra</span><strong>${esc(moneyFmt(group.importeCompra))}</strong></div>
+          <div role="listitem"><span>Necesidad total</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds.</strong></div>
+          <div role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(moneyFmt(group.valorDonado))}</strong></div>
         </div>
         <div class="mapa-product-meta">
           <div><b>Ticket / estado:</b> ${esc(renderTicketLine(group))}</div>
@@ -248,39 +264,65 @@
           <div class="mapa-subtitle">Donantes de este producto</div>
           ${renderDonationRows(group.donationRows)}
         </div>
-      </div>`).join('');
+      </article>`).join('');
 
     const onlyDonationBlock = data.onlyDonations.length ? `
-      <div class="mapa-only-donations">
+      <section class="mapa-only-donations">
         <div class="mapa-subtitle big">Productos con donación, pero sin compra planificada</div>
         ${data.onlyDonations.map(item => `
-          <div class="mapa-product-card donation-only">
+          <article class="mapa-product-card donation-only">
             <div class="mapa-product-head"><div><span class="mapa-store">Solo donación</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
             <div class="mapa-product-kpis compact"><div><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
             ${renderDonationRows(item.donationRows)}
-          </div>`).join('')}
-      </div>` : '';
+          </article>`).join('')}
+      </section>` : '';
 
     wrap.innerHTML = cards + onlyDonationBlock;
   }
 
+  function closeMobileDrawer(){
+    try{ document.body.classList.remove('mobile-drawer-open'); }catch(_){ }
+  }
   function applyMapVisibility(){
-    const active = currentTab() === 'mapa';
-    const has = hasEvent();
-    const panel = $('tabMapaProductos');
-    const btn = $('tabMapaBtn');
-    if(panel) panel.classList.toggle('hidden', !active || !has);
+    const active = currentTab() === TAB_NAME;
+    const eventReady = hasEvent();
+    const panel = $(PANEL_ID);
+    const btn = $(BUTTON_ID);
+    if(panel) panel.classList.toggle('hidden', !active || !eventReady);
     if(btn){
       btn.classList.toggle('active', active);
       btn.classList.remove('hidden-by-role-v228');
       btn.style.removeProperty('display');
       btn.removeAttribute('aria-hidden');
+      btn.disabled = false;
+      btn.removeAttribute('aria-disabled');
     }
     document.querySelectorAll('.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => {
       el.classList.remove('hidden-by-role-v228');
       el.style.removeProperty('display');
       el.removeAttribute('aria-hidden');
+      el.disabled = false;
+      el.removeAttribute('aria-disabled');
+      el.classList.toggle('primary', active);
     });
+  }
+  function forceShowMapa(options = {}){
+    setCurrentTab(TAB_NAME);
+    KNOWN_PANELS.forEach(id => {
+      const el = $(id);
+      if(el) el.classList.toggle('hidden', id !== PANEL_ID || !hasEvent());
+    });
+    KNOWN_BUTTONS.forEach(id => {
+      const el = $(id);
+      if(el) el.classList.toggle('active', id === BUTTON_ID);
+    });
+    applyMapVisibility();
+    renderMapaProductos();
+    closeMobileDrawer();
+    try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
+    if(options.scroll !== false){
+      try{ $('mainTabs')?.scrollIntoView?.({block:'start', behavior:'smooth'}); }catch(_){ }
+    }
   }
   function ensureMobileMenuAction(){
     const grids = Array.from(document.querySelectorAll('.mobile-menu-grid'));
@@ -299,18 +341,18 @@
   }
 
   const oldRenderTabVisibility = (typeof window.renderTabVisibility === 'function') ? window.renderTabVisibility : (function(){ try{ return typeof renderTabVisibility === 'function' ? renderTabVisibility : null; }catch(_){ return null; } })();
-  function renderTabVisibilityV30(){
+  function renderTabVisibilityV301(){
     const result = oldRenderTabVisibility ? oldRenderTabVisibility.apply(this, arguments) : undefined;
     applyMapVisibility();
     return result;
   }
 
   const oldRender = (typeof window.render === 'function') ? window.render : (function(){ try{ return typeof render === 'function' ? render : null; }catch(_){ return null; } })();
-  function renderV30(){
+  function renderV301(){
     const result = oldRender ? oldRender.apply(this, arguments) : undefined;
     applyMapVisibility();
     ensureMobileMenuAction();
-    if(currentTab() === 'mapa') renderMapaProductos();
+    if(currentTab() === TAB_NAME) forceShowMapa({reason:'render-v301', scroll:false});
     return result;
   }
 
@@ -318,21 +360,25 @@
     const target = event.target?.closest?.('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]');
     if(!target) return;
     event.preventDefault();
-    if(target.classList?.contains('mobile-menu-action')){
-      const realBtn = $('tabMapaBtn');
-      if(realBtn && target !== realBtn){ realBtn.click(); return; }
-    }
-    setCurrentTab('mapa');
-    try{ if(typeof window.render === 'function') window.render(); else renderV30(); }catch(error){ console.warn('[v30.0] render mapa', error); }
-    try{ window.ControlEventModules?.activate?.('mapa', {reason:'mapa-click'}); }catch(_){ }
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    forceShowMapa({reason:'mapa-click'});
+    return false;
   }, true);
 
-  try{ renderTabVisibility = renderTabVisibilityV30; }catch(_){ }
-  try{ window.renderTabVisibility = renderTabVisibilityV30; }catch(_){ }
-  try{ render = renderV30; }catch(_){ }
-  try{ window.render = renderV30; }catch(_){ }
+  document.addEventListener('change', event => {
+    if(event.target && event.target.id === 'selectedEvent' && currentTab() === TAB_NAME){
+      setTimeout(() => forceShowMapa({reason:'event-change', scroll:false}), 60);
+    }
+  }, true);
+
+  try{ renderTabVisibility = renderTabVisibilityV301; }catch(_){ }
+  try{ window.renderTabVisibility = renderTabVisibilityV301; }catch(_){ }
+  try{ render = renderV301; }catch(_){ }
+  try{ window.render = renderV301; }catch(_){ }
   try{ window.renderMapaProductos = renderMapaProductos; }catch(_){ }
   try{ window.buildMapaProductos = buildMapaProductos; }catch(_){ }
+  try{ window.showMapaProductos = forceShowMapa; }catch(_){ }
 
   function patchAppActions(){
     try{
@@ -341,6 +387,7 @@
         actions.render = (...args) => window.render(...args);
         actions.renderTabVisibility = (...args) => window.renderTabVisibility(...args);
         actions.renderMapaProductos = (...args) => window.renderMapaProductos(...args);
+        actions.showMapaProductos = (...args) => window.showMapaProductos(...args);
       }
     }catch(_){ }
   }
@@ -348,14 +395,16 @@
   window.addEventListener('controlevent:app-ready', patchAppActions);
   window.addEventListener('controlevent:runtime-ready', () => { applyMapVisibility(); ensureMobileMenuAction(); patchAppActions(); });
 
-  const observer = new MutationObserver(() => ensureMobileMenuAction());
+  const observer = new MutationObserver(() => { ensureMobileMenuAction(); applyMapVisibility(); });
   try{ observer.observe(document.documentElement, {childList:true, subtree:true}); }catch(_){ }
-  [0, 200, 800, 1500].forEach(ms => setTimeout(() => { applyMapVisibility(); ensureMobileMenuAction(); }, ms));
+  [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
 
   window.ControlEventMapaProductos = {
     version: VERSION,
+    mode: 'stable-screen-v301',
     render: renderMapaProductos,
     build: buildMapaProductos,
-    sync: () => { applyMapVisibility(); ensureMobileMenuAction(); renderMapaProductos(); }
+    show: forceShowMapa,
+    sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }
   };
 })();

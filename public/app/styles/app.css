@@ -1060,7 +1060,7 @@ body.ce-v257-gd #newProductoPrecio{
   background:#fff!important;
 }
 
-/* ==== V30.0: Mapa de productos ==== */
+/* ==== V30.1: Mapa de productos ==== */
 #mainTabs{grid-template-columns:repeat(6,minmax(0,1fr));}
 .mapa-productos-card .section-title p{max-width:820px;}
 .mapa-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;}
@@ -1099,4 +1099,58 @@ body.ce-v257-gd #newProductoPrecio{
   .mapa-product-head{display:block;}
   .mapa-tags{justify-content:flex-start;margin-top:8px;}
   .mapa-metric-value{font-size:18px;}
+}
+
+/* ==== V30.1: Mapa de productos como pantalla estable y móvil visual ==== */
+#tabMapaProductos{display:block;}
+#tabMapaProductos.hidden{display:none!important;}
+#tabMapaBtn{position:relative;}
+#tabMapaBtn.active{background:#111827;color:#fff;border-color:#111827;}
+.mapa-product-card{position:relative;overflow:hidden;}
+.mapa-product-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,#6366f1,#22c55e);}
+.mapa-need-strip{margin-top:12px;border:1px solid #dbeafe;background:#f8fbff;border-radius:16px;padding:10px 12px;}
+.mapa-need-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:#111827;}
+.mapa-need-title strong{font-weight:950;}
+.mapa-need-title span{font-weight:950;color:#1d4ed8;}
+.mapa-need-bar{height:12px;border-radius:999px;overflow:hidden;background:#e5e7eb;margin-top:9px;display:flex;}
+.mapa-need-bar i{display:block;height:100%;min-width:0;}
+.mapa-need-bar i.buy{background:#f97316;}
+.mapa-need-bar i.don{background:#22c55e;}
+.mapa-need-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px;font-weight:800;color:#334155;}
+.mapa-need-legend span{display:inline-flex;align-items:center;gap:5px;}
+.mapa-need-legend i{width:10px;height:10px;border-radius:999px;display:inline-block;}
+.mapa-need-legend i.buy{background:#f97316;}
+.mapa-need-legend i.don{background:#22c55e;}
+.mobile-menu-action[data-target="tabMapaBtn"].primary{background:#111827;color:#fff;border-color:#111827;}
+
+@media (max-width:760px){
+  #tabMapaProductos .card{padding:12px;border-radius:18px;}
+  .mapa-productos-card .section-title{align-items:flex-start;gap:10px;}
+  .mapa-productos-card .section-title p{font-size:12px;line-height:1.35;}
+  .mapa-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px;}
+  .mapa-metric{padding:10px;border-radius:15px;min-height:78px;}
+  .mapa-metric-label{font-size:10px;}
+  .mapa-metric-value{font-size:17px;}
+  .mapa-metric-note{font-size:11px;}
+  .mapa-product-card{border-radius:18px;margin-top:11px;padding:12px 12px 12px 15px;box-shadow:0 6px 16px rgba(15,23,42,.06);}
+  .mapa-product-head{display:flex!important;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .mapa-product-head h3{font-size:16px;margin-top:5px;}
+  .mapa-store{font-size:11px;padding:3px 8px;}
+  .mapa-tags{justify-content:flex-end;margin-top:0;max-width:44%;}
+  .mapa-tags span{font-size:10px;padding:3px 7px;}
+  .mapa-need-strip{padding:9px;border-radius:14px;}
+  .mapa-need-title{font-size:12px;}
+  .mapa-need-legend{font-size:11px;gap:8px;}
+  .mapa-product-kpis{display:flex!important;grid-template-columns:none!important;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding-bottom:4px;margin-left:-2px;margin-right:-2px;}
+  .mapa-product-kpis div{min-width:132px;scroll-snap-align:start;border-radius:13px;padding:8px;}
+  .mapa-product-kpis span{font-size:10px;}
+  .mapa-product-kpis strong{font-size:13px;line-height:1.2;}
+  .mapa-product-meta{grid-template-columns:1fr!important;gap:6px;font-size:12px;}
+  .mapa-product-meta div{padding:8px;border-radius:12px;}
+  .mapa-subtitle{font-size:12px;margin-bottom:7px;}
+  .mapa-donation-row{grid-template-columns:1fr auto!important;gap:7px;border-left:5px solid #22c55e;padding:8px;border-radius:13px;}
+  .mapa-donation-row .donor{grid-column:1 / -1;}
+  .mapa-donation-row strong{font-size:13px;}
+  .mapa-donation-row span{font-size:10px;}
+  .mapa-donation-row > div:nth-child(4){display:none;}
 }

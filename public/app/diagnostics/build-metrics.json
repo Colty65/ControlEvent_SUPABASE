@@ -1,7 +1,7 @@
 {
-  "version": "v30.0",
-  "appVersion": "ControlEvent v30.0",
-  "notes": "v30.0 parte de la V29.4 estable y añade la opción funcional Mapa de productos: compras + donaciones por tienda y producto.",
-  "generatedAt": "2026-05-20",
-  "base": "ControlEvent v29.4"
+  "version": "v30.1",
+  "base": "v30.0",
+  "notes": "v30.1 corrige Mapa de productos: pantalla estable, apertura fiable en PC/iPad/Android y presentacion movil visual.",
+  "mobileLitePreserved": true,
+  "functionalAreasUntouched": ["INFOEVENTOS", "BACKUP", "Excel", "Ingresos", "Compras", "Donaciones"]
 }

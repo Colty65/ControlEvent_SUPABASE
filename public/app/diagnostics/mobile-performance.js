@@ -1,10 +1,10 @@
-/* ControlEvent v30.0 - Diagnóstico de carga móvil/rendimiento.
+/* ControlEvent v30.1 - Diagnóstico de carga móvil/rendimiento.
    Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
 import { VERSION } from '../version.js';
 
-const DIAGNOSTICS_VERSION = 'v30.0';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.0.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.0.js';
+const DIAGNOSTICS_VERSION = 'v30.1';
+const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.1.js';
+const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.1.js';
 let lastReport = null;
 
 function nowIso(){
