@@ -1,4 +1,4 @@
-/* ControlEvent v30.2 - LowResourceLegacyPatch
+/* ControlEvent v30.3 - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
    - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
@@ -7,7 +7,7 @@
 (function(){
   'use strict';
   const root = window.ControlEventLowResource;
-  const VERSION = 'ControlEvent v30.2';
+  const VERSION = 'ControlEvent v30.3';
   if(!root || !root.enabled){
     window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
     return;
@@ -194,6 +194,44 @@
     }
   }
 
+
+
+  function setCurrentTab(value){
+    try{ if(typeof currentMainTab !== 'undefined') currentMainTab = value; }catch(_){ }
+    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = value; }catch(_){ }
+  }
+
+  function warmCoreDataScreens(reason){
+    // V30.3: tras login/cambio de evento, precalienta las tres pantallas de captura
+    // para que Colaboradores, Donaciones y Compras no queden vacías si el render LITE
+    // ha evitado repintar una pestaña oculta. Se restaura la pestaña original antes
+    // de devolver el control, por lo que no debería verse parpadeo.
+    if(!hasAuth() || isRO()) return;
+    const originalTab = currentTab();
+    try{
+      window.__ceMapaProductosWarmup = true;
+      renderSelectorsIfNeeded(true);
+      const tasks = [
+        {tab:'ingresos', renders:['renderIngresosSummary','renderColabs']},
+        {tab:'donaciones', renders:['renderDonaciones']},
+        {tab:'compras', renders:['renderCompras']}
+      ];
+      tasks.forEach(item => {
+        setCurrentTab(item.tab);
+        call('renderTabVisibility');
+        item.renders.forEach(name => call(name));
+      });
+    }catch(error){
+      stats.errors.push({at:new Date().toISOString(), name:'warmCoreDataScreens', message:error?.message || String(error), reason});
+      if(stats.errors.length > 12) stats.errors.shift();
+    }finally{
+      window.__ceMapaProductosWarmup = false;
+      setCurrentTab(originalTab || 'ingresos');
+      try{ call('renderTabVisibility'); }catch(_){ }
+      try{ if(originalTab === 'mapa' && window.renderMapaProductos) window.renderMapaProductos(); }catch(_){ }
+    }
+  }
+
   const oldRender = getFn('render');
   const oldBudget = getFn('renderBudget');
   const oldGraficas = getFn('renderGraficas');
@@ -215,6 +253,7 @@
     note('full-bootstrap', 'render', reason);
     const result = oldRender.apply(thisArg || window, args || []);
     try{ applyCriticalRoleUi(); }catch(_){ }
+    try{ warmCoreDataScreens(reason || 'auth-event'); }catch(_){ }
     activateCurrentModule('full-bootstrap:' + (reason || 'auth-event'));
     return result;
   }
@@ -227,7 +266,7 @@
       call('renderAuthUI');
       if(!hasAuth()) return undefined;
 
-      // Punto clave v30.2: primer render autenticado y cambio real de evento no se recortan.
+      // Punto clave v30.3: primer render autenticado y cambio real de evento no se recortan.
       // Así no quedan menús GD ocultos ni paneles vacíos tras login/selección de evento.
       if(needsFullBootstrap()){
         return runFullBootstrap(this, arguments, 'auth-or-event-change');
@@ -357,7 +396,7 @@
   }
   function print(){
     const report = inspect();
-    console.group('[ControlEventLowResourceLegacy/ControlEvent v30.2]');
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v30.3]');
     console.info(report);
     try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
@@ -373,5 +412,5 @@
     activateCurrentModule
   };
   window.__ceV294RoleSync = applyCriticalRoleUi;
-  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v30.2] Render legacy recortado + Mapa de productos activado.'); }catch(_){ }
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v30.3] Render legacy recortado + Mapa de productos activado.'); }catch(_){ }
 })();

@@ -1,15 +1,16 @@
-/* ControlEvent v30.2 - Mapa de productos
+/* ControlEvent v30.3 - Mapa de productos
    Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
-   v30.2 convierte el mapa en pantalla propia para que no dependa del render heredado. */
+   v30.3 convierte el mapa en pantalla propia para que no dependa del render heredado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.2';
+  const VERSION = 'ControlEvent v30.3';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
   const BUTTON_ID = 'tabMapaBtn';
   const KNOWN_PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabResumen','tabGraficas'];
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabResumenBtn','tabGraficasBtn'];
+  let mapPinned = false;
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -32,6 +33,14 @@
   function setCurrentTab(value){
     try{ if(typeof currentMainTab !== 'undefined') currentMainTab = value; }catch(_){ }
     try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = value; }catch(_){ }
+    try{ window.__ceMapaProductosPinned = value === TAB_NAME; }catch(_){ }
+  }
+  function clearMapPinIfOtherTab(){
+    const tab = currentTab();
+    if(tab && tab !== TAB_NAME){
+      mapPinned = false;
+      try{ window.__ceMapaProductosPinned = false; }catch(_){ }
+    }
   }
   function esc(value){
     try{ if(typeof escapeHtml === 'function') return escapeHtml(value); }catch(_){ }
@@ -284,6 +293,7 @@
     try{ document.body.classList.remove('mobile-drawer-open'); }catch(_){ }
   }
   function applyMapVisibility(){
+    if(mapPinned && !window.__ceMapaProductosWarmup && currentTab() !== TAB_NAME) setCurrentTab(TAB_NAME);
     const active = currentTab() === TAB_NAME;
     const eventReady = hasEvent();
     const panel = $(PANEL_ID);
@@ -308,6 +318,7 @@
     bindDirectMapaButton();
   }
   function forceShowMapa(options = {}){
+    mapPinned = true;
     setCurrentTab(TAB_NAME);
     KNOWN_PANELS.forEach(id => {
       const el = $(id);
@@ -321,9 +332,7 @@
     renderMapaProductos();
     closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
-    if(options.scroll !== false){
-      try{ $('mainTabs')?.scrollIntoView?.({block:'start', behavior:'smooth'}); }catch(_){ }
-    }
+    // V30.3: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
   }
   function ensureMobileMenuAction(){
     const grids = Array.from(document.querySelectorAll('.mobile-menu-grid'));
@@ -354,7 +363,7 @@
     const result = oldRender ? oldRender.apply(this, arguments) : undefined;
     applyMapVisibility();
     ensureMobileMenuAction();
-    if(currentTab() === TAB_NAME) forceShowMapa({reason:'render-v302', scroll:false});
+    if(currentTab() === TAB_NAME) forceShowMapa({reason:'render-v303', scroll:false});
     return result;
   }
 
@@ -414,6 +423,11 @@
     openMapaFromEvent(event, 'document-click');
   }, true);
 
+  document.addEventListener('click', event => {
+    const other = event.target?.closest?.('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"]');
+    if(other) { mapPinned = false; try{ window.__ceMapaProductosPinned = false; }catch(_){ } }
+  }, true);
+
   document.addEventListener('change', event => {
     if(event.target && event.target.id === 'selectedEvent' && currentTab() === TAB_NAME){
       setTimeout(() => forceShowMapa({reason:'event-change', scroll:false}), 60);
@@ -450,7 +464,7 @@
 
   window.ControlEventMapaProductos = {
     version: VERSION,
-    mode: 'stable-screen-v302-pointer-safe',
+    mode: 'stable-screen-v303-official-tab',
     render: renderMapaProductos,
     build: buildMapaProductos,
     show: forceShowMapa,
