@@ -1,8 +1,8 @@
-/* ControlEvent v29.2 - Perfilador de uso legacy bajo demanda.
+/* ControlEvent v29.3 - Perfilador de uso legacy bajo demanda.
    No se activa solo. Sólo envuelve funciones globales cuando el usuario ejecuta
    ControlEventLegacyUsage.start(). Sirve para saber qué parte del legacy se usa
    realmente antes de borrar o diferir código. */
-const VERSION = 'v29.2';
+const VERSION = 'v29.3';
 const DEFAULT_PREFIXES = [
   'render', 'save', 'add', 'update', 'delete', 'export', 'import', 'load', 'sync',
   'select', 'toggle', 'show', 'hide', 'open', 'close', 'doLogin', 'logout',

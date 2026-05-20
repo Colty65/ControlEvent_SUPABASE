@@ -1,11 +1,11 @@
-/* ControlEvent v29.2 - LowResourceLegacyPatch
+/* ControlEvent v29.3 - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    En v29.1 se envolvian funciones en window, pero muchas llamadas internas seguian usando
    las referencias lexicas del bundle legacy. Esto aplica el modo ligero donde realmente se llama. */
 (function(){
   'use strict';
   const root = window.ControlEventLowResource;
-  const VERSION = 'ControlEvent v29.2';
+  const VERSION = 'ControlEvent v29.3';
   if(!root || !root.enabled){
     window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
     return;
@@ -211,12 +211,12 @@
   }
   function print(){
     const report = inspect();
-    console.group('[ControlEventLowResourceLegacy/ControlEvent v29.2]');
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v29.3]');
     console.info(report);
     try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
     return report;
   }
   window.ControlEventLowResourceLegacy = {version:VERSION, installed:true, inspect, print, refreshSelectors:()=>renderSelectorsIfNeeded(true)};
-  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v29.2] Render legacy recortado activado.'); }catch(_){ }
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v29.3] Render legacy recortado activado.'); }catch(_){ }
 })();
