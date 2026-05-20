@@ -1,7 +1,14 @@
 {
-  "version": "v30.3",
+  "version": "v30.4",
   "base": "v30.0",
-  "notes": "v30.3 corrige Mapa de productos: pantalla estable, apertura fiable en PC/iPad/Android y presentacion movil visual.",
+  "notes": "v30.4 estabiliza el refresco de Colaboradores/Ingresos, Donaciones y Compras, limpia el click de Mapa y renombra Pendiente comprar a Compras producto.",
   "mobileLitePreserved": true,
-  "functionalAreasUntouched": ["INFOEVENTOS", "BACKUP", "Excel", "Ingresos", "Compras", "Donaciones"]
+  "functionalAreasUntouched": [
+    "INFOEVENTOS",
+    "BACKUP",
+    "Excel",
+    "Ingresos",
+    "Compras",
+    "Donaciones"
+  ]
 }

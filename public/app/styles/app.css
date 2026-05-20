@@ -1060,7 +1060,7 @@ body.ce-v257-gd #newProductoPrecio{
   background:#fff!important;
 }
 
-/* ==== V30.3: Mapa de productos ==== */
+/* ==== V30.4: Mapa de productos ==== */
 #mainTabs{grid-template-columns:repeat(6,minmax(0,1fr));}
 .mapa-productos-card .section-title p{max-width:820px;}
 .mapa-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;}
@@ -1101,7 +1101,7 @@ body.ce-v257-gd #newProductoPrecio{
   .mapa-metric-value{font-size:18px;}
 }
 
-/* ==== V30.3: Mapa de productos como pantalla estable y móvil visual ==== */
+/* ==== V30.4: Mapa de productos como pantalla estable y móvil visual ==== */
 #tabMapaProductos{display:block;}
 #tabMapaProductos.hidden{display:none!important;}
 #tabMapaBtn{position:relative;}

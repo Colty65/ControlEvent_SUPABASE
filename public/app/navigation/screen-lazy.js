@@ -1,7 +1,7 @@
-/* ControlEvent v30.3 - Carga diferida por pantalla sin tocar operativa estable */
+/* ControlEvent v30.4 - Carga diferida por pantalla sin tocar operativa estable */
 import { VERSION } from '../version.js';
 
-const SCREEN_LAZY_VERSION = 'v30.3';
+const SCREEN_LAZY_VERSION = 'v30.4';
 const state = {
   version: SCREEN_LAZY_VERSION,
   mode: 'screen-lazy-safe',
@@ -42,7 +42,7 @@ async function activateScreen(name, options = {}){
     state.lastError = error?.message || String(error);
     const item = {name, ok:false, startedAt, finishedAt: now(), ms: now() - startedAt, error: state.lastError, reason: options.reason || 'manual'};
     state.activations.push(item);
-    console.warn('[ControlEventScreenLazy/v30.3] No se pudo activar pantalla', name, error);
+    console.warn('[ControlEventScreenLazy/v30.4] No se pudo activar pantalla', name, error);
     return item;
   }
 }
@@ -91,7 +91,7 @@ function info(){
 }
 function print(){
   const report = info();
-  console.group('[ControlEventScreenLazy/v30.3] Carga diferida por pantalla');
+  console.group('[ControlEventScreenLazy/v30.4] Carga diferida por pantalla');
   console.info('Resumen', report);
   if(report.activations?.length) console.table(report.activations);
   console.groupEnd();

@@ -1,9 +1,9 @@
-/* ControlEvent v30.3 - Mapa de productos
+/* ControlEvent v30.4 - Mapa de productos
    Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
-   v30.3 convierte el mapa en pantalla propia para que no dependa del render heredado. */
+   v30.4 limpia la interacción del botón para que se comporte como una pestaña normal. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.3';
+  const VERSION = 'ControlEvent v30.4';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -223,7 +223,7 @@
       <div class="mapa-need-strip" aria-label="Necesidad del producto">
         <div class="mapa-need-title"><strong>Necesidad del evento</strong><span>${esc(qtyFmt(total))} uds.</span></div>
         <div class="mapa-need-bar"><i class="buy" style="width:${compraPct}%"></i><i class="don" style="width:${donadoPct}%"></i></div>
-        <div class="mapa-need-legend"><span><i class="buy"></i>Pendiente comprar: ${esc(qtyFmt(group.unidadesCompra))}</span><span><i class="don"></i>Donado: ${esc(qtyFmt(group.unidadesDonadas))}</span></div>
+        <div class="mapa-need-legend"><span><i class="buy"></i>Compras producto: ${esc(qtyFmt(group.unidadesCompra))}</span><span><i class="don"></i>Donado: ${esc(qtyFmt(group.unidadesDonadas))}</span></div>
       </div>`;
   }
 
@@ -242,7 +242,7 @@
     const productsWithDonations = new Set(data.donations.map(row => String(row.productoId || ''))).size;
     summary.innerHTML = [
       renderMetric('Necesidad valorada', moneyFmt(totalCompra + totalDonado), 'Compras previstas + donaciones', 'ok'),
-      renderMetric('Pendiente comprar', moneyFmt(totalCompra), `${data.groups.length} tienda-producto`, 'warn'),
+      renderMetric('Compras producto', moneyFmt(totalCompra), `${data.groups.length} tienda-producto`, 'warn'),
       renderMetric('Donado producto', moneyFmt(totalDonado), `${productsWithDonations} productos con donación`, 'ok'),
       renderMetric('Solo donación', String(data.onlyDonations.length), 'Sin compra planificada', '')
     ].join('');
@@ -260,7 +260,7 @@
         </div>
         ${renderNeedStrip(group)}
         <div class="mapa-product-kpis" role="list">
-          <div role="listitem"><span>A comprar</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds.</strong></div>
+          <div role="listitem"><span>Compras producto</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds.</strong></div>
           <div role="listitem"><span>Importe compra</span><strong>${esc(moneyFmt(group.importeCompra))}</strong></div>
           <div role="listitem"><span>Necesidad total</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds.</strong></div>
           <div role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(moneyFmt(group.valorDonado))}</strong></div>
@@ -332,7 +332,7 @@
     renderMapaProductos();
     closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
-    // V30.3: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
+    // V30.4: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
   }
   function ensureMobileMenuAction(){
     const grids = Array.from(document.querySelectorAll('.mobile-menu-grid'));
@@ -386,39 +386,44 @@
       if(tip) tip.style.display = 'none';
     }catch(_){ }
   }
+  function preserveScrollAfterOpen(x, y){
+    try{
+      requestAnimationFrame(() => window.scrollTo(x, y));
+      setTimeout(() => window.scrollTo(x, y), 80);
+    }catch(_){ }
+  }
   function openMapaFromEvent(event, reason){
     const target = isMapaTrigger(event);
     if(!target) return false;
     const now = Date.now();
-    if(now - lastOpenAt < 220){
+    if(now - lastOpenAt < 180){
       try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
       return true;
     }
     lastOpenAt = now;
+    const x = window.scrollX || window.pageXOffset || 0;
+    const y = window.scrollY || window.pageYOffset || 0;
     try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
     silenceMapTooltip();
     forceShowMapa({reason});
+    preserveScrollAfterOpen(x, y);
     return true;
   }
   function bindDirectMapaButton(){
     silenceMapTooltip();
     document.querySelectorAll('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => {
-      if(el.__ceMapaV302Bound) return;
-      el.__ceMapaV302Bound = true;
-      el.addEventListener('pointerdown', ev => openMapaFromEvent(ev, 'direct-pointerdown'), true);
-      el.addEventListener('touchstart', ev => openMapaFromEvent(ev, 'direct-touchstart'), {capture:true, passive:false});
-      el.addEventListener('mousedown', ev => openMapaFromEvent(ev, 'direct-mousedown'), true);
+      if(el.__ceMapaV304Bound) return;
+      el.__ceMapaV304Bound = true;
+      // V30.4: sólo click/teclado. Evita pointerdown/touchstart para que iPad no desplace el menú.
       el.addEventListener('click', ev => openMapaFromEvent(ev, 'direct-click'), true);
+      el.addEventListener('keydown', ev => {
+        if(ev.key === 'Enter' || ev.key === ' '){ openMapaFromEvent(ev, 'direct-keyboard'); }
+      }, true);
       el.onclick = function(ev){ openMapaFromEvent(ev || window.event || {target:el}, 'direct-onclick'); return false; };
     });
   }
 
-  // Captura en window: se ejecuta antes que los manejadores heredados de document.
-  ['pointerdown','mousedown','click'].forEach(type => {
-    window.addEventListener(type, event => openMapaFromEvent(event, 'window-' + type), true);
-  });
-  window.addEventListener('touchstart', event => openMapaFromEvent(event, 'window-touchstart'), {capture:true, passive:false});
-
+  // Captura sólo el click final, igual que el resto de pestañas. Se evita touchstart/pointerdown.
   document.addEventListener('click', event => {
     openMapaFromEvent(event, 'document-click');
   }, true);
