@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v30.1</title>
-  <!-- ControlEvent v30.1 PWA / instalación móvil -->
+  <title>ControlEvent v30.2</title>
+  <!-- ControlEvent v30.2 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -72,7 +72,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v30.1</span>
+          <span>ControlEvent v30.2</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -90,7 +90,7 @@
         <button type="button" class="tab active" id="tabIngresosBtn" title="Colaboradores económicos"><span class="tabicon">🤝</span></button>
         <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
         <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
-        <button type="button" class="tab" id="tabMapaBtn" title="Mapa de productos"><span class="tabicon">🧭</span></button>
+        <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de productos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">🧭</span></button>
         <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
       </div>
@@ -451,10 +451,10 @@
 
 <script src="./app/performance/low-resource-boot.js"></script>
 <script src="/api/bootstrap.js"></script>
-<script id="legacy-bundle-before-modules-v301" src="./app/legacy/legacy-bundle-before-modules-v30.1.js"></script>
+<script id="legacy-bundle-before-modules-v302" src="./app/legacy/legacy-bundle-before-modules-v30.2.js"></script>
 
 <script type="module" src="./modules/module-loader.js"></script>
-<script id="legacy-bundle-after-modules-v301" src="./app/legacy/legacy-bundle-after-modules-v30.1.js"></script>
+<script id="legacy-bundle-after-modules-v302" src="./app/legacy/legacy-bundle-after-modules-v30.2.js"></script>
 <script src="./app/features/mapa-productos.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
