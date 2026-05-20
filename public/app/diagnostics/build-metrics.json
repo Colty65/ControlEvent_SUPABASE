@@ -1,14 +1,17 @@
 {
-  "version": "v30.4",
-  "base": "v30.0",
-  "notes": "v30.4 estabiliza el refresco de Colaboradores/Ingresos, Donaciones y Compras, limpia el click de Mapa y renombra Pendiente comprar a Compras producto.",
+  "version": "v30.5",
+  "base": "v30.4",
+  "notes": "v30.5 mantiene rendimiento, refuerza Compras producto en Mapa y sustituye los globos heredados de Ingresos en dinero y Donacion de producto por un sistema ligero por clic.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
     "BACKUP",
     "Excel",
-    "Ingresos",
     "Compras",
-    "Donaciones"
+    "Donaciones",
+    "Operativa"
+  ],
+  "newFiles": [
+    "public/app/features/budget-tooltips-lite.js"
   ]
 }

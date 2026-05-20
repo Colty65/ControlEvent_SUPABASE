@@ -1,9 +1,9 @@
-/* ControlEvent v30.4 - Mapa de productos
+/* ControlEvent v30.5 - Mapa de productos
    Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
-   v30.4 limpia la interacción del botón para que se comporte como una pestaña normal. */
+   v30.5 limpia la interacción del botón para que se comporte como una pestaña normal. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.4';
+  const VERSION = 'ControlEvent v30.5';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -146,7 +146,7 @@
       const group = groups.get(key);
       const unidades = Number(row.unidades || 0);
       const valor = rowValue(row);
-      const ticket = String(row.ticketDonacion || '').trim() || 'Pdte.Compra';
+      const ticket = String(row.ticketDonacion || '').trim() || 'Compras producto';
       group.unidadesCompra += unidades;
       group.importeCompra += valor;
       group.rows.push(row);
@@ -287,6 +287,28 @@
       </section>` : '';
 
     wrap.innerHTML = cards + onlyDonationBlock;
+    normalizeMapaLabelsV305();
+  }
+
+
+  function normalizeMapaLabelsV305(){
+    const panel = $(PANEL_ID);
+    if(!panel) return;
+    const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+    const fixes = [
+      [/PENDIENTE\s+COMPRAR/gi, 'COMPRAS PRODUCTO'],
+      [/Pendiente\s+comprar/g, 'Compras producto'],
+      [/Pendiente\s+de\s+comprar/g, 'Compras producto'],
+      [/Pdte\.Compra/g, 'Compras producto']
+    ];
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      let text = node.nodeValue || '';
+      const old = text;
+      fixes.forEach(([rx, value]) => { text = text.replace(rx, value); });
+      if(text !== old) node.nodeValue = text;
+    });
   }
 
   function closeMobileDrawer(){
@@ -330,9 +352,10 @@
     });
     applyMapVisibility();
     renderMapaProductos();
+    normalizeMapaLabelsV305();
     closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
-    // V30.4: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
+    // V30.5: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
   }
   function ensureMobileMenuAction(){
     const grids = Array.from(document.querySelectorAll('.mobile-menu-grid'));
@@ -414,7 +437,7 @@
     document.querySelectorAll('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => {
       if(el.__ceMapaV304Bound) return;
       el.__ceMapaV304Bound = true;
-      // V30.4: sólo click/teclado. Evita pointerdown/touchstart para que iPad no desplace el menú.
+      // V30.5: sólo click/teclado. Evita pointerdown/touchstart para que iPad no desplace el menú.
       el.addEventListener('click', ev => openMapaFromEvent(ev, 'direct-click'), true);
       el.addEventListener('keydown', ev => {
         if(ev.key === 'Enter' || ev.key === ' '){ openMapaFromEvent(ev, 'direct-keyboard'); }

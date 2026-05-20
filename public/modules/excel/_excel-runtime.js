@@ -1,6 +1,6 @@
 import { getApp, callAction } from '../../app/app-context.js';
 
-const EXCEL_RUNTIME_VERSION = 'v30.4';
+const EXCEL_RUNTIME_VERSION = 'v30.5';
 const registry = new Map();
 const legacyEngines = new Map();
 const publicFacadeMarkers = new Set();

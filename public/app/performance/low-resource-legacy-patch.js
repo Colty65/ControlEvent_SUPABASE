@@ -1,4 +1,4 @@
-/* ControlEvent v30.4 - LowResourceLegacyPatch
+/* ControlEvent v30.5 - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
    - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
@@ -7,7 +7,7 @@
 (function(){
   'use strict';
   const root = window.ControlEventLowResource;
-  const VERSION = 'ControlEvent v30.4';
+  const VERSION = 'ControlEvent v30.5';
   if(!root || !root.enabled){
     window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
     return;
@@ -202,7 +202,7 @@
   }
 
   function warmCoreDataScreens(reason){
-    // V30.4: tras login/cambio de evento, precalienta las tres pantallas de captura
+    // V30.5: tras login/cambio de evento, precalienta las tres pantallas de captura
     // para que Colaboradores, Donaciones y Compras no queden vacías si el render LITE
     // ha evitado repintar una pestaña oculta. Se restaura la pestaña original antes
     // de devolver el control, por lo que no debería verse parpadeo.
@@ -266,7 +266,7 @@
       call('renderAuthUI');
       if(!hasAuth()) return undefined;
 
-      // Punto clave v30.4: primer render autenticado y cambio real de evento no se recortan.
+      // Punto clave v30.5: primer render autenticado y cambio real de evento no se recortan.
       // Así no quedan menús GD ocultos ni paneles vacíos tras login/selección de evento.
       if(needsFullBootstrap()){
         return runFullBootstrap(this, arguments, 'auth-or-event-change');
@@ -396,7 +396,7 @@
   }
   function print(){
     const report = inspect();
-    console.group('[ControlEventLowResourceLegacy/ControlEvent v30.4]');
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v30.5]');
     console.info(report);
     try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
@@ -412,5 +412,5 @@
     activateCurrentModule
   };
   window.__ceV294RoleSync = applyCriticalRoleUi;
-  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v30.4] Render legacy recortado + Mapa de productos activado.'); }catch(_){ }
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v30.5] Render legacy recortado + Mapa de productos activado.'); }catch(_){ }
 })();
