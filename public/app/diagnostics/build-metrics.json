@@ -1,11 +1,11 @@
 {
-  "version": "v29.3",
+  "version": "v29.4",
   "indexHtmlLines": 445,
-  "notes": "v29.3 añade diagnóstico de peso legacy para preparar limpieza sin tocar operativa.",
-  "mobileOptimization": "exceljs-lazy-load",
-  "focus": "legacy-hotpath-cache",
+  "notes": "v29.4 conserva el rendimiento LITE/turbo y corrige bootstrap post-login/cambio de evento en iPad y Android.",
+  "mobileOptimization": "low-resource-lite-with-auth-event-bootstrap",
+  "focus": "low-resource-post-login-bootstrap",
   "excelJsLazy": true,
-  "appVersion": "ControlEvent v29.3",
+  "appVersion": "ControlEvent v29.4",
   "indexLines": 445,
   "hotpathOptimizer": true
 }
