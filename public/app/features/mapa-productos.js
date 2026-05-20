@@ -1,9 +1,9 @@
-/* ControlEvent v30.6 - Mapa de productos
+/* ControlEvent v30.7 - Mapa de productos
    Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
-   v30.6 limpia la interacción del botón para que se comporte como una pestaña normal. */
+   v30.7 limpia la interacción del botón para que se comporte como una pestaña normal. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.6';
+  const VERSION = 'ControlEvent v30.7';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';

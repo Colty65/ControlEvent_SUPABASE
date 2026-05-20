@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v30.6",
-  "base": "v30.4",
-  "notes": "v30.6 mantiene rendimiento y corrige cierre/activación de globos de presupuesto, bloqueando restos de globos heredados en móvil/tablet.",
+  "version": "ControlEvent v30.7",
+  "base": "v30.6",
+  "notes": "v30.7 mantiene rendimiento, corrige la instalación de globos de presupuesto y refuerza la ordenación por Tienda/Ticket.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -12,6 +12,7 @@
     "Operativa"
   ],
   "newFiles": [
-    "public/app/features/budget-tooltips-lite.js"
+    "public/app/features/budget-tooltips-lite.js",
+    "public/app/features/summary-tienda-sort-fix.js"
   ]
 }

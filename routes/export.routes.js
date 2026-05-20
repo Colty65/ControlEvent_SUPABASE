@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v30.6';
-const BACKUP_VERSION_FILE = 'ControlEvent_v30_6';
+const BACKUP_VERSION = 'ControlEvent v30.7';
+const BACKUP_VERSION_FILE = 'ControlEvent_v30_7';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 

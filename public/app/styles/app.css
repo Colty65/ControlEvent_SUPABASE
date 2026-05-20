@@ -1175,9 +1175,18 @@ body.ce-v257-gd #newProductoPrecio{
 .ce-budget-lite-table td:nth-child(n+2):not(:first-child){font-variant-numeric:tabular-nums;}
 @media(max-width:760px){.ce-budget-lite-tooltip-v306{width:calc(100vw - 18px);max-height:78vh;border-radius:18px;padding:10px}.ce-budget-lite-table{font-size:11px}.ce-budget-lite-table th,.ce-budget-lite-table td{padding:6px 8px}.ce-budget-lite-title{font-size:13px}.ce-budget-lite-total strong{font-size:15px}}
 
-/* ControlEvent v30.6 - bloqueo de globos presupuestarios heredados en móvil/tablet */
+/* ControlEvent v30.7 - bloqueo de globos presupuestarios heredados en móvil/tablet */
 .ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 #ceTooltipV21.ce-budget-legacy-suppressed-v306,#ceTooltipV190.ce-budget-legacy-suppressed-v306,#ceTooltipV181.ce-budget-legacy-suppressed-v306,#ceTooltipV1952.ce-budget-legacy-suppressed-v306,#ceTooltipV196.ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 .ce-v306-budget-lite-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.10);}
 .ce-v306-budget-lite-row:active{filter:brightness(.98);transform:translateY(1px);}
 .ce-budget-lite-tooltip-v306[aria-hidden="true"]{display:none!important;}
+
+/* ControlEvent v30.7 - refuerzo globos presupuestarios y orden tienda/ticket */
+.ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#ceTooltipV21.ce-budget-legacy-suppressed-v307,#ceTooltipV190.ce-budget-legacy-suppressed-v307,#ceTooltipV181.ce-budget-legacy-suppressed-v307,#ceTooltipV1952.ce-budget-legacy-suppressed-v307,#ceTooltipV196.ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.socios .budget-subrow,
+body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.ce-v306-donantes-lite .budget-subrow,
+body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budget-subrow{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.12);}
+#summaryTiendaTicket .ce-sort-link-v307{display:inline-block;padding:2px 4px;border-radius:6px;font-weight:800;text-decoration:underline;cursor:pointer;touch-action:manipulation;}
+#summaryTiendaTicket .ce-sort-link-v307.is-active{background:#e0f2fe;color:#075985;text-decoration:none;}

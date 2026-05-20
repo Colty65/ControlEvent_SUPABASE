@@ -1,10 +1,10 @@
-/* ControlEvent v30.6 - Globos ligeros para RESUMEN PRESUPUESTARIO.
-   Sustituye los globos heredados de INGRESOS EN DINERO y DONACION DE PRODUCTO
-   por un visor por clic, estable en iPad/Android y sin listeners de mousemove. */
+/* ControlEvent v30.7 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+   Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
+   bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.6';
-  const TOOLTIP_ID = 'ceBudgetLiteTooltipV306';
+  const VERSION = 'ControlEvent v30.7';
+  const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
     'data-ce-tip-v21','data-tip-bg-v21','data-ce-tip-layout-v21','data-ce-tip-lazy-v250',
@@ -27,6 +27,7 @@
   const LEGACY_TOOLTIP_IDS = ['ceTooltipV181','ceTooltipV190','ceTooltipV1952','ceTooltipV196','ceTooltipV21'];
   let lastOpenAt = 0;
   let sanitizeTimer = 0;
+  let lastSanitizeAt = 0;
   const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   function isBudgetLegacyText(text){
     const t = up(text);
@@ -36,13 +37,14 @@
   }
   function suppressLegacyTooltipElement(el){
     if(!el) return;
-    try{ el.classList.add('ce-budget-legacy-suppressed-v306'); }catch(_){ }
+    try{ el.classList.add('ce-budget-legacy-suppressed-v307'); }catch(_){ }
     try{ el.style.display = 'none'; }catch(_){ }
     try{ el.style.visibility = 'hidden'; }catch(_){ }
     try{ el.style.pointerEvents = 'none'; }catch(_){ }
     try{ el.setAttribute('aria-hidden', 'true'); }catch(_){ }
   }
   function hideLegacyBudgetTooltips(){
+    document.querySelectorAll('.ce-budget-legacy-suppressed-v307').forEach(suppressLegacyTooltipElement);
     LEGACY_TOOLTIP_IDS.forEach(id => {
       const el = $(id);
       if(!el) return;
@@ -272,6 +274,9 @@
     nodes.forEach(stripLegacyAttrs);
   }
   function sanitizeBudgetPanels(){
+    const t = now();
+    if(t - lastSanitizeAt < 20) return;
+    lastSanitizeAt = t;
     hideLegacyBudgetTooltips();
     const budget = $('budgetLayout');
     if(!budget) return;
@@ -295,14 +300,44 @@
     });
   }
 
+  function isBudgetPanel(panel){
+    if(!panel) return false;
+    const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
+    return panel.classList.contains('socios')
+      || panel.classList.contains('donantes')
+      || panel.classList.contains('ce-v306-donantes-lite')
+      || /INGRESOS\s+EN\s+DINERO|DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO/.test(text);
+  }
+  function isDonationPanel(panel){
+    if(!panel) return false;
+    const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
+    return panel.classList.contains('donantes')
+      || panel.classList.contains('ce-v306-donantes-lite')
+      || /DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO/.test(text);
+  }
+  function isIncomePanel(panel){
+    if(!panel) return false;
+    const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
+    return panel.classList.contains('socios') || /INGRESOS\s+EN\s+DINERO|SOCIOS|NO\s+SOCIOS/.test(text);
+  }
+  function findBudgetRow(target){
+    const row = target?.closest?.('#budgetLayout .ce-v306-budget-lite-row,#budgetLayout .budget-subrow,#budgetLayout .budget-row');
+    if(!row) return null;
+    const panel = row.closest('.budget-panel');
+    if(!isBudgetPanel(panel)) return null;
+    return row;
+  }
   function openForTarget(target){
-    const row = target?.closest?.('#budgetLayout .ce-v306-budget-lite-row');
+    hideLegacyBudgetTooltips();
+    const row = findBudgetRow(target);
     if(!row) return false;
     const panel = row.closest('.budget-panel');
     let tip = null;
-    if(panel?.classList.contains('socios')) tip = incomeTipForRow(row);
-    else if(panel?.classList.contains('ce-v306-donantes-lite')) tip = donationTipForRow(row);
+    if(isIncomePanel(panel)) tip = incomeTipForRow(row);
+    if(!tip && isDonationPanel(panel)) tip = donationTipForRow(row);
     if(!tip) return false;
+    row.classList.add('ce-v306-budget-lite-row');
+    try{ row.setAttribute('role', 'button'); row.setAttribute('tabindex', '0'); }catch(_){ }
     sanitizeBudgetPanels();
     hideLegacyBudgetTooltips();
     showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
@@ -327,6 +362,9 @@
   document.addEventListener('pointerup', event => {
     if(activateFromEvent(event)) return;
   }, true);
+  document.addEventListener('touchend', event => {
+    if(activateFromEvent(event)) return;
+  }, {capture:true, passive:false});
   document.addEventListener('click', event => {
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && box.contains(event.target)) return;
@@ -358,7 +396,7 @@
   }, true);
   document.addEventListener('visibilitychange', hideTooltip, true);
 
-  function patchRenderBudget()  function patchRenderBudget(){
+  function patchRenderBudget(){
     const old = (typeof window.renderBudget === 'function') ? window.renderBudget : null;
     if(!old || old.__ceV306BudgetLiteWrapped) return;
     const wrapped = function(){
@@ -371,12 +409,13 @@
   }
   function scheduleSanitize(){
     clearTimeout(sanitizeTimer);
-    sanitizeTimer = setTimeout(sanitizeBudgetPanels, 30);
+    sanitizeTimer = setTimeout(sanitizeBudgetPanels, 0);
   }
+  try{ document.body.classList.add('ce-budget-tips-lite-active-v307'); }catch(_){ }
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [60, 180, 500, 1100, 2200].forEach(ms => setTimeout(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, ms));
+  [0, 60, 180, 500, 1100, 2200].forEach(ms => setTimeout(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, ms));
   setInterval(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, window.ControlEventLowResource?.interval?.(1600) || 1600);
   try{
     const observer = new MutationObserver(() => scheduleSanitize());
