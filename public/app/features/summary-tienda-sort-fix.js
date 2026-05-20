@@ -1,8 +1,8 @@
-/* ControlEvent v30.7 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
+/* ControlEvent v30.8 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
    Evita depender del onclick inline, que en algunas capas antiguas no se ejecutaba. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.7';
+  const VERSION = 'ControlEvent v30.8';
   const ROOT_ID = 'summaryTiendaTicket';
 
   function $(id){ return document.getElementById(id); }
