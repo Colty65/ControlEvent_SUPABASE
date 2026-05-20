@@ -8,7 +8,7 @@ const view = createLegacyView({
   }
 });
 
-export const meta = { ...view.meta, title: 'Mapa de recursos', version: 'v30.9.1' };
+export const meta = { ...view.meta, title: 'Mapa de recursos', version: 'v30.9' };
 export const mount = context => view.mount(context);
 export const activate = context => view.activate(context);
 export const refresh = activate;

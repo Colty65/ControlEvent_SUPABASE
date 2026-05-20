@@ -1,4 +1,4 @@
-# ControlEvent v30.9.1.1
+# ControlEvent v30.9
 
 Base: v30.7 estable de rendimiento/login.
 
