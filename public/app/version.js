@@ -1,3 +1,3 @@
-export const VERSION = 'ControlEvent v30.10';
-export const VERSION_FILE = 'ControlEvent_v30_10';
-export const PACKAGE_NAME = 'controlevent-v30-10-supabase-localhost';
+export const VERSION = 'ControlEvent v30.11';
+export const VERSION_FILE = 'ControlEvent_v30_11';
+export const PACKAGE_NAME = 'controlevent-v30-11-supabase-localhost';

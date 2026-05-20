@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v30.10",
+  "version": "ControlEvent v30.11",
   "base": "v30.6",
-  "notes": "v30.7 mantiene rendimiento, corrige la instalación de globos de presupuesto y refuerza la ordenación por Tienda/Ticket.",
+  "notes": "v30.11 parte de V30.10 rescate estable y añade Mapa de recursos con filtro SOCIOS, orden Tienda/TK/Producto y verde Excel para TK comprados.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
