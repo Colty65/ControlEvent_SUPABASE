@@ -1060,7 +1060,7 @@ body.ce-v257-gd #newProductoPrecio{
   background:#fff!important;
 }
 
-/* ==== V30.6: Mapa de recursos ==== */
+/* ==== V30.6: Mapa de productos ==== */
 #mainTabs{grid-template-columns:repeat(6,minmax(0,1fr));}
 .mapa-productos-card .section-title p{max-width:820px;}
 .mapa-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;}
@@ -1101,7 +1101,7 @@ body.ce-v257-gd #newProductoPrecio{
   .mapa-metric-value{font-size:18px;}
 }
 
-/* ==== V30.6: Mapa de recursos como pantalla estable y móvil visual ==== */
+/* ==== V30.6: Mapa de productos como pantalla estable y móvil visual ==== */
 #tabMapaProductos{display:block;}
 #tabMapaProductos.hidden{display:none!important;}
 #tabMapaBtn{position:relative;}
@@ -1175,23 +1175,24 @@ body.ce-v257-gd #newProductoPrecio{
 .ce-budget-lite-table td:nth-child(n+2):not(:first-child){font-variant-numeric:tabular-nums;}
 @media(max-width:760px){.ce-budget-lite-tooltip-v306{width:calc(100vw - 18px);max-height:78vh;border-radius:18px;padding:10px}.ce-budget-lite-table{font-size:11px}.ce-budget-lite-table th,.ce-budget-lite-table td{padding:6px 8px}.ce-budget-lite-title{font-size:13px}.ce-budget-lite-total strong{font-size:15px}}
 
-/* ControlEvent v30.8 - bloqueo de globos presupuestarios heredados en móvil/tablet */
+/* ControlEvent v30.9 - bloqueo de globos presupuestarios heredados en móvil/tablet */
 .ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 #ceTooltipV21.ce-budget-legacy-suppressed-v306,#ceTooltipV190.ce-budget-legacy-suppressed-v306,#ceTooltipV181.ce-budget-legacy-suppressed-v306,#ceTooltipV1952.ce-budget-legacy-suppressed-v306,#ceTooltipV196.ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 .ce-v306-budget-lite-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.10);}
 .ce-v306-budget-lite-row:active{filter:brightness(.98);transform:translateY(1px);}
 .ce-budget-lite-tooltip-v306[aria-hidden="true"]{display:none!important;}
 
-/* ControlEvent v30.8 - refuerzo globos presupuestarios y orden tienda/ticket */
-.ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-#ceTooltipV21.ce-budget-legacy-suppressed-v307,#ceTooltipV190.ce-budget-legacy-suppressed-v307,#ceTooltipV181.ce-budget-legacy-suppressed-v307,#ceTooltipV1952.ce-budget-legacy-suppressed-v307,#ceTooltipV196.ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.socios .budget-subrow,
-body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.ce-v306-donantes-lite .budget-subrow,
-body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budget-subrow{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.12);}
-#summaryTiendaTicket .ce-sort-link-v307{display:inline-block;padding:2px 4px;border-radius:6px;font-weight:800;text-decoration:underline;cursor:pointer;touch-action:manipulation;}
-#summaryTiendaTicket .ce-sort-link-v307.is-active{background:#e0f2fe;color:#075985;text-decoration:none;}
+/* ControlEvent v30.9 - refuerzo globos presupuestarios y orden tienda/ticket */
+.ce-budget-legacy-suppressed-v309{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#ceTooltipV21.ce-budget-legacy-suppressed-v309,#ceTooltipV190.ce-budget-legacy-suppressed-v309,#ceTooltipV181.ce-budget-legacy-suppressed-v309,#ceTooltipV1952.ce-budget-legacy-suppressed-v309,#ceTooltipV196.ce-budget-legacy-suppressed-v309{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.socios .budget-subrow,
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.ce-v306-donantes-lite .budget-subrow,
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.donantes .budget-subrow{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.12);}
+#summaryTiendaTicket .ce-sort-link-v309{display:inline-block;padding:2px 4px;border-radius:6px;font-weight:800;text-decoration:underline;cursor:pointer;touch-action:manipulation;}
+#summaryTiendaTicket .ce-sort-link-v309.is-active{background:#e0f2fe;color:#075985;text-decoration:none;}
 
-/* ==== V30.8: Mapa de recursos, filtro responsables y estado TK ==== */
+
+/* ==== V30.9: Mapa de recursos con responsables, orden Tienda/TK/Producto y TK comprado ==== */
 .mapa-productos-card .section-title h2{letter-spacing:-.01em;}
 .mapa-summary-grid{display:block!important;margin-top:12px;}
 .mapa-summary-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px;}
@@ -1206,17 +1207,30 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .mapa-filter-option{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(99,102,241,.18);border-radius:12px;padding:8px 9px;font-size:13px;font-weight:800;}
 .mapa-filter-option.all{background:#f8fafc;border-color:#c7d2fe;}
 .mapa-filter-option input{width:18px;height:18px;accent-color:#4f46e5;}
+.mapa-group-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 8px;padding:9px 12px;border-radius:14px;border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;font-weight:900;}
+.mapa-group-header.resolved{background:rgba(198,224,180,.42);border-color:#a9d18e;color:#375623;}
+.mapa-group-header span{font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
 .mapa-product-card.pending-buy:before{background:#f97316;}
 .mapa-product-card.resolved-tk{background:rgba(198,224,180,.35);border-color:#a9d18e;box-shadow:0 8px 22px rgba(112,173,71,.10);}
 .mapa-product-card.resolved-tk:before{background:#70ad47;}
 .mapa-product-card.resolved-tk .mapa-product-meta div{background:rgba(226,239,218,.78);border-color:#a9d18e;}
 .mapa-tags .ticket.tk{background:rgba(112,173,71,.18);color:#375623;border:1px solid rgba(112,173,71,.35);}
 .mapa-tags .ticket.pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;}
-@media (max-width:760px){
+@media(max-width:820px){
   .mapa-summary-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px;}
   .mapa-filter{border-radius:15px;padding:9px;}
   .mapa-filter summary{align-items:flex-start;}
   .mapa-filter summary span{max-width:55%;line-height:1.2;}
   .mapa-filter-panel{grid-template-columns:1fr;max-height:210px;}
   .mapa-filter-option{font-size:12px;padding:8px;}
+  .mapa-group-header{align-items:flex-start;flex-direction:column;gap:3px;}
 }
+
+/* ==== V30.9: globos presupuesto sin interferir con login ==== */
+.ce-budget-legacy-suppressed-v309{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#ceTooltipV21.ce-budget-legacy-suppressed-v309,#ceTooltipV190.ce-budget-legacy-suppressed-v309,#ceTooltipV181.ce-budget-legacy-suppressed-v309,#ceTooltipV1952.ce-budget-legacy-suppressed-v309,#ceTooltipV196.ce-budget-legacy-suppressed-v309{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.socios .budget-subrow,
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.ce-v309-donantes-lite .budget-subrow,
+body.ce-budget-tips-lite-active-v309 #budgetLayout .budget-panel.donantes .budget-subrow,
+body.ce-budget-tips-lite-active-v309 #budgetLayout .ce-v309-budget-lite-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.12);}
+.ce-budget-lite-tooltip-v309[aria-hidden="true"]{display:none!important;}

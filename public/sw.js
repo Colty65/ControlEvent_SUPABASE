@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v30-8';
+const CACHE_NAME = 'controlevent-shell-v30-9-1-1';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -15,16 +15,16 @@ const SHELL_ASSETS = [
   '/app/performance/mobile-lite.js',
   '/app/performance/low-resource-boot.js',
   '/app/performance/low-resource-legacy-patch.js',
-  '/app/features/mapa-productos.js',
+  '/app/features/mapa-recursos-v30.9.1.js',
   '/app/features/view-refresh-stabilizer.js',
-  '/app/features/budget-tooltips-lite.js',
+  '/app/features/budget-tooltips-lite-v30.9.1.js',
   '/app/features/summary-tienda-sort-fix.js',
   '/modules/module-loader.js',
   '/modules/menu-registry.js',
   '/modules/views/_view-runtime.js',
   '/modules/views/mapa-productos.js',
-  '/app/legacy/legacy-bundle-before-modules-v30.8.js',
-  '/app/legacy/legacy-bundle-after-modules-v30.8.js',
+  '/app/legacy/legacy-bundle-before-modules-v30.9.1.js',
+  '/app/legacy/legacy-bundle-after-modules-v30.9.1.js',
   '/assets/embedded/coltylab-logo.png',
   '/assets/embedded/footer-excel.jpg',
   '/assets/embedded/footer-importacion.jpg',

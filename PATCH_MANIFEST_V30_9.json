@@ -1,5 +1,5 @@
 {
-  "version": "v30.9",
+  "version": "v30.9.1",
   "base": "v30.7",
   "changes": [
     "login PC fix after v30.8",
@@ -10,7 +10,7 @@
     "Donation tooltip mobile fix"
   ],
   "new_files": [
-    "public/app/features/mapa-recursos-v30.9.js",
-    "public/app/features/budget-tooltips-lite-v30.9.js"
+    "public/app/features/mapa-recursos-v30.9.1.js",
+    "public/app/features/budget-tooltips-lite-v30.9.1.js"
   ]
 }
