@@ -1,7 +1,7 @@
 {
-  "version": "v30.5",
+  "version": "ControlEvent v30.6",
   "base": "v30.4",
-  "notes": "v30.5 mantiene rendimiento, refuerza Compras producto en Mapa y sustituye los globos heredados de Ingresos en dinero y Donacion de producto por un sistema ligero por clic.",
+  "notes": "v30.6 mantiene rendimiento y corrige cierre/activación de globos de presupuesto, bloqueando restos de globos heredados en móvil/tablet.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",

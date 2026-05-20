@@ -1060,7 +1060,7 @@ body.ce-v257-gd #newProductoPrecio{
   background:#fff!important;
 }
 
-/* ==== V30.5: Mapa de productos ==== */
+/* ==== V30.6: Mapa de productos ==== */
 #mainTabs{grid-template-columns:repeat(6,minmax(0,1fr));}
 .mapa-productos-card .section-title p{max-width:820px;}
 .mapa-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;}
@@ -1101,7 +1101,7 @@ body.ce-v257-gd #newProductoPrecio{
   .mapa-metric-value{font-size:18px;}
 }
 
-/* ==== V30.5: Mapa de productos como pantalla estable y móvil visual ==== */
+/* ==== V30.6: Mapa de productos como pantalla estable y móvil visual ==== */
 #tabMapaProductos{display:block;}
 #tabMapaProductos.hidden{display:none!important;}
 #tabMapaBtn{position:relative;}
@@ -1155,13 +1155,13 @@ body.ce-v257-gd #newProductoPrecio{
   .mapa-donation-row > div:nth-child(4){display:none;}
 }
 
-/* ===== V30.5: globos ligeros para RESUMEN PRESUPUESTARIO ===== */
-#budgetLayout .budget-panel.ce-v305-donantes-lite{background:linear-gradient(180deg,#fff7e8 0%,#fffdf7 100%)}
-#budgetLayout .ce-v305-budget-lite-row{cursor:pointer;touch-action:manipulation;}
-#budgetLayout .ce-v305-budget-lite-row:active{transform:scale(.995);filter:brightness(.98)}
-#budgetLayout .ce-v305-budget-lite-row:focus-visible{outline:3px solid rgba(37,99,235,.35);outline-offset:2px;}
-.ce-budget-lite-tooltip-v305{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(980px,calc(100vw - 28px));max-height:min(76vh,720px);overflow:auto;background:#fff;border:1px solid rgba(15,23,42,.15);border-radius:20px;box-shadow:0 24px 80px rgba(15,23,42,.32);z-index:4000;padding:14px;-webkit-overflow-scrolling:touch;color:#111827;}
-.ce-budget-lite-tooltip-v305.open{display:block;}
+/* ===== V30.6: globos ligeros para RESUMEN PRESUPUESTARIO ===== */
+#budgetLayout .budget-panel.ce-v306-donantes-lite{background:linear-gradient(180deg,#fff7e8 0%,#fffdf7 100%)}
+#budgetLayout .ce-v306-budget-lite-row{cursor:pointer;touch-action:manipulation;}
+#budgetLayout .ce-v306-budget-lite-row:active{transform:scale(.995);filter:brightness(.98)}
+#budgetLayout .ce-v306-budget-lite-row:focus-visible{outline:3px solid rgba(37,99,235,.35);outline-offset:2px;}
+.ce-budget-lite-tooltip-v306{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(980px,calc(100vw - 28px));max-height:min(76vh,720px);overflow:auto;background:#fff;border:1px solid rgba(15,23,42,.15);border-radius:20px;box-shadow:0 24px 80px rgba(15,23,42,.32);z-index:4000;padding:14px;-webkit-overflow-scrolling:touch;color:#111827;}
+.ce-budget-lite-tooltip-v306.open{display:block;}
 .ce-budget-lite-close{position:sticky;top:0;float:right;width:34px;height:34px;border-radius:999px;border:1px solid rgba(15,23,42,.15);background:#fff;color:#111827;font-size:24px;line-height:1;z-index:1;}
 .ce-budget-lite-title{font-weight:900;font-size:15px;letter-spacing:.02em;margin:4px 42px 8px 0;text-transform:uppercase;}
 .ce-budget-lite-total{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;background:#f8fafc;border:1px solid rgba(15,23,42,.08);border-radius:14px;margin-bottom:10px;}
@@ -1173,4 +1173,11 @@ body.ce-v257-gd #newProductoPrecio{
 .ce-budget-lite-table th{position:sticky;top:0;background:#f1f5f9;font-weight:900;z-index:1;}
 .ce-budget-lite-table td:first-child,.ce-budget-lite-table th:first-child{font-weight:900;}
 .ce-budget-lite-table td:nth-child(n+2):not(:first-child){font-variant-numeric:tabular-nums;}
-@media(max-width:760px){.ce-budget-lite-tooltip-v305{width:calc(100vw - 18px);max-height:78vh;border-radius:18px;padding:10px}.ce-budget-lite-table{font-size:11px}.ce-budget-lite-table th,.ce-budget-lite-table td{padding:6px 8px}.ce-budget-lite-title{font-size:13px}.ce-budget-lite-total strong{font-size:15px}}
+@media(max-width:760px){.ce-budget-lite-tooltip-v306{width:calc(100vw - 18px);max-height:78vh;border-radius:18px;padding:10px}.ce-budget-lite-table{font-size:11px}.ce-budget-lite-table th,.ce-budget-lite-table td{padding:6px 8px}.ce-budget-lite-title{font-size:13px}.ce-budget-lite-total strong{font-size:15px}}
+
+/* ControlEvent v30.6 - bloqueo de globos presupuestarios heredados en móvil/tablet */
+.ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#ceTooltipV21.ce-budget-legacy-suppressed-v306,#ceTooltipV190.ce-budget-legacy-suppressed-v306,#ceTooltipV181.ce-budget-legacy-suppressed-v306,#ceTooltipV1952.ce-budget-legacy-suppressed-v306,#ceTooltipV196.ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+.ce-v306-budget-lite-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.10);}
+.ce-v306-budget-lite-row:active{filter:brightness(.98);transform:translateY(1px);}
+.ce-budget-lite-tooltip-v306[aria-hidden="true"]{display:none!important;}

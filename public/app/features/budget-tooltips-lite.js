@@ -1,14 +1,14 @@
-/* ControlEvent v30.5 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v30.6 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Sustituye los globos heredados de INGRESOS EN DINERO y DONACION DE PRODUCTO
    por un visor por clic, estable en iPad/Android y sin listeners de mousemove. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.5';
-  const TOOLTIP_ID = 'ceBudgetLiteTooltipV305';
+  const VERSION = 'ControlEvent v30.6';
+  const TOOLTIP_ID = 'ceBudgetLiteTooltipV306';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
     'data-ce-tip-v21','data-tip-bg-v21','data-ce-tip-layout-v21','data-ce-tip-lazy-v250',
-    'data-ce-tip-bg','data-ce-tip-layout'
+    'data-ce-tip-bg','data-ce-tip-layout','data-tip-bg-v196','data-tip-bg-v1952','data-tip-bg-v21','data-ce-tip-layout-v20','data-ce-tip-layout-v21','data-ce-tip-layout-v196','data-ce-tip-black'
   ];
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -23,6 +23,39 @@
     return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(Number(value || 0));
   };
   const cmp = (a,b) => up(a).localeCompare(up(b), 'es');
+
+  const LEGACY_TOOLTIP_IDS = ['ceTooltipV181','ceTooltipV190','ceTooltipV1952','ceTooltipV196','ceTooltipV21'];
+  let lastOpenAt = 0;
+  let sanitizeTimer = 0;
+  const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  function isBudgetLegacyText(text){
+    const t = up(text);
+    return /\b(SOCIOS|NO SOCIOS)\s*\/\s*(PERSONAS|IMPORTE|INGRESADO|PENDIENTE)/.test(t)
+      || /DONACI[OÓ]N\s+DE\s+PRODUCTO\s*\//.test(t)
+      || /VALOR\s+PRODUCTO\s+DONADO/.test(t);
+  }
+  function suppressLegacyTooltipElement(el){
+    if(!el) return;
+    try{ el.classList.add('ce-budget-legacy-suppressed-v306'); }catch(_){ }
+    try{ el.style.display = 'none'; }catch(_){ }
+    try{ el.style.visibility = 'hidden'; }catch(_){ }
+    try{ el.style.pointerEvents = 'none'; }catch(_){ }
+    try{ el.setAttribute('aria-hidden', 'true'); }catch(_){ }
+  }
+  function hideLegacyBudgetTooltips(){
+    LEGACY_TOOLTIP_IDS.forEach(id => {
+      const el = $(id);
+      if(!el) return;
+      const text = el.textContent || '';
+      const cls = String(el.className || '');
+      const layout = Array.from(el.classList || []).join(' ');
+      const looksBudget = isBudgetLegacyText(text) || /budget(income|donation)|budgetdonation|budgetincome/i.test(cls + ' ' + layout);
+      if(looksBudget) suppressLegacyTooltipElement(el);
+    });
+  }
+  function stripLegacyAttrs(node){
+    try{ LEGACY_TIP_ATTRS.forEach(attr => node.removeAttribute(attr)); }catch(_){ }
+  }
 
   function stateRef(){
     try{ if(typeof state !== 'undefined' && state) return state; }catch(_){ }
@@ -125,24 +158,34 @@
   }
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
+    hideLegacyBudgetTooltips();
     box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
     box.classList.add('open');
-    box.querySelector('.ce-budget-lite-close')?.addEventListener('click', hideTooltip, {once:true});
+    box.removeAttribute('aria-hidden');
+    lastOpenAt = now();
+    box.querySelector('.ce-budget-lite-close')?.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){} hideTooltip(); }, {once:true});
+    try{ box.focus({preventScroll:true}); }catch(_){ }
+    setTimeout(hideLegacyBudgetTooltips, 0);
+    requestAnimationFrame(hideLegacyBudgetTooltips);
   }
   function ensureTooltip(){
     let box = $(TOOLTIP_ID);
     if(box) return box;
     box = document.createElement('div');
     box.id = TOOLTIP_ID;
-    box.className = 'ce-budget-lite-tooltip-v305';
+    box.className = 'ce-budget-lite-tooltip-v306';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-live', 'polite');
+    box.setAttribute('tabindex', '-1');
     document.body.appendChild(box);
     return box;
   }
   function hideTooltip(){
     const box = $(TOOLTIP_ID);
-    if(box) box.classList.remove('open');
+    if(box){
+      box.classList.remove('open');
+      box.setAttribute('aria-hidden', 'true');
+    }
   }
 
   function incomeTipForRow(row){
@@ -207,18 +250,18 @@
 
   function installLegacyTipAttributeFirewall(){
     try{
-      if(Element.prototype.setAttribute.__ceV305BudgetTipFirewall) return;
+      if(Element.prototype.setAttribute.__ceV306BudgetTipFirewall) return;
       const nativeSetAttribute = Element.prototype.setAttribute;
       const wrapped = function(name, value){
         try{
           const attr = String(name || '');
-          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v305-donantes-lite')){
+          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite')){
             return undefined;
           }
         }catch(_){ }
         return nativeSetAttribute.call(this, name, value);
       };
-      wrapped.__ceV305BudgetTipFirewall = true;
+      wrapped.__ceV306BudgetTipFirewall = true;
       Element.prototype.setAttribute = wrapped;
     }catch(_){ }
   }
@@ -226,23 +269,24 @@
   function removeLegacyAttributes(root){
     if(!root) return;
     const nodes = [root, ...root.querySelectorAll('*')];
-    nodes.forEach(node => LEGACY_TIP_ATTRS.forEach(attr => node.removeAttribute(attr)));
+    nodes.forEach(stripLegacyAttrs);
   }
   function sanitizeBudgetPanels(){
+    hideLegacyBudgetTooltips();
     const budget = $('budgetLayout');
     if(!budget) return;
     const donationPanel = budget.querySelector('.budget-panel.donantes');
     if(donationPanel){
       donationPanel.classList.remove('donantes');
-      donationPanel.classList.add('ce-v305-donantes-lite');
+      donationPanel.classList.add('ce-v306-donantes-lite');
     }
-    budget.querySelectorAll('.budget-panel.socios,.budget-panel.ce-v305-donantes-lite').forEach(panel => {
+    budget.querySelectorAll('.budget-panel.socios,.budget-panel.ce-v306-donantes-lite').forEach(panel => {
       removeLegacyAttributes(panel);
-      panel.classList.add('ce-v305-budget-lite-panel');
+      panel.classList.add('ce-v306-budget-lite-panel');
       panel.querySelectorAll('.budget-subrow,.budget-row').forEach(row => {
         const active = panel.classList.contains('socios') ? row.classList.contains('budget-subrow') : (row.classList.contains('budget-subrow') || up(row.textContent).includes('VALOR PRODUCTO DONADO'));
         if(!active) return;
-        row.classList.add('ce-v305-budget-lite-row');
+        row.classList.add('ce-v306-budget-lite-row');
         row.setAttribute('role', 'button');
         row.setAttribute('tabindex', '0');
         row.setAttribute('aria-label', 'Ver detalle');
@@ -252,46 +296,79 @@
   }
 
   function openForTarget(target){
-    const row = target?.closest?.('#budgetLayout .ce-v305-budget-lite-row');
+    const row = target?.closest?.('#budgetLayout .ce-v306-budget-lite-row');
     if(!row) return false;
     const panel = row.closest('.budget-panel');
     let tip = null;
     if(panel?.classList.contains('socios')) tip = incomeTipForRow(row);
-    else if(panel?.classList.contains('ce-v305-donantes-lite')) tip = donationTipForRow(row);
+    else if(panel?.classList.contains('ce-v306-donantes-lite')) tip = donationTipForRow(row);
     if(!tip) return false;
     sanitizeBudgetPanels();
+    hideLegacyBudgetTooltips();
     showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
     return true;
   }
 
+  function shouldIgnoreActivation(event){
+    const box = $(TOOLTIP_ID);
+    if(box && box.classList.contains('open') && box.contains(event.target)) return true;
+    if(now() - lastOpenAt < 80) return true;
+    return false;
+  }
+  function activateFromEvent(event){
+    if(shouldIgnoreActivation(event)) return false;
+    if(openForTarget(event.target)){
+      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
+      setTimeout(hideLegacyBudgetTooltips, 0);
+      return true;
+    }
+    return false;
+  }
+  document.addEventListener('pointerup', event => {
+    if(activateFromEvent(event)) return;
+  }, true);
   document.addEventListener('click', event => {
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && box.contains(event.target)) return;
-    if(openForTarget(event.target)){
-      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
-      return;
-    }
-    if(box && box.classList.contains('open') && !event.target?.closest?.('#budgetLayout .ce-v305-budget-lite-row')) hideTooltip();
+    if(activateFromEvent(event)) return;
+    if(box && box.classList.contains('open') && !event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row')) hideTooltip();
+    hideLegacyBudgetTooltips();
+  }, true);
+  document.addEventListener('pointerdown', event => {
+    const box = $(TOOLTIP_ID);
+    if(box && box.classList.contains('open') && !box.contains(event.target) && !event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row')) hideTooltip();
+    hideLegacyBudgetTooltips();
+  }, true);
+  document.addEventListener('focusin', event => {
+    const box = $(TOOLTIP_ID);
+    if(box && box.classList.contains('open') && !box.contains(event.target) && !event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row')) hideTooltip();
+    hideLegacyBudgetTooltips();
   }, true);
   document.addEventListener('keydown', event => {
     if(event.key === 'Escape') hideTooltip();
-    if((event.key === 'Enter' || event.key === ' ') && openForTarget(event.target)){
-      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
-    }
+    if((event.key === 'Enter' || event.key === ' ') && activateFromEvent(event)) return;
   }, true);
+  window.addEventListener('resize', hideTooltip, true);
+  window.addEventListener('orientationchange', hideTooltip, true);
+  window.addEventListener('scroll', event => {
+    const box = $(TOOLTIP_ID);
+    if(box && box.contains(event.target)) return;
+    hideTooltip();
+    hideLegacyBudgetTooltips();
+  }, true);
+  document.addEventListener('visibilitychange', hideTooltip, true);
 
-  function patchRenderBudget(){
+  function patchRenderBudget()  function patchRenderBudget(){
     const old = (typeof window.renderBudget === 'function') ? window.renderBudget : null;
-    if(!old || old.__ceV305BudgetLiteWrapped) return;
+    if(!old || old.__ceV306BudgetLiteWrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
       scheduleSanitize();
       return ret;
     };
-    wrapped.__ceV305BudgetLiteWrapped = true;
+    wrapped.__ceV306BudgetLiteWrapped = true;
     try{ window.renderBudget = wrapped; renderBudget = wrapped; }catch(_){ window.renderBudget = wrapped; }
   }
-  let sanitizeTimer = 0;
   function scheduleSanitize(){
     clearTimeout(sanitizeTimer);
     sanitizeTimer = setTimeout(sanitizeBudgetPanels, 30);
@@ -299,8 +376,8 @@
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [60, 180, 500, 1100, 2200].forEach(ms => setTimeout(sanitizeBudgetPanels, ms));
-  setInterval(sanitizeBudgetPanels, window.ControlEventLowResource?.interval?.(1600) || 1600);
+  [60, 180, 500, 1100, 2200].forEach(ms => setTimeout(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, ms));
+  setInterval(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, window.ControlEventLowResource?.interval?.(1600) || 1600);
   try{
     const observer = new MutationObserver(() => scheduleSanitize());
     observer.observe(document.documentElement, {childList:true, subtree:true});

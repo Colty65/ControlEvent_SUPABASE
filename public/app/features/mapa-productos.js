@@ -1,9 +1,9 @@
-/* ControlEvent v30.5 - Mapa de productos
+/* ControlEvent v30.6 - Mapa de productos
    Pantalla informativa estable que cruza COMPRAS + DONACIONES por Tienda + Producto.
-   v30.5 limpia la interacción del botón para que se comporte como una pestaña normal. */
+   v30.6 limpia la interacción del botón para que se comporte como una pestaña normal. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.5';
+  const VERSION = 'ControlEvent v30.6';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -287,11 +287,11 @@
       </section>` : '';
 
     wrap.innerHTML = cards + onlyDonationBlock;
-    normalizeMapaLabelsV305();
+    normalizeMapaLabelsV306();
   }
 
 
-  function normalizeMapaLabelsV305(){
+  function normalizeMapaLabelsV306(){
     const panel = $(PANEL_ID);
     if(!panel) return;
     const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
@@ -352,10 +352,10 @@
     });
     applyMapVisibility();
     renderMapaProductos();
-    normalizeMapaLabelsV305();
+    normalizeMapaLabelsV306();
     closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
-    // V30.5: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
+    // V30.6: no forzar scroll. Mapa debe comportarse como el resto de pestañas, sin salto hacia arriba.
   }
   function ensureMobileMenuAction(){
     const grids = Array.from(document.querySelectorAll('.mobile-menu-grid'));
@@ -437,7 +437,7 @@
     document.querySelectorAll('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => {
       if(el.__ceMapaV304Bound) return;
       el.__ceMapaV304Bound = true;
-      // V30.5: sólo click/teclado. Evita pointerdown/touchstart para que iPad no desplace el menú.
+      // V30.6: sólo click/teclado. Evita pointerdown/touchstart para que iPad no desplace el menú.
       el.addEventListener('click', ev => openMapaFromEvent(ev, 'direct-click'), true);
       el.addEventListener('keydown', ev => {
         if(ev.key === 'Enter' || ev.key === ' '){ openMapaFromEvent(ev, 'direct-keyboard'); }

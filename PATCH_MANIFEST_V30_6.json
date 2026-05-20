@@ -1,0 +1,10 @@
+{
+  "version": "ControlEvent v30.6",
+  "base": "ControlEvent v30.5",
+  "changes": [
+    "Cierre de globos ligeros al perder foco o pulsar fuera.",
+    "Bloqueo de globos heredados SOCIOS/INGRESADO SOCIOS y DONACION DE PRODUCTO que se quedaban visibles en móvil/tablet.",
+    "Activación reforzada por pointerup/click para iPad/iPhone/Android.",
+    "Nuevo cache controlevent-shell-v30-6."
+  ]
+}

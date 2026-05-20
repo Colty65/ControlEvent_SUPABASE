@@ -1,6 +1,6 @@
-/* ControlEvent v30.5 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
+/* ControlEvent v30.6 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
 (function(){
-  const VERSION = 'v30.5';
+  const VERSION = 'v30.6';
   const num = v => {
     if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
     let s = String(v ?? '').replace(/[^0-9,.-]/g, '');
