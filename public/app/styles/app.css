@@ -1586,3 +1586,11 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .ce-plan-top-float{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:10020;width:46px;height:46px;border-radius:999px;border:1px solid rgba(17,24,39,.22);background:#111827;color:#fff;font-size:24px;font-weight:900;line-height:1;box-shadow:0 12px 28px rgba(15,23,42,.28);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .ce-plan-top-float.hidden{display:none!important;}
 @media (max-width:700px){.ce-plan-top-float{right:16px;bottom:76px;top:auto;transform:none;width:44px;height:44px;font-size:22px;}}
+
+/* V32.3 Planificación inicial: réplica de evento finalizado */
+.planificacion-note.compact-note{margin:10px 0 12px;}
+.plan-product-card.plan-donation-card{background:#f0fdf4;border-color:#bbf7d0;}
+.plan-product-card.plan-purchase-card{background:#fff;}
+.plan-product-grid.replica-grid{grid-template-columns:repeat(6,minmax(0,1fr));}
+@media (max-width:1000px){.plan-product-grid.replica-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:620px){.plan-product-grid.replica-grid{grid-template-columns:1fr;}}

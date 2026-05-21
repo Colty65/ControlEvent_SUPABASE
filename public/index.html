@@ -274,12 +274,12 @@
             <div class="icon-badge">🧠</div>
             <div>
               <h2>Planificación inicial</h2>
-              <p>Genera una propuesta previa de evento usando el histórico real de COMPRAS. Solo crea un borrador: no graba datos todavía.</p>
+              <p>Replica un evento ya finalizado como borrador inicial. No graba datos todavía: solo prepara una propuesta revisable.</p>
             </div>
           </div>
 
           <div class="planificacion-note">
-            <strong>Versión V32.1:</strong> se usa la historia de compras propias para proponer productos, tienda habitual, responsable habitual, cantidades y presupuesto. La duración del evento se tiene en cuenta para ajustar cantidades totales del evento cuando sea de varios días.
+            <strong>Versión V32.3:</strong> primera fase sencilla: elegir un evento FINALIZADO y replicarlo tal cual, con sus compras y donaciones de producto, para usarlo como punto de partida de un nuevo evento.
           </div>
 
           <div class="planificacion-grid">
@@ -300,14 +300,14 @@
               <div class="icon-badge">📚</div>
               <div>
                 <h2>Histórico a utilizar</h2>
-                <p>El sistema analiza COMPRAS anteriores para proponer una estructura inicial.</p>
+                <p>El sistema solo permite elegir eventos FINALIZADOS para que la réplica sea fiable.</p>
               </div>
             </div>
             <div class="planificacion-grid compact">
-              <div class="field"><label>Fuente histórica</label><select id="planFuenteHistorica"></select></div>
-              <div class="field"><label>Evento base</label><select id="planEventoBase"></select></div>
-              <div class="field"><label>Productos a proponer</label><select id="planNivelPropuesta"></select></div>
-              <div class="field"><label>&nbsp;</label><button type="button" id="btnGenerarPlanificacion">Generar propuesta desde histórico</button></div>
+              <div class="field"><label>Modo de planificación</label><select id="planFuenteHistorica"></select></div>
+              <div class="field"><label>Evento FINALIZADO a replicar</label><select id="planEventoBase"></select></div>
+              <div class="field"><label>Contenido</label><select id="planNivelPropuesta"></select></div>
+              <div class="field"><label>&nbsp;</label><button type="button" id="btnGenerarPlanificacion">Replicar evento finalizado</button></div>
             </div>
           </div>
 
@@ -509,7 +509,7 @@
 <script src="./app/features/view-refresh-stabilizer.js"></script>
 <script src="./app/features/budget-tooltips-lite.js"></script>
 <script src="./app/features/summary-tienda-sort-fix.js"></script>
-<script src="./app/features/maintenance-duplicates-v32.0.js"></script>
+<script src="./app/features/maintenance-duplicates-v32.1.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
 

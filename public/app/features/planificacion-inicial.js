@@ -1,31 +1,18 @@
-/* ControlEvent v32.2 - Planificación inicial por histórico de COMPRAS.
-   Borrador revisable, sin grabar datos reales. */
+/* ControlEvent v32.3 - Planificación inicial por réplica de evento FINALIZADO.
+   Borrador revisable, sin grabar datos reales todavía. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v32.2';
+  const VERSION = 'ControlEvent v32.3';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
   const KNOWN_PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas','noEventMessage'];
-  const JUERGA = [
-    {id:'BARATO', nombre:'Barato', precio:10},
-    {id:'CONSERVADOR', nombre:'Conservador', precio:20},
-    {id:'CARILLO', nombre:'Carillo', precio:30},
-    {id:'LUJO', nombre:'De lujo', precio:40}
-  ];
-  const FUENTES = [
-    {id:'ALL', nombre:'Todos los eventos anteriores'},
-    {id:'LAST3', nombre:'Últimos 3 eventos'},
-    {id:'BASE', nombre:'Elegir evento base'}
-  ];
-  const NIVELES = [
-    {id:'HABITUALES', nombre:'Muy habituales y habituales'},
-    {id:'TODOS', nombre:'Todo lo comprado anteriormente'},
-    {id:'MUY', nombre:'Solo productos muy habituales'}
-  ];
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
+  const PURCHASE_TICKET_OPTIONS = ['', 'GASTOS CORRIENTES', ...Array.from({length:50}, (_,i)=>`TK${String(i+1).padStart(2,'0')}`)];
+  const DONATION_TICKET_OPTIONS = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   let initialized = false;
   let lastProposal = [];
+  let lastSourceEvent = null;
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function state(){ return app()?.state || window.state || {}; }
@@ -52,19 +39,21 @@
   }
   function normalizeText(value){ return up(value).replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim(); }
   function productOf(row){ return byId('productos', row?.productoId) || null; }
-  function tiendaOf(id){ return byId('tiendas', id) || null; }
-  function personaOf(id){ return byId('personas', id) || null; }
   function productName(row){ return productOf(row)?.nombre || row?.producto || 'Producto sin nombre'; }
   function segmentName(row){ return productOf(row)?.segmento || row?.segmento || 'Sin segmento'; }
   function destinoName(row){ return productOf(row)?.destino || row?.destino || 'Sin destino'; }
+  function tiendaOf(id){ return byId('tiendas', id) || null; }
+  function personaOf(id){ return byId('personas', id) || null; }
   function tiendaName(id){ return tiendaOf(id)?.nombre || 'Sin tienda'; }
   function personaName(id){ return personaOf(id)?.nombre || 'Sin responsable'; }
   function rowResponsible(row){ return String(row?.responsableId || row?.responsable || row?.socioResponsableId || ''); }
-  function rowTienda(row){
-    const p = productOf(row) || {};
-    return String(row?.tiendaId || p.tiendaId || p.defaultTiendaId || '');
-  }
+  function rowTienda(row){ const p = productOf(row) || {}; return String(row?.tiendaId || p.tiendaId || p.defaultTiendaId || ''); }
   function isDonation(row){ return DONATION_TYPES.includes(String(row?.ticketDonacion || row?.ticket || '').trim()); }
+  function ticketLabel(row){
+    const raw = String(row?.ticketDonacion || '').trim();
+    if(isDonation(row)) return raw || 'DONADO';
+    return raw || 'Pte.Compra u otros gastos';
+  }
   function unitPrice(row){
     const p = productOf(row) || {};
     const candidates = [row?.precio, p.precio, p.precioReferencia, p.defaultPrecio];
@@ -89,49 +78,12 @@
     }
     return null;
   }
-  function daysBetween(start, end){
-    const a = parseDate(start), b = parseDate(end || start);
+  function dateKey(event){ const d = parseDate(event?.fechaIni || ''); return d ? d.getTime() : 0; }
+  function eventDays(event){
+    const a = parseDate(event?.fechaIni), b = parseDate(event?.fechaFin || event?.fechaIni);
     if(!a || !b) return 1;
     const ms = new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate());
     return Math.max(1, Math.round(ms / 86400000) + 1);
-  }
-  function eventDays(event){ return daysBetween(event?.fechaIni, event?.fechaFin || event?.fechaIni); }
-  function dateKey(event){
-    const d = parseDate(event?.fechaIni || '');
-    return d ? d.getTime() : 0;
-  }
-  function peopleForEvent(eventId){
-    const items = rows('colaboradores').filter(c => String(c.eventId || '') === String(eventId || ''));
-    const total = items.reduce((sum, row) => sum + Math.max(0, Number(row.numero || 0)), 0);
-    return total > 0 ? total : 0;
-  }
-  function confidence(countEvents, totalEvents){
-    if(totalEvents <= 1) return countEvents >= 1 ? 'Solo evento base' : 'Ocasional';
-    const ratio = countEvents / totalEvents;
-    if(countEvents >= 4 || ratio >= 0.7) return 'Muy habitual';
-    if(countEvents >= 2 || ratio >= 0.35) return 'Habitual';
-    return 'Ocasional';
-  }
-  function confidenceClass(value){
-    const t = up(value);
-    if(t.includes('MUY') || t.includes('BASE')) return 'alta';
-    if(t.includes('HABITUAL')) return 'media';
-    return 'baja';
-  }
-  function mostFrequent(items){
-    const map = new Map();
-    items.filter(Boolean).forEach(id => map.set(String(id), (map.get(String(id)) || 0) + 1));
-    let best = '', score = -1;
-    map.forEach((count, id) => { if(count > score){ best = id; score = count; } });
-    return best;
-  }
-  function latestByEventDate(items){
-    return items.slice().sort((a,b)=>dateKey(byId('eventos', b.eventId)) - dateKey(byId('eventos', a.eventId)))[0] || null;
-  }
-  function selectedJuerga(){ return JUERGA.find(j => j.id === document.getElementById('planTipoJuerga')?.value) || JUERGA[1]; }
-  function getNewDays(){
-    const manual = Math.max(1, Number(document.getElementById('planDias')?.value || 1));
-    return Number.isFinite(manual) && manual > 0 ? Math.round(manual) : 1;
   }
   function setOptions(select, options, value){
     if(!select) return;
@@ -139,203 +91,150 @@
     select.innerHTML = options.map(opt => `<option value="${esc(opt.value)}">${esc(opt.label)}</option>`).join('');
     if(options.some(opt => String(opt.value) === String(current))) select.value = String(current);
   }
-  function socios(){
-    return rows('personas').filter(p => up(p.rango || '') === 'SOCIO').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
-  }
+  function socios(){ return rows('personas').filter(p => up(p.rango || '') === 'SOCIO').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function tiendas(){ return rows('tiendas').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
-  function eventosOrdenados(){ return rows('eventos').slice().sort((a,b)=>dateKey(b)-dateKey(a)); }
+  function finalizados(){ return rows('eventos').filter(e => up(e.situacion || '') === 'FINALIZADO').slice().sort((a,b)=>dateKey(b)-dateKey(a)); }
+  function donorOptions(){
+    const out = [], seen = new Set();
+    rows('personas').forEach(p => {
+      const label = String(p.nombre || '').trim();
+      if(!label) return;
+      const key = normalizeText(label);
+      if(seen.has(key)) return;
+      seen.add(key); out.push({value:`P:${p.id}`, label});
+    });
+    rows('tiendas').forEach(t => {
+      const label = String(t.nombre || '').trim();
+      if(!label) return;
+      const key = normalizeText(label);
+      if(seen.has(key)) return;
+      seen.add(key); out.push({value:`T:${t.id}`, label});
+    });
+    return out.sort((a,b)=>a.label.localeCompare(b.label,'es'));
+  }
+  function donorLabel(ref){
+    if(!ref) return 'Sin donante';
+    const parts = String(ref).split(':');
+    const kind = parts[0], id = parts.slice(1).join(':');
+    if(kind === 'P') return personaOf(id)?.nombre || 'Persona sin nombre';
+    if(kind === 'T') return tiendaOf(id)?.nombre || 'Tienda sin nombre';
+    return ref;
+  }
+  function sociosParaIngresosIniciales(){
+    // Regla preparada para inserción futura: si hay registro conjunto numero=2, prima sobre los individuales numero=1.
+    const list = socios();
+    const selected = new Map();
+    const coveredSingles = new Set();
+    const couples = [];
+    list.forEach(p => {
+      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
+      const name = normalizeText(p.nombre || '');
+      if(!name) return;
+      if(numero >= 2){
+        couples.push({persona:p, numero, name});
+        name.split(/\s+(?:Y|E|\+)\s+/).map(normalizeText).filter(Boolean).forEach(part => coveredSingles.add(part));
+      }
+    });
+    couples.forEach(c => selected.set(String(c.persona.id), {...c.persona, numeroIngreso:c.numero}));
+    list.forEach(p => {
+      const id = String(p.id || '');
+      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
+      const name = normalizeText(p.nombre || '');
+      if(!id || !name || numero >= 2) return;
+      if(coveredSingles.has(name)) return;
+      selected.set(id, {...p, numeroIngreso:1});
+    });
+    return [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+  }
 
   function initForm(){
-    setOptions(document.getElementById('planTipoJuerga'), JUERGA.map(j => ({value:j.id, label:`${j.nombre} · ${money(j.precio)} por persona`})), 'CONSERVADOR');
-    setOptions(document.getElementById('planFuenteHistorica'), FUENTES.map(f => ({value:f.id, label:f.nombre})), 'LAST3');
-    setOptions(document.getElementById('planNivelPropuesta'), NIVELES.map(n => ({value:n.id, label:n.nombre})), 'HABITUALES');
+    // V32.3: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
+    const events = finalizados();
+    setOptions(document.getElementById('planEventoBase'), events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], events[0]?.id || '');
+    const fuente = document.getElementById('planFuenteHistorica');
+    if(fuente){ setOptions(fuente, [{value:'BASE', label:'Replicar un evento finalizado'}], 'BASE'); fuente.disabled = true; }
+    const nivel = document.getElementById('planNivelPropuesta');
+    if(nivel){ setOptions(nivel, [{value:'REPLICA', label:'Todas las compras y donaciones del evento'}], 'REPLICA'); nivel.disabled = true; }
+    const base = document.getElementById('planEventoBase'); if(base) base.disabled = !events.length;
     const socioOptions = socios().map(p => ({value:p.id, label:p.nombre || 'Socio sin nombre'}));
     setOptions(document.getElementById('planResponsable'), socioOptions.length ? socioOptions : [{value:'', label:'Sin socios disponibles'}]);
     const tiendaOptions = tiendas().map(t => ({value:t.id, label:t.nombre || 'Tienda sin nombre'}));
     setOptions(document.getElementById('planTienda'), tiendaOptions.length ? tiendaOptions : [{value:'', label:'Sin tiendas disponibles'}]);
-    const events = eventosOrdenados();
-    setOptions(document.getElementById('planEventoBase'), events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'}`})), events[0]?.id || '');
-    syncBaseEventAvailability();
-  }
-  function syncBaseEventAvailability(){
-    const source = document.getElementById('planFuenteHistorica')?.value || 'LAST3';
-    const base = document.getElementById('planEventoBase');
-    if(base) base.disabled = source !== 'BASE';
+    updateDaysFromDates();
   }
   function updateDaysFromDates(){
     const ini = document.getElementById('planFechaIni')?.value;
     const fin = document.getElementById('planFechaFin')?.value;
-    const days = daysBetween(ini, fin || ini);
     const field = document.getElementById('planDias');
-    if(field && ini && fin) field.value = String(days);
-  }
-  function historicalEventIds(){
-    const source = document.getElementById('planFuenteHistorica')?.value || 'LAST3';
-    const all = eventosOrdenados();
-    if(source === 'BASE'){
-      const id = document.getElementById('planEventoBase')?.value || '';
-      return id ? [id] : [];
+    if(!field) return;
+    const a = parseDate(ini), b = parseDate(fin || ini);
+    if(a && b){
+      const ms = new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate());
+      field.value = String(Math.max(1, Math.round(ms / 86400000) + 1));
     }
-    if(source === 'LAST3') return all.slice(0,3).map(e => e.id);
-    return all.map(e => e.id);
   }
-  function selectedHistoricalSource(){
-    return document.getElementById('planFuenteHistorica')?.value || 'LAST3';
+  function sourceEvent(){
+    const id = document.getElementById('planEventoBase')?.value || '';
+    return byId('eventos', id);
   }
-  function practicalQty(value){
-    const n = Number(value || 0);
-    if(!Number.isFinite(n) || n <= 0) return 0.01;
-    return n >= 1 ? Math.ceil(n) : Math.round(n * 100) / 100;
-  }
-  function uniqueCompraKey(row){
-    const prod = productOf(row);
-    const pkey = prod?.id ? `id:${prod.id}` : `name:${normalizeText(productName(row))}`;
-    return [pkey, rowTienda(row) || 'sin-tienda', rowResponsible(row) || 'sin-responsable', normalizeText(segmentName(row)), normalizeText(destinoName(row))].join('|');
-  }
-  function sociosParaIngresosIniciales(){
-    const list = socios();
-    const byBase = new Map();
-    list.forEach(p => {
-      const nombre = normalizeText(p.nombre || '');
-      if(!nombre) return;
-      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
-      const tokens = nombre.split(' ').filter(Boolean);
-      let candidates = [nombre];
-      if(numero >= 2){
-        candidates = candidates.concat(nombre.split(/\s+(?:Y|E|\+)\s+/).map(normalizeText).filter(Boolean));
-      }
-      candidates.forEach(key => {
-        const current = byBase.get(key);
-        if(!current || numero > current.numero || (numero === current.numero && String(p.nombre||'').length > String(current.persona.nombre||'').length)){
-          byBase.set(key, {persona:p, numero});
-        }
-      });
-      if(tokens.length === 1 && !byBase.has(nombre)) byBase.set(nombre, {persona:p, numero});
+  function buildReplicaProposal(){
+    const ev = sourceEvent();
+    if(!ev){ return {event:null, rows:[]}; }
+    if(up(ev.situacion || '') !== 'FINALIZADO') return {event:ev, rows:[]};
+    const eventRows = rows('compras').filter(row => String(row.eventId || '') === String(ev.id || ''));
+    const mapped = eventRows.map((row, index) => {
+      const product = productOf(row) || {};
+      const tipo = isDonation(row) ? 'DONACION' : 'COMPRA';
+      return {
+        key: `replica:${row.id || index}`,
+        include: true,
+        tipo,
+        sourceId: row.id || '',
+        productId: product.id || row.productoId || '',
+        productName: product.nombre || productName(row),
+        segmento: product.segmento || segmentName(row),
+        destino: product.destino || destinoName(row),
+        unidades: Math.max(0, Math.round(Number(row.unidades || 0) * 100) / 100),
+        precio: unitPrice(row),
+        tiendaId: rowTienda(row),
+        responsableId: rowResponsible(row),
+        ticketDonacion: String(row.ticketDonacion || ''),
+        donorRef: String(row.donorRef || ''),
+        confidence: 'Réplica exacta',
+        reason: tipo === 'DONACION'
+          ? 'Donación de producto replicada tal cual desde el evento finalizado.'
+          : 'Compra replicada tal cual desde el evento finalizado.'
+      };
     });
-    const selected = new Map();
-    byBase.forEach(item => {
-      const id = String(item.persona.id || '');
-      if(id) selected.set(id, item);
+    mapped.sort((a,b) => {
+      const ta = a.tipo.localeCompare(b.tipo, 'es');
+      if(ta) return ta;
+      return String(tiendaName(a.tiendaId)).localeCompare(String(tiendaName(b.tiendaId)),'es') || String(a.ticketDonacion || '').localeCompare(String(b.ticketDonacion || ''),'es') || a.productName.localeCompare(b.productName,'es');
     });
-    return [...selected.values()].map(item => ({...item.persona, numeroIngreso:item.numero})).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+    return {event:ev, rows:mapped};
   }
-  function groupHistoricalRows(){
-    const eventIds = new Set(historicalEventIds().map(String));
-    const totalEvents = Math.max(1, eventIds.size);
-    const newDays = getNewDays();
-    const newPeople = Math.max(1, Number(document.getElementById('planPersonas')?.value || 1));
-    const defaultTienda = document.getElementById('planTienda')?.value || '';
-    const defaultResponsable = document.getElementById('planResponsable')?.value || '';
-    const source = selectedHistoricalSource();
-    const compraRows = rows('compras').filter(row => eventIds.has(String(row.eventId || '')) && !isDonation(row));
 
-    if(source === 'BASE'){
-      return compraRows.slice().sort((a,b) => {
-        const ta = tiendaName(rowTienda(a));
-        const tb = tiendaName(rowTienda(b));
-        return ta.localeCompare(tb,'es') || productName(a).localeCompare(productName(b),'es');
-      }).map((row, index) => {
-        const product = productOf(row) || {};
-        const priceRef = unitPrice(row);
-        return {
-          key: `base:${row.id || index}:${uniqueCompraKey(row)}`,
-          include: true,
-          productId: product.id || '',
-          productName: product.nombre || productName(row),
-          segmento: product.segmento || segmentName(row),
-          destino: product.destino || destinoName(row),
-          unidades: Math.max(0.01, Math.round(Number(row.unidades || 0) * 100) / 100),
-          precio: priceRef,
-          tiendaId: rowTienda(row) || defaultTienda,
-          responsableId: rowResponsible(row) || defaultResponsable,
-          eventCount: 1,
-          totalEvents: 1,
-          confidence: 'Evento base',
-          reason: 'Replicado tal cual desde el evento base: mismas unidades, tienda y responsable de la compra original.'
-        };
-      });
-    }
-
-    const groups = new Map();
-    compraRows.forEach(row => {
-      const key = uniqueCompraKey(row);
-      if(!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(row);
-    });
-    const proposals = [];
-    groups.forEach((items, key) => {
-      const latest = latestByEventDate(items) || items[0];
-      const product = productOf(latest) || {};
-      const byEvent = new Map();
-      items.forEach(row => {
-        const eid = String(row.eventId || '');
-        if(!byEvent.has(eid)) byEvent.set(eid, []);
-        byEvent.get(eid).push(row);
-      });
-      const eventCount = byEvent.size;
-      const conf = confidence(eventCount, totalEvents);
-      const qtySamples = [];
-      byEvent.forEach((eventRows, eid) => {
-        const ev = byId('eventos', eid) || {};
-        const histDays = Math.max(1, eventDays(ev));
-        const histPeople = peopleForEvent(eid);
-        const rawUnits = eventRows.reduce((sum,row) => sum + Math.max(0, Number(row.unidades || 0)), 0);
-        let q = rawUnits;
-        if(histDays > 0) q = (rawUnits / histDays) * newDays;
-        // No reducimos nunca la compra histórica; solo escalamos al alza si el evento nuevo es mayor.
-        if(histPeople > 0 && newPeople > histPeople) q *= (newPeople / histPeople);
-        if(Number.isFinite(q) && q > 0) qtySamples.push(q);
-      });
-      let suggestedQty = qtySamples.length ? qtySamples.reduce((a,b)=>a+b,0) / qtySamples.length : Number(latest?.unidades || 1) || 1;
-      suggestedQty = practicalQty(suggestedQty);
-      const priceRef = unitPrice(latest);
-      const tiendaId = mostFrequent(items.map(rowTienda)) || defaultTienda;
-      const responsableId = mostFrequent(items.map(rowResponsible).filter(id => up(personaOf(id)?.rango || '') === 'SOCIO')) || defaultResponsable;
-      const nivel = document.getElementById('planNivelPropuesta')?.value || 'HABITUALES';
-      const include = nivel === 'TODOS' ? true : nivel === 'MUY' ? conf === 'Muy habitual' : conf !== 'Ocasional' || totalEvents <= 1;
-      proposals.push({
-        key,
-        include,
-        productId: product.id || '',
-        productName: product.nombre || productName(latest),
-        segmento: product.segmento || segmentName(latest),
-        destino: product.destino || destinoName(latest),
-        unidades: Math.max(0.01, Math.round(suggestedQty * 100) / 100),
-        precio: priceRef,
-        tiendaId,
-        responsableId,
-        eventCount,
-        totalEvents,
-        confidence: conf,
-        reason: `${eventCount} de ${totalEvents} evento(s) analizados · cantidad total media por evento ajustada a ${newDays} día(s)${newPeople ? ` y sin reducir por ${newPeople} persona(s) previstas` : ''}`
-      });
-    });
-    return proposals.sort((a,b) => {
-      const c = ['Muy habitual','Habitual','Evento base','Solo evento base','Ocasional'];
-      return (c.indexOf(a.confidence) - c.indexOf(b.confidence)) || a.segmento.localeCompare(b.segmento,'es') || a.productName.localeCompare(b.productName,'es');
-    });
-  }
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
-    const title = document.getElementById('planEventoTitulo')?.value.trim() || 'Nuevo evento sin título';
-    const juerga = selectedJuerga();
-    const personas = Math.max(1, Number(document.getElementById('planPersonas')?.value || 1));
-    const presupuesto = personas * juerga.precio;
     const proposals = lastProposal;
-    const included = proposals.filter(p => p.include);
-    const totalCompras = included.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
-    const sourceLabel = FUENTES.find(f => f.id === (document.getElementById('planFuenteHistorica')?.value || ''))?.nombre || 'Histórico';
-    const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay compras históricas suficientes para generar propuesta con los criterios elegidos.</div>';
-    box.classList.remove('hidden');
+    const source = lastSourceEvent;
+    const compras = proposals.filter(p => p.tipo === 'COMPRA' && p.include);
+    const donaciones = proposals.filter(p => p.tipo === 'DONACION' && p.include);
+    const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+    const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const sociosIngreso = sociosParaIngresosIniciales();
+    const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay compras ni donaciones de producto en el evento finalizado elegido.</div>';
+    box.classList.remove('hidden');
     box.innerHTML = `
       <div class="plan-summary-grid">
-        <div class="plan-metric"><span>Evento previsto</span><strong>${esc(title)}</strong><small>${esc(sourceLabel)}</small></div>
-        <div class="plan-metric"><span>Presupuesto ingresos</span><strong>${money(presupuesto)}</strong><small>${personas} personas × ${money(juerga.precio)}</small></div>
-        <div class="plan-metric"><span>Duración</span><strong>${getNewDays()} día(s)</strong><small>Factor usado para ajustar cantidades</small></div>
-        <div class="plan-metric"><span>Compras propuestas</span><strong>${money(totalCompras)}</strong><small>${included.length} de ${proposals.length} productos incluidos</small></div>
-        <div class="plan-metric"><span>Socios a ingresos</span><strong>${sociosIngreso.length}</strong><small>Regla: parejas número 2; si no existe pareja, número 1</small></div>
+        <div class="plan-metric"><span>Evento modelo finalizado</span><strong>${esc(source?.titulo || 'Sin evento')}</strong><small>${esc(source?.fechaIni || '')}${source?.fechaFin ? ' · ' + esc(source.fechaFin) : ''}</small></div>
+        <div class="plan-metric"><span>Compras replicadas</span><strong>${compras.length}</strong><small>${money(totalCompras)} previstos</small></div>
+        <div class="plan-metric"><span>Donaciones replicadas</span><strong>${donaciones.length}</strong><small>${money(totalDonaciones)} valor estimado</small></div>
+        <div class="plan-metric"><span>Socios a ingresos</span><strong>${sociosIngreso.length}</strong><small>Regla futura: pareja nº2; si no, socio nº1</small></div>
+      </div>
+      <div class="planificacion-note compact-note">
+        <strong>V32.3:</strong> esta versión solo replica eventos ya finalizados. No calcula cantidades, no mezcla históricos y no graba datos reales todavía. La propuesta queda para revisión previa.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -343,9 +242,8 @@
       </div>
       <div class="plan-actions-line">
         <button type="button" class="outline" id="btnPlanSelectAll">Incluir todo</button>
-        <button type="button" class="outline" id="btnPlanSelectHabitual">Solo habituales</button>
         <button type="button" class="outline" id="btnPlanSelectNone">Quitar todo</button>
-        <button type="button" class="secondary" id="btnPlanApplyDisabled" disabled title="Se activará en la siguiente versión cuando validemos la propuesta">Crear evento desde planificación · próxima versión</button>
+        <button type="button" class="secondary" id="btnPlanApplyDisabled" disabled title="Se activará cuando validemos la réplica previa">Crear evento real desde réplica · próxima versión</button>
       </div>
       <div class="plan-proposal-list" id="planProposalList">${cards}</div>
     `;
@@ -354,22 +252,26 @@
   function renderProposalRow(p, index){
     const tiendasOpts = tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(p.tiendaId)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
     const sociosOpts = socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(p.responsableId)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
+    const donorOpts = donorOptions().map(d => `<option value="${esc(d.value)}" ${String(d.value)===String(p.donorRef)?'selected':''}>${esc(d.label)}</option>`).join('');
+    const ticketOpts = (p.tipo === 'DONACION' ? DONATION_TICKET_OPTIONS : PURCHASE_TICKET_OPTIONS).map(v => `<option value="${esc(v)}" ${String(v)===String(p.ticketDonacion)?'selected':''}>${esc(v || 'Pte.Compra u otros gastos')}</option>`).join('');
     const importe = Number(p.unidades || 0) * Number(p.precio || 0);
     return `
-      <div class="plan-product-card ${p.include ? '' : 'excluded'}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
+      <div class="plan-product-card ${p.include ? '' : 'excluded'} ${p.tipo === 'DONACION' ? 'plan-donation-card' : 'plan-purchase-card'}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
         <div class="plan-product-head">
           <label class="plan-include"><input type="checkbox" data-plan-field="include" ${p.include ? 'checked' : ''}/> Incluir</label>
           <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}</span></div>
-          <span class="plan-confidence ${confidenceClass(p.confidence)}">${esc(p.confidence)}</span>
+          <span class="plan-confidence alta">${p.tipo === 'DONACION' ? 'Donación' : 'Compra'}</span>
         </div>
-        <div class="plan-product-grid">
-          <div class="field"><label>Unidades sugeridas</label><input type="number" min="0" step="0.01" value="${esc(p.unidades)}" data-plan-field="unidades" /></div>
-          <div class="field"><label>Precio ref./histórico</label><input type="number" min="0" step="0.01" value="${esc(p.precio)}" data-plan-field="precio" /></div>
-          <div class="field"><label>Importe previsto</label><input readonly class="soft-readonly" value="${esc(money(importe))}" data-plan-output="importe" /></div>
-          <div class="field"><label>Tienda propuesta</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>
-          <div class="field"><label>Responsable propuesto</label><select data-plan-field="responsableId">${sociosOpts || '<option value="">Sin socios</option>'}</select></div>
+        <div class="plan-product-grid replica-grid">
+          <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${esc(p.unidades)}" data-plan-field="unidades" /></div>
+          <div class="field"><label>Precio</label><input type="number" min="0" step="0.01" value="${esc(p.precio)}" data-plan-field="precio" /></div>
+          <div class="field"><label>Importe</label><input readonly class="soft-readonly" value="${esc(money(importe))}" data-plan-output="importe" /></div>
+          <div class="field"><label>${p.tipo === 'DONACION' ? 'Tipo donación' : 'Ticket / estado'}</label><select data-plan-field="ticketDonacion">${ticketOpts}</select></div>
+          <div class="field"><label>Tienda</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>
+          <div class="field"><label>Responsable</label><select data-plan-field="responsableId">${sociosOpts || '<option value="">Sin socios</option>'}</select></div>
+          ${p.tipo === 'DONACION' ? `<div class="field"><label>Donante</label><select data-plan-field="donorRef"><option value="" ${!p.donorRef?'selected':''}>-- sin donante --</option>${donorOpts}</select></div>` : ''}
         </div>
-        <div class="plan-reason">${esc(p.reason)}</div>
+        <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Donante: ${esc(donorLabel(p.donorRef))}.` : ''}</div>
       </div>
     `;
   }
@@ -401,17 +303,11 @@
         });
       });
     });
-    const setIncluded = mode => {
-      lastProposal = lastProposal.map(p => ({...p, include: mode === 'all' ? true : mode === 'none' ? false : p.confidence !== 'Ocasional'}));
-      renderProposal();
-    };
+    const setIncluded = mode => { lastProposal = lastProposal.map(p => ({...p, include: mode === 'all'})); renderProposal(); };
     document.getElementById('btnPlanSelectAll')?.addEventListener('click', () => setIncluded('all'));
     document.getElementById('btnPlanSelectNone')?.addEventListener('click', () => setIncluded('none'));
-    document.getElementById('btnPlanSelectHabitual')?.addEventListener('click', () => setIncluded('habitual'));
     document.getElementById('btnPlanBuscarProducto')?.addEventListener('click', searchProposalProduct);
-    document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => {
-      if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); }
-    });
+    document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); } });
   }
   function updateProposalFromCard(idx, card, light){
     const p = lastProposal[idx];
@@ -429,7 +325,17 @@
   }
   function generateProposal(){
     if(!isGD()) return;
-    lastProposal = groupHistoricalRows();
+    const replica = buildReplicaProposal();
+    lastSourceEvent = replica.event;
+    if(!replica.event){
+      try{ alert('Debes elegir un evento finalizado para replicar.'); }catch(_){ }
+      return;
+    }
+    if(up(replica.event.situacion || '') !== 'FINALIZADO'){
+      try{ alert('Solo se pueden replicar eventos que estén en situación FINALIZADO.'); }catch(_){ }
+      return;
+    }
+    lastProposal = replica.rows;
     renderProposal();
     document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
   }
@@ -471,7 +377,6 @@
     const panel = document.getElementById(PANEL_ID);
     if(!panel || panel.classList.contains('hidden')) return;
     const activePlan = document.getElementById(TAB_BUTTON_ID)?.classList.contains('active');
-    // Si se ha abierto Resumen, Gráficas u otra pestaña por el render legacy, la planificación no debe quedar debajo.
     const otherVisible = KNOWN_PANELS.filter(id => id !== PANEL_ID).some(id => {
       const el = document.getElementById(id);
       return el && !el.classList.contains('hidden') && el.offsetParent !== null;
@@ -524,7 +429,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV322_${eventName}`;
+    const key = `__cePlanV323_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -532,18 +437,15 @@
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
     bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); showPlanificacion(); }, true);
-    KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => {
-      bindOnce(document.getElementById(id), 'click', () => setTimeout(hidePlanificacion, 0));
-    });
+    KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => bindOnce(document.getElementById(id), 'click', () => setTimeout(hidePlanificacion, 0)));
     document.querySelectorAll('.mobile-menu-action').forEach(el => {
       if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => setTimeout(hidePlanificacion, 0));
     });
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
-    bindOnce(document.getElementById('planFuenteHistorica'), 'change', syncBaseEventAvailability);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV322){
-      document.__cePlanMobileClickV322 = true;
+    if(!document.__cePlanMobileClickV323){
+      document.__cePlanMobileClickV323 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
