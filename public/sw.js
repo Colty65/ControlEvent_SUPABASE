@@ -1,5 +1,5 @@
-const CACHE_NAME = 'controlevent-shell-v30-11';
-// V30.11: base rescate estable + Mapa de recursos con filtro SOCIOS, ordenacion Tienda/TK/Producto y color TK.
+const CACHE_NAME = 'controlevent-shell-v30-12';
+// V30.12: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -16,7 +16,6 @@ const SHELL_ASSETS = [
   '/app/performance/mobile-lite.js',
   '/app/performance/low-resource-boot.js',
   '/app/performance/low-resource-legacy-patch.js',
-  '/app/features/mapa-recursos-v30.11.js',
   '/app/features/mapa-productos.js',
   '/app/features/view-refresh-stabilizer.js',
   '/app/features/budget-tooltips-lite.js',

@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v30.11",
+  "version": "ControlEvent v30.12",
   "base": "v30.6",
-  "notes": "v30.11 parte de V30.10 rescate estable y añade Mapa de recursos con filtro SOCIOS, orden Tienda/TK/Producto y verde Excel para TK comprados.",
+  "notes": "v30.7 mantiene rendimiento, corrige la instalación de globos de presupuesto y refuerza la ordenación por Tienda/Ticket.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -14,5 +14,6 @@
   "newFiles": [
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
-  ]
+  ],
+  "build": "v30.12"
 }
