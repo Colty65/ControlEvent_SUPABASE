@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v33.5",
+  "version": "ControlEvent v33.6",
   "base": "v30.6",
-  "notes": "v33.5 elimina Tipo de juerga de Planificación inicial y mantiene réplica exacta de evento finalizado.",
+  "notes": "v33.6 permite crear evento real desde una réplica de evento finalizado y añade baja segura de evento en cascada controlada.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v33.5"
+  "build": "v33.6"
 }

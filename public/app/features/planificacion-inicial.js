@@ -1,9 +1,9 @@
-/* ControlEvent v33.5 - Planificación inicial por réplica de evento FINALIZADO.
-   Borrador revisable, sin grabar datos reales todavía.
-   V33.5 elimina Tipo de juerga porque la planificación replica un evento tal cual. */
+/* ControlEvent v33.6 - Planificación inicial por réplica de evento FINALIZADO.
+   La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
+   Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.5';
+  const VERSION = 'ControlEvent v33.6';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -15,6 +15,7 @@
   let lastProposal = [];
   let lastIncomeProposal = [];
   let lastSourceEvent = null;
+  let lastCreatedEventId = "";
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function state(){ return app()?.state || window.state || {}; }
@@ -299,7 +300,7 @@
       </div>
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
-        <strong>V33.5:</strong> replica eventos ya finalizados tal cual: ingresos, compras y donaciones de producto quedan como propuesta revisable. Se elimina Tipo de juerga porque aquí no se recalcula nada: el modelo elegido manda.
+        <strong>V33.6:</strong> replica eventos ya finalizados tal cual. Revisa la propuesta y, cuando esté correcta, pulsa <strong>Crear evento real desde réplica</strong>.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -308,7 +309,7 @@
       <div class="plan-actions-line">
         <button type="button" class="outline" id="btnPlanSelectAll">Incluir todo</button>
         <button type="button" class="outline" id="btnPlanSelectNone">Quitar todo</button>
-        <button type="button" class="secondary" id="btnPlanApplyDisabled" disabled title="Se activará cuando validemos la réplica previa">Crear evento real desde réplica · próxima versión</button>
+        <button type="button" class="secondary" id="btnPlanApplyReplica">Crear evento real desde réplica</button>
       </div>
       <div class="plan-proposal-list" id="planProposalList">${cards}</div>
     `;
@@ -373,6 +374,7 @@
     document.getElementById('btnPlanSelectNone')?.addEventListener('click', () => setIncluded('none'));
     document.getElementById('btnPlanBuscarProducto')?.addEventListener('click', searchProposalProduct);
     document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); } });
+    document.getElementById('btnPlanApplyReplica')?.addEventListener('click', applyReplicaToRealEvent);
   }
   function updateProposalFromCard(idx, card, light){
     const p = lastProposal[idx];
@@ -388,6 +390,120 @@
     if(out) out.value = money(Number(p.unidades || 0) * Number(p.precio || 0));
     if(!light) setTimeout(renderProposal, 0);
   }
+
+  function makeId(){
+    try{ if(typeof window.uid === 'function') return window.uid(); }catch(_){ }
+    try{ if(typeof uid === 'function') return uid(); }catch(_){ }
+    return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+  function callSave(){
+    try{ if(typeof window.saveState === 'function'){ window.saveState(); return; } }catch(_){ }
+    try{ if(typeof saveState === 'function') saveState(); }catch(_){ }
+  }
+  function callRender(){
+    try{ if(typeof window.render === 'function'){ window.render(); return; } }catch(_){ }
+    try{ if(typeof render === 'function') render(); }catch(_){ }
+    try{ if(typeof window.renderPlanificacionInicial === 'function') window.renderPlanificacionInicial(); }catch(_){ }
+  }
+  function fieldValue(id){ return String(document.getElementById(id)?.value || '').trim(); }
+  function proposedEventTitle(){
+    const raw = fieldValue('planEventoTitulo');
+    if(raw) return raw;
+    const base = lastSourceEvent?.titulo || sourceEvent()?.titulo || 'Evento replicado';
+    return 'Copia de ' + base;
+  }
+  function confirmReplicaCreation(){
+    const included = lastProposal.filter(p => p.include);
+    const purchases = included.filter(p => p.tipo === 'COMPRA').length;
+    const donations = included.filter(p => p.tipo === 'DONACION').length;
+    const inc = incomeSummary(lastIncomeProposal);
+    const title = proposedEventTitle();
+    const msg = [
+      'Se va a crear un EVENTO REAL a partir del evento finalizado seleccionado.',
+      '',
+      'Evento nuevo: ' + title,
+      'Ingresos a replicar: ' + inc.registros + ' registros (' + qty(inc.sociosPersonas) + ' SOCIOS · ' + qty(inc.noSociosPersonas) + ' NO SOCIOS)',
+      'Compras a replicar: ' + purchases,
+      'Donaciones de producto a replicar: ' + donations,
+      '',
+      'No se crearán ni eliminarán PERSONAS, TIENDAS ni PRODUCTOS generales.',
+      'Después podrás revisar y adaptar el evento desde las pantallas normales.',
+      '',
+      '¿Quieres continuar?'
+    ].join('\n');
+    try{ return confirm(msg); }catch(_){ return false; }
+  }
+  function applyReplicaToRealEvent(){
+    if(!isGD()) return;
+    const source = lastSourceEvent || sourceEvent();
+    if(!source){ try{ alert('Primero debes generar una réplica desde un evento finalizado.'); }catch(_){} return; }
+    if(up(source.situacion || '') !== 'FINALIZADO'){
+      try{ alert('Solo se puede crear desde un evento que esté FINALIZADO.'); }catch(_){}
+      return;
+    }
+    if(!lastProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Replicar evento finalizado.'); }catch(_){} return; }
+    const st = state();
+    if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
+    const title = proposedEventTitle();
+    if(!title){ try{ alert('Indica un nombre para el nuevo evento.'); }catch(_){} return; }
+    const duplicate = st.eventos.some(e => normalizeText(e.titulo || '') === normalizeText(title));
+    if(duplicate){ try{ alert('Ya existe un evento con ese nombre. Cambia el nombre antes de crear la réplica.'); }catch(_){} return; }
+    if(!confirmReplicaCreation()) return;
+
+    const newEventId = makeId();
+    const fechaIni = fieldValue('planFechaIni') || source.fechaIni || '';
+    const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source.fechaFin || source.fechaIni || '';
+    const descUser = fieldValue('planDescripcion');
+    const infoUser = fieldValue('planInfo');
+    const descripcion = [
+      descUser || source.descripcion || '',
+      'Réplica inicial creada desde evento finalizado: ' + (source.titulo || 'sin título') + '.',
+      infoUser ? 'Información de planificación: ' + infoUser : ''
+    ].filter(Boolean).join('\n');
+
+    st.eventos.push({
+      id: newEventId,
+      titulo: title,
+      precio: parseNum(source.precio || 0),
+      fechaIni,
+      fechaFin,
+      situacion: 'En curso',
+      descripcion
+    });
+
+    lastIncomeProposal.forEach(item => {
+      if(!item.personaId) return;
+      st.colaboradores.push({
+        id: makeId(),
+        eventId: newEventId,
+        personaId: item.personaId,
+        numero: Number(item.numero || 0),
+        situacion: item.situacion || 'Pendiente',
+        importe: Number(item.importeVoluntario || 0)
+      });
+    });
+
+    lastProposal.filter(p => p.include).forEach(p => {
+      if(!p.productId) return;
+      st.compras.push({
+        id: makeId(),
+        eventId: newEventId,
+        productoId: p.productId,
+        unidades: Number(p.unidades || 0),
+        ticketDonacion: String(p.ticketDonacion || ''),
+        donorRef: String(p.donorRef || ''),
+        responsableId: String(p.responsableId || '')
+      });
+    });
+
+    st.selectedEventId = newEventId;
+    lastCreatedEventId = newEventId;
+    callSave();
+    callRender();
+    try{ alert('Evento creado correctamente desde la réplica. Revísalo y adapta lo necesario.'); }catch(_){}
+    try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){}
+  }
+
   function generateProposal(){
     if(!isGD()) return;
     const replica = buildReplicaProposal();
@@ -512,7 +628,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV335_${eventName}`;
+    const key = `__cePlanV336_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -527,8 +643,8 @@
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV335){
-      document.__cePlanMobileClickV335 = true;
+    if(!document.__cePlanMobileClickV336){
+      document.__cePlanMobileClickV336 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
