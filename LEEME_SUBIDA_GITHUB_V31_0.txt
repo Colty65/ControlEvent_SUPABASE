@@ -1,0 +1,13 @@
+ControlEvent V31.0 - Solo subir a GitHub
+
+Base: V30.13 validada en todos los dispositivos.
+
+Subir sustituyendo los archivos existentes. No incluye la rama problemática 30.9/30.11.
+
+Cambios principales:
+- Mapa de recursos: totales de cabecera globales del evento aunque se filtre por responsable.
+- COMPRAS PRODUCTO muestra total, TKxx comprado y Pte.Compra.
+- Se elimina la ficha SOLO DONACION y se traslada el dato a la cabecera de productos donados.
+- Se añade precio unitario en productos comprados y donados.
+- Se añade buscador de producto.
+- Eventos ordenados por fecha de inicio en desplegable EVENTOS y mantenimiento EVENTOS.
