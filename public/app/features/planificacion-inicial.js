@@ -1,8 +1,8 @@
-/* ControlEvent v33.3 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v33.4 - Planificación inicial por réplica de evento FINALIZADO.
    Borrador revisable, sin grabar datos reales todavía. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.3';
+  const VERSION = 'ControlEvent v33.4';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -12,6 +12,7 @@
   const DONATION_TICKET_OPTIONS = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   let initialized = false;
   let lastProposal = [];
+  let lastIncomeProposal = [];
   let lastSourceEvent = null;
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
@@ -134,6 +135,53 @@
     if(kind === 'T') return tiendaOf(id)?.nombre || 'Tienda sin nombre';
     return ref;
   }
+  function incomeRowsForEvent(eventId){
+    const id = String(eventId || '');
+    return rows('colaboradores').filter(c => String(c.eventId || '') === id).map((c, index) => {
+      const persona = personaOf(c.personaId) || {};
+      const rango = up(persona.rango || c.rango || '');
+      const numero = Math.max(0, Number(c.numero || 0));
+      const voluntario = parseNum(c.importe ?? c.importeVoluntario ?? 0);
+      const precioEvento = parseNum(sourceEvent()?.precio ?? 0);
+      const obligatorio = rango === 'SOCIO' ? numero * precioEvento : 0;
+      return {
+        key: `ingreso:${c.id || index}`,
+        sourceId: c.id || '',
+        personaId: c.personaId || '',
+        personaName: persona.nombre || 'Persona sin nombre',
+        rango: rango || 'SIN RANGO',
+        numero,
+        situacion: c.situacion || c.ingreso || 'Pendiente',
+        importeVoluntario: voluntario,
+        importeObligatorio: obligatorio
+      };
+    });
+  }
+  function incomeSummary(incomes){
+    const list = Array.isArray(incomes) ? incomes : [];
+    const sociosRows = list.filter(x => x.rango === 'SOCIO');
+    const noSociosRows = list.filter(x => x.rango !== 'SOCIO');
+    const sumNumero = arr => arr.reduce((sum,x)=>sum + Number(x.numero || 0), 0);
+    const sociosPersonas = sumNumero(sociosRows);
+    const noSociosPersonas = sumNumero(noSociosRows);
+    const totalPersonas = sociosPersonas + noSociosPersonas;
+    const importe = list.reduce((sum,x)=>sum + Number(x.importeObligatorio || 0) + Number(x.importeVoluntario || 0), 0);
+    return {sociosRows, noSociosRows, sociosPersonas, noSociosPersonas, totalPersonas, registros:list.length, importe};
+  }
+  function renderIngresosReplica(incomes){
+    const info = incomeSummary(incomes);
+    if(!info.registros){
+      return '<div class="planificacion-note compact-note"><strong>Ingresos del evento modelo:</strong> no hay ingresos registrados para replicar.</div>';
+    }
+    return `
+      <div class="planificacion-note compact-note plan-income-replica">
+        <strong>Ingresos a replicar tal cual:</strong>
+        ${qty(info.sociosPersonas)} SOCIOS · ${qty(info.noSociosPersonas)} NO SOCIOS
+        <span>(${info.registros} registros de ingresos · ${qty(info.totalPersonas)} personas representadas · ${money(info.importe)})</span>
+      </div>
+    `;
+  }
+
   function sociosParaIngresosIniciales(){
     // Regla preparada para inserción futura: si hay registro conjunto numero=2, prima sobre los individuales numero=1.
     const list = socios();
@@ -162,7 +210,7 @@
   }
 
   function initForm(){
-    // V33.3: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
+    // V33.4: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
     const events = finalizados();
     setOptions(document.getElementById('planEventoBase'), events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], events[0]?.id || '');
     const fuente = document.getElementById('planFuenteHistorica');
@@ -195,7 +243,7 @@
   function buildReplicaProposal(){
     const ev = sourceEvent();
     if(!ev){ return {event:null, rows:[]}; }
-    if(up(ev.situacion || '') !== 'FINALIZADO') return {event:ev, rows:[]};
+    if(up(ev.situacion || '') !== 'FINALIZADO') return {event:ev, rows:[], incomes:[]};
     const eventRows = rows('compras').filter(row => String(row.eventId || '') === String(ev.id || ''));
     const mapped = eventRows.map((row, index) => {
       const product = productOf(row) || {};
@@ -226,7 +274,7 @@
       if(ta) return ta;
       return String(tiendaName(a.tiendaId)).localeCompare(String(tiendaName(b.tiendaId)),'es') || String(a.ticketDonacion || '').localeCompare(String(b.ticketDonacion || ''),'es') || a.productName.localeCompare(b.productName,'es');
     });
-    return {event:ev, rows:mapped};
+    return {event:ev, rows:mapped, incomes: incomeRowsForEvent(ev.id)};
   }
 
   function renderProposal(){
@@ -238,7 +286,7 @@
     const donaciones = proposals.filter(p => p.tipo === 'DONACION' && p.include);
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
-    const sociosIngreso = sociosParaIngresosIniciales();
+    const ingresosInfo = incomeSummary(lastIncomeProposal);
     const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay compras ni donaciones de producto en el evento finalizado elegido.</div>';
     box.classList.remove('hidden');
     box.innerHTML = `
@@ -246,10 +294,11 @@
         <div class="plan-metric"><span>Evento modelo finalizado</span><strong>${esc(source?.titulo || 'Sin evento')}</strong><small>${esc(source?.fechaIni || '')}${source?.fechaFin ? ' · ' + esc(source.fechaFin) : ''}</small></div>
         <div class="plan-metric"><span>Compras replicadas</span><strong>${compras.length}</strong><small>${money(totalCompras)} previstos</small></div>
         <div class="plan-metric"><span>Donaciones replicadas</span><strong>${donaciones.length}</strong><small>${money(totalDonaciones)} valor estimado</small></div>
-        <div class="plan-metric"><span>Socios a ingresos</span><strong>${sociosIngreso.length}</strong><small>Regla futura: pareja nº2; si no, socio nº1</small></div>
+        <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
+      ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
-        <strong>V33.3:</strong> esta versión solo replica eventos ya finalizados. No calcula cantidades, no mezcla históricos y no graba datos reales todavía. La propuesta queda para revisión previa.
+        <strong>V33.4:</strong> esta versión replica eventos ya finalizados tal cual: ingresos, compras y donaciones de producto quedan como propuesta revisable. No calcula cantidades, no mezcla históricos y no graba datos reales todavía.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -343,14 +392,17 @@
     const replica = buildReplicaProposal();
     lastSourceEvent = replica.event;
     if(!replica.event){
+      lastIncomeProposal = [];
       try{ alert('Debes elegir un evento finalizado para replicar.'); }catch(_){ }
       return;
     }
     if(up(replica.event.situacion || '') !== 'FINALIZADO'){
+      lastIncomeProposal = [];
       try{ alert('Solo se pueden replicar eventos que estén en situación FINALIZADO.'); }catch(_){ }
       return;
     }
     lastProposal = replica.rows;
+    lastIncomeProposal = replica.incomes || [];
     renderProposal();
     document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
   }
@@ -364,12 +416,26 @@
       btn.className = 'ce-plan-top-float hidden';
       btn.textContent = '⌂';
       btn.setAttribute('aria-label', 'Volver al inicio de planificación');
-      btn.addEventListener('click', event => {
-        event.preventDefault();
-        const target = document.getElementById(PANEL_ID);
-        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
-        else window.scrollTo({top:0, behavior:'smooth'});
-      });
+      const goTop = event => {
+        if(event){ event.preventDefault(); event.stopPropagation(); }
+        const target = document.getElementById(PANEL_ID)?.querySelector?.('.planificacion-card') || document.getElementById(PANEL_ID);
+        try{
+          if(target){
+            const top = Math.max(0, target.getBoundingClientRect().top + (window.scrollY || document.documentElement.scrollTop || 0) - 8);
+            window.scrollTo({top, behavior:'smooth'});
+            target.scrollIntoView({behavior:'smooth', block:'start'});
+          }else{
+            window.scrollTo({top:0, behavior:'smooth'});
+          }
+          ['.main','.app','body','html'].forEach(sel => {
+            const el = document.querySelector(sel);
+            if(el && el.scrollTop > 0) el.scrollTo({top:0, behavior:'smooth'});
+          });
+        }catch(_){ try{ window.scrollTo(0,0); }catch(__){} }
+      };
+      btn.addEventListener('click', goTop, true);
+      btn.addEventListener('pointerup', goTop, true);
+      btn.addEventListener('touchend', goTop, true);
       document.body.appendChild(btn);
     }
     return btn;
@@ -445,7 +511,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV333_${eventName}`;
+    const key = `__cePlanV334_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -460,8 +526,8 @@
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV333){
-      document.__cePlanMobileClickV333 = true;
+    if(!document.__cePlanMobileClickV334){
+      document.__cePlanMobileClickV334 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }

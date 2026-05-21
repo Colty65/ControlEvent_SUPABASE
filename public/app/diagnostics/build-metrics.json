@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v32.0",
+  "version": "ControlEvent v33.4",
   "base": "v30.6",
-  "notes": "v32.0 añade Planificación inicial por histórico de COMPRAS, solo para usuarios GD, con ajuste por duración del evento y propuesta revisable sin grabar datos.",
+  "notes": "v33.4 corrige aislamiento de Planificación inicial y cálculo de unidades sugeridas como cantidad total de evento.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v32.0"
+  "build": "v33.4"
 }
