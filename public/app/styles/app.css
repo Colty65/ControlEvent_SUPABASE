@@ -1533,7 +1533,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-card.compra-card.purchased-locked .mapa-product-actions:after{font-size:10px;padding:5px 8px;margin-top:4px;}
 }
 
-/* ==== ControlEvent v32.0: Planificación inicial ==== */
+/* ==== ControlEvent v32.1: Planificación inicial ==== */
 #tabPlanificacionBtn{position:relative;}
 #tabPlanificacionBtn.active{background:#111827;color:#fff;border-color:#111827;}
 .mobile-menu-action[data-target="tabPlanificacionBtn"].primary{background:#111827;color:#fff;border-color:#111827;}

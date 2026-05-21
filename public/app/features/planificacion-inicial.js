@@ -1,8 +1,8 @@
-/* ControlEvent v32.0 - Planificación inicial por histórico de COMPRAS.
+/* ControlEvent v32.1 - Planificación inicial por histórico de COMPRAS.
    Primera versión: genera una propuesta revisable, sin grabar datos reales. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v32.0';
+  const VERSION = 'ControlEvent v32.1';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -205,12 +205,19 @@
         const ev = byId('eventos', row.eventId) || {};
         const histDays = Math.max(1, eventDays(ev));
         const histPeople = peopleForEvent(row.eventId);
-        const basePerDay = Number(row.unidades || 0) / histDays;
-        let q = basePerDay * newDays;
-        if(histPeople > 0) q = q * (newPeople / histPeople);
-        return Number.isFinite(q) ? q : Number(row.unidades || 0);
+        const rawUnits = Math.max(0, Number(row.unidades || 0));
+        // V32.1: la propuesta debe ser cantidad TOTAL para el evento, no una cantidad por persona.
+        // Ajustamos por duración y solo escalamos AL ALZA por personas; nunca reducimos por tener menos personas previstas,
+        // porque eso generaba importes/unidades ridículamente pequeñas para la lista inicial de compras.
+        let q = rawUnits;
+        if(histDays > 0) q = (rawUnits / histDays) * newDays;
+        if(histPeople > 0 && newPeople > histPeople) q *= (newPeople / histPeople);
+        return Number.isFinite(q) ? q : rawUnits;
       }).filter(n => Number.isFinite(n) && n > 0);
-      const suggestedQty = qtySamples.length ? qtySamples.reduce((a,b)=>a+b,0) / qtySamples.length : Number(latest?.unidades || 1) || 1;
+      let suggestedQty = qtySamples.length ? qtySamples.reduce((a,b)=>a+b,0) / qtySamples.length : Number(latest?.unidades || 1) || 1;
+      // Redondeo práctico para compras: si la media supera 1 unidad, redondeamos hacia arriba.
+      // Si es menor de 1, mantenemos dos decimales por si son kg/litros u otra unidad fraccionaria.
+      suggestedQty = suggestedQty >= 1 ? Math.ceil(suggestedQty) : Math.round(suggestedQty * 100) / 100;
       const priceRef = unitPrice(latest);
       const tiendaId = mostFrequent(items.map(rowTienda)) || defaultTienda;
       const responsableId = mostFrequent(items.map(rowResponsible).filter(id => up(personaOf(id)?.rango || '') === 'SOCIO')) || defaultResponsable;
@@ -334,6 +341,24 @@
     document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
+  function hidePlanificacion(){
+    const panel = document.getElementById(PANEL_ID);
+    if(panel) panel.classList.add('hidden');
+    const btn = document.getElementById(TAB_BUTTON_ID);
+    if(btn) btn.classList.remove('active');
+    document.querySelectorAll(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`).forEach(el => el.classList.remove('primary'));
+  }
+  function enforcePlanificacionIsolation(){
+    const panel = document.getElementById(PANEL_ID);
+    if(!panel || panel.classList.contains('hidden')) return;
+    const activePlan = document.getElementById(TAB_BUTTON_ID)?.classList.contains('active');
+    // Si se ha abierto Resumen, Gráficas u otra pestaña por el render legacy, la planificación no debe quedar debajo.
+    const otherVisible = KNOWN_PANELS.filter(id => id !== PANEL_ID).some(id => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden') && el.offsetParent !== null;
+    });
+    if(!activePlan && otherVisible) hidePlanificacion();
+  }
   function showPlanificacion(){
     if(!isGD()){
       try{ alert('Planificación inicial solo está disponible para usuarios GD.'); }catch(_){ }
@@ -386,6 +411,12 @@
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
     bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); showPlanificacion(); }, true);
+    KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => {
+      bindOnce(document.getElementById(id), 'click', () => setTimeout(hidePlanificacion, 0));
+    });
+    document.querySelectorAll('.mobile-menu-action').forEach(el => {
+      if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => setTimeout(hidePlanificacion, 0));
+    });
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFuenteHistorica'), 'change', syncBaseEventAvailability);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
@@ -412,7 +443,7 @@
     window.renderPlanificacionInicial = ensureReady;
     window.addEventListener('controlevent:app-ready', ensureReady);
     window.addEventListener('controlevent:runtime-ready', ensureReady);
-    setInterval(ensureReady, window.ControlEventLowResource?.interval?.(1800) || 1800);
+    setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
   else install();
