@@ -1,21 +1,11 @@
-import { createLegacyView } from './_view-runtime.js';
-import { installMaintenanceModules, refreshCurrentMaintenance } from '../maintenance/index.js';
-
-const view = createLegacyView({
-  name: 'mantenimiento',
-  render: ['renderMaintenance'],
-  afterActivate(){
-    const maintenance = installMaintenanceModules();
-    const scheduler = maintenance?.scheduleCurrent;
-    if(typeof scheduler === 'function'){
-      scheduler({reason:'mantenimiento-view-activate-lazy', delay:90});
-    }else{
-      refreshCurrentMaintenance({reason:'mantenimiento-view-activate'});
-    }
-  }
-});
-
-export const meta = {...view.meta, maintenance:'v27.0'};
-export const mount = context => view.mount(context);
-export const activate = context => view.activate(context);
-export const refresh = activate;
+{
+  "version": "30.12",
+  "base": "ControlEvent_v30_10_RESCATE",
+  "changes": [
+    "Mapa de recursos con filtro multiple por responsables SOCIO",
+    "Ordenacion por Tienda, Pte. Comprar/TKxx y Producto",
+    "TKxx en verde Excel transparente",
+    "Fix anti-bloqueo de login: el mapa no actua mientras authOverlay esta visible",
+    "Fix anti-bucle: MutationObserver del mapa con debounce y sin reescritura continua del menu"
+  ]
+}

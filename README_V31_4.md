@@ -1,10 +1,7 @@
-ControlEvent v31.6
+# ControlEvent v31.6.1
 
-Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
-
-Cambios principales:
-- BACKUP/METADATOS: VERSION = ControlEvent v31.6 y VERSION_FICHERO = ControlEvent_v31_6.
-- Mapa de recursos: botón flotante de inicio con icono ⌂.
-- PC/iPad: botón centrado a la derecha.
-- iPhone/Android: botón encima de Menú.
-- Caché nueva: controlevent-shell-v31-6.
+Correcciones:
+- package.json y package-lock.json validados como JSON real para Vercel.
+- Mapa de recursos: el buscador limpia el texto al finalizar una búsqueda.
+- Mantenimientos generales: bloqueo de duplicados en PERSONAS, EVENTOS, TIENDAS y PRODUCTOS, tanto al añadir como al modificar.
+- Caché: controlevent-shell-v31-6-1.

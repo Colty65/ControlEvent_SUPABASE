@@ -1,9 +1,9 @@
-# ControlEvent v31.6
+# ControlEvent v31.6.1
 
 Base: v31.5 validada.
 
 Cambios:
-- BACKUP: corregida la versión de METADATOS para que informe ControlEvent v31.6 y ControlEvent_v31_6.
+- BACKUP: corregida la versión de METADATOS para que informe ControlEvent v31.6.1 y ControlEvent_v31_6_1.
 - Mapa de recursos: botón flotante de volver al inicio con icono de casa.
 - En PC e iPad se coloca a la derecha, centrado verticalmente.
 - En iPhone/Android se coloca abajo a la derecha, justo por encima del botón Menú.

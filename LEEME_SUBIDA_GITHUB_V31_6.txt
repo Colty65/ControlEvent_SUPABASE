@@ -1,12 +1,10 @@
-import { createLegacyView } from './_view-runtime.js';
+ControlEvent v31.6.1
 
-const view = createLegacyView({
-  name: 'donaciones',
-  render: ['renderDonaciones'],
-  patches: true
-});
+Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
 
-export const meta = view.meta;
-export const mount = context => view.mount(context);
-export const activate = context => view.activate(context);
-export const refresh = activate;
+Cambios principales:
+- BACKUP/METADATOS: VERSION = ControlEvent v31.6.1 y VERSION_FICHERO = ControlEvent_v31_6_1.
+- Mapa de recursos: botón flotante de inicio con icono ⌂.
+- PC/iPad: botón centrado a la derecha.
+- iPhone/Android: botón encima de Menú.
+- Caché nueva: controlevent-shell-v31-6-1.

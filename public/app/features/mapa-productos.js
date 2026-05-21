@@ -1,8 +1,8 @@
-/* ControlEvent v31.5 - Mapa de recursos
+/* ControlEvent v31.6.1 - Mapa de recursos
    Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.5';
+  const VERSION = 'ControlEvent v31.6.1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -454,6 +454,26 @@
     scrollToElementStrong(target);
     return true;
   }
+  function ensureFloatingHomeButton(){
+    let btn = document.getElementById('ceMapaFloatingHomeButton');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'ceMapaFloatingHomeButton';
+      btn.className = 'mapa-floating-home';
+      btn.setAttribute('data-mapa-back-top', '1');
+      btn.setAttribute('aria-label', 'Volver al inicio del Mapa de recursos');
+      btn.title = 'Volver al inicio';
+      btn.textContent = '⌂';
+      btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToMapaTop(); }, true);
+      btn.addEventListener('pointerup', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToMapaTop(); }, true);
+      document.body.appendChild(btn);
+    }
+    const shouldShow = !isAuthVisible() && currentTab() === TAB_NAME && hasEvent() && !!document.getElementById(PANEL_ID) && !document.getElementById(PANEL_ID).classList.contains('hidden');
+    btn.hidden = !shouldShow;
+    btn.classList.toggle('is-visible', shouldShow);
+    return btn;
+  }
   function bindDonationSummaryJump(){
     const btn = document.querySelector('[data-mapa-jump-donados="1"]');
     if(btn && !btn.__ceDonationJumpBoundV314){
@@ -473,7 +493,7 @@
       setTimeout(scrollToDonationHeader, 180);
       return true;
     }
-    const top = event.target?.closest?.('#tabMapaProductos [data-mapa-back-top="1"]');
+    const top = event.target?.closest?.('#tabMapaProductos [data-mapa-back-top="1"],#ceMapaFloatingHomeButton');
     if(top){
       try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
       setTimeout(scrollToMapaTop, 0);
@@ -516,13 +536,13 @@
         ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
         ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `TKxx: ${moneyFmt(eventSummary.totalCompraTk || 0)} · Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
-      </div>
-      <button type="button" class="mapa-floating-top" data-mapa-back-top="1" title="Volver arriba" aria-label="Volver arriba">↑ Volver arriba</button>`;
+      </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
     const donationMetric = summary.querySelector('.mapa-metric.jump-donados');
     if(donationMetric){ donationMetric.setAttribute('data-mapa-jump-donados','1'); donationMetric.setAttribute('role','button'); donationMetric.setAttribute('tabindex','0'); donationMetric.setAttribute('title','Ir a productos donados'); }
     bindDonationSummaryJump();
+    ensureFloatingHomeButton();
 
     if(!data.groups.length && !data.onlyDonations.length){
       wrap.innerHTML = '<div class="empty">No hay compras ni donaciones de producto para el filtro actual.</div>';
@@ -608,12 +628,13 @@
     if(btn){ btn.classList.toggle('active', active); btn.classList.remove('hidden-by-role-v228'); btn.style.removeProperty('display'); btn.removeAttribute('aria-hidden'); btn.disabled = false; btn.removeAttribute('aria-disabled'); }
     document.querySelectorAll('.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => { el.classList.remove('hidden-by-role-v228'); el.style.removeProperty('display'); el.removeAttribute('aria-hidden'); el.disabled = false; el.removeAttribute('aria-disabled'); el.classList.toggle('primary', active); });
     bindDirectMapaButton();
+    ensureFloatingHomeButton();
   }
   function forceShowMapa(options = {}){
     mapPinned = true; setCurrentTab(TAB_NAME);
     KNOWN_PANELS.forEach(id => { const el = $(id); if(el) el.classList.toggle('hidden', id !== PANEL_ID || !hasEvent()); });
     KNOWN_BUTTONS.forEach(id => { const el = $(id); if(el) el.classList.toggle('active', id === BUTTON_ID); });
-    applyMapVisibility(); renderMapaProductos(); normalizeMapaLabelsV3013(); closeMobileDrawer();
+    applyMapVisibility(); renderMapaProductos(); normalizeMapaLabelsV3013(); ensureFloatingHomeButton(); closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
   }
   function ensureMobileMenuAction(){
@@ -707,5 +728,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v314', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v316', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

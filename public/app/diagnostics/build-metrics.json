@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v31.5",
+  "version": "ControlEvent v31.6.1",
   "base": "v30.6",
-  "notes": "v30.7 mantiene rendimiento, corrige la instalación de globos de presupuesto y refuerza la ordenación por Tienda/Ticket.",
+  "notes": "v31.6 corrige metadatos de BACKUP y ajusta el botón flotante de Mapa de recursos por dispositivo.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v31.5"
+  "build": "v31.6"
 }

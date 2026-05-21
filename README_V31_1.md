@@ -1,8 +1,8 @@
-ControlEvent v31.3 - SOLO SUBIR GITHUB
+# ControlEvent v31.3
 
-Subir todo el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
+Ajustes funcionales sobre V31.0 en Mapa de recursos.
 
-Cambios principales:
-- Corrección de totales y salto en DONADO PRODUCTO dentro de Mapa de recursos.
-- Botón Volver arriba al final de productos donados.
-- Corrección del desplegable Ingreso en alta de colaboradores.
+- El buscador de producto ya no busca al teclear; busca al pulsar Buscar o Enter.
+- Cabecera de productos donados simplificada: número de productos donados para responsables seleccionados y valor estimado.
+- La ficha Donado producto permite saltar a la cabecera de productos donados.
+- Sin cambios en login, globos de gráficas ni rendimiento.

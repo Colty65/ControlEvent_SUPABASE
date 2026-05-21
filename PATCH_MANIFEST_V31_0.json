@@ -1,12 +1,12 @@
-import { createLegacyView } from './_view-runtime.js';
-
-const view = createLegacyView({
-  name: 'resumen',
-  render: ['renderBudget'],
-  patches: true
-});
-
-export const meta = view.meta;
-export const mount = context => view.mount(context);
-export const activate = context => view.activate(context);
-export const refresh = activate;
+{
+  "version": "31.0",
+  "base": "V30.13 estable validada",
+  "changes": [
+    "Mapa de recursos: cabecera con totales globales del evento aunque haya filtro por responsable",
+    "Mapa de recursos: COMPRAS PRODUCTO muestra total, TKxx comprado y Pte.Compra",
+    "Mapa de recursos: se elimina ficha SOLO DONACION y se mueve el dato a la cabecera de productos donados",
+    "Mapa de recursos: se añade precio unitario en compras y donaciones",
+    "Mapa de recursos: buscador de producto que se posiciona en el primer registro coincidente",
+    "Eventos: desplegable y mantenimiento ordenados por fecha de inicio"
+  ]
+}
