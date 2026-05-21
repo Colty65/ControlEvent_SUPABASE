@@ -1,4 +1,4 @@
-# ControlEvent v31.1
+# ControlEvent v31.2
 
 Ajustes funcionales sobre V31.0 en Mapa de recursos.
 

@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v31.1",
+  "version": "ControlEvent v31.2",
   "base": "ControlEvent v30.12",
   "changes": [
     "Mapa de recursos sin observador global continuo",

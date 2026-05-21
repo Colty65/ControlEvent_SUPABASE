@@ -1,0 +1,9 @@
+ControlEvent v31.2
+
+Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos.
+
+Importante:
+- Esta versión parte de v31.1.
+- No modifica login, globos generales ni rendimiento.
+- Corrige Mapa de recursos: la ficha Donado producto y la cabecera inferior de productos donados usan la misma base.
+- Cache: controlevent-shell-v31-2.

@@ -1,4 +1,4 @@
-ControlEvent V31.1 - Solo subir a GitHub
+ControlEvent V31.2 - Solo subir a GitHub
 
 Base: V30.13 validada en todos los dispositivos.
 

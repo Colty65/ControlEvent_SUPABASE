@@ -1,8 +1,8 @@
-/* ControlEvent v31.1 - Mapa de recursos
-   Cruza compras + donaciones y añade filtro por responsables SOCIO. */
+/* ControlEvent v31.2 - Mapa de recursos
+   Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.1';
+  const VERSION = 'ControlEvent v31.2';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -220,13 +220,16 @@
       return a.producto.localeCompare(b.producto, 'es');
     });
 
+    // V31.2: la zona inferior "PRODUCTOS DONADOS" lista TODOS los productos con donación
+    // del filtro actual, no solo los que no tienen compra planificada. Así la ficha
+    // "Donado producto" y la cabecera inferior hablan del mismo conjunto de datos.
     const productIdsWithCompra = new Set(result.map(group => group.productoId));
     const onlyDonations = Array.from(donationByProduct.entries())
-      .filter(([productId]) => !productIdsWithCompra.has(productId))
       .map(([productId, items]) => {
         const first = items[0]?.row || {productoId};
         const unidadesDonadas = items.reduce((sum, item) => sum + Number(item.unidades || 0), 0);
         const valorDonado = items.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+        const hasCompraPlanificada = productIdsWithCompra.has(productId);
         return {
           productId,
           producto: productName(first),
@@ -235,10 +238,14 @@
           unidadesDonadas,
           valorDonado,
           precioDonado: unitPriceFrom(unidadesDonadas, valorDonado),
+          origen: hasCompraPlanificada ? 'Donación asociada a compra' : 'Solo donación',
           donationRows: items.sort((a,b)=>a.donor.localeCompare(b.donor,'es'))
         };
       })
       .sort((a,b)=>a.producto.localeCompare(b.producto,'es'));
+
+    const filteredDonationValue = onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
+    const filteredProductsWithDonations = onlyDonations.length;
 
     return {
       groups: result,
@@ -253,6 +260,8 @@
         totalCompraPte: eventTotalCompraPte,
         totalDonado: eventTotalDonado,
         productsWithDonations: eventProductsWithDonations,
+        filteredDonationValue,
+        filteredProductsWithDonations,
         necesidadValor: eventTotalCompra + eventTotalDonado
       }
     };
@@ -325,7 +334,8 @@
   }
 
   function renderMetric(label, value, note, kind){
-    return `<div class="mapa-metric ${kind || ''}"><div class="mapa-metric-label">${esc(label)}</div><div class="mapa-metric-value">${esc(value)}</div>${note ? `<div class="mapa-metric-note">${esc(note)}</div>` : ''}</div>`;
+    const jumpAttrs = String(kind || '').includes('jump-donados') ? ' data-mapa-jump-donados="1" role="button" tabindex="0" title="Ir a productos donados"' : '';
+    return `<div class="mapa-metric ${kind || ''}"${jumpAttrs}><div class="mapa-metric-label">${esc(label)}</div><div class="mapa-metric-value">${esc(value)}</div>${note ? `<div class="mapa-metric-note">${esc(note)}</div>` : ''}</div>`;
   }
   function renderDonationRows(items){
     if(!items.length) return '<div class="mapa-donation-empty">Sin donaciones registradas de este producto para el filtro actual.</div>';
@@ -382,26 +392,74 @@
     if(!input || input.__ceMapaSearchBound) return;
     input.__ceMapaSearchBound = true;
     const run = () => { productSearchText = input.value || ''; focusFirstProduct(productSearchText); };
-    // V31.1: no buscar en cada pulsación; solo al pulsar Buscar o Enter.
+    // V31.2: no buscar en cada pulsación; solo al pulsar Buscar o Enter.
     input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); run(); } });
     btn?.addEventListener('click', event => { try{ event.preventDefault(); }catch(_){ } run(); });
     if(productSearchText) setTimeout(() => focusFirstProduct(productSearchText), 80);
   }
-  function scrollToDonationHeader(){
-    const target = document.getElementById('mapaOnlyDonationsHead') || document.querySelector('#mapaProductosList .mapa-only-donations-head') || document.querySelector('#mapaProductosList .mapa-donation-block');
+  function findScrollParent(el){
+    let node = el?.parentElement || null;
+    while(node && node !== document.body && node !== document.documentElement){
+      try{
+        const cs = getComputedStyle(node);
+        const canScroll = /(auto|scroll)/.test(`${cs.overflowY} ${cs.overflow}`) && node.scrollHeight > node.clientHeight + 8;
+        if(canScroll) return node;
+      }catch(_){ }
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+  function scrollToElementStrong(target){
     if(!target) return false;
-    try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ target.scrollIntoView(); }
-    try{ target.classList.add('mapa-donation-head-focus'); setTimeout(() => target.classList.remove('mapa-donation-head-focus'), 1400); }catch(_){ }
+    const scroller = findScrollParent(target);
+    const headerOffset = 96;
+    try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ try{ target.scrollIntoView(); }catch(__){ } }
+    try{
+      if(scroller && scroller !== document.scrollingElement && scroller !== document.documentElement){
+        const sRect = scroller.getBoundingClientRect();
+        const tRect = target.getBoundingClientRect();
+        scroller.scrollTo({top: scroller.scrollTop + (tRect.top - sRect.top) - 14, behavior:'smooth'});
+      }else{
+        const top = window.pageYOffset + target.getBoundingClientRect().top - headerOffset;
+        window.scrollTo({top: Math.max(0, top), behavior:'smooth'});
+      }
+      setTimeout(() => {
+        try{
+          const top = window.pageYOffset + target.getBoundingClientRect().top - headerOffset;
+          if(Math.abs(target.getBoundingClientRect().top - headerOffset) > 40) window.scrollTo({top: Math.max(0, top), behavior:'auto'});
+        }catch(_){ }
+      }, 260);
+    }catch(_){ }
+    return true;
+  }
+  function scrollToDonationHeader(){
+    const target = document.getElementById('mapaOnlyDonationsHead') || document.querySelector('#mapaProductosList .mapa-only-donations-head');
+    if(!target) return false;
+    scrollToElementStrong(target);
+    try{ target.classList.add('mapa-donation-head-focus'); setTimeout(() => target.classList.remove('mapa-donation-head-focus'), 1600); }catch(_){ }
     return true;
   }
   function bindDonationSummaryJump(){
     const btn = document.querySelector('[data-mapa-jump-donados="1"]');
-    if(!btn || btn.__ceDonationJumpBound) return;
-    btn.__ceDonationJumpBound = true;
-    btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToDonationHeader(); });
-    btn.addEventListener('keydown', event => { if(event.key === 'Enter' || event.key === ' '){ try{ event.preventDefault(); }catch(_){ } scrollToDonationHeader(); } });
+    if(btn && !btn.__ceDonationJumpBound){
+      btn.__ceDonationJumpBound = true;
+      btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToDonationHeader(); });
+      btn.addEventListener('pointerup', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToDonationHeader(); });
+      btn.addEventListener('keydown', event => { if(event.key === 'Enter' || event.key === ' '){ try{ event.preventDefault(); }catch(_){ } scrollToDonationHeader(); } });
+    }
   }
   function dataProductText(parts){ return esc(parts.filter(Boolean).join(' · ')); }
+
+  function bindDelegatedDonationJumpOnce(){
+    if(document.__ceMapaDonationJumpDelegatedV312) return;
+    document.__ceMapaDonationJumpDelegatedV312 = true;
+    document.addEventListener('click', event => {
+      const trigger = event.target?.closest?.('#tabMapaProductos [data-mapa-jump-donados="1"]');
+      if(!trigger) return;
+      try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
+      scrollToDonationHeader();
+    }, false);
+  }
 
   function renderMapaProductos(){
     const wrap = $('mapaProductosList');
@@ -425,7 +483,7 @@
       <div class="mapa-summary-metrics">
         ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
         ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `TKxx: ${moneyFmt(eventSummary.totalCompraTk || 0)} · Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
-        ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
+        ${renderMetric('Donado producto', moneyFmt(eventSummary.filteredDonationValue || 0), `${eventSummary.filteredProductsWithDonations || 0} productos donados para los responsables seleccionados · pulsar para ir a donados`, 'ok jump-donados')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
@@ -472,10 +530,10 @@
         <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>${esc(String(data.onlyDonations.length))} PRODUCTOS DONADOS PARA LOS RESPONSABLES SELECCIONADOS. VALOR ESTIMADO ${esc(moneyFmt(onlyDonationValue))}</strong></div>
         ${data.onlyDonations.map(item => {
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
-          const searchText = dataProductText(['Solo donación', item.producto, item.segmento, item.destino, donorTxt]);
+          const searchText = dataProductText([item.origen || 'Producto donado', item.producto, item.segmento, item.destino, donorTxt]);
           return `
           <article class="mapa-product-card donation-only" data-product-text="${searchText}">
-            <div class="mapa-product-head"><div><span class="mapa-store">Solo donación</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
+            <div class="mapa-product-head"><div><span class="mapa-store">${esc(item.origen || 'Producto donado')}</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
             <div class="mapa-product-kpis compact"><div><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
             ${renderDonationRows(item.donationRows)}
           </article>`;
@@ -506,7 +564,7 @@
   }
   function applyMapVisibility(){
     if(isAuthVisible()) return;
-    // V31.1: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
+    // V31.2: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
     const active = currentTab() === TAB_NAME;
     const eventReady = hasEvent();
     const panel = $(PANEL_ID), btn = $(BUTTON_ID);
@@ -594,7 +652,7 @@
   function patchAppActions(){
     try{ const actions = window.ControlEventApp?.actions; if(actions){ actions.render = (...args) => window.render(...args); actions.renderTabVisibility = (...args) => window.renderTabVisibility(...args); actions.renderMapaProductos = (...args) => window.renderMapaProductos(...args); actions.showMapaProductos = (...args) => window.showMapaProductos(...args); } }catch(_){ }
   }
-  patchAppActions(); bindDirectMapaButton();
+  patchAppActions(); bindDirectMapaButton(); bindDelegatedDonationJumpOnce();
   window.addEventListener('controlevent:app-ready', patchAppActions);
   window.addEventListener('controlevent:runtime-ready', () => { applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); patchAppActions(); });
   const scheduleMapaSync = (() => {
@@ -611,7 +669,7 @@
       }, 80);
     };
   })();
-  // V31.1: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
+  // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v311', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v312', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

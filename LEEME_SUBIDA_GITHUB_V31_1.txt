@@ -1,4 +1,4 @@
-ControlEvent v31.1
+ControlEvent v31.2
 
 Subir todos los archivos de este ZIP al repositorio, sustituyendo los anteriores.
 
