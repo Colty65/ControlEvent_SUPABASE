@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v31.10",
+  "version": "ControlEvent v32.0",
   "base": "v30.6",
-  "notes": "v31.10 ajusta Mapa de recursos: fichas donadas más compactas y sin marcado manual en compras ya compradas.",
+  "notes": "v32.0 añade Planificación inicial por histórico de COMPRAS, solo para usuarios GD, con ajuste por duración del evento y propuesta revisable sin grabar datos.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v31.10"
+  "build": "v32.0"
 }

@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v31.8</title>
-  <!-- ControlEvent v31.8 PWA / instalación móvil -->
+  <title>ControlEvent v32.0</title>
+  <!-- ControlEvent v32.0 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -72,7 +72,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v31.8</span>
+          <span>ControlEvent v32.0</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -91,6 +91,7 @@
         <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
         <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
         <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de recursos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">🧭</span></button>
+        <button type="button" class="tab hidden" id="tabPlanificacionBtn" aria-label="Planificación inicial"><span class="tabicon">🧠</span></button>
         <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
       </div>
@@ -264,6 +265,53 @@
           <div id="mapaProductosSummary" class="mapa-summary-grid"></div>
           <div class="separator"></div>
           <div id="mapaProductosList"></div>
+        </div>
+      </div>
+
+      <div id="tabPlanificacionInicial" class="hidden">
+        <div class="card planificacion-card">
+          <div class="section-title">
+            <div class="icon-badge">🧠</div>
+            <div>
+              <h2>Planificación inicial</h2>
+              <p>Genera una propuesta previa de evento usando el histórico real de COMPRAS. Solo crea un borrador: no graba datos todavía.</p>
+            </div>
+          </div>
+
+          <div class="planificacion-note">
+            <strong>Primera versión V32.0:</strong> se usa la historia de compras propias para proponer productos, tienda habitual, responsable habitual, cantidades y presupuesto. La duración del evento se tiene en cuenta para ajustar cantidades cuando sea de varios días.
+          </div>
+
+          <div class="planificacion-grid">
+            <div class="field"><label>Nombre del evento</label><input id="planEventoTitulo" placeholder="Ej. Cumpleaños / comida peña" /></div>
+            <div class="field"><label>Fecha inicio</label><input id="planFechaIni" placeholder="DD/MM/AA" /></div>
+            <div class="field"><label>Fecha fin</label><input id="planFechaFin" placeholder="DD/MM/AA" /></div>
+            <div class="field"><label>Días de duración</label><input id="planDias" type="number" min="1" step="1" value="1" /></div>
+            <div class="field"><label>Tipo de juerga</label><select id="planTipoJuerga"></select></div>
+            <div class="field"><label>Nº estimado personas</label><input id="planPersonas" type="number" min="1" step="1" value="30" /></div>
+            <div class="field"><label>Responsable inicial</label><select id="planResponsable"></select></div>
+            <div class="field"><label>Tienda por defecto</label><select id="planTienda"></select></div>
+            <div class="field plan-span-2"><label>Breve descripción</label><textarea id="planDescripcion" rows="2" placeholder="Descripción inicial del evento"></textarea></div>
+            <div class="field plan-span-2"><label>Información para la construcción</label><textarea id="planInfo" rows="4" placeholder="Ej. comida y cena, cerveza, vino, cubatas, aperitivos, postre, hielo, vasos, mesas, etc."></textarea></div>
+          </div>
+
+          <div class="planificacion-subcard">
+            <div class="section-title small-title">
+              <div class="icon-badge">📚</div>
+              <div>
+                <h2>Histórico a utilizar</h2>
+                <p>El sistema analiza COMPRAS anteriores para proponer una estructura inicial.</p>
+              </div>
+            </div>
+            <div class="planificacion-grid compact">
+              <div class="field"><label>Fuente histórica</label><select id="planFuenteHistorica"></select></div>
+              <div class="field"><label>Evento base</label><select id="planEventoBase"></select></div>
+              <div class="field"><label>Productos a proponer</label><select id="planNivelPropuesta"></select></div>
+              <div class="field"><label>&nbsp;</label><button type="button" id="btnGenerarPlanificacion">Generar propuesta desde histórico</button></div>
+            </div>
+          </div>
+
+          <div id="planificacionResultado" class="planificacion-resultado hidden"></div>
         </div>
       </div>
 
@@ -456,11 +504,12 @@
 <script type="module" src="./modules/module-loader.js"></script>
 <script id="legacy-bundle-after-modules-v307" src="./app/legacy/legacy-bundle-after-modules-v30.7.js"></script>
 <script src="./app/features/mapa-productos.js"></script>
+<script src="./app/features/planificacion-inicial.js"></script>
 <script src="./app/features/ingresos-select-fix.js"></script>
 <script src="./app/features/view-refresh-stabilizer.js"></script>
 <script src="./app/features/budget-tooltips-lite.js"></script>
 <script src="./app/features/summary-tienda-sort-fix.js"></script>
-<script src="./app/features/maintenance-duplicates-v31.8.js"></script>
+<script src="./app/features/maintenance-duplicates-v32.0.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
 
