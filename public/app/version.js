@@ -1,2 +1,2 @@
-export const VERSION = 'ControlEvent v31.4';
-export const VERSION_FILE = 'ControlEvent_v31_4';
+export const VERSION = 'ControlEvent v31.5';
+export const VERSION_FILE = 'ControlEvent_v31_5';

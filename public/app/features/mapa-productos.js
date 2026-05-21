@@ -1,8 +1,8 @@
-/* ControlEvent v31.4 - Mapa de recursos
+/* ControlEvent v31.5 - Mapa de recursos
    Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.4';
+  const VERSION = 'ControlEvent v31.5';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -516,7 +516,8 @@
         ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
         ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `TKxx: ${moneyFmt(eventSummary.totalCompraTk || 0)} · Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
-      </div>`;
+      </div>
+      <button type="button" class="mapa-floating-top" data-mapa-back-top="1" title="Volver arriba" aria-label="Volver arriba">↑ Volver arriba</button>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
     const donationMetric = summary.querySelector('.mapa-metric.jump-donados');
@@ -556,8 +557,10 @@
       </article>`;
     }).join('');
 
-    const donationHeaderCount = Number(eventSummary.productsWithDonations || data.onlyDonations.length || 0);
-    const donationHeaderValue = Number(eventSummary.totalDonado || 0);
+    // V31.5: la cabecera inferior de productos donados debe respetar el filtro actual de responsables.
+    // La ficha superior DONADO PRODUCTO mantiene el total global del evento; esta cabecera resume solo lo listado.
+    const donationHeaderCount = Number(data.onlyDonations.length || 0);
+    const donationHeaderValue = data.onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
     const onlyDonationBlock = data.onlyDonations.length ? `
       <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
         <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>${esc(String(donationHeaderCount))} PRODUCTOS DONADOS PARA LOS RESPONSABLES SELECCIONADOS. VALOR ESTIMADO ${esc(moneyFmt(donationHeaderValue))}</strong></div>
@@ -571,7 +574,6 @@
             ${renderDonationRows(item.donationRows)}
           </article>`;
         }).join('')}
-        <div class="mapa-donations-footer"><button type="button" class="outline small" data-mapa-back-top="1">↑ Volver arriba</button></div>
       </section>` : '';
 
     wrap.innerHTML = cards + onlyDonationBlock;
