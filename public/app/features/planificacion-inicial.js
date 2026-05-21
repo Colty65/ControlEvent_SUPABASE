@@ -1,8 +1,9 @@
-/* ControlEvent v33.4 - Planificación inicial por réplica de evento FINALIZADO.
-   Borrador revisable, sin grabar datos reales todavía. */
+/* ControlEvent v33.5 - Planificación inicial por réplica de evento FINALIZADO.
+   Borrador revisable, sin grabar datos reales todavía.
+   V33.5 elimina Tipo de juerga porque la planificación replica un evento tal cual. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.4';
+  const VERSION = 'ControlEvent v33.5';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -210,7 +211,7 @@
   }
 
   function initForm(){
-    // V33.4: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
+    // V33.5: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
     const events = finalizados();
     setOptions(document.getElementById('planEventoBase'), events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], events[0]?.id || '');
     const fuente = document.getElementById('planFuenteHistorica');
@@ -298,7 +299,7 @@
       </div>
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
-        <strong>V33.4:</strong> esta versión replica eventos ya finalizados tal cual: ingresos, compras y donaciones de producto quedan como propuesta revisable. No calcula cantidades, no mezcla históricos y no graba datos reales todavía.
+        <strong>V33.5:</strong> replica eventos ya finalizados tal cual: ingresos, compras y donaciones de producto quedan como propuesta revisable. Se elimina Tipo de juerga porque aquí no se recalcula nada: el modelo elegido manda.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -511,7 +512,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV334_${eventName}`;
+    const key = `__cePlanV335_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -526,8 +527,8 @@
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV334){
-      document.__cePlanMobileClickV334 = true;
+    if(!document.__cePlanMobileClickV335){
+      document.__cePlanMobileClickV335 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }

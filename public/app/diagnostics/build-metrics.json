@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v33.4",
+  "version": "ControlEvent v33.5",
   "base": "v30.6",
-  "notes": "v33.4 corrige aislamiento de Planificación inicial y cálculo de unidades sugeridas como cantidad total de evento.",
+  "notes": "v33.5 elimina Tipo de juerga de Planificación inicial y mantiene réplica exacta de evento finalizado.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v33.4"
+  "build": "v33.5"
 }
