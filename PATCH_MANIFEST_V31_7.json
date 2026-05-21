@@ -1,11 +1,11 @@
 {
-  "version": "ControlEvent v31.7",
+  "version": "ControlEvent v31.8",
   "base": "ControlEvent v31.6.1 estable",
   "changes": [
     "Mapa de recursos: fichas de producto compactas",
     "Menos información redundante por registro",
     "Sin cambios en login, globos generales, BACKUP, INFOEVENTO ni resto de pantallas",
-    "Cache actualizado a controlevent-shell-v31-7"
+    "Cache actualizado a controlevent-shell-v31-8"
   ],
   "files": [
     "public/app/features/mapa-productos.js",

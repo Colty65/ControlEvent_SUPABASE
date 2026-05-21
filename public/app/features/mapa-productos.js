@@ -1,8 +1,8 @@
-/* ControlEvent v31.7 - Mapa de recursos
+/* ControlEvent v31.8 - Mapa de recursos
    Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.7';
+  const VERSION = 'ControlEvent v31.8';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -127,6 +127,40 @@
       if(!map.has(id)) map.set(id, {id, name});
     });
     return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  }
+
+  // V31.8: marcado visual local para usar Mapa de recursos como lista de la compra.
+  // No modifica datos ni tickets; solo colorea/tacha la ficha en este navegador.
+  function shoppingStorageKey(){ return `ControlEventMapaRecursosCompradoAhora_v318_${selectedId() || 'sin_evento'}`; }
+  function readShoppingChecked(){
+    try{
+      const raw = localStorage.getItem(shoppingStorageKey());
+      const list = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(list) ? list.map(String) : []);
+    }catch(_){ return new Set(); }
+  }
+  function writeShoppingChecked(set){
+    try{ localStorage.setItem(shoppingStorageKey(), JSON.stringify(Array.from(set || []))); }catch(_){ }
+  }
+  function toggleShoppingChecked(key){
+    const k = String(key || '');
+    if(!k) return false;
+    const set = readShoppingChecked();
+    const checked = !set.has(k);
+    if(checked) set.add(k); else set.delete(k);
+    writeShoppingChecked(set);
+    return checked;
+  }
+  function applyShoppingCheckedToCard(card, checked){
+    if(!card) return;
+    card.classList.toggle('shop-checked', !!checked);
+    const btn = card.querySelector('[data-mapa-shop-toggle]');
+    if(btn){
+      btn.classList.toggle('is-checked', !!checked);
+      btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+      btn.innerHTML = checked ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado';
+      btn.title = checked ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora';
+    }
   }
 
   function buildMapaProductos(){
@@ -349,6 +383,16 @@
       </div>`).join('')}</div>`;
   }
 
+  function renderDonationRowsCompact(items){
+    if(!items.length) return '';
+    return `<div class="mapa-donation-list donation-only-compact-list">${items.map(item => `
+      <div class="mapa-donation-row donation-only-row">
+        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}${item.responsable ? ' · Resp. ' + esc(item.responsable) : ''}</span></div>
+        <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</span></div>
+        <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
+      </div>`).join('')}</div>`;
+  }
+
   function renderTicketLine(group){ return group.ticket || 'Pte. Comprar u otros gastos'; }
   function pct(part, total){
     const n = total > 0 ? Math.max(0, Math.min(100, (Number(part || 0) / total) * 100)) : 0;
@@ -486,6 +530,15 @@
   function dataProductText(parts){ return esc(parts.filter(Boolean).join(' · ')); }
 
   function handleMapaInternalAction(event){
+    const shop = event.target?.closest?.('#tabMapaProductos [data-mapa-shop-toggle="1"]');
+    if(shop){
+      try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
+      const key = shop.getAttribute('data-shop-key') || '';
+      const checked = toggleShoppingChecked(key);
+      const card = shop.closest('.mapa-product-card.compra-card');
+      applyShoppingCheckedToCard(card, checked);
+      return true;
+    }
     const jump = event.target?.closest?.('#tabMapaProductos [data-mapa-jump-donados="1"]');
     if(jump){
       try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
@@ -549,7 +602,9 @@
       return;
     }
 
+    const shoppingChecked = readShoppingChecked();
     const cards = data.groups.map(group => {
+      const checkedNow = shoppingChecked.has(group.key);
       const responsablesTxt = Array.from(group.responsables.values()).join(', ') || '—';
       const donorTxt = group.donationRows.map(item => item.donor).join(', ');
       const searchText = dataProductText([group.tienda, group.ticket, group.producto, group.segmento, group.destino, responsablesTxt, donorTxt]);
@@ -559,10 +614,13 @@
           ${renderDonationRows(group.donationRows)}
         </div>` : '';
       return `
-      <article class="mapa-product-card mapa-product-card-compact ${group.isResolvedTk ? 'resolved-tk' : 'pending-buy'}" data-product-text="${searchText}">
+      <article class="mapa-product-card mapa-product-card-compact compra-card ${group.isResolvedTk ? 'resolved-tk' : 'pending-buy'} ${checkedNow ? 'shop-checked' : ''}" data-product-text="${searchText}" data-shop-key="${esc(group.key)}">
         <div class="mapa-product-head compact">
           <div class="mapa-product-title"><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
-          <div class="mapa-tags compact"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
+          <div class="mapa-product-actions">
+            <div class="mapa-tags compact"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
+            <button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" title="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>
+          </div>
         </div>
         <div class="mapa-product-resp"><b>Responsable:</b> ${esc(responsablesTxt)}</div>
         <div class="mapa-product-compact-line" role="list">
@@ -585,10 +643,13 @@
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
           const searchText = dataProductText([item.origen || 'Producto donado', item.producto, item.segmento, item.destino, donorTxt]);
           return `
-          <article class="mapa-product-card mapa-product-card-compact donation-only" data-product-text="${searchText}">
-            <div class="mapa-product-head compact"><div class="mapa-product-title"><span class="mapa-store">${esc(item.origen || 'Producto donado')}</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags compact"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
-            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
-            <div class="mapa-donation-block compact">${renderDonationRows(item.donationRows)}</div>
+          <article class="mapa-product-card mapa-product-card-compact donation-only donation-only-compact" data-product-text="${searchText}">
+            <div class="mapa-product-head compact donation-head-compact">
+              <div class="mapa-product-title"><h3>${esc(item.producto)}</h3></div>
+              <div class="mapa-tags compact"><span>${esc(item.origen || 'Producto donado')}</span><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div>
+            </div>
+            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Total donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
+            <div class="mapa-donation-block compact donation-only-block">${renderDonationRowsCompact(item.donationRows)}</div>
           </article>`;
         }).join('')}
       </section>` : '';
@@ -725,5 +786,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v317', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v318', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

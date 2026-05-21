@@ -1264,13 +1264,13 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .mapa-only-donations-head strong{line-height:1.35;}
 
 
-/* ControlEvent v31.7 - Mapa de recursos: retorno desde productos donados */
+/* ControlEvent v31.8 - Mapa de recursos: retorno desde productos donados */
 .mapa-donations-footer{display:flex;justify-content:center;margin:14px 0 4px;}
 .mapa-donations-footer button{font-weight:900;border-radius:999px;padding:9px 16px;}
 .mapa-metric.jump-donados{user-select:none;-webkit-user-select:none;touch-action:manipulation;}
 
 
-/* ControlEvent v31.7 - Mapa de recursos: botón flotante Volver arriba */
+/* ControlEvent v31.8 - Mapa de recursos: botón flotante Volver arriba */
 #tabMapaProductos .mapa-floating-top{
   position:fixed;
   right:18px;
@@ -1300,7 +1300,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 }
 
 
-/* ControlEvent v31.7 - Mapa de recursos: botón flotante inicio responsive */
+/* ControlEvent v31.8 - Mapa de recursos: botón flotante inicio responsive */
 #tabMapaProductos .mapa-floating-top{display:none!important;}
 #ceMapaFloatingHomeButton.mapa-floating-home{
   position:fixed;
@@ -1341,7 +1341,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   }
 }
 
-/* ControlEvent v31.7 - Mapa de recursos: fichas de producto compactas */
+/* ControlEvent v31.8 - Mapa de recursos: fichas de producto compactas */
 .mapa-product-card.mapa-product-card-compact{
   margin-top:8px;
   padding:10px 12px 10px 15px;
@@ -1438,4 +1438,73 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 @media (min-width:761px) and (max-width:1180px){
   .mapa-product-compact-line{grid-template-columns:1fr 1fr;}
   .mapa-product-compact-line > div.need{grid-column:1 / -1;}
+}
+
+/* ControlEvent v31.8 - Mapa de recursos: fichas donadas compactas y marcado de compra en tienda */
+.mapa-product-actions{
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.mapa-shop-toggle{
+  border:1px solid rgba(15,23,42,.14);
+  background:#fff;
+  color:#334155;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:11px;
+  font-weight:950;
+  line-height:1;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(34,197,94,.15);
+  box-shadow:0 2px 7px rgba(15,23,42,.06);
+}
+.mapa-shop-toggle span{font-weight:950;margin-right:3px;}
+.mapa-shop-toggle:hover,.mapa-shop-toggle:focus{outline:none;box-shadow:0 0 0 3px rgba(34,197,94,.16),0 4px 10px rgba(15,23,42,.10);}
+.mapa-shop-toggle.is-checked{background:#38761d;color:#fff;border-color:#38761d;}
+.mapa-product-card.compra-card.shop-checked{
+  background:rgba(217,234,211,.88)!important;
+  border-color:#6aa84f!important;
+  box-shadow:0 0 0 2px rgba(106,168,79,.18),0 8px 22px rgba(56,118,29,.12)!important;
+}
+.mapa-product-card.compra-card.shop-checked:before{background:#38761d!important;width:7px;}
+.mapa-product-card.compra-card.shop-checked .mapa-product-title h3,
+.mapa-product-card.compra-card.shop-checked .mapa-product-compact-line strong{
+  text-decoration:line-through;
+  text-decoration-thickness:2px;
+  text-decoration-color:rgba(56,118,29,.65);
+}
+.mapa-product-card.donation-only.donation-only-compact{
+  padding:9px 12px 9px 15px;
+  background:#f8fafc;
+}
+.mapa-product-card.donation-only.donation-only-compact:before{background:#22c55e;}
+.mapa-product-head.donation-head-compact{align-items:center;}
+.mapa-product-head.donation-head-compact h3{font-size:15px;margin:0;}
+.mapa-product-card.donation-only-compact .mapa-product-compact-line{grid-template-columns:1fr;margin-top:6px;}
+.mapa-product-card.donation-only-compact .mapa-product-compact-line > div{padding:6px 8px;}
+.mapa-product-card.donation-only-compact .mapa-donation-block.compact.donation-only-block{margin-top:6px;padding-top:6px;}
+.mapa-product-card.donation-only-compact .donation-only-compact-list{gap:5px;}
+.mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row{
+  grid-template-columns:minmax(0,1.5fr) auto auto!important;
+  padding:6px 8px;
+  border-radius:10px;
+  border-left:4px solid #22c55e;
+}
+.mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row strong{font-size:12px;}
+.mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row span{font-size:9px;}
+@media (max-width:760px){
+  .mapa-product-actions{align-items:flex-start;justify-content:flex-start;margin-top:5px;}
+  .mapa-shop-toggle{width:auto;min-height:34px;padding:6px 10px;font-size:11px;}
+  .mapa-product-card.compra-card.shop-checked:before{width:6px;}
+  .mapa-product-head.donation-head-compact{display:block!important;}
+  .mapa-product-head.donation-head-compact h3{font-size:14px;}
+  .mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row{
+    grid-template-columns:1fr auto!important;
+    gap:6px;
+  }
+  .mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row .donor{grid-column:1 / -1;}
 }
