@@ -1,8 +1,8 @@
-/* ControlEvent v32.3 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v33.3 - Planificación inicial por réplica de evento FINALIZADO.
    Borrador revisable, sin grabar datos reales todavía. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v32.3';
+  const VERSION = 'ControlEvent v33.3';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -91,6 +91,20 @@
     select.innerHTML = options.map(opt => `<option value="${esc(opt.value)}">${esc(opt.label)}</option>`).join('');
     if(options.some(opt => String(opt.value) === String(current))) select.value = String(current);
   }
+  function unlockPlanControls(){
+    const panel = document.getElementById(PANEL_ID);
+    if(!panel) return;
+    panel.querySelectorAll('input, select, textarea, button').forEach(el => {
+      if(el.id === 'btnPlanApplyDisabled' || el.hasAttribute('data-plan-keep-disabled')) return;
+      el.disabled = false;
+      if(el.classList?.contains('soft-readonly') || el.dataset?.planOutput) return;
+      if(el.hasAttribute('data-plan-readonly')) return;
+      if(el.readOnly && !el.matches('[data-plan-output]')) el.readOnly = false;
+    });
+    panel.querySelectorAll('.app-disabled, .disabled, .locked, .is-locked').forEach(el => {
+      if(el.id !== 'btnPlanApplyDisabled') el.classList.remove('app-disabled','disabled','locked','is-locked');
+    });
+  }
   function socios(){ return rows('personas').filter(p => up(p.rango || '') === 'SOCIO').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function tiendas(){ return rows('tiendas').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function finalizados(){ return rows('eventos').filter(e => up(e.situacion || '') === 'FINALIZADO').slice().sort((a,b)=>dateKey(b)-dateKey(a)); }
@@ -148,19 +162,20 @@
   }
 
   function initForm(){
-    // V32.3: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
+    // V33.3: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
     const events = finalizados();
     setOptions(document.getElementById('planEventoBase'), events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], events[0]?.id || '');
     const fuente = document.getElementById('planFuenteHistorica');
-    if(fuente){ setOptions(fuente, [{value:'BASE', label:'Replicar un evento finalizado'}], 'BASE'); fuente.disabled = true; }
+    if(fuente){ setOptions(fuente, [{value:'BASE', label:'Replicar un evento finalizado'}], 'BASE'); fuente.disabled = false; }
     const nivel = document.getElementById('planNivelPropuesta');
-    if(nivel){ setOptions(nivel, [{value:'REPLICA', label:'Todas las compras y donaciones del evento'}], 'REPLICA'); nivel.disabled = true; }
-    const base = document.getElementById('planEventoBase'); if(base) base.disabled = !events.length;
+    if(nivel){ setOptions(nivel, [{value:'REPLICA', label:'Todas las compras y donaciones del evento'}], 'REPLICA'); nivel.disabled = false; }
+    const base = document.getElementById('planEventoBase'); if(base) base.disabled = false;
     const socioOptions = socios().map(p => ({value:p.id, label:p.nombre || 'Socio sin nombre'}));
     setOptions(document.getElementById('planResponsable'), socioOptions.length ? socioOptions : [{value:'', label:'Sin socios disponibles'}]);
     const tiendaOptions = tiendas().map(t => ({value:t.id, label:t.nombre || 'Tienda sin nombre'}));
     setOptions(document.getElementById('planTienda'), tiendaOptions.length ? tiendaOptions : [{value:'', label:'Sin tiendas disponibles'}]);
     updateDaysFromDates();
+    unlockPlanControls();
   }
   function updateDaysFromDates(){
     const ini = document.getElementById('planFechaIni')?.value;
@@ -234,7 +249,7 @@
         <div class="plan-metric"><span>Socios a ingresos</span><strong>${sociosIngreso.length}</strong><small>Regla futura: pareja nº2; si no, socio nº1</small></div>
       </div>
       <div class="planificacion-note compact-note">
-        <strong>V32.3:</strong> esta versión solo replica eventos ya finalizados. No calcula cantidades, no mezcla históricos y no graba datos reales todavía. La propuesta queda para revisión previa.
+        <strong>V33.3:</strong> esta versión solo replica eventos ya finalizados. No calcula cantidades, no mezcla históricos y no graba datos reales todavía. La propuesta queda para revisión previa.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -395,6 +410,7 @@
     KNOWN_BUTTONS.forEach(id => document.getElementById(id)?.classList.toggle('active', id === TAB_BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action').forEach(el => el.classList.toggle('primary', el.dataset.target === TAB_BUTTON_ID));
     initForm();
+    unlockPlanControls();
     syncPlanTopButton();
     setTimeout(() => document.getElementById(PANEL_ID)?.scrollIntoView({behavior:'smooth', block:'start'}), 20);
     return false;
@@ -429,7 +445,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV323_${eventName}`;
+    const key = `__cePlanV333_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -444,8 +460,8 @@
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV323){
-      document.__cePlanMobileClickV323 = true;
+    if(!document.__cePlanMobileClickV333){
+      document.__cePlanMobileClickV333 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
@@ -458,6 +474,7 @@
     ensureMobileButton();
     hideByRole();
     syncPlanTopButton();
+    unlockPlanControls();
   }
   function install(){
     if(initialized) return;
@@ -467,7 +484,7 @@
     window.renderPlanificacionInicial = ensureReady;
     window.addEventListener('controlevent:app-ready', ensureReady);
     window.addEventListener('controlevent:runtime-ready', ensureReady);
-    setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);
+    setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); unlockPlanControls(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
   else install();

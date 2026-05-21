@@ -1,0 +1,12 @@
+ControlEvent V33.3 - Parche mínimo correctivo
+
+Aplicar encima de la versión actual.
+
+Corrige:
+- Versión visible: ControlEvent v33.3.
+- Caché del service worker: controlevent-shell-v33-3.
+- Planificación inicial: evita que los campos queden bloqueados/protegidos por el bloqueo del evento finalizado usado como modelo.
+- Se mantiene la lógica sencilla: solo replicar un evento FINALIZADO como propuesta revisable.
+
+No incluye package.json ni package-lock.json.
+No toca login, Mapa de recursos, BACKUP, INFOEVENTO ni mantenimientos.
