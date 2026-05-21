@@ -1,0 +1,20 @@
+ControlEvent v32.2 - PARCHE MINIMO SOLO CAMBIOS
+
+Aplicar sobre la versión actual con V32.1 ya subida.
+
+Incluye únicamente:
+- public/app/features/planificacion-inicial.js
+- public/app/styles/app.css
+- public/app/version.js
+- public/sw.js
+
+No incluye package.json ni package-lock.json.
+No toca login, Mapa de recursos, BACKUP, INFOEVENTO, globos ni mantenimientos.
+
+Cambios:
+- Si se elige un evento base, la propuesta replica tal cual sus compras: unidades, tienda y responsable.
+- En históricos de varios eventos, las unidades se calculan como totales por evento y producto/tienda/responsable, no como cantidades por persona.
+- Se conserva el ajuste por días de duración y solo se escala al alza por personas, nunca a la baja.
+- Se deja preparada la regla futura de alta de ingresos: priorizar SOCIOS con numero=2; si no existe pareja, usar socio individual numero=1.
+- Añade buscador manual de productos en la propuesta.
+- Añade botón flotante ⌂ para volver al inicio de Planificación inicial.

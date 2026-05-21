@@ -1578,3 +1578,11 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .plan-product-head{grid-template-columns:1fr;align-items:start;}
   .plan-confidence{justify-self:start;}
 }
+
+/* ==== ControlEvent v32.2: ajustes Planificación inicial ==== */
+.plan-search-line{display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap;}
+.plan-search-line input{flex:1 1 260px;min-width:180px;}
+.plan-product-card.plan-found{outline:3px solid #f59e0b;box-shadow:0 0 0 6px rgba(245,158,11,.18),0 8px 24px rgba(15,23,42,.10);}
+.ce-plan-top-float{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:10020;width:46px;height:46px;border-radius:999px;border:1px solid rgba(17,24,39,.22);background:#111827;color:#fff;font-size:24px;font-weight:900;line-height:1;box-shadow:0 12px 28px rgba(15,23,42,.28);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.ce-plan-top-float.hidden{display:none!important;}
+@media (max-width:700px){.ce-plan-top-float{right:16px;bottom:76px;top:auto;transform:none;width:44px;height:44px;font-size:22px;}}
