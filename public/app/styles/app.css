@@ -1192,7 +1192,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 #summaryTiendaTicket .ce-sort-link-v307.is-active{background:#e0f2fe;color:#075985;text-decoration:none;}
 
 
-/* ==== V30.12: Mapa de recursos, filtro responsables y estado TK seguro ==== */
+/* ==== V30.13: Mapa de recursos estable, filtro responsables y estado TK seguro ==== */
 .mapa-productos-card .section-title h2{letter-spacing:-.01em;}
 .mapa-summary-grid{display:block!important;margin-top:12px;}
 .mapa-summary-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px;}
@@ -1221,3 +1221,17 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-filter-panel{grid-template-columns:1fr;max-height:210px;}
   .mapa-filter-option{font-size:12px;padding:8px;}
 }
+
+
+/* ==== V30.13: filtro de responsables estable en iPad/iPhone ==== */
+.mapa-filter-v3013{display:block;position:relative;z-index:1;}
+.mapa-filter-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;color:#111827;font:inherit;font-weight:900;padding:0;cursor:pointer;text-align:left;}
+.mapa-filter-toggle span{font-size:12px;color:#475569;font-weight:800;text-align:right;line-height:1.2;}
+.mapa-filter-toggle em{font-style:normal;color:#3730a3;font-size:13px;}
+.mapa-filter-help{font-size:11px;color:#64748b;margin-top:7px;font-weight:700;}
+.mapa-filter-v3013 .mapa-filter-panel[hidden]{display:none !important;}
+.mapa-filter-v3013 .mapa-filter-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px;margin-top:10px;max-height:240px;overflow:auto;padding:2px;-webkit-overflow-scrolling:touch;}
+#tabMapaProductos{position:relative;z-index:1;}
+#ceMobileMenuBtn{z-index:2600 !important;pointer-events:auto !important;}
+#ceMobileDrawer,#ceMobileDrawerBackdrop{z-index:2550 !important;}
+@media (max-width:760px){.mapa-filter-toggle{align-items:flex-start}.mapa-filter-toggle span{max-width:58%;}.mapa-filter-v3013 .mapa-filter-panel{grid-template-columns:1fr;max-height:220px;}}

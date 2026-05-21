@@ -1,9 +1,9 @@
-/* ControlEvent v30.7 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v30.13 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.7';
+  const VERSION = 'ControlEvent v30.13';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -35,6 +35,34 @@
       || /DONACI[OÓ]N\s+DE\s+PRODUCTO\s*\//.test(t)
       || /VALOR\s+PRODUCTO\s+DONADO/.test(t);
   }
+  function isActuallyVisible(el){
+    if(!el) return false;
+    try{
+      const cs = window.getComputedStyle ? getComputedStyle(el) : null;
+      if(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || 1) === 0)) return false;
+      if(el.classList?.contains('hidden')) return false;
+      return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+    }catch(_){ return false; }
+  }
+  function isBudgetLayoutActive(){
+    const budget = $('budgetLayout');
+    if(!budget || !isActuallyVisible(budget)) return false;
+    const resumen = $('tabResumen');
+    if(resumen && !isActuallyVisible(resumen)) return false;
+    return true;
+  }
+  function releaseLegacyTooltipElement(el){
+    if(!el) return;
+    try{ el.classList.remove('ce-budget-legacy-suppressed-v307'); }catch(_){ }
+    try{ el.style.removeProperty('display'); }catch(_){ }
+    try{ el.style.removeProperty('visibility'); }catch(_){ }
+    try{ el.style.removeProperty('pointer-events'); }catch(_){ }
+    try{ el.removeAttribute('aria-hidden'); }catch(_){ }
+  }
+  function releaseLegacyBudgetTooltipsOutsideResumen(){
+    if(isBudgetLayoutActive()) return;
+    document.querySelectorAll('.ce-budget-legacy-suppressed-v307').forEach(releaseLegacyTooltipElement);
+  }
   function suppressLegacyTooltipElement(el){
     if(!el) return;
     try{ el.classList.add('ce-budget-legacy-suppressed-v307'); }catch(_){ }
@@ -44,6 +72,10 @@
     try{ el.setAttribute('aria-hidden', 'true'); }catch(_){ }
   }
   function hideLegacyBudgetTooltips(){
+    if(!isBudgetLayoutActive()){
+      releaseLegacyBudgetTooltipsOutsideResumen();
+      return;
+    }
     document.querySelectorAll('.ce-budget-legacy-suppressed-v307').forEach(suppressLegacyTooltipElement);
     LEGACY_TOOLTIP_IDS.forEach(id => {
       const el = $(id);
@@ -274,6 +306,7 @@
     nodes.forEach(stripLegacyAttrs);
   }
   function sanitizeBudgetPanels(){
+    if(!isBudgetLayoutActive()){ releaseLegacyBudgetTooltipsOutsideResumen(); return; }
     const t = now();
     if(t - lastSanitizeAt < 20) return;
     lastSanitizeAt = t;
@@ -321,6 +354,7 @@
     return panel.classList.contains('socios') || /INGRESOS\s+EN\s+DINERO|SOCIOS|NO\s+SOCIOS/.test(text);
   }
   function findBudgetRow(target){
+    if(!isBudgetLayoutActive()) return null;
     const row = target?.closest?.('#budgetLayout .ce-v306-budget-lite-row,#budgetLayout .budget-subrow,#budgetLayout .budget-row');
     if(!row) return null;
     const panel = row.closest('.budget-panel');
@@ -395,6 +429,14 @@
     hideLegacyBudgetTooltips();
   }, true);
   document.addEventListener('visibilitychange', hideTooltip, true);
+
+  document.addEventListener('click', event => {
+    if(event.target?.closest?.('#tabGraficas')){
+      releaseLegacyBudgetTooltipsOutsideResumen();
+      const box = $(TOOLTIP_ID);
+      if(box) hideTooltip();
+    }
+  }, false);
 
   function patchRenderBudget(){
     const old = (typeof window.renderBudget === 'function') ? window.renderBudget : null;

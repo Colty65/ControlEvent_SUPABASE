@@ -1,8 +1,8 @@
-/* ControlEvent v30.12 - Mapa de recursos
+/* ControlEvent v30.13 - Mapa de recursos
    Cruza compras + donaciones y añade filtro por responsables SOCIO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.12';
+  const VERSION = 'ControlEvent v30.13';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -226,24 +226,38 @@
       return `<div class="mapa-filter muted"><strong>Responsables</strong><span>No hay responsables SOCIO asignados.</span></div>`;
     }
     const allChecked = !selectedResponsables || selectedResponsables.size === 0;
-    return `<details class="mapa-filter" id="${FILTER_ID}">
-      <summary><strong>Responsables</strong><span>${esc(filterLabel(options))}</span></summary>
-      <div class="mapa-filter-panel">
+    return `<div class="mapa-filter mapa-filter-v3013" id="${FILTER_ID}">
+      <button type="button" class="mapa-filter-toggle" data-mapa-filter-toggle="1" aria-expanded="false">
+        <strong>Responsables</strong><span>${esc(filterLabel(options))}</span><em>▾</em>
+      </button>
+      <div class="mapa-filter-panel" data-mapa-filter-panel="1" hidden>
         <label class="mapa-filter-option all"><input type="checkbox" value="__ALL__" ${allChecked ? 'checked' : ''}> Todos los responsables</label>
         ${options.map(opt => `<label class="mapa-filter-option"><input type="checkbox" value="${esc(opt.id)}" ${!allChecked && selectedResponsables.has(opt.id) ? 'checked' : ''}> ${esc(opt.name)}</label>`).join('')}
       </div>
-    </details>`;
+      <div class="mapa-filter-help">Elige todos, uno o varios socios responsables.</div>
+    </div>`;
   }
   function bindResponsableFilter(options){
     const filter = $(FILTER_ID);
-    if(!filter || filter.__ceBoundV3012) return;
-    filter.__ceBoundV3012 = true;
-    filter.addEventListener('change', event => {
-      const input = event.target;
-      if(!input || input.tagName !== 'INPUT') return;
+    if(!filter || filter.__ceBoundV3013) return;
+    filter.__ceBoundV3013 = true;
+    const panel = filter.querySelector('[data-mapa-filter-panel]');
+    const toggle = filter.querySelector('[data-mapa-filter-toggle]');
+    const syncToggle = () => {
+      if(!toggle || !panel) return;
+      const open = !panel.hidden;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const em = toggle.querySelector('em'); if(em) em.textContent = open ? '▴' : '▾';
+    };
+    toggle?.addEventListener('click', event => {
+      try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
+      if(panel) panel.hidden = !panel.hidden;
+      syncToggle();
+    });
+    const applySelection = (input) => {
       const all = filter.querySelector('input[value="__ALL__"]');
       const items = Array.from(filter.querySelectorAll('input[type="checkbox"]')).filter(el => el.value !== '__ALL__');
-      if(input.value === '__ALL__'){
+      if(input && input.value === '__ALL__'){
         if(input.checked){ selectedResponsables = null; items.forEach(el => { el.checked = false; }); }
         else if(!items.some(el => el.checked)){ input.checked = true; selectedResponsables = null; }
       }else{
@@ -252,7 +266,17 @@
         if(!selected.length){ selectedResponsables = null; if(all) all.checked = true; }
         else selectedResponsables = new Set(selected);
       }
-      setTimeout(renderMapaProductos, 0);
+      renderMapaProductos();
+      const next = $(FILTER_ID);
+      const nextPanel = next?.querySelector('[data-mapa-filter-panel]');
+      const nextToggle = next?.querySelector('[data-mapa-filter-toggle]');
+      if(nextPanel && nextToggle){ nextPanel.hidden = false; nextToggle.setAttribute('aria-expanded','true'); const em = nextToggle.querySelector('em'); if(em) em.textContent = '▴'; }
+    };
+    filter.addEventListener('change', event => {
+      const input = event.target;
+      if(!input || input.tagName !== 'INPUT') return;
+      try{ event.stopPropagation(); }catch(_){ }
+      applySelection(input);
     });
   }
 
@@ -353,10 +377,10 @@
       </section>` : '';
 
     wrap.innerHTML = cards + onlyDonationBlock;
-    normalizeMapaLabelsV3012();
+    normalizeMapaLabelsV3013();
   }
 
-  function normalizeMapaLabelsV3012(){
+  function normalizeMapaLabelsV3013(){
     const panel = $(PANEL_ID); if(!panel) return;
     const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
     const fixes = [[/PENDIENTE\s+COMPRAR/gi, 'COMPRAS PRODUCTO'],[/Pendiente\s+comprar/g, 'COMPRAS PRODUCTO'],[/Pendiente\s+de\s+comprar/g, 'COMPRAS PRODUCTO'],[/Pdte\.Compra/g, 'COMPRAS PRODUCTO'],[/Mapa de recursos/g, 'Mapa de recursos']];
@@ -375,7 +399,7 @@
   }
   function applyMapVisibility(){
     if(isAuthVisible()) return;
-    if(mapPinned && !window.__ceMapaProductosWarmup && currentTab() !== TAB_NAME) setCurrentTab(TAB_NAME);
+    // V30.13: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
     const active = currentTab() === TAB_NAME;
     const eventReady = hasEvent();
     const panel = $(PANEL_ID), btn = $(BUTTON_ID);
@@ -388,7 +412,7 @@
     mapPinned = true; setCurrentTab(TAB_NAME);
     KNOWN_PANELS.forEach(id => { const el = $(id); if(el) el.classList.toggle('hidden', id !== PANEL_ID || !hasEvent()); });
     KNOWN_BUTTONS.forEach(id => { const el = $(id); if(el) el.classList.toggle('active', id === BUTTON_ID); });
-    applyMapVisibility(); renderMapaProductos(); normalizeMapaLabelsV3012(); closeMobileDrawer();
+    applyMapVisibility(); renderMapaProductos(); normalizeMapaLabelsV3013(); closeMobileDrawer();
     try{ window.ControlEventModules?.activate?.(TAB_NAME, {reason: options.reason || 'mapa-force-show'}); }catch(_){ }
   }
   function ensureMobileMenuAction(){
@@ -411,9 +435,9 @@
   }
 
   const oldRenderTabVisibility = (typeof window.renderTabVisibility === 'function') ? window.renderTabVisibility : (function(){ try{ return typeof renderTabVisibility === 'function' ? renderTabVisibility : null; }catch(_){ return null; } })();
-  function renderTabVisibilityV3012(){ const result = oldRenderTabVisibility ? oldRenderTabVisibility.apply(this, arguments) : undefined; applyMapVisibility(); return result; }
+  function renderTabVisibilityV3013(){ const result = oldRenderTabVisibility ? oldRenderTabVisibility.apply(this, arguments) : undefined; applyMapVisibility(); return result; }
   const oldRender = (typeof window.render === 'function') ? window.render : (function(){ try{ return typeof render === 'function' ? render : null; }catch(_){ return null; } })();
-  function renderV3012(){ const result = oldRender ? oldRender.apply(this, arguments) : undefined; applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) forceShowMapa({reason:'render-v3012', scroll:false}); return result; }
+  function renderV3013(){ const result = oldRender ? oldRender.apply(this, arguments) : undefined; applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); return result; }
 
   let lastOpenAt = 0;
   function isMapaTrigger(event){ return event.target?.closest?.('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]') || null; }
@@ -439,24 +463,23 @@
     if(isAuthVisible()) return;
     silenceMapTooltip();
     document.querySelectorAll('#tabMapaBtn,.mobile-menu-action[data-target="tabMapaBtn"]').forEach(el => {
-      if(el.__ceMapaV3012Bound) return; el.__ceMapaV3012Bound = true;
+      if(el.__ceMapaV3013Bound) return; el.__ceMapaV3013Bound = true;
       el.addEventListener('click', ev => openMapaFromEvent(ev, 'direct-click'), true);
       el.addEventListener('keydown', ev => { if(ev.key === 'Enter' || ev.key === ' '){ openMapaFromEvent(ev, 'direct-keyboard'); } }, true);
       el.onclick = function(ev){ openMapaFromEvent(ev || window.event || {target:el}, 'direct-onclick'); return false; };
     });
   }
 
-  document.addEventListener('click', event => { openMapaFromEvent(event, 'document-click'); }, true);
   document.addEventListener('click', event => {
-    const other = event.target?.closest?.('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"]');
+    const other = event.target?.closest?.('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"],#ceMobileMenuBtn');
     if(other) { mapPinned = false; try{ window.__ceMapaProductosPinned = false; }catch(_){ } }
-  }, true);
+  }, false);
   document.addEventListener('change', event => { if(event.target && event.target.id === 'selectedEvent' && currentTab() === TAB_NAME){ setTimeout(() => forceShowMapa({reason:'event-change', scroll:false}), 60); } }, true);
 
-  try{ renderTabVisibility = renderTabVisibilityV3012; }catch(_){ }
-  try{ window.renderTabVisibility = renderTabVisibilityV3012; }catch(_){ }
-  try{ render = renderV3012; }catch(_){ }
-  try{ window.render = renderV3012; }catch(_){ }
+  try{ renderTabVisibility = renderTabVisibilityV3013; }catch(_){ }
+  try{ window.renderTabVisibility = renderTabVisibilityV3013; }catch(_){ }
+  try{ render = renderV3013; }catch(_){ }
+  try{ window.render = renderV3013; }catch(_){ }
   try{ window.renderMapaProductos = renderMapaProductos; }catch(_){ }
   try{ window.buildMapaProductos = buildMapaProductos; }catch(_){ }
   try{ window.showMapaProductos = forceShowMapa; }catch(_){ }
@@ -481,8 +504,7 @@
       }, 80);
     };
   })();
-  const observer = new MutationObserver(scheduleMapaSync);
-  try{ observer.observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(_){ }
+  // V30.13: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v3012', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v3013', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();
