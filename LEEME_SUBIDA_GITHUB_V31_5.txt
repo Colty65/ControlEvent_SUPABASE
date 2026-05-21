@@ -1,8 +1,11 @@
-ControlEvent v31.5
+import { createLegacyView } from './_view-runtime.js';
 
-Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
+const view = createLegacyView({
+  name: 'compras',
+  render: ['renderBudget', 'renderCompras']
+});
 
-Cambios principales:
-- Mapa de recursos: botón Volver arriba flotante a la derecha y centrado verticalmente.
-- Mapa de recursos: cabecera inferior de productos donados calculada solo con lo filtrado por responsables.
-- Caché nueva: controlevent-shell-v31-5.
+export const meta = view.meta;
+export const mount = context => view.mount(context);
+export const activate = context => view.activate(context);
+export const refresh = activate;

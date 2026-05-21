@@ -1,9 +1,8 @@
-# ControlEvent v31.3
+ControlEvent v31.6
 
-Versión basada en v31.2.
+Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
 
-Cambios:
-- Mapa de recursos: la cabecera inferior de productos donados usa el mismo total correcto que la ficha DONADO PRODUCTO.
-- Mapa de recursos: el clic en la ficha DONADO PRODUCTO salta a la cabecera de productos donados.
-- Mapa de recursos: botón al pie de productos donados para volver arriba.
-- Ingresos de colaboradores: refuerzo del desplegable Ingreso en el alta para que siempre muestre Banco, Bizum, Efectivo y Pendiente antes de grabar.
+Cambios principales:
+- Mapa de recursos: botón Volver arriba flotante a la derecha y centrado verticalmente.
+- Mapa de recursos: cabecera inferior de productos donados calculada solo con lo filtrado por responsables.
+- Caché nueva: controlevent-shell-v31-6.

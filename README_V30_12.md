@@ -1,18 +1,13 @@
-# ControlEvent v31.3
+ControlEvent V31.2 - Solo subir a GitHub
 
-Base: V30.10_RESCATE estable.
+Base: V30.13 validada en todos los dispositivos.
 
-Objetivo de esta versión:
-- No tocar login ni globos.
-- Mantener la fluidez de la rama de rescate.
-- Incorporar en Mapa de recursos:
-  - filtro/desplegable por responsables SOCIO;
-  - selección de todos, uno o varios responsables;
-  - ordenación por Tienda, Pte. Comprar u otros gastos / TKxx, Producto;
-  - fichas TKxx en verde Excel transparente;
-  - donaciones filtradas por responsable elegido.
+Subir sustituyendo los archivos existentes. No incluye la rama problemática 30.9/30.11.
 
-Corrección crítica frente a V30.11:
-- El observador del Mapa se ha hecho seguro y con debounce.
-- No escribe continuamente el menú móvil.
-- No actúa mientras está visible la pantalla de login.
+Cambios principales:
+- Mapa de recursos: totales de cabecera globales del evento aunque se filtre por responsable.
+- COMPRAS PRODUCTO muestra total, TKxx comprado y Pte.Compra.
+- Se elimina la ficha SOLO DONACION y se traslada el dato a la cabecera de productos donados.
+- Se añade precio unitario en productos comprados y donados.
+- Se añade buscador de producto.
+- Eventos ordenados por fecha de inicio en desplegable EVENTOS y mantenimiento EVENTOS.

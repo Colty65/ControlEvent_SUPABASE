@@ -1,20 +1,12 @@
-{
-  "name": "controlevent-v31-5",
-  "version": "31.5",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "node scripts/dev-server.js",
-    "start": "node scripts/dev-server.js",
-    "dev:supabase": "node scripts/dev-server-supabase.js",
-    "supabase:check": "node scripts/check-supabase-schema.js",
-    "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.4",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "exceljs": "^4.4.0",
-    "mime-types": "^2.1.35"
-  }
-}
+import { createLegacyView } from './_view-runtime.js';
+
+const view = createLegacyView({
+  name: 'graficas',
+  render: ['renderGraficas'],
+  patches: true
+});
+
+export const meta = view.meta;
+export const mount = context => view.mount(context);
+export const activate = context => view.activate(context);
+export const refresh = activate;

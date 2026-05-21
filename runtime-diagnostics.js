@@ -1,150 +1,212 @@
-/* ControlEvent v30.7 - Diagnóstico de peso legacy y preparación de limpieza.
-   Sólo diagnóstico bajo demanda. No modifica la operativa. */
+/* ControlEvent v30.7 - Perfilador de uso legacy bajo demanda.
+   No se activa solo. Sólo envuelve funciones globales cuando el usuario ejecuta
+   ControlEventLegacyUsage.start(). Sirve para saber qué parte del legacy se usa
+   realmente antes de borrar o diferir código. */
 const VERSION = 'v30.7';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.7.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.7.js';
-const LEGACY_PATHS = [
-  `/app/legacy/${LEGACY_BEFORE}`,
-  `/app/legacy/${LEGACY_AFTER}`
+const DEFAULT_PREFIXES = [
+  'render', 'save', 'add', 'update', 'delete', 'export', 'import', 'load', 'sync',
+  'select', 'toggle', 'show', 'hide', 'open', 'close', 'doLogin', 'logout',
+  'set', 'get', 'build', 'summary', 'budget', 'draw', 'refresh'
 ];
+const EXCLUDED_NAMES = new Set([
+  'ControlEventLegacyUsage', 'ControlEventDebug', 'ControlEventRuntime',
+  'ControlEventDiagnostics', 'ControlEventMobilePerformance', 'ControlEventLegacyWeight',
+  'ControlEventExcel', 'ControlEventModules', 'ControlEventDomain', 'ControlEventTickets',
+  'ControlEventMaintenance', 'ControlEventScreenLazy', 'ControlEventDataIntegrity',
+  'ControlEventForms', 'ControlEventMaintenanceDiagnostics', 'ControlEventLegacyMap',
+  'ControlEventLegacyCleanup'
+]);
+const state = {
+  active: false,
+  startedAt: null,
+  stoppedAt: null,
+  wrapped: new Map(),
+  counts: new Map(),
+  errors: new Map(),
+  marks: [],
+  options: null
+};
 
-function bytesToKb(bytes){ return Math.round((Number(bytes || 0) / 1024) * 10) / 10; }
-function nowIso(){ try{return new Date().toISOString();}catch(_){return '';} }
-async function fetchText(path){
-  const response = await fetch(path, {cache:'no-store'});
-  if(!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
-  return response.text();
+function now(){ return (performance?.now?.() || Date.now()); }
+function iso(){ try{return new Date().toISOString();}catch(_){return '';} }
+function isCandidateName(name, prefixes = DEFAULT_PREFIXES){
+  if(!name || EXCLUDED_NAMES.has(name)) return false;
+  if(name.startsWith('__') || name.startsWith('webkit') || name.startsWith('on')) return false;
+  if(/^HTML|^CSS|^SVG|^IDB|^Intl|^Map$|^Set$|^Array$|^Object$|^Promise$/.test(name)) return false;
+  return prefixes.some(prefix => name === prefix || name.startsWith(prefix));
 }
-async function gzipSize(text){
+function isWrappable(name, value){
+  if(typeof value !== 'function') return false;
+  if(value.__ceLegacyUsageWrapped) return false;
+  const src = Function.prototype.toString.call(value);
+  if(/\[native code\]/.test(src)) return false;
+  return true;
+}
+function readWindowFunctionNames({prefixes = DEFAULT_PREFIXES, include = [], max = 350} = {}){
+  const names = new Set();
+  for(const name of include){
+    try{ if(isWrappable(name, window[name])) names.add(name); }catch(_){ }
+  }
+  for(const name of Object.getOwnPropertyNames(window)){
+    if(names.size >= max) break;
+    if(!isCandidateName(name, prefixes)) continue;
+    try{ if(isWrappable(name, window[name])) names.add(name); }catch(_){ }
+  }
+  return [...names].sort();
+}
+function recordCall(name, elapsed, errored){
+  const prev = state.counts.get(name) || {name, calls:0, totalMs:0, maxMs:0, errors:0, firstAt:null, lastAt:null};
+  prev.calls += 1;
+  prev.totalMs += elapsed;
+  prev.maxMs = Math.max(prev.maxMs, elapsed);
+  prev.avgMs = prev.calls ? prev.totalMs / prev.calls : 0;
+  if(errored) prev.errors += 1;
+  prev.firstAt = prev.firstAt || iso();
+  prev.lastAt = iso();
+  state.counts.set(name, prev);
+}
+function wrapFunction(name){
+  if(state.wrapped.has(name)) return false;
+  const original = window[name];
+  if(!isWrappable(name, original)) return false;
+  const wrapped = function ControlEventLegacyUsageWrapped(...args){
+    const start = now();
+    let failed = false;
+    try{
+      return original.apply(this, args);
+    }catch(error){
+      failed = true;
+      const list = state.errors.get(name) || [];
+      if(list.length < 10) list.push({at: iso(), message: String(error?.message || error)});
+      state.errors.set(name, list);
+      throw error;
+    }finally{
+      recordCall(name, now() - start, failed);
+    }
+  };
   try{
-    if(typeof CompressionStream === 'undefined') return null;
-    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
-    const buffer = await new Response(stream).arrayBuffer();
-    return buffer.byteLength;
-  }catch(_error){ return null; }
+    Object.defineProperty(wrapped, 'name', {value: original.name || name, configurable:true});
+  }catch(_){ }
+  Object.defineProperty(wrapped, '__ceLegacyUsageWrapped', {value:true});
+  state.wrapped.set(name, original);
+  window[name] = wrapped;
+  return true;
 }
-function resourceEntry(path){
-  const entries = performance?.getEntriesByType?.('resource') || [];
-  return entries.find(entry => String(entry.name || '').includes(path)) || null;
+function start(options = {}){
+  if(state.active) return status();
+  const names = readWindowFunctionNames(options);
+  let wrapped = 0;
+  for(const name of names){ if(wrapFunction(name)) wrapped += 1; }
+  state.active = true;
+  state.startedAt = iso();
+  state.stoppedAt = null;
+  state.options = {...options, candidates: names.length, wrapped};
+  mark('start');
+  console.info(`[ControlEventLegacyUsage/${VERSION}] Perfil iniciado. Funciones envueltas: ${wrapped}. Usa la app y luego ejecuta ControlEventLegacyUsage.print().`);
+  return status();
 }
-function countOccurrences(text, pattern){
-  const matches = text.match(pattern);
-  return matches ? matches.length : 0;
-}
-function topRepeatedFunctionNames(text, limit = 25){
-  const names = [];
-  const patterns = [
-    /function\s+([A-Za-z_$][\w$]*)\s*\(/g,
-    /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g,
-    /window\.([A-Za-z_$][\w$]*)\s*=/g
-  ];
-  for(const rx of patterns){
-    let m; while((m = rx.exec(text))) names.push(m[1]);
+function stop(){
+  for(const [name, original] of state.wrapped.entries()){
+    try{ if(window[name]?.__ceLegacyUsageWrapped) window[name] = original; }catch(_){ }
   }
-  const counts = new Map();
-  for(const name of names) counts.set(name, (counts.get(name) || 0) + 1);
-  return [...counts.entries()]
-    .filter(([,count]) => count > 1)
-    .sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  state.wrapped.clear();
+  state.active = false;
+  state.stoppedAt = iso();
+  mark('stop');
+  return status();
+}
+function reset({keepActive = true} = {}){
+  state.counts.clear();
+  state.errors.clear();
+  state.marks = [];
+  if(!keepActive) stop();
+  if(state.active) mark('reset');
+  return status();
+}
+function mark(label = 'mark'){
+  const item = {label:String(label || 'mark'), at:iso(), ms:now()};
+  state.marks.push(item);
+  return item;
+}
+function rows({limit = 80, minCalls = 1} = {}){
+  return [...state.counts.values()]
+    .filter(item => item.calls >= minCalls)
+    .sort((a,b) => b.totalMs - a.totalMs || b.calls - a.calls || a.name.localeCompare(b.name))
     .slice(0, limit)
-    .map(([name,count]) => ({name, count}));
+    .map(item => ({
+      name: item.name,
+      calls: item.calls,
+      totalMs: Math.round(item.totalMs * 10) / 10,
+      avgMs: Math.round(item.avgMs * 100) / 100,
+      maxMs: Math.round(item.maxMs * 10) / 10,
+      errors: item.errors,
+      firstAt: item.firstAt,
+      lastAt: item.lastAt
+    }));
 }
-function sectionMarkers(text){
-  const markers = [];
-  const rx = /Bloque inline #(\d+)|v(\d+\.\d+(?:\.\d+)?)/g;
-  let m;
-  while((m = rx.exec(text)) && markers.length < 250){
-    markers.push(m[1] ? `inline-${m[1]}` : `v${m[2]}`);
-  }
-  return markers;
+function unusedCandidates(){
+  const wrappedNames = [...state.wrapped.keys()];
+  return wrappedNames.filter(name => !state.counts.has(name)).sort();
 }
-async function analyzePath(path){
-  const text = await fetchText(path);
-  const encoded = new TextEncoder().encode(text);
-  const gzipBytes = await gzipSize(text);
-  const entry = resourceEntry(path);
+function inspect(){
+  const usedRows = rows({limit: 500});
   return {
-    path,
-    rawBytes: encoded.byteLength,
-    rawKb: bytesToKb(encoded.byteLength),
-    gzipBytes,
-    gzipKb: gzipBytes == null ? null : bytesToKb(gzipBytes),
-    transferKb: bytesToKb(entry?.transferSize || entry?.encodedBodySize || 0),
-    decodedKb: bytesToKb(entry?.decodedBodySize || encoded.byteLength),
-    lines: text.split(/\r?\n/).length,
-    functionDeclarations: countOccurrences(text, /function\s+[A-Za-z_$][\w$]*\s*\(/g),
-    windowAssignments: countOccurrences(text, /window\.[A-Za-z_$][\w$]*\s*=/g),
-    inlineBlocks: countOccurrences(text, /Bloque inline #\d+/g),
-    versionMarkers: countOccurrences(text, /ControlEvent v\d+\.\d+(?:\.\d+)?/g),
-    topDuplicates: topRepeatedFunctionNames(text, 15),
-    sampleMarkers: sectionMarkers(text).slice(0, 40)
-  };
-}
-function recommendations(report){
-  const recs = [];
-  const totalKb = report.totals.rawKb;
-  if(totalKb > 500) recs.push('El legacy sigue siendo pesado: priorizar partición por uso real antes de eliminar código.');
-  if(report.totals.windowAssignments > 100) recs.push('Hay muchas funciones globales: extraer primero acciones con menor acoplamiento y mantener fachada de compatibilidad.');
-  if(report.totals.inlineBlocks > 20) recs.push('Aún hay muchos bloques legacy históricos: revisar parches antiguos por versión y retirar sólo con mapa de uso.');
-  recs.push('No tocar INFOEVENTO/BACKUP mientras sigan estables; la limpieza debe centrarse en código no ejecutado o diagnóstico.');
-  recs.push('Siguiente paso seguro: instrumentar qué funciones legacy se llaman realmente durante una sesión normal.');
-  return recs;
-}
-async function inspect(){
-  const bundles = [];
-  for(const path of LEGACY_PATHS){
-    try{ bundles.push(await analyzePath(path)); }
-    catch(error){ bundles.push({path, error: String(error?.message || error)}); }
-  }
-  const totals = bundles.reduce((acc, item) => {
-    acc.rawBytes += item.rawBytes || 0;
-    acc.gzipBytes += item.gzipBytes || 0;
-    acc.lines += item.lines || 0;
-    acc.functionDeclarations += item.functionDeclarations || 0;
-    acc.windowAssignments += item.windowAssignments || 0;
-    acc.inlineBlocks += item.inlineBlocks || 0;
-    acc.versionMarkers += item.versionMarkers || 0;
-    return acc;
-  }, {rawBytes:0, gzipBytes:0, lines:0, functionDeclarations:0, windowAssignments:0, inlineBlocks:0, versionMarkers:0});
-  totals.rawKb = bytesToKb(totals.rawBytes);
-  totals.gzipKb = totals.gzipBytes ? bytesToKb(totals.gzipBytes) : null;
-  const report = {
     version: VERSION,
-    capturedAt: nowIso(),
-    mode: 'diagnostic-only',
-    bundles,
-    totals,
-    recommendations: []
+    active: state.active,
+    startedAt: state.startedAt,
+    stoppedAt: state.stoppedAt,
+    wrapped: state.wrapped.size,
+    used: usedRows.length,
+    unused: unusedCandidates().length,
+    calls: usedRows.reduce((sum, item) => sum + item.calls, 0),
+    totalMs: Math.round(usedRows.reduce((sum, item) => sum + item.totalMs, 0) * 10) / 10,
+    marks: state.marks.slice(),
+    top: usedRows.slice(0, 25),
+    unusedCandidates: unusedCandidates().slice(0, 100),
+    errors: Object.fromEntries(state.errors.entries()),
+    options: state.options
   };
-  report.recommendations = recommendations(report);
-  window.__CE_LEGACY_WEIGHT_LAST_REPORT__ = report;
-  return report;
 }
-async function print(){
-  const report = await inspect();
-  console.group(`[ControlEventLegacyWeight/${VERSION}] Peso legacy y preparación de limpieza`);
-  console.table(report.bundles.map(b => ({path:b.path, rawKb:b.rawKb, gzipKb:b.gzipKb, lines:b.lines, inlineBlocks:b.inlineBlocks, funciones:b.functionDeclarations, windowAssignments:b.windowAssignments, error:b.error || ''})));
-  console.info('Totales', report.totals);
-  console.info('Recomendaciones', report.recommendations);
+function print(options = {}){
+  const report = inspect();
+  console.group(`[ControlEventLegacyUsage/${VERSION}] Uso real de funciones legacy`);
+  console.info('Estado', {active: report.active, wrapped: report.wrapped, used: report.used, calls: report.calls, totalMs: report.totalMs});
+  if(report.marks.length) console.table(report.marks);
+  console.table(rows({limit: options.limit || 40, minCalls: options.minCalls || 1}));
+  if(report.unusedCandidates.length) console.info('Candidatas no usadas durante esta sesión', report.unusedCandidates.slice(0, 40));
+  if(Object.keys(report.errors).length) console.warn('Errores capturados', report.errors);
   console.groupEnd();
   return report;
 }
-function last(){ return window.__CE_LEGACY_WEIGHT_LAST_REPORT__ || null; }
-async function quick(){
-  const report = await inspect();
+function status(){
   return {
-    version: report.version,
-    rawKb: report.totals.rawKb,
-    gzipKb: report.totals.gzipKb,
-    lines: report.totals.lines,
-    inlineBlocks: report.totals.inlineBlocks,
-    windowAssignments: report.totals.windowAssignments,
-    recommendation: report.recommendations[0]
+    version: VERSION,
+    active: state.active,
+    startedAt: state.startedAt,
+    stoppedAt: state.stoppedAt,
+    wrapped: state.wrapped.size,
+    used: state.counts.size,
+    calls: [...state.counts.values()].reduce((sum, item) => sum + item.calls, 0),
+    commands: [
+      'ControlEventLegacyUsage.start()',
+      "ControlEventLegacyUsage.mark('descripción')",
+      'ControlEventLegacyUsage.print()',
+      'ControlEventLegacyUsage.stop()'
+    ]
   };
 }
+function scenarioInstructions(){
+  return [
+    '1) Ejecuta ControlEventLegacyUsage.start() en modo debug.',
+    "2) Marca acciones: ControlEventLegacyUsage.mark('abrir ingresos').",
+    '3) Usa la app: pestañas, mantenimiento, INFOEVENTO, BACKUP, carga de datos.',
+    '4) Ejecuta ControlEventLegacyUsage.print().',
+    '5) Ejecuta ControlEventLegacyUsage.stop() si quieres restaurar funciones originales.'
+  ];
+}
 
-export function installLegacyWeightDiagnostics(){
-  const api = {version: VERSION, paths: LEGACY_PATHS.slice(), inspect, print, quick, last};
-  window.ControlEventLegacyWeight = api;
+export function installLegacyUsageProfiler(){
+  const api = {version: VERSION, start, stop, reset, mark, print, inspect, status, rows, unusedCandidates, scenarioInstructions};
+  window.ControlEventLegacyUsage = api;
   return api;
 }

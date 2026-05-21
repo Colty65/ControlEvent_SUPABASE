@@ -1,12 +1,9 @@
-# ControlEvent V31.2
+ControlEvent v31.3
 
-Base: V30.13 validada.
+Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos.
 
-Cambios principales:
-
-- En Mapa de recursos, las fichas de cabecera mantienen los totales globales del evento aunque se filtre por responsable.
-- COMPRAS PRODUCTO muestra total, ya comprado TKxx y Pte.Compra.
-- Se elimina la ficha SOLO DONACION y el dato pasa a la cabecera de productos donados sin compra planificada.
-- Se añade precio unitario en compra y donación dentro de las fichas de producto.
-- Se añade buscador de producto para posicionarse en el primer registro que contenga el texto tecleado.
-- Los eventos se ordenan por fecha de inicio en el desplegable EVENTOS y en mantenimiento de EVENTOS.
+Importante:
+- Esta versión parte de v31.1.
+- No modifica login, globos generales ni rendimiento.
+- Corrige Mapa de recursos: la ficha Donado producto y la cabecera inferior de productos donados usan la misma base.
+- Cache: controlevent-shell-v31-3.

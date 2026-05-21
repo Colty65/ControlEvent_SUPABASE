@@ -1,19 +1,22 @@
-{
-  "version": "ControlEvent v31.5",
-  "base": "ControlEvent v31.3",
-  "changes": [
-    "package.json y package-lock.json regenerados como JSON válido",
-    "Mapa de recursos: buscador limpia el texto al finalizar la búsqueda",
-    "Mantenimientos generales: control de duplicados en PERSONAS, EVENTOS, TIENDAS y PRODUCTOS al añadir y modificar",
-    "Cache actualizado a controlevent-shell-v31-5"
-  ],
-  "files": [
-    "public/app/features/mapa-productos.js",
-    "public/app/features/maintenance-duplicates-v31.5.js",
-    "public/index.html",
-    "public/sw.js",
-    "public/app/version.js",
-    "package.json",
-    "package-lock.json"
-  ]
-}
+import express from 'express';
+import { asyncHandler } from './_async.js';
+import { APP_VERSION, BACKEND_NAME } from '../server/paths.js';
+import { health } from '../repositories/supabase-state.repository.js';
+import { getDiagnostics } from '../services/state.service.js';
+
+const router = express.Router();
+
+router.get('/health', asyncHandler(async (req, res) => {
+  const result = await health();
+  res.status(result.ok ? 200 : 500).json(result);
+}));
+
+router.get('/diagnostics', asyncHandler(async (req, res) => {
+  res.json(await getDiagnostics());
+}));
+
+router.get('/version', (req, res) => {
+  res.json({ ok: true, backend: BACKEND_NAME, version: APP_VERSION, modularization: 'v30.7-legacy-weight-diagnostics' });
+});
+
+export default router;

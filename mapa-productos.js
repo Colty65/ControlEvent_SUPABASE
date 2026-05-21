@@ -1,305 +1,329 @@
-/* ControlEvent v30.7 - Diagnóstico de carga móvil/rendimiento.
-   Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
-import { VERSION } from '../version.js';
+import { getApp } from '../app-context.js';
+import { PACKAGE_NAME, VERSION, VERSION_FILE } from '../version.js';
 
 const DIAGNOSTICS_VERSION = 'v30.7';
-const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.7.js';
-const LEGACY_AFTER = 'legacy-bundle-after-modules-v30.7.js';
-let lastReport = null;
+const INDEX_LINES_BEFORE_V26_5 = 21412;
+const INDEX_LINES_AFTER_V26_5 = 20392;
+const INDEX_BYTES_BEFORE_V26_5 = 1418313;
+const INDEX_BYTES_AFTER_V26_5 = 1166152;
+const INDEX_LINES_BEFORE_V26_6 = 20392;
+const INDEX_LINES_AFTER_V26_6 = 570;
+const INDEX_BYTES_BEFORE_V26_6 = 1166152;
+const INDEX_BYTES_AFTER_V26_6 = 27229;
+const INDEX_INLINE_SCRIPTS_EXTRACTED_V26_6 = 63;
+const INDEX_LINES_AFTER_V26_7 = 447;
+const INDEX_BYTES_AFTER_V26_7 = 21333;
+const INDEX_LEGACY_REQUESTS_BEFORE_V26_7 = 63;
+const INDEX_LEGACY_REQUESTS_AFTER_V26_7 = 2;
+const INDEX_LINES_AFTER_V26_9 = 447;
+const INDEX_BYTES_AFTER_V26_9 = 21333;
+const INDEX_LINES_AFTER_V27_0 = 447;
+const INDEX_BYTES_AFTER_V27_0 = 21333;
+const DEFAULT_TIMEOUT_MS = 8000;
+let lastInspection = null;
+let lastApiCheck = null;
 
 function nowIso(){
   try{ return new Date().toISOString(); }catch(_){ return String(Date.now()); }
 }
 
-function number(value, fallback = 0){
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+function exists(value){
+  return value !== undefined && value !== null;
 }
 
-function round(value, decimals = 1){
-  const p = Math.pow(10, decimals);
-  return Math.round(number(value) * p) / p;
+function fn(value){
+  return typeof value === 'function';
 }
 
-function bytesToKb(bytes){ return round(number(bytes) / 1024, 1); }
-function bytesToMb(bytes){ return round(number(bytes) / (1024 * 1024), 2); }
-
-function navInfo(){
-  const nav = navigator || {};
-  const connection = nav.connection || nav.mozConnection || nav.webkitConnection || null;
-  return {
-    userAgent: nav.userAgent || '',
-    platform: nav.platform || '',
-    language: nav.language || '',
-    online: nav.onLine,
-    hardwareConcurrency: nav.hardwareConcurrency || null,
-    deviceMemoryGb: nav.deviceMemory || null,
-    connection: connection ? {
-      effectiveType: connection.effectiveType || null,
-      downlinkMbps: connection.downlink || null,
-      rttMs: connection.rtt || null,
-      saveData: !!connection.saveData
-    } : null
-  };
+function objectVersion(name){
+  const obj = window[name];
+  return obj?.version || obj?.meta?.version || null;
 }
 
-function screenInfo(){
-  return {
-    width: window.innerWidth || 0,
-    height: window.innerHeight || 0,
-    screenWidth: window.screen?.width || 0,
-    screenHeight: window.screen?.height || 0,
-    devicePixelRatio: window.devicePixelRatio || 1,
-    orientation: window.screen?.orientation?.type || null,
-    isLikelyMobile: Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 760 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
-  };
+function objectMode(name){
+  const obj = window[name];
+  return obj?.mode || obj?.meta?.mode || null;
 }
 
-function getPerformanceEntries(){
-  try{ return performance.getEntriesByType('resource') || []; }catch(_){ return []; }
+function mapSize(value){
+  if(value instanceof Map) return value.size;
+  if(Array.isArray(value)) return value.length;
+  if(value && typeof value === 'object') return Object.keys(value).length;
+  return 0;
 }
 
-function isSameOrigin(entry){
-  try{ return new URL(entry.name, location.href).origin === location.origin; }catch(_){ return false; }
-}
-
-function pathOf(entry){
-  try{ return new URL(entry.name, location.href).pathname; }catch(_){ return String(entry.name || ''); }
-}
-
-function sizeOf(entry){
-  return number(entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0);
-}
-
-function resourceRows(){
-  return getPerformanceEntries().map(entry => ({
-    name: entry.name,
-    path: pathOf(entry),
-    type: entry.initiatorType || '',
-    sameOrigin: isSameOrigin(entry),
-    durationMs: round(entry.duration || 0, 1),
-    transferKb: bytesToKb(entry.transferSize || 0),
-    encodedKb: bytesToKb(entry.encodedBodySize || 0),
-    decodedKb: bytesToKb(entry.decodedBodySize || 0),
-    sizeBytes: sizeOf(entry),
-    fromCacheLikely: !entry.transferSize && !!entry.decodedBodySize
-  }));
-}
-
-function groupResources(rows){
-  const totals = {all:{count:0,kb:0}, script:{count:0,kb:0}, css:{count:0,kb:0}, image:{count:0,kb:0}, fetch:{count:0,kb:0}, other:{count:0,kb:0}};
-  for(const row of rows){
-    const key = row.type === 'script' ? 'script' : row.type === 'css' || row.type === 'link' ? 'css' : row.type === 'img' ? 'image' : row.type === 'fetch' || row.type === 'xmlhttprequest' ? 'fetch' : 'other';
-    const kb = row.transferKb || row.encodedKb || row.decodedKb || 0;
-    totals.all.count += 1; totals.all.kb += kb;
-    totals[key].count += 1; totals[key].kb += kb;
+function safeCall(label, callback, fallback = null){
+  try{
+    return callback?.() ?? fallback;
+  }catch(error){
+    return {ok:false, label, error:error?.message || String(error)};
   }
-  for(const value of Object.values(totals)) value.kb = round(value.kb, 1);
-  return totals;
 }
 
-function legacyResources(rows){
-  return rows.filter(row => row.path.includes('/app/legacy/') || row.path.includes(LEGACY_BEFORE) || row.path.includes(LEGACY_AFTER));
+function checkRoot(id){
+  const el = document.getElementById(id);
+  return {id, ok: !!el, module: el?.dataset?.ceModule || null, maintenance: el?.dataset?.ceMaintenanceModule || null};
 }
 
-function domMetrics(){
-  const inputs = document.querySelectorAll('input,select,textarea,button').length;
-  const cards = document.querySelectorAll('.card,.itemcard,.summary-card,.budget-panel').length;
-  const hidden = document.querySelectorAll('.hidden,[hidden],.collapsed-body.hidden').length;
-  const nodes = document.getElementsByTagName('*').length;
-  return {
-    nodes,
-    inputsAndButtons: inputs,
-    cards,
-    hiddenNodes: hidden,
-    mainCards: document.querySelectorAll('.main .card').length,
-    rowsRendered: document.querySelectorAll('.itemcard,.rowline,.summary-item,.budget-row').length
-  };
+function collectWarnings(report){
+  const warnings = [];
+  if(!report.app.ready) warnings.push('ControlEventApp todavía no está disponible.');
+  if(!report.modules.domain.present) warnings.push('No se ha instalado ControlEventDomain.');
+  if(!report.modules.views.present) warnings.push('No se ha instalado ControlEventModules.');
+  if(!report.modules.excel.present) warnings.push('No se ha instalado ControlEventExcel.');
+  if(!report.modules.tickets.present) warnings.push('No se ha instalado ControlEventTickets.');
+  if(!report.modules.legacyCleanup.present) warnings.push('No se ha instalado ControlEventLegacyCleanup.');
+  if(!report.modules.forms.present) warnings.push('No se ha instalado ControlEventForms.');
+  if(!report.modules.maintenanceDiagnostics?.present) warnings.push('No se ha instalado ControlEventMaintenanceDiagnostics.');
+  if(!report.modules.mobilePerformance?.present) warnings.push('No se ha instalado ControlEventMobilePerformance.');
+  // Mantenimiento se instala bajo demanda al activar su vista, así que no es aviso crítico al arrancar.
+  if(!report.dom.mainRoots.every(item => item.ok)) warnings.push('Falta algún contenedor principal de pantalla.');
+  if(report.version.domTitle && !report.version.domTitle.includes('v30.7')) warnings.push('El título del documento no parece estar en v30.7.');
+  if(report.version.bodyDataset && !report.version.bodyDataset.includes('v30.7')) warnings.push('body.dataset.ceVersion no coincide con v30.7.');
+  if(!report.legacy.exportExcel) warnings.push('No se encuentra exportExcel legacy; INFOEVENTO podría fallar.');
+  if(!report.legacy.saveStateNow) warnings.push('No se encuentra saveStateNow; el guardado podría depender de otro flujo.');
+  return warnings;
 }
 
-function memoryInfo(){
-  const mem = performance.memory || null;
-  if(!mem) return null;
-  return {
-    usedJsHeapMb: bytesToMb(mem.usedJSHeapSize),
-    totalJsHeapMb: bytesToMb(mem.totalJSHeapSize),
-    heapLimitMb: bytesToMb(mem.jsHeapSizeLimit)
-  };
-}
+export function inspectRuntime(){
+  const app = getApp() || window.ControlEventApp || null;
+  const modules = window.ControlEventModules || null;
+  const maintenance = window.ControlEventMaintenance || null;
+  const excel = window.ControlEventExcel || null;
+  const tickets = window.ControlEventTickets || null;
+  const domain = window.ControlEventDomain || null;
+  const legacyMap = window.ControlEventLegacyMap || null;
+  const legacyCleanup = window.ControlEventLegacyCleanup || null;
+  const forms = window.ControlEventForms || null;
+  const maintenanceDiagnostics = window.ControlEventMaintenanceDiagnostics || null;
+  const mobilePerformance = window.ControlEventMobilePerformance || null;
 
-function navTiming(){
-  const nav = performance.getEntriesByType?.('navigation')?.[0] || null;
-  if(nav){
-    return {
-      type: nav.type || null,
-      domInteractiveMs: round(nav.domInteractive || 0, 1),
-      domContentLoadedMs: round(nav.domContentLoadedEventEnd || 0, 1),
-      loadEventEndMs: round(nav.loadEventEnd || 0, 1),
-      responseEndMs: round(nav.responseEnd || 0, 1),
-      transferKb: bytesToKb(nav.transferSize || 0),
-      decodedKb: bytesToKb(nav.decodedBodySize || 0)
-    };
-  }
-  const timing = performance.timing || null;
-  if(!timing) return null;
-  const start = timing.navigationStart;
-  return {
-    type: 'legacy-timing',
-    domInteractiveMs: timing.domInteractive - start,
-    domContentLoadedMs: timing.domContentLoadedEventEnd - start,
-    loadEventEndMs: timing.loadEventEnd - start,
-    responseEndMs: timing.responseEnd - start
-  };
-}
-
-function scriptTags(){
-  return Array.from(document.scripts || []).map(script => ({
-    id: script.id || '',
-    src: script.src ? pathOf({name: script.src}) : '(inline)',
-    type: script.type || 'classic',
-    async: !!script.async,
-    defer: !!script.defer
-  }));
-}
-
-function estimateScore(report){
-  let score = 100;
-  const allKb = report.resources.totals.all.kb;
-  const scriptKb = report.resources.totals.script.kb;
-  const scriptCount = report.resources.totals.script.count;
-  const legacyCount = report.resources.legacy.count;
-  const domNodes = report.dom.nodes;
-  if(allKb > 2500) score -= 25; else if(allKb > 1500) score -= 15; else if(allKb > 900) score -= 8;
-  if(scriptKb > 1800) score -= 25; else if(scriptKb > 1000) score -= 15; else if(scriptKb > 700) score -= 8;
-  if(scriptCount > 25) score -= 12; else if(scriptCount > 15) score -= 7;
-  if(legacyCount > 2) score -= 10;
-  if(domNodes > 5000) score -= 18; else if(domNodes > 3000) score -= 10; else if(domNodes > 1800) score -= 5;
-  if(report.navigator.connection?.saveData) score -= 3;
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-function recommendations(report){
-  const recs = [];
-  if(report.resources.totals.script.kb > 1000) recs.push('Separar ExcelJS y legacy para cargarlos sólo cuando se usan. Impacto móvil: muy alto.');
-  if(report.resources.legacy.count >= 2) recs.push('Siguiente fase: dividir legacy por pantalla o cargar el segundo bundle bajo demanda.');
-  if(report.dom.nodes > 2500) recs.push('Reducir renderizados iniciales: listas largas sólo al abrir cada pestaña.');
-  if(report.resources.excelJs.loadedAtStart) recs.push('ExcelJS ya aparece cargado; confirmar que sólo se ha cargado tras pedir INFOEVENTO/Excel.');
-  else recs.push('ExcelJS no está cargado al inicio: correcto para móvil. Se cargará bajo demanda al generar Excel.');
-  if(report.pwa.controlled && report.resources.totals.all.kb === 0) recs.push('Muchos recursos parecen venir de caché; probar una carga en incógnito para medir peso real.');
-  if(!recs.length) recs.push('Diagnóstico sin avisos relevantes. Mantener estrategia de carga diferida por pantalla.');
-  return recs;
-}
-
-export function inspectMobilePerformance(){
-  const rows = resourceRows();
-  const legacy = legacyResources(rows);
-  const excelJs = rows.find(row => row.path.includes('exceljs')) || null;
   const report = {
-    version: DIAGNOSTICS_VERSION,
-    appVersion: VERSION,
+    ok: true,
+    diagnosticsVersion: DIAGNOSTICS_VERSION,
     inspectedAt: nowIso(),
-    mode: 'diagnostic-only',
-    screen: screenInfo(),
-    navigator: navInfo(),
-    timing: navTiming(),
-    memory: memoryInfo(),
-    dom: domMetrics(),
-    scripts: {
-      tags: scriptTags(),
-      count: document.scripts?.length || 0
+    indexHtml: {
+      linesBeforeV26_5: INDEX_LINES_BEFORE_V26_5,
+      linesAfterV26_5: INDEX_LINES_AFTER_V26_5,
+      linesReducedV26_5: INDEX_LINES_BEFORE_V26_5 - INDEX_LINES_AFTER_V26_5,
+      bytesBeforeV26_5: INDEX_BYTES_BEFORE_V26_5,
+      bytesAfterV26_5: INDEX_BYTES_AFTER_V26_5,
+      bytesReducedV26_5: INDEX_BYTES_BEFORE_V26_5 - INDEX_BYTES_AFTER_V26_5,
+      linesBeforeV26_6: INDEX_LINES_BEFORE_V26_6,
+      linesAfterV26_6: INDEX_LINES_AFTER_V26_6,
+      linesReducedV26_6: INDEX_LINES_BEFORE_V26_6 - INDEX_LINES_AFTER_V26_6,
+      bytesBeforeV26_6: INDEX_BYTES_BEFORE_V26_6,
+      bytesAfterV26_6: INDEX_BYTES_AFTER_V26_6,
+      bytesReducedV26_6: INDEX_BYTES_BEFORE_V26_6 - INDEX_BYTES_AFTER_V26_6,
+      inlineScriptsExtractedV26_6: INDEX_INLINE_SCRIPTS_EXTRACTED_V26_6,
+      linesReducedTotalSinceV26_4: INDEX_LINES_BEFORE_V26_5 - INDEX_LINES_AFTER_V26_6,
+      bytesReducedTotalSinceV26_4: INDEX_BYTES_BEFORE_V26_5 - INDEX_BYTES_AFTER_V26_6,
+      linesAfterV26_7: INDEX_LINES_AFTER_V26_7,
+      bytesAfterV26_7: INDEX_BYTES_AFTER_V26_7,
+      legacyRequestsBeforeV26_7: INDEX_LEGACY_REQUESTS_BEFORE_V26_7,
+      legacyRequestsAfterV26_7: INDEX_LEGACY_REQUESTS_AFTER_V26_7,
+      legacyRequestsReducedV26_7: INDEX_LEGACY_REQUESTS_BEFORE_V26_7 - INDEX_LEGACY_REQUESTS_AFTER_V26_7,
+      linesAfterV26_9: INDEX_LINES_AFTER_V26_9,
+      bytesAfterV26_9: INDEX_BYTES_AFTER_V26_9,
+      linesAfterV27_0: INDEX_LINES_AFTER_V27_0,
+      bytesAfterV27_0: INDEX_BYTES_AFTER_V27_0
     },
-    resources: {
-      totals: groupResources(rows),
-      count: rows.length,
-      rows,
-      legacy: {
-        count: legacy.length,
-        totalKb: round(legacy.reduce((sum, row) => sum + (row.transferKb || row.encodedKb || row.decodedKb || 0), 0), 1),
-        files: legacy.map(row => ({path: row.path, kb: row.transferKb || row.encodedKb || row.decodedKb || 0, durationMs: row.durationMs}))
+    version: {
+      expected: VERSION,
+      file: VERSION_FILE,
+      packageName: PACKAGE_NAME,
+      domTitle: document.title || '',
+      bodyDataset: document.body?.dataset?.ceVersion || ''
+    },
+    app: {
+      ready: !!app,
+      hasState: !!(app?.state || window.state),
+      selectedEventId: String(app?.state?.selectedEventId || window.state?.selectedEventId || ''),
+      currentMainTab: app?.navigation?.currentMainTab || null,
+      currentMaintTab: app?.navigation?.currentMaintTab || null,
+      user: app?.authUser?.nombre || window.authUser?.nombre || null,
+      userLevel: app?.authUser?.nivel || window.authUser?.nivel || null
+    },
+    modules: {
+      domain: {
+        present: !!domain,
+        version: objectVersion('ControlEventDomain'),
+        mode: objectMode('ControlEventDomain'),
+        hasApi: !!domain?.api,
+        canCompareLegacy: fn(domain?.compareWithLegacy)
       },
-      excelJs: {
-        loadedAtStart: !!excelJs,
-        path: excelJs?.path || null,
-        kb: excelJs ? (excelJs.transferKb || excelJs.encodedKb || excelJs.decodedKb || 0) : 0,
-        globalReady: !!window.ExcelJS?.Workbook,
-        lazyInfo: window.ControlEventExcel?.excelJsInfo?.() || null
+      views: {
+        present: !!modules,
+        version: objectVersion('ControlEventModules'),
+        entries: modules?.entries?.map?.(entry => entry.name) || [],
+        loaded: mapSize(modules?.loaded),
+        state: safeCall('ControlEventModules.info', () => modules?.info?.() || modules?.diagnostics?.(), {})
+      },
+      viewRuntime: {
+        present: !!window.ControlEventViewRuntime,
+        version: objectVersion('ControlEventViewRuntime'),
+        info: safeCall('ControlEventViewRuntime.info', () => window.ControlEventViewRuntime?.info?.(), {})
+      },
+      maintenance: {
+        present: !!maintenance,
+        version: objectVersion('ControlEventMaintenance'),
+        sections: maintenance?.sections?.map?.(section => section.name) || [],
+        loaded: mapSize(maintenance?.loaded),
+        info: safeCall('ControlEventMaintenance.info', () => maintenance?.info?.(), {})
+      },
+      excel: {
+        present: !!excel,
+        version: objectVersion('ControlEventExcel'),
+        mode: objectMode('ControlEventExcel'),
+        info: safeCall('ControlEventExcel.info', () => excel?.info?.(), {})
+      },
+      resumenSheet: {
+        present: !!window.ControlEventResumenSheet,
+        version: objectVersion('ControlEventResumenSheet'),
+        mode: objectMode('ControlEventResumenSheet'),
+        ready: safeCall('ControlEventResumenSheet.assertReady', () => window.ControlEventResumenSheet?.assertReady?.(), {})
+      },
+      tickets: {
+        present: !!tickets,
+        version: objectVersion('ControlEventTickets'),
+        mode: objectMode('ControlEventTickets'),
+        info: safeCall('ControlEventTickets.info', () => tickets?.info?.(), {})
+      },
+      legacyMap: {
+        present: !!legacyMap,
+        version: objectVersion('ControlEventLegacyMap'),
+        summary: safeCall('ControlEventLegacyMap.summary', () => legacyMap?.summary?.(), {})
+      },
+      legacyCleanup: {
+        present: !!legacyCleanup,
+        version: objectVersion('ControlEventLegacyCleanup'),
+        info: safeCall('ControlEventLegacyCleanup.info', () => legacyCleanup?.info?.(), {})
+      },
+      forms: {
+        present: !!forms,
+        version: objectVersion('ControlEventForms'),
+        mode: objectMode('ControlEventForms'),
+        info: safeCall('ControlEventForms.info', () => forms?.info?.(), {}),
+        snapshot: safeCall('ControlEventForms.snapshot', () => forms?.snapshot?.(), {})
+      },
+      mobilePerformance: {
+        present: !!mobilePerformance,
+        version: objectVersion('ControlEventMobilePerformance'),
+        mode: objectMode('ControlEventMobilePerformance'),
+        quick: safeCall('ControlEventMobilePerformance.quick', () => mobilePerformance?.quick?.(), {})
+      },
+      maintenanceDiagnostics: {
+        present: !!maintenanceDiagnostics,
+        version: objectVersion('ControlEventMaintenanceDiagnostics'),
+        mode: objectMode('ControlEventMaintenanceDiagnostics'),
+        info: safeCall('ControlEventMaintenanceDiagnostics.info', () => maintenanceDiagnostics?.info?.(), {}),
+        inspect: safeCall('ControlEventMaintenanceDiagnostics.inspect', () => maintenanceDiagnostics?.inspect?.(), {})
       }
+    },
+    dom: {
+      mainRoots: ['tabIngresos','tabCompras','tabDonaciones','tabResumen','tabGraficas','maintenanceWrapper'].map(checkRoot),
+      maintenanceRoots: ['mtPersonas','mtEventos','mtTiendas','mtProductos','mtAcceso','mtImportar'].map(checkRoot)
+    },
+    legacy: {
+      exportExcel: fn(window.exportExcel) || fn(app?.actions?.exportExcel),
+      exportSeedWorkbook: fn(window.exportSeedWorkbook) || fn(app?.actions?.exportSeedWorkbook),
+      saveStateNow: fn(window.saveStateNow) || fn(app?.actions?.saveStateNow),
+      renderBudget: fn(window.renderBudget) || fn(app?.actions?.renderBudget),
+      renderCompras: fn(window.renderCompras) || fn(app?.actions?.renderCompras),
+      renderDonaciones: fn(window.renderDonaciones) || fn(app?.actions?.renderDonaciones),
+      renderColabs: fn(window.renderColabs) || fn(app?.actions?.renderColabs)
     },
     pwa: {
       serviceWorkerAvailable: 'serviceWorker' in navigator,
-      controlled: !!navigator.serviceWorker?.controller,
-      controllerUrl: navigator.serviceWorker?.controller?.scriptURL || null
+      controlled: !!navigator.serviceWorker?.controller
     }
   };
-  report.score = estimateScore(report);
-  report.recommendations = recommendations(report);
-  lastReport = report;
+  report.warnings = collectWarnings(report);
+  report.ok = report.warnings.length === 0;
+  lastInspection = report;
   return report;
 }
 
-export function resources(){
-  const rows = resourceRows();
-  try{ console.table(rows.map(row => ({type: row.type, path: row.path, kb: row.transferKb || row.encodedKb || row.decodedKb, ms: row.durationMs, cache: row.fromCacheLikely}))); }catch(_){ console.log(rows); }
-  return rows;
+function fetchWithTimeout(url, options = {}){
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs || DEFAULT_TIMEOUT_MS);
+  return fetch(url, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    ...options,
+    signal: controller.signal
+  }).finally(() => window.clearTimeout(timeout));
 }
 
-export function scripts(){
-  const rows = scriptTags();
-  try{ console.table(rows); }catch(_){ console.log(rows); }
-  return rows;
+async function readJsonEndpoint(path){
+  const startedAt = Date.now();
+  try{
+    const response = await fetchWithTimeout(path, {timeoutMs: DEFAULT_TIMEOUT_MS});
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json') ? await response.json() : await response.text();
+    return {path, ok: response.ok, status: response.status, ms: Date.now() - startedAt, payload};
+  }catch(error){
+    return {path, ok:false, status:0, ms: Date.now() - startedAt, error:error?.message || String(error)};
+  }
+}
+
+export async function checkApi(){
+  const endpoints = ['/api/version', '/api/health', '/api/diagnostics'];
+  const results = [];
+  for(const endpoint of endpoints){
+    results.push(await readJsonEndpoint(endpoint));
+  }
+  lastApiCheck = {
+    ok: results.every(result => result.ok),
+    checkedAt: nowIso(),
+    results
+  };
+  return lastApiCheck;
+}
+
+export function assertHealthy(){
+  const report = inspectRuntime();
+  if(!report.ok){
+    console.warn('[ControlEventDiagnostics/v30.7] Avisos detectados', report.warnings, report);
+  }
+  return report;
 }
 
 export function print(){
-  const report = inspectMobilePerformance();
-  console.group(`[ControlEventMobilePerformance/${DIAGNOSTICS_VERSION}] Diagnóstico móvil/rendimiento`);
-  console.log('Resumen', {
-    score: report.score,
-    isLikelyMobile: report.screen.isLikelyMobile,
-    resourcesKb: report.resources.totals.all.kb,
-    scriptKb: report.resources.totals.script.kb,
-    scriptCount: report.resources.totals.script.count,
-    legacyKb: report.resources.legacy.totalKb,
-    domNodes: report.dom.nodes,
-    excelJsAtStart: report.resources.excelJs.loadedAtStart,
-    swControlled: report.pwa.controlled
-  });
-  try{
-    console.table(Object.entries(report.resources.totals).map(([tipo, value]) => ({tipo, peticiones:value.count, kb:value.kb})));
-  }catch(_){ console.log(report.resources.totals); }
-  if(report.recommendations.length) console.info('Recomendaciones:', report.recommendations);
-  console.groupEnd();
+  const report = inspectRuntime();
+  const rows = [
+    ['App', report.app.ready ? 'OK' : 'NO'],
+    ['Domain', report.modules.domain.present ? 'OK' : 'NO'],
+    ['Views', report.modules.views.present ? 'OK' : 'NO'],
+    ['Maintenance', report.modules.maintenance.present ? 'OK' : 'NO'],
+    ['Excel', report.modules.excel.present ? 'OK' : 'NO'],
+    ['Tickets', report.modules.tickets.present ? 'OK' : 'NO'],
+    ['Legacy exportExcel', report.legacy.exportExcel ? 'OK' : 'NO'],
+    ['Legacy map', report.modules.legacyMap.present ? 'OK' : 'NO'],
+    ['Legacy cleanup', report.modules.legacyCleanup.present ? 'OK' : 'NO'],
+    ['Forms', report.modules.forms.present ? 'OK' : 'NO'],
+    ['Mobile performance', report.modules.mobilePerformance.present ? 'OK' : 'NO'],
+    ['PWA control', report.pwa.controlled ? 'SW activo' : 'sin controlador']
+  ];
+  try{ console.table(rows.map(([area, estado]) => ({area, estado}))); }catch(_){ console.log(rows); }
+  if(report.warnings.length) console.warn('[ControlEventDiagnostics/v30.7]', report.warnings);
   return report;
 }
 
-export function quick(){
-  const report = inspectMobilePerformance();
-  return {
-    version: report.version,
-    score: report.score,
-    mobile: report.screen.isLikelyMobile,
-    resourcesKb: report.resources.totals.all.kb,
-    scriptKb: report.resources.totals.script.kb,
-    scriptCount: report.resources.totals.script.count,
-    legacyKb: report.resources.legacy.totalKb,
-    domNodes: report.dom.nodes,
-    excelJsAtStart: report.resources.excelJs.loadedAtStart,
-    recommendations: report.recommendations
-  };
-}
-
-export function installMobilePerformanceDiagnostics(){
+export function installRuntimeDiagnostics(runtime = {}){
   const api = {
     version: DIAGNOSTICS_VERSION,
-    mode: 'diagnostic-only',
-    inspect: inspectMobilePerformance,
+    appVersion: VERSION,
+    inspect: inspectRuntime,
+    assertHealthy,
+    checkApi,
     print,
-    quick,
-    resources,
-    scripts,
-    get lastReport(){ return lastReport; }
+    get lastInspection(){ return lastInspection; },
+    get lastApiCheck(){ return lastApiCheck; },
+    runtime
   };
-  window.ControlEventMobilePerformance = api;
-  window.__ceV278MobilePerformance = api;
-  window.dispatchEvent(new CustomEvent('controlevent:mobile-performance-ready', {detail: api}));
+  window.ControlEventDiagnostics = api;
+  window.__ceV264Diagnostics = api;
+  window.dispatchEvent(new CustomEvent('controlevent:diagnostics-ready', {detail: api}));
   return api;
 }
