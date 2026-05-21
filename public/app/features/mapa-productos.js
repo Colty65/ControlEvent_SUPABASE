@@ -1,8 +1,8 @@
-/* ControlEvent v31.6.1 - Mapa de recursos
+/* ControlEvent v31.7 - Mapa de recursos
    Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.6.1';
+  const VERSION = 'ControlEvent v31.7';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -553,27 +553,24 @@
       const responsablesTxt = Array.from(group.responsables.values()).join(', ') || '—';
       const donorTxt = group.donationRows.map(item => item.donor).join(', ');
       const searchText = dataProductText([group.tienda, group.ticket, group.producto, group.segmento, group.destino, responsablesTxt, donorTxt]);
-      return `
-      <article class="mapa-product-card ${group.isResolvedTk ? 'resolved-tk' : 'pending-buy'}" data-product-text="${searchText}">
-        <div class="mapa-product-head">
-          <div><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
-          <div class="mapa-tags"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
-        </div>
-        ${renderNeedStrip(group)}
-        <div class="mapa-product-kpis" role="list">
-          <div role="listitem"><span>COMPRAS PRODUCTO</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. · ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))}</strong></div>
-          <div role="listitem"><span>Importe compra</span><strong>${esc(moneyFmt(group.importeCompra))}</strong></div>
-          <div role="listitem"><span>Necesidad total</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. · ${esc(moneyFmt(group.necesidadValor))}</strong></div>
-          <div role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} · ${esc(moneyFmt(group.valorDonado))}</strong></div>
-        </div>
-        <div class="mapa-product-meta">
-          <div><b>Ticket / estado:</b> ${esc(renderTicketLine(group))}</div>
-          <div><b>Responsable:</b> ${esc(responsablesTxt)}</div>
-        </div>
-        <div class="mapa-donation-block">
-          <div class="mapa-subtitle">Donantes de este producto</div>
+      const donationBlock = group.donationRows.length ? `
+        <div class="mapa-donation-block compact">
+          <div class="mapa-subtitle">Donantes</div>
           ${renderDonationRows(group.donationRows)}
+        </div>` : '';
+      return `
+      <article class="mapa-product-card mapa-product-card-compact ${group.isResolvedTk ? 'resolved-tk' : 'pending-buy'}" data-product-text="${searchText}">
+        <div class="mapa-product-head compact">
+          <div class="mapa-product-title"><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
+          <div class="mapa-tags compact"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
         </div>
+        <div class="mapa-product-resp"><b>Responsable:</b> ${esc(responsablesTxt)}</div>
+        <div class="mapa-product-compact-line" role="list">
+          <div class="buy" role="listitem"><span>Compra</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. · ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))} · ${esc(moneyFmt(group.importeCompra))}</strong></div>
+          <div class="don" role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} · ${esc(moneyFmt(group.valorDonado))}</strong></div>
+          <div class="need" role="listitem"><span>Necesidad</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. · ${esc(moneyFmt(group.necesidadValor))}</strong></div>
+        </div>
+        ${donationBlock}
       </article>`;
     }).join('');
 
@@ -588,10 +585,10 @@
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
           const searchText = dataProductText([item.origen || 'Producto donado', item.producto, item.segmento, item.destino, donorTxt]);
           return `
-          <article class="mapa-product-card donation-only" data-product-text="${searchText}">
-            <div class="mapa-product-head"><div><span class="mapa-store">${esc(item.origen || 'Producto donado')}</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
-            <div class="mapa-product-kpis compact"><div><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
-            ${renderDonationRows(item.donationRows)}
+          <article class="mapa-product-card mapa-product-card-compact donation-only" data-product-text="${searchText}">
+            <div class="mapa-product-head compact"><div class="mapa-product-title"><span class="mapa-store">${esc(item.origen || 'Producto donado')}</span><h3>${esc(item.producto)}</h3></div><div class="mapa-tags compact"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div></div>
+            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
+            <div class="mapa-donation-block compact">${renderDonationRows(item.donationRows)}</div>
           </article>`;
         }).join('')}
       </section>` : '';
@@ -728,5 +725,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v316', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v317', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

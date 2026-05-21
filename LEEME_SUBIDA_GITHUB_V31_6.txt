@@ -1,10 +1,10 @@
-ControlEvent v31.6.1
+ControlEvent v31.7
 
 Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
 
 Cambios principales:
-- BACKUP/METADATOS: VERSION = ControlEvent v31.6.1 y VERSION_FICHERO = ControlEvent_v31_6_1.
+- BACKUP/METADATOS: VERSION = ControlEvent v31.7 y VERSION_FICHERO = ControlEvent_v31_7.
 - Mapa de recursos: botón flotante de inicio con icono ⌂.
 - PC/iPad: botón centrado a la derecha.
 - iPhone/Android: botón encima de Menú.
-- Caché nueva: controlevent-shell-v31-6-1.
+- Caché nueva: controlevent-shell-v31-7.

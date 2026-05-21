@@ -1264,13 +1264,13 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .mapa-only-donations-head strong{line-height:1.35;}
 
 
-/* ControlEvent v31.6.1 - Mapa de recursos: retorno desde productos donados */
+/* ControlEvent v31.7 - Mapa de recursos: retorno desde productos donados */
 .mapa-donations-footer{display:flex;justify-content:center;margin:14px 0 4px;}
 .mapa-donations-footer button{font-weight:900;border-radius:999px;padding:9px 16px;}
 .mapa-metric.jump-donados{user-select:none;-webkit-user-select:none;touch-action:manipulation;}
 
 
-/* ControlEvent v31.6.1 - Mapa de recursos: botón flotante Volver arriba */
+/* ControlEvent v31.7 - Mapa de recursos: botón flotante Volver arriba */
 #tabMapaProductos .mapa-floating-top{
   position:fixed;
   right:18px;
@@ -1300,7 +1300,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 }
 
 
-/* ControlEvent v31.6.1 - Mapa de recursos: botón flotante inicio responsive */
+/* ControlEvent v31.7 - Mapa de recursos: botón flotante inicio responsive */
 #tabMapaProductos .mapa-floating-top{display:none!important;}
 #ceMapaFloatingHomeButton.mapa-floating-home{
   position:fixed;
@@ -1339,4 +1339,103 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
     font-size:22px;
     box-shadow:0 10px 24px rgba(15,23,42,.22);
   }
+}
+
+/* ControlEvent v31.7 - Mapa de recursos: fichas de producto compactas */
+.mapa-product-card.mapa-product-card-compact{
+  margin-top:8px;
+  padding:10px 12px 10px 15px;
+  border-radius:16px;
+  box-shadow:0 5px 14px rgba(15,23,42,.045);
+}
+.mapa-product-card.mapa-product-card-compact:before{width:4px;}
+.mapa-product-head.compact{
+  align-items:center;
+  gap:10px;
+}
+.mapa-product-head.compact h3{
+  margin:2px 0 0;
+  font-size:16px;
+  line-height:1.15;
+}
+.mapa-product-head.compact .mapa-store{
+  font-size:10px;
+  padding:2px 7px;
+}
+.mapa-tags.compact{gap:4px;}
+.mapa-tags.compact span{
+  font-size:10px;
+  padding:3px 7px;
+}
+.mapa-product-resp{
+  margin-top:6px;
+  font-size:12px;
+  color:#475569;
+  line-height:1.25;
+}
+.mapa-product-resp b{color:#111827;}
+.mapa-product-compact-line{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:6px;
+  margin-top:8px;
+}
+.mapa-product-compact-line > div{
+  border:1px solid rgba(15,23,42,.08);
+  border-radius:12px;
+  padding:7px 9px;
+  background:#f8fafc;
+  min-width:0;
+}
+.mapa-product-compact-line > div.buy{background:#fff7ed;border-color:#fed7aa;}
+.mapa-product-compact-line > div.don{background:#ecfdf5;border-color:#bbf7d0;}
+.mapa-product-compact-line > div.need{background:#eef2ff;border-color:#c7d2fe;}
+.mapa-product-compact-line span{
+  display:block;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+  font-weight:900;
+  color:#64748b;
+}
+.mapa-product-compact-line strong{
+  display:block;
+  margin-top:2px;
+  font-size:13px;
+  line-height:1.2;
+  color:#111827;
+}
+.mapa-product-compact-line.donation-only-line{
+  grid-template-columns:1fr;
+}
+.mapa-product-card.mapa-product-card-compact .mapa-donation-block.compact{
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px dashed rgba(34,197,94,.35);
+}
+.mapa-product-card.mapa-product-card-compact .mapa-subtitle{
+  font-size:11px;
+  margin-bottom:5px;
+}
+.mapa-product-card.mapa-product-card-compact .mapa-donation-row{
+  padding:6px 8px;
+  border-radius:11px;
+  gap:6px;
+}
+.mapa-product-card.mapa-product-card-compact .mapa-donation-row strong{font-size:12px;}
+.mapa-product-card.mapa-product-card-compact .mapa-donation-row span{font-size:9px;}
+@media (max-width:760px){
+  .mapa-product-card.mapa-product-card-compact{margin-top:8px;padding:9px 10px 9px 14px;border-radius:15px;}
+  .mapa-product-head.compact{display:block!important;}
+  .mapa-product-head.compact h3{font-size:15px;}
+  .mapa-tags.compact{justify-content:flex-start;margin-top:5px;max-width:none;}
+  .mapa-product-resp{font-size:11px;margin-top:5px;}
+  .mapa-product-compact-line{grid-template-columns:1fr;gap:5px;margin-top:7px;}
+  .mapa-product-compact-line > div{padding:6px 8px;border-radius:11px;}
+  .mapa-product-compact-line strong{font-size:12px;}
+  .mapa-product-card.mapa-product-card-compact .mapa-donation-block.compact{margin-top:7px;padding-top:7px;}
+}
+@media (min-width:761px) and (max-width:1180px){
+  .mapa-product-compact-line{grid-template-columns:1fr 1fr;}
+  .mapa-product-compact-line > div.need{grid-column:1 / -1;}
 }
