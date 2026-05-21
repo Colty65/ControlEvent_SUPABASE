@@ -1,8 +1,9 @@
-/* ControlEvent v31.9 - Mapa de recursos
-   Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
+/* ControlEvent v31.10 - Mapa de recursos
+   Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados.
+   V31.10: refuerzo del marcado comprado tras cambio de evento. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.9';
+  const VERSION = 'ControlEvent v31.10';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -15,6 +16,8 @@
   let selectedResponsables = null; // null = todos
   let productSearchText = '';
   let lastRenderedEventId = null;
+  let lastShopActivationAt = 0;
+  let lastShopActivationKey = '';
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -129,7 +132,7 @@
     return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   }
 
-  // V31.9: marcado visual local para usar Mapa de recursos como lista de la compra.
+  // V31.10: marcado visual local para usar Mapa de recursos como lista de la compra.
   // No modifica datos ni tickets; solo colorea/tacha la ficha en este navegador.
   function shoppingStorageKey(){ return `ControlEventMapaRecursosCompradoAhora_v319_${selectedId() || 'sin_evento'}`; }
   function readShoppingChecked(){
@@ -159,8 +162,39 @@
       btn.classList.toggle('is-checked', !!checked);
       btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
       btn.innerHTML = checked ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado';
-      btn.title = checked ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora';
+      btn.setAttribute('aria-label', checked ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora');
+      btn.removeAttribute('title');
     }
+  }
+  function activateShoppingButton(button, event){
+    const btn = button && button.closest ? button.closest('[data-mapa-shop-toggle="1"]') : null;
+    if(!btn) return false;
+    try{ event?.preventDefault?.(); event?.stopPropagation?.(); event?.stopImmediatePropagation?.(); }catch(_){ }
+    const key = btn.getAttribute('data-shop-key') || '';
+    if(!key) return true;
+    const now = Date.now();
+    if(lastShopActivationKey === key && now - lastShopActivationAt < 260) return true;
+    lastShopActivationKey = key;
+    lastShopActivationAt = now;
+    const checked = toggleShoppingChecked(key);
+    const card = btn.closest('.mapa-product-card.compra-card');
+    applyShoppingCheckedToCard(card, checked);
+    return true;
+  }
+  function bindShoppingButtonsDirect(){
+    const panel = document.getElementById(PANEL_ID);
+    if(!panel) return;
+    panel.querySelectorAll('[data-mapa-shop-toggle="1"]').forEach(btn => {
+      if(btn.__ceMapaShopBoundV3110) return;
+      btn.__ceMapaShopBoundV3110 = true;
+      btn.removeAttribute('title');
+      btn.addEventListener('click', event => activateShoppingButton(btn, event), true);
+      btn.addEventListener('pointerup', event => activateShoppingButton(btn, event), true);
+      btn.addEventListener('touchend', event => activateShoppingButton(btn, event), {capture:true, passive:false});
+      btn.addEventListener('keydown', event => {
+        if(event.key === 'Enter' || event.key === ' ') activateShoppingButton(btn, event);
+      }, true);
+    });
   }
 
   function buildMapaProductos(){
@@ -532,12 +566,7 @@
   function handleMapaInternalAction(event){
     const shop = event.target?.closest?.('#tabMapaProductos [data-mapa-shop-toggle="1"]');
     if(shop){
-      try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
-      const key = shop.getAttribute('data-shop-key') || '';
-      const checked = toggleShoppingChecked(key);
-      const card = shop.closest('.mapa-product-card.compra-card');
-      applyShoppingCheckedToCard(card, checked);
-      return true;
+      return activateShoppingButton(shop, event);
     }
     const jump = event.target?.closest?.('#tabMapaProductos [data-mapa-jump-donados="1"]');
     if(jump){
@@ -613,7 +642,7 @@
           <div class="mapa-subtitle">Donantes</div>
           ${renderDonationRows(group.donationRows)}
         </div>` : '';
-      const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" title="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>`;
+      const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" aria-label="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleShop&&window.ControlEventMapaProductos.toggleShop(this,event)}catch(_e){};return false;">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>`;
       return `
       <article class="mapa-product-card mapa-product-card-compact compra-card ${group.isResolvedTk ? 'resolved-tk purchased-locked' : 'pending-buy'} ${checkedNow ? 'shop-checked' : ''}" data-product-text="${searchText}" data-shop-key="${esc(group.key)}">
         <div class="mapa-product-head compact">
@@ -657,6 +686,7 @@
 
     wrap.innerHTML = cards + onlyDonationBlock;
     normalizeMapaLabelsV3013();
+    bindShoppingButtonsDirect();
     // V31.4: no repetir automáticamente la búsqueda anterior tras renderizar.
   }
 
@@ -787,5 +817,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v319', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v3110', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

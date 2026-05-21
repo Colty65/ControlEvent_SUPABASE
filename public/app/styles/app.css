@@ -1264,13 +1264,13 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .mapa-only-donations-head strong{line-height:1.35;}
 
 
-/* ControlEvent v31.9 - Mapa de recursos: retorno desde productos donados */
+/* ControlEvent v31.10 - Mapa de recursos: retorno desde productos donados */
 .mapa-donations-footer{display:flex;justify-content:center;margin:14px 0 4px;}
 .mapa-donations-footer button{font-weight:900;border-radius:999px;padding:9px 16px;}
 .mapa-metric.jump-donados{user-select:none;-webkit-user-select:none;touch-action:manipulation;}
 
 
-/* ControlEvent v31.9 - Mapa de recursos: botón flotante Volver arriba */
+/* ControlEvent v31.10 - Mapa de recursos: botón flotante Volver arriba */
 #tabMapaProductos .mapa-floating-top{
   position:fixed;
   right:18px;
@@ -1300,7 +1300,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 }
 
 
-/* ControlEvent v31.9 - Mapa de recursos: botón flotante inicio responsive */
+/* ControlEvent v31.10 - Mapa de recursos: botón flotante inicio responsive */
 #tabMapaProductos .mapa-floating-top{display:none!important;}
 #ceMapaFloatingHomeButton.mapa-floating-home{
   position:fixed;
@@ -1341,7 +1341,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   }
 }
 
-/* ControlEvent v31.9 - Mapa de recursos: fichas de producto compactas */
+/* ControlEvent v31.10 - Mapa de recursos: fichas de producto compactas */
 .mapa-product-card.mapa-product-card-compact{
   margin-top:8px;
   padding:10px 12px 10px 15px;
@@ -1440,7 +1440,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-compact-line > div.need{grid-column:1 / -1;}
 }
 
-/* ControlEvent v31.9 - Mapa de recursos: fichas donadas compactas y marcado de compra en tienda */
+/* ControlEvent v31.10 - Mapa de recursos: fichas donadas compactas y marcado de compra en tienda */
 .mapa-product-actions{
   display:flex;
   align-items:flex-end;
@@ -1509,7 +1509,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row .donor{grid-column:1 / -1;}
 }
 
-/* ControlEvent v31.9 - ajuste final: TKxx bloqueado y donaciones más limpias */
+/* ControlEvent v31.10 - ajuste final: TKxx bloqueado y donaciones más limpias */
 .mapa-product-card.compra-card.purchased-locked .mapa-product-actions{align-items:flex-start;}
 .mapa-product-card.compra-card.purchased-locked .mapa-product-actions:after{
   content:"✓ Ya comprado";
