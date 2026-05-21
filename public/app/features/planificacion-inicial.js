@@ -1,8 +1,8 @@
-/* ControlEvent v32.1 - Planificación inicial por histórico de COMPRAS.
-   Primera versión: genera una propuesta revisable, sin grabar datos reales. */
+/* ControlEvent v32.2 - Planificación inicial por histórico de COMPRAS.
+   Borrador revisable, sin grabar datos reales. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v32.1';
+  const VERSION = 'ControlEvent v32.2';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -114,7 +114,7 @@
   }
   function confidenceClass(value){
     const t = up(value);
-    if(t.includes('MUY')) return 'alta';
+    if(t.includes('MUY') || t.includes('BASE')) return 'alta';
     if(t.includes('HABITUAL')) return 'media';
     return 'baja';
   }
@@ -179,6 +179,46 @@
     if(source === 'LAST3') return all.slice(0,3).map(e => e.id);
     return all.map(e => e.id);
   }
+  function selectedHistoricalSource(){
+    return document.getElementById('planFuenteHistorica')?.value || 'LAST3';
+  }
+  function practicalQty(value){
+    const n = Number(value || 0);
+    if(!Number.isFinite(n) || n <= 0) return 0.01;
+    return n >= 1 ? Math.ceil(n) : Math.round(n * 100) / 100;
+  }
+  function uniqueCompraKey(row){
+    const prod = productOf(row);
+    const pkey = prod?.id ? `id:${prod.id}` : `name:${normalizeText(productName(row))}`;
+    return [pkey, rowTienda(row) || 'sin-tienda', rowResponsible(row) || 'sin-responsable', normalizeText(segmentName(row)), normalizeText(destinoName(row))].join('|');
+  }
+  function sociosParaIngresosIniciales(){
+    const list = socios();
+    const byBase = new Map();
+    list.forEach(p => {
+      const nombre = normalizeText(p.nombre || '');
+      if(!nombre) return;
+      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
+      const tokens = nombre.split(' ').filter(Boolean);
+      let candidates = [nombre];
+      if(numero >= 2){
+        candidates = candidates.concat(nombre.split(/\s+(?:Y|E|\+)\s+/).map(normalizeText).filter(Boolean));
+      }
+      candidates.forEach(key => {
+        const current = byBase.get(key);
+        if(!current || numero > current.numero || (numero === current.numero && String(p.nombre||'').length > String(current.persona.nombre||'').length)){
+          byBase.set(key, {persona:p, numero});
+        }
+      });
+      if(tokens.length === 1 && !byBase.has(nombre)) byBase.set(nombre, {persona:p, numero});
+    });
+    const selected = new Map();
+    byBase.forEach(item => {
+      const id = String(item.persona.id || '');
+      if(id) selected.set(id, item);
+    });
+    return [...selected.values()].map(item => ({...item.persona, numeroIngreso:item.numero})).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+  }
   function groupHistoricalRows(){
     const eventIds = new Set(historicalEventIds().map(String));
     const totalEvents = Math.max(1, eventIds.size);
@@ -186,11 +226,39 @@
     const newPeople = Math.max(1, Number(document.getElementById('planPersonas')?.value || 1));
     const defaultTienda = document.getElementById('planTienda')?.value || '';
     const defaultResponsable = document.getElementById('planResponsable')?.value || '';
+    const source = selectedHistoricalSource();
     const compraRows = rows('compras').filter(row => eventIds.has(String(row.eventId || '')) && !isDonation(row));
+
+    if(source === 'BASE'){
+      return compraRows.slice().sort((a,b) => {
+        const ta = tiendaName(rowTienda(a));
+        const tb = tiendaName(rowTienda(b));
+        return ta.localeCompare(tb,'es') || productName(a).localeCompare(productName(b),'es');
+      }).map((row, index) => {
+        const product = productOf(row) || {};
+        const priceRef = unitPrice(row);
+        return {
+          key: `base:${row.id || index}:${uniqueCompraKey(row)}`,
+          include: true,
+          productId: product.id || '',
+          productName: product.nombre || productName(row),
+          segmento: product.segmento || segmentName(row),
+          destino: product.destino || destinoName(row),
+          unidades: Math.max(0.01, Math.round(Number(row.unidades || 0) * 100) / 100),
+          precio: priceRef,
+          tiendaId: rowTienda(row) || defaultTienda,
+          responsableId: rowResponsible(row) || defaultResponsable,
+          eventCount: 1,
+          totalEvents: 1,
+          confidence: 'Evento base',
+          reason: 'Replicado tal cual desde el evento base: mismas unidades, tienda y responsable de la compra original.'
+        };
+      });
+    }
+
     const groups = new Map();
     compraRows.forEach(row => {
-      const prod = productOf(row);
-      const key = prod?.id ? `id:${prod.id}` : `name:${normalizeText(productName(row))}`;
+      const key = uniqueCompraKey(row);
       if(!groups.has(key)) groups.set(key, []);
       groups.get(key).push(row);
     });
@@ -198,34 +266,33 @@
     groups.forEach((items, key) => {
       const latest = latestByEventDate(items) || items[0];
       const product = productOf(latest) || {};
-      const eventSet = new Set(items.map(row => String(row.eventId || '')));
-      const eventCount = eventSet.size;
+      const byEvent = new Map();
+      items.forEach(row => {
+        const eid = String(row.eventId || '');
+        if(!byEvent.has(eid)) byEvent.set(eid, []);
+        byEvent.get(eid).push(row);
+      });
+      const eventCount = byEvent.size;
       const conf = confidence(eventCount, totalEvents);
-      const qtySamples = items.map(row => {
-        const ev = byId('eventos', row.eventId) || {};
+      const qtySamples = [];
+      byEvent.forEach((eventRows, eid) => {
+        const ev = byId('eventos', eid) || {};
         const histDays = Math.max(1, eventDays(ev));
-        const histPeople = peopleForEvent(row.eventId);
-        const rawUnits = Math.max(0, Number(row.unidades || 0));
-        // V32.1: la propuesta debe ser cantidad TOTAL para el evento, no una cantidad por persona.
-        // Ajustamos por duración y solo escalamos AL ALZA por personas; nunca reducimos por tener menos personas previstas,
-        // porque eso generaba importes/unidades ridículamente pequeñas para la lista inicial de compras.
+        const histPeople = peopleForEvent(eid);
+        const rawUnits = eventRows.reduce((sum,row) => sum + Math.max(0, Number(row.unidades || 0)), 0);
         let q = rawUnits;
         if(histDays > 0) q = (rawUnits / histDays) * newDays;
+        // No reducimos nunca la compra histórica; solo escalamos al alza si el evento nuevo es mayor.
         if(histPeople > 0 && newPeople > histPeople) q *= (newPeople / histPeople);
-        return Number.isFinite(q) ? q : rawUnits;
-      }).filter(n => Number.isFinite(n) && n > 0);
+        if(Number.isFinite(q) && q > 0) qtySamples.push(q);
+      });
       let suggestedQty = qtySamples.length ? qtySamples.reduce((a,b)=>a+b,0) / qtySamples.length : Number(latest?.unidades || 1) || 1;
-      // Redondeo práctico para compras: si la media supera 1 unidad, redondeamos hacia arriba.
-      // Si es menor de 1, mantenemos dos decimales por si son kg/litros u otra unidad fraccionaria.
-      suggestedQty = suggestedQty >= 1 ? Math.ceil(suggestedQty) : Math.round(suggestedQty * 100) / 100;
+      suggestedQty = practicalQty(suggestedQty);
       const priceRef = unitPrice(latest);
       const tiendaId = mostFrequent(items.map(rowTienda)) || defaultTienda;
       const responsableId = mostFrequent(items.map(rowResponsible).filter(id => up(personaOf(id)?.rango || '') === 'SOCIO')) || defaultResponsable;
-      const include = document.getElementById('planNivelPropuesta')?.value === 'TODOS'
-        ? true
-        : document.getElementById('planNivelPropuesta')?.value === 'MUY'
-          ? conf === 'Muy habitual'
-          : conf !== 'Ocasional' || totalEvents <= 1;
+      const nivel = document.getElementById('planNivelPropuesta')?.value || 'HABITUALES';
+      const include = nivel === 'TODOS' ? true : nivel === 'MUY' ? conf === 'Muy habitual' : conf !== 'Ocasional' || totalEvents <= 1;
       proposals.push({
         key,
         include,
@@ -240,11 +307,11 @@
         eventCount,
         totalEvents,
         confidence: conf,
-        reason: `${eventCount} de ${totalEvents} evento(s) analizados · cantidades ajustadas a ${newDays} día(s)${newPeople ? ` y ${newPeople} persona(s) previstas` : ''}`
+        reason: `${eventCount} de ${totalEvents} evento(s) analizados · cantidad total media por evento ajustada a ${newDays} día(s)${newPeople ? ` y sin reducir por ${newPeople} persona(s) previstas` : ''}`
       });
     });
     return proposals.sort((a,b) => {
-      const c = ['Muy habitual','Habitual','Solo evento base','Ocasional'];
+      const c = ['Muy habitual','Habitual','Evento base','Solo evento base','Ocasional'];
       return (c.indexOf(a.confidence) - c.indexOf(b.confidence)) || a.segmento.localeCompare(b.segmento,'es') || a.productName.localeCompare(b.productName,'es');
     });
   }
@@ -261,12 +328,18 @@
     const sourceLabel = FUENTES.find(f => f.id === (document.getElementById('planFuenteHistorica')?.value || ''))?.nombre || 'Histórico';
     const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay compras históricas suficientes para generar propuesta con los criterios elegidos.</div>';
     box.classList.remove('hidden');
+    const sociosIngreso = sociosParaIngresosIniciales();
     box.innerHTML = `
       <div class="plan-summary-grid">
         <div class="plan-metric"><span>Evento previsto</span><strong>${esc(title)}</strong><small>${esc(sourceLabel)}</small></div>
         <div class="plan-metric"><span>Presupuesto ingresos</span><strong>${money(presupuesto)}</strong><small>${personas} personas × ${money(juerga.precio)}</small></div>
         <div class="plan-metric"><span>Duración</span><strong>${getNewDays()} día(s)</strong><small>Factor usado para ajustar cantidades</small></div>
         <div class="plan-metric"><span>Compras propuestas</span><strong>${money(totalCompras)}</strong><small>${included.length} de ${proposals.length} productos incluidos</small></div>
+        <div class="plan-metric"><span>Socios a ingresos</span><strong>${sociosIngreso.length}</strong><small>Regla: parejas número 2; si no existe pareja, número 1</small></div>
+      </div>
+      <div class="plan-search-line">
+        <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
+        <button type="button" class="outline" id="btnPlanBuscarProducto">Buscar</button>
       </div>
       <div class="plan-actions-line">
         <button type="button" class="outline" id="btnPlanSelectAll">Incluir todo</button>
@@ -274,7 +347,7 @@
         <button type="button" class="outline" id="btnPlanSelectNone">Quitar todo</button>
         <button type="button" class="secondary" id="btnPlanApplyDisabled" disabled title="Se activará en la siguiente versión cuando validemos la propuesta">Crear evento desde planificación · próxima versión</button>
       </div>
-      <div class="plan-proposal-list">${cards}</div>
+      <div class="plan-proposal-list" id="planProposalList">${cards}</div>
     `;
     bindProposalControls();
   }
@@ -283,7 +356,7 @@
     const sociosOpts = socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(p.responsableId)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
     const importe = Number(p.unidades || 0) * Number(p.precio || 0);
     return `
-      <div class="plan-product-card ${p.include ? '' : 'excluded'}" data-plan-index="${index}">
+      <div class="plan-product-card ${p.include ? '' : 'excluded'}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
         <div class="plan-product-head">
           <label class="plan-include"><input type="checkbox" data-plan-field="include" ${p.include ? 'checked' : ''}/> Incluir</label>
           <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}</span></div>
@@ -299,6 +372,22 @@
         <div class="plan-reason">${esc(p.reason)}</div>
       </div>
     `;
+  }
+  function searchProposalProduct(){
+    const input = document.getElementById('planBuscarProducto');
+    const term = normalizeText(input?.value || '');
+    if(!term){ input?.focus(); return; }
+    const cards = Array.from(document.querySelectorAll('#planProposalList .plan-product-card'));
+    const found = cards.find(card => String(card.dataset.planProductName || '').includes(term));
+    document.querySelectorAll('#planProposalList .plan-product-card.plan-found').forEach(el => el.classList.remove('plan-found'));
+    if(found){
+      found.classList.add('plan-found');
+      found.scrollIntoView({behavior:'smooth', block:'center'});
+      setTimeout(() => found.classList.remove('plan-found'), 2600);
+    }else{
+      try{ alert('No se ha encontrado ningún producto que contenga: ' + (input?.value || '')); }catch(_){ }
+    }
+    if(input) input.value = '';
   }
   function bindProposalControls(){
     const box = document.getElementById('planificacionResultado');
@@ -319,6 +408,10 @@
     document.getElementById('btnPlanSelectAll')?.addEventListener('click', () => setIncluded('all'));
     document.getElementById('btnPlanSelectNone')?.addEventListener('click', () => setIncluded('none'));
     document.getElementById('btnPlanSelectHabitual')?.addEventListener('click', () => setIncluded('habitual'));
+    document.getElementById('btnPlanBuscarProducto')?.addEventListener('click', searchProposalProduct);
+    document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => {
+      if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); }
+    });
   }
   function updateProposalFromCard(idx, card, light){
     const p = lastProposal[idx];
@@ -341,12 +434,38 @@
     document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
+  function ensurePlanTopButton(){
+    let btn = document.getElementById('cePlanTopFloat');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'cePlanTopFloat';
+      btn.className = 'ce-plan-top-float hidden';
+      btn.textContent = '⌂';
+      btn.setAttribute('aria-label', 'Volver al inicio de planificación');
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        const target = document.getElementById(PANEL_ID);
+        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+        else window.scrollTo({top:0, behavior:'smooth'});
+      });
+      document.body.appendChild(btn);
+    }
+    return btn;
+  }
+  function syncPlanTopButton(){
+    const btn = ensurePlanTopButton();
+    const panel = document.getElementById(PANEL_ID);
+    const visible = !!(panel && !panel.classList.contains('hidden') && isGD());
+    btn.classList.toggle('hidden', !visible);
+  }
   function hidePlanificacion(){
     const panel = document.getElementById(PANEL_ID);
     if(panel) panel.classList.add('hidden');
     const btn = document.getElementById(TAB_BUTTON_ID);
     if(btn) btn.classList.remove('active');
     document.querySelectorAll(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`).forEach(el => el.classList.remove('primary'));
+    syncPlanTopButton();
   }
   function enforcePlanificacionIsolation(){
     const panel = document.getElementById(PANEL_ID);
@@ -371,6 +490,7 @@
     KNOWN_BUTTONS.forEach(id => document.getElementById(id)?.classList.toggle('active', id === TAB_BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action').forEach(el => el.classList.toggle('primary', el.dataset.target === TAB_BUTTON_ID));
     initForm();
+    syncPlanTopButton();
     setTimeout(() => document.getElementById(PANEL_ID)?.scrollIntoView({behavior:'smooth', block:'start'}), 20);
     return false;
   }
@@ -381,6 +501,7 @@
     document.querySelectorAll(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`).forEach(el => { el.classList.toggle('hidden', !visible); el.style.display = visible ? '' : 'none'; });
     const panel = document.getElementById(PANEL_ID);
     if(panel && !visible) panel.classList.add('hidden');
+    syncPlanTopButton();
   }
   function ensureMobileButton(){
     const drawer = document.getElementById('ceMobileDrawer') || document.querySelector('.mobile-menu-drawer');
@@ -403,7 +524,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV320_${eventName}`;
+    const key = `__cePlanV322_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -421,8 +542,8 @@
     bindOnce(document.getElementById('planFuenteHistorica'), 'change', syncBaseEventAvailability);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV320){
-      document.__cePlanMobileClickV320 = true;
+    if(!document.__cePlanMobileClickV322){
+      document.__cePlanMobileClickV322 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
@@ -434,6 +555,7 @@
     bindEvents();
     ensureMobileButton();
     hideByRole();
+    syncPlanTopButton();
   }
   function install(){
     if(initialized) return;
