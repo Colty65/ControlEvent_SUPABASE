@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v31.8",
+  "version": "ControlEvent v31.9",
   "base": "v30.6",
-  "notes": "v31.8 corrige metadatos de BACKUP y ajusta el botón flotante de Mapa de recursos por dispositivo.",
+  "notes": "v31.9 ajusta Mapa de recursos: fichas donadas más compactas y sin marcado manual en compras ya compradas.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v31.8"
+  "build": "v31.9"
 }

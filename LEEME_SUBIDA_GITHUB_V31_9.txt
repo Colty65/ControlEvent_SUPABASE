@@ -1,0 +1,14 @@
+ControlEvent v31.9
+
+Subir a GitHub el contenido completo del ZIP SOLO_SUBIR_GITHUB.
+
+Cambios incluidos:
+- En Mapa de recursos, las fichas con TKxx ya comprado no permiten marcar/desmarcar manualmente.
+- Las fichas donadas se simplifican para eliminar datos redundantes.
+
+Validaciones realizadas:
+- package.json JSON válido.
+- package-lock.json JSON válido.
+- Scripts referenciados existentes.
+- Assets del service worker existentes.
+- Sintaxis JS validada en archivos principales.
