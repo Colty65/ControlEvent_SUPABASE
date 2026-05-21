@@ -1,281 +1,416 @@
-/* ControlEvent v30.9 - LowResourceBoot
-   Modo tactil/turbo para iPad/Android modestos.
-   En produccion trabaja sin indicador visible; el panel aparece solo con ?ceDiag=1. */
+/* ControlEvent v31.3 - LowResourceLegacyPatch
+   Parche clasico posterior al legacy: puede reasignar el render global heredado.
+   V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
+   - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
+   - las opciones GD/RW/RO se sincronizan inmediatamente, sin esperar al intervalo heredado;
+   - la pantalla activa se re-activa sin temporizadores para evitar paneles vacios en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.9';
-  const params = new URLSearchParams(location.search || '');
-  const ua = navigator.userAgent || '';
-  const platform = navigator.platform || '';
-  const maxTouchPoints = Number(navigator.maxTouchPoints || 0);
-  const isAndroid = /Android/i.test(ua);
-  const isIPad = /iPad/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
-  const isIPhone = /iPhone|iPod/i.test(ua) && !isIPad;
-  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  const memory = Number(navigator.deviceMemory || 0);
-  const cores = Number(navigator.hardwareConcurrency || 0);
-  const forcedOn = /^(1|true|on|si|sí)$/i.test(params.get('ceLite') || '');
-  const forcedOff = /^(0|false|off|no)$/i.test(params.get('ceLite') || '');
-  const diagForced = /^(1|true|on|si|sí)$/i.test(params.get('ceDiag') || '');
-  const likelyLowResource = (memory && memory <= 4) || (cores && cores <= 4);
-  const detected = isAndroid || isIPad || (coarse && likelyLowResource && !isIPhone);
-  const enabled = forcedOn || (!forcedOff && detected);
-  const showBadge = diagForced;
-  const reason = forcedOn ? 'forzado-ceLite=1' : forcedOff ? 'desactivado-ceLite=0' : isAndroid ? 'Android' : isIPad ? 'iPad' : (coarse && likelyLowResource ? 'tactil-recursos-limitados' : 'equipo-normal');
-
-  const nativeSetInterval = window.setInterval ? window.setInterval.bind(window) : null;
-  const nativeSetTimeout = window.setTimeout ? window.setTimeout.bind(window) : null;
-  const nativeRAF = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null;
+  const root = window.ControlEventLowResource;
+  const VERSION = 'ControlEvent v31.3';
+  if(!root || !root.enabled){
+    window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
+    return;
+  }
 
   const stats = {
     version: VERSION,
-    enabled,
-    reason,
-    ua,
-    platform,
-    maxTouchPoints,
-    coarse,
-    memory: memory || null,
-    cores: cores || null,
-    intervalsAdjusted: 0,
-    timeoutsAdjusted: 0,
-    rafAdjusted: 0,
-    scrollIntoViewAdjusted: 0,
-    suppressedListeners: {},
-    createdAt: new Date().toISOString(),
-    lastPanelOpen: null,
-    legacyPatch: null
+    installed: true,
+    installedAt: new Date().toISOString(),
+    liteRenderCalls: 0,
+    fullRenderFallbacks: 0,
+    fullBootstrapRenders: 0,
+    selectorsRendered: 0,
+    maintenanceLiteCalls: 0,
+    moduleActivations: 0,
+    roleSyncCalls: 0,
+    executed: {},
+    skipped: {budget:0, graficas:0, maintenance:0, render:0},
+    errors: [],
+    last: null
   };
 
-  function interval(ms){
-    const value = Number(ms || 0);
-    if(!enabled || !value) return value;
-    if(value >= 30000) return value;
-    stats.intervalsAdjusted += 1;
-    // En v29.1 se multiplicaban; en equipos antiguos seguia habiendo barridos cada pocos segundos.
-    // En v30.9 los intervalos legacy repetitivos pasan a modo "vigilancia", no a modo "repintado".
-    if(value <= 2500) return 45000;
-    if(value <= 10000) return Math.max(45000, value * 4);
-    return Math.max(30000, value);
-  }
-
-  function timeout(ms){
-    const value = Number(ms || 0);
-    if(!enabled || !value) return value;
-    if(value >= 1000) return value;
-    // Evita cascadas de retoques visuales inmediatos. No cancela tareas; solo las desapelmaza.
-    const next = Math.max(value, 80);
-    if(next !== value) stats.timeoutsAdjusted += 1;
-    return next;
-  }
-
-  if(enabled && nativeSetInterval && !window.setInterval.__ceLowResourceWrapped){
-    const wrappedSetInterval = function(handler, ms, ...args){
-      return nativeSetInterval(handler, interval(ms), ...args);
-    };
-    wrappedSetInterval.__ceLowResourceWrapped = true;
-    window.setInterval = wrappedSetInterval;
-  }
-
-  if(enabled && nativeSetTimeout && !window.setTimeout.__ceLowResourceWrapped){
-    const wrappedSetTimeout = function(handler, ms, ...args){
-      return nativeSetTimeout(handler, timeout(ms), ...args);
-    };
-    wrappedSetTimeout.__ceLowResourceWrapped = true;
-    window.setTimeout = wrappedSetTimeout;
-  }
-
-  if(enabled && nativeRAF && !window.requestAnimationFrame.__ceLowResourceWrapped){
-    const wrappedRAF = function(callback){
-      stats.rafAdjusted += 1;
-      return nativeSetTimeout(() => callback(Date.now()), 90);
-    };
-    wrappedRAF.__ceLowResourceWrapped = true;
-    window.requestAnimationFrame = wrappedRAF;
-  }
-
-  const noisyEvents = new Set(['mousemove','mouseover','mouseenter','pointermove']);
-  const nativeAdd = EventTarget.prototype.addEventListener;
-  if(enabled && nativeAdd && !nativeAdd.__ceLowResourceWrapped){
-    EventTarget.prototype.addEventListener = function(type, listener, options){
-      try{
-        const t = String(type || '');
-        const targetIsGlobal = this === document || this === window || this === document.body || this === document.documentElement;
-        if(targetIsGlobal && noisyEvents.has(t)){
-          stats.suppressedListeners[t] = Number(stats.suppressedListeners[t] || 0) + 1;
-          return;
-        }
-      }catch(_){ }
-      return nativeAdd.call(this, type, listener, options);
-    };
-    EventTarget.prototype.addEventListener.__ceLowResourceWrapped = true;
-  }
-
-  try{
-    const nativeScrollIntoView = Element.prototype.scrollIntoView;
-    if(enabled && nativeScrollIntoView && !nativeScrollIntoView.__ceLowResourceWrapped){
-      const wrappedScroll = function(options){
-        try{
-          if(options && typeof options === 'object' && options.behavior === 'smooth'){
-            stats.scrollIntoViewAdjusted += 1;
-            return nativeScrollIntoView.call(this, {...options, behavior:'auto'});
-          }
-        }catch(_){ }
-        return nativeScrollIntoView.apply(this, arguments);
-      };
-      wrappedScroll.__ceLowResourceWrapped = true;
-      Element.prototype.scrollIntoView = wrappedScroll;
+  const $ = id => document.getElementById(id);
+  function inc(group, key){ group[key] = Number(group[key] || 0) + 1; }
+  function note(kind, name, detail){ stats.last = {at:new Date().toISOString(), kind, name, detail:detail||null}; }
+  function isHiddenByClass(el){
+    if(!el) return true;
+    let node = el;
+    while(node && node !== document.documentElement){
+      if(node.classList && node.classList.contains('hidden')) return true;
+      node = node.parentElement;
     }
-  }catch(_){ }
+    return false;
+  }
+  function isVisible(id){ const el = $(id); return !!el && !isHiddenByClass(el); }
+  function currentTab(){
+    try{ if(typeof currentMainTab !== 'undefined') return String(currentMainTab || 'ingresos'); }catch(_){ }
+    try{ return String(window.ControlEventApp?.navigation?.currentMainTab || 'ingresos'); }catch(_){ return 'ingresos'; }
+  }
+  function currentMaintenanceTab(){
+    try{ if(typeof currentMaintTab !== 'undefined') return String(currentMaintTab || 'personas'); }catch(_){ }
+    return 'personas';
+  }
+  function authRef(){
+    try{ if(typeof authUser !== 'undefined') return authUser || null; }catch(_){ }
+    try{ return window.ControlEventApp?.authUser || window.authUser || null; }catch(_){ return null; }
+  }
+  function hasAuth(){ return !!authRef(); }
+  function role(){ return String(authRef()?.nivel || '').toUpperCase(); }
+  function isGD(){ return role() === 'GD'; }
+  function isRW(){ return role() === 'RW'; }
+  function isRO(){ return role() === 'RO'; }
+  function stateRef(){
+    try{ if(typeof state !== 'undefined') return state || {}; }catch(_){ }
+    try{ return window.ControlEventApp?.state || window.state || {}; }catch(_){ return {}; }
+  }
+  function stateSignature(){
+    const st = stateRef();
+    const count = k => Array.isArray(st[k]) ? st[k].length : 0;
+    return [st.selectedEventId || '', count('eventos'), count('personas'), count('productos'), count('tiendas')].join('|');
+  }
+  function authEventSignature(){
+    const st = stateRef();
+    const u = authRef() || {};
+    return [u.identificacion || '', u.nivel || '', st.selectedEventId || '', Array.isArray(st.eventos) ? st.eventos.length : 0].join('|');
+  }
+  function getFn(name){
+    try{ if(typeof window[name] === 'function') return window[name]; }catch(_){ }
+    try{ return eval('typeof '+name+' === "function" ? '+name+' : null'); }catch(_){ return null; }
+  }
+  function call(name, args){
+    const fn = getFn(name);
+    if(typeof fn !== 'function') return undefined;
+    try{
+      inc(stats.executed, name);
+      note('run', name);
+      return fn.apply(window, args || []);
+    }catch(error){
+      stats.errors.push({at:new Date().toISOString(), name, message:error && (error.message || String(error))});
+      if(stats.errors.length > 12) stats.errors.shift();
+      throw error;
+    }
+  }
 
-  function esc(value){
-    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function show(el, yes){
+    if(!el) return;
+    el.classList.toggle('hidden-by-role-v228', !yes);
+    if(yes){
+      el.style.removeProperty('display');
+      el.removeAttribute('aria-hidden');
+    }else{
+      el.style.setProperty('display', 'none', 'important');
+      el.setAttribute('aria-hidden', 'true');
+    }
   }
-  function short(value, max=80){
-    const text = String(value ?? '');
-    return text.length > max ? text.slice(0, max - 1) + '…' : text;
+  function setDisabled(el, yes){
+    if(!el) return;
+    el.disabled = !!yes;
+    if(yes) el.setAttribute('aria-disabled','true');
+    else el.removeAttribute('aria-disabled');
   }
-  function getLite(){ try{return window.ControlEventMobileLite?.inspect?.() || null;}catch(_){return null;} }
-  function getHotpath(){ try{return window.ControlEventHotpath?.inspect?.() || null;}catch(_){return null;} }
-  function getScreenLazy(){ try{return window.ControlEventScreenLazy?.info?.() || null;}catch(_){return null;} }
-  function getLegacyPatch(){ try{return window.ControlEventLowResourceLegacy?.inspect?.() || null;}catch(_){return null;} }
-  function totals(object){ return Object.values(object || {}).reduce((sum, n) => sum + Number(n || 0), 0); }
+  function hideMobileTarget(target, visible){
+    document.querySelectorAll(`.mobile-menu-action[data-target="${target}"]`).forEach(el => show(el, visible));
+  }
+  function currentEvent(){
+    const st = stateRef();
+    const id = String(st.selectedEventId || '');
+    return (Array.isArray(st.eventos) ? st.eventos : []).find(e => String(e.id) === id) || null;
+  }
+  function isFinalized(){ return String(currentEvent()?.situacion || '').toUpperCase() === 'FINALIZADO'; }
+  function applyCriticalRoleUi(){
+    if(!hasAuth()) return;
+    stats.roleSyncCalls += 1;
+    const gd = isGD(), rw = isRW(), ro = isRO();
+    try{
+      document.body.classList.toggle('ce-role-gd', gd);
+      document.body.classList.toggle('ce-role-rw', rw);
+      document.body.classList.toggle('ce-role-ro', ro);
+      document.body.classList.toggle('ce-event-finalized', isFinalized());
+      document.body.classList.toggle('ce-event-not-finalized', !isFinalized());
+    }catch(_){ }
 
-  function installLowCss(){
-    if(!enabled || document.getElementById('ceLowResourceCss')) return;
-    try{ document.documentElement.classList.add('ce-lite-low-resource'); }catch(_){ }
-    const style = document.createElement('style');
-    style.id = 'ceLowResourceCss';
-    style.textContent = `
-      html.ce-lite-low-resource, html.ce-lite-low-resource *{scroll-behavior:auto!important;}
-      html.ce-lite-low-resource *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;}
-      html.ce-lite-low-resource .card,
-      html.ce-lite-low-resource .itemcard,
-      html.ce-lite-low-resource .metric,
-      html.ce-lite-low-resource .budget-panel,
-      html.ce-lite-low-resource button,
-      html.ce-lite-low-resource select,
-      html.ce-lite-low-resource input{box-shadow:none!important;}
-      html.ce-lite-low-resource .app-shell,
-      html.ce-lite-low-resource .panel,
-      html.ce-lite-low-resource .chart-row{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-      html.ce-lite-low-resource #ceLowResourceBadge{font-size:12px!important;}
-    `;
-    (document.head || document.documentElement).appendChild(style);
+    // Menú principal: en GD deben estar todas desde el primer render post-login.
+    show($('tabIngresosBtn'), !ro);
+    show($('tabDonacionesBtn'), !ro);
+    show($('tabComprasBtn'), !ro);
+    show($('tabMapaBtn'), gd || rw || ro);
+    show($('tabResumenBtn'), gd || rw || ro);
+    show($('tabGraficasBtn'), gd || rw || ro);
+
+    // Herramientas del pie y mantenimiento, replicando el criterio heredado crítico.
+    show($('btnExportExcel'), (gd || rw || ro) && (!ro || isFinalized()));
+    setDisabled($('btnExportExcel'), ro && !isFinalized());
+    show($('btnOpenImport'), gd);
+    show($('btnExportSeed'), gd);
+    show($('btnToggleMaintenance'), gd || rw);
+    show($('mtAccesoBtn'), gd);
+    const accCard = $('mtAcceso');
+    if(accCard) accCard.classList.toggle('hidden-by-role', !gd);
+
+    ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn'].forEach(t => hideMobileTarget(t, !ro));
+    hideMobileTarget('tabMapaBtn', gd || rw || ro);
+    hideMobileTarget('tabResumenBtn', gd || rw || ro);
+    hideMobileTarget('tabGraficasBtn', gd || rw || ro);
+    hideMobileTarget('btnExportExcel', (gd || rw || ro) && (!ro || isFinalized()));
+    hideMobileTarget('btnToggleMaintenance', gd || rw);
+    hideMobileTarget('btnOpenImport', gd);
+    hideMobileTarget('btnExportSeed', gd);
+
+    if(ro){
+      show($('tabIngresos'), false);
+      show($('tabDonaciones'), false);
+      show($('tabCompras'), false);
+    }
+    note('role-sync', 'applyCriticalRoleUi', role());
   }
+
+  let moduleActivationBusy = false;
+  function activateCurrentModule(reason){
+    const modules = window.ControlEventModules;
+    if(moduleActivationBusy || !modules || typeof modules.activate !== 'function') return;
+    const tab = currentTab();
+    moduleActivationBusy = true;
+    stats.moduleActivations += 1;
+    Promise.resolve()
+      .then(() => modules.activate(tab, {reason: reason || 'low-resource-render-sync'}))
+      .catch(error => {
+        stats.errors.push({at:new Date().toISOString(), name:'activateCurrentModule', message:error?.message || String(error)});
+        if(stats.errors.length > 12) stats.errors.shift();
+      })
+      .finally(() => { moduleActivationBusy = false; });
+  }
+
+  let lastSelectorSignature = '';
+  let lastSelectorAt = 0;
+  function renderSelectorsIfNeeded(force){
+    const now = Date.now();
+    const sig = stateSignature();
+    if(force || sig !== lastSelectorSignature || (now - lastSelectorAt) > 3500){
+      lastSelectorSignature = sig;
+      lastSelectorAt = now;
+      stats.selectorsRendered += 1;
+      return call('renderMainSelectors');
+    }
+  }
+
+
+
+  function setCurrentTab(value){
+    try{ if(typeof currentMainTab !== 'undefined') currentMainTab = value; }catch(_){ }
+    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = value; }catch(_){ }
+  }
+
+  function warmCoreDataScreens(reason){
+    // V30.6: tras login/cambio de evento, precalienta las tres pantallas de captura
+    // para que Colaboradores, Donaciones y Compras no queden vacías si el render LITE
+    // ha evitado repintar una pestaña oculta. Se restaura la pestaña original antes
+    // de devolver el control, por lo que no debería verse parpadeo.
+    if(!hasAuth() || isRO()) return;
+    const originalTab = currentTab();
+    try{
+      window.__ceMapaProductosWarmup = true;
+      renderSelectorsIfNeeded(true);
+      const tasks = [
+        {tab:'ingresos', renders:['renderIngresosSummary','renderColabs']},
+        {tab:'donaciones', renders:['renderDonaciones']},
+        {tab:'compras', renders:['renderCompras']}
+      ];
+      tasks.forEach(item => {
+        setCurrentTab(item.tab);
+        call('renderTabVisibility');
+        item.renders.forEach(name => call(name));
+      });
+    }catch(error){
+      stats.errors.push({at:new Date().toISOString(), name:'warmCoreDataScreens', message:error?.message || String(error), reason});
+      if(stats.errors.length > 12) stats.errors.shift();
+    }finally{
+      window.__ceMapaProductosWarmup = false;
+      setCurrentTab(originalTab || 'ingresos');
+      try{ call('renderTabVisibility'); }catch(_){ }
+      try{ if(originalTab === 'mapa' && window.renderMapaProductos) window.renderMapaProductos(); }catch(_){ }
+    }
+  }
+
+  const oldRender = getFn('render');
+  const oldBudget = getFn('renderBudget');
+  const oldGraficas = getFn('renderGraficas');
+  const oldMaintenance = getFn('renderMaintenance');
+  let lastBootstrapSignature = '';
+
+  function needsFullBootstrap(){
+    if(!hasAuth()) return false;
+    const sig = authEventSignature();
+    if(sig && sig !== lastBootstrapSignature){
+      lastBootstrapSignature = sig;
+      return true;
+    }
+    return false;
+  }
+
+  function runFullBootstrap(thisArg, args, reason){
+    stats.fullBootstrapRenders += 1;
+    note('full-bootstrap', 'render', reason);
+    const result = oldRender.apply(thisArg || window, args || []);
+    try{ applyCriticalRoleUi(); }catch(_){ }
+    try{ warmCoreDataScreens(reason || 'auth-event'); }catch(_){ }
+    activateCurrentModule('full-bootstrap:' + (reason || 'auth-event'));
+    return result;
+  }
+
+  function liteRender(){
+    if(!oldRender){ stats.fullRenderFallbacks += 1; return undefined; }
+    stats.liteRenderCalls += 1;
+    try{
+      call('renderEnvironmentBanner');
+      call('renderAuthUI');
+      if(!hasAuth()) return undefined;
+
+      // Punto clave v30.7: primer render autenticado y cambio real de evento no se recortan.
+      // Así no quedan menús GD ocultos ni paneles vacíos tras login/selección de evento.
+      if(needsFullBootstrap()){
+        return runFullBootstrap(this, arguments, 'auth-or-event-change');
+      }
+
+      try{ call('saveState'); }catch(_){ }
+      call('renderHeader');
+      call('renderTabVisibility');
+      applyCriticalRoleUi();
+      renderSelectorsIfNeeded(false);
+      const tab = currentTab();
+      if(tab === 'ingresos'){
+        call('renderIngresosSummary');
+        call('renderColabs');
+      }else if(tab === 'compras'){
+        call('renderCompras');
+      }else if(tab === 'donaciones'){
+        call('renderDonaciones');
+      }else if(tab === 'mapa'){
+        call('renderMapaProductos');
+      }else if(tab === 'resumen'){
+        call('renderBudget');
+      }else if(tab === 'graficas'){
+        call('renderGraficas');
+      }else{
+        stats.fullRenderFallbacks += 1;
+        return runFullBootstrap(this, arguments, 'unknown-tab:' + tab);
+      }
+      if(isVisible('maintenanceWrapper')) call('renderMaintenance');
+      call('renderPermissions');
+      call('renderLockState');
+      applyCriticalRoleUi();
+      activateCurrentModule('lite-render:' + tab);
+      note('lite-render', tab);
+      return undefined;
+    }catch(error){
+      stats.fullRenderFallbacks += 1;
+      try{ return runFullBootstrap(this, arguments, 'exception-fallback'); }catch(err){ throw error; }
+    }
+  }
+
+  function liteRenderBudget(){
+    if(!isVisible('tabResumen') && currentTab() !== 'resumen'){
+      stats.skipped.budget += 1;
+      note('skip','renderBudget','tabResumen oculto');
+      return undefined;
+    }
+    return oldBudget ? oldBudget.apply(this, arguments) : call('renderBudget', arguments);
+  }
+
+  function liteRenderGraficas(){
+    if(!isVisible('tabGraficas') && currentTab() !== 'graficas'){
+      stats.skipped.graficas += 1;
+      note('skip','renderGraficas','tabGraficas oculto');
+      return undefined;
+    }
+    return oldGraficas ? oldGraficas.apply(this, arguments) : undefined;
+  }
+
+  function liteRenderMaintenance(){
+    if(!isVisible('maintenanceWrapper')){
+      stats.skipped.maintenance += 1;
+      note('skip','renderMaintenance','maintenanceWrapper oculto');
+      return undefined;
+    }
+    stats.maintenanceLiteCalls += 1;
+    call('renderMaintenanceTabs');
+    const mt = currentMaintenanceTab();
+    if(mt === 'personas') call('renderPersonas');
+    else if(mt === 'eventos') call('renderEventos');
+    else if(mt === 'tiendas') call('renderTiendas');
+    else if(mt === 'productos') call('renderProductos');
+    else if(mt === 'acceso') call('renderAcceso');
+    else if(mt === 'importar') { /* la pantalla de importacion no necesita repintado masivo */ }
+    else if(oldMaintenance) return oldMaintenance.apply(this, arguments);
+    return undefined;
+  }
+
+  try{ renderGraficas = liteRenderGraficas; }catch(_){ }
+  try{ window.renderGraficas = liteRenderGraficas; }catch(_){ }
+  try{ renderBudget = liteRenderBudget; }catch(_){ }
+  try{ window.renderBudget = liteRenderBudget; }catch(_){ }
+  try{ renderMaintenance = liteRenderMaintenance; }catch(_){ }
+  try{ window.renderMaintenance = liteRenderMaintenance; }catch(_){ }
+  try{ render = liteRender; }catch(_){ }
+  try{ window.render = liteRender; }catch(_){ }
+
+  function patchAppActions(){
+    try{
+      const actions = window.ControlEventApp?.actions;
+      if(!actions) return;
+      actions.render = (...args) => window.render(...args);
+      actions.renderBudget = (...args) => window.renderBudget(...args);
+      actions.renderGraficas = (...args) => window.renderGraficas(...args);
+      if(window.renderMapaProductos) actions.renderMapaProductos = (...args) => window.renderMapaProductos(...args);
+      actions.renderMaintenance = (...args) => window.renderMaintenance(...args);
+    }catch(_){ }
+    try{ applyCriticalRoleUi(); }catch(_){ }
+  }
+  patchAppActions();
+  window.addEventListener('controlevent:app-ready', () => { patchAppActions(); activateCurrentModule('app-ready'); });
+  window.addEventListener('controlevent:runtime-ready', () => { patchAppActions(); activateCurrentModule('runtime-ready'); });
+  document.addEventListener('change', event => {
+    if(event.target && event.target.id === 'selectedEvent'){
+      lastBootstrapSignature = '';
+    }
+  }, true);
 
   function inspect(){
-    const legacy = getLegacyPatch();
-    stats.legacyPatch = legacy;
     return {
       ...stats,
-      mobileLite: getLite(),
-      hotpath: getHotpath(),
-      screenLazy: getScreenLazy(),
-      legacyPatch: legacy,
-      commands: [
-        'ControlEventLowResource.print()',
-        'ControlEventLowResourceLegacy.print()',
-        'ControlEventMobileLite.print()',
-        'ControlEventRuntime.inspect()'
-      ]
+      currentTab: currentTab(),
+      currentMaintenanceTab: currentMaintenanceTab(),
+      role: role(),
+      bootstrapSignature: lastBootstrapSignature,
+      visible: {
+        ingresos: isVisible('tabIngresos'),
+        compras: isVisible('tabCompras'),
+        donaciones: isVisible('tabDonaciones'),
+        mapa: isVisible('tabMapaProductos'),
+        resumen: isVisible('tabResumen'),
+        graficas: isVisible('tabGraficas'),
+        mantenimiento: isVisible('maintenanceWrapper')
+      },
+      commands: ['ControlEventLowResourceLegacy.print()', 'ControlEventLowResourceLegacy.syncRoleUi()', 'ControlEventLowResourceLegacy.refreshSelectors()']
     };
-  }
-
-  function panelHtml(){
-    const lite = getLite();
-    const hot = getHotpath();
-    const lazy = getScreenLazy();
-    const legacy = getLegacyPatch();
-    const wrapped = lite?.wrapped?.length || 0;
-    const skipped = totals(lite?.skipped);
-    const executed = totals(lite?.executed);
-    const legacySkips = legacy?.skipped || {};
-    const suppressed = Object.entries(stats.suppressedListeners || {}).map(([k,v]) => `${esc(k)}: ${esc(v)}`).join(' · ') || '0';
-    const hotRows = Array.isArray(hot?.rows) ? hot.rows.slice(0, 6) : [];
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
-        <strong>Diagnóstico móvil ${esc(VERSION)}</strong>
-        <button type="button" data-ce-lite-close style="border:0;border-radius:10px;padding:6px 9px;background:#111827;color:white">Cerrar</button>
-      </div>
-      <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:8px;margin-bottom:10px;font-size:13px">
-        <b>Lectura rápida:</b> el modo LITE queda oculto en producción. Este panel solo aparece con <b>?ceDiag=1</b>; los contadores sirven para diagnóstico interno.
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
-        <div><b>LowResource</b><br>${enabled ? 'ACTIVO' : 'NO activo'}<br><small>${esc(reason)}</small></div>
-        <div><b>MobileLite</b><br>${lite?.installed ? 'INSTALADO' : 'No instalado'} / ${lite?.enabled ? 'ON' : 'OFF'}<br><small>envueltas: ${wrapped}</small></div>
-        <div><b>Render visible-only</b><br>ejecutados: ${executed}<br>ocultos evitados: ${skipped}</div>
-        <div><b>Legacy Turbo v30.9</b><br>${legacy?.installed ? 'ACTIVO' : 'no instalado'}<br><small>render ligero: ${esc(legacy?.liteRenderCalls || 0)}</small></div>
-        <div><b>Saltos legacy</b><br>budget: ${esc(legacySkips.budget || 0)} · gráficas: ${esc(legacySkips.graficas || 0)} · mant.: ${esc(legacySkips.maintenance || 0)}</div>
-        <div><b>Tab actual</b><br>${esc(lite?.currentTab || legacy?.currentTab || lazy?.current || 'sin dato')}<br><small>pantallas cargadas: ${esc((lazy?.loadedScreens || []).join(', ') || '—')}</small></div>
-        <div><b>Intervalos rebajados</b><br>${esc(stats.intervalsAdjusted)}<br><small>los barridos cortos pasan a ~45 s</small></div>
-        <div><b>Eventos hover anulados</b><br>${suppressed}</div>
-        <div><b>Timeout/RAF suavizados</b><br>${esc(stats.timeoutsAdjusted)} / ${esc(stats.rafAdjusted)}</div>
-        <div><b>Scroll suave evitado</b><br>${esc(stats.scrollIntoViewAdjusted)}</div>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,23,42,.18)">
-        <b>Última acción MobileLite</b><br><small>${esc(short(JSON.stringify(lite?.last || null), 240))}</small>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,23,42,.18)">
-        <b>Cache Hotpath</b><br><small>${hot ? `cache: ${esc(hot.cacheSize)} · funciones: ${esc((hot.cachedFunctions||[]).length)} · invalidaciones: ${esc((hot.invalidations||[]).length)}` : 'sin dato'}</small>
-        ${hotRows.length ? `<table style="width:100%;font-size:12px;margin-top:6px;border-collapse:collapse"><tr><th style="text-align:left">Función</th><th>Hits</th><th>Ms</th></tr>${hotRows.map(row => `<tr><td style="border-top:1px solid #e5e7eb">${esc(row.name)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.hits)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.totalMs)}</td></tr>`).join('')}</table>` : ''}
-      </div>
-      <div style="margin-top:10px;font-size:12px;color:#4b5563">Pruebas: <b>?ceLite=1</b> fuerza el modo ligero. <b>?ceLite=0</b> lo desactiva. <b>?ceDiag=1</b> muestra este diagnóstico.</div>
-    `;
-  }
-
-  function ensureUi(){
-    installLowCss();
-    if(!showBadge) return;
-    if(document.getElementById('ceLowResourceBadge')) return;
-    const badge = document.createElement('button');
-    badge.type = 'button';
-    badge.id = 'ceLowResourceBadge';
-    badge.textContent = enabled ? '⚡ LITE DIAG ON' : '⚡ LITE DIAG OFF';
-    badge.title = 'Ver diagnóstico de rendimiento móvil';
-    badge.style.cssText = 'position:fixed;right:10px;bottom:72px;z-index:3000;border:0;border-radius:999px;padding:8px 11px;font:700 12px system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 8px 22px rgba(15,23,42,.25);background:' + (enabled ? '#16a34a' : '#6b7280') + ';color:white;opacity:.92';
-    badge.addEventListener('click', () => openPanel(), true);
-    document.body.appendChild(badge);
-  }
-
-  function openPanel(){
-    stats.lastPanelOpen = new Date().toISOString();
-    let panel = document.getElementById('ceLowResourcePanel');
-    if(!panel){
-      panel = document.createElement('div');
-      panel.id = 'ceLowResourcePanel';
-      panel.style.cssText = 'position:fixed;left:10px;right:10px;bottom:118px;z-index:3001;max-height:68vh;overflow:auto;background:white;color:#111827;border:1px solid rgba(15,23,42,.18);border-radius:18px;padding:14px;box-shadow:0 22px 60px rgba(15,23,42,.32);font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.35';
-      panel.addEventListener('click', ev => { if(ev.target?.closest?.('[data-ce-lite-close]')) closePanel(); }, true);
-      document.body.appendChild(panel);
-    }
-    panel.innerHTML = panelHtml();
-    panel.style.display = 'block';
-  }
-  function closePanel(){ const panel = document.getElementById('ceLowResourcePanel'); if(panel) panel.style.display = 'none'; }
-  function refreshUi(){
-    const badge = document.getElementById('ceLowResourceBadge');
-    if(badge){
-      const lite = getLite();
-      const skipped = totals(lite?.skipped);
-      const legacy = getLegacyPatch();
-      badge.textContent = enabled ? `⚡ LITE DIAG · ocultos ${skipped || 0}${legacy?.installed ? ' · turbo' : ''}` : '⚡ LITE DIAG OFF';
-    }
-    const panel = document.getElementById('ceLowResourcePanel');
-    if(panel && panel.style.display !== 'none') panel.innerHTML = panelHtml();
   }
   function print(){
     const report = inspect();
-    console.group(`[ControlEventLowResource/${VERSION}]`);
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v31.3]');
     console.info(report);
+    try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
     return report;
   }
-  window.ControlEventLowResource = {version:VERSION, enabled, isLite:enabled, reason, stats, interval, timeout, inspect, print, ensureUi, openPanel, closePanel, refreshUi};
-  try{ document.documentElement.dataset.ceLite = enabled ? 'on' : 'off'; document.documentElement.dataset.ceLiteReason = reason; }catch(_){}
-  function startUiRefresh(){
-    ensureUi();
-    if(showBadge && nativeSetInterval) nativeSetInterval(refreshUi, 2500);
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startUiRefresh, {once:true});
-  else startUiRefresh();
+  window.ControlEventLowResourceLegacy = {
+    version:VERSION,
+    installed:true,
+    inspect,
+    print,
+    refreshSelectors:()=>renderSelectorsIfNeeded(true),
+    syncRoleUi: applyCriticalRoleUi,
+    activateCurrentModule
+  };
+  window.__ceV294RoleSync = applyCriticalRoleUi;
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v31.3] Render legacy recortado + Mapa de recursos activado.'); }catch(_){ }
 })();

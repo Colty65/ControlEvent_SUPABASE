@@ -1,20 +1,18 @@
-import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
-
-const RESUMEN_SHEET_VERSION = 'v30.9';
-let lastSnapshot = null;
-let lastWorksheetBuild = null;
-let installed = false;
-let lastInfoEventoAttach = null;
-const AUDIT_STORAGE_KEY = 'controlevent:v28.0:resumenModularAudit';
+import { registerExcelModule, ensureExcelJS as ensureRuntimeExcelJS } from './_excel-runtime.js';
 
 export const meta = {
-  name: 'resumen-sheet',
-  version: RESUMEN_SHEET_VERSION,
-  mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v28.0 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
+  name: 'backup',
+  version: 'v30.7',
+  mode: 'server-backup-download-with-client-fallback',
+  description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const text = value => String(value ?? '').trim();
+const BACKUP_VERSION = 'ControlEvent v30.7';
+const BACKUP_VERSION_FILE = 'ControlEvent_v27_7_1';
+const BACKUP_PASSWORD = 'open_excel_arrastre';
+const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
+
+const norm = value => String(value ?? '').trim();
 const num = value => {
   if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
   let s = String(value ?? '').replace(/[^0-9,.-]/g, '');
@@ -23,574 +21,308 @@ const num = value => {
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 };
-const money = value => Number(num(value).toFixed(2));
-const arr = (obj, key) => Array.isArray(obj?.[key]) ? obj[key] : [];
-const safeName = value => String(value || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0,80) || 'evento';
-
-function storageAvailable(){
-  try{ return typeof window !== 'undefined' && !!window.localStorage; }
-  catch(_){ return false; }
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const rows = (state, key) => Array.isArray(state?.[key]) ? state[key] : [];
+const countRows = state => COLLECTIONS.reduce((total, key) => total + rows(state, key).length, 0) + Object.keys(state?.ticketImages || {}).length;
+const cleanFilePart = value => norm(value || 'SIN_TITULO').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'SIN_TITULO';
+function stamp(date = new Date()){
+  const pad = n => String(n).padStart(2, '0');
+  return {yyyy:date.getFullYear(), mm:pad(date.getMonth()+1), dd:pad(date.getDate()), hh:pad(date.getHours()), mi:pad(date.getMinutes()), ss:pad(date.getSeconds())};
 }
-function readAuditSetting(){
-  if(!storageAvailable()) return false;
-  const raw = window.localStorage.getItem(AUDIT_STORAGE_KEY);
-  if(raw === null || raw === '') return false;
-  return ['1','true','yes','on'].includes(String(raw).toLowerCase());
+function backupFileName(scope, title){
+  const s = stamp();
+  const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
+  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
 }
-export function setInfoEventoAuditEnabled(enabled = true){
-  if(storageAvailable()) window.localStorage.setItem(AUDIT_STORAGE_KEY, enabled ? '1' : '0');
-  return getInfoEventoAuditConfig();
+function backupServerUrl(scope){
+  const params = new URLSearchParams({scope: scope || 'TODOS', t: String(Date.now())});
+  return `/api/export/backup?${params.toString()}`;
 }
-export function getInfoEventoAuditConfig(){
-  return {
-    version: RESUMEN_SHEET_VERSION,
-    enabled: readAuditSetting(),
-    storageKey: AUDIT_STORAGE_KEY,
-    sheetName: 'RESUMEN_MODULAR',
-    lastInfoEventoAttach
-  };
+function filenameFromDisposition(disposition){
+  const text = String(disposition || '');
+  const utf = text.match(/filename\*=UTF-8''([^;]+)/i);
+  if(utf){ try{ return decodeURIComponent(utf[1]); }catch(_){ return utf[1]; } }
+  const plain = text.match(/filename="?([^";]+)"?/i);
+  return plain ? plain[1] : '';
 }
-
-function app(){
-  return window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
+async function downloadServerBackup(scope){
+  const url = backupServerUrl(scope);
+  const response = await fetch(url, {cache:'no-store'});
+  if(!response.ok){
+    let detail = '';
+    try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }catch(_){ detail = await response.text().catch(()=> ''); }
+    throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
+  }
+  const blob = await response.blob();
+  if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
+  const filename = filenameFromDisposition(response.headers.get('content-disposition')) || backupFileName(scope, scope);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1600);
+  return {ok:true, source:'server-api-export', scope, filename, size: blob.size};
 }
-
-function currentEvent(application = app()){
-  const state = application?.state || window.state || {};
-  const selectedId = state.selectedEventId || application?.selectedEventId || window.selectedEventId || '';
-  const events = arr(state, 'eventos').length ? arr(state, 'eventos') : arr(window, 'eventos');
-  return events.find(event => String(event.id) === String(selectedId)) || events[0] || null;
+function isGD(){
+  const user = window.ControlEventApp?.authUser || window.authUser || window.__CONTROL_EVENT_USER__ || null;
+  return String(user?.nivel || '').trim().toUpperCase() === 'GD';
 }
-
-function safeCall(label, fn, fallback = null){
-  try{ return fn(); }
+async function ensureExcelJS(){
+  return ensureRuntimeExcelJS();
+}
+function cloneState(value){
+  if(!value || typeof value !== 'object') return {};
+  try{ return JSON.parse(JSON.stringify(value)); }catch(_){ return {...value}; }
+}
+function normalizeState(value){
+  const state = cloneState(value);
+  for(const key of COLLECTIONS) if(!Array.isArray(state[key])) state[key] = [];
+  state.ticketImages = state.ticketImages && typeof state.ticketImages === 'object' ? state.ticketImages : {};
+  return state;
+}
+async function fetchServerState(){
+  const res = await fetch('/api/state', {cache:'no-store'});
+  if(!res.ok) throw new Error(`No se pudo leer /api/state (${res.status}).`);
+  return normalizeState(await res.json());
+}
+function fallbackState(){
+  const appState = window.ControlEventApp?.state;
+  const globalState = window.state;
+  const candidates = [appState, globalState, window.__CONTROL_EVENT_STATE__].map(normalizeState);
+  candidates.sort((a,b) => countRows(b) - countRows(a));
+  return candidates[0] || normalizeState({});
+}
+async function getBestState(){
+  let source = 'server';
+  let state = null;
+  try{ state = await fetchServerState(); }
   catch(error){
-    console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] No se pudo calcular ${label}`, error);
-    return fallback;
+    console.warn('[ControlEventExcel/v30.7] No se pudo leer /api/state; se usa estado de la app.', error);
+    source = 'app-fallback';
+    state = fallbackState();
   }
-}
-
-function legacyBudget(application = app()){
-  const candidates = [
-    () => application?.calculations?.budgetSummary?.(),
-    () => window.budgetSummary?.(),
-    () => window.ControlEventDomain?.api?.budgetSummary?.()
-  ];
-  for(const candidate of candidates){
-    const value = safeCall('budgetSummary', candidate, null);
-    if(value && typeof value === 'object') return value;
+  const app = fallbackState();
+  if(countRows(app) > countRows(state)){
+    source = source === 'server' ? 'app-fallback-mas-completo' : source;
+    state = app;
   }
-  return {};
+  return {state: normalizeState(state), source, counts: countsFor(state)};
 }
-
-function normalizeBudget(raw = {}){
-  const ingresosDinero = raw.ingresosDinero || {};
-  const socios = ingresosDinero.socios || raw.socios || {};
-  const donantes = ingresosDinero.noSocios || ingresosDinero.donantes || raw.donantes || {};
-  const donacionProducto = raw.donacionProducto || {};
-  const operativa = raw.operativa || {};
-  const compras = raw.compras || {};
+function countsFor(state){
   return {
-    socios: {
-      personas: num(socios.count ?? socios.personas),
-      importe: money(socios.importe),
-      ingresado: money(socios.ingresado),
-      pendiente: money(socios.pendiente)
-    },
-    donantes: {
-      personas: num(donantes.count ?? donantes.personas),
-      importe: money(donantes.importe),
-      ingresado: money(donantes.ingresado),
-      pendiente: money(donantes.pendiente)
-    },
-    donacionProducto: {
-      lineas: num(donacionProducto.lineas ?? donacionProducto.count),
-      valorDonado: money(donacionProducto.valorDonado),
-      tiendas: num(donacionProducto.tiendas),
-      socios: num(donacionProducto.socios),
-      otros: num(donacionProducto.otros)
-    },
-    operativa: {
-      ingresosComprometidos: money(ingresosDinero.totalComprometido ?? operativa.ingresos),
-      ingresosRealizados: money(ingresosDinero.totalIngresado ?? operativa.ingresoDinero),
-      pendienteIngresos: money(ingresosDinero.pendiente),
-      comprado: money(operativa.gastoCompras ?? compras.resueltas),
-      gastosOrganizacion: money(operativa.gastosOrganizacion ?? compras.gastosCorrientes),
-      pendienteCompra: money(operativa.pendiente ?? compras.pendientes),
-      gastosPrevistos: money(operativa.gastosPrevistos),
-      gastosRealizados: money(operativa.gastosRealizados),
-      saldoActual: money(operativa.saldoActual ?? compras.saldoReal),
-      saldoOperativo: money(operativa.saldoOperativo),
-      valorDonado: money(operativa.valorDonado ?? donacionProducto.valorDonado),
-      valoracionEvento: money(operativa.valoracionEvento)
-    }
+    eventos: rows(state,'eventos').length,
+    personas: rows(state,'personas').length,
+    tiendas: rows(state,'tiendas').length,
+    productos: rows(state,'productos').length,
+    colaboradores: rows(state,'colaboradores').length,
+    compras: rows(state,'compras').length,
+    ticketImages: Object.keys(state?.ticketImages || {}).length
   };
 }
-
-export function buildResumenModel(options = {}){
-  const application = options.app || app();
-  const event = options.event || currentEvent(application);
-  const rawBudget = options.budget || legacyBudget(application);
-  const budget = normalizeBudget(rawBudget);
-  const generatedAt = new Date().toISOString();
-  const title = text(event?.titulo || event?.EVENTOS_TITULO || 'Sin evento');
-  return {
-    version: RESUMEN_SHEET_VERSION,
-    generatedAt,
-    event: {
-      id: event?.id || '',
-      titulo: title,
-      precio: money(event?.precio ?? event?.EVENTOS_PRECIO),
-      fechaIni: event?.fechaIni || event?.fechaini || '',
-      fechaFin: event?.fechaFin || event?.fechafin || '',
-      situacion: event?.situacion || 'En curso',
-      descripcion: event?.descripcion || ''
-    },
-    budget,
-    rawBudget
-  };
-}
-
-export function buildResumenRows(model = buildResumenModel()){
-  const b = model.budget;
-  return [
-    ['BLOQUE', 'CAMPO', 'VALOR'],
-    ['EVENTO', 'Título', model.event.titulo],
-    ['EVENTO', 'Precio', model.event.precio],
-    ['EVENTO', 'Fecha inicio', model.event.fechaIni],
-    ['EVENTO', 'Fecha fin', model.event.fechaFin],
-    ['EVENTO', 'Situación', model.event.situacion],
-    ['SOCIOS', 'Personas', b.socios.personas],
-    ['SOCIOS', 'Importe socios', b.socios.importe],
-    ['SOCIOS', 'Ingresado socios', b.socios.ingresado],
-    ['SOCIOS', 'Pendiente socios', b.socios.pendiente],
-    ['DONANTES', 'Personas', b.donantes.personas],
-    ['DONANTES', 'Importe donantes', b.donantes.importe],
-    ['DONANTES', 'Ingresado donantes', b.donantes.ingresado],
-    ['DONANTES', 'Pendiente donantes', b.donantes.pendiente],
-    ['DONACIÓN PRODUCTO', 'Valor donado', b.donacionProducto.valorDonado],
-    ['OPERATIVA', 'Ingresos comprometidos', b.operativa.ingresosComprometidos],
-    ['OPERATIVA', 'Ingresos realizados', b.operativa.ingresosRealizados],
-    ['OPERATIVA', 'Comprado', b.operativa.comprado],
-    ['OPERATIVA', 'Gastos organización', b.operativa.gastosOrganizacion],
-    ['OPERATIVA', 'Pendiente compra', b.operativa.pendienteCompra],
-    ['OPERATIVA', 'Saldo actual', b.operativa.saldoActual],
-    ['OPERATIVA', 'Saldo operativo', b.operativa.saldoOperativo],
-    ['OPERATIVA', 'Valoración evento', b.operativa.valoracionEvento]
-  ];
-}
-
-export function buildResumenSections(model = buildResumenModel()){
-  const b = model.budget;
-  return [
-    {
-      title: 'SOCIOS',
-      rows: [
-        ['SOCIOS', b.socios.personas],
-        ['IMPORTE SOCIOS', b.socios.importe],
-        ['INGRESADO SOCIOS', b.socios.ingresado],
-        ['PENDIENTE SOCIOS', b.socios.pendiente]
-      ]
-    },
-    {
-      title: 'DONANTES',
-      rows: [
-        ['DONANTES', b.donantes.personas],
-        ['IMPORTE DONANTES', b.donantes.importe],
-        ['INGRESADO DONANTES', b.donantes.ingresado],
-        ['VALOR ESTIMADO PRODUCTO DONADO', b.donacionProducto.valorDonado]
-      ]
-    },
-    {
-      title: 'OPERATIVA',
-      rows: [
-        ['SALDO GLOBAL', b.operativa.saldoActual],
-        ['COMPRADO', b.operativa.comprado],
-        ['PDTE.COMPRA', b.operativa.pendienteCompra],
-        ['SALDO OPERATIVO', b.operativa.saldoOperativo],
-        ['VALORACIÓN EVENTO', b.operativa.valoracionEvento]
-      ]
-    }
-  ];
-}
-
-function styleTitle(cell){
-  cell.font = {bold:true, size:16};
-  cell.alignment = {vertical:'middle', horizontal:'left'};
-}
-function styleHeader(cell){
-  cell.font = {bold:true};
-  cell.alignment = {vertical:'middle', horizontal:'center', wrapText:true};
-  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
-}
-function styleLabel(cell){
-  cell.font = {bold:true};
-  cell.alignment = {vertical:'middle', horizontal:'left', wrapText:true};
-  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
-}
-function styleValue(cell){
-  cell.alignment = {vertical:'middle', horizontal:'right', wrapText:true};
-  cell.border = {top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'}};
-  if(typeof cell.value === 'number') cell.numFmt = '#,##0.00 €;[Red]-#,##0.00 €';
-}
-function putRow(ws, rowNumber, values, styleFn){
-  const row = ws.getRow(rowNumber);
-  values.forEach((value, index) => {
-    const cell = row.getCell(index + 1);
-    cell.value = value;
-    if(styleFn) styleFn(cell, index, value);
+function chooseBackupScope(state){
+  return new Promise(resolve => {
+    const events = rows(state, 'eventos');
+    const selectedId = window.ControlEventApp?.state?.selectedEventId || state.selectedEventId || '';
+    const overlay = document.createElement('div');
+    overlay.className = 'ce-backup-overlay-v181';
+    overlay.innerHTML = `<div class="ce-backup-modal-v181"><h3>Descarga de datos</h3><p>Elige si quieres descargar todos los datos o solo los vinculados a un evento concreto.</p><div class="field"><label>Evento a descargar</label><select id="ceBackupScopeV2702"><option value="TODOS">TODOS los eventos</option>${events.map(e => `<option value="${esc(e.id)}" ${String(e.id)===String(selectedId)?'selected':''}>${esc(e.titulo || e.id)}</option>`).join('')}</select></div><div class="ce-backup-actions-v181"><button type="button" class="outline" id="ceBackupCancelV2702">Cancelar</button><button type="button" id="ceBackupOkV2702">Descargar</button></div></div>`;
+    document.body.appendChild(overlay);
+    const done = value => { overlay.remove(); resolve(value); };
+    overlay.querySelector('#ceBackupCancelV2702')?.addEventListener('click', () => done(null));
+    overlay.querySelector('#ceBackupOkV2702')?.addEventListener('click', () => done(overlay.querySelector('#ceBackupScopeV2702')?.value || 'TODOS'));
+    overlay.addEventListener('click', ev => { if(ev.target === overlay) done(null); });
   });
-  row.commit?.();
-  return row;
 }
-
-function configureCleanWorksheet(ws){
-  try{
+function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
+function makeCodes(items, prefix){
+  const out = {};
+  (items || []).forEach((item, index) => { out[item.id] = prefix + String(index + 1).padStart(prefix === 'EV' ? 3 : 4, '0'); });
+  return out;
+}
+function ticketEventIdFromKey(key){ return String(key || '').split('|')[0] || ''; }
+function ticketInnerKeyFromKey(key){ const parts = String(key || '').split('|'); return parts.slice(1).join('|').trim(); }
+function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
+function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
+function price(c, productMap){
+  const direct = num(c?.precio);
+  if(direct) return direct;
+  const p = productMap[String(c?.productoId)] || {};
+  return num(p.defaultPrecio ?? p.precio);
+}
+function scopedBackupState(fullState, scope){
+  const all = scope === 'TODOS';
+  const eventos = all ? [...rows(fullState,'eventos')] : rows(fullState,'eventos').filter(e => String(e.id) === String(scope));
+  const eventIds = new Set(eventos.map(e => String(e.id)));
+  const colaboradores = rows(fullState,'colaboradores').filter(c => all || eventIds.has(String(c.eventId)));
+  const compras = rows(fullState,'compras').filter(c => all || eventIds.has(String(c.eventId)));
+  const personIds = new Set();
+  colaboradores.forEach(c => { if(c.personaId) personIds.add(String(c.personaId)); });
+  compras.forEach(c => {
+    if(c.responsableId) personIds.add(String(c.responsableId));
+    const donor = String(c.donorRef || '');
+    if(donor.startsWith('P:')) personIds.add(donor.slice(2));
+  });
+  const storeIds = new Set();
+  compras.forEach(c => {
+    if(c.tiendaId) storeIds.add(String(c.tiendaId));
+    const donor = String(c.donorRef || '');
+    if(donor.startsWith('T:')) storeIds.add(donor.slice(2));
+  });
+  const productIds = new Set(compras.map(c => String(c.productoId || '')).filter(Boolean));
+  const personas = all ? [...rows(fullState,'personas')] : rows(fullState,'personas').filter(p => personIds.has(String(p.id)));
+  const tiendas = all ? [...rows(fullState,'tiendas')] : rows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
+  const productos = all ? [...rows(fullState,'productos')] : rows(fullState,'productos').filter(p => productIds.has(String(p.id)));
+  const ticketImages = {};
+  Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => {
+    if(all || eventIds.has(String(ticketEventIdFromKey(key)))) ticketImages[key] = value;
+  });
+  return {eventos, personas, tiendas, productos, colaboradores, compras, ticketImages};
+}
+function splitLongText(value, size = 30000){
+  const text = String(value || '');
+  const out = [];
+  for(let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
+  return out.length ? out : [''];
+}
+function setupWorkbook(ExcelJS){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`;
+  wb.created = new Date();
+  const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
+  const fills = {title:'FF111827', soft:'FFF8FAFC', white:'FFFFFFFF'};
+  function sheet(name, headers){
+    const ws = wb.addWorksheet(name);
+    ws.properties.defaultRowHeight = 21;
+    ws.columns = headers.map(h => ({width: Math.max(14, Math.min(42, String(h).length + 4))}));
+    headers.forEach((h,i) => {
+      const c = ws.getCell(1, i + 1);
+      c.value = h;
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:fills.title}};
+      c.font = {bold:true, color:{argb:'FFFFFFFF'}};
+      c.border = border;
+      c.alignment = {vertical:'middle', horizontal:'center', wrapText:true};
+    });
+    ws.getRow(1).height = 24;
     ws.views = [{state:'frozen', ySplit:1}];
-    ws.pageSetup = {
-      paperSize: 9,
-      orientation: 'landscape',
-      fitToPage: true,
-      fitToWidth: 1,
-      fitToHeight: 0,
-      margins: {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.1, footer:0.1}
-    };
-    ws.properties.defaultRowHeight = 20;
-  }catch(_){ }
-}
-
-function markMoneyColumn(ws, fromRow = 1, toRow = ws.rowCount){
-  for(let r = fromRow; r <= toRow; r += 1){
-    const valueCell = ws.getCell(r, 2);
-    if(typeof valueCell.value === 'number') valueCell.numFmt = '#,##0.00 €;[Red]-#,##0.00 €';
+    return ws;
   }
-}
-
-
-function formatEuro(value){
-  try{
-    return `${money(value).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2})} €`;
-  }catch(_){
-    return `${money(value).toFixed(2).replace('.', ',')} €`;
-  }
-}
-function roundedRect(ctx, x, y, width, height, radius){
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-function makeResumenChartImage(model){
-  if(typeof document === 'undefined') return null;
-  const b = model.budget || {};
-  const items = [
-    {label:'Importe socios', value:b.socios?.importe, color:'#2563eb'},
-    {label:'Ingresado socios', value:b.socios?.ingresado, color:'#059669'},
-    {label:'Pendiente socios', value:b.socios?.pendiente, color:'#dc2626'},
-    {label:'Comprado', value:b.operativa?.comprado, color:'#ef4444'},
-    {label:'Pendiente compra', value:b.operativa?.pendienteCompra, color:'#f59e0b'},
-    {label:'Saldo actual', value:b.operativa?.saldoActual, color:'#0f766e'},
-    {label:'Saldo operativo', value:b.operativa?.saldoOperativo, color:'#0891b2'},
-    {label:'Valoración evento', value:b.operativa?.valoracionEvento, color:'#111827'}
-  ].map(item => ({...item, value:money(item.value)}));
-  const width = 980;
-  const height = 520;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if(!ctx) return null;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0,0,width,height);
-  ctx.fillStyle = '#111827';
-  ctx.font = '700 28px system-ui, -apple-system, Segoe UI, Arial';
-  ctx.fillText(`RESUMEN VISUAL - ${model.event?.titulo || ''}`.slice(0, 62), 28, 44);
-  ctx.font = '500 15px system-ui, -apple-system, Segoe UI, Arial';
-  ctx.fillStyle = '#6b7280';
-  ctx.fillText('Gráfico modular generado desde los datos del evento', 28, 70);
-  const max = Math.max(1, ...items.map(item => Math.abs(item.value)));
-  const labelX = 30;
-  const barX = 300;
-  const valueX = 860;
-  const top = 105;
-  const rowH = 47;
-  items.forEach((item, index) => {
-    const y = top + index * rowH;
-    ctx.font = '700 16px system-ui, -apple-system, Segoe UI, Arial';
-    ctx.fillStyle = '#111827';
-    ctx.fillText(item.label, labelX, y + 23);
-    ctx.fillStyle = '#f3f4f6';
-    roundedRect(ctx, barX, y + 6, 520, 22, 11);
-    ctx.fill();
-    const ratio = Math.min(1, Math.abs(item.value) / max);
-    const barW = Math.max(item.value === 0 ? 0 : 4, Math.round(520 * ratio));
-    if(barW > 0){
-      ctx.fillStyle = item.value < 0 ? '#b91c1c' : item.color;
-      roundedRect(ctx, barX, y + 6, barW, 22, 11);
-      ctx.fill();
-    }
-    ctx.font = '700 15px system-ui, -apple-system, Segoe UI, Arial';
-    ctx.fillStyle = item.value < 0 ? '#b91c1c' : '#111827';
-    ctx.textAlign = 'right';
-    ctx.fillText(formatEuro(item.value), valueX + 90, y + 23);
-    ctx.textAlign = 'left';
-  });
-  ctx.fillStyle = '#e5e7eb';
-  ctx.fillRect(28, height - 44, width - 56, 1);
-  ctx.fillStyle = '#6b7280';
-  ctx.font = '500 13px system-ui, -apple-system, Segoe UI, Arial';
-  ctx.fillText(`©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, 28, height - 18);
-  return canvas.toDataURL('image/png');
-}
-function addResumenChartImage(workbook, worksheet, model){
-  try{
-    if(!workbook || !worksheet || typeof workbook.addImage !== 'function' || typeof worksheet.addImage !== 'function') return {added:false, reason:'exceljs-image-api-unavailable'};
-    const base64 = makeResumenChartImage(model);
-    if(!base64) return {added:false, reason:'canvas-unavailable'};
-    const imageId = workbook.addImage({base64, extension:'png'});
-    worksheet.addImage(imageId, {
-      tl: {col: 3.2, row: 1.0},
-      ext: {width: 760, height: 405},
-      editAs: 'oneCell'
+  function addRows(name, headers, data){
+    const ws = sheet(name, headers);
+    data.forEach(row => ws.addRow(row.map(v => v == null ? '' : v)));
+    ws.eachRow(row => row.eachCell(cell => {
+      cell.border = border;
+      cell.alignment = {vertical:'middle', horizontal:'left', wrapText:true};
+    }));
+    ws.columns.forEach((col, idx) => {
+      let width = col.width || 14;
+      col.eachCell({includeEmpty:true}, cell => { width = Math.max(width, Math.min(70, String(cell.value ?? '').length + 3)); });
+      col.width = headers[idx] === 'IMAGEN_BASE64_PARTE' ? 72 : Math.min(70, width);
     });
-    for(let c = 4; c <= 12; c += 1) worksheet.getColumn(c).width = 14;
-    for(let r = 2; r <= 22; r += 1) worksheet.getRow(r).height = Math.max(worksheet.getRow(r).height || 20, 22);
-    return {added:true, imageId, width:760, height:405};
-  }catch(error){
-    console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] No se pudo añadir gráfico standalone de RESUMEN.`, error);
-    return {added:false, error:error?.message || String(error)};
+    return ws;
   }
+  return {wb, addRows};
 }
-
-export function writeResumenWorksheet(workbook, options = {}){
-  if(!workbook || typeof workbook.addWorksheet !== 'function'){
-    throw new Error('writeResumenWorksheet necesita un workbook de ExcelJS.');
-  }
-  const model = options.model || buildResumenModel(options);
-  const sheetName = options.sheetName || 'RESUMEN_MODULAR';
-  const existing = workbook.getWorksheet?.(sheetName);
-  if(existing && typeof workbook.removeWorksheet === 'function') workbook.removeWorksheet(existing.id);
-  const ws = workbook.addWorksheet(sheetName, {views:[{state:'frozen', ySplit:1}]});
-  configureCleanWorksheet(ws);
-  ws.columns = [
-    {header:'Concepto', key:'concepto', width:36},
-    {header:'Valor', key:'valor', width:22},
-    {header:'Observaciones', key:'observaciones', width:44}
-  ];
-
-  let r = 1;
-  ws.mergeCells(r,1,r,3);
-  ws.getCell(r,1).value = `RESUMEN DEL EVENTO - ${model.event.titulo}`;
-  styleTitle(ws.getCell(r,1));
-  ws.getRow(r).height = 24;
-  r += 1;
-
-  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
-  putRow(ws, r++, ['Fechas', `${model.event.fechaIni || ''}${model.event.fechaFin ? ' - ' + model.event.fechaFin : ''}`, model.event.situacion], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
-  putRow(ws, r++, ['Precio evento', model.event.precio, model.event.descripcion || ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
-  r += 1;
-
-  buildResumenSections(model).forEach(section => {
-    ws.mergeCells(r,1,r,3);
-    ws.getCell(r,1).value = section.title;
-    styleHeader(ws.getCell(r,1));
-    r += 1;
-    section.rows.forEach(([label, value]) => {
-      putRow(ws, r++, [label, value, ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
-    });
-    r += 1;
-  });
-
-  if(options.includeDiagnosticRows === true){
-    r += 1;
-    putRow(ws, r++, ['BLOQUE', 'CAMPO', 'VALOR'], styleHeader);
-    buildResumenRows(model).slice(1).forEach(row => {
-      putRow(ws, r++, row, (cell, index) => index < 2 ? styleLabel(cell) : styleValue(cell));
-    });
-  }
-
-  ws.eachRow(row => {
-    row.eachCell(cell => {
-      cell.alignment = {...(cell.alignment || {}), vertical:'middle', wrapText:true};
-    });
-  });
-  markMoneyColumn(ws);
-  try{ ws.autoFilter = {from:{row:5,column:1}, to:{row:Math.max(5, ws.rowCount), column:3}}; }catch(_){ }
-  lastWorksheetBuild = {
-    builtAt: new Date().toISOString(),
-    version: RESUMEN_SHEET_VERSION,
-    sheetName,
-    eventTitle: model.event.titulo,
-    rows: ws.rowCount,
-    columns: ws.columnCount,
-    standaloneClean: options.includeDiagnosticRows !== true
-  };
-  window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-worksheet-built', {detail:lastWorksheetBuild}));
-  return {worksheet: ws, model, info: lastWorksheetBuild};
-}
-
-export function captureResumenSnapshot(options = {}){
-  const model = buildResumenModel(options);
-  const rows = buildResumenRows(model);
-  lastSnapshot = {
-    capturedAt: new Date().toISOString(),
-    source: options.source || 'manual',
-    model,
-    rows,
-    rowCount: rows.length,
-    writerReady: typeof window.ExcelJS?.Workbook === 'function'
-  };
-  window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-snapshot', {detail:lastSnapshot}));
-  return lastSnapshot;
-}
-
-export function preview(){
-  const snapshot = captureResumenSnapshot({source:'preview'});
-  console.table(snapshot.rows.slice(1).map(row => ({bloque:row[0], campo:row[1], valor:row[2]})));
-  return snapshot;
-}
-
-
-export function attachResumenToInfoEventoWorkbook(workbook, options = {}){
-  if(!readAuditSetting() && options.force !== true){
-    lastInfoEventoAttach = {attached:false, skipped:true, reason:'disabled', at:new Date().toISOString(), version:RESUMEN_SHEET_VERSION};
-    return lastInfoEventoAttach;
-  }
-  try{
-    if(!workbook || typeof workbook.addWorksheet !== 'function') throw new Error('Workbook ExcelJS no disponible.');
-    const sheetName = options.sheetName || 'RESUMEN_MODULAR';
-    const result = writeResumenWorksheet(workbook, {
-      ...options,
-      sheetName,
-      source: options.source || 'infoevento-audit'
-    });
-    const ws = result.worksheet;
-    try{ ws.state = options.hidden ? 'hidden' : 'visible'; }catch(_){ }
-    lastInfoEventoAttach = {
-      attached:true,
-      skipped:false,
-      at:new Date().toISOString(),
-      version:RESUMEN_SHEET_VERSION,
-      sheetName,
-      hidden: !!options.hidden,
-      rows: ws?.rowCount || 0,
-      eventTitle: result.model?.event?.titulo || ''
-    };
-    window.dispatchEvent(new CustomEvent('controlevent:excel-resumen-infoevento-attached', {detail:lastInfoEventoAttach}));
-    return lastInfoEventoAttach;
-  }catch(error){
-    lastInfoEventoAttach = {attached:false, skipped:false, at:new Date().toISOString(), version:RESUMEN_SHEET_VERSION, error:error?.message || String(error)};
-    console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] No se pudo añadir RESUMEN modular al INFOEVENTO. Se mantiene RESUMEN legacy.`, error);
-    return lastInfoEventoAttach;
-  }
-}
-
-
-function sanitizeStandaloneWorkbook(workbook, worksheet){
-  try{
-    if(!workbook || !worksheet) return {ok:false, reason:'missing-workbook-or-worksheet'};
-    const keepId = worksheet.id;
-    if(Array.isArray(workbook.worksheets) && typeof workbook.removeWorksheet === 'function'){
-      [...workbook.worksheets].forEach(ws => {
-        if(ws && ws.id !== keepId) workbook.removeWorksheet(ws.id);
+async function protectWorkbook(wb){
+  for(const ws of wb.worksheets){
+    try{
+      ws.eachRow(row => row.eachCell(cell => { cell.protection = {locked:true}; }));
+      await ws.protect(BACKUP_PASSWORD, {
+        selectLockedCells:true, selectUnlockedCells:true,
+        formatCells:false, formatColumns:false, formatRows:false,
+        insertColumns:false, insertRows:false, deleteColumns:false, deleteRows:false,
+        sort:false, autoFilter:false, pivotTables:false,
+        objects:false, scenarios:false
       });
-    }
-    // v28.0: no se vacían drawings/media porque los gráficos standalone son imágenes PNG protegidas.
-    // Sólo se eliminan hojas sobrantes; la protección de objetos impide borrar los gráficos.
-    try{ workbook.definedNames.model = []; }catch(_){ }
-    configureCleanWorksheet(worksheet);
-    return {ok:true, kept:worksheet.name, sheetCount:workbook.worksheets?.length || 0};
-  }catch(error){
-    console.warn('[ControlEventExcel] No se pudo limpiar el workbook standalone de RESUMEN.', error);
-    return {ok:false, error:error?.message || String(error)};
+    }catch(_){ }
   }
 }
-
-export async function downloadStandaloneResumen(options = {}){
-  const message = 'RESUMEN standalone desactivado en v28.0: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
-  console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] ${message}`, {options});
-  return {ok:false, disabled:true, version:RESUMEN_SHEET_VERSION, module:'resumen-sheet', message, recommendedAction:'exportExcel'};
+async function downloadWorkbook(wb, filename){
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1200);
 }
 
-export function getLastSnapshot(){
-  return lastSnapshot;
-}
+export async function run(options = {}){
+  if(!isGD()){
+    alert('Solo GD puede realizar descarga de datos.');
+    return null;
+  }
+  const {state, source, counts} = await getBestState();
+  const scope = options.scope || await chooseBackupScope(state);
+  if(!scope) return null;
+  const scoped = scopedBackupState(state, scope);
+  const scopedCounts = countsFor(scoped);
+  const dataCount = countRows(scoped);
+  console.info('[ControlEventExcel/v30.7] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
+  try{
+    const serverResult = await downloadServerBackup(scope);
+    console.info('[ControlEventExcel/v30.7] Backup generado por servidor', serverResult);
+    return {...serverResult, counts, scopedCounts};
+  }catch(serverError){
+    console.warn('[ControlEventExcel/v30.7] Fallback a backup cliente', serverError);
+  }
+  if(dataCount === 0){
+    alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');
+    return null;
+  }
+  const ExcelJS = await ensureExcelJS();
+  const {wb, addRows} = setupWorkbook(ExcelJS);
+  const eventCode = makeCodes(scoped.eventos, 'EV');
+  const personCode = makeCodes(scoped.personas, 'PE');
+  const storeCode = makeCodes(scoped.tiendas, 'TI');
+  const productCode = makeCodes(scoped.productos, 'PR');
+  const productMap = byIdMap(scoped.productos);
+  const selectedEvent = scope === 'TODOS' ? null : scoped.eventos.find(e => String(e.id) === String(scope));
+  const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
+  const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
+  const now = stamp();
 
-export function getLastWorksheetBuild(){
-  return lastWorksheetBuild;
-}
-
-export function assertReady(){
-  const snapshot = captureResumenSnapshot({source:'assert-ready'});
-  const warnings = [];
-  if(!snapshot.model.event.id && !snapshot.model.event.titulo) warnings.push('No hay evento activo para RESUMEN.');
-  if(snapshot.rowCount < 10) warnings.push('El modelo RESUMEN contiene pocas filas.');
-  if(!snapshot.writerReady) warnings.push('ExcelJS no está disponible todavía; la escritura modular se probará cuando cargue vendor/exceljs.');
-  return {ok:warnings.length === 0, warnings, snapshot, lastWorksheetBuild, audit:getInfoEventoAuditConfig()};
-}
-
-export function installResumenSheetBridge(){
-  if(installed) return window.ControlEventResumenSheet;
-  installed = true;
-  window.ControlEventResumenSheet = {
-    version: RESUMEN_SHEET_VERSION,
-    mode: meta.mode,
-    meta,
-    buildModel: buildResumenModel,
-    buildRows: buildResumenRows,
-    buildSections: buildResumenSections,
-    writeWorksheet: writeResumenWorksheet,
-    downloadStandalone: downloadStandaloneResumen,
-    attachToInfoEventoWorkbook: attachResumenToInfoEventoWorkbook,
-    enableInfoEventoAudit: setInfoEventoAuditEnabled,
-    auditConfig: getInfoEventoAuditConfig,
-    capture: captureResumenSnapshot,
-    preview,
-    assertReady,
-    getLastSnapshot,
-    getLastWorksheetBuild
-  };
-  window.addEventListener('controlevent:excel-before-run', event => {
-    if(event?.detail?.name === 'exportExcel'){
-      captureResumenSnapshot({source:'excel-before-run', excelOptions:event.detail.options});
-    }
+  addRows('METADATOS', ['CAMPO','VALOR'], [
+    ['VERSION', BACKUP_VERSION],
+    ['VERSION_FICHERO', BACKUP_VERSION_FILE],
+    ['FUENTE_DATOS', source],
+    ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle],
+    ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode],
+    ['FECHA_DESCARGA', `${now.yyyy}${now.mm}${now.dd}-${now.hh}_${now.mi}_${now.ss}`],
+    ['REGISTROS_EVENTOS', scopedCounts.eventos],
+    ['REGISTROS_PERSONAS', scopedCounts.personas],
+    ['REGISTROS_TIENDAS', scopedCounts.tiendas],
+    ['REGISTROS_PRODUCTOS', scopedCounts.productos],
+    ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
+    ['REGISTROS_COMPRAS', scopedCounts.compras],
+    ['REGISTROS_TICKETS', scopedCounts.ticketImages],
+    ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
+    ['NOTA', 'Las imagenes grandes de tickets se dividen en TICKETS_PARTES para evitar ficheros Excel corruptos.']
+  ]);
+  addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+  addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
+  addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
+  const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
+  try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
+  addRows('INGRESOS', ['EVENTO_CODIGO','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
+  addRows('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
+  addRows('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
+  const ticketRows = [], partRows = [];
+  Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
+    const evCode = eventCode[ticketEventIdFromKey(fullKey)] || '';
+    const key = ticketInnerKeyFromKey(fullKey);
+    const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
+    const parts = splitLongText(data, 30000);
+    ticketRows.push([evCode, key, '', data.length <= 30000 ? data : '', data.length > 30000 ? 'DIVIDIDA_EN_TICKETS_PARTES' : '']);
+    parts.forEach((part, idx) => partRows.push([evCode, key, idx + 1, parts.length, part]));
   });
-  return window.ControlEventResumenSheet;
+  addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
+  addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
+  await protectWorkbook(wb);
+  await downloadWorkbook(wb, backupFileName(scope, selectedTitle));
+  return {ok:true, source, scope, counts, scopedCounts, filename: backupFileName(scope, selectedTitle)};
 }
 
-export function describe(){
-  return {...meta, audit:getInfoEventoAuditConfig(), lastSnapshot, lastWorksheetBuild, lastInfoEventoAttach};
-}
-
-const api = {
-  meta,
-  describe,
-  run: captureResumenSnapshot,
-  buildModel: buildResumenModel,
-  buildRows: buildResumenRows,
-  buildSections: buildResumenSections,
-  writeWorksheet: writeResumenWorksheet,
-  downloadStandalone: downloadStandaloneResumen,
-  attachToInfoEventoWorkbook: attachResumenToInfoEventoWorkbook,
-  enableInfoEventoAudit: setInfoEventoAuditEnabled,
-  auditConfig: getInfoEventoAuditConfig,
-  capture: captureResumenSnapshot,
-  preview,
-  assertReady,
-  install: installResumenSheetBridge
-};
-registerExcelModule('resumen-sheet', api);
-registerExcelModule('resumen', api);
-
-if(typeof window !== 'undefined'){
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installResumenSheetBridge, {once:true});
-  else installResumenSheetBridge();
-}
+registerExcelModule('exportSeedWorkbook', {meta, run});
+registerExcelModule('backup', {meta, run});
