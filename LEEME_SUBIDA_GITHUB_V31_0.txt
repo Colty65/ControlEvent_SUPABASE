@@ -1,12 +1,13 @@
-import { createLegacyView } from './_view-runtime.js';
+ControlEvent V31.2 - Solo subir a GitHub
 
-const view = createLegacyView({
-  name: 'resumen',
-  render: ['renderBudget'],
-  patches: true
-});
+Base: V30.13 validada en todos los dispositivos.
 
-export const meta = view.meta;
-export const mount = context => view.mount(context);
-export const activate = context => view.activate(context);
-export const refresh = activate;
+Subir sustituyendo los archivos existentes. No incluye la rama problemática 30.9/30.11.
+
+Cambios principales:
+- Mapa de recursos: totales de cabecera globales del evento aunque se filtre por responsable.
+- COMPRAS PRODUCTO muestra total, TKxx comprado y Pte.Compra.
+- Se elimina la ficha SOLO DONACION y se traslada el dato a la cabecera de productos donados.
+- Se añade precio unitario en productos comprados y donados.
+- Se añade buscador de producto.
+- Eventos ordenados por fecha de inicio en desplegable EVENTOS y mantenimiento EVENTOS.
