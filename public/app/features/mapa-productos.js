@@ -1,8 +1,8 @@
-/* ControlEvent v31.0 - Mapa de recursos
+/* ControlEvent v31.1 - Mapa de recursos
    Cruza compras + donaciones y añade filtro por responsables SOCIO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.0';
+  const VERSION = 'ControlEvent v31.1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -381,12 +381,25 @@
     const input = $(SEARCH_ID), btn = $(SEARCH_ID + 'Btn');
     if(!input || input.__ceMapaSearchBound) return;
     input.__ceMapaSearchBound = true;
-    let timer = 0;
     const run = () => { productSearchText = input.value || ''; focusFirstProduct(productSearchText); };
-    input.addEventListener('input', () => { productSearchText = input.value || ''; clearTimeout(timer); timer = setTimeout(run, 120); });
+    // V31.1: no buscar en cada pulsación; solo al pulsar Buscar o Enter.
     input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); run(); } });
     btn?.addEventListener('click', event => { try{ event.preventDefault(); }catch(_){ } run(); });
     if(productSearchText) setTimeout(() => focusFirstProduct(productSearchText), 80);
+  }
+  function scrollToDonationHeader(){
+    const target = document.getElementById('mapaOnlyDonationsHead') || document.querySelector('#mapaProductosList .mapa-only-donations-head') || document.querySelector('#mapaProductosList .mapa-donation-block');
+    if(!target) return false;
+    try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ target.scrollIntoView(); }
+    try{ target.classList.add('mapa-donation-head-focus'); setTimeout(() => target.classList.remove('mapa-donation-head-focus'), 1400); }catch(_){ }
+    return true;
+  }
+  function bindDonationSummaryJump(){
+    const btn = document.querySelector('[data-mapa-jump-donados="1"]');
+    if(!btn || btn.__ceDonationJumpBound) return;
+    btn.__ceDonationJumpBound = true;
+    btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToDonationHeader(); });
+    btn.addEventListener('keydown', event => { if(event.key === 'Enter' || event.key === ' '){ try{ event.preventDefault(); }catch(_){ } scrollToDonationHeader(); } });
   }
   function dataProductText(parts){ return esc(parts.filter(Boolean).join(' · ')); }
 
@@ -412,10 +425,13 @@
       <div class="mapa-summary-metrics">
         ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
         ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `TKxx: ${moneyFmt(eventSummary.totalCompraTk || 0)} · Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
-        ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento`, 'ok')}
+        ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
+    const donationMetric = summary.querySelector('.mapa-metric.jump-donados');
+    if(donationMetric){ donationMetric.setAttribute('data-mapa-jump-donados','1'); donationMetric.setAttribute('role','button'); donationMetric.setAttribute('tabindex','0'); donationMetric.setAttribute('title','Ir a productos donados'); }
+    bindDonationSummaryJump();
 
     if(!data.groups.length && !data.onlyDonations.length){
       wrap.innerHTML = '<div class="empty">No hay compras ni donaciones de producto para el filtro actual.</div>';
@@ -450,9 +466,10 @@
       </article>`;
     }).join('');
 
+    const onlyDonationValue = data.onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
     const onlyDonationBlock = data.onlyDonations.length ? `
-      <section class="mapa-only-donations">
-        <div class="mapa-only-donations-head"><strong>${esc(String(data.onlyDonations.length))} PRODUCTOS DONADOS</strong><span>Productos con donación, pero sin compra planificada</span></div>
+      <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
+        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>${esc(String(data.onlyDonations.length))} PRODUCTOS DONADOS PARA LOS RESPONSABLES SELECCIONADOS. VALOR ESTIMADO ${esc(moneyFmt(onlyDonationValue))}</strong></div>
         ${data.onlyDonations.map(item => {
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
           const searchText = dataProductText(['Solo donación', item.producto, item.segmento, item.destino, donorTxt]);
@@ -489,7 +506,7 @@
   }
   function applyMapVisibility(){
     if(isAuthVisible()) return;
-    // V31.0: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
+    // V31.1: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
     const active = currentTab() === TAB_NAME;
     const eventReady = hasEvent();
     const panel = $(PANEL_ID), btn = $(BUTTON_ID);
@@ -594,7 +611,7 @@
       }, 80);
     };
   })();
-  // V31.0: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
+  // V31.1: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v310', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v311', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

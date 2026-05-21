@@ -1192,7 +1192,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 #summaryTiendaTicket .ce-sort-link-v307.is-active{background:#e0f2fe;color:#075985;text-decoration:none;}
 
 
-/* ==== V31.0: Mapa de recursos, buscador, totales de evento y precios ==== */
+/* ==== V31.1: Mapa de recursos, buscador, totales de evento y precios ==== */
 .mapa-productos-card .section-title h2{letter-spacing:-.01em;}
 .mapa-summary-grid{display:block!important;margin-top:12px;}
 .mapa-summary-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px;}
@@ -1223,7 +1223,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 }
 
 
-/* ==== V31.0: filtro de responsables estable en iPad/iPhone ==== */
+/* ==== V31.1: filtro de responsables estable en iPad/iPhone ==== */
 .mapa-filter-v3013{display:block;position:relative;z-index:1;}
 .mapa-filter-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;color:#111827;font:inherit;font-weight:900;padding:0;cursor:pointer;text-align:left;}
 .mapa-filter-toggle span{font-size:12px;color:#475569;font-weight:800;text-align:right;line-height:1.2;}
@@ -1237,7 +1237,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 @media (max-width:760px){.mapa-filter-toggle{align-items:flex-start}.mapa-filter-toggle span{max-width:58%;}.mapa-filter-v3013 .mapa-filter-panel{grid-template-columns:1fr;max-height:220px;}}
 
 
-/* ==== V31.0: Mapa de recursos - buscador y cabeceras ==== */
+/* ==== V31.1: Mapa de recursos - buscador y cabeceras ==== */
 .mapa-summary-metrics{grid-template-columns:repeat(3,minmax(0,1fr));}
 .mapa-metric.split .mapa-metric-note{font-weight:900;color:#7c2d12;line-height:1.35;}
 .mapa-product-search{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:8px;align-items:end;border:1px solid #dbeafe;background:#f8fbff;border-radius:18px;padding:10px 12px;margin-top:10px;}
@@ -1245,7 +1245,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .mapa-product-search input{width:100%;}
 .mapa-search-help{grid-column:1 / -1;font-size:11px;color:#64748b;font-weight:700;}
 .mapa-product-card.mapa-search-found{outline:4px solid rgba(37,99,235,.32);box-shadow:0 0 0 6px rgba(37,99,235,.08),0 8px 22px rgba(15,23,42,.08);}
-.mapa-only-donations-head{display:flex;flex-direction:column;gap:3px;border:1px solid #bbf7d0;background:linear-gradient(135deg,#ecfdf5,#f8fafc);border-radius:18px;padding:12px 14px;margin:16px 0 10px;color:#065f46;}
+.mapa-only-donations-head{display:flex;flex-direction:column;gap:3px;border:1px solid #bbf7d0;background:linear-gradient(135deg,#ecfdf5,#f8fafc);border-radius:18px;padding:12px 14px;margin:16px 0 10px;color:#065f46;scroll-margin-top:90px;}
 .mapa-only-donations-head strong{font-size:16px;font-weight:950;letter-spacing:.03em;}
 .mapa-only-donations-head span{font-size:12px;font-weight:800;color:#047857;text-transform:uppercase;letter-spacing:.04em;}
 @media (max-width:760px){
@@ -1256,3 +1256,9 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 @media (min-width:761px){
   .mapa-donation-row{grid-template-columns:1.35fr .45fr .7fr .75fr .75fr;}
 }
+
+/* ControlEvent v31.1 - ajustes Mapa de recursos */
+.mapa-metric.jump-donados{cursor:pointer;outline:none;}
+.mapa-metric.jump-donados:hover,.mapa-metric.jump-donados:focus{box-shadow:0 0 0 3px rgba(34,197,94,.18);transform:translateY(-1px);}
+.mapa-only-donations-head.mapa-donation-head-focus{box-shadow:0 0 0 4px rgba(34,197,94,.22);}
+.mapa-only-donations-head strong{line-height:1.35;}
