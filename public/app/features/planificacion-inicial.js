@@ -1,9 +1,9 @@
-/* ControlEvent v33.6 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v33.7 - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.6';
+  const VERSION = 'ControlEvent v33.7';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -59,8 +59,11 @@
   }
   function unitPrice(row){
     const p = productOf(row) || {};
-    const candidates = [row?.precio, p.precio, p.precioReferencia, p.defaultPrecio];
+    const candidates = [row?.precio, row?.precioUnitario, row?.precioReferencia, p.precio, p.precioReferencia, p.defaultPrecio];
     for(const item of candidates){ const n = parseNum(item); if(Number.isFinite(n) && n > 0) return n; }
+    const total = parseNum(row?.importe ?? row?.importeTotal ?? row?.valor ?? row?.total);
+    const units = Number(row?.unidades || 0);
+    if(total > 0 && units > 0) return total / units;
     return 0;
   }
   function rowValue(row){ return Number(row?.unidades || 0) * unitPrice(row); }
@@ -265,6 +268,8 @@
         responsableId: rowResponsible(row),
         ticketDonacion: String(row.ticketDonacion || ''),
         donorRef: String(row.donorRef || ''),
+        sourceTiendaId: String(row.tiendaId || ''),
+        sourcePrecio: unitPrice(row),
         confidence: 'Réplica exacta',
         reason: tipo === 'DONACION'
           ? 'Donación de producto replicada tal cual desde el evento finalizado.'
@@ -300,7 +305,7 @@
       </div>
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
-        <strong>V33.6:</strong> replica eventos ya finalizados tal cual. Revisa la propuesta y, cuando esté correcta, pulsa <strong>Crear evento real desde réplica</strong>.
+        <strong>V33.7:</strong> crea el evento real desde una réplica revisada. Ingresos en Pendiente, donaciones tal cual y compras en Pte.Compra u otros gastos.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -478,20 +483,23 @@
         eventId: newEventId,
         personaId: item.personaId,
         numero: Number(item.numero || 0),
-        situacion: item.situacion || 'Pendiente',
+        situacion: 'Pendiente',
         importe: Number(item.importeVoluntario || 0)
       });
     });
 
     lastProposal.filter(p => p.include).forEach(p => {
       if(!p.productId) return;
+      const isDon = p.tipo === 'DONACION';
       st.compras.push({
         id: makeId(),
         eventId: newEventId,
         productoId: p.productId,
         unidades: Number(p.unidades || 0),
-        ticketDonacion: String(p.ticketDonacion || ''),
-        donorRef: String(p.donorRef || ''),
+        precio: Number(p.precio || 0),
+        tiendaId: String(p.tiendaId || p.sourceTiendaId || ''),
+        ticketDonacion: isDon ? String(p.ticketDonacion || '') : '',
+        donorRef: isDon ? String(p.donorRef || '') : '',
         responsableId: String(p.responsableId || '')
       });
     });
@@ -575,11 +583,12 @@
     const panel = document.getElementById(PANEL_ID);
     if(!panel || panel.classList.contains('hidden')) return;
     const activePlan = document.getElementById(TAB_BUTTON_ID)?.classList.contains('active');
+    const otherActive = KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).some(id => document.getElementById(id)?.classList.contains('active'));
     const otherVisible = KNOWN_PANELS.filter(id => id !== PANEL_ID).some(id => {
       const el = document.getElementById(id);
-      return el && !el.classList.contains('hidden') && el.offsetParent !== null;
+      return el && !el.classList.contains('hidden') && (el.offsetParent !== null || id === 'tabMapaProductos');
     });
-    if(!activePlan && otherVisible) hidePlanificacion();
+    if(!activePlan || otherActive || otherVisible) hidePlanificacion();
   }
   function showPlanificacion(){
     if(!isGD()){
@@ -595,7 +604,7 @@
     initForm();
     unlockPlanControls();
     syncPlanTopButton();
-    setTimeout(() => document.getElementById(PANEL_ID)?.scrollIntoView({behavior:'smooth', block:'start'}), 20);
+    // No forzamos scroll al abrir para evitar el pequeño salto visual de la ventana.
     return false;
   }
   function hideByRole(){
@@ -628,7 +637,7 @@
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
-    const key = `__cePlanV336_${eventName}`;
+    const key = `__cePlanV337_${eventName}`;
     if(element[key]) return;
     element[key] = true;
     element.addEventListener(eventName, handler, options);
@@ -643,11 +652,20 @@
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
-    if(!document.__cePlanMobileClickV336){
-      document.__cePlanMobileClickV336 = true;
+    if(!document.__cePlanMobileClickV337){
+      document.__cePlanMobileClickV337 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
         if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
+      }, true);
+    }
+    if(!document.__cePlanHideOtherTabsV337){
+      document.__cePlanHideOtherTabsV337 = true;
+      document.addEventListener('click', event => {
+        const target = event.target?.closest?.('button[id], .mobile-menu-action[data-target]');
+        if(!target) return;
+        const id = target.id || target.dataset?.target || '';
+        if(id && id !== TAB_BUTTON_ID && KNOWN_BUTTONS.includes(id)) setTimeout(hidePlanificacion, 0);
       }, true);
     }
   }
