@@ -1,11 +1,11 @@
-/* ControlEvent v40.1 - Ajustes finales
+/* ControlEvent v41.0 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v40.1';
-  const VERSION_FILE = 'ControlEvent_v40_1';
+  const VERSION = 'ControlEvent v41.0';
+  const VERSION_FILE = 'ControlEvent_v41_0';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);
@@ -111,6 +111,99 @@
     return el ? el.value : '';
   }
 
+  function setTabDonaciones(){
+    try{ currentMainTab = 'donaciones'; showDonacionesEvent = true; }catch(_){ }
+    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = 'donaciones'; }catch(_){ }
+  }
+  function parseEuroSafe(value){
+    try{ if(typeof parseEuroInput === 'function') return parseEuroInput(value); }catch(_){ }
+    try{ if(typeof parseEuro === 'function') return parseEuro(value); }catch(_){ }
+    return num(value);
+  }
+  function donationInputProduct(){ return String($('donProducto')?.value || ''); }
+  function donationInputDonor(){ return String($('donDonante')?.value || ''); }
+  function sameDonationKey(row, productId, donorRef, selfId){
+    if(!row || !isDonation(ticket(row))) return false;
+    if(selfId && String(row.id || '') === String(selfId)) return false;
+    return String(row.eventId || '') === selectedId()
+      && String(row.productoId || '') === String(productId || '')
+      && String(row.donorRef || '') === String(donorRef || '');
+  }
+  function findDonationDuplicate(productId, donorRef, selfId){
+    if(!productId) return null;
+    return arr('compras').find(row => sameDonationKey(row, productId, donorRef, selfId)) || null;
+  }
+  function locateDonationRow(id){
+    const safe = (window.CSS && CSS.escape) ? CSS.escape(String(id || '')) : String(id || '').replace(/"/g,'\\"');
+    return document.getElementById('donacionRow_' + id)
+      || document.querySelector(`#donacionesList select[data-action="edit-donacion-producto"][data-id="${safe}"]`)?.closest?.('.itemcard')
+      || document.querySelector(`#donacionesList [data-id="${safe}"]`)?.closest?.('.itemcard');
+  }
+  function jumpToDonation(row){
+    if(!row) return false;
+    setTabDonaciones();
+    renderNow();
+    setTimeout(() => highlight(locateDonationRow(row.id)), 100);
+    return true;
+  }
+  function resetDonationInputs(){
+    ['donProducto','donDonante','donResponsable'].forEach(id => { const el = $(id); if(el) el.value = ''; });
+    if($('donUnidades')) $('donUnidades').value = '1.00';
+    if($('donPrecio')) $('donPrecio').value = '0,00 €';
+    if($('donImporte')) $('donImporte').value = '';
+    try{ if($('donTicket') && typeof DONATION_TICKET_OPTIONS !== 'undefined') $('donTicket').value = DONATION_TICKET_OPTIONS[0]; }catch(_){ }
+  }
+
+  function installDonationDuplicateGuard(){
+    // v41.0: la duplicidad de donaciones se comprueba solo ANTES de insertar.
+    // Tras una alta nueva no se busca ni se salta al registro recién creado.
+    if(!window.__ceV410DonationChangeGuardInstalled){
+      window.__ceV410DonationChangeGuardInstalled = true;
+      window.addEventListener('change', ev => {
+        const t = ev.target;
+        if(!t || t.id !== 'donProducto') return;
+        try{ if(typeof isLocked === 'function' && isLocked()) return; }catch(_){ }
+        try{ if(typeof updateDonationPreview === 'function') updateDonationPreview(true); else window.updateDonationPreview?.(true); }catch(_){ }
+        ev.stopPropagation();
+        ev.stopImmediatePropagation();
+      }, true);
+    }
+
+    const addDonationV41 = function(){
+      try{ if(typeof selectedEvent === 'function' && !selectedEvent()) return; }catch(_){ if(!selectedId()) return; }
+      const productId = donationInputProduct();
+      if(!productId) return;
+      const donorRef = donationInputDonor();
+      const found = findDonationDuplicate(productId, donorRef, '');
+      if(found){
+        alert(`Ya existe esta donación con el mismo Producto + Donante.\n\nProducto: ${productName(found)}\nDonante: ${donorName(found)}\n\nSe muestra el registro existente para modificarlo si procede.`);
+        jumpToDonation(found);
+        return;
+      }
+      const p = product(productId);
+      const rec = {
+        id: (typeof uid === 'function' ? uid() : ('id_' + Date.now() + '_' + Math.random().toString(36).slice(2))),
+        eventId: selectedId(),
+        productoId: productId,
+        unidades: num($('donUnidades')?.value || 0),
+        precio: parseEuroSafe($('donPrecio')?.value || p.defaultPrecio || p.precio || 0),
+        ticketDonacion: $('donTicket')?.value || 'DONADO TIENDA',
+        donorRef: donorRef,
+        responsableId: $('donResponsable')?.value || ''
+      };
+      if(!Array.isArray(st().compras)) st().compras = [];
+      st().compras.push(rec);
+      saveNow();
+      resetDonationInputs();
+      setTabDonaciones();
+      renderNow();
+      setTimeout(() => { try{ $('donProducto')?.focus?.({preventScroll:true}); }catch(_){} }, 80);
+    };
+    addDonationV41.__ceV41 = true;
+    try{ window.addDonation = addDonationV41; }catch(_){ }
+    try{ addDonation = addDonationV41; }catch(_){ }
+  }
+
   function installCompraTicketDuplicateGuard(){
     // Neutraliza el salto antiguo Producto+Tienda en el cambio de desplegables. En v40 la clave incluye Ticket.
     if(!window.__ceV401ChangeGuardInstalled){
@@ -156,7 +249,9 @@
       saveNow();
       setTabCompras();
       renderNow();
-      setTimeout(() => highlight(locateCompraRow(rec.id)), 120);
+      // v41.0: en altas nuevas no se salta al registro recién creado.
+      // Solo se posiciona sobre el registro cuando se detecta duplicado antes de insertar.
+      setTimeout(() => { try{ $('buyProducto')?.focus?.({preventScroll:true}); }catch(_){} }, 80);
     };
     addCompraV40.__ceV40 = true;
     try{ window.addCompra = addCompraV40; }catch(_){ }
@@ -183,6 +278,30 @@
     }
   }
 
+  function activeMaintenancePanel(){
+    return document.querySelector('#mtPersonas:not(.hidden),#mtTiendas:not(.hidden),#mtProductos:not(.hidden)');
+  }
+  function forceScrollMaintenanceTop(){
+    const target = activeMaintenancePanel() || document.getElementById('maintenancePanel') || document.getElementById('mantenimiento') || document.body;
+    const scrollTop = el => {
+      try{
+        if(!el) return;
+        if(el === window){ window.scrollTo({top:0, left:0, behavior:'smooth'}); return; }
+        if(typeof el.scrollTo === 'function') el.scrollTo({top:0, left:0, behavior:'smooth'});
+        else el.scrollTop = 0;
+      }catch(_){ try{ if(el && el !== window) el.scrollTop = 0; }catch(__){} }
+    };
+    const nodes = [window, document.scrollingElement, document.documentElement, document.body, target];
+    ['main','.app-shell','.app-main','#app','#maintenancePanel','#mantenimiento','.maintenance-panel','.maintenance-tabs'].forEach(sel => {
+      try{ const el = document.querySelector(sel); if(el) nodes.push(el); }catch(_){ }
+    });
+    nodes.forEach(scrollTop);
+    try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ }
+    [120,320,650].forEach(ms => setTimeout(() => {
+      nodes.forEach(el => { try{ if(el === window) window.scrollTo({top:0,left:0,behavior:'auto'}); else if(el) el.scrollTop = 0; }catch(_){ } });
+      try{ target.scrollIntoView({block:'start'}); }catch(_){ }
+    }, ms));
+  }
   function ensureMaintenanceTopButton(){
     let btn = $('ceMaintFloatingTopV40');
     if(!btn){
@@ -193,19 +312,17 @@
       btn.textContent = '⌂';
       btn.title = 'Volver al inicio';
       btn.setAttribute('aria-label','Volver al inicio en mantenimiento');
-      btn.addEventListener('click', ev => {
-        ev.preventDefault(); ev.stopPropagation();
-        const target = document.querySelector('#mtPersonas:not(.hidden),#mtTiendas:not(.hidden),#mtProductos:not(.hidden)') || document.getElementById('maintenancePanel') || document.getElementById('mantenimiento') || document.body;
-        const scrollTop = el => { try{ if(el && typeof el.scrollTo === 'function') el.scrollTo({top:0, behavior:'smooth'}); }catch(_){} };
-        scrollTop(window);
-        scrollTop(document.scrollingElement || document.documentElement);
-        ['main','.app-shell','.app-main','#app','#maintenancePanel','#mantenimiento'].forEach(sel => { try{ scrollTop(document.querySelector(sel)); }catch(_){} });
-        try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(__){} }
-        setTimeout(() => { try{ target.scrollIntoView({block:'start'}); }catch(_){} }, 260);
-      });
+      const handler = ev => {
+        try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
+        forceScrollMaintenanceTop();
+        return false;
+      };
+      btn.addEventListener('click', handler, true);
+      btn.addEventListener('pointerup', handler, true);
+      btn.addEventListener('touchend', handler, {capture:true, passive:false});
       document.body.appendChild(btn);
     }
-    const visiblePanel = document.querySelector('#mtPersonas:not(.hidden),#mtTiendas:not(.hidden),#mtProductos:not(.hidden)');
+    const visiblePanel = activeMaintenancePanel();
     const maintOpen = !!visiblePanel && !document.body.classList.contains('auth-open');
     btn.hidden = !maintOpen;
     btn.classList.toggle('is-visible', maintOpen);
@@ -217,8 +334,9 @@
     style.id = 'ceV40Style';
     style.textContent = `
       .ce-v40-found{outline:3px solid rgba(146,64,14,.78)!important; box-shadow:0 0 0 7px rgba(251,191,36,.18)!important;}
-      .ce-maint-floating-top-v40{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:9997;width:46px;height:46px;border-radius:999px;border:1px solid rgba(148,163,184,.55);background:rgba(255,255,255,.96);color:#0f172a;font-size:24px;font-weight:900;box-shadow:0 12px 26px rgba(15,23,42,.24);cursor:pointer;display:none;align-items:center;justify-content:center;}
+      .ce-maint-floating-top-v40{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:99997;width:46px;height:46px;border-radius:999px;border:1px solid rgba(148,163,184,.55);background:rgba(255,255,255,.96);color:#0f172a;font-size:24px;font-weight:900;line-height:1;box-shadow:0 12px 26px rgba(15,23,42,.24);cursor:pointer;display:none;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
       .ce-maint-floating-top-v40.is-visible{display:flex;}
+      @media (max-width:760px){.ce-maint-floating-top-v40{top:auto;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);transform:none;width:44px;height:44px;font-size:22px;}}
       .mapa-donation-delivered{border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:999px;padding:5px 10px;font-weight:800;white-space:nowrap;cursor:pointer;}
       .mapa-donation-delivered.is-delivered{background:#dcfce7;border-color:#86efac;color:#166534;}
       .donation-delivered-cell{display:flex;align-items:center;justify-content:flex-end;min-width:120px;}
@@ -432,7 +550,7 @@
     const productCode = makeCodes(scoped.productos, 'PR');
     function make(name, headers, data){ const ws = x.ws(name, headers.map(h => Math.max(14, Math.min(38, String(h).length + 5)))); x.title(ws,1,name,headers.length); x.headers(ws,3,headers); let r = 4; data.forEach(row => { row.forEach((v,i) => x.text(ws,r,i+1,v)); r += 1; }); x.autoFilter(ws,3,headers.length); return ws; }
     const selectedTitle = scope === 'TODOS' ? 'TODOS' : (scoped.eventos[0]?.titulo || scope);
-    make('METADATOS',['CAMPO','VALOR'],[['VERSION',VERSION],['ALCANCE',scope === 'TODOS' ? 'TODOS' : selectedTitle],['EVENTO_CODIGO',scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || '')],['FECHA_DESCARGA',`${t.dd}/${t.mm}/${t.yyyy} ${t.hh}:${t.mi}:${t.ss}`],['NOTA','Backup v40.1 generado en cliente. Incluye hoja JSON_COMPLETO para conservar campos no tabulares.']]);
+    make('METADATOS',['CAMPO','VALOR'],[['VERSION',VERSION],['ALCANCE',scope === 'TODOS' ? 'TODOS' : selectedTitle],['EVENTO_CODIGO',scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || '')],['FECHA_DESCARGA',`${t.dd}/${t.mm}/${t.yyyy} ${t.hh}:${t.mi}:${t.ss}`],['NOTA','Backup v41.0 generado en cliente. Incluye hoja JSON_COMPLETO para conservar campos no tabulares.']]);
     make('EVENTOS',['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_DESCRIPCION','EVENTO_SITUACION'], scoped.eventos.map(e => [eventCode[e.id] || '', e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.descripcion || '', e.situacion || '']));
     make('PERSONAS',['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id] || '', p.id || '', p.nombre || '', p.rango || '']));
     make('TIENDAS',['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(ti => [storeCode[ti.id] || '', ti.id || '', ti.nombre || '']));
@@ -459,15 +577,15 @@
       if(typeof window.exportExcel === 'function') return window.exportExcel();
     }catch(err){ return Promise.reject(err); }
     try{
-      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v40.1-legacy-infoevento'});
+      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v41.0-legacy-infoevento'});
     }catch(err){ return Promise.reject(err); }
     alert('INFOEVENTO no está disponible todavía. Espera a que termine de cargar la app y vuelve a intentarlo.');
   }
 
   function installExcelGuards(){
-    // v40.1: NO sustituimos INFOEVENTO. Se deja el motor legacy protegido,
+    // v41.0: NO sustituimos INFOEVENTO. Se deja el motor legacy protegido,
     // que es el que genera RESUMEN/GRAFICAS con protección y estructura completa.
-    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v40.1] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
+    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v41.0] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
     backup.__ceV40 = true;
     try{ window.exportSeedWorkbook = backup; }catch(_){ }
     try{ exportSeedWorkbook = backup; }catch(_){ }
@@ -504,13 +622,14 @@
     injectStyle();
     applyVersion();
     installCompraTicketDuplicateGuard();
+    installDonationDuplicateGuard();
     installExcelGuards();
     ensureMaintenanceTopButton();
   }
 
-  window.ControlEventV40 = {version: VERSION, install, exportInfoEvento: exportInfoEventoLegacy, exportBackup: exportBackupV40, duplicateKey:'producto+tienda+ticket'};
+  window.ControlEventV40 = {version: VERSION, install, exportInfoEvento: exportInfoEventoLegacy, exportBackup: exportBackupV40, duplicateKey:'producto+tienda+ticket', donationDuplicateKey:'producto+donante', addNewDoesNotJump:true};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   document.addEventListener('scroll', () => ensureMaintenanceTopButton(), true);
-  document.addEventListener('click', () => setTimeout(() => { applyVersion(); ensureMaintenanceTopButton(); installCompraTicketDuplicateGuard(); installExcelGuards(); }, 60), true);
+  document.addEventListener('click', () => setTimeout(() => { applyVersion(); ensureMaintenanceTopButton(); installCompraTicketDuplicateGuard(); installDonationDuplicateGuard(); installExcelGuards(); }, 60), true);
   [0,120,500,1200,2500].forEach(ms => setTimeout(install, ms));
 })();

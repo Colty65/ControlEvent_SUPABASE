@@ -1,9 +1,9 @@
-/* ControlEvent v40.1 - Mapa de recursos
+/* ControlEvent v41.0 - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v40.1';
+  const VERSION = 'ControlEvent v41.0';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -571,6 +571,7 @@
     const target = document.querySelector('#tabMapaProductos .mapa-productos-card') || document.getElementById('tabMapaProductos') || document.getElementById('mainTabs');
     if(!target) return false;
     scrollToElementStrong(target);
+    [140,320,650].forEach(ms => setTimeout(() => scrollToElementStrong(target), ms));
     return true;
   }
   function ensureFloatingHomeButton(){
@@ -584,8 +585,9 @@
       btn.setAttribute('aria-label', 'Volver al inicio del Mapa de recursos');
       btn.title = 'Volver al inicio';
       btn.textContent = '⌂';
-      btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToMapaTop(); }, true);
-      btn.addEventListener('pointerup', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } scrollToMapaTop(); }, true);
+      btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, true);
+      btn.addEventListener('pointerup', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, true);
+      btn.addEventListener('touchend', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, {capture:true, passive:false});
       document.body.appendChild(btn);
     }
     const shouldShow = !isAuthVisible() && currentTab() === TAB_NAME && hasEvent() && !!document.getElementById(PANEL_ID) && !document.getElementById(PANEL_ID).classList.contains('hidden');
@@ -663,7 +665,7 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
-        ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `TKxx: ${moneyFmt(eventSummary.totalCompraTk || 0)} · Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
+        ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
@@ -862,5 +864,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v400', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, toggleDonationDelivered, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v410', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, toggleDonationDelivered, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

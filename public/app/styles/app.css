@@ -1594,3 +1594,25 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .plan-product-grid.replica-grid{grid-template-columns:repeat(6,minmax(0,1fr));}
 @media (max-width:1000px){.plan-product-grid.replica-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media (max-width:620px){.plan-product-grid.replica-grid{grid-template-columns:1fr;}}
+
+
+/* ControlEvent v41.0 - posición reforzada de casitas flotantes */
+#ceMapaFloatingHomeButton.mapa-floating-home,
+.ce-maint-floating-top-v40{
+  position:fixed;
+  right:18px;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:99997;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+@media (max-width:760px){
+  #ceMapaFloatingHomeButton.mapa-floating-home,
+  .ce-maint-floating-top-v40{
+    top:auto;
+    right:14px;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 82px);
+    transform:none;
+  }
+}

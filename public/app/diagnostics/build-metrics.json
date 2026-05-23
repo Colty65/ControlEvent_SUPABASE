@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v40.1",
+  "version": "ControlEvent v41.0",
   "base": "v30.6",
-  "notes": "v40.1: panel de recursos con donaciones no repetidas, compras por producto+tienda+ticket, boton entregado en donaciones y correctivos INFOEVENTO/backup.",
+  "notes": "v41.0: tarjetas de Mapa de recursos muestran GASTADO/Pte.Compra, GASTOS CORRIENTES cuentan como gastado, altas de compras/donaciones no saltan al registro nuevo, casitas flotantes reposicionadas y reforzadas.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v40.1"
+  "build": "v41.0"
 }
