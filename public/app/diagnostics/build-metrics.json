@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v33.7",
+  "version": "ControlEvent v40.0",
   "base": "v30.6",
-  "notes": "v33.7 permite crear evento real desde una réplica de evento finalizado y añade baja segura de evento en cascada controlada.",
+  "notes": "v40.0: panel de recursos con donaciones no repetidas, compras por producto+tienda+ticket, boton entregado en donaciones y correctivos INFOEVENTO/backup.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v33.7"
+  "build": "v40.0"
 }

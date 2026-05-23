@@ -1,9 +1,9 @@
-/* ControlEvent v31.10 - Mapa de recursos
-   Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados.
-   V31.10: refuerzo del marcado comprado tras cambio de evento. */
+/* ControlEvent v40.0 - Mapa de recursos
+   Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
+   la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v31.10';
+  const VERSION = 'ControlEvent v40.0';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -145,6 +145,28 @@
   function writeShoppingChecked(set){
     try{ localStorage.setItem(shoppingStorageKey(), JSON.stringify(Array.from(set || []))); }catch(_){ }
   }
+  function isDonationDelivered(row){
+    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ'));
+  }
+  function setDonationDelivered(row, delivered){
+    if(!row) return false;
+    row.donacionEntregada = !!delivered;
+    try{ if(typeof saveState === 'function') saveState(); else if(window.saveState) window.saveState(); }catch(_){ }
+    try{ if(typeof render === 'function') render(); else if(window.render) window.render(); }catch(_){ renderMapaProductos(); }
+    return true;
+  }
+  function toggleDonationDelivered(id){
+    const row = arr('compras').find(item => String(item?.id || '') === String(id || ''));
+    if(!row) return false;
+    setDonationDelivered(row, !isDonationDelivered(row));
+    return true;
+  }
+  function renderDonationDeliveredButton(item){
+    const id = item?.row?.id || item?.id || '';
+    if(!id) return '';
+    const delivered = isDonationDelivered(item?.row);
+    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}">${delivered ? '✓ Entregado' : '○ Marcar entregado'}</button>`;
+  }
   function toggleShoppingChecked(key){
     const k = String(key || '');
     if(!k) return false;
@@ -221,6 +243,7 @@
       const unidades = Number(row.unidades || 0);
       const valor = rowValue(row);
       donationByProduct.get(pid).push({
+        id: row.id || '',
         row,
         producto: productName(row),
         donor: donorName(row),
@@ -228,7 +251,8 @@
         valor,
         precioUnitario: unitPriceFrom(unidades, valor),
         tipo: row.ticketDonacion || 'Donación',
-        responsable: responsibleName(row)
+        responsable: responsibleName(row),
+        entregada: isDonationDelivered(row)
       });
     });
 
@@ -268,18 +292,17 @@
     });
 
     const result = Array.from(groups.values()).map(group => {
-      const donationRows = (donationByProduct.get(group.productoId) || []).slice().sort((a,b)=>a.donor.localeCompare(b.donor,'es'));
-      const unidadesDonadas = donationRows.reduce((sum, item) => sum + Number(item.unidades || 0), 0);
-      const valorDonado = donationRows.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+      const allDonationRows = (donationByProduct.get(group.productoId) || []).slice().sort((a,b)=>a.donor.localeCompare(b.donor,'es'));
       return {
         ...group,
-        donationRows,
-        unidadesDonadas,
-        valorDonado,
+        allDonationRows,
+        donationRows: [],
+        unidadesDonadas: 0,
+        valorDonado: 0,
         precioCompra: unitPriceFrom(group.unidadesCompra, group.importeCompra),
-        precioDonado: unitPriceFrom(unidadesDonadas, valorDonado),
-        necesidadUnidades: Number(group.unidadesCompra || 0) + unidadesDonadas,
-        necesidadValor: Number(group.importeCompra || 0) + valorDonado
+        precioDonado: 0,
+        necesidadUnidades: Number(group.unidadesCompra || 0),
+        necesidadValor: Number(group.importeCompra || 0)
       };
     }).sort((a,b) => {
       const tienda = a.tienda.localeCompare(b.tienda, 'es'); if(tienda !== 0) return tienda;
@@ -288,16 +311,29 @@
       return a.producto.localeCompare(b.producto, 'es');
     });
 
-    // V31.2: la zona inferior "PRODUCTOS DONADOS" lista TODOS los productos con donación
-    // del filtro actual, no solo los que no tienen compra planificada. Así la ficha
-    // "Donado producto" y la cabecera inferior hablan del mismo conjunto de datos.
+    // V40.0: una donación asociada a un producto con compra se muestra solo en la primera ficha
+    // de compra de ese producto. Las siguientes compras del mismo producto no repiten esas donaciones.
+    const donationProductsAlreadyShown = new Set();
+    result.forEach(group => {
+      if(!group.allDonationRows.length || donationProductsAlreadyShown.has(group.productoId)) return;
+      group.donationRows = group.allDonationRows.slice();
+      group.unidadesDonadas = group.donationRows.reduce((sum, item) => sum + Number(item.unidades || 0), 0);
+      group.valorDonado = group.donationRows.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+      group.precioDonado = unitPriceFrom(group.unidadesDonadas, group.valorDonado);
+      group.necesidadUnidades = Number(group.unidadesCompra || 0) + group.unidadesDonadas;
+      group.necesidadValor = Number(group.importeCompra || 0) + group.valorDonado;
+      donationProductsAlreadyShown.add(group.productoId);
+    });
+
+    // V40.0: la zona inferior solo lista producto donado que no tiene ninguna necesidad
+    // de compra en el listado actual. Las donaciones ya asociadas visualmente a compra no se repiten.
     const productIdsWithCompra = new Set(result.map(group => group.productoId));
     const onlyDonations = Array.from(donationByProduct.entries())
+      .filter(([productId]) => !productIdsWithCompra.has(productId))
       .map(([productId, items]) => {
         const first = items[0]?.row || {productoId};
         const unidadesDonadas = items.reduce((sum, item) => sum + Number(item.unidades || 0), 0);
         const valorDonado = items.reduce((sum, item) => sum + Number(item.valor || 0), 0);
-        const hasCompraPlanificada = productIdsWithCompra.has(productId);
         return {
           productId,
           producto: productName(first),
@@ -306,7 +342,7 @@
           unidadesDonadas,
           valorDonado,
           precioDonado: unitPriceFrom(unidadesDonadas, valorDonado),
-          origen: hasCompraPlanificada ? 'Donación asociada a compra' : 'Solo donación',
+          origen: 'Producto donado fuera de necesidad de compra',
           donationRows: items.sort((a,b)=>a.donor.localeCompare(b.donor,'es'))
         };
       })
@@ -414,6 +450,7 @@
         <div><strong>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</strong><span>precio</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
         <div><strong>${esc(item.responsable || '—')}</strong><span>resp.</span></div>
+        <div class="donation-delivered-cell">${renderDonationDeliveredButton(item)}</div>
       </div>`).join('')}</div>`;
   }
 
@@ -424,6 +461,7 @@
         <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}${item.responsable ? ' · Resp. ' + esc(item.responsable) : ''}</span></div>
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
+        <div class="donation-delivered-cell">${renderDonationDeliveredButton(item)}</div>
       </div>`).join('')}</div>`;
   }
 
@@ -564,6 +602,12 @@
   function dataProductText(parts){ return esc(parts.filter(Boolean).join(' · ')); }
 
   function handleMapaInternalAction(event){
+    const donationToggle = event.target?.closest?.('#tabMapaProductos [data-mapa-donation-toggle="1"]');
+    if(donationToggle){
+      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
+      toggleDonationDelivered(donationToggle.getAttribute('data-donation-id') || '');
+      return true;
+    }
     const shop = event.target?.closest?.('#tabMapaProductos [data-mapa-shop-toggle="1"]');
     if(shop){
       return activateShoppingButton(shop, event);
@@ -668,7 +712,7 @@
     const donationHeaderValue = data.onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
     const onlyDonationBlock = data.onlyDonations.length ? `
       <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
-        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>${esc(String(donationHeaderCount))} PRODUCTOS DONADOS PARA LOS RESPONSABLES SELECCIONADOS. VALOR ESTIMADO ${esc(moneyFmt(donationHeaderValue))}</strong></div>
+        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>MAS PRODUCTO DONADO FUERA DE NECESIDAD DE COMPRA · ${esc(String(donationHeaderCount))} PRODUCTOS · VALOR ESTIMADO ${esc(moneyFmt(donationHeaderValue))}</strong></div>
         ${data.onlyDonations.map(item => {
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
           const searchText = dataProductText([item.producto, item.segmento, item.destino, donorTxt]);
@@ -817,5 +861,5 @@
   })();
   // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
-  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v3110', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
+  window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v400', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, toggleDonationDelivered, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();
