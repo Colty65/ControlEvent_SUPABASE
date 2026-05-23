@@ -1,0 +1,31 @@
+{
+  "version": "ControlEvent v40.1",
+  "base": "ControlEvent v40.0",
+  "notes": [
+    "Restaurado INFOEVENTO legacy protegido; el parche v40 ya no intercepta #btnExportExcel.",
+    "Backup v40 se mantiene e intercepta solo descarga de datos.",
+    "GASTOS CORRIENTES computa como gasto realizado, no pendiente.",
+    "Mapa de recursos limpia la cabecera de producto donado fuera de necesidad.",
+    "Boton flotante casita solo en PERSONAS/PRODUCTOS/TIENDAS."
+  ],
+  "changed_files": [
+    "PATCH_MANIFEST_V40_1.json",
+    "README_V40_1.md",
+    "index.html",
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/domain/agrupacion-calculos.js",
+    "public/app/features/event-delete-cascade-v33.7.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/backup.js",
+    "public/sw.js",
+    "routes/export.routes.js"
+  ]
+}

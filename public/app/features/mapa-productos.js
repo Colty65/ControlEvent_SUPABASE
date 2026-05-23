@@ -1,9 +1,9 @@
-/* ControlEvent v40.0 - Mapa de recursos
+/* ControlEvent v40.1 - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v40.0';
+  const VERSION = 'ControlEvent v40.1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -101,12 +101,15 @@
   function comprasRaw(){ const eventId = selectedId(); return arr('compras').filter(c => String(c.eventId || '') === eventId); }
   function ticketRaw(row){ return String(row?.ticketDonacion || row?.ticket || '').trim(); }
   function isTk(ticket){ return /^TK\s*\d+/i.test(String(ticket || '').trim()); }
+  function isCurrentExpenseTicket(ticket){ return up(ticket) === 'GASTOS CORRIENTES'; }
+  function isResolvedPurchaseTicket(ticket){ return isTk(ticket) || isCurrentExpenseTicket(ticket); }
   function ticketNumber(ticket){ const m = String(ticket || '').match(/^TK\s*(\d+)/i); return m ? Number(m[1]) : 999999; }
   function ticketLabel(row){
     const raw = ticketRaw(row);
     if(!raw) return 'Pte. Comprar u otros gastos';
     if(isDonation(raw)) return raw;
     if(isTk(raw)) return raw.replace(/^TK\s*/i, 'TK');
+    if(isCurrentExpenseTicket(raw)) return 'GASTOS CORRIENTES';
     const t = up(raw);
     if(t.includes('PTE') || t.includes('PENDIENTE') || t.includes('COMPRA') || t.includes('GASTO')) return 'Pte. Comprar u otros gastos';
     return raw;
@@ -227,8 +230,8 @@
     const eventBuys = rowsAll.filter(row => !isDonation(row.ticketDonacion));
     const eventDonations = rowsAll.filter(row => isDonation(row.ticketDonacion));
     const eventTotalCompra = eventBuys.reduce((sum, row) => sum + rowValue(row), 0);
-    const eventTotalCompraTk = eventBuys.filter(row => isTk(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
-    const eventTotalCompraPte = eventBuys.filter(row => !isTk(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
+    const eventTotalCompraTk = eventBuys.filter(row => isResolvedPurchaseTicket(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
+    const eventTotalCompraPte = eventBuys.filter(row => !isResolvedPurchaseTicket(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
     const eventTotalDonado = eventDonations.reduce((sum, row) => sum + rowValue(row), 0);
     const eventProductsWithDonations = new Set(eventDonations.map(row => String(row.productoId || '')).filter(Boolean)).size;
 
@@ -268,7 +271,7 @@
           tiendaId: String(store.id || ''),
           tienda: normText(store.nombre || 'Sin tienda'),
           ticket,
-          isResolvedTk: isTk(ticket),
+          isResolvedTk: isResolvedPurchaseTicket(ticket),
           ticketSort: ticketSortKey(ticket),
           productoId: String(row.productoId || ''),
           producto: normText(product.nombre || row.producto || 'Producto sin nombre'),
@@ -708,11 +711,9 @@
 
     // V31.5: la cabecera inferior de productos donados debe respetar el filtro actual de responsables.
     // La ficha superior DONADO PRODUCTO mantiene el total global del evento; esta cabecera resume solo lo listado.
-    const donationHeaderCount = Number(data.onlyDonations.length || 0);
-    const donationHeaderValue = data.onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
     const onlyDonationBlock = data.onlyDonations.length ? `
       <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
-        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>MAS PRODUCTO DONADO FUERA DE NECESIDAD DE COMPRA · ${esc(String(donationHeaderCount))} PRODUCTOS · VALOR ESTIMADO ${esc(moneyFmt(donationHeaderValue))}</strong></div>
+        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>MAS PRODUCTO DONADO FUERA DE NECESIDAD DE COMPRA</strong></div>
         ${data.onlyDonations.map(item => {
           const donorTxt = item.donationRows.map(row => row.donor).join(', ');
           const searchText = dataProductText([item.producto, item.segmento, item.destino, donorTxt]);

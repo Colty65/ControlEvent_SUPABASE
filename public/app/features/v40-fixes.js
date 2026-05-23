@@ -1,11 +1,11 @@
-/* ControlEvent v40.0 - Ajustes finales
+/* ControlEvent v40.1 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
-   - Botón flotante subir arriba en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
-   - Exportación INFOEVENTO y BACKUP con motor seguro sin recursión. */
+   - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
+   - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v40.0';
-  const VERSION_FILE = 'ControlEvent_v40_0';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);
@@ -113,8 +113,8 @@
 
   function installCompraTicketDuplicateGuard(){
     // Neutraliza el salto antiguo Producto+Tienda en el cambio de desplegables. En v40 la clave incluye Ticket.
-    if(!window.__ceV40ChangeGuardInstalled){
-      window.__ceV40ChangeGuardInstalled = true;
+    if(!window.__ceV401ChangeGuardInstalled){
+      window.__ceV401ChangeGuardInstalled = true;
       window.addEventListener('change', ev => {
         const t = ev.target;
         if(!t || !['buyProducto','buyTienda'].includes(t.id)) return;
@@ -162,8 +162,8 @@
     try{ window.addCompra = addCompraV40; }catch(_){ }
     try{ addCompra = addCompraV40; }catch(_){ }
 
-    if(!window.__ceV40CompraSaveGuardInstalled){
-      window.__ceV40CompraSaveGuardInstalled = true;
+    if(!window.__ceV401CompraSaveGuardInstalled){
+      window.__ceV401CompraSaveGuardInstalled = true;
       window.addEventListener('click', ev => {
         const btn = ev.target?.closest?.('button[data-action="save-compra"]');
         if(!btn) return;
@@ -190,13 +190,18 @@
       btn.id = 'ceMaintFloatingTopV40';
       btn.type = 'button';
       btn.className = 'ce-maint-floating-top-v40';
-      btn.textContent = '↑';
-      btn.title = 'Subir arriba';
-      btn.setAttribute('aria-label','Subir arriba en mantenimiento');
+      btn.textContent = '⌂';
+      btn.title = 'Volver al inicio';
+      btn.setAttribute('aria-label','Volver al inicio en mantenimiento');
       btn.addEventListener('click', ev => {
         ev.preventDefault(); ev.stopPropagation();
         const target = document.querySelector('#mtPersonas:not(.hidden),#mtTiendas:not(.hidden),#mtProductos:not(.hidden)') || document.getElementById('maintenancePanel') || document.getElementById('mantenimiento') || document.body;
-        try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ window.scrollTo({top:0, behavior:'smooth'}); }
+        const scrollTop = el => { try{ if(el && typeof el.scrollTo === 'function') el.scrollTo({top:0, behavior:'smooth'}); }catch(_){} };
+        scrollTop(window);
+        scrollTop(document.scrollingElement || document.documentElement);
+        ['main','.app-shell','.app-main','#app','#maintenancePanel','#mantenimiento'].forEach(sel => { try{ scrollTop(document.querySelector(sel)); }catch(_){} });
+        try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(__){} }
+        setTimeout(() => { try{ target.scrollIntoView({block:'start'}); }catch(_){} }, 260);
       });
       document.body.appendChild(btn);
     }
@@ -212,7 +217,7 @@
     style.id = 'ceV40Style';
     style.textContent = `
       .ce-v40-found{outline:3px solid rgba(146,64,14,.78)!important; box-shadow:0 0 0 7px rgba(251,191,36,.18)!important;}
-      .ce-maint-floating-top-v40{position:fixed;right:18px;bottom:82px;z-index:9997;width:46px;height:46px;border-radius:999px;border:0;background:#8f3f55;color:#fff;font-size:24px;font-weight:900;box-shadow:0 12px 26px rgba(15,23,42,.24);cursor:pointer;display:none;align-items:center;justify-content:center;}
+      .ce-maint-floating-top-v40{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:9997;width:46px;height:46px;border-radius:999px;border:1px solid rgba(148,163,184,.55);background:rgba(255,255,255,.96);color:#0f172a;font-size:24px;font-weight:900;box-shadow:0 12px 26px rgba(15,23,42,.24);cursor:pointer;display:none;align-items:center;justify-content:center;}
       .ce-maint-floating-top-v40.is-visible{display:flex;}
       .mapa-donation-delivered{border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:999px;padding:5px 10px;font-weight:800;white-space:nowrap;cursor:pointer;}
       .mapa-donation-delivered.is-delivered{background:#dcfce7;border-color:#86efac;color:#166534;}
@@ -427,7 +432,7 @@
     const productCode = makeCodes(scoped.productos, 'PR');
     function make(name, headers, data){ const ws = x.ws(name, headers.map(h => Math.max(14, Math.min(38, String(h).length + 5)))); x.title(ws,1,name,headers.length); x.headers(ws,3,headers); let r = 4; data.forEach(row => { row.forEach((v,i) => x.text(ws,r,i+1,v)); r += 1; }); x.autoFilter(ws,3,headers.length); return ws; }
     const selectedTitle = scope === 'TODOS' ? 'TODOS' : (scoped.eventos[0]?.titulo || scope);
-    make('METADATOS',['CAMPO','VALOR'],[['VERSION',VERSION],['ALCANCE',scope === 'TODOS' ? 'TODOS' : selectedTitle],['EVENTO_CODIGO',scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || '')],['FECHA_DESCARGA',`${t.dd}/${t.mm}/${t.yyyy} ${t.hh}:${t.mi}:${t.ss}`],['NOTA','Backup v40.0 generado en cliente. Incluye hoja JSON_COMPLETO para conservar campos no tabulares.']]);
+    make('METADATOS',['CAMPO','VALOR'],[['VERSION',VERSION],['ALCANCE',scope === 'TODOS' ? 'TODOS' : selectedTitle],['EVENTO_CODIGO',scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || '')],['FECHA_DESCARGA',`${t.dd}/${t.mm}/${t.yyyy} ${t.hh}:${t.mi}:${t.ss}`],['NOTA','Backup v40.1 generado en cliente. Incluye hoja JSON_COMPLETO para conservar campos no tabulares.']]);
     make('EVENTOS',['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_DESCRIPCION','EVENTO_SITUACION'], scoped.eventos.map(e => [eventCode[e.id] || '', e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.descripcion || '', e.situacion || '']));
     make('PERSONAS',['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id] || '', p.id || '', p.nombre || '', p.rango || '']));
     make('TIENDAS',['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(ti => [storeCode[ti.id] || '', ti.id || '', ti.nombre || '']));
@@ -449,41 +454,46 @@
     await makeDownload(x.wb, `${VERSION_FILE}_BACKUP_${scope === 'TODOS' ? 'TODOS' : cleanFilePart(selectedTitle)}_${t.yyyy}${t.mm}${t.dd}_${t.hh}_${t.mi}_${t.ss}.xlsx`);
   }
 
+  function exportInfoEventoLegacy(){
+    try{
+      if(typeof window.exportExcel === 'function') return window.exportExcel();
+    }catch(err){ return Promise.reject(err); }
+    try{
+      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v40.1-legacy-infoevento'});
+    }catch(err){ return Promise.reject(err); }
+    alert('INFOEVENTO no está disponible todavía. Espera a que termine de cargar la app y vuelve a intentarlo.');
+  }
+
   function installExcelGuards(){
-    const info = function(){ return exportInfoEventoV40().catch(err => { console.error('[v40] INFOEVENTO', err); alert(`No se pudo descargar INFOEVENTO.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
-    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v40] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
-    info.__ceV40 = true; backup.__ceV40 = true;
-    try{ window.exportExcel = info; }catch(_){ }
-    try{ exportExcel = info; }catch(_){ }
+    // v40.1: NO sustituimos INFOEVENTO. Se deja el motor legacy protegido,
+    // que es el que genera RESUMEN/GRAFICAS con protección y estructura completa.
+    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v40.1] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
+    backup.__ceV40 = true;
     try{ window.exportSeedWorkbook = backup; }catch(_){ }
     try{ exportSeedWorkbook = backup; }catch(_){ }
     try{
       const app = window.ControlEventApp;
-      if(app?.actions){ app.actions.exportExcel = info; app.actions.exportSeedWorkbook = backup; }
+      if(app?.actions){ app.actions.exportSeedWorkbook = backup; }
     }catch(_){ }
     try{
       const excel = window.ControlEventExcel;
       if(excel){
-        excel.downloadInfoEvento = info;
         excel.downloadBackup = backup;
-        if(typeof excel.run === 'function' && !excel.run.__ceV40){
+        if(typeof excel.run === 'function' && !excel.run.__ceV401Backup){
           const oldRun = excel.run.bind(excel);
           const patchedRun = function(name, options){
-            if(name === 'exportExcel' || name === 'infoevento') return info(options || {});
             if(name === 'exportSeedWorkbook' || name === 'backup') return backup(options || {});
             return oldRun(name, options || {});
           };
-          patchedRun.__ceV40 = true;
-          patchedRun.__ceV40Original = oldRun;
+          patchedRun.__ceV401Backup = true;
+          patchedRun.__ceV401BackupOriginal = oldRun;
           excel.run = patchedRun;
         }
       }
     }catch(_){ }
-    if(!window.__ceV40ExportClickInstalled){
-      window.__ceV40ExportClickInstalled = true;
+    if(!window.__ceV401BackupClickInstalled){
+      window.__ceV401BackupClickInstalled = true;
       window.addEventListener('click', ev => {
-        const excel = ev.target?.closest?.('#btnExportExcel,.mobile-menu-action[data-target="btnExportExcel"]');
-        if(excel){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); info(); return false; }
         const seed = ev.target?.closest?.('#btnExportSeed,.mobile-menu-action[data-target="btnExportSeed"]');
         if(seed){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); backup(); return false; }
       }, true);
@@ -498,7 +508,7 @@
     ensureMaintenanceTopButton();
   }
 
-  window.ControlEventV40 = {version: VERSION, install, exportInfoEvento: exportInfoEventoV40, exportBackup: exportBackupV40, duplicateKey:'producto+tienda+ticket'};
+  window.ControlEventV40 = {version: VERSION, install, exportInfoEvento: exportInfoEventoLegacy, exportBackup: exportBackupV40, duplicateKey:'producto+tienda+ticket'};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   document.addEventListener('scroll', () => ensureMaintenanceTopButton(), true);
   document.addEventListener('click', () => setTimeout(() => { applyVersion(); ensureMaintenanceTopButton(); installCompraTicketDuplicateGuard(); installExcelGuards(); }, 60), true);

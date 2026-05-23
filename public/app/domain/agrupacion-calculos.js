@@ -18,7 +18,7 @@ export function groupedBreakdown(app, kind){
   const rows = comprasForEvent(app);
   return baseKeysFor(app, kind, rows).map(key => {
     const matches = row => String(kind === 'segmento' ? productSegment(app, row) : productDestino(app, row)) === String(key);
-    const comprados = rows.filter(row => matches(row) && !isDonationTicket(row.ticketDonacion) && !isCurrentExpenseTicket(row.ticketDonacion) && text(row.ticketDonacion) !== '').sort((a, b) => comparePurchaseByTicketProduct(app, a, b));
+    const comprados = rows.filter(row => matches(row) && !isDonationTicket(row.ticketDonacion) && text(row.ticketDonacion) !== '').sort((a, b) => comparePurchaseByTicketProduct(app, a, b));
     const donados = rows.filter(row => matches(row) && isDonationTicket(row.ticketDonacion)).sort((a, b) => compareDonationByDonorProduct(app, a, b));
     const pendientes = rows.filter(row => matches(row) && !isDonationTicket(row.ticketDonacion) && text(row.ticketDonacion) === '').sort((a, b) => comparePurchaseByTicketProduct(app, a, b));
     const comprado = comprados.reduce((total, row) => total + purchaseValue(app, row), 0);

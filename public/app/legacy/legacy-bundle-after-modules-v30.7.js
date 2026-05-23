@@ -1,14 +1,14 @@
-/* ControlEvent v33.7 - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v40.1 - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #55. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #55. */
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -238,12 +238,12 @@
 
 ;/* ===== BEGIN legacy-inline-56-v251-core.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #56. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #56. */
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -586,12 +586,12 @@
 
 ;/* ===== BEGIN legacy-inline-57-v252-core.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #57. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #57. */
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -875,12 +875,12 @@
 
 ;/* ===== BEGIN legacy-inline-58-v253-core.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #58. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #58. */
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1230,12 +1230,12 @@
 
 ;/* ===== BEGIN legacy-inline-59-v253-final-clean.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #59. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #59. */
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1555,12 +1555,12 @@
 
 ;/* ===== BEGIN legacy-inline-60-v254-fixes.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #60. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #60. */
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -1992,12 +1992,12 @@
 
 ;/* ===== BEGIN legacy-inline-61-v255-fixes.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #61. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #61. */
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -2412,12 +2412,12 @@
 
 ;/* ===== BEGIN legacy-inline-62-v257-fixes.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #62. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #62. */
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -2506,8 +2506,12 @@
     const b = budget();
     const op = b.operativa || {};
     const donation = num(b.donacionProducto?.valorDonado ?? sum(compras().filter(c => isDonation(ticket(c))).map(value)));
-    const gastosRealizados = num(op.gastosRealizados) || num(op.gastoCompras) + num(op.gastosOrganizacion) || sum(compras().filter(c => !isDonation(ticket(c)) && (ticket(c) && !isCurrent(ticket(c)))).map(value));
-    const pendiente = num(op.pendiente) || sum(compras().filter(c => !isDonation(ticket(c)) && (!ticket(c) || isCurrent(ticket(c)))).map(value));
+    const hasOpValue = v => v !== undefined && v !== null && String(v).trim() !== '';
+    const gastosRealizados = hasOpValue(op.gastosRealizados) ? num(op.gastosRealizados)
+      : ((hasOpValue(op.gastoCompras) || hasOpValue(op.gastosOrganizacion)) ? num(op.gastoCompras) + num(op.gastosOrganizacion)
+        : sum(compras().filter(c => !isDonation(ticket(c)) && ticket(c)).map(value)));
+    const pendiente = hasOpValue(op.pendiente) ? num(op.pendiente)
+      : sum(compras().filter(c => !isDonation(ticket(c)) && !ticket(c)).map(value));
     const gastosPrevistos = num(op.gastosPrevistos) || gastosRealizados + pendiente;
     const presupuesto = num(op.presupuesto ?? op.ingresos ?? b.ingresosDinero?.totalComprometido ?? sum(collabs().map(c => c.total)));
     const ingresoDinero = num(op.ingresoDinero ?? b.ingresosDinero?.totalIngresado ?? sum(collabs().filter(c => up(c.situacion) !== 'PENDIENTE').map(c => c.total)));
@@ -2529,7 +2533,7 @@
       if(!map.has(label)) map.set(label, {label, comprado:0, donado:0, pendiente:0, total:0});
       const row = map.get(label), v = value(c), tk = ticket(c);
       if(isDonation(tk)) row.donado += v;
-      else if(!tk || isCurrent(tk)) row.pendiente += v;
+      else if(!tk) row.pendiente += v;
       else row.comprado += v;
       row.total += v;
     });
@@ -2581,10 +2585,40 @@
     }
     return '';
   }
+  async function compactInfoEventoImageDataUrl(dataUrl){
+    const val = norm(dataUrl);
+    if(!/^data:image\//i.test(val)) return val;
+    return await new Promise(resolve => {
+      try{
+        const img = new Image();
+        img.onload = () => {
+          try{
+            const w = img.naturalWidth || img.width || 0;
+            const h = img.naturalHeight || img.height || 0;
+            if(!w || !h) return resolve(val);
+            const maxSide = 1200;
+            const maxPixels = 1200 * 900;
+            const ratio = Math.min(1, maxSide / Math.max(w, h), Math.sqrt(maxPixels / Math.max(1, w * h)));
+            if(ratio >= 0.98 && val.length < 900000) return resolve(val);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(w * ratio));
+            canvas.height = Math.max(1, Math.round(h * ratio));
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return resolve(val);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.78));
+          }catch(_){ resolve(val); }
+        };
+        img.onerror = () => resolve(val);
+        img.src = val;
+      }catch(_){ resolve(val); }
+    });
+  }
+
   async function sourceToData(src){
     const val = norm(src);
     if(!val) return '';
-    if(/^data:image\//i.test(val)) return val;
+    if(/^data:image\//i.test(val)) return await compactInfoEventoImageDataUrl(val);
     try{ if(typeof sourceToDataUrl === 'function') return await sourceToDataUrl(val); }catch(_){ }
     try{
       const res = await fetch(val, {cache:'no-store'});
@@ -2592,7 +2626,7 @@
       const blob = await res.blob();
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onload = () => { const out = String(reader.result || ''); compactInfoEventoImageDataUrl(out).then(resolve).catch(() => resolve(out)); };
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
@@ -2973,12 +3007,12 @@
               sort:false, autoFilter:false, pivotTables:false, objects:false, scenarios:false
             });
           }catch(protectError){
-            console.warn('[ControlEvent v33.7] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
+            console.warn('[ControlEvent v40.1] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
           }
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v33.7] No se pudo aplicar protección final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v40.1] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }
@@ -3053,12 +3087,12 @@
 
 ;/* ===== BEGIN legacy-inline-63-v259-app-facade.js ===== */
 
-/* ControlEvent v33.7 - JS legacy extraido de public/index.html. Bloque inline #63. */
+/* ControlEvent v40.1 - JS legacy extraido de public/index.html. Bloque inline #63. */
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v33.7';
-  const VERSION_FILE = 'ControlEvent_v33_7';
+  const VERSION = 'ControlEvent v40.1';
+  const VERSION_FILE = 'ControlEvent_v40_1';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
