@@ -1616,3 +1616,40 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
     transform:none;
   }
 }
+
+/* ControlEvent v41.1 - menú en una línea, casitas y móvil */
+#mainTabs{grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:5px!important;}
+#mainTabs .tab{min-width:0!important;padding:8px 8px!important;}
+#mainTabs .tab .tabicon{font-size:36px!important;line-height:1!important;}
+#toggleComprasEvent,
+.mobile-menu-action[data-target="toggleComprasEvent"]{display:none!important;}
+#comprasEventBody{display:block!important;}
+#cePlanTopFloat,.ce-plan-top-float{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#ceMapaFloatingHomeButton.mapa-floating-home,
+.ce-maint-floating-top-v40{
+  z-index:3200!important;
+  right:18px!important;
+  top:50%!important;
+  bottom:auto!important;
+  transform:translateY(-50%)!important;
+  background:rgba(255,255,255,.98)!important;
+  color:#0f172a!important;
+  border:1px solid rgba(148,163,184,.65)!important;
+}
+@media (max-width:760px){
+  #mainTabs{grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;padding:6px!important;}
+  #mainTabs .tab{min-height:48px!important;padding:6px 4px!important;border-radius:13px!important;}
+  #mainTabs .tab .tabicon{font-size:28px!important;}
+  #ceMapaFloatingHomeButton.mapa-floating-home,
+  .ce-maint-floating-top-v40{
+    top:auto!important;
+    right:14px!important;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 86px)!important;
+    transform:none!important;
+    width:44px!important;
+    height:44px!important;
+    font-size:22px!important;
+  }
+  .donation-delivered-cell{min-width:0!important;justify-content:flex-start!important;}
+  .mapa-donation-delivered{padding:7px 10px!important;min-height:38px!important;touch-action:manipulation!important;position:relative!important;z-index:3!important;}
+}

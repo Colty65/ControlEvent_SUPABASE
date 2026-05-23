@@ -1,11 +1,11 @@
-/* ControlEvent v41.0 - Ajustes finales
+/* ControlEvent v41.1 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v41.0';
-  const VERSION_FILE = 'ControlEvent_v41_0';
+  const VERSION = 'ControlEvent v41.1';
+  const VERSION_FILE = 'ControlEvent_v41_1';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);
@@ -536,40 +536,43 @@
   function ticketEventIdFromKey(key){ return String(key || '').split('|')[0] || ''; }
   function ticketInnerKeyFromKey(key){ const parts = String(key || '').split('|'); return parts.slice(1).join('|').trim(); }
   function splitLongText(text, size = 30000){ const s = String(text || ''); const out = []; for(let i=0;i<s.length;i+=size) out.push(s.slice(i,i+size)); return out.length ? out : ['']; }
+  function backupServerUrl(scope){
+    const params = new URLSearchParams({scope: scope || 'TODOS', t: String(Date.now())});
+    return `/api/export/backup?${params.toString()}`;
+  }
+  function filenameFromDisposition(disposition){
+    const text = String(disposition || '');
+    const utf = text.match(/filename\*=UTF-8''([^;]+)/i);
+    if(utf){ try{ return decodeURIComponent(utf[1]); }catch(_){ return utf[1]; } }
+    const plain = text.match(/filename="?([^";]+)"?/i);
+    return plain ? plain[1] : '';
+  }
+  async function downloadServerBackup(scope){
+    const response = await fetch(backupServerUrl(scope), {cache:'no-store'});
+    if(!response.ok){
+      let detail = '';
+      try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }
+      catch(_){ detail = await response.text().catch(()=> ''); }
+      throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
+    }
+    const blob = await response.blob();
+    if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
+    const filename = filenameFromDisposition(response.headers.get('content-disposition')) || `${VERSION_FILE}_BACKUP_${scope || 'TODOS'}.xlsx`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { try{ URL.revokeObjectURL(a.href); }catch(_){} try{ a.remove(); }catch(_){} }, 1600);
+    return {ok:true, source:'server-api-export', scope, filename, size: blob.size};
+  }
   async function exportBackupV40(){
     if(!isGD()){ alert('Solo GD puede realizar descarga de datos.'); return; }
     const scope = await chooseBackupScope();
     if(!scope) return;
-    const ExcelJS = await ensureExcelJS();
-    const scoped = scopeState(scope);
-    const x = setupBook(ExcelJS);
-    const t = stamp();
-    const eventCode = makeCodes(scoped.eventos, 'EV');
-    const personCode = makeCodes(scoped.personas, 'PE');
-    const storeCode = makeCodes(scoped.tiendas, 'TI');
-    const productCode = makeCodes(scoped.productos, 'PR');
-    function make(name, headers, data){ const ws = x.ws(name, headers.map(h => Math.max(14, Math.min(38, String(h).length + 5)))); x.title(ws,1,name,headers.length); x.headers(ws,3,headers); let r = 4; data.forEach(row => { row.forEach((v,i) => x.text(ws,r,i+1,v)); r += 1; }); x.autoFilter(ws,3,headers.length); return ws; }
-    const selectedTitle = scope === 'TODOS' ? 'TODOS' : (scoped.eventos[0]?.titulo || scope);
-    make('METADATOS',['CAMPO','VALOR'],[['VERSION',VERSION],['ALCANCE',scope === 'TODOS' ? 'TODOS' : selectedTitle],['EVENTO_CODIGO',scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || '')],['FECHA_DESCARGA',`${t.dd}/${t.mm}/${t.yyyy} ${t.hh}:${t.mi}:${t.ss}`],['NOTA','Backup v41.0 generado en cliente. Incluye hoja JSON_COMPLETO para conservar campos no tabulares.']]);
-    make('EVENTOS',['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_DESCRIPCION','EVENTO_SITUACION'], scoped.eventos.map(e => [eventCode[e.id] || '', e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.descripcion || '', e.situacion || '']));
-    make('PERSONAS',['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id] || '', p.id || '', p.nombre || '', p.rango || '']));
-    make('TIENDAS',['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(ti => [storeCode[ti.id] || '', ti.id || '', ti.nombre || '']));
-    make('PRODUCTOS',['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO','TIENDA_CODIGO'], scoped.productos.map(p => [productCode[p.id] || '', p.id || '', p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio), storeCode[p.tiendaId] || '']));
-    make('INGRESOS',['EVENTO_CODIGO','PERSONA_CODIGO','NUMERO','SITUACION','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', personCode[c.personaId] || '', num(c.numero), c.situacion || '', num(c.importe ?? c.donation)]));
-    make('COMPRAS',['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), storeCode[storeIdOf(c)] || '', personCode[c.responsableId] || '']));
-    make('DONACIONES',['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO','ENTREGADO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = norm(c.donorRef).split(':'); const kind = parts[0], id = parts.slice(1).join(':'); return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '', c.donacionEntregada ? 'SI' : 'NO']; }));
-    const ticketRows = [], partRows = [];
-    Object.entries(scoped.ticketImages || {}).forEach(([key, image]) => {
-      if(scope !== 'TODOS' && String(ticketEventIdFromKey(key)) !== String(scope)) return;
-      const data = String(image || '');
-      const parts = splitLongText(data, 30000);
-      ticketRows.push([eventCode[ticketEventIdFromKey(key)] || '', ticketInnerKeyFromKey(key), '', data.length <= 30000 ? data : '', data.length > 30000 ? 'DIVIDIDA_EN_TICKETS_PARTES' : '']);
-      parts.forEach((part, idx) => partRows.push([eventCode[ticketEventIdFromKey(key)] || '', ticketInnerKeyFromKey(key), idx + 1, parts.length, part]));
-    });
-    make('TICKETS',['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
-    make('TICKETS_PARTES',['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
-    make('JSON_COMPLETO',['COLECCION','ID','PAYLOAD_JSON'], ['eventos','personas','tiendas','productos','colaboradores','compras'].flatMap(key => scoped[key].map(row => [key, row.id || '', JSON.stringify(row)])));
-    await makeDownload(x.wb, `${VERSION_FILE}_BACKUP_${scope === 'TODOS' ? 'TODOS' : cleanFilePart(selectedTitle)}_${t.yyyy}${t.mm}${t.dd}_${t.hh}_${t.mi}_${t.ss}.xlsx`);
+    // v41.1: se vuelve al backup generado por servidor. Evita el RangeError
+    // "Maximum call stack size exceeded" provocado por crear el Excel completo en el navegador.
+    return downloadServerBackup(scope);
   }
 
   function exportInfoEventoLegacy(){
@@ -577,7 +580,7 @@
       if(typeof window.exportExcel === 'function') return window.exportExcel();
     }catch(err){ return Promise.reject(err); }
     try{
-      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v41.0-legacy-infoevento'});
+      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v41.1-legacy-infoevento'});
     }catch(err){ return Promise.reject(err); }
     alert('INFOEVENTO no está disponible todavía. Espera a que termine de cargar la app y vuelve a intentarlo.');
   }
@@ -585,8 +588,8 @@
   function installExcelGuards(){
     // v41.0: NO sustituimos INFOEVENTO. Se deja el motor legacy protegido,
     // que es el que genera RESUMEN/GRAFICAS con protección y estructura completa.
-    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v41.0] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
-    backup.__ceV40 = true;
+    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v41.1] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
+    backup.__ceV411 = true;
     try{ window.exportSeedWorkbook = backup; }catch(_){ }
     try{ exportSeedWorkbook = backup; }catch(_){ }
     try{

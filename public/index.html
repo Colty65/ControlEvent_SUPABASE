@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v41.0</title>
-  <!-- ControlEvent v41.0 PWA / instalación móvil -->
+  <title>ControlEvent v41.1</title>
+  <!-- ControlEvent v41.1 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -72,7 +72,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v41.0</span>
+          <span>ControlEvent v41.1</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -162,7 +162,7 @@
                 <p>Compras normales y otros gastos, con responsable opcional.</p>
               </div>
             </div>
-            <button type="button" class="outline" id="toggleComprasEvent">🧰</button>
+            <button type="button" class="outline hidden" id="toggleComprasEvent" aria-hidden="true" tabindex="-1">🧰</button>
           </div>
           <div id="comprasEventBody" class="collapsed-body">
             <div class="row-purchase-form entry-zone">
@@ -278,9 +278,6 @@
             </div>
           </div>
 
-          <div class="planificacion-note">
-            <strong>Versión V33.7:</strong> elegir un evento FINALIZADO, revisar ingresos, compras y donaciones de producto, y crear el evento real desde la réplica.
-          </div>
 
           <div class="planificacion-grid">
             <div class="field"><label>Nombre del evento</label><input id="planEventoTitulo" placeholder="Ej. Cumpleaños / comida peña" /></div>
@@ -512,7 +509,8 @@
 <script src="./app/features/maintenance-duplicates-v32.1.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
-<script src="./app/features/v40-fixes.js?v=41.0"></script>
+<script src="./app/features/v40-fixes.js?v=41.1"></script>
+<script src="./app/features/v41-1-fixes.js?v=41.1"></script>
 
 </body>
 </html>
