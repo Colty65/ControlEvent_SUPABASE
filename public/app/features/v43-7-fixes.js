@@ -1,8 +1,8 @@
-/* ControlEvent v43.7 - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
+/* ControlEvent v43.8 - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.7';
-  const VERSION_FILE = 'ControlEvent_v43_7';
+  const VERSION = 'ControlEvent v43.8';
+  const VERSION_FILE = 'ControlEvent_v43_8';
   const PROTECTION_PASSWORD = 'open_excel_arrastre';
   let backupBusy = false;
   let infoBusy = false;
@@ -217,7 +217,7 @@
       await protectWorkbook(wb);
       const buffer = await wb.xlsx.writeBuffer();
       downloadBuffer(buffer, `${VERSION_FILE}_INFOEVENTO-${fileSafe(currentEventTitle())}_${ymd()}.xlsx`);
-    }catch(err){ console.error('[v43.7] INFOEVENTO', err); alert(`No se pudo descargar INFOEVENTO.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }
+    }catch(err){ console.error('[v43.8] INFOEVENTO', err); alert(`No se pudo descargar INFOEVENTO.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }
     finally{ infoBusy = false; }
   }
 
@@ -234,7 +234,7 @@
     });
   }
   async function tryServerBackup(scope){
-    const res = await fetch(`/api/export/backup?scope=${encodeURIComponent(scope)}&eventId=${encodeURIComponent(selectedEventId())}&v=43.7`, {cache:'no-store'});
+    const res = await fetch(`/api/export/backup?scope=${encodeURIComponent(scope)}&eventId=${encodeURIComponent(selectedEventId())}&v=43.8`, {cache:'no-store'});
     if(!res.ok) throw new Error(await res.text().catch(()=>`HTTP ${res.status}`));
     const ct = String(res.headers.get('content-type') || '').toLowerCase();
     if(ct.includes('text/html')) throw new Error('La ruta de backup del servidor no devolvió un Excel');
@@ -268,27 +268,22 @@
       if(!scope || scope === 'cancel') return;
       if(scope !== 'all' && !currentEvent()){ alert('Selecciona un evento para descargar su backup.'); return; }
       try{ await tryServerBackup(scope); }
-      catch(serverErr){ console.warn('[v43.7] Backup servidor no disponible, se usa cliente', serverErr); await clientBackup(scope); }
-    }catch(err){ console.error('[v43.7] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }
+      catch(serverErr){ console.warn('[v43.8] Backup servidor no disponible, se usa cliente', serverErr); await clientBackup(scope); }
+    }catch(err){ console.error('[v43.8] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }
     finally{ backupBusy = false; }
   }
 
   function patchExportEntryPoints(){
-    try{ window.exportInfoEventoV437 = exportInfoEventoV437; window.exportBackupV437 = exportBackupV437; }catch(_){ }
-    try{ window.exportExcel = exportInfoEventoV437; }catch(_){ }
-    try{ window.exportSeedWorkbook = exportBackupV437; }catch(_){ }
-    try{ window.exportBackupV40 = exportBackupV437; }catch(_){ }
-    try{ if(window.ControlEventExcel && !window.ControlEventExcel.__ceV437Run){ const oldRun = window.ControlEventExcel.run?.bind(window.ControlEventExcel); window.ControlEventExcel.run = async (name, opts) => name === 'exportExcel' ? exportInfoEventoV437() : (oldRun ? oldRun(name, opts) : exportInfoEventoV437()); window.ControlEventExcel.__ceV437Run = true; } }catch(_){ }
+    // v43.8: NO se sustituyen INFOEVENTO ni BACKUP.
+    // Se mantiene el motor legacy/modular original, que es el que generaba los Excel correctos.
+    return false;
   }
+
   function captureExportClick(event){
-    const target = event.target;
-    const excel = target?.closest?.('#btnExportExcel,.mobile-menu-action[data-target="btnExportExcel"]');
-    const backup = target?.closest?.('#btnExportSeed,.mobile-menu-action[data-target="btnExportSeed"]');
-    if(!excel && !backup) return;
-    event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
-    if(excel) exportInfoEventoV437();
-    if(backup) exportBackupV437();
+    // v43.8: sin captura de exportaciones para no bloquear el motor original.
+    return false;
   }
+
 
   function normalizeMapaSummary(){
     try{
@@ -311,13 +306,8 @@
     injectStyle(); applyVersion(); hideDeleteTip(); installDeleteTipGuard(); patchExportEntryPoints(); normalizeMapaSummary();
     setTimeout(() => { hideDeleteTip(); normalizeMapaSummary(); }, 120);
   }
-  if(!window.__ceV437ClickCapture){
-    window.__ceV437ClickCapture = true;
-    window.addEventListener('click', captureExportClick, true);
-    window.addEventListener('pointerup', captureExportClick, true);
-    window.addEventListener('touchend', captureExportClick, {capture:true, passive:false});
-  }
+  // v43.8: no se instala captura de click de INFOEVENTO/BACKUP.
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
   try{ install(); }catch(_){ }
-  window.ControlEventV437 = {version:VERSION, install, exportInfoEvento:exportInfoEventoV437, exportBackup:exportBackupV437};
+  window.ControlEventV437 = {version:VERSION, install};
 })();

@@ -1,8 +1,8 @@
-/* ControlEvent v43.7 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v43.8 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.7';
-  const VERSION_FILE = 'ControlEvent_v43_7';
+  const VERSION = 'ControlEvent v43.8';
+  const VERSION_FILE = 'ControlEvent_v43_8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();
@@ -59,6 +59,15 @@
     if(el.type === 'checkbox') return el.checked ? (el.value || 'on') : '';
     return el.value ?? fallback;
   }
+
+  function valueForAny(actions, id, scope, fallback=''){
+    for(const action of actions){
+      const value = valueFor(action, id, scope, undefined);
+      if(value !== undefined) return value;
+    }
+    return fallback;
+  }
+
   function scopeForButton(btn, id){
     return btn?.closest?.('.itemcard,.rowline,.card') || document.querySelector(`[data-id="${cssEsc(id)}"]`)?.closest?.('.itemcard,.rowline,.card') || null;
   }
@@ -72,18 +81,18 @@
   function applyFieldChange(el){
     const action = el?.getAttribute?.('data-action') || '';
     const id = el?.getAttribute?.('data-id') || '';
-    if(!id || !/^edit-compra-/.test(action)) return false;
+    if(!id || !/^edit-(compra|donacion)-/.test(action)) return false;
     const row = rowById(id); if(!row) return false;
     const scope = el.closest?.('.itemcard,.rowline,.card') || null;
-    const donationContext = !!el.closest?.('#donacionesList') || isDonation(valueFor('edit-compra-ticket', id, scope, row.ticketDonacion || '')) || isDonation(row.ticketDonacion || '');
-    if(action === 'edit-compra-producto') row.productoId = el.value;
-    if(action === 'edit-compra-unidades') row.unidades = Number(el.value || 0);
-    if(action === 'edit-compra-ticket') row.ticketDonacion = el.value;
-    if(action === 'edit-compra-donante') row.donorRef = el.value;
-    if(action === 'edit-compra-responsable') row.responsableId = el.value;
+    const donationContext = !!el.closest?.('#donacionesList') || /^edit-donacion-/.test(action) || isDonation(valueForAny(['edit-donacion-ticket','edit-compra-ticket'], id, scope, row.ticketDonacion || '')) || isDonation(row.ticketDonacion || '');
+    if(action === 'edit-compra-producto' || action === 'edit-donacion-producto') row.productoId = el.value;
+    if(action === 'edit-compra-unidades' || action === 'edit-donacion-unidades') row.unidades = Number(el.value || 0);
+    if(action === 'edit-compra-ticket' || action === 'edit-donacion-ticket') row.ticketDonacion = el.value;
+    if(action === 'edit-compra-donante' || action === 'edit-donacion-donante') row.donorRef = el.value;
+    if(action === 'edit-compra-responsable' || action === 'edit-donacion-responsable') row.responsableId = el.value;
     if(action === 'edit-compra-tienda') row.tiendaId = el.value;
-    if(action === 'edit-compra-precio') row.precio = parseEuro(el.value || 0);
-    if(donationContext && !row.donorRef) row.donorRef = valueFor('edit-compra-donante', id, scope, row.donorRef || '');
+    if(action === 'edit-compra-precio' || action === 'edit-donacion-precio') row.precio = parseEuro(el.value || 0);
+    if(donationContext && !row.donorRef) row.donorRef = valueForAny(['edit-donacion-donante','edit-compra-donante'], id, scope, row.donorRef || '');
     return true;
   }
 
@@ -92,34 +101,42 @@
     const row = rowById(id);
     if(!row) return false;
     const scope = scopeForButton(btn, id);
+    const donationContext = !!btn.closest?.('#donacionesList') || isDonation(row.ticketDonacion || '');
+    if(donationContext){
+      // En DONACIONES los campos reales son edit-donacion-*. Así el refresco visual sale bien a la primera.
+      const ticket = valueForAny(['edit-donacion-ticket','edit-compra-ticket'], id, scope, row.ticketDonacion || '');
+      const productoId = valueForAny(['edit-donacion-producto','edit-compra-producto'], id, scope, row.productoId || '');
+      const unidades = Number(valueForAny(['edit-donacion-unidades','edit-compra-unidades'], id, scope, row.unidades || 0) || 0);
+      const precio = parseEuro(valueForAny(['edit-donacion-precio','edit-compra-precio'], id, scope, row.precio || 0) || 0);
+      const responsableId = valueForAny(['edit-donacion-responsable','edit-compra-responsable'], id, scope, row.responsableId || '');
+      const donorRef = valueForAny(['edit-donacion-donante','edit-compra-donante'], id, scope, row.donorRef || '');
+      row.productoId = productoId;
+      row.unidades = Number.isFinite(unidades) ? unidades : 0;
+      row.precio = Number.isFinite(precio) ? precio : 0;
+      row.ticketDonacion = ticket;
+      row.donorRef = donorRef;
+      row.responsableId = responsableId;
+      const p = productObj(productoId);
+      if(p && Number.isFinite(precio)){ p.precio = precio; p.defaultPrecio = precio; }
+      saveNow();
+      try{ if(typeof renderDonaciones === 'function') renderDonaciones(); else window.renderDonaciones?.(); }catch(_){ renderNow(); }
+      setTimeout(() => { try{ const card = document.getElementById('donacionRow_' + id); if(card) setFound(card); }catch(_){} }, 20);
+      return true;
+    }
     const ticket = valueFor('edit-compra-ticket', id, scope, row.ticketDonacion || '');
-    const donationContext = !!btn.closest?.('#donacionesList') || isDonation(ticket) || isDonation(row.ticketDonacion || '');
     const productoId = valueFor('edit-compra-producto', id, scope, row.productoId || '');
     const unidades = Number(valueFor('edit-compra-unidades', id, scope, row.unidades || 0) || 0);
     const precio = parseEuro(valueFor('edit-compra-precio', id, scope, row.precio || 0) || 0);
     const responsableId = valueFor('edit-compra-responsable', id, scope, row.responsableId || '');
     const donorRef = valueFor('edit-compra-donante', id, scope, row.donorRef || '');
-    if(donationContext){
-      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
-      const dup = null; // duplicateDonation(productoId, donorRef, id);
-      row.productoId = productoId;
-      row.unidades = Number.isFinite(unidades) ? unidades : 0;
-      if(precio) row.precio = precio;
-      row.ticketDonacion = ticket;
-      row.donorRef = donorRef;
-      row.responsableId = responsableId;
-    }else{
-      const tiendaId = valueFor('edit-compra-tienda', id, scope, row.tiendaId || '');
-      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
-      const dup = null; // duplicateCompra(productoId, tiendaId, ticket, id);
-      row.productoId = productoId;
-      row.unidades = Number.isFinite(unidades) ? unidades : 0;
-      if(precio) row.precio = precio;
-      row.ticketDonacion = ticket;
-      row.tiendaId = tiendaId;
-      row.donorRef = donorRef;
-      row.responsableId = responsableId;
-    }
+    const tiendaId = valueFor('edit-compra-tienda', id, scope, row.tiendaId || '');
+    row.productoId = productoId;
+    row.unidades = Number.isFinite(unidades) ? unidades : 0;
+    if(precio) row.precio = precio;
+    row.ticketDonacion = ticket;
+    row.tiendaId = tiendaId;
+    row.donorRef = donorRef;
+    row.responsableId = responsableId;
     const p = productObj(productoId);
     if(p && precio){ p.precio = precio; p.defaultPrecio = precio; }
     saveNow();

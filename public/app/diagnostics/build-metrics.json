@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v43.7",
+  "version": "ControlEvent v43.8",
   "base": "v30.6",
-  "notes": "v43.7: corrige exportación INFOEVENTO/BACKUP evitando llamadas recursivas, elimina falso duplicado al modificar donaciones/compras, oculta globo de borrado permanente y reordena Mapa de recursos con SALDO LÍMITE.",
+  "notes": "v43.8: corrige refresco de edición en DONACIONES y restaura INFOEVENTO/BACKUP al motor original que generaba los Excel correctos.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -17,5 +17,5 @@
     "public/app/features/v41-3-fixes.js",
     "public/app/features/v43-7-fixes.js"
   ],
-  "build": "v43.7"
+  "build": "v43.8"
 }
