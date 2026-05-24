@@ -1,8 +1,8 @@
-/* ControlEvent v41.2 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
+/* ControlEvent v41.3 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v41.2';
-  const VERSION_FILE = 'ControlEvent_v41_2';
+  const VERSION = 'ControlEvent v41.3';
+  const VERSION_FILE = 'ControlEvent_v41_3';
   const HOME_ID = 'ceGlobalFloatingHomeButton';
   let lastHomeAt = 0;
   let lastDonationToggle = {id:'', at:0};
@@ -187,15 +187,28 @@
     const n = Number(s);
     return Number.isFinite(n) ? n : 0;
   }
-  function currentValue(action, id){
+  function currentValue(action, id, scope){
     const selector = `[data-action="${escCss(action)}"][data-id="${escCss(id)}"]`;
     let nodes = [];
-    try{ nodes = Array.from(document.querySelectorAll(selector)); }catch(_){ nodes = []; }
+    try{ nodes = Array.from((scope || document).querySelectorAll(selector)); }catch(_){ nodes = []; }
+    if(!nodes.length && scope){ try{ nodes = Array.from(document.querySelectorAll(selector)); }catch(_){ nodes = []; } }
     const visible = nodes.find(isVisible) || nodes.find(el => !isHidden(el)) || nodes[0];
     if(!visible) return '';
     if(visible.tagName === 'SELECT') return visible.value;
     if(visible.type === 'checkbox') return visible.checked ? (visible.value || 'on') : '';
     return visible.value ?? '';
+  }
+  function fieldValue(actions, id, scope, fallback=''){
+    const arr = Array.isArray(actions) ? actions : [actions];
+    for(const action of arr){
+      const v = currentValue(action, id, scope);
+      if(v !== '') return v;
+    }
+    return fallback;
+  }
+  function rowScope(id){
+    const sel = `[data-id="${escCss(id)}"]`;
+    try{ return document.querySelector(`${sel}`)?.closest?.('.itemcard,.rowline,.card') || null; }catch(_){ return null; }
   }
   function compras(){ const s=st(); if(!Array.isArray(s.compras)) s.compras = []; return s.compras; }
   function isDonationTicket(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(String(ticket || '').trim().toUpperCase()); }
@@ -216,22 +229,37 @@
   function saveCompraFromDom(id){
     const c = compras().find(x => String(x?.id || '') === String(id || ''));
     if(!c) return false;
-    const productoId = currentValue('edit-compra-producto', id);
-    const unidades = Number(currentValue('edit-compra-unidades', id) || 0);
-    const precio = parseEuro(currentValue('edit-compra-precio', id) || 0);
-    const ticket = currentValue('edit-compra-ticket', id);
-    const tiendaId = currentValue('edit-compra-tienda', id);
-    const responsableId = currentValue('edit-compra-responsable', id);
-    const found = duplicateCompra(productoId, tiendaId, ticket, id);
-    if(found){ alert('No autorizado. Ya existe otra compra con el mismo Producto + Tienda + Ticket.'); return true; }
-    c.productoId = productoId;
-    c.unidades = Number.isFinite(unidades) ? unidades : 0;
-    c.precio = precio;
-    c.ticketDonacion = ticket;
-    c.tiendaId = tiendaId;
-    c.responsableId = responsableId;
+    const scope = rowScope(id);
+    const productoId = fieldValue('edit-compra-producto', id, scope, c.productoId || '');
+    const unidades = Number(fieldValue('edit-compra-unidades', id, scope, c.unidades || 0) || 0);
+    const precio = parseEuro(fieldValue('edit-compra-precio', id, scope, c.precio || 0) || 0);
+    const ticket = fieldValue('edit-compra-ticket', id, scope, c.ticketDonacion || '');
+    const responsableId = fieldValue('edit-compra-responsable', id, scope, c.responsableId || '');
+    const donorRef = fieldValue(['edit-compra-donante','edit-donacion-donante'], id, scope, c.donorRef || '');
+    const donation = isDonationTicket(ticket) || isDonationTicket(c.ticketDonacion || '') || !!scope?.closest?.('#donacionesList');
+    if(donation){
+      const found = duplicateDonacion(productoId, donorRef, id);
+      if(found){ alert('No autorizado. Ya existe otra donación con el mismo Producto + Donante.'); return true; }
+      c.productoId = productoId;
+      c.unidades = Number.isFinite(unidades) ? unidades : 0;
+      if(precio) c.precio = precio;
+      c.ticketDonacion = ticket;
+      c.donorRef = donorRef;
+      c.responsableId = responsableId;
+    }else{
+      const tiendaId = fieldValue('edit-compra-tienda', id, scope, c.tiendaId || '');
+      const found = duplicateCompra(productoId, tiendaId, ticket, id);
+      if(found){ alert('No autorizado. Ya existe otra compra con el mismo Producto + Tienda + Ticket.'); return true; }
+      c.productoId = productoId;
+      c.unidades = Number.isFinite(unidades) ? unidades : 0;
+      if(precio) c.precio = precio;
+      c.ticketDonacion = ticket;
+      c.tiendaId = tiendaId;
+      c.donorRef = donorRef;
+      c.responsableId = responsableId;
+    }
     const p = productById(productoId);
-    if(p){ p.defaultPrecio = precio; p.precio = precio; }
+    if(p && precio){ p.defaultPrecio = precio; p.precio = precio; }
     saveNow();
     renderNow();
     return true;
@@ -239,22 +267,23 @@
   function saveDonacionFromDom(id){
     const c = compras().find(x => String(x?.id || '') === String(id || ''));
     if(!c) return false;
-    const productoId = currentValue('edit-donacion-producto', id);
-    const unidades = Number(currentValue('edit-donacion-unidades', id) || 0);
-    const precio = parseEuro(currentValue('edit-donacion-precio', id) || 0);
-    const ticket = currentValue('edit-donacion-ticket', id);
-    const donorRef = currentValue('edit-donacion-donante', id);
-    const responsableId = currentValue('edit-donacion-responsable', id);
+    const scope = rowScope(id);
+    const productoId = fieldValue(['edit-donacion-producto','edit-compra-producto'], id, scope, c.productoId || '');
+    const unidades = Number(fieldValue(['edit-donacion-unidades','edit-compra-unidades'], id, scope, c.unidades || 0) || 0);
+    const precio = parseEuro(fieldValue(['edit-donacion-precio','edit-compra-precio'], id, scope, c.precio || 0) || 0);
+    const ticket = fieldValue(['edit-donacion-ticket','edit-compra-ticket'], id, scope, c.ticketDonacion || '');
+    const donorRef = fieldValue(['edit-donacion-donante','edit-compra-donante'], id, scope, c.donorRef || '');
+    const responsableId = fieldValue(['edit-donacion-responsable','edit-compra-responsable'], id, scope, c.responsableId || '');
     const found = duplicateDonacion(productoId, donorRef, id);
     if(found){ alert('No autorizado. Ya existe otra donación con el mismo Producto + Donante.'); return true; }
     c.productoId = productoId;
     c.unidades = Number.isFinite(unidades) ? unidades : 0;
-    c.precio = precio;
+    if(precio) c.precio = precio;
     c.ticketDonacion = ticket;
     c.donorRef = donorRef;
     c.responsableId = responsableId;
     const p = productById(productoId);
-    if(p){ p.defaultPrecio = precio; p.precio = precio; }
+    if(p && precio){ p.defaultPrecio = precio; p.precio = precio; }
     saveNow();
     renderNow();
     return true;
@@ -265,8 +294,8 @@
     const action = btn.getAttribute('data-action');
     const id = btn.getAttribute('data-id') || '';
     event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
-    if(action === 'save-compra') saveCompraFromDom(id);
-    else saveDonacionFromDom(id);
+    if(action === 'save-donacion' || btn.closest?.('#donacionesList')) saveDonacionFromDom(id);
+    else saveCompraFromDom(id);
     setTimeout(syncHomes, 80);
     return true;
   }

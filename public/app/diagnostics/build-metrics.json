@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v41.2",
+  "version": "ControlEvent v41.3",
   "base": "v30.6",
-  "notes": "v41.2: corrige backup por servidor, casitas sin duplicados ni parpadeo, entrada inicial a Gráficas, cambio de evento conservando ventana, menú en una línea y donaciones entregadas en móvil.",
+  "notes": "v41.3: corrige guardado a la primera en compras/donaciones, añade buscadores, elimina Por segmento/Por destino del resumen y cambia Gráficas a queso + Por destino.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -13,7 +13,8 @@
   ],
   "newFiles": [
     "public/app/features/budget-tooltips-lite.js",
-    "public/app/features/summary-tienda-sort-fix.js"
+    "public/app/features/summary-tienda-sort-fix.js",
+    "public/app/features/v41-3-fixes.js"
   ],
-  "build": "v41.2"
+  "build": "v41.3"
 }

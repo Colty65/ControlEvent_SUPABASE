@@ -1,0 +1,18 @@
+{
+  "version": "ControlEvent v41.3",
+  "from": "ControlEvent v41.2",
+  "description": "Corrección de guardado en compras/donaciones, buscadores y rediseño de gráficas.",
+  "changes": [
+    "COMPRAS y DONACIONES guardan modificaciones a la primera.",
+    "Buscador añadido en COMPRAS y DONACIONES.",
+    "Se ocultan Por segmento y Por destino en Cálculos por agrupación del Resumen.",
+    "Gráficas principales en diagrama de queso con globos al pulsar.",
+    "Por destino se muestra en Gráficas con barras estrechas y globos.",
+    "Versión actualizada a ControlEvent v41.3."
+  ],
+  "new_files": [
+    "public/app/features/v41-3-fixes.js",
+    "README_V41_3.md",
+    "PATCH_MANIFEST_V41_3.json"
+  ]
+}
