@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v43.8",
+  "version": "ControlEvent v43.8.2",
   "from": "ControlEvent v43.7",
   "changes": [
     "DONACIONES: guardado y refresco visual usando campos edit-donacion-* en lugar de edit-compra-*",
