@@ -1,9 +1,9 @@
-/* ControlEvent v43.8.4 - Planificación inicial móvil y versión BACKUP.
+/* ControlEvent v43.8.5 - Planificación inicial móvil y versión BACKUP.
    Parche puntual: no toca COMPRAS, DONACIONES, INFOEVENTO ni GRAFICAS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.4';
-  const VERSION_FILE = 'ControlEvent_v43_8_4';
+  const VERSION = 'ControlEvent v43.8.5';
+  const VERSION_FILE = 'ControlEvent_v43_8_5';
   const PLAN_BUTTON_ID = 'tabPlanificacionBtn';
   const PLAN_PANEL_ID = 'tabPlanificacionInicial';
   const PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas','noEventMessage'];
@@ -15,7 +15,7 @@
     try{ return window.matchMedia && window.matchMedia('(max-width: 760px)').matches; }
     catch(_){ return (window.innerWidth || 0) <= 760; }
   }
-  function safeCall(fn){ try{ return fn && fn(); }catch(err){ console.warn('[ControlEvent v43.8.4]', err); return null; } }
+  function safeCall(fn){ try{ return fn && fn(); }catch(err){ console.warn('[ControlEvent v43.8.5]', err); return null; } }
   function setHidden(el, hidden){
     if(!el) return;
     el.classList.toggle('hidden', !!hidden);

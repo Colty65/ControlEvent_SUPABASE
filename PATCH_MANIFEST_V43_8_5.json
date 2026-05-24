@@ -1,0 +1,11 @@
+{
+  "version": "ControlEvent v43.8.5",
+  "objetivo": "Recuperar login y corregir apertura real de Planificacion inicial en movil sin tocar areas funcionales ya estabilizadas.",
+  "no_tocado": ["COMPRAS", "DONACIONES", "INFOEVENTO", "BACKUP", "GRAFICAS"],
+  "cambios": [
+    "Base reconstruida desde una version estable para evitar la rotura de login.",
+    "Planificacion inicial movil se abre realmente al pulsar su opcion de menu.",
+    "Version unificada en cabecera, nombres de descarga, backup, service worker y cache.",
+    "Neutralizado un parche anterior si queda referenciado por cache antigua."
+  ]
+}

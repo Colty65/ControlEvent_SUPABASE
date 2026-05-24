@@ -1,0 +1,32 @@
+{
+  "version": "ControlEvent v43.8.5",
+  "patch_desde": "version anterior",
+  "archivos": [
+    "index.html",
+    "package-lock.json",
+    "package.json",
+    "README_V43_8_5.md",
+    "PATCH_MANIFEST_V43_8_5.json",
+    "public/index.html",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "public/app/version.js",
+    "public/modules/excel/backup.js",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-4-fixes.js",
+    "public/app/features/v43-7-fixes.js",
+    "public/app/features/v43-8-1-fixes.js",
+    "public/app/features/v43-8-2-fixes.js",
+    "public/app/features/v43-8-3-fixes.js",
+    "public/app/features/v43-8-5-fixes.js",
+    "public/app/features/v43-8-4-fixes.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js"
+  ]
+}
