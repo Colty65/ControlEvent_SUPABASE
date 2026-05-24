@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v41.1",
+  "version": "ControlEvent v41.2",
   "base": "v30.6",
-  "notes": "v41.1: corrige backup por servidor, casitas sin duplicados ni parpadeo, entrada inicial a Gráficas, cambio de evento conservando ventana, menú en una línea y donaciones entregadas en móvil.",
+  "notes": "v41.2: corrige backup por servidor, casitas sin duplicados ni parpadeo, entrada inicial a Gráficas, cambio de evento conservando ventana, menú en una línea y donaciones entregadas en móvil.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,5 +15,5 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js"
   ],
-  "build": "v41.1"
+  "build": "v41.2"
 }

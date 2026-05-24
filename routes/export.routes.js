@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v41.1';
-const BACKUP_VERSION_FILE = 'ControlEvent_v41_1';
+const BACKUP_VERSION = 'ControlEvent v41.2';
+const BACKUP_VERSION_FILE = 'ControlEvent_v41_2';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -30,10 +30,31 @@ function backupFileName(scope, title){
   const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
   return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
 }
+function plainRow(row){
+  if(!row || typeof row !== 'object') return row;
+  const out = {};
+  Object.keys(row).forEach(key => {
+    const value = row[key];
+    if(value == null || ['string','number','boolean'].includes(typeof value)) out[key] = value;
+    else if(value instanceof Date) out[key] = value.toISOString();
+    else if(Array.isArray(value)) out[key] = value.map(item => (item == null || ['string','number','boolean'].includes(typeof item)) ? item : String(item));
+    else out[key] = value.id || value.value || value.nombre || value.titulo || '';
+  });
+  return out;
+}
+function normalizeTicketImage(value){
+  if(value == null) return '';
+  if(typeof value === 'string') return value;
+  if(typeof value !== 'object') return String(value);
+  return value.base64 || value.dataUrl || value.dataURL || value.image || value.src || value.url || value.filename || value.name || '';
+}
 function normalizeState(value){
-  const state = value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : {};
-  for (const key of COLLECTIONS) if (!Array.isArray(state[key])) state[key] = [];
-  state.ticketImages = state.ticketImages && typeof state.ticketImages === 'object' ? state.ticketImages : {};
+  const source = value && typeof value === 'object' ? value : {};
+  const state = {};
+  for (const key of COLLECTIONS) state[key] = Array.isArray(source[key]) ? source[key].map(plainRow) : [];
+  state.ticketImages = {};
+  const ticketImages = source.ticketImages && typeof source.ticketImages === 'object' ? source.ticketImages : {};
+  Object.entries(ticketImages).forEach(([key, image]) => { state.ticketImages[String(key)] = normalizeTicketImage(image); });
   return state;
 }
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
@@ -52,7 +73,7 @@ function price(c, productMap){
   const p = productMap[String(c?.productoId)] || {};
   return num(p.defaultPrecio ?? p.precio);
 }
-function splitLongText(value, size = 30000){
+function splitLongText(value, size = 8000){
   const text = String(value || '');
   const out = [];
   for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
@@ -186,7 +207,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
     ['TOTAL_ORIGEN_PRODUCTOS', totalCounts.productos],
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
-    ['NOTA', 'Exportación generada en servidor para evitar descargas vacías por estado frontend desfasado.']
+    ['NOTA', 'Exportación generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
   ]);
   addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
@@ -201,8 +222,8 @@ async function buildBackupWorkbook(fullState, scope){
     const evCode = eventCode[ticketEventIdFromKey(fullKey)] || '';
     const key = ticketInnerKeyFromKey(fullKey);
     const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
-    const parts = splitLongText(data, 30000);
-    ticketRows.push([evCode, key, '', data.length <= 30000 ? data : '', data.length > 30000 ? 'DIVIDIDA_EN_TICKETS_PARTES' : '']);
+    const parts = splitLongText(data, 8000);
+    ticketRows.push([evCode, key, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_V41_2' : 'SIN_IMAGEN']);
     parts.forEach((part, idx) => partRows.push([evCode, key, idx + 1, parts.length, part]));
   });
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
