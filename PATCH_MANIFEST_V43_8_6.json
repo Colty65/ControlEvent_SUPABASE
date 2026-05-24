@@ -1,0 +1,5 @@
+{
+  "version": "ControlEvent v43.8.6",
+  "base": "ControlEvent v43.8.3 estable",
+  "notes": "Recuperación de login y parche mínimo de Planificación inicial móvil."
+}
