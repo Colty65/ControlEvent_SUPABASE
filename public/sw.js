@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v44-0';
+const CACHE_NAME = 'controlevent-shell-v44-1';
 // V30.12: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
@@ -15,6 +15,7 @@ const SHELL_ASSETS = [
   '/app/performance/legacy-hotpath.js',
   '/app/performance/active-render.js',
   '/app/performance/mobile-lite.js',
+  '/app/performance/perf-diagnostics-v44-1.js',
   '/app/performance/low-resource-boot.js',
   '/app/performance/low-resource-legacy-patch.js',
   '/app/features/mapa-productos.js',
