@@ -1,11 +1,11 @@
-/* ControlEvent v43.8.6 - Ajustes finales
+/* ControlEvent v43.8.3 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);

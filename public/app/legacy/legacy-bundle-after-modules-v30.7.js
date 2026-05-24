@@ -1,15 +1,15 @@
 window.__ceDisableLegacyBarGraficas = true;
-/* ControlEvent v43.8.6 - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v43.8.3 - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #55. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #55. */
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -239,12 +239,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-56-v251-core.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #56. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #56. */
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -587,12 +587,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-57-v252-core.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #57. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #57. */
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -876,12 +876,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-58-v253-core.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #58. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #58. */
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1231,12 +1231,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-59-v253-final-clean.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #59. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #59. */
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1556,12 +1556,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-60-v254-fixes.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #60. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #60. */
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -1994,12 +1994,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-61-v255-fixes.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #61. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #61. */
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -2415,12 +2415,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-62-v257-fixes.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #62. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #62. */
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -3010,12 +3010,12 @@ window.__ceDisableLegacyBarGraficas = true;
               sort:false, autoFilter:false, pivotTables:false, objects:false, scenarios:false
             });
           }catch(protectError){
-            console.warn('[ControlEvent v43.8.6] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
+            console.warn('[ControlEvent v43.8.3] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
           }
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v43.8.6] No se pudo aplicar protección final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v43.8.3] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }
@@ -3090,12 +3090,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-63-v259-app-facade.js ===== */
 
-/* ControlEvent v43.8.6 - JS legacy extraido de public/index.html. Bloque inline #63. */
+/* ControlEvent v43.8.3 - JS legacy extraido de public/index.html. Bloque inline #63. */
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.6';
-  const VERSION_FILE = 'ControlEvent_v43_8_6';
+  const VERSION = 'ControlEvent v43.8.3';
+  const VERSION_FILE = 'ControlEvent_v43_8_3';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
