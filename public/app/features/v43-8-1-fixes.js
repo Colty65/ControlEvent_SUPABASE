@@ -1,9 +1,9 @@
-/* ControlEvent v43.8.1 - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v43.8.2 - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.1';
-  const VERSION_FILE = 'ControlEvent_v43_8_1';
+  const VERSION = 'ControlEvent v43.8.2';
+  const VERSION_FILE = 'ControlEvent_v43_8_2';
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -73,12 +73,14 @@
     try{
       document.body.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
       document.documentElement.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
+      // No ponemos display:none ni hidden inline: el menú móvil legacy abre/cierra con body.mobile-drawer-open.
+      // Si aquí dejamos estilos inline, después el botón Menú parece no responder.
       ['ceMobileDrawerBackdrop','ceMobileOverlay'].forEach(id => {
         const el = $(id);
-        if(el){ el.classList.add('hidden'); el.style.display = 'none'; el.style.pointerEvents = 'none'; }
+        if(el){ el.classList.remove('open','is-open','active'); el.style.removeProperty('display'); el.style.removeProperty('pointer-events'); }
       });
       const drawer = $('ceMobileDrawer');
-      if(drawer){ drawer.classList.remove('open','is-open','active'); drawer.setAttribute('aria-hidden','true'); }
+      if(drawer){ drawer.classList.remove('open','is-open','active'); drawer.style.removeProperty('display'); drawer.style.removeProperty('pointer-events'); drawer.setAttribute('aria-hidden','true'); }
     }catch(_){ }
   }
   function isPlanVisible(){
@@ -167,10 +169,6 @@
 
   window.ControlEventV4381 = {version: VERSION, install, updateBuyPreview:updateBuyPreviewV4381, closeMobileDrawer};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
-  document.addEventListener('click', () => setTimeout(install, 50), true);
-  document.addEventListener('change', () => setTimeout(install, 50), true);
-  const mo = new MutationObserver(() => setTimeout(() => { applyVersion(); fixPlanificacionMobile(); }, 40));
-  try{ mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true, attributeFilter:['class','style']}); }catch(_){ }
-  [0,80,250,700,1500,3000].forEach(ms => setTimeout(install, ms));
-  setInterval(() => { applyVersion(); fixPlanificacionMobile(); }, 1500);
+  // Instalación puntual, sin refrescos permanentes de cabecera para evitar parpadeos.
+  [0,80,250,700,1500].forEach(ms => setTimeout(install, ms));
 })();
