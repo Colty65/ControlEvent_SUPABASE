@@ -1,9 +1,9 @@
-/* ControlEvent v43.8.7 - menú móvil estable y versión unificada.
+/* ControlEvent v43.8.8 - menú móvil estable y versión unificada.
    Parche defensivo: no toca INFOEVENTO, BACKUP, COMPRAS ni DONACIONES. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.7';
-  const VERSION_FILE = 'ControlEvent_v43_8_7';
+  const VERSION = 'ControlEvent v43.8.8';
+  const VERSION_FILE = 'ControlEvent_v43_8_8';
   const MOBILE_MAX = 760;
   const $ = id => document.getElementById(id);
 
@@ -55,46 +55,10 @@
     if(document.body.classList.contains('mobile-drawer-open')) closeMenu();
     else openMenu();
   }
-  function setHidden(el, hidden){
-    if(!el) return;
-    el.classList.toggle('hidden', !!hidden);
-    if(hidden) el.setAttribute('aria-hidden','true');
-    else el.removeAttribute('aria-hidden');
-  }
-  function forcePlanificacionVisible(){
-    const panel = $('tabPlanificacionInicial');
-    if(!panel) return false;
-    ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas','noEventMessage'].forEach(pid => {
-      const el = $(pid);
-      if(el) setHidden(el, pid !== 'tabPlanificacionInicial');
-    });
-    const maint = $('maintenanceWrapper');
-    if(maint) setHidden(maint, true);
-    setHidden(panel, false);
-    panel.style.removeProperty('display');
-    panel.style.removeProperty('filter');
-    panel.style.removeProperty('opacity');
-    ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'].forEach(bid => {
-      const b = $(bid);
-      if(b) b.classList.toggle('active', bid === 'tabPlanificacionBtn');
-    });
-    document.querySelectorAll('.mobile-menu-action').forEach(el => {
-      el.classList.toggle('primary', el.dataset && el.dataset.target === 'tabPlanificacionBtn');
-    });
-    try{ if(typeof window.renderPlanificacionInicial === 'function') window.renderPlanificacionInicial(); }catch(_){ }
-    return true;
-  }
-  function openPlanificacionFromMobile(){
-    closeMenu();
-    try{ if(typeof window.showPlanificacionInicial === 'function') window.showPlanificacionInicial(); }catch(_){ }
-    forcePlanificacionVisible();
-    setTimeout(forcePlanificacionVisible, 80);
-    setTimeout(forcePlanificacionVisible, 260);
-  }
   function targetClick(id){
     if(!id) return;
-    if(id === 'tabPlanificacionBtn'){
-      openPlanificacionFromMobile();
+    if(id === 'tabPlanificacionBtn' && typeof window.showPlanificacionInicial === 'function'){
+      window.showPlanificacionInicial();
       return;
     }
     const el = $(id);

@@ -1,9 +1,9 @@
-/* ControlEvent v43.8.7 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v43.8.8 - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.7';
+  const VERSION = 'ControlEvent v43.8.8';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -571,6 +571,50 @@
     const visible = !!(panel && !panel.classList.contains('hidden') && isGD());
     btn.classList.toggle('hidden', !visible);
   }
+
+  function setCurrentMainTabPlanificacion(){
+    try{ currentMainTab = 'planificacion'; }catch(_){ }
+    try{ window.ControlEventApp.navigation.currentMainTab = 'planificacion'; }catch(_){ }
+    try{ window.__ceCurrentMainTab = 'planificacion'; }catch(_){ }
+  }
+  function forcePlanificacionPanelVisible(){
+    const panel = document.getElementById(PANEL_ID);
+    if(!panel) return false;
+    setCurrentMainTabPlanificacion();
+    KNOWN_PANELS.forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      const isPlan = id === PANEL_ID;
+      el.classList.toggle('hidden', !isPlan);
+      if(isPlan){
+        el.removeAttribute('aria-hidden');
+        el.hidden = false;
+        el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('opacity');
+        el.style.removeProperty('filter');
+        el.style.pointerEvents = 'auto';
+      }else{
+        el.setAttribute('aria-hidden','true');
+      }
+    });
+    const maint = document.getElementById('maintenanceWrapper');
+    if(maint){ maint.classList.add('hidden'); maint.setAttribute('aria-hidden','true'); }
+    KNOWN_BUTTONS.forEach(id => {
+      const b = document.getElementById(id);
+      if(b) b.classList.toggle('active', id === TAB_BUTTON_ID);
+    });
+    document.querySelectorAll('.mobile-menu-action').forEach(el => {
+      el.classList.toggle('primary', el.dataset?.target === TAB_BUTTON_ID);
+    });
+    try{ panel.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ }
+    syncPlanTopButton();
+    return true;
+  }
+  function scheduleForcePlanificacionVisible(){
+    forcePlanificacionPanelVisible();
+    [40, 120, 300].forEach(ms => setTimeout(forcePlanificacionPanelVisible, ms));
+  }
   function hidePlanificacion(){
     const panel = document.getElementById(PANEL_ID);
     if(panel) panel.classList.add('hidden');
@@ -595,16 +639,12 @@
       try{ alert('Planificación inicial solo está disponible para usuarios GD.'); }catch(_){ }
       return false;
     }
+    setCurrentMainTabPlanificacion();
     ensureReady();
-    KNOWN_PANELS.forEach(id => document.getElementById(id)?.classList.add('hidden'));
-    document.getElementById('maintenanceWrapper')?.classList.add('hidden');
-    document.getElementById(PANEL_ID)?.classList.remove('hidden');
-    KNOWN_BUTTONS.forEach(id => document.getElementById(id)?.classList.toggle('active', id === TAB_BUTTON_ID));
-    document.querySelectorAll('.mobile-menu-action').forEach(el => el.classList.toggle('primary', el.dataset.target === TAB_BUTTON_ID));
-    initForm();
+    forcePlanificacionPanelVisible();
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v43.8.8] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
-    syncPlanTopButton();
-    // No forzamos scroll al abrir para evitar el pequeño salto visual de la ventana.
+    scheduleForcePlanificacionVisible();
     return false;
   }
   function hideByRole(){
@@ -628,12 +668,21 @@
     const ref = grid.querySelector('[data-target="tabMapaBtn"]') || grid.querySelector('[data-target="tabResumenBtn"]');
     if(ref && ref.parentNode === grid) grid.insertBefore(btn, ref.nextSibling);
     else grid.appendChild(btn);
-    btn.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }, true);
+    btn.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); closeMobileMenu(); showPlanificacion(); }, true);
   }
   function closeMobileMenu(){
-    document.body.classList.remove('mobile-menu-open');
-    document.getElementById('ceMobileDrawer')?.classList.add('hidden');
-    document.getElementById('ceMobileOverlay')?.classList.add('hidden');
+    try{
+      document.body.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
+      document.documentElement.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
+      const drawer = document.getElementById('ceMobileDrawer');
+      if(drawer){ drawer.setAttribute('aria-hidden','true'); drawer.style.removeProperty('display'); drawer.style.removeProperty('pointer-events'); }
+      ['ceMobileDrawerBackdrop','ceMobileOverlay'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el){ el.style.removeProperty('display'); el.style.removeProperty('pointer-events'); }
+      });
+      const menuBtn = document.getElementById('ceMobileMenuBtn');
+      if(menuBtn){ menuBtn.disabled = false; menuBtn.removeAttribute('disabled'); menuBtn.removeAttribute('aria-disabled'); menuBtn.style.pointerEvents = 'auto'; }
+    }catch(_){ }
   }
   function bindOnce(element, eventName, handler, options){
     if(!element) return;
@@ -644,7 +693,7 @@
   }
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
-    bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); showPlanificacion(); }, true);
+    bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); showPlanificacion(); }, true);
     KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => bindOnce(document.getElementById(id), 'click', () => setTimeout(hidePlanificacion, 0)));
     document.querySelectorAll('.mobile-menu-action').forEach(el => {
       if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => setTimeout(hidePlanificacion, 0));
@@ -656,7 +705,7 @@
       document.__cePlanMobileClickV337 = true;
       document.addEventListener('click', event => {
         const mobile = event.target?.closest?.(`.mobile-menu-action[data-target="${TAB_BUTTON_ID}"]`);
-        if(mobile){ event.preventDefault(); event.stopPropagation(); closeMobileMenu(); showPlanificacion(); }
+        if(mobile){ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); closeMobileMenu(); showPlanificacion(); }
       }, true);
     }
     if(!document.__cePlanHideOtherTabsV337){
@@ -683,6 +732,24 @@
     ensureReady();
     window.showPlanificacionInicial = showPlanificacion;
     window.renderPlanificacionInicial = ensureReady;
+    try{
+      const previousRender = typeof render === 'function' ? render : window.render;
+      if(previousRender && !previousRender.__cePlanificacionV4388){
+        const wrappedRender = function(){
+          const result = previousRender.apply(this, arguments);
+          try{
+            if((typeof currentMainTab !== 'undefined' && currentMainTab === 'planificacion') || window.__ceCurrentMainTab === 'planificacion'){
+              setTimeout(forcePlanificacionPanelVisible, 20);
+              setTimeout(forcePlanificacionPanelVisible, 120);
+            }
+          }catch(_){ }
+          return result;
+        };
+        wrappedRender.__cePlanificacionV4388 = true;
+        try{ render = wrappedRender; }catch(_){ }
+        window.render = wrappedRender;
+      }
+    }catch(_){ }
     window.addEventListener('controlevent:app-ready', ensureReady);
     window.addEventListener('controlevent:runtime-ready', ensureReady);
     setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); unlockPlanControls(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);

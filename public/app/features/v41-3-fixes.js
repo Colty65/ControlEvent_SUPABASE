@@ -1,8 +1,8 @@
-/* ControlEvent v43.8.7 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v43.8.8 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.7';
-  const VERSION_FILE = 'ControlEvent_v43_8_7';
+  const VERSION = 'ControlEvent v43.8.8';
+  const VERSION_FILE = 'ControlEvent_v43_8_8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();
