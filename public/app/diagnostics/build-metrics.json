@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v43.8.3",
+  "version": "ControlEvent v43.8.2",
   "base": "v30.6",
-  "notes": "v43.8.3: estabiliza Menú móvil tras Planificación inicial y unifica versión en cabecera, INFOEVENTO y BACKUP sin tocar motores Excel.",
+  "notes": "v43.8.2: estabiliza Menú móvil tras Planificación inicial y unifica versión en cabecera, INFOEVENTO y BACKUP sin tocar motores Excel.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -19,5 +19,5 @@
     "public/app/features/v43-7-fixes.js",
     "public/app/features/v43-8-1-fixes.js"
   ],
-  "build": "v43.8.3"
+  "build": "v43.8.2"
 }
