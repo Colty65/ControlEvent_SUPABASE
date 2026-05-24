@@ -1,0 +1,22 @@
+{
+  "version": "ControlEvent v43.7",
+  "from": "ControlEvent v43.6",
+  "date": "2026-05-24",
+  "changes": [
+    "Corrige modificaciones de donaciones/compras evitando falso mensaje de duplicidad al editar.",
+    "Oculta el mensaje flotante de borrado cuando no corresponde.",
+    "Reordena fichas de Mapa de recursos y añade SALDO LÍMITE.",
+    "Sustituye las exportaciones conflictivas de INFOEVENTO y BACKUP por rutas seguras que evitan Maximum call stack size exceeded.",
+    "Actualiza versión activa a ControlEvent v43.7."
+  ],
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-7-fixes.js",
+    "public/app/diagnostics/build-metrics.json"
+  ]
+}

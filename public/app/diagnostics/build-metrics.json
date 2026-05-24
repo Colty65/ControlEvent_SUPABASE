@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v43.6",
+  "version": "ControlEvent v43.7",
   "base": "v30.6",
-  "notes": "v43.6: corrige el parpadeo de GRAFICAS desactivando el render legacy de barras y dejando un único render estable de queso + Por destino; barras de Por destino más anchas.",
+  "notes": "v43.7: corrige exportación INFOEVENTO/BACKUP evitando llamadas recursivas, elimina falso duplicado al modificar donaciones/compras, oculta globo de borrado permanente y reordena Mapa de recursos con SALDO LÍMITE.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -14,7 +14,8 @@
   "newFiles": [
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js",
-    "public/app/features/v41-3-fixes.js"
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-7-fixes.js"
   ],
-  "build": "v43.6"
+  "build": "v43.7"
 }

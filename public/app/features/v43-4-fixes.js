@@ -1,9 +1,9 @@
-/* ControlEvent v43.6 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v43.7 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
-  const VERSION = 'ControlEvent v43.6';
-  const VERSION_FILE = 'ControlEvent_v43_6';
+  const VERSION = 'ControlEvent v43.7';
+  const VERSION_FILE = 'ControlEvent_v43_7';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const fold = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -308,7 +308,7 @@
     const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = signature;
-    wrap.dataset.ceStableChart = 'v43.6';
+    wrap.dataset.ceStableChart = 'v43.7';
     setTimeout(() => { chartRendering = false; }, 0);
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
@@ -325,7 +325,7 @@
     try{ if(window.ControlEventV413) window.ControlEventV413.renderGraficas = renderGraficasV434; }catch(_){ }
   }
   function installChartObserver(){
-    // v43.6: el observer anterior provocaba un ciclo: legacy pintaba barras y el observer repintaba queso.
+    // v43.7: el observer anterior provocaba un ciclo: legacy pintaba barras y el observer repintaba queso.
     // Se desconecta para que GRAFICAS se pinte una sola vez por render real.
     try{ window.__ceV434ChartObserver?.disconnect?.(); }catch(_){ }
     window.__ceV434ChartObserver = null;

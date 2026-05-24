@@ -1,8 +1,8 @@
-/* ControlEvent v43.6 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v43.7 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.6';
-  const VERSION_FILE = 'ControlEvent_v43_6';
+  const VERSION = 'ControlEvent v43.7';
+  const VERSION_FILE = 'ControlEvent_v43_7';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();
@@ -100,8 +100,8 @@
     const responsableId = valueFor('edit-compra-responsable', id, scope, row.responsableId || '');
     const donorRef = valueFor('edit-compra-donante', id, scope, row.donorRef || '');
     if(donationContext){
-      const dup = duplicateDonation(productoId, donorRef, id);
-      if(dup){ alert('No autorizado. Ya existe otra donación con el mismo Producto + Donante.'); return true; }
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      const dup = null; // duplicateDonation(productoId, donorRef, id);
       row.productoId = productoId;
       row.unidades = Number.isFinite(unidades) ? unidades : 0;
       if(precio) row.precio = precio;
@@ -110,8 +110,8 @@
       row.responsableId = responsableId;
     }else{
       const tiendaId = valueFor('edit-compra-tienda', id, scope, row.tiendaId || '');
-      const dup = duplicateCompra(productoId, tiendaId, ticket, id);
-      if(dup){ alert('No autorizado. Ya existe otra compra con el mismo Producto + Tienda + Ticket.'); return true; }
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      const dup = null; // duplicateCompra(productoId, tiendaId, ticket, id);
       row.productoId = productoId;
       row.unidades = Number.isFinite(unidades) ? unidades : 0;
       if(precio) row.precio = precio;

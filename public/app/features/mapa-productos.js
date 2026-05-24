@@ -1,9 +1,9 @@
-/* ControlEvent v43.6 - Mapa de recursos
+/* ControlEvent v43.7 - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.6';
+  const VERSION = 'ControlEvent v43.7';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -99,6 +99,25 @@
   function segmentName(row){ return productOf(row)?.segmento || 'Sin segmento'; }
   function destinoName(row){ return productOf(row)?.destino || 'Sin destino'; }
   function comprasRaw(){ const eventId = selectedId(); return arr('compras').filter(c => String(c.eventId || '') === eventId); }
+  function ingresosRaw(){ const eventId = selectedId(); return arr('colaboradores').filter(c => String(c.eventId || '') === eventId); }
+  function parseAmount(value){
+    if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    let text = String(value ?? '').replace(/[^0-9,.-]/g,'').trim();
+    if(text.includes(',') && text.includes('.')) text = text.replace(/\./g,'').replace(',','.');
+    else if(text.includes(',')) text = text.replace(',','.');
+    const n = Number(text);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function currentEventObj(){ return findById('eventos', selectedId()) || {}; }
+  function ingresoTotal(row){
+    const persona = personOf(row?.personaId) || {};
+    const ev = currentEventObj();
+    const numero = parseAmount(row?.numero || 0);
+    const precioEvento = parseAmount(ev?.precio || ev?.EVENTOS_PRECIO || 0);
+    const voluntario = parseAmount(row?.importe ?? row?.importeVoluntario ?? row?.voluntario ?? row?.extra ?? 0);
+    const obligatorio = up(persona?.rango || row?.rango || '') === 'SOCIO' ? numero * precioEvento : 0;
+    return obligatorio + voluntario;
+  }
   function ticketRaw(row){ return String(row?.ticketDonacion || row?.ticket || '').trim(); }
   function isTk(ticket){ return /^TK\s*\d+/i.test(String(ticket || '').trim()); }
   function isCurrentExpenseTicket(ticket){ return up(ticket) === 'GASTOS CORRIENTES'; }
@@ -353,6 +372,7 @@
 
     const filteredDonationValue = onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
     const filteredProductsWithDonations = onlyDonations.length;
+    const eventSaldoLimite = ingresosRaw().reduce((sum, row) => sum + ingresoTotal(row), 0);
 
     return {
       groups: result,
@@ -369,7 +389,8 @@
         productsWithDonations: eventProductsWithDonations,
         filteredDonationValue,
         filteredProductsWithDonations,
-        necesidadValor: eventTotalCompra + eventTotalDonado
+        necesidadValor: eventTotalCompra + eventTotalDonado,
+        saldoLimite: eventSaldoLimite
       }
     };
   }
@@ -665,8 +686,9 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('VALORACION DEL EVENTO', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
+        ${renderMetric('DONACION DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
-        ${renderMetric('DONACION DE PRODUCTO', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
+        ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();

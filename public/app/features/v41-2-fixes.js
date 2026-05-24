@@ -1,8 +1,8 @@
-/* ControlEvent v43.6 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
+/* ControlEvent v43.7 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.6';
-  const VERSION_FILE = 'ControlEvent_v43_6';
+  const VERSION = 'ControlEvent v43.7';
+  const VERSION_FILE = 'ControlEvent_v43_7';
   const HOME_ID = 'ceGlobalFloatingHomeButton';
   let lastHomeAt = 0;
   let lastDonationToggle = {id:'', at:0};
@@ -238,8 +238,8 @@
     const donorRef = fieldValue(['edit-compra-donante','edit-donacion-donante'], id, scope, c.donorRef || '');
     const donation = isDonationTicket(ticket) || isDonationTicket(c.ticketDonacion || '') || !!scope?.closest?.('#donacionesList');
     if(donation){
-      const found = duplicateDonacion(productoId, donorRef, id);
-      if(found){ alert('No autorizado. Ya existe otra donación con el mismo Producto + Donante.'); return true; }
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      const found = null; // duplicateDonacion(productoId, donorRef, id);
       c.productoId = productoId;
       c.unidades = Number.isFinite(unidades) ? unidades : 0;
       if(precio) c.precio = precio;
@@ -248,8 +248,8 @@
       c.responsableId = responsableId;
     }else{
       const tiendaId = fieldValue('edit-compra-tienda', id, scope, c.tiendaId || '');
-      const found = duplicateCompra(productoId, tiendaId, ticket, id);
-      if(found){ alert('No autorizado. Ya existe otra compra con el mismo Producto + Tienda + Ticket.'); return true; }
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      const found = null; // duplicateCompra(productoId, tiendaId, ticket, id);
       c.productoId = productoId;
       c.unidades = Number.isFinite(unidades) ? unidades : 0;
       if(precio) c.precio = precio;
@@ -274,8 +274,8 @@
     const ticket = fieldValue(['edit-donacion-ticket','edit-compra-ticket'], id, scope, c.ticketDonacion || '');
     const donorRef = fieldValue(['edit-donacion-donante','edit-compra-donante'], id, scope, c.donorRef || '');
     const responsableId = fieldValue(['edit-donacion-responsable','edit-compra-responsable'], id, scope, c.responsableId || '');
-    const found = duplicateDonacion(productoId, donorRef, id);
-    if(found){ alert('No autorizado. Ya existe otra donación con el mismo Producto + Donante.'); return true; }
+    // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+    const found = null; // duplicateDonacion(productoId, donorRef, id);
     c.productoId = productoId;
     c.unidades = Number.isFinite(unidades) ? unidades : 0;
     if(precio) c.precio = precio;
