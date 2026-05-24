@@ -1,11 +1,11 @@
-/* ControlEvent v41.3 - Ajustes finales
+/* ControlEvent v43.4 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v41.3';
-  const VERSION_FILE = 'ControlEvent_v41_3';
+  const VERSION = 'ControlEvent v43.4';
+  const VERSION_FILE = 'ControlEvent_v43_4';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);
@@ -570,7 +570,7 @@
     if(!isGD()){ alert('Solo GD puede realizar descarga de datos.'); return; }
     const scope = await chooseBackupScope();
     if(!scope) return;
-    // v41.3: se vuelve al backup generado por servidor. Evita el RangeError
+    // v43.4: se vuelve al backup generado por servidor. Evita el RangeError
     // "Maximum call stack size exceeded" provocado por crear el Excel completo en el navegador.
     return downloadServerBackup(scope);
   }
@@ -580,7 +580,7 @@
       if(typeof window.exportExcel === 'function') return window.exportExcel();
     }catch(err){ return Promise.reject(err); }
     try{
-      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v41.3-legacy-infoevento'});
+      if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v43.4-legacy-infoevento'});
     }catch(err){ return Promise.reject(err); }
     alert('INFOEVENTO no está disponible todavía. Espera a que termine de cargar la app y vuelve a intentarlo.');
   }
@@ -588,7 +588,7 @@
   function installExcelGuards(){
     // v41.0: NO sustituimos INFOEVENTO. Se deja el motor legacy protegido,
     // que es el que genera RESUMEN/GRAFICAS con protección y estructura completa.
-    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v41.3] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
+    const backup = function(){ return exportBackupV40().catch(err => { console.error('[v43.4] BACKUP', err); alert(`No se pudo descargar la descarga de datos.\n\n${err?.name || 'Error'}: ${err?.message || err}`); }); };
     backup.__ceV411 = true;
     try{ window.exportSeedWorkbook = backup; }catch(_){ }
     try{ exportSeedWorkbook = backup; }catch(_){ }

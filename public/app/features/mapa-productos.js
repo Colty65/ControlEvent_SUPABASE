@@ -1,9 +1,9 @@
-/* ControlEvent v41.3 - Mapa de recursos
+/* ControlEvent v43.4 - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v41.3';
+  const VERSION = 'ControlEvent v43.4';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -480,7 +480,7 @@
     return `<div class="mapa-need-strip" aria-label="Necesidad del producto">
       <div class="mapa-need-title"><strong>Necesidad del evento</strong><span>${esc(qtyFmt(total))} uds.</span></div>
       <div class="mapa-need-bar"><i class="buy" style="width:${compraPct}%"></i><i class="don" style="width:${donadoPct}%"></i></div>
-      <div class="mapa-need-legend"><span><i class="buy"></i>COMPRAS PRODUCTO: ${esc(qtyFmt(group.unidadesCompra))}</span><span><i class="don"></i>Donado: ${esc(qtyFmt(group.unidadesDonadas))}</span></div>
+      <div class="mapa-need-legend"><span><i class="buy"></i>COMPRAS: ${esc(qtyFmt(group.unidadesCompra))}</span><span><i class="don"></i>Donado: ${esc(qtyFmt(group.unidadesDonadas))}</span></div>
     </div>`;
   }
 
@@ -664,9 +664,9 @@
       ${renderResponsableFilter(data.responsableOptions)}
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
-        ${renderMetric('Necesidad valorada', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
-        ${renderMetric('Compras producto', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
-        ${renderMetric('Donado producto', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
+        ${renderMetric('VALORACION DEL EVENTO', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
+        ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
+        ${renderMetric('DONACION DE PRODUCTO', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
@@ -712,7 +712,7 @@
     }).join('');
 
     // V31.5: la cabecera inferior de productos donados debe respetar el filtro actual de responsables.
-    // La ficha superior DONADO PRODUCTO mantiene el total global del evento; esta cabecera resume solo lo listado.
+    // La ficha superior DONACION DE PRODUCTO mantiene el total global del evento; esta cabecera resume solo lo listado.
     const onlyDonationBlock = data.onlyDonations.length ? `
       <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
         <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>MAS PRODUCTO DONADO FUERA DE NECESIDAD DE COMPRA</strong></div>
@@ -740,7 +740,7 @@
   function normalizeMapaLabelsV3013(){
     const panel = $(PANEL_ID); if(!panel) return;
     const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
-    const fixes = [[/PENDIENTE\s+COMPRAR/gi, 'COMPRAS PRODUCTO'],[/Pendiente\s+comprar/g, 'COMPRAS PRODUCTO'],[/Pendiente\s+de\s+comprar/g, 'COMPRAS PRODUCTO'],[/Pdte\.Compra/g, 'COMPRAS PRODUCTO'],[/Mapa de recursos/g, 'Mapa de recursos']];
+    const fixes = [[/PENDIENTE\s+COMPRAR/gi, 'COMPRAS'],[/Pendiente\s+comprar/g, 'COMPRAS'],[/Pendiente\s+de\s+comprar/g, 'COMPRAS'],[/Pdte\.Compra/g, 'COMPRAS'],[/Mapa de recursos/g, 'Mapa de recursos']];
     const nodes = [];
     while(walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(node => { let text = node.nodeValue || ''; const old = text; fixes.forEach(([rx, value]) => { text = text.replace(rx, value); }); if(text !== old) node.nodeValue = text; });

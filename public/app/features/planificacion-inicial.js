@@ -1,9 +1,9 @@
-/* ControlEvent v41.3 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v43.4 - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v41.3';
+  const VERSION = 'ControlEvent v43.4';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
