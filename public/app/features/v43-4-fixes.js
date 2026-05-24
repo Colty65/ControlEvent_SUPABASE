@@ -1,8 +1,8 @@
-/* ControlEvent v43.4 - buscadores, gráficas definitivas, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v43.5 - buscadores, gráficas definitivas, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.4';
-  const VERSION_FILE = 'ControlEvent_v43_4';
+  const VERSION = 'ControlEvent v43.5';
+  const VERSION_FILE = 'ControlEvent_v43_5';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const fold = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -82,13 +82,13 @@
       .ce-v434-destino-bars{display:grid;gap:10px;}
       .ce-v434-destino-card{border:1px solid #eef2f7;border-radius:16px;background:#f9fafb;padding:9px;}
       .ce-v434-destino-title{font-size:12px;font-weight:950;color:#334155;margin-bottom:7px;display:flex;justify-content:space-between;gap:8px;}
-      .ce-v434-mini-bars{display:flex;align-items:flex-end;justify-content:center;gap:11px;min-height:165px;}
-      .ce-v434-mini-col{width:48px;min-width:48px;text-align:center;cursor:pointer;border-radius:12px;padding:4px 2px;}
+      .ce-v434-mini-bars{display:flex;align-items:flex-end;justify-content:center;gap:13px;min-height:165px;}
+      .ce-v434-mini-col{width:62px;min-width:62px;text-align:center;cursor:pointer;border-radius:12px;padding:4px 3px;}
       .ce-v434-mini-col:hover{background:#eef2ff;}
       .ce-v434-mini-value{font-size:10px;font-weight:900;color:#334155;writing-mode:vertical-rl;transform:rotate(180deg);margin:0 auto 5px;max-height:72px;overflow:hidden;}
-      .ce-v434-mini-stick{width:30px;border-radius:10px 10px 0 0;margin:0 auto;min-height:8px;box-shadow:inset 0 -1px 0 rgba(0,0,0,.08);}
+      .ce-v434-mini-stick{width:42px;border-radius:10px 10px 0 0;margin:0 auto;min-height:8px;box-shadow:inset 0 -1px 0 rgba(0,0,0,.08);}
       .ce-v434-mini-label{font-size:9px;font-weight:900;color:#64748b;margin-top:4px;line-height:1.05;}
-      @media(max-width:860px){.ce-v434-chart-layout{grid-template-columns:1fr}.ce-v434-pies{grid-template-columns:1fr}.ce-v434-search{flex-direction:column;align-items:stretch}.ce-v434-search button{width:100%;}.ce-v434-mini-col{width:54px;min-width:54px}.ce-v434-mini-stick{width:34px;}}
+      @media(max-width:860px){.ce-v434-chart-layout{grid-template-columns:1fr}.ce-v434-pies{grid-template-columns:1fr}.ce-v434-search{flex-direction:column;align-items:stretch}.ce-v434-search button{width:100%;}.ce-v434-mini-bars{gap:14px}.ce-v434-mini-col{width:68px;min-width:68px}.ce-v434-mini-stick{width:48px;}}
     `;
     document.head.appendChild(style);
   }
@@ -288,11 +288,26 @@
     return `<div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Por destino</span><strong>${esc(moneyF(total))}</strong></div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte.Compra</span></div><div class="ce-v434-destino-bars">${cards || '<div class="empty">Sin datos por destino.</div>'}</div></div>`;
   }
   let chartRendering = false;
-  function renderGraficasV434(){
+  let lastChartSignature = '';
+  function signatureForGraficas(g){
+    try{
+      const dest = destinoRows().map(r => [r.label, r.comprado, r.donado, r.pendiente].join(':')).join('|');
+      const flat = [].concat(g.incomeItems||[], g.donationItems||[], g.expenseItems||[], g.saldoItems||[]).map(it => `${it.label}:${it.value}:${it.displayValue ?? ''}`).join('|');
+      return `${selectedEventId()}::${flat}::${dest}`;
+    }catch(_){ return `${selectedEventId()}::${Date.now()}`; }
+  }
+  function renderGraficasV434(options = {}){
     const wrap = $('eventChartWrap'); if(!wrap) return;
-    chartRendering = true;
+    window.__ceStableGraficasV435 = true;
     const g = chartParts();
-    wrap.innerHTML = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div></div>`;
+    const signature = signatureForGraficas(g);
+    const own = wrap.firstElementChild?.classList?.contains('ce-v434-chart-layout-shell') && wrap.children.length === 1;
+    if(own && lastChartSignature === signature && options.force !== true) return;
+    chartRendering = true;
+    const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div></div>`;
+    wrap.innerHTML = html;
+    lastChartSignature = signature;
+    wrap.dataset.ceStableChart = 'v43.5';
     setTimeout(() => { chartRendering = false; }, 0);
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
@@ -303,13 +318,22 @@
     if(!own) renderGraficasV434();
   }
   function patchGraficas(){
+    window.__ceStableGraficasV435 = true;
     try{ renderGraficas = renderGraficasV434; }catch(_){ }
     window.renderGraficas = renderGraficasV434;
+    try{ if(window.ControlEventV413) window.ControlEventV413.renderGraficas = renderGraficasV434; }catch(_){ }
   }
   function installChartObserver(){
-    if(window.__ceV434ChartObserver) return;
     const wrap = $('eventChartWrap'); if(!wrap) return;
-    window.__ceV434ChartObserver = new MutationObserver(() => { if(!chartRendering) setTimeout(ensureGraficas, 15); });
+    if(window.__ceV434ChartObserver && window.__ceV434ChartObserverTarget === wrap) return;
+    try{ window.__ceV434ChartObserver?.disconnect?.(); }catch(_){ }
+    let t = 0;
+    window.__ceV434ChartObserverTarget = wrap;
+    window.__ceV434ChartObserver = new MutationObserver(() => {
+      if(chartRendering) return;
+      clearTimeout(t);
+      t = setTimeout(() => { if(!chartRendering) ensureGraficas(); }, 90);
+    });
     window.__ceV434ChartObserver.observe(wrap, {childList:true, subtree:false});
   }
 
@@ -366,6 +390,7 @@
   }
 
   window.ControlEventV434 = {version:VERSION, install, runSearch, renderGraficas:renderGraficasV434, normalizeMapaLabels};
+  window.ControlEventV435 = window.ControlEventV434;
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 25)));
   document.addEventListener('click', () => setTimeout(install, 60), true);
   document.addEventListener('scroll', () => setTimeout(() => { forceResumenOpen(); }, 60), true);

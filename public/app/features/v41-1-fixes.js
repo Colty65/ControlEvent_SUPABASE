@@ -1,8 +1,8 @@
-/* ControlEvent v43.4 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
+/* ControlEvent v43.5 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.4';
-  const VERSION_FILE = 'ControlEvent_v43_4';
+  const VERSION = 'ControlEvent v43.5';
+  const VERSION_FILE = 'ControlEvent_v43_5';
   const $ = id => document.getElementById(id);
   const now = () => Date.now();
   let lastHomeAt = 0;
@@ -107,7 +107,7 @@
     const wrapped = function(){
       const hasAuthNow = !!auth();
       if(hasAuthNow && !hadAuth){
-        // v43.4: al entrar desde LOGIN, la primera ventana de trabajo será GRAFICAS.
+        // v43.5: al entrar desde LOGIN, la primera ventana de trabajo será GRAFICAS.
         setCurrentTab('graficas');
       }
       const result = old.apply(this, arguments);
@@ -127,11 +127,11 @@
     const wrapped = async function(value){
       const before = currentTab() || 'graficas';
       const ret = await old.apply(this, arguments);
-      // v43.4: al cambiar de evento desde dentro, mantener la misma ventana activa.
+      // v43.5: al cambiar de evento desde dentro, mantener la misma ventana activa.
       if(before) setCurrentTab(before);
       try{ if(typeof render === 'function') render(); else window.render?.(); }catch(_){ }
       setTimeout(() => {
-        try{ window.ControlEventModules?.activate?.(before, {reason:'v43.4-event-change-preserve-tab'}); }catch(_){ }
+        try{ window.ControlEventModules?.activate?.(before, {reason:'v43.5-event-change-preserve-tab'}); }catch(_){ }
         if(before === 'mapa') try{ window.renderMapaProductos?.(); }catch(_){ }
         applyVersion(); syncCompraToggle(); syncFloatingHomes();
       }, 80);

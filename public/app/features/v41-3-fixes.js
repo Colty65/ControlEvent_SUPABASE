@@ -1,8 +1,8 @@
-/* ControlEvent v43.4 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v43.5 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.4';
-  const VERSION_FILE = 'ControlEvent_v43_4';
+  const VERSION = 'ControlEvent v43.5';
+  const VERSION_FILE = 'ControlEvent_v43_5';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();
@@ -332,12 +332,19 @@
     const cards = rows.map(r => `<div class="ce-v413-destino-card"><div class="ce-v413-destino-title"><span>${esc(r.label)}</span><strong>${esc(moneyF(r.total))}</strong></div><div class="ce-v413-mini-bars">${item(r,'comprado','Comprado','#dc2626',r.listComprado)}${item(r,'donado','Donado','#f59e0b',r.listDonado)}${item(r,'pendiente','Pte.Compra','#fb7185',r.listPendiente)}</div></div>`).join('');
     return `<div class="ce-v413-chart-panel"><div class="ce-v413-panel-title"><span>Por destino</span><strong>${esc(moneyF(total))}</strong></div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte.Compra</span></div><div class="ce-v413-destino-bars">${cards || '<div class="empty">Sin datos por destino.</div>'}</div></div>`;
   }
+  function graficasV413Superseded(){
+    return !!(window.__ceStableGraficasV435 || window.ControlEventV434 || window.ControlEventV435);
+  }
   function renderGraficasV413(){
+    if(graficasV413Superseded()){
+      try{ return (window.ControlEventV435?.renderGraficas || window.ControlEventV434?.renderGraficas)?.({reason:'v413-superseded'}); }catch(_){ return; }
+    }
     const wrap = $('eventChartWrap'); if(!wrap) return;
     const g = chartParts();
     wrap.innerHTML = `<div class="chart-shell ce-v413-chart-layout"><div class="ce-v413-chart-panel"><div class="ce-v413-panel-title"><span>Distribución general</span></div><div class="ce-v413-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div>`;
   }
   function patchGraficas(){
+    if(graficasV413Superseded()) return;
     if(renderGraficasV413.__installed) return;
     renderGraficasV413.__installed = true;
     try{ renderGraficas = renderGraficasV413; }catch(_){ }
