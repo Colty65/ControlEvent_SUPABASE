@@ -1,8 +1,8 @@
-/* ControlEvent v43.8.8 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
+/* ControlEvent v44.0 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.8';
-  const VERSION_FILE = 'ControlEvent_v43_8_8';
+  const VERSION = 'ControlEvent v44.0';
+  const VERSION_FILE = 'ControlEvent_v44_0';
   const $ = id => document.getElementById(id);
   const now = () => Date.now();
   let lastHomeAt = 0;

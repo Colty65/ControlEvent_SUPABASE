@@ -1,9 +1,9 @@
-/* ControlEvent v43.8.8 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v44.0 - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v43.8.8';
+  const VERSION = 'ControlEvent v44.0';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -571,16 +571,16 @@
     const visible = !!(panel && !panel.classList.contains('hidden') && isGD());
     btn.classList.toggle('hidden', !visible);
   }
-
   function setCurrentMainTabPlanificacion(){
     try{ currentMainTab = 'planificacion'; }catch(_){ }
-    try{ window.ControlEventApp.navigation.currentMainTab = 'planificacion'; }catch(_){ }
-    try{ window.__ceCurrentMainTab = 'planificacion'; }catch(_){ }
+    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = 'planificacion'; }catch(_){ }
   }
-  function forcePlanificacionPanelVisible(){
+  function clearPlanificacionRuntimeFlag(){
+    try{ if(window.__ceCurrentMainTab === 'planificacion') window.__ceCurrentMainTab = ''; }catch(_){ }
+  }
+  function showOnlyPlanificacionPanel(){
     const panel = document.getElementById(PANEL_ID);
     if(!panel) return false;
-    setCurrentMainTabPlanificacion();
     KNOWN_PANELS.forEach(id => {
       const el = document.getElementById(id);
       if(!el) return;
@@ -600,22 +600,14 @@
     });
     const maint = document.getElementById('maintenanceWrapper');
     if(maint){ maint.classList.add('hidden'); maint.setAttribute('aria-hidden','true'); }
-    KNOWN_BUTTONS.forEach(id => {
-      const b = document.getElementById(id);
-      if(b) b.classList.toggle('active', id === TAB_BUTTON_ID);
-    });
-    document.querySelectorAll('.mobile-menu-action').forEach(el => {
-      el.classList.toggle('primary', el.dataset?.target === TAB_BUTTON_ID);
-    });
-    try{ panel.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ }
+    KNOWN_BUTTONS.forEach(id => document.getElementById(id)?.classList.toggle('active', id === TAB_BUTTON_ID));
+    document.querySelectorAll('.mobile-menu-action').forEach(el => el.classList.toggle('primary', el.dataset?.target === TAB_BUTTON_ID));
     syncPlanTopButton();
     return true;
   }
-  function scheduleForcePlanificacionVisible(){
-    forcePlanificacionPanelVisible();
-    [40, 120, 300].forEach(ms => setTimeout(forcePlanificacionPanelVisible, ms));
-  }
+
   function hidePlanificacion(){
+    clearPlanificacionRuntimeFlag();
     const panel = document.getElementById(PANEL_ID);
     if(panel) panel.classList.add('hidden');
     const btn = document.getElementById(TAB_BUTTON_ID);
@@ -639,12 +631,21 @@
       try{ alert('Planificación inicial solo está disponible para usuarios GD.'); }catch(_){ }
       return false;
     }
+    clearPlanificacionRuntimeFlag();
     setCurrentMainTabPlanificacion();
     ensureReady();
-    forcePlanificacionPanelVisible();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v43.8.8] No se pudo inicializar el formulario de planificación.', error); }
+    showOnlyPlanificacionPanel();
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v44.0] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
-    scheduleForcePlanificacionVisible();
+    // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
+    [50, 180].forEach(ms => setTimeout(() => {
+      try{
+        if((typeof currentMainTab !== 'undefined' && currentMainTab === 'planificacion') || document.getElementById(TAB_BUTTON_ID)?.classList.contains('active')){
+          showOnlyPlanificacionPanel();
+          unlockPlanControls();
+        }
+      }catch(_){ }
+    }, ms));
     return false;
   }
   function hideByRole(){
@@ -694,9 +695,9 @@
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
     bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); showPlanificacion(); }, true);
-    KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => bindOnce(document.getElementById(id), 'click', () => setTimeout(hidePlanificacion, 0)));
+    KNOWN_BUTTONS.filter(id => id !== TAB_BUTTON_ID).forEach(id => bindOnce(document.getElementById(id), 'click', () => { clearPlanificacionRuntimeFlag(); setTimeout(hidePlanificacion, 0); }));
     document.querySelectorAll('.mobile-menu-action').forEach(el => {
-      if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => setTimeout(hidePlanificacion, 0));
+      if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => { clearPlanificacionRuntimeFlag(); setTimeout(hidePlanificacion, 0); });
     });
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
@@ -714,7 +715,7 @@
         const target = event.target?.closest?.('button[id], .mobile-menu-action[data-target]');
         if(!target) return;
         const id = target.id || target.dataset?.target || '';
-        if(id && id !== TAB_BUTTON_ID && KNOWN_BUTTONS.includes(id)) setTimeout(hidePlanificacion, 0);
+        if(id && id !== TAB_BUTTON_ID && KNOWN_BUTTONS.includes(id)){ clearPlanificacionRuntimeFlag(); setTimeout(hidePlanificacion, 0); }
       }, true);
     }
   }
@@ -732,24 +733,6 @@
     ensureReady();
     window.showPlanificacionInicial = showPlanificacion;
     window.renderPlanificacionInicial = ensureReady;
-    try{
-      const previousRender = typeof render === 'function' ? render : window.render;
-      if(previousRender && !previousRender.__cePlanificacionV4388){
-        const wrappedRender = function(){
-          const result = previousRender.apply(this, arguments);
-          try{
-            if((typeof currentMainTab !== 'undefined' && currentMainTab === 'planificacion') || window.__ceCurrentMainTab === 'planificacion'){
-              setTimeout(forcePlanificacionPanelVisible, 20);
-              setTimeout(forcePlanificacionPanelVisible, 120);
-            }
-          }catch(_){ }
-          return result;
-        };
-        wrappedRender.__cePlanificacionV4388 = true;
-        try{ render = wrappedRender; }catch(_){ }
-        window.render = wrappedRender;
-      }
-    }catch(_){ }
     window.addEventListener('controlevent:app-ready', ensureReady);
     window.addEventListener('controlevent:runtime-ready', ensureReady);
     setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); unlockPlanControls(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);

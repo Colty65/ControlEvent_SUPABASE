@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v43.8.7",
+  "version": "ControlEvent v43.8.2",
   "from": "ControlEvent v43.6",
   "date": "2026-05-24",
   "changes": [
@@ -7,7 +7,7 @@
     "Oculta el mensaje flotante de borrado cuando no corresponde.",
     "Reordena fichas de Mapa de recursos y añade SALDO LÍMITE.",
     "Sustituye las exportaciones conflictivas de INFOEVENTO y BACKUP por rutas seguras que evitan Maximum call stack size exceeded.",
-    "Actualiza versión activa a ControlEvent v43.8.7."
+    "Actualiza versión activa a ControlEvent v43.8.2."
   ],
   "files": [
     "public/index.html",
