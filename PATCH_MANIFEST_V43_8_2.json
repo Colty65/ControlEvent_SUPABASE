@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v43.8.2",
+  "version": "ControlEvent v43.8.7",
   "base": "ControlEvent v43.8.1",
   "changes": [
     "Menú móvil estable tras Planificación inicial.",

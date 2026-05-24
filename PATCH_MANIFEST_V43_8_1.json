@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v43.8.2",
-  "base": "ControlEvent v43.8.2",
+  "version": "ControlEvent v43.8.7",
+  "base": "ControlEvent v43.8.7",
   "changedFiles": [
     "public/index.html",
     "public/app/version.js",
