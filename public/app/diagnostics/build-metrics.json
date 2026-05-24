@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v43.5",
+  "version": "ControlEvent v43.6",
   "base": "v30.6",
-  "notes": "v43.5: corrige guardado a la primera en compras/donaciones, añade buscadores, elimina Por segmento/Por destino del resumen y cambia Gráficas a queso + Por destino.",
+  "notes": "v43.6: corrige el parpadeo de GRAFICAS desactivando el render legacy de barras y dejando un único render estable de queso + Por destino; barras de Por destino más anchas.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -16,5 +16,5 @@
     "public/app/features/summary-tienda-sort-fix.js",
     "public/app/features/v41-3-fixes.js"
   ],
-  "build": "v43.5"
+  "build": "v43.6"
 }
