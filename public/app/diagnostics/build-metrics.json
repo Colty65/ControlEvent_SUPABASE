@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v43.8",
+  "version": "ControlEvent v43.8.1",
   "base": "v30.6",
-  "notes": "v43.8: corrige refresco de edición en DONACIONES y restaura INFOEVENTO/BACKUP al motor original que generaba los Excel correctos.",
+  "notes": "v43.8.1: corrige Planificación inicial borrosa/bloqueada en móvil y vuelve a mostrar el precio del producto en COMPRAS.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -15,7 +15,8 @@
     "public/app/features/budget-tooltips-lite.js",
     "public/app/features/summary-tienda-sort-fix.js",
     "public/app/features/v41-3-fixes.js",
-    "public/app/features/v43-7-fixes.js"
+    "public/app/features/v43-7-fixes.js",
+    "public/app/features/v43-8-1-fixes.js"
   ],
-  "build": "v43.8"
+  "build": "v43.8.1"
 }
