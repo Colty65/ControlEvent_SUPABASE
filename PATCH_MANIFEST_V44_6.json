@@ -1,0 +1,13 @@
+{
+  "version": "ControlEvent v44.6",
+  "version_file": "ControlEvent_v44_6",
+  "base": "ControlEvent v44.5.1",
+  "changes": [
+    "Capa de carga durante cambio de evento",
+    "Bloqueo temporal de interacción mientras se recompone el evento",
+    "Preservación del desplegable de eventos",
+    "PERF muestra estado del cambio de evento",
+    "Service worker/cache actualizado"
+  ],
+  "untouched_business_logic": ["COMPRAS", "DONACIONES", "INFOEVENTO", "BACKUP"]
+}

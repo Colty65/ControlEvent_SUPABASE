@@ -1,9 +1,9 @@
-/* ControlEvent v44.5.1 - Diagnóstico de rendimiento robusto.
+/* ControlEvent v44.6 - Diagnóstico de rendimiento robusto.
    Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.5.1';
+  const VERSION = 'ControlEvent v44.6';
   const START_MS = (performance && performance.now) ? performance.now() : Date.now();
   const MAX_EVENTS = 120;
   const MAX_ERRORS = 30;
