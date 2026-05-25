@@ -1,0 +1,22 @@
+ControlEvent v45.1
+==================
+
+Versión basada en v45.0.
+
+Cambios realizados:
+- RESUMEN PRESUPUESTARIO / OPERATIVA:
+  - PRESUPUESTO se sustituye por INGRESO TOTAL.
+- RESUMEN PRESUPUESTARIO / INGRESOS EN DINERO:
+  - INGRESOS EN DINERO e INGRESO DINERO se sustituyen por INGRESOS.
+- Añadido parche ligero final: public/app/features/v45-1-budget-labels.js
+  - Solo actúa sobre #budgetLayout.
+  - No toca el selector de evento ni el flujo de carga v44.7.x/v45.0.
+- Versión actualizada a ControlEvent v45.1 / ControlEvent_v45_1.
+- Cache/service worker actualizado a controlevent-shell-v45-1.
+
+No se ha tocado:
+- Guardado de COMPRAS.
+- Guardado de DONACIONES.
+- INFOEVENTO.
+- BACKUP.
+- Cambio de evento conseguido en v44.7.x/v45.0.
