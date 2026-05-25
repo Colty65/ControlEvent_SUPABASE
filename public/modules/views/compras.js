@@ -2,7 +2,7 @@ import { createLegacyView } from './_view-runtime.js';
 
 const view = createLegacyView({
   name: 'compras',
-  render: ['renderBudget', 'renderCompras']
+  render: ['renderCompras']
 });
 
 export const meta = view.meta;

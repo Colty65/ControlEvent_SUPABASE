@@ -1,0 +1,20 @@
+{
+  "version": "ControlEvent v44.7.0",
+  "from": "ControlEvent v44.5.1",
+  "type": "event-switcher-rethink",
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/v44-7-event-switcher.js",
+    "public/modules/views/compras.js",
+    "package.json"
+  ],
+  "changes": [
+    "Selector de evento unificado para login y cambio durante uso.",
+    "Render activo único con limpieza de DOM pesado de ventanas no activas.",
+    "Cancelación de renders obsoletos mediante token.",
+    "Menú respetado durante la carga: no vuelve a INGRESOS por defecto.",
+    "RESUMEN no dispara GRAFICAS; COMPRAS no dispara RESUMEN desde el módulo lazy."
+  ]
+}

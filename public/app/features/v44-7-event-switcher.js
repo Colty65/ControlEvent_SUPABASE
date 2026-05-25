@@ -1,0 +1,428 @@
+/* ControlEvent v44.7.0 - selector de evento unificado y render activo único.
+   Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
+   cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
+(function(){
+  'use strict';
+
+  const VERSION = 'ControlEvent v44.7.0';
+  const VERSION_FILE = 'ControlEvent_v44_7_0';
+  const SELECT_KEY = 'controlevent_v229_selected_event_id';
+  const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
+  const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
+  const STORAGE_FALLBACK = 'controlevent_v6_4';
+  const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
+  const PANEL_BY_TAB = {
+    ingresos:'tabIngresos',
+    donaciones:'tabDonaciones',
+    compras:'tabCompras',
+    mapa:'tabMapaProductos',
+    planificacion:'tabPlanificacionInicial',
+    resumen:'tabResumen',
+    graficas:'tabGraficas'
+  };
+  const BUTTON_BY_TAB = {
+    ingresos:'tabIngresosBtn',
+    donaciones:'tabDonacionesBtn',
+    compras:'tabComprasBtn',
+    mapa:'tabMapaBtn',
+    planificacion:'tabPlanificacionBtn',
+    resumen:'tabResumenBtn',
+    graficas:'tabGraficasBtn'
+  };
+  const TAB_BY_BUTTON = Object.entries(BUTTON_BY_TAB).reduce((acc,[tab,id]) => (acc[id]=tab, acc), {});
+  const DYNAMIC_IDS = {
+    ingresos:['ingresosSummaryGrid','collabList'],
+    donaciones:['donacionesList'],
+    compras:['comprasList'],
+    mapa:['mapaProductosSummary','mapaProductosList'],
+    planificacion:['planificacionInicialBody','planificacionInicialList','planificacionInicialSummary'],
+    resumen:['budgetLayout','summarySegmento','summaryDestino','summaryTiendaTicket'],
+    graficas:['eventChartWrap']
+  };
+  const transition = {
+    token: 0,
+    timer: 0,
+    active: false,
+    eventId: '',
+    targetTab: '',
+    startedAt: 0,
+    lastRenderAt: 0
+  };
+
+  let originalRender = null;
+  let originalRenderBudget = null;
+
+  function $(id){ return document.getElementById(id); }
+  function safe(fn, fallback){ try{ const value = fn(); return value === undefined ? fallback : value; }catch(_){ return fallback; } }
+  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v44.7.0] Error en ' + name, error); return undefined; } }
+  function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
+  function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
+  function storageKey(){ return safe(() => (typeof STORAGE_KEY !== 'undefined' && STORAGE_KEY) || STORAGE_FALLBACK, STORAGE_FALLBACK); }
+  function events(){ const s = st(); return Array.isArray(s.eventos) ? s.eventos : []; }
+  function eventById(id){ const sid = String(id || ''); return events().find(e => String(e.id || '') === sid) || null; }
+  function hasValidEvent(id){ const sid = String(id == null ? st().selectedEventId : id); return !!sid && !!eventById(sid); }
+  function currentEventId(){ return String(st().selectedEventId || ''); }
+  function isAwaitingEvent(){ return !!auth() && !hasValidEvent(); }
+  function isMobileLike(){ return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches) || /iPad|iPhone|Android/i.test(navigator.userAgent || ''); }
+  function currentTab(){
+    const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
+    if(TABS.includes(String(lexical))) return String(lexical);
+    const appTab = safe(() => window.ControlEventApp?.navigation?.currentMainTab || '', '');
+    if(TABS.includes(String(appTab))) return String(appTab);
+    const memorized = safe(() => window.__ceCurrentMainTab || '', '');
+    if(TABS.includes(String(memorized))) return String(memorized);
+    const visible = TABS.find(tab => { const panel = $(PANEL_BY_TAB[tab]); return panel && !panel.classList.contains('hidden'); });
+    return visible || 'ingresos';
+  }
+  function setTab(tab){
+    const next = TABS.includes(String(tab)) ? String(tab) : 'ingresos';
+    try{ currentMainTab = next; }catch(_){ }
+    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = next; }catch(_){ }
+    try{ window.__ceCurrentMainTab = next; }catch(_){ }
+    return next;
+  }
+  function markChosen(){ try{ sessionStorage.setItem(CHOSEN_KEY, '1'); sessionStorage.setItem(OLD_CHOSEN_KEY, '1'); }catch(_){ } }
+  function clearChosen(){ try{ sessionStorage.removeItem(CHOSEN_KEY); sessionStorage.removeItem(OLD_CHOSEN_KEY); }catch(_){ } }
+  function chosen(){ return safe(() => sessionStorage.getItem(CHOSEN_KEY) === '1' || sessionStorage.getItem(OLD_CHOSEN_KEY) === '1', false); }
+  function rememberEvent(id){ if(!hasValidEvent(id)) return; try{ sessionStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } try{ localStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } }
+  function persistLocal(){ try{ localStorage.setItem(storageKey(), JSON.stringify(st())); }catch(_){ } }
+  function scheduleRemoteSave(){
+    try{
+      const u = auth();
+      if(!u || !['RW','GD'].includes(String(u.nivel || '').toUpperCase())) return;
+      if(typeof pushStateToServer !== 'function' && typeof window.pushStateToServer !== 'function') return;
+      clearTimeout(window.__ceV447EventSaveTimer);
+      window.__ceV447EventSaveTimer = setTimeout(() => { try{ (window.pushStateToServer || pushStateToServer)(); }catch(_){ } }, 450);
+    }catch(_){ }
+  }
+  function applyVersion(){
+    try{ document.title = VERSION; }catch(_){ }
+    try{ document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; window.VERSION = VERSION; window.VERSION_FILE = VERSION_FILE; }catch(_){ }
+    try{
+      document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
+        const t = el.textContent || '';
+        if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION);
+      });
+    }catch(_){ }
+    try{
+      const proto = HTMLAnchorElement.prototype;
+      if(!proto.click.__ceV447VersionFile){
+        const old = proto.click;
+        const wrapped = function(){
+          try{ if(this.download) this.download = String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE); }catch(_){ }
+          return old.apply(this, arguments);
+        };
+        wrapped.__ceV447VersionFile = true;
+        proto.click = wrapped;
+      }
+    }catch(_){ }
+  }
+  function injectStyle(){
+    if($('ceV447Style')) return;
+    const style = document.createElement('style');
+    style.id = 'ceV447Style';
+    style.textContent = `
+      #ceEventSwitchNotice{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:5000;max-width:min(560px,92vw);padding:10px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:white;font-weight:800;font-size:13px;box-shadow:0 12px 28px rgba(15,23,42,.26);pointer-events:none;opacity:0;transition:opacity .16s ease, transform .16s ease;text-align:center;}
+      #ceEventSwitchNotice.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+      .ce-v447-loading{margin:14px 0;padding:16px 18px;border-radius:18px;background:rgba(248,250,252,.96);border:1px solid rgba(148,163,184,.28);color:#334155;font-weight:800;box-shadow:0 10px 28px rgba(15,23,42,.08);}
+      .ce-v447-loading small{display:block;margin-top:3px;color:#64748b;font-weight:700;}
+      body.ce-v447-switching #selectedEvent{outline:2px solid rgba(37,99,235,.65);box-shadow:0 0 0 4px rgba(37,99,235,.13);}
+    `;
+    document.head.appendChild(style);
+  }
+  function notice(text){
+    injectStyle();
+    let box = $('ceEventSwitchNotice');
+    if(!box){ box = document.createElement('div'); box.id = 'ceEventSwitchNotice'; document.body.appendChild(box); }
+    box.textContent = text || 'Cargando evento...';
+    box.classList.add('visible');
+    clearTimeout(box.__hideTimer);
+    box.__hideTimer = setTimeout(() => box.classList.remove('visible'), 1400);
+  }
+  function setSwitching(on){ try{ document.body.classList.toggle('ce-v447-switching', !!on); }catch(_){ } }
+  function clearContainer(id){ const el = $(id); if(!el) return 0; const n = el.getElementsByTagName ? el.getElementsByTagName('*').length : el.childNodes.length; if(el.childNodes.length) el.replaceChildren(); return n; }
+  function clearDynamic(activeTab, options = {}){
+    const includeActive = options.includeActive === true;
+    Object.entries(DYNAMIC_IDS).forEach(([tab, ids]) => {
+      if(tab === activeTab && !includeActive) return;
+      ids.forEach(clearContainer);
+    });
+  }
+  function showLoading(tab, label){
+    const ids = DYNAMIC_IDS[tab] || [];
+    const id = ids[ids.length - 1] || ids[0];
+    const el = id ? $(id) : null;
+    if(!el) return;
+    el.innerHTML = `<div class="ce-v447-loading">${escapeHtml(label || 'Cargando nuevo evento...')}<small>Preparando la ventana ${escapeHtml(tab || '')}.</small></div>`;
+  }
+  function closeMobileDrawer(){ try{ document.body.classList.remove('mobile-drawer-open'); }catch(_){ } }
+  function syncTabs(){
+    const tab = currentTab();
+    const hasEvent = hasValidEvent();
+    TABS.forEach(name => {
+      const panel = $(PANEL_BY_TAB[name]);
+      if(panel) panel.classList.toggle('hidden', !hasEvent || name !== tab);
+      const btn = $(BUTTON_BY_TAB[name]);
+      if(btn) btn.classList.toggle('active', hasEvent && name === tab);
+      document.querySelectorAll(`.mobile-menu-action[data-target="${BUTTON_BY_TAB[name]}"]`).forEach(el => {
+        el.classList.toggle('primary', hasEvent && name === tab);
+      });
+    });
+    const msg = $('noEventMessage');
+    if(msg) msg.classList.toggle('hidden', hasEvent);
+    try{ document.body.classList.toggle('ce-v44-awaiting-event', !hasEvent && !!auth()); }catch(_){ }
+  }
+  function shell(){
+    applyVersion();
+    call('renderEnvironmentBanner');
+    call('renderAuthUI');
+    if(!auth()) return;
+    if(hasValidEvent()){
+      try{ document.body.classList.remove('ce-v44-awaiting-event'); }catch(_){ }
+      const msg = $('noEventMessage'); if(msg) msg.classList.add('hidden');
+      call('renderHeader');
+      syncTabs();
+      call('renderPermissions');
+      call('renderLockState');
+      return;
+    }
+    // Sin evento seleccionado: solo cabecera y pantalla limpia.
+    call('renderHeader');
+    syncTabs();
+    const msg = $('noEventMessage');
+    if(msg){
+      msg.classList.remove('hidden');
+      if(!msg.querySelector('.ce-v44-welcome')){
+        msg.innerHTML = '<div class="ce-v44-welcome"><img src="./assets/icons/controlevent-welcome-v44.png" alt="ControlEvent" /><h2>Selecciona un evento para trabajar</h2><p>Elige el evento en el desplegable superior. Hasta entonces la pantalla de trabajo queda limpia.</p></div>';
+      }
+    }
+  }
+  function withGraficasDisabled(fn){
+    const oldWin = window.renderGraficas;
+    let oldLex;
+    try{ oldLex = (typeof renderGraficas !== 'undefined' ? renderGraficas : undefined); }catch(_){ oldLex = undefined; }
+    const noop = function(){ return undefined; };
+    try{ renderGraficas = noop; }catch(_){ }
+    window.renderGraficas = noop;
+    try{ return fn(); }
+    finally{
+      if(oldLex){ try{ renderGraficas = oldLex; }catch(_){ } }
+      if(oldWin) window.renderGraficas = oldWin;
+    }
+  }
+  function renderBudgetNoGraph(){
+    const fn = originalRenderBudget || window.renderBudget;
+    if(typeof fn !== 'function' || fn === renderBudgetNoGraph) return undefined;
+    return withGraficasDisabled(() => fn.apply(window, arguments));
+  }
+  function renderStableGraficas(){
+    try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
+    const wrap = $('eventChartWrap');
+    if(wrap){
+      const oldBars = wrap.querySelector('.chart-bars,.chart-track,.chart-seg:not(.ce-v434-pie-slice)');
+      if(oldBars) wrap.replaceChildren();
+    }
+    const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
+    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.0-active-only'});
+    return call('renderGraficas');
+  }
+  function renderActive(tab){
+    if(!hasValidEvent()) return;
+    const active = setTab(tab || currentTab());
+    shell();
+    if(['ingresos','compras','donaciones'].includes(active)) call('renderMainSelectors');
+    switch(active){
+      case 'ingresos': call('renderIngresosSummary'); call('renderColabs'); break;
+      case 'compras': call('renderCompras'); break;
+      case 'donaciones': call('renderDonaciones'); break;
+      case 'mapa': call('renderMapaProductos'); break;
+      case 'planificacion': try{ window.ControlEventPlanificacion?.show?.(); }catch(_){ } break;
+      case 'resumen': renderBudgetNoGraph(); clearContainer('eventChartWrap'); break;
+      case 'graficas': renderStableGraficas(); break;
+    }
+    call('renderPermissions');
+    call('renderLockState');
+    transition.active = false;
+    transition.lastRenderAt = Date.now();
+    setSwitching(false);
+    applyVersion();
+  }
+  function queueActive(tab, token, options = {}){
+    const active = setTab(tab || currentTab());
+    clearTimeout(transition.timer);
+    const delay = Number(options.delay ?? (isMobileLike() ? 140 : 40));
+    transition.timer = setTimeout(() => {
+      if(token && token !== transition.token) return;
+      try{ renderActive(active); }catch(error){ console.warn('[v44.7.0] render activo', error); setSwitching(false); }
+    }, delay);
+  }
+  function chooseTargetTab(wasEvent){
+    const nowTab = currentTab();
+    if(!wasEvent || isAwaitingEvent()) return 'graficas';
+    if(!TABS.includes(nowTab) || nowTab === 'planificacion') return 'graficas';
+    return nowTab;
+  }
+  async function selectEvent(value, options = {}){
+    const id = String(value || '');
+    const s = st();
+    if(!id || !eventById(id)){
+      if(s) s.selectedEventId = '';
+      clearChosen();
+      clearDynamic('', {includeActive:true});
+      shell();
+      return false;
+    }
+    const previousId = currentEventId();
+    const wasEvent = hasValidEvent(previousId);
+    const targetTab = options.tab || chooseTargetTab(wasEvent);
+    const token = ++transition.token;
+    transition.active = true;
+    transition.eventId = id;
+    transition.targetTab = targetTab;
+    transition.startedAt = Date.now();
+    setSwitching(true);
+    markChosen();
+    rememberEvent(id);
+    if(s) s.selectedEventId = id;
+    setTab(targetTab);
+    const sel = $('selectedEvent'); if(sel) sel.value = id;
+    persistLocal();
+    scheduleRemoteSave();
+    clearDynamic(targetTab, {includeActive:true});
+    shell();
+    showLoading(targetTab, wasEvent ? 'Cargando nuevo evento...' : 'Cargando evento seleccionado...');
+    notice(wasEvent ? 'Cargando nuevo evento… preparando ventana activa' : 'Cargando evento seleccionado… preparando Gráficas');
+    queueActive(targetTab, token, {delay: options.delay});
+    return false;
+  }
+  function renderV447(options = {}){
+    if(transition.active && !options.force){
+      shell();
+      return undefined;
+    }
+    shell();
+    if(auth() && hasValidEvent()){
+      queueActive(currentTab(), ++transition.token, {delay: options.delay ?? 0});
+    }
+    return undefined;
+  }
+  function patchBudget(){
+    const current = window.renderBudget || safe(() => (typeof renderBudget === 'function' ? renderBudget : null), null);
+    if(typeof current === 'function' && current !== renderBudgetNoGraph && !originalRenderBudget) originalRenderBudget = current;
+    try{ renderBudget = renderBudgetNoGraph; }catch(_){ }
+    window.renderBudget = renderBudgetNoGraph;
+  }
+  function patchRender(){
+    const current = window.render || safe(() => (typeof render === 'function' ? render : null), null);
+    if(typeof current === 'function' && current !== renderV447 && !originalRender) originalRender = current;
+    try{ render = renderV447; }catch(_){ }
+    window.render = renderV447;
+  }
+  function patchChangeSelected(){
+    const fn = function(value){ return selectEvent(value); };
+    fn.__ceV447Unified = true;
+    try{ changeSelectedEvent = fn; }catch(_){ }
+    window.changeSelectedEvent = fn;
+  }
+  function patchAppActions(){
+    const actions = window.ControlEventApp?.actions;
+    if(!actions) return;
+    actions.render = (...args) => renderV447(...args);
+    actions.changeSelectedEvent = (...args) => selectEvent(...args);
+    actions.renderBudget = (...args) => renderBudgetNoGraph(...args);
+    actions.renderGraficas = (...args) => renderStableGraficas(...args);
+    actions.renderTabVisibility = (...args) => { syncTabs(); return call('renderTabVisibility', args); };
+  }
+  function handleTabClick(event){
+    const trigger = event.target?.closest?.('button[id],.mobile-menu-action[data-target]');
+    if(!trigger) return;
+    const id = trigger.dataset?.target || trigger.id || '';
+    const tab = TAB_BY_BUTTON[id] || '';
+    if(!tab) return;
+    if(!auth() || !hasValidEvent()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    closeMobileDrawer();
+    const token = ++transition.token;
+    transition.active = true;
+    transition.targetTab = tab;
+    setSwitching(true);
+    setTab(tab);
+    clearDynamic(tab, {includeActive:true});
+    shell();
+    showLoading(tab, 'Preparando ventana...');
+    queueActive(tab, token, {delay: isMobileLike() ? 80 : 20});
+    return false;
+  }
+  function handleSelectedChange(event){
+    const sel = event.target?.closest?.('#selectedEvent');
+    if(!sel) return;
+    // Los listeners antiguos invocan window.changeSelectedEvent; esta barrera evita renders duplicados si llega hasta aquí.
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    selectEvent(sel.value);
+    return false;
+  }
+  function patchLoginPicker(){
+    const old = window.doLogin || safe(() => (typeof doLogin === 'function' ? doLogin : null), null);
+    if(typeof old !== 'function' || old.__ceV447Login) return;
+    const wrapped = async function(){
+      clearChosen();
+      const ret = await old.apply(this, arguments);
+      try{
+        if(auth()){
+          const s = st();
+          if(Array.isArray(s.eventos)) s.selectedEventId = '';
+          setTab('graficas');
+          clearDynamic('', {includeActive:true});
+          shell();
+        }
+      }catch(_){ }
+      return ret;
+    };
+    wrapped.__ceV447Login = true;
+    try{ doLogin = wrapped; }catch(_){ }
+    window.doLogin = wrapped;
+    try{ if(window.ControlEventApp?.actions) window.ControlEventApp.actions.doLogin = (...args) => wrapped(...args); }catch(_){ }
+  }
+  function install(){
+    injectStyle();
+    applyVersion();
+    patchBudget();
+    patchRender();
+    patchChangeSelected();
+    patchLoginPicker();
+    patchAppActions();
+    try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
+    if(!document.__ceV447Tabs){
+      document.__ceV447Tabs = true;
+      document.addEventListener('click', handleTabClick, true);
+      document.addEventListener('change', handleSelectedChange, true);
+    }
+    if(auth() && !chosen() && events().length && hasValidEvent()){
+      // Si venimos justo del login con un selectedEventId restaurado por parches antiguos, volver al selector.
+      const s = st();
+      s.__ceV447PreviousEventId = s.selectedEventId;
+      s.selectedEventId = '';
+      clearDynamic('', {includeActive:true});
+    }
+    shell();
+  }
+
+  window.ControlEventV447 = {
+    version: VERSION,
+    versionFile: VERSION_FILE,
+    install,
+    selectEvent,
+    render: renderV447,
+    renderActive,
+    state: transition
+  };
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
+  else install();
+  ['load','controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
+  [120, 600, 1400].forEach(ms => setTimeout(install, ms));
+})();
