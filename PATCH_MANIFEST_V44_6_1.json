@@ -1,0 +1,11 @@
+{
+  "version": "ControlEvent v44.6.1",
+  "version_file": "ControlEvent_v44_6_1",
+  "base": "ControlEvent v44.6",
+  "summary": [
+    "Convierte la capa de carga de evento de v44.6 en aviso pasivo no bloqueante.",
+    "No deshabilita el desplegable de eventos ni bloquea clicks.",
+    "Elimina el MutationObserver global y las esperas por estabilidad DOM que podían dejar el cambio colgado.",
+    "Actualiza versión/caché a v44.6.1."
+  ]
+}

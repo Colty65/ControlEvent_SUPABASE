@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v44.6",
-  "version_file": "ControlEvent_v44_6",
+  "version": "ControlEvent v44.6.1",
+  "version_file": "ControlEvent_v44_6_1",
   "base": "ControlEvent v44.5.1",
   "changes": [
     "Capa de carga durante cambio de evento",

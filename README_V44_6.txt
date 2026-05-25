@@ -1,4 +1,4 @@
-ControlEvent v44.6
+ControlEvent v44.6.1
 
 Base: v44.5.1 estable.
 

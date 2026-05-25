@@ -1,4 +1,4 @@
-ControlEvent v44.6
+ControlEvent v44.6.1
 
 Base: v44.3
 
@@ -13,6 +13,6 @@ Cambios principales:
 - La limpieza de ventanas pesadas pasa a ser selectiva y limitada por ventana/evento.
 - Se reduce la reinstalación repetida de parches al cambiar de módulo.
 - Se mantiene GRAFICAS con motor estable queso + Por destino.
-- Versión actualizada a ControlEvent v44.6 / ControlEvent_v44_6.
+- Versión actualizada a ControlEvent v44.6.1 / ControlEvent_v44_6_1.
 
 No se ha tocado la lógica de guardado de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.
