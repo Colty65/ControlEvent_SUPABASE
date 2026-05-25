@@ -1,9 +1,9 @@
-/* ControlEvent v44.6.1 - Diagnóstico de rendimiento robusto.
+/* ControlEvent v44.6.2 - Diagnóstico de rendimiento robusto.
    Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.6.1';
+  const VERSION = 'ControlEvent v44.6.2';
   const START_MS = (performance && performance.now) ? performance.now() : Date.now();
   const MAX_EVENTS = 120;
   const MAX_ERRORS = 30;
@@ -188,13 +188,13 @@
     return true;
   }
   function installRenderOptimizer(){
-    // v44.6.1: el diagnóstico ya NO limpia automáticamente el DOM.
-    // La limpieza global de v44.2/v44.6.1 era útil para medir, pero generaba demasiadas pasadas
+    // v44.6.2: el diagnóstico ya NO limpia automáticamente el DOM.
+    // La limpieza global de v44.2/v44.6.2 era útil para medir, pero generaba demasiadas pasadas
     // y podía convertirse en otro proceso pesado. Aquí solo se mantienen métricas y una acción manual.
     if(renderOptimizer.installed) return;
     renderOptimizer.installed = true;
     renderOptimizer.mode = 'diagnostic-only-no-auto-prune';
-    renderOptimizer.lastReason = 'v44.6.1: limpieza automática desactivada';
+    renderOptimizer.lastReason = 'v44.6.2: limpieza automática desactivada';
   }
 
   function sample(reason){
@@ -352,10 +352,8 @@
     const d = last.dom || {};
     const m = last.memory || {};
     const events = state.events.slice(-8).map(ev => `${ev.at} · ${ev.type}${ev.ms ? ' · '+ev.ms+'ms' : ''}${ev.label ? ' · '+ev.label : ''}${ev.name ? ' · '+ev.name : ''}`).join('\n');
-    const load = window.__ceV446LoadingState || {};
-    const loadLine = load.startedAt ? `\nCambio evento: ${load.active ? 'EN CURSO' : 'COMPLETADO'} · fase ${load.phase || '-'} · último ${load.lastCompletedMs || load.elapsedMs || 0} ms · evento ${load.eventId || '-'} · bloqueos ${load.preventedClicks || 0}` : '\nCambio evento: sin datos v44.6.1';
     panel.innerHTML = `
-      <h3>Diagnóstico rendimiento · v44.6.1</h3>
+      <h3>Diagnóstico rendimiento · v44.6.2</h3>
       <div class="grid">
         ${cell('Pantalla', last.screen || '-')}
         ${cell('Evento', last.eventId || '-')}
@@ -371,7 +369,7 @@
         ${cell('Errores', state.counters.errors)}
       </div>
       <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, gráficas ${r.renderizado?.graficas||0}\nOptimización DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
-Optimización v44.6.1: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}${loadLine}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
+Optimización v44.6.2: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
       <pre>${htmlEscape(events || 'Sin eventos recientes')}</pre>
       <div class="actions">
         <button type="button" id="cePerf442Copy">Copiar informe</button>
@@ -519,7 +517,7 @@ Optimización v44.6.1: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
   else install();
   window.addEventListener('load', () => setTimeout(install, 80), {once:true});
   ['controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(installWrappers, 80)));
-  // v44.6.1: refresco ligero del panel PERF mientras está abierto, sin podas automáticas.
+  // v44.6.2: refresco ligero del panel PERF mientras está abierto, sin podas automáticas.
   setInterval(() => {
     installWrappers();
     installRenderOptimizer();

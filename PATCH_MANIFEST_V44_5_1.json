@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v44.6.1",
-  "version_file": "ControlEvent_v44_6_1",
+  "version": "ControlEvent v44.5.1",
+  "version_file": "ControlEvent_v44_5_1",
   "base": "ControlEvent v44.4",
   "reason": "Recovery: v44.5 broke event selection after login/dropdown; rollback event optimizer and keep v44.4 stable behavior with updated version.",
   "created_at": "2026-05-25T10:54:31.004903Z",
