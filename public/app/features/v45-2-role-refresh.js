@@ -1,4 +1,4 @@
-/* ControlEvent v45.2 - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v45.3 - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
    - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v45.2';
-  const VERSION_FILE = 'ControlEvent_v45_2';
+  const VERSION = 'ControlEvent v45.3';
+  const VERSION_FILE = 'ControlEvent_v45_3';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',
@@ -36,7 +36,7 @@
     if(typeof window[name] === 'function') return window[name];
     return safe(() => Function('return (typeof '+name+' === "function") ? '+name+' : null')(), null);
   }
-  function call(name, args){ const fn = getGlobalFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.2] Error en '+name, error); return undefined; } }
+  function call(name, args){ const fn = getGlobalFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.3] Error en '+name, error); return undefined; } }
   function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
   function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
   function role(){ return String(auth()?.nivel || '').toUpperCase(); }
@@ -104,6 +104,32 @@
     ['btnOpenImport','btnExportSeed','btnToggleMaintenance'].forEach(id => show($(id), false));
     document.querySelectorAll('.mobile-menu-action[data-target="btnOpenImport"],.mobile-menu-action[data-target="btnExportSeed"],.mobile-menu-action[data-target="btnToggleMaintenance"]').forEach(el => show(el, false));
   }
+  function clearRoleResiduesForWritable(){
+    if(isRO()) return;
+    // v45.3: al pasar de RO a GD/RW, limpiar restos de display:none!important y clases de ocultación del rol anterior.
+    Object.values(PANEL_BY_TAB).forEach(id => {
+      const panel = $(id);
+      if(!panel) return;
+      panel.classList.remove('ce-v452-hidden-role');
+      panel.removeAttribute('aria-hidden');
+      panel.removeAttribute('aria-disabled');
+      panel.style.removeProperty('display');
+      panel.style.removeProperty('visibility');
+      panel.style.removeProperty('pointer-events');
+      panel.style.removeProperty('opacity');
+    });
+    Object.values(BUTTON_BY_TAB).forEach(id => show($(id), roleAllowsTab(TAB_BY_BUTTON[id] || '')));
+    document.querySelectorAll('.mobile-menu-action[data-target],#btnOpenImport,#btnExportSeed,#btnToggleMaintenance').forEach(el => {
+      el.classList.remove('ce-v452-hidden-role');
+      el.removeAttribute('aria-hidden');
+      el.removeAttribute('aria-disabled');
+      el.style.removeProperty('display');
+      el.style.removeProperty('visibility');
+      el.style.removeProperty('pointer-events');
+      el.style.removeProperty('opacity');
+      if('disabled' in el) el.disabled = false;
+    });
+  }
   function applyVersion(){
     try{ document.title = VERSION; document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; window.VERSION = VERSION; window.VERSION_FILE = VERSION_FILE; }catch(_){ }
     try{
@@ -123,6 +149,7 @@
       if(!roleAllowsTab(currentTab())) setCurrentTab(defaultTabForRole());
     }
     if(!auth()) return;
+    clearRoleResiduesForWritable();
     if(!roleAllowsTab(currentTab())) setCurrentTab(defaultTabForRole());
     Object.entries(BUTTON_BY_TAB).forEach(([tab,id]) => show($(id), roleAllowsTab(tab)));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => {
@@ -151,8 +178,8 @@
     const style = document.createElement('style');
     style.id = 'ceV452Style';
     style.textContent = `
-      #btnSoftRefresh{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:74px;}
-      #btnSoftRefresh.ce-refreshing{opacity:.72;pointer-events:none;}
+      #btnSoftRefresh{display:inline-flex!important;align-items:center;justify-content:center;gap:4px;min-width:74px;pointer-events:auto!important;position:relative;z-index:40;}
+      #btnSoftRefresh.ce-refreshing{opacity:.72;pointer-events:none!important;}
       #ceSoftRefreshNotice{position:fixed;right:calc(env(safe-area-inset-right,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 58px);z-index:5200;max-width:min(380px,90vw);padding:10px 13px;border-radius:15px;background:rgba(17,24,39,.94);color:#fff;font-weight:850;font-size:12px;box-shadow:0 12px 28px rgba(15,23,42,.24);opacity:0;transform:translateY(-6px);transition:opacity .16s ease, transform .16s ease;pointer-events:none;}
       #ceSoftRefreshNotice.visible{opacity:1;transform:translateY(0);}
       .ce-v452-hidden-role{display:none!important;}
@@ -169,22 +196,49 @@
     clearTimeout(box.__timer);
     box.__timer = setTimeout(() => box.classList.remove('visible'), 1800);
   }
+  function bindRefreshButton(btn){
+    if(!btn || btn.__ceV453RefreshBound) return;
+    btn.__ceV453RefreshBound = true;
+    const run = function(event){
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      refreshActive('button-direct');
+      return false;
+    };
+    // Click directo además del capturador global: evita que otros listeners de menú lo traten como botón normal.
+    btn.addEventListener('click', run, true);
+    btn.onclick = run;
+  }
   function injectRefreshButton(){
     injectStyle();
     const logout = $('btnLogout');
-    if(!logout || $('btnSoftRefresh')) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'btnSoftRefresh';
-    btn.className = 'outline small hidden';
-    btn.title = 'Refrescar datos de la ventana activa sin salir';
-    btn.textContent = 'Refrescar';
-    logout.insertAdjacentElement('beforebegin', btn);
+    let btn = $('btnSoftRefresh');
+    if(!btn && logout){
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'btnSoftRefresh';
+      btn.className = 'outline small hidden';
+      btn.title = 'Refrescar datos de la ventana activa sin salir';
+      btn.textContent = 'Refrescar';
+      logout.insertAdjacentElement('beforebegin', btn);
+    }
+    if(btn){
+      btn.type = 'button';
+      btn.title = 'Refrescar datos de la ventana activa sin salir';
+      btn.style.pointerEvents = 'auto';
+      bindRefreshButton(btn);
+    }
   }
   function setRefreshVisible(){
     injectRefreshButton();
     const btn = $('btnSoftRefresh');
-    if(btn) btn.classList.toggle('hidden', !auth());
+    if(btn){
+      btn.classList.toggle('hidden', !auth());
+      btn.disabled = !!refreshState.busy;
+      btn.style.pointerEvents = refreshState.busy ? 'none' : 'auto';
+      bindRefreshButton(btn);
+    }
     try{ document.body.classList.toggle('ce-role-ro-v452', isRO()); }catch(_){ }
   }
   async function loadFreshState(){
@@ -202,7 +256,7 @@
     return target;
   }
   async function refreshActive(reason){
-    if(refreshState.busy) return false;
+    if(refreshState.busy){ softNotice('Ya se está refrescando...'); return false; }
     if(!auth()){ softNotice('No hay usuario identificado.'); return false; }
     const btn = $('btnSoftRefresh');
     const prevText = btn?.textContent || 'Refrescar';
@@ -216,6 +270,7 @@
       const keepEvent = hasEventId(eventBefore) ? eventBefore : '';
       s.selectedEventId = keepEvent;
       const active = setCurrentTab(activeBefore);
+      try{ window.ControlEventV447?.install?.(); }catch(_){ }
       syncRoleMenu();
       call('renderAuthUI');
       call('renderHeader');
@@ -229,15 +284,15 @@
       }else{
         call('render');
       }
-      setTimeout(syncRoleMenu, 80);
+      setTimeout(() => { try{ window.ControlEventV447?.install?.(); }catch(_){ } syncRoleMenu(); }, 80);
       setTimeout(() => {
         const tab = defaultTabForRole(currentTab());
-        try{ window.ControlEventViewRefreshStabilizer?.hydrate?.(tab, 'v45.2-soft-refresh'); }catch(_){ }
+        try{ window.ControlEventViewRefreshStabilizer?.hydrate?.(tab, 'v45.3-soft-refresh'); }catch(_){ }
       }, 180);
       softNotice('Datos refrescados.');
       return true;
     }catch(error){
-      console.warn('[v45.2] refresco limpio', error);
+      console.warn('[v45.3] refresco limpio', error);
       softNotice('No se pudo refrescar. Usa Salir/Entrar si continúa.');
       return false;
     }finally{

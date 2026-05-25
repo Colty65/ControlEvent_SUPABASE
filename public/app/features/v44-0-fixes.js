@@ -1,12 +1,12 @@
-/* ControlEvent v45.1 - corrección mínima sobre v44.0:
+/* ControlEvent v45.3 - corrección mínima sobre v44.0:
    - navegación de Planificación inicial sin contaminar el resto de pestañas;
    - entrada desde login siempre con selección de evento pendiente;
    - pantalla limpia con icono mientras se selecciona evento.
    No toca COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.1';
-  const VERSION_FILE = 'ControlEvent_v45_1';
+  const VERSION = 'ControlEvent v45.3';
+  const VERSION_FILE = 'ControlEvent_v45_3';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
   const WELCOME_ICON = './assets/icons/controlevent-welcome-v44.png';
