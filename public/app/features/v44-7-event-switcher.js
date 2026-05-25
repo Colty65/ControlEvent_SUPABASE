@@ -1,11 +1,11 @@
-/* ControlEvent v45.1 - selector de evento unificado y render activo único.
+/* ControlEvent v45.2 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v45.1';
-  const VERSION_FILE = 'ControlEvent_v45_1';
+  const VERSION = 'ControlEvent v45.2';
+  const VERSION_FILE = 'ControlEvent_v45_2';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
@@ -69,7 +69,7 @@
 
   function $(id){ return document.getElementById(id); }
   function safe(fn, fallback){ try{ const value = fn(); return value === undefined ? fallback : value; }catch(_){ return fallback; } }
-  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.1] Error en ' + name, error); return undefined; } }
+  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.2] Error en ' + name, error); return undefined; } }
   function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
   function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
   function storageKey(){ return safe(() => (typeof STORAGE_KEY !== 'undefined' && STORAGE_KEY) || STORAGE_FALLBACK, STORAGE_FALLBACK); }
@@ -79,7 +79,24 @@
   function currentEventId(){ return String(st().selectedEventId || ''); }
   function isAwaitingEvent(){ return !!auth() && !hasValidEvent(); }
   function isMobileLike(){ return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches) || /iPad|iPhone|Android/i.test(navigator.userAgent || ''); }
-  function isGD(){ return String(auth()?.nivel || '').toUpperCase() === 'GD'; }
+  function role(){ return String(auth()?.nivel || '').toUpperCase(); }
+  function isGD(){ return role() === 'GD'; }
+  function isRW(){ return role() === 'RW'; }
+  function isRO(){ return role() === 'RO'; }
+  function roleAllowsTab(tab){
+    const name = String(tab || '');
+    if(!auth()) return false;
+    if(isRO()) return ['resumen','mapa','graficas'].includes(name);
+    if(name === 'planificacion') return isGD();
+    return TABS.includes(name);
+  }
+  function defaultTabForRole(prefer){
+    const preferred = String(prefer || '');
+    if(roleAllowsTab(preferred)) return preferred;
+    if(isRO()) return 'resumen';
+    return roleAllowsTab('ingresos') ? 'ingresos' : (roleAllowsTab('resumen') ? 'resumen' : 'graficas');
+  }
+  function tabFromButtonId(id){ return TAB_BY_BUTTON[String(id || '')] || ''; }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
     if(TABS.includes(String(lexical))) return String(lexical);
@@ -91,7 +108,8 @@
     return visible || 'ingresos';
   }
   function setTab(tab){
-    const next = TABS.includes(String(tab)) ? String(tab) : 'ingresos';
+    let next = TABS.includes(String(tab)) ? String(tab) : defaultTabForRole();
+    if(auth() && !roleAllowsTab(next)) next = defaultTabForRole(next);
     try{ currentMainTab = next; }catch(_){ }
     try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = next; }catch(_){ }
     try{ window.__ceCurrentMainTab = next; }catch(_){ }
@@ -168,7 +186,7 @@
     transition.watchdog = setTimeout(() => {
       if(token && token !== transition.token) return;
       if(!transition.active) return;
-      console.warn('[v45.1] Watchdog libera transición bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
+      console.warn('[v45.2] Watchdog libera transición bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
       finishTransition(token);
       notice('Control recuperado. Puedes volver a elegir evento u opción.');
     }, Number(ms || (isMobileLike() ? 9000 : 6000)));
@@ -227,7 +245,8 @@
     if(!grid) return;
     let last = grid.querySelector('[data-target="tabComprasBtn"]') || grid.querySelector('[data-target="tabDonacionesBtn"]') || grid.lastElementChild;
     EVENT_MENU_ORDER.forEach(id => {
-      if(id === 'tabPlanificacionBtn' && !isGD()) return;
+      const tab = tabFromButtonId(id);
+      if(!roleAllowsTab(tab)) return;
       if(grid.querySelector(`.mobile-menu-action[data-target="${id}"]`)){
         last = grid.querySelector(`.mobile-menu-action[data-target="${id}"]`) || last;
         return;
@@ -247,14 +266,24 @@
     if(!auth()) return;
     const tabs = $('mainTabs');
     if(tabs) ensureVisibleControl(tabs, true);
-    ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabResumenBtn','tabGraficasBtn'].forEach(id => ensureVisibleControl($(id), true));
-    ensureVisibleControl($('tabPlanificacionBtn'), isGD());
+    EVENT_MENU_ORDER.forEach(id => {
+      const tab = tabFromButtonId(id);
+      ensureVisibleControl($(id), roleAllowsTab(tab));
+    });
     ensureMobileMenuButtons();
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => {
       const target = el.dataset?.target || '';
-      if(target === 'tabPlanificacionBtn') ensureVisibleControl(el, isGD());
-      else if(EVENT_MENU_ORDER.includes(target)) ensureVisibleControl(el, true);
+      const tab = tabFromButtonId(target);
+      if(EVENT_MENU_ORDER.includes(target)) ensureVisibleControl(el, roleAllowsTab(tab));
     });
+    if(isRO()){
+      ['tabIngresos','tabDonaciones','tabCompras','tabPlanificacionInicial'].forEach(id => ensureVisibleControl($(id), false));
+      ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabPlanificacionBtn'].forEach(id => ensureVisibleControl($(id), false));
+      document.querySelectorAll('.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabPlanificacionBtn"],.mobile-menu-action[data-target="btnToggleMaintenance"],.mobile-menu-action[data-target="btnOpenImport"],.mobile-menu-action[data-target="btnExportSeed"]').forEach(el => ensureVisibleControl(el, false));
+      ensureVisibleControl($('btnToggleMaintenance'), false);
+      ensureVisibleControl($('btnOpenImport'), false);
+      ensureVisibleControl($('btnExportSeed'), false);
+    }
   }
   function ensureEventPlaceholder(){
     const sel = $('selectedEvent');
@@ -334,7 +363,7 @@
       setTimeout(() => { try{ if(isGD()) call('fetchAccessUsers'); }catch(_){ } }, 0);
       return false;
     }catch(err){
-      console.error('[v45.1] login rápido', err);
+      console.error('[v45.2] login rápido', err);
       if(error) error.textContent = err?.message || String(err);
       try{ authUser = null; }catch(_){ }
       window.authUser = null;
@@ -346,15 +375,17 @@
   }
   function syncTabs(){
     unlockMenuShell();
-    const tab = currentTab();
+    let tab = currentTab();
+    if(auth() && !roleAllowsTab(tab)) tab = setTab(defaultTabForRole(tab));
     const hasEvent = hasValidEvent();
     TABS.forEach(name => {
+      const allowed = roleAllowsTab(name);
       const panel = $(PANEL_BY_TAB[name]);
-      if(panel) panel.classList.toggle('hidden', !hasEvent || name !== tab);
+      if(panel) panel.classList.toggle('hidden', !hasEvent || name !== tab || !allowed);
       const btn = $(BUTTON_BY_TAB[name]);
-      if(btn) btn.classList.toggle('active', hasEvent && name === tab);
+      if(btn) btn.classList.toggle('active', hasEvent && name === tab && allowed);
       document.querySelectorAll(`.mobile-menu-action[data-target="${BUTTON_BY_TAB[name]}"]`).forEach(el => {
-        el.classList.toggle('primary', hasEvent && name === tab);
+        el.classList.toggle('primary', hasEvent && name === tab && allowed);
       });
     });
     const msg = $('noEventMessage');
@@ -415,12 +446,13 @@
       if(oldBars) wrap.replaceChildren();
     }
     const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
-    if(typeof stable === 'function') return stable({force:true, reason:'v45.1-active-only'});
+    if(typeof stable === 'function') return stable({force:true, reason:'v45.2-active-only'});
     return call('renderGraficas');
   }
   function renderActive(tab){
     if(!hasValidEvent()) return;
-    const active = setTab(tab || currentTab());
+    const requested = tab || currentTab();
+    const active = setTab(roleAllowsTab(requested) ? requested : defaultTabForRole(requested));
     shell();
     if(['ingresos','compras','donaciones'].includes(active)) call('renderMainSelectors');
     switch(active){
@@ -453,7 +485,7 @@
       const run = () => {
         if(token && token !== transition.token) return;
         try{ renderActive(active); }
-        catch(error){ console.warn('[v45.1] render activo', error); finishTransition(token); }
+        catch(error){ console.warn('[v45.2] render activo', error); finishTransition(token); }
       };
       if(typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(run);
       else run();
@@ -461,9 +493,9 @@
   }
   function chooseTargetTab(wasEvent){
     const nowTab = currentTab();
-    if(!wasEvent || isAwaitingEvent()) return 'graficas';
-    if(!TABS.includes(nowTab) || nowTab === 'planificacion') return 'graficas';
-    return nowTab;
+    let proposed = (!wasEvent || isAwaitingEvent()) ? 'graficas' : nowTab;
+    if(!TABS.includes(proposed) || proposed === 'planificacion') proposed = 'graficas';
+    return roleAllowsTab(proposed) ? proposed : defaultTabForRole(proposed);
   }
   async function selectEvent(value, options = {}){
     const id = String(value || '');
@@ -485,7 +517,8 @@
     }
     if(sameSelectionStillRunning(id)) return false;
     const wasEvent = hasValidEvent(previousId);
-    const targetTab = options.tab || chooseTargetTab(wasEvent);
+    const requestedTab = options.tab || chooseTargetTab(wasEvent);
+    const targetTab = roleAllowsTab(requestedTab) ? requestedTab : defaultTabForRole(requestedTab);
     clearPendingWork();
     const token = ++transition.token;
     transition.active = true;
@@ -519,7 +552,7 @@
     }
     shell();
     if(auth() && hasValidEvent()){
-      queueActive(currentTab(), ++transition.token, {delay: options.delay ?? 0});
+      queueActive(defaultTabForRole(currentTab()), ++transition.token, {delay: options.delay ?? 0});
     }
     return undefined;
   }
@@ -557,6 +590,14 @@
     const tab = TAB_BY_BUTTON[id] || '';
     if(!tab) return;
     if(!auth() || !hasValidEvent()) return;
+    if(!roleAllowsTab(tab)){
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      notice(isRO() ? 'Usuario RO: solo Resumen, Mapa de recursos y Gráficas.' : 'Opción no disponible para este usuario.');
+      setTimeout(() => { try{ shell(); }catch(_){ } }, 0);
+      return false;
+    }
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
@@ -616,6 +657,9 @@
     const oldActivate = modules.activate.bind(modules);
     modules.activate = function(name, options){
       const tab = String(name || '');
+      if(TABS.includes(tab) && auth() && !roleAllowsTab(tab)){
+        return Promise.resolve({ok:true, skipped:true, name:tab, reason:'role-not-allowed'});
+      }
       if(transition.active && transition.targetTab && tab !== transition.targetTab){
         return Promise.resolve({ok:true, skipped:true, name:tab, reason:'event-switch-active'});
       }
@@ -637,6 +681,7 @@
     patchAppActions();
     patchModules();
     unlockMenuShell();
+    if(auth() && !roleAllowsTab(currentTab())) setTab(defaultTabForRole(currentTab()));
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     if(!window.__ceV447Capture){
       window.__ceV447Capture = true;
