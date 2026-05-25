@@ -1,0 +1,4 @@
+Este parche desactiva v44-5-event-optimizer.js eliminando sus referencias de public/index.html y public/sw.js.
+Si quieres dejar la carpeta totalmente limpia, puedes borrar manualmente:
+public/app/features/v44-5-event-optimizer.js
+No es necesario si subes el ZIP completo.
