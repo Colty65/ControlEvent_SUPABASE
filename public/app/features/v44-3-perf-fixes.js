@@ -1,10 +1,10 @@
-/* ControlEvent v44.7.0 - Optimización controlada de render y gráficas.
+/* ControlEvent v44.7.1 - Optimización controlada de render y gráficas.
    Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.7.0';
-  const VERSION_FILE = 'ControlEvent_v44_7_0';
+  const VERSION = 'ControlEvent v44.7.1';
+  const VERSION_FILE = 'ControlEvent_v44_7_1';
   const HEAVY_GROUPS = {
     ingresos: ['collabList','ingresosSummaryGrid'],
     compras: ['comprasList'],
@@ -20,7 +20,7 @@
   function call(name, args){
     const fn = window[name];
     if(typeof fn !== 'function') return undefined;
-    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v44.7.0] Error en ' + name, error); return undefined; }
+    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v44.7.1] Error en ' + name, error); return undefined; }
   }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
@@ -42,6 +42,7 @@
     return safe(() => window.ControlEventApp?.state?.selectedEventId || window.state?.selectedEventId || document.getElementById('selectedEvent')?.value || '', '');
   }
   function hasUser(){ return !!safe(() => (typeof authUser !== 'undefined' ? authUser : null), null) || !!window.authUser; }
+  function eventSwitcherOwnsRender(){ return !!window.__ceEventSwitcherOwnsRender || !!window.ControlEventV447; }
   function visibleTab(id){ const el=$(id); return !!(el && !el.classList.contains('hidden')); }
   function clearIds(ids){
     let cleared = 0;
@@ -55,7 +56,7 @@
     return cleared;
   }
   function pruneInactive(active, reason){
-    // v44.7.0: limpieza selectiva. No se barre todo en cada render.
+    // v44.7.1: limpieza selectiva. No se barre todo en cada render.
     // Solo se limpia una vez por combinación ventana/evento, o cuando se fuerza.
     const key = String(active || '') + '|' + String(selectedEventId() || '');
     const force = reason === 'event-change' || reason === 'force';
@@ -91,7 +92,7 @@
     }
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
-    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.0'});
+    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.1'});
     return call('renderGraficas');
   }
   function renderActiveContent(active){
@@ -124,6 +125,8 @@
     }
   }
   function renderV443(){
+    // v44.7.1: si el nuevo selector unificado controla el render, este optimizador antiguo no debe lanzar render extra.
+    if(eventSwitcherOwnsRender() && window.render !== renderV443) return;
     if(pruneState.rendering) return;
     pruneState.rendering = true;
     try{
@@ -159,7 +162,7 @@
     const wrapped = async function(){
       const result = await old.apply(this, arguments);
       setTimeout(() => {
-        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v44.7.0] render tras cambio de evento', error); }
+        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v44.7.1] render tras cambio de evento', error); }
       }, 0);
       return result;
     };
@@ -187,7 +190,7 @@
   }
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    // v44.7.0: actualización ligera de versión. Evita recorrer todo el DOM en cada instalación.
+    // v44.7.1: actualización ligera de versión. Evita recorrer todo el DOM en cada instalación.
     document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
       const t = el.textContent || '';
       if(/ControlEvent\s+v\d+(?:\.\d+)*/.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/g, VERSION);
@@ -196,9 +199,10 @@
     try{ window.VERSION = VERSION; window.VERSION_FILE = VERSION_FILE; }catch(_){ }
   }
   function install(){
-    window.__ceV443Stats = window.__ceV443Stats || {prunes:0, clearedNodes:0, installedAt:new Date().toISOString(), mode:'v44.7.0-selective'};
+    window.__ceV443Stats = window.__ceV443Stats || {prunes:0, clearedNodes:0, installedAt:new Date().toISOString(), mode:'v44.7.1-selective'};
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     applyVersion();
+    if(eventSwitcherOwnsRender()) return;
     if(!pruneState.installed){
       pruneState.installed = true;
       patchRender();

@@ -1,11 +1,11 @@
-/* ControlEvent v44.7.0 - selector de evento unificado y render activo único.
+/* ControlEvent v44.7.1 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.7.0';
-  const VERSION_FILE = 'ControlEvent_v44_7_0';
+  const VERSION = 'ControlEvent v44.7.1';
+  const VERSION_FILE = 'ControlEvent_v44_7_1';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
@@ -46,15 +46,18 @@
     eventId: '',
     targetTab: '',
     startedAt: 0,
-    lastRenderAt: 0
+    lastRenderAt: 0,
+    lastSelectKey: '',
+    lastSelectAt: 0
   };
+  try{ window.__ceEventSwitcherOwnsRender = VERSION; }catch(_){ }
 
   let originalRender = null;
   let originalRenderBudget = null;
 
   function $(id){ return document.getElementById(id); }
   function safe(fn, fallback){ try{ const value = fn(); return value === undefined ? fallback : value; }catch(_){ return fallback; } }
-  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v44.7.0] Error en ' + name, error); return undefined; } }
+  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v44.7.1] Error en ' + name, error); return undefined; } }
   function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
   function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
   function storageKey(){ return safe(() => (typeof STORAGE_KEY !== 'undefined' && STORAGE_KEY) || STORAGE_FALLBACK, STORAGE_FALLBACK); }
@@ -85,15 +88,16 @@
   function clearChosen(){ try{ sessionStorage.removeItem(CHOSEN_KEY); sessionStorage.removeItem(OLD_CHOSEN_KEY); }catch(_){ } }
   function chosen(){ return safe(() => sessionStorage.getItem(CHOSEN_KEY) === '1' || sessionStorage.getItem(OLD_CHOSEN_KEY) === '1', false); }
   function rememberEvent(id){ if(!hasValidEvent(id)) return; try{ sessionStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } try{ localStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } }
-  function persistLocal(){ try{ localStorage.setItem(storageKey(), JSON.stringify(st())); }catch(_){ } }
+  function persistLocal(){
+    // v44.7.1: el cambio de evento NO debe serializar todo el estado.
+    // En móviles, JSON.stringify(state) puede incluir muchos registros o imágenes de tickets y bloquear la UI.
+    return undefined;
+  }
   function scheduleRemoteSave(){
-    try{
-      const u = auth();
-      if(!u || !['RW','GD'].includes(String(u.nivel || '').toUpperCase())) return;
-      if(typeof pushStateToServer !== 'function' && typeof window.pushStateToServer !== 'function') return;
-      clearTimeout(window.__ceV447EventSaveTimer);
-      window.__ceV447EventSaveTimer = setTimeout(() => { try{ (window.pushStateToServer || pushStateToServer)(); }catch(_){ } }, 450);
-    }catch(_){ }
+    // v44.7.1: seleccionar evento es una preferencia local, no un cambio de datos del evento.
+    // Evitamos pushStateToServer() para que el cambio no dispare guardados globales ni sincronizaciones pesadas.
+    try{ clearTimeout(window.__ceV447EventSaveTimer); }catch(_){ }
+    return undefined;
   }
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
@@ -140,6 +144,20 @@
     box.__hideTimer = setTimeout(() => box.classList.remove('visible'), 1400);
   }
   function setSwitching(on){ try{ document.body.classList.toggle('ce-v447-switching', !!on); }catch(_){ } }
+  function clearPendingWork(){
+    clearTimeout(transition.timer);
+    try{ clearTimeout(window.__ceV447EventSaveTimer); }catch(_){ }
+  }
+  function sameSelectionStillRunning(id){
+    const now = Date.now();
+    return transition.active && String(transition.eventId || '') === String(id || '') && (now - transition.startedAt) < 1600;
+  }
+  function finishTransition(token){
+    if(token && token !== transition.token) return;
+    transition.active = false;
+    transition.lastRenderAt = Date.now();
+    setSwitching(false);
+  }
   function clearContainer(id){ const el = $(id); if(!el) return 0; const n = el.getElementsByTagName ? el.getElementsByTagName('*').length : el.childNodes.length; if(el.childNodes.length) el.replaceChildren(); return n; }
   function clearDynamic(activeTab, options = {}){
     const includeActive = options.includeActive === true;
@@ -223,7 +241,7 @@
       if(oldBars) wrap.replaceChildren();
     }
     const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
-    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.0-active-only'});
+    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.1-active-only'});
     return call('renderGraficas');
   }
   function renderActive(tab){
@@ -242,18 +260,24 @@
     }
     call('renderPermissions');
     call('renderLockState');
-    transition.active = false;
-    transition.lastRenderAt = Date.now();
-    setSwitching(false);
+    finishTransition();
     applyVersion();
   }
   function queueActive(tab, token, options = {}){
     const active = setTab(tab || currentTab());
     clearTimeout(transition.timer);
-    const delay = Number(options.delay ?? (isMobileLike() ? 140 : 40));
+    const isHeavy = active === 'graficas' || active === 'resumen';
+    const baseDelay = isHeavy ? (isMobileLike() ? 260 : 90) : (isMobileLike() ? 90 : 25);
+    const delay = Number(options.delay ?? baseDelay);
     transition.timer = setTimeout(() => {
       if(token && token !== transition.token) return;
-      try{ renderActive(active); }catch(error){ console.warn('[v44.7.0] render activo', error); setSwitching(false); }
+      const run = () => {
+        if(token && token !== transition.token) return;
+        try{ renderActive(active); }
+        catch(error){ console.warn('[v44.7.1] render activo', error); finishTransition(token); }
+      };
+      if(typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(run);
+      else run();
     }, delay);
   }
   function chooseTargetTab(wasEvent){
@@ -273,13 +297,24 @@
       return false;
     }
     const previousId = currentEventId();
+    if(previousId === id && hasValidEvent(id) && !options.force){
+      // Evita dobles disparos del selector o del listener antiguo.
+      markChosen();
+      rememberEvent(id);
+      shell();
+      return false;
+    }
+    if(sameSelectionStillRunning(id)) return false;
     const wasEvent = hasValidEvent(previousId);
     const targetTab = options.tab || chooseTargetTab(wasEvent);
+    clearPendingWork();
     const token = ++transition.token;
     transition.active = true;
     transition.eventId = id;
     transition.targetTab = targetTab;
     transition.startedAt = Date.now();
+    transition.lastSelectKey = previousId + '>' + id + '|' + targetTab;
+    transition.lastSelectAt = transition.startedAt;
     setSwitching(true);
     markChosen();
     rememberEvent(id);
@@ -388,6 +423,7 @@
     try{ if(window.ControlEventApp?.actions) window.ControlEventApp.actions.doLogin = (...args) => wrapped(...args); }catch(_){ }
   }
   function install(){
+    try{ window.__ceEventSwitcherOwnsRender = VERSION; clearTimeout(window.__ceV447EventSaveTimer); }catch(_){ }
     injectStyle();
     applyVersion();
     patchBudget();

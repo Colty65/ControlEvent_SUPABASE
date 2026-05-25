@@ -1,0 +1,21 @@
+{
+  "version": "ControlEvent v44.7.1",
+  "versionFile": "ControlEvent_v44_7_1",
+  "base": "ControlEvent v44.7.0",
+  "type": "stability-hotfix",
+  "changes": [
+    "El cambio de evento deja de serializar todo el estado en localStorage.",
+    "El cambio de evento deja de lanzar pushStateToServer.",
+    "Se guarda solo el id de evento seleccionado como preferencia local.",
+    "Se añade bloqueo de dobles disparos del selector.",
+    "Se cancela trabajo pendiente obsoleto antes de renderizar el nuevo evento.",
+    "Se protege el optimizador v44.3 para que no lance renders extra cuando manda el selector unificado."
+  ],
+  "files": [
+    "public/app/features/v44-7-event-switcher.js",
+    "public/app/features/v44-3-perf-fixes.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/sw.js"
+  ]
+}
