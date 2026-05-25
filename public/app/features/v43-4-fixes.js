@@ -1,9 +1,9 @@
-/* ControlEvent v44.7.2 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v44.7.3 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
-  const VERSION = 'ControlEvent v44.7.2';
-  const VERSION_FILE = 'ControlEvent_v44_7_2';
+  const VERSION = 'ControlEvent v44.7.3';
+  const VERSION_FILE = 'ControlEvent_v44_7_3';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const fold = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -89,6 +89,11 @@
       .ce-v434-mini-value{font-size:10px;font-weight:900;color:#334155;writing-mode:vertical-rl;transform:rotate(180deg);margin:0 auto 5px;max-height:72px;overflow:hidden;}
       .ce-v434-mini-stick{width:58px;border-radius:10px 10px 0 0;margin:0 auto;min-height:8px;box-shadow:inset 0 -1px 0 rgba(0,0,0,.08);}
       .ce-v434-mini-label{font-size:9px;font-weight:900;color:#64748b;margin-top:4px;line-height:1.05;}
+      #ceTooltipV21.ce-v21-layout-chart .ce-v21-table{border-collapse:separate;border-spacing:0 4px;width:max-content;max-width:min(920px,calc(100vw - 48px));}
+      #ceTooltipV21.ce-v21-layout-chart .ce-v21-table tr:first-child td{font-weight:950!important;background:rgba(255,255,255,.48)!important;}
+      #ceTooltipV21.ce-v21-layout-chart .ce-v21-table td{font-weight:700!important;white-space:nowrap!important;color:#111827!important;}
+      #ceTooltipV21.ce-v21-layout-chart .ce-v21-table td:nth-child(n+3),#ceTooltipV21.ce-v21-layout-chart .ce-v21-table td:last-child{text-align:right!important;font-variant-numeric:tabular-nums;}
+      #ceTooltipV21.ce-v21-layout-chart .ce-v21-table td:first-child,#ceTooltipV21.ce-v21-layout-chart .ce-v21-table td:nth-child(2),#ceTooltipV21.ce-v21-layout-chart .ce-v21-table td:last-child{font-weight:950!important;}
       @media(max-width:860px){.ce-v434-chart-layout{grid-template-columns:1fr}.ce-v434-pies{grid-template-columns:1fr}.ce-v434-search{flex-direction:column;align-items:stretch}.ce-v434-search button{width:100%;}.ce-v434-mini-bars{gap:16px}.ce-v434-mini-col{width:82px;min-width:82px}.ce-v434-mini-stick{width:62px;}}
     `;
     document.head.appendChild(style);
@@ -195,9 +200,29 @@
     }, true);
   }
 
-  function incomeLines(fn){ return rowsForEvent().filter(fn).map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} — ${moneyF(r.total || (Number(r.importe||0) + 0))}`); }
-  function donationLines(ticket){ return buysForEvent().filter(r => norm(r.ticketDonacion) === ticket).map(r => `${donorName(r) || 'Sin donante'} — ${r.producto?.nombre || productName(r.productoId) || 'Producto'} — ${moneyF(value(r))}`); }
-  function expenseLines(fn){ return buysForEvent().filter(fn).map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} — ${r.ticketDonacion || 'Pte.Compra'} — ${r.producto?.nombre || productName(r.productoId) || 'Producto'} — ${moneyF(value(r))}`); }
+  function unitPriceFor(row){
+    const p = productObj(row?.productoId) || {};
+    return Number(row?.precio != null ? row.precio : (row?.precioCalc != null ? row.precioCalc : (p.defaultPrecio ?? p.precio ?? 0)));
+  }
+  function qtyF(row){
+    try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0, maximumFractionDigits:2}).format(Number(row?.unidades || 0)); }
+    catch(_){ return String(Number(row?.unidades || 0)); }
+  }
+  function incomeLines(fn){
+    const list = rowsForEvent().filter(fn);
+    if(!list.length) return ['Sin registros'];
+    return ['Nombre | Importe', ...list.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${moneyF(r.total || (Number(r.importe||0) + 0))}`)];
+  }
+  function donationLines(ticket){
+    const list = buysForEvent().filter(r => norm(r.ticketDonacion) === ticket);
+    if(!list.length) return ['Sin registros'];
+    return ['Donante | Producto | Cant. | Precio | Total', ...list.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(value(r))}`)];
+  }
+  function expenseLines(fn){
+    const list = buysForEvent().filter(fn);
+    if(!list.length) return ['Sin registros'];
+    return ['Tienda | Ticket | Producto | Cant. | Precio | Total', ...list.map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(value(r))}`)];
+  }
   function chartParts(){
     const rows = rowsForEvent();
     const compras = buysForEvent();
@@ -246,15 +271,18 @@
       const start = angle;
       const inc = (Math.abs(Number(it.value||0)) / denom) * 360;
       angle += inc;
-      if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it)}></circle>`;
+      if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it, it.color || '#ffffff')}></circle>`;
       const d = arcPath(50,50,42,start,angle);
-      return `<path class="ce-v434-pie-slice" d="${d}" fill="${esc(it.color)}" ${tipAttrs(it)}></path>`;
+      return `<path class="ce-v434-pie-slice" d="${d}" fill="${esc(it.color)}" ${tipAttrs(it, it.color || '#ffffff')}></path>`;
     }).join('') : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`;
-    const legend = (nonzero.length ? nonzero : [{label:'Sin datos',value:0,color:'#e5e7eb',lines:['Sin registros']}]).map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
+    const legend = (nonzero.length ? nonzero : [{label:'Sin datos',value:0,color:'#e5e7eb',lines:['Sin registros']}]).map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color || '#ffffff')}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
     return `<div class="ce-v434-pie-card"><div class="ce-v434-pie-title"><span>${esc(title)}</span><strong>${esc(moneyF(total))}</strong></div><svg class="ce-v434-pie-svg" viewBox="0 0 100 100" role="img" aria-label="${esc(title)}">${slices}<circle cx="50" cy="50" r="21" fill="#fff"></circle></svg><div class="ce-v434-legend">${legend}</div></div>`;
   }
+  function hasDestinoValues(row){
+    return Math.abs(Number(row?.comprado || 0)) > 0 || Math.abs(Number(row?.donado || 0)) > 0 || Math.abs(Number(row?.pendiente || 0)) > 0;
+  }
   function destinoRows(){
-    try{ if(typeof summaryByDestino === 'function') return summaryByDestino() || []; }catch(_){ }
+    try{ if(typeof summaryByDestino === 'function') return (summaryByDestino() || []).filter(hasDestinoValues); }catch(_){ }
     const compras = buysForEvent();
     const destinos = Array.from(new Set([...(window.DESTINO_OPTIONS || []), ...compras.map(c=>c.producto?.destino || productObj(c.productoId)?.destino || 'Sin destino')])).filter(Boolean);
     return destinos.map(k => {
@@ -274,16 +302,18 @@
       };
       row.total = row.comprado + row.donado + row.pendiente;
       return row;
-    }).filter(r => r.total || r.label);
+    }).filter(hasDestinoValues);
   }
   function destinoBars(){
     const rows = destinoRows();
     const maxVal = Math.max(1, ...rows.flatMap(r => [Number(r.comprado||0), Number(r.donado||0), Number(r.pendiente||0)]));
     const total = rows.reduce((a,b)=>a+Number(b.total||0),0);
     const item = (r, key, label, color, lines) => {
-      const value = Number(r[key]||0); const h = Math.max(value ? 18 : 8, value / maxVal * 145);
+      const value = Number(r[key]||0);
+      if(Math.abs(value) <= 0) return '';
+      const h = Math.max(18, value / maxVal * 145);
       const tip = `${r.label} - ${label}: ${moneyF(value)}\n${(lines?.length ? lines : ['Sin productos']).join('\n')}`;
-      return `<div class="ce-v434-mini-col" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="#ffffff" data-ce-tip-layout-v21="chart"><div class="ce-v434-mini-value">${esc(moneyF(value))}</div><div class="ce-v434-mini-stick" style="height:${h}px;background:${color}"></div><div class="ce-v434-mini-label">${esc(label)}</div></div>`;
+      return `<div class="ce-v434-mini-col" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="${esc(color)}" data-ce-tip-layout-v21="chart"><div class="ce-v434-mini-value">${esc(moneyF(value))}</div><div class="ce-v434-mini-stick" style="height:${h}px;background:${color}"></div><div class="ce-v434-mini-label">${esc(label)}</div></div>`;
     };
     const cards = rows.map(r => `<div class="ce-v434-destino-card"><div class="ce-v434-destino-title"><span>${esc(r.label)}</span><strong>${esc(moneyF(r.total))}</strong></div><div class="ce-v434-mini-bars">${item(r,'comprado','Comprado','#dc2626',r.listComprado)}${item(r,'donado','Donado','#f59e0b',r.listDonado)}${item(r,'pendiente','Pte.Compra','#fb7185',r.listPendiente)}</div></div>`).join('');
     return `<div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Por destino</span><strong>${esc(moneyF(total))}</strong></div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte.Compra</span></div><div class="ce-v434-destino-bars">${cards || '<div class="empty">Sin datos por destino.</div>'}</div></div>`;

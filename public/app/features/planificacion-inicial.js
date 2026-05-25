@@ -1,9 +1,9 @@
-/* ControlEvent v44.7.2 - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v44.7.3 - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v44.7.2';
+  const VERSION = 'ControlEvent v44.7.3';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -635,7 +635,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v44.7.2] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v44.7.3] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {
@@ -733,6 +733,12 @@
     ensureReady();
     window.showPlanificacionInicial = showPlanificacion;
     window.renderPlanificacionInicial = ensureReady;
+    window.ControlEventPlanificacion = Object.assign(window.ControlEventPlanificacion || {}, {
+      version: VERSION,
+      show: showPlanificacion,
+      hide: hidePlanificacion,
+      ready: ensureReady
+    });
     window.addEventListener('controlevent:app-ready', ensureReady);
     window.addEventListener('controlevent:runtime-ready', ensureReady);
     setInterval(() => { ensureReady(); enforcePlanificacionIsolation(); unlockPlanControls(); }, window.ControlEventLowResource?.interval?.(1800) || 1800);

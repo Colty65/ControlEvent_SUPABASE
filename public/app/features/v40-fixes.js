@@ -1,11 +1,11 @@
-/* ControlEvent v44.7.2 - Ajustes finales
+/* ControlEvent v44.7.3 - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v44.7.2';
-  const VERSION_FILE = 'ControlEvent_v44_7_2';
+  const VERSION = 'ControlEvent v44.7.3';
+  const VERSION_FILE = 'ControlEvent_v44_7_3';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);
@@ -494,7 +494,7 @@
 
     const wsG = x.ws('GRAFICAS', [34,18,18]);
     x.title(wsG,1,'GRAFICAS DEL EVENTO - DATOS BASE',3); x.headers(wsG,3,['Concepto','Valor','Observación']);
-    r = 4; [['INGRESO DINERO',s.ingresoDinero,''],['DONACION DE PRODUCTO',s.donado,''],['GASTOS',money(s.comprado+s.gastos),''],['PTE.COMPRA',s.pendiente,''],['SALDO ACTUAL',s.saldoActual,s.saldoActual < 0 ? 'Negativo' : ''],['SALDO OPERATIVO',s.saldoOperativo,s.saldoOperativo < 0 ? 'Negativo' : '']].forEach(([a,b,c]) => { x.text(wsG,r,1,a,b < 0 ? 'bad' : 'white', true); x.euro(wsG,r,2,b,b < 0 ? 'bad' : 'white', true); x.text(wsG,r++,3,c); });
+    r = 4; [['INGRESOS',s.ingresoDinero,''],['DONACION DE PRODUCTO',s.donado,''],['GASTOS',money(s.comprado+s.gastos),''],['PTE.COMPRA',s.pendiente,''],['SALDO ACTUAL',s.saldoActual,s.saldoActual < 0 ? 'Negativo' : ''],['SALDO OPERATIVO',s.saldoOperativo,s.saldoOperativo < 0 ? 'Negativo' : '']].forEach(([a,b,c]) => { x.text(wsG,r,1,a,b < 0 ? 'bad' : 'white', true); x.euro(wsG,r,2,b,b < 0 ? 'bad' : 'white', true); x.text(wsG,r++,3,c); });
 
     await makeDownload(x.wb, `${VERSION_FILE}_INFOEVENTO-${cleanFilePart(ev.titulo || 'EVENTO')}_${t.yyyy}${t.mm}${t.dd}.xlsx`);
   }

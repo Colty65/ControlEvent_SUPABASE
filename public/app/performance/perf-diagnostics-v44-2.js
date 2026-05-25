@@ -1,9 +1,9 @@
-/* ControlEvent v44.7.2 - Diagnóstico de rendimiento robusto.
+/* ControlEvent v44.7.3 - Diagnóstico de rendimiento robusto.
    Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.7.2';
+  const VERSION = 'ControlEvent v44.7.3';
   const START_MS = (performance && performance.now) ? performance.now() : Date.now();
   const MAX_EVENTS = 120;
   const MAX_ERRORS = 30;
@@ -44,6 +44,26 @@
   function appState(){ return app()?.state || window.state || {}; }
   function nav(){ return app()?.navigation || {}; }
   function text(value){ return String(value == null ? '' : value); }
+  function auth(){ return app()?.authUser || window.authUser || null; }
+  function userLevel(){ return text(auth()?.nivel || '').trim().toUpperCase(); }
+  function isPcLike(){
+    const ua = navigator.userAgent || '';
+    const mobileUA = /iPad|iPhone|Android|Mobile/i.test(ua);
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    const narrow = !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+    return !mobileUA && !coarse && !narrow;
+  }
+  function perfAllowed(){
+    const level = userLevel();
+    return isPcLike() && (level === 'GD' || level === 'RW');
+  }
+  function removeUi(){
+    state.opened = false;
+    const btn = byId('cePerf442Button') || byId('cePerf441Button');
+    if(btn) btn.remove();
+    const panel = byId('cePerf442Panel') || byId('cePerf441Panel');
+    if(panel) panel.remove();
+  }
 
   function pushEvent(type, detail){
     state.events.push(Object.assign({at: new Date().toLocaleTimeString(), ms: bootMs(), type}, detail || {}));
@@ -188,13 +208,13 @@
     return true;
   }
   function installRenderOptimizer(){
-    // v44.7.2: el diagnóstico ya NO limpia automáticamente el DOM.
-    // La limpieza global de v44.2/v44.7.2 era útil para medir, pero generaba demasiadas pasadas
+    // v44.7.3: el diagnóstico ya NO limpia automáticamente el DOM.
+    // La limpieza global de v44.2/v44.7.3 era útil para medir, pero generaba demasiadas pasadas
     // y podía convertirse en otro proceso pesado. Aquí solo se mantienen métricas y una acción manual.
     if(renderOptimizer.installed) return;
     renderOptimizer.installed = true;
     renderOptimizer.mode = 'diagnostic-only-no-auto-prune';
-    renderOptimizer.lastReason = 'v44.7.2: limpieza automática desactivada';
+    renderOptimizer.lastReason = 'v44.7.3: limpieza automática desactivada';
   }
 
   function sample(reason){
@@ -353,7 +373,7 @@
     const m = last.memory || {};
     const events = state.events.slice(-8).map(ev => `${ev.at} · ${ev.type}${ev.ms ? ' · '+ev.ms+'ms' : ''}${ev.label ? ' · '+ev.label : ''}${ev.name ? ' · '+ev.name : ''}`).join('\n');
     panel.innerHTML = `
-      <h3>Diagnóstico rendimiento · v44.7.2</h3>
+      <h3>Diagnóstico rendimiento · v44.7.3</h3>
       <div class="grid">
         ${cell('Pantalla', last.screen || '-')}
         ${cell('Evento', last.eventId || '-')}
@@ -369,7 +389,7 @@
         ${cell('Errores', state.counters.errors)}
       </div>
       <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, gráficas ${r.renderizado?.graficas||0}\nOptimización DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
-Optimización v44.7.2: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
+Optimización v44.7.3: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
       <pre>${htmlEscape(events || 'Sin eventos recientes')}</pre>
       <div class="actions">
         <button type="button" id="cePerf442Copy">Copiar informe</button>
@@ -488,13 +508,21 @@ Optimización v44.7.2: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
     document.body.appendChild(btn);
   }
 
+  let coreInstalled = false;
   function install(){
+    if(!perfAllowed()){
+      removeUi();
+      return;
+    }
     installWrappers();
     installObservers();
     installRenderOptimizer();
     ensureUi();
-    sample('install');
-    pushEvent('installed', {version: VERSION});
+    sample(coreInstalled ? 'install-refresh' : 'install');
+    if(!coreInstalled){
+      pushEvent('installed', {version: VERSION, scope:'pc-gd-rw'});
+      coreInstalled = true;
+    }
   }
 
   window.ControlEventPerf = {
@@ -516,11 +544,10 @@ Optimización v44.7.2: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
   else install();
   window.addEventListener('load', () => setTimeout(install, 80), {once:true});
-  ['controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(installWrappers, 80)));
-  // v44.7.2: refresco ligero del panel PERF mientras está abierto, sin podas automáticas.
+  ['controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));
+  // v44.7.3: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentación activa en móvil/tablet/RO.
   setInterval(() => {
-    installWrappers();
-    installRenderOptimizer();
+    install();
     if(state.opened) updatePanel();
   }, 1200);
 })();

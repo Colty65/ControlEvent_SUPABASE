@@ -1,4 +1,4 @@
-ControlEvent v44.7.2
+ControlEvent v44.7.3
 
 Corrección de estabilización del login y cambio de evento sobre la base v44.7.1.
 
@@ -36,4 +36,4 @@ Cambios principales:
    - sin pushStateToServer por simple selección de evento.
 
 Recomendación tras subir a GitHub/Vercel:
-- En móvil/tablet, cerrar pestaña o recargar una vez para que entre el nuevo service worker/cache v44.7.2.
+- En móvil/tablet, cerrar pestaña o recargar una vez para que entre el nuevo service worker/cache v44.7.3.

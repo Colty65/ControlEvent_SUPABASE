@@ -1,0 +1,33 @@
+{
+  "version": "44.7.3",
+  "versionLabel": "ControlEvent v44.7.3",
+  "versionFile": "ControlEvent_v44_7_3",
+  "base": "44.7.2",
+  "goal": "Cambios esteticos y de acceso manteniendo el flujo rapido de cambio de evento de v44.7.x.",
+  "changes": [
+    "GRAFICAS queso: globos encolumnados y fondo del color del trozo de grafico.",
+    "GRAFICAS queso: donacion de producto y gastos muestran cantidad, precio y total.",
+    "Por destino: se ocultan barras con valor cero y destinos sin comprado/donado/pendiente.",
+    "RESUMEN PRESUPUESTARIO / OPERATIVA: PRESUPUESTO se sustituye por INGRESO TOTAL.",
+    "RESUMEN PRESUPUESTARIO / OPERATIVA: INGRESOS EN DINERO e INGRESO DINERO se sustituyen por INGRESOS.",
+    "Planificacion inicial: refuerzo para abrir desde movil vertical.",
+    "PERF: disponible solo en PC y para niveles GD o RW."
+  ],
+  "runtimeFiles": [
+    "public/index.html",
+    "public/app/version.js",
+    "public/sw.js",
+    "package.json",
+    "public/app/features/v43-4-fixes.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v44-7-event-switcher.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/performance/perf-diagnostics-v44-2.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js"
+  ],
+  "notes": [
+    "No se modifica el guardado funcional de compras, donaciones, infoevento ni backup.",
+    "El cambio de evento queda en el flujo v44.7.x y no vuelve a render global pesado."
+  ]
+}
