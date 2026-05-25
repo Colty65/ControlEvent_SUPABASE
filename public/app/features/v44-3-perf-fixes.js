@@ -1,10 +1,10 @@
-/* ControlEvent v44.3 - Optimización controlada de render y gráficas.
+/* ControlEvent v44.4 - Optimización controlada de render y gráficas.
    Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.3';
-  const VERSION_FILE = 'ControlEvent_v44_3';
+  const VERSION = 'ControlEvent v44.4';
+  const VERSION_FILE = 'ControlEvent_v44_4';
   const HEAVY_GROUPS = {
     ingresos: ['collabList','ingresosSummaryGrid'],
     compras: ['comprasList'],
@@ -13,13 +13,14 @@
     resumen: ['budgetLayout','summarySegmento','summaryDestino','summaryTiendaTicket'],
     graficas: ['eventChartWrap']
   };
+  const pruneState = {lastKey:'', lastAt:0, rendering:false, installed:false};
 
   function $(id){ return document.getElementById(id); }
   function safe(fn, fallback){ try{ const value = fn(); return value === undefined ? fallback : value; }catch(_){ return fallback; } }
   function call(name, args){
     const fn = window[name];
     if(typeof fn !== 'function') return undefined;
-    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v44.3] Error en ' + name, error); return undefined; }
+    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v44.4] Error en ' + name, error); return undefined; }
   }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
@@ -37,6 +38,9 @@
     try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = tab; }catch(_){ }
     try{ window.__ceCurrentMainTab = tab; }catch(_){ }
   }
+  function selectedEventId(){
+    return safe(() => window.ControlEventApp?.state?.selectedEventId || window.state?.selectedEventId || document.getElementById('selectedEvent')?.value || '', '');
+  }
   function hasUser(){ return !!safe(() => (typeof authUser !== 'undefined' ? authUser : null), null) || !!window.authUser; }
   function visibleTab(id){ const el=$(id); return !!(el && !el.classList.contains('hidden')); }
   function clearIds(ids){
@@ -50,12 +54,20 @@
     });
     return cleared;
   }
-  function pruneInactive(active){
+  function pruneInactive(active, reason){
+    // v44.4: limpieza selectiva. No se barre todo en cada render.
+    // Solo se limpia una vez por combinación ventana/evento, o cuando se fuerza.
+    const key = String(active || '') + '|' + String(selectedEventId() || '');
+    const force = reason === 'event-change' || reason === 'force';
+    const t = Date.now();
+    if(!force && pruneState.lastKey === key && (t - pruneState.lastAt) < 12000) return 0;
+    pruneState.lastKey = key;
+    pruneState.lastAt = t;
     let cleared = 0;
     Object.entries(HEAVY_GROUPS).forEach(([group, ids]) => {
       if(group !== active) cleared += clearIds(ids);
     });
-    try{ window.__ceV443Stats.prunes += cleared ? 1 : 0; window.__ceV443Stats.clearedNodes += cleared; }catch(_){ }
+    try{ window.__ceV443Stats.prunes += cleared ? 1 : 0; window.__ceV443Stats.clearedNodes += cleared; window.__ceV443Stats.lastReason = reason || 'selective'; }catch(_){ }
     return cleared;
   }
   function withGraficasDisabled(fn){
@@ -79,7 +91,7 @@
     }
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
-    if(typeof stable === 'function') return stable({force:true, reason:'v44.3'});
+    if(typeof stable === 'function') return stable({force:true, reason:'v44.4'});
     return call('renderGraficas');
   }
   function renderActiveContent(active){
@@ -112,21 +124,26 @@
     }
   }
   function renderV443(){
-    call('renderEnvironmentBanner');
-    call('renderAuthUI');
-    if(!hasUser()) return;
-    call('saveState');
-    call('renderHeader');
-    call('renderTabVisibility');
-    call('renderMainSelectors');
-    const active = currentTab();
-    pruneInactive(active);
-    renderActiveContent(active);
-    const maint = $('maintenanceWrapper');
-    if(maint && !maint.classList.contains('hidden')) call('renderMaintenance');
-    call('renderPermissions');
-    call('renderLockState');
-    setTimeout(() => pruneInactive(currentTab()), 0);
+    if(pruneState.rendering) return;
+    pruneState.rendering = true;
+    try{
+      call('renderEnvironmentBanner');
+      call('renderAuthUI');
+      if(!hasUser()) return;
+      call('saveState');
+      call('renderHeader');
+      call('renderTabVisibility');
+      call('renderMainSelectors');
+      const active = currentTab();
+      pruneInactive(active, 'active-render');
+      renderActiveContent(active);
+      const maint = $('maintenanceWrapper');
+      if(maint && !maint.classList.contains('hidden')) call('renderMaintenance');
+      call('renderPermissions');
+      call('renderLockState');
+    }finally{
+      pruneState.rendering = false;
+    }
   }
   function patchRender(){
     const old = safe(() => (typeof render === 'function' ? render : window.render), null);
@@ -142,7 +159,7 @@
     const wrapped = async function(){
       const result = await old.apply(this, arguments);
       setTimeout(() => {
-        try{ renderV443(); }catch(error){ console.warn('[ControlEvent v44.3] render tras cambio de evento', error); }
+        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v44.4] render tras cambio de evento', error); }
       }, 0);
       return result;
     };
@@ -170,25 +187,29 @@
   }
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('body *').forEach(el => {
-      if(el.children && el.children.length) return;
+    // v44.4: actualización ligera de versión. Evita recorrer todo el DOM en cada instalación.
+    document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
       const t = el.textContent || '';
       if(/ControlEvent\s+v\d+(?:\.\d+)*/.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/g, VERSION);
     });
+    try{ document.body.dataset.ceVersion = VERSION; }catch(_){ }
     try{ window.VERSION = VERSION; window.VERSION_FILE = VERSION_FILE; }catch(_){ }
   }
   function install(){
-    window.__ceV443Stats = window.__ceV443Stats || {prunes:0, clearedNodes:0, installedAt:new Date().toISOString()};
+    window.__ceV443Stats = window.__ceV443Stats || {prunes:0, clearedNodes:0, installedAt:new Date().toISOString(), mode:'v44.4-selective'};
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     applyVersion();
-    patchRender();
-    patchEventChange();
-    patchMobileMenuClick();
+    if(!pruneState.installed){
+      pruneState.installed = true;
+      patchRender();
+      patchEventChange();
+      patchMobileMenuClick();
+    }
     if(hasUser()) setTimeout(() => { try{ renderV443(); }catch(_){} }, 0);
   }
   window.ControlEventV443 = {version:VERSION, versionFile:VERSION_FILE, install, render:renderV443, renderStableGraficas};
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
   else install();
-  ['load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
-  [120,650,1800].forEach(ms => setTimeout(install, ms));
+  ['load','controlevent:runtime-ready','controlevent:app-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
+  [120,650].forEach(ms => setTimeout(install, ms));
 })();
