@@ -1,0 +1,13 @@
+{
+  "version": "45.0",
+  "versionLabel": "ControlEvent v45.0",
+  "versionFile": "ControlEvent_v45_0",
+  "base": "ControlEvent v44.7.3",
+  "changes": [
+    "Fix mantenimiento PRODUCTOS para GD/RW",
+    "Bloqueo real de borrado con dependencias para PRODUCTOS/PERSONAS/TIENDAS",
+    "Tooltip/mensaje: No es posible, tiene dependencias.",
+    "Baja de EVENTO solo GD con confirmación y cascada controlada",
+    "Cache/service worker actualizado"
+  ]
+}

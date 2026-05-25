@@ -1,11 +1,11 @@
-/* ControlEvent v44.7.3 - selector de evento unificado y render activo único.
+/* ControlEvent v45.0 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.7.3';
-  const VERSION_FILE = 'ControlEvent_v44_7_3';
+  const VERSION = 'ControlEvent v45.0';
+  const VERSION_FILE = 'ControlEvent_v45_0';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
@@ -69,7 +69,7 @@
 
   function $(id){ return document.getElementById(id); }
   function safe(fn, fallback){ try{ const value = fn(); return value === undefined ? fallback : value; }catch(_){ return fallback; } }
-  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v44.7.3] Error en ' + name, error); return undefined; } }
+  function call(name, args){ const fn = window[name] || safe(() => eval(name), null); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.0] Error en ' + name, error); return undefined; } }
   function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
   function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
   function storageKey(){ return safe(() => (typeof STORAGE_KEY !== 'undefined' && STORAGE_KEY) || STORAGE_FALLBACK, STORAGE_FALLBACK); }
@@ -102,12 +102,12 @@
   function chosen(){ return safe(() => sessionStorage.getItem(CHOSEN_KEY) === '1' || sessionStorage.getItem(OLD_CHOSEN_KEY) === '1', false); }
   function rememberEvent(id){ if(!hasValidEvent(id)) return; try{ sessionStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } try{ localStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } }
   function persistLocal(){
-    // v44.7.3: el cambio de evento NO debe serializar todo el estado.
+    // v45.0: el cambio de evento NO debe serializar todo el estado.
     // En móviles, JSON.stringify(state) puede incluir muchos registros o imágenes de tickets y bloquear la UI.
     return undefined;
   }
   function scheduleRemoteSave(){
-    // v44.7.3: seleccionar evento es una preferencia local, no un cambio de datos del evento.
+    // v45.0: seleccionar evento es una preferencia local, no un cambio de datos del evento.
     // Evitamos pushStateToServer() para que el cambio no dispare guardados globales ni sincronizaciones pesadas.
     try{ clearTimeout(window.__ceV447EventSaveTimer); }catch(_){ }
     return undefined;
@@ -168,7 +168,7 @@
     transition.watchdog = setTimeout(() => {
       if(token && token !== transition.token) return;
       if(!transition.active) return;
-      console.warn('[v44.7.3] Watchdog libera transición bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
+      console.warn('[v45.0] Watchdog libera transición bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
       finishTransition(token);
       notice('Control recuperado. Puedes volver a elegir evento u opción.');
     }, Number(ms || (isMobileLike() ? 9000 : 6000)));
@@ -334,7 +334,7 @@
       setTimeout(() => { try{ if(isGD()) call('fetchAccessUsers'); }catch(_){ } }, 0);
       return false;
     }catch(err){
-      console.error('[v44.7.3] login rápido', err);
+      console.error('[v45.0] login rápido', err);
       if(error) error.textContent = err?.message || String(err);
       try{ authUser = null; }catch(_){ }
       window.authUser = null;
@@ -415,7 +415,7 @@
       if(oldBars) wrap.replaceChildren();
     }
     const stable = window.ControlEventV434?.renderGraficas || window.ControlEventV435?.renderGraficas || window.ControlEventV436?.renderGraficas;
-    if(typeof stable === 'function') return stable({force:true, reason:'v44.7.3-active-only'});
+    if(typeof stable === 'function') return stable({force:true, reason:'v45.0-active-only'});
     return call('renderGraficas');
   }
   function renderActive(tab){
@@ -453,7 +453,7 @@
       const run = () => {
         if(token && token !== transition.token) return;
         try{ renderActive(active); }
-        catch(error){ console.warn('[v44.7.3] render activo', error); finishTransition(token); }
+        catch(error){ console.warn('[v45.0] render activo', error); finishTransition(token); }
       };
       if(typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(run);
       else run();
