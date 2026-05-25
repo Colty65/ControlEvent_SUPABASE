@@ -1,26 +1,21 @@
 {
   "version": "ControlEvent v44.5",
-  "versionFile": "ControlEvent_v44_5",
-  "base": "ControlEvent v44.3",
-  "createdAt": "2026-05-25 09:35:57",
-  "changes": [
-    "PERF refresca automáticamente al cambiar de ventana/evento mientras está abierto.",
-    "Desactivada limpieza DOM automática del diagnóstico PERF.",
-    "Limpieza de pantallas pesadas limitada por ventana/evento.",
-    "Reducidas reinstalaciones repetidas del parche de rendimiento.",
-    "Versión actualizada en cabecera, backup, service worker y scripts activos."
-  ],
-  "filesChanged": [
+  "version_file": "ControlEvent_v44_5",
+  "base": "ControlEvent v44.4",
+  "changed_files": [
     "index.html",
     "package-lock.json",
     "package.json",
     "LEEME_SUBIDA_GITHUB_V44_4.txt",
     "PATCH_MANIFEST_V44_4.json",
+    "LEEME_SUBIDA_GITHUB_V44_5.txt",
     "public/index.html",
     "public/sw.js",
     "routes/export.routes.js",
     "public/app/version.js",
     "public/modules/excel/backup.js",
+    "public/modules/views/compras.js",
+    "public/modules/views/graficas.js",
     "public/app/diagnostics/build-metrics.json",
     "public/app/features/mapa-productos.js",
     "public/app/features/planificacion-inicial.js",
@@ -34,9 +29,16 @@
     "public/app/features/v43-8-2-fixes.js",
     "public/app/features/v44-0-fixes.js",
     "public/app/features/v44-3-perf-fixes.js",
+    "public/app/features/v44-5-event-optimizer.js",
     "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
     "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
     "public/app/performance/perf-diagnostics-v44-1.js",
     "public/app/performance/perf-diagnostics-v44-2.js"
+  ],
+  "notes": [
+    "Optimización de cambio de evento con token para cancelar renders tardíos.",
+    "COMPRAS deja de recalcular RESUMEN al activarse.",
+    "GRAFICAS evita render legacy de barras desde el módulo.",
+    "PERF y versiones actualizados a v44.5."
   ]
 }

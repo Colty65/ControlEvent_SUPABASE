@@ -1,9 +1,9 @@
-/* ControlEvent v44.4 - Diagnóstico de rendimiento robusto.
+/* ControlEvent v44.5 - Diagnóstico de rendimiento robusto.
    Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v44.4';
+  const VERSION = 'ControlEvent v44.5';
   const START_MS = (performance && performance.now) ? performance.now() : Date.now();
   const MAX_EVENTS = 120;
   const MAX_ERRORS = 30;
@@ -194,7 +194,7 @@
     if(renderOptimizer.installed) return;
     renderOptimizer.installed = true;
     renderOptimizer.mode = 'diagnostic-only-no-auto-prune';
-    renderOptimizer.lastReason = 'v44.4: limpieza automática desactivada';
+    renderOptimizer.lastReason = 'v44.5: limpieza automática desactivada';
   }
 
   function sample(reason){
@@ -353,7 +353,7 @@
     const m = last.memory || {};
     const events = state.events.slice(-8).map(ev => `${ev.at} · ${ev.type}${ev.ms ? ' · '+ev.ms+'ms' : ''}${ev.label ? ' · '+ev.label : ''}${ev.name ? ' · '+ev.name : ''}`).join('\n');
     panel.innerHTML = `
-      <h3>Diagnóstico rendimiento · v44.4</h3>
+      <h3>Diagnóstico rendimiento · v44.5</h3>
       <div class="grid">
         ${cell('Pantalla', last.screen || '-')}
         ${cell('Evento', last.eventId || '-')}
@@ -369,7 +369,7 @@
         ${cell('Errores', state.counters.errors)}
       </div>
       <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, gráficas ${r.renderizado?.graficas||0}\nOptimización DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
-Optimización v44.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
+Optimización v44.5: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
       <pre>${htmlEscape(events || 'Sin eventos recientes')}</pre>
       <div class="actions">
         <button type="button" id="cePerf442Copy">Copiar informe</button>
