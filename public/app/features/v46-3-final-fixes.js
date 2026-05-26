@@ -1,15 +1,15 @@
-/* ControlEvent v46.2 - ajustes finales sobre v45.4 estable.
+/* ControlEvent v46.3 - ajustes finales sobre v45.4 estable.
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.2';
-  const VERSION_FILE = 'ControlEvent_v46_2';
+  const VERSION = 'ControlEvent v46.3';
+  const VERSION_FILE = 'ControlEvent_v46_3';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
-  const INSTALLED = '__ceV462FinalFixes';
+  const INSTALLED = '__ceV463FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -131,6 +131,14 @@
       .ce-v46-modified,.ce-v46-modified *{font-weight:900!important;}
       .ce-v46-modified input,.ce-v46-modified select,.ce-v46-modified textarea{font-weight:900!important;}
       .ce-v46-deleting{animation:ceV46Destroy 1.5s ease-in forwards!important;overflow:hidden!important;pointer-events:none!important;transform-origin:center;}
+
+      .ce-ingreso-receipt-tools-v463{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;grid-column:1/-1;}
+      .ce-ingreso-receipt-tools-v463 .ce-receipt-ok{font-weight:900;color:#065f46;background:#d1fae5;border:1px solid #34d399;border-radius:999px;padding:4px 9px;font-size:12px;}
+      .ce-ingreso-receipt-tools-v463 button{min-height:30px;}
+      .ce-receipt-modal-v463{position:fixed;inset:0;background:rgba(15,23,42,.72);z-index:999999;display:flex;align-items:center;justify-content:center;padding:18px;}
+      .ce-receipt-modal-card-v463{max-width:min(980px,96vw);max-height:92vh;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.42);padding:12px;display:flex;flex-direction:column;gap:10px;}
+      .ce-receipt-modal-head-v463{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:950;color:#0f172a;}
+      .ce-receipt-modal-card-v463 img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:12px;background:#f8fafc;}
       @keyframes ceV46Destroy{0%{opacity:1;transform:scale(1) rotate(0);filter:none;max-height:420px;}18%{transform:scale(1.012) rotate(.35deg);filter:contrast(1.1);}42%{transform:scale(.985) rotate(-.35deg);background:#111827;color:#fff;}72%{opacity:.38;transform:scale(.94) rotate(.65deg);max-height:420px;}100%{opacity:0;transform:scale(.82) rotate(-1.3deg);max-height:0;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;border-width:0;}}
       .ce-v46-pies{grid-template-columns:repeat(2,minmax(0,1fr));}
       @media(min-width:1180px){.ce-v46-pies{grid-template-columns:repeat(3,minmax(0,1fr));}}
@@ -382,7 +390,7 @@
     if(!canWrite()) return block(ev, 'No autorizado para eliminar.');
     if(isLockedSafe()) return block(ev, 'Evento finalizado. No se puede eliminar.');
     const id = btn.dataset.id;
-    return deleteAfterAnimation(btn, ev, () => { st().colaboradores = arr('colaboradores').filter(c => !same(c.id, id)); });
+    return deleteAfterAnimation(btn, ev, () => { deleteIngresoReceipt(id); st().colaboradores = arr('colaboradores').filter(c => !same(c.id, id)); });
   }
   function deleteCompra(btn, ev){
     if(!canWrite()) return block(ev, 'No autorizado para eliminar.');
@@ -395,6 +403,76 @@
     if(isLockedSafe()) return block(ev, 'Evento finalizado. No se puede eliminar.');
     const id = btn.dataset.id;
     return deleteAfterAnimation(btn, ev, () => { st().compras = arr('compras').filter(c => !same(c.id, id)); });
+  }
+
+  function ingresoReceiptKey(id){ return `${selectedId()}|INGRESO:${String(id || '')}`; }
+  function ingresoReceiptStore(){ const stateObj = st(); if(!stateObj.ticketImages || typeof stateObj.ticketImages !== 'object') stateObj.ticketImages = {}; return stateObj.ticketImages; }
+  function ingresoReceiptData(id){ return ingresoReceiptStore()[ingresoReceiptKey(id)] || ''; }
+  function setIngresoReceipt(id, data){ ingresoReceiptStore()[ingresoReceiptKey(id)] = data; }
+  function deleteIngresoReceipt(id){ try{ delete ingresoReceiptStore()[ingresoReceiptKey(id)]; }catch(_){ } }
+  function readImageAsDataUrl(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error || new Error('No se pudo leer la imagen.'));
+      reader.readAsDataURL(file);
+    });
+  }
+  function showIngresoReceipt(id){
+    const data = ingresoReceiptData(id);
+    if(!data){ alert('Este ingreso no tiene justificante adjunto.'); return; }
+    const ov = document.createElement('div');
+    ov.className = 'ce-receipt-modal-v463';
+    ov.innerHTML = `<div class="ce-receipt-modal-card-v463"><div class="ce-receipt-modal-head-v463"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><img alt="Justificante de ingreso" src="${esc(data)}"></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) ov.remove(); });
+  }
+  function addIngresoReceiptTools(){
+    const wrap = $('collabList'); if(!wrap) return;
+    wrap.querySelectorAll('.itemcard,.rowline,.card').forEach(card => {
+      const id = card.querySelector('[data-action="save-collab"][data-id], [data-action="edit-collab-persona"][data-id], [data-action="delete-collab"][data-id]')?.dataset?.id;
+      if(!id || card.querySelector('.ce-ingreso-receipt-tools-v463')) return;
+      const has = !!ingresoReceiptData(id);
+      const box = document.createElement('div');
+      box.className = 'ce-ingreso-receipt-tools-v463';
+      box.innerHTML = `${has ? '<span class="ce-receipt-ok">📎 Justificante adjunto</span>' : ''}<button type="button" class="outline small" data-action="ingreso-receipt-add" data-id="${esc(id)}">${has ? 'Cambiar justificante' : 'Adjuntar justificante'}</button>${has ? `<button type="button" class="outline small" data-action="ingreso-receipt-view" data-id="${esc(id)}">Ver justificante</button><button type="button" class="danger small" data-action="ingreso-receipt-delete" data-id="${esc(id)}">Eliminar justificante</button>` : ''}`;
+      const actions = card.querySelector('button[data-action="save-collab"]')?.parentElement || card;
+      try{ actions.appendChild(box); }catch(_){ card.appendChild(box); }
+    });
+  }
+  async function addIngresoReceipt(id){
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.style.position = 'fixed'; input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      try{
+        const file = input.files && input.files[0];
+        if(!file) return;
+        const data = await readImageAsDataUrl(file);
+        setIngresoReceipt(id, data);
+        saveNow();
+        renderNow();
+        applyVersion();
+        setTimeout(addIngresoReceiptTools, 80);
+      }catch(error){ alert('No se pudo adjuntar el justificante. ' + (error?.message || error)); }
+      finally{ input.remove(); }
+    }, {once:true});
+    input.click();
+  }
+  function handleIngresoReceiptClick(ev){
+    const btn = ev.target?.closest?.('[data-action="ingreso-receipt-add"],[data-action="ingreso-receipt-view"],[data-action="ingreso-receipt-delete"]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    if(btn.dataset.action === 'ingreso-receipt-view'){ stop(ev); showIngresoReceipt(id); return false; }
+    if(!canWrite()) return block(ev, 'No autorizado para modificar justificantes.');
+    if(isLockedSafe()) return block(ev, 'Evento finalizado. No se puede modificar.');
+    if(btn.dataset.action === 'ingreso-receipt-add'){ stop(ev); addIngresoReceipt(id); return false; }
+    if(btn.dataset.action === 'ingreso-receipt-delete'){
+      stop(ev);
+      if(confirm('¿Eliminar el justificante de este ingreso?')){ deleteIngresoReceipt(id); saveNow(); renderNow(); applyVersion(); setTimeout(addIngresoReceiptTools, 80); }
+      return false;
+    }
   }
 
   function accessRenderNow(){
@@ -518,8 +596,8 @@
     return ['Donante | Producto | Cant. | Precio | Total', ...rows.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function expenseLines(rows){
-    if(!rows.length) return ['Tienda | Ticket | Producto | Cant. | Precio | Total', 'Sin registros'];
-    return ['Tienda | Ticket | Producto | Cant. | Precio | Total', ...rows.map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    if(!rows.length) return ['Ticket | Tienda | Producto | Cant. | Precio | Total', 'Sin registros'];
+    return ['Ticket | Tienda | Producto | Cant. | Precio | Total', ...rows.map(r => `${r.ticketDonacion || 'Pte.Compra'} | ${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
@@ -543,11 +621,11 @@
     const arrLines = Array.isArray(lines) ? lines.slice() : [];
     return arrLines.filter(line => {
       const u = upper(String(line || '').split('|').map(x => x.trim()).join(' | '));
-      return !/^(NOMBRE\s*\|\s*INGRESO\s*\|\s*IMPORTE|DONANTE\s*\|\s*PRODUCTO\s*\|\s*CANT|TIENDA\s*\|\s*TICKET\s*\|\s*PRODUCTO|GASTOS\s*\||INGRESOS\s*\||DONACIONES\s*\|)/.test(u);
+      return !/^(NOMBRE\s*\|\s*INGRESO\s*\|\s*IMPORTE|DONANTE\s*\|\s*PRODUCTO\s*\|\s*CANT|(?:TIENDA\s*\|\s*TICKET|TICKET\s*\|\s*TIENDA)\s*\|\s*PRODUCTO|GASTOS\s*\||INGRESOS\s*\||DONACIONES\s*\|)/.test(u);
     });
   }
   function detailHeaderFor(label){
-    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Tienda | Ticket | Producto | Cant. | Precio | Total';
+    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Ticket | Tienda | Producto | Cant. | Precio | Total';
   }
   function pieCard(title, total, items){
     const nonzero = items.filter(it => Math.abs(Number(it.value || 0)) > 0);
@@ -606,7 +684,7 @@
     const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = sig;
-    wrap.dataset.ceStableChart = 'v46.2';
+    wrap.dataset.ceStableChart = 'v46.3';
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
   function installGraficas(){
@@ -707,7 +785,7 @@
       const fn = window.exportExcel;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.info = false; });
       throw new Error('No se ha encontrado un motor seguro para INFOEVENTO.');
-    }catch(error){ exportLocks.info = false; console.error('[v46.2] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.info = false; console.error('[v46.3] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function directBackup(){
     if(exportLocks.backup) return false; exportLocks.backup = true;
@@ -715,11 +793,11 @@
       const engine = window.__ceV257?.exportSeedWorkbook;
       if(typeof engine === 'function') return Promise.resolve(engine()).finally(() => { exportLocks.backup = false; });
       const excel = window.ControlEventExcel;
-      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-2-direct'})).finally(() => { exportLocks.backup = false; });
+      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-3-direct'})).finally(() => { exportLocks.backup = false; });
       const fn = window.exportSeedWorkbook;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.backup = false; });
       throw new Error('No se ha encontrado un motor seguro para Descarga de datos.');
-    }catch(error){ exportLocks.backup = false; console.error('[v46.2] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.backup = false; console.error('[v46.3] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function installExportGuard(){
     try{
@@ -748,7 +826,7 @@
     if(!old || old.__ceV460Wrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      setTimeout(() => { applyVersion(); installGraficas(); installExportGuard(); applyModifiedMarks(); }, 50);
+      setTimeout(() => { applyVersion(); installGraficas(); installExportGuard(); applyModifiedMarks(); addIngresoReceiptTools(); }, 50);
       return ret;
     };
     wrapped.__ceV460Wrapped = true;
@@ -756,11 +834,12 @@
     window.render = wrapped;
   }
   function install(){
-    injectStyle(); applyVersion(); installGraficas(); installExportGuard(); wrapRender();
+    injectStyle(); applyVersion(); installGraficas(); installExportGuard(); wrapRender(); addIngresoReceiptTools();
   }
 
   window.addEventListener('click', handleChartTooltipClick, true);
-  window.addEventListener('scroll', () => closeTipV462(true), true);
+  document.addEventListener('click', handleIngresoReceiptClick, true);
+  // v46.3: no cerrar globos al usar ruleta/ascensor; se cierran al perder foco/click fuera.
   window.addEventListener('resize', () => closeTipV462(false), true);
   window.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleTableAction, true);
