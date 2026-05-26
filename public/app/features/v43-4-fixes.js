@@ -1,9 +1,9 @@
-/* ControlEvent v46.1 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v46.2 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
-  const VERSION = 'ControlEvent v46.1';
-  const VERSION_FILE = 'ControlEvent_v46_1';
+  const VERSION = 'ControlEvent v46.2';
+  const VERSION_FILE = 'ControlEvent_v46_2';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const fold = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();

@@ -1,0 +1,3 @@
+Parche ControlEvent v46.2 desde v46.1.
+Copiar/mezclar estos archivos sobre el repositorio existente y subir a GitHub/Vercel.
+Tras desplegar, hacer una recarga fuerte para limpiar el service worker/cache anterior.

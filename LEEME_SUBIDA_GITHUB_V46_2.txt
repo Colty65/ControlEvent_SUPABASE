@@ -1,0 +1,10 @@
+ControlEvent v46.2
+Base: ControlEvent v46.1.
+
+Cambios:
+- Corrección de cabeceras y columnas en globos de GRAFICAS.
+- Globos de GASTOS, SALDO ACTUAL, SALDO OPERATIVO, VALORACION DEL EVENTO y Por destino con cabeceras alineadas con los datos.
+- Globos de Por destino para Donado y Pte.Compra con cabeceras visibles y encolumnadas.
+- Aparición y cierre de globos de GRAFICAS con animación visual.
+- Al modificar registros en Ingresos, Donaciones, Compras y mantenimientos generales se mantiene posición y se refuerza la negrita en todos los campos del registro.
+- Versión unificada como ControlEvent v46.2 / ControlEvent_v46_2.
