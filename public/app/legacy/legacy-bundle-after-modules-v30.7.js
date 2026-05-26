@@ -1,15 +1,15 @@
 window.__ceDisableLegacyBarGraficas = true;
-/* ControlEvent v45.4 - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v45.5 - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #55. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #55. */
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -239,12 +239,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-56-v251-core.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #56. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #56. */
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -587,12 +587,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-57-v252-core.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #57. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #57. */
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -876,12 +876,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-58-v253-core.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #58. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #58. */
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1231,12 +1231,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-59-v253-final-clean.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #59. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #59. */
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1556,12 +1556,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-60-v254-fixes.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #60. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #60. */
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -1994,12 +1994,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-61-v255-fixes.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #61. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #61. */
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -2415,12 +2415,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-62-v257-fixes.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #62. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #62. */
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -2505,6 +2505,13 @@ window.__ceDisableLegacyBarGraficas = true;
     try{ if(typeof budgetSummary === 'function') return budgetSummary() || {}; }catch(_){ }
     return {};
   }
+  function isIrpfElaIncomeV455(c){
+    const name = up(c?.persona?.nombre || personName(c?.personaId) || c?.nombre || '');
+    return name === 'Z_DEV_IRPF ELA' || name.includes('Z_DEV_IRPF ELA') || name.includes('Z DEV IRPF ELA');
+  }
+  function irpfElaAmountV455(){
+    return sum(collabs().filter(c => isIrpfElaIncomeV455(c) && up(c.situacion) !== 'PENDIENTE').map(c => c.total));
+  }
   function opValues(){
     const b = budget();
     const op = b.operativa || {};
@@ -2520,7 +2527,9 @@ window.__ceDisableLegacyBarGraficas = true;
     const ingresoDinero = num(op.ingresoDinero ?? b.ingresosDinero?.totalIngresado ?? sum(collabs().filter(c => up(c.situacion) !== 'PENDIENTE').map(c => c.total)));
     const saldoActual = Number.isFinite(Number(op.saldoActual)) ? num(op.saldoActual) : ingresoDinero - gastosRealizados;
     const saldoOperativo = Number.isFinite(Number(op.saldoOperativo)) ? num(op.saldoOperativo) : presupuesto - gastosPrevistos;
-    return {donation,presupuesto,gastosRealizados,pendiente,gastosPrevistos,ingresoDinero,saldoActual,saldoOperativo,valoracion:gastosPrevistos + donation};
+    const irpfEla = num(op.zDevIrpfEla ?? op.irpfEla ?? irpfElaAmountV455());
+    const donacionFinal = Number.isFinite(Number(op.donacionFinal ?? op.donacion)) ? num(op.donacionFinal ?? op.donacion) : saldoActual - irpfEla;
+    return {donation,presupuesto,gastosRealizados,pendiente,gastosPrevistos,ingresoDinero,saldoActual,saldoOperativo,irpfEla,donacionFinal,donacion:donacionFinal,valoracion:gastosPrevistos + donation};
   }
   function sum(arr){ return (arr || []).reduce((a,x) => a + num(x), 0); }
   function grouping(kind){
@@ -2684,7 +2693,7 @@ window.__ceDisableLegacyBarGraficas = true;
   }
   function makeEventChart(){
     const canvas = document.createElement('canvas');
-    canvas.width = 1800; canvas.height = 930;
+    canvas.width = 1800; canvas.height = 1080;
     const ctx = canvas.getContext('2d');
     const op = opValues();
     const cs = collabs();
@@ -2713,6 +2722,9 @@ window.__ceDisableLegacyBarGraficas = true;
       ['SALDO OPERATIVO', op.saldoOperativo, [{label:'Saldo operativo', value:Math.abs(op.saldoOperativo), displayValue:op.saldoOperativo, color:op.saldoOperativo >= 0 ? '#155e75' : '#7f1d1d'}]],
       ['VALORACION DEL EVENTO', op.valoracion, [{label:'Gastos previstos + valor producto donado', value:Math.abs(op.valoracion), displayValue:op.valoracion, color:'#111827'}]]
     ];
+    if(Math.abs(num(op.donacionFinal)) > 0.004){
+      rows.splice(4, 0, ['DONACION', op.donacionFinal, [{label:'Donacion', value:Math.abs(op.donacionFinal), displayValue:op.donacionFinal, color:'#0b1f3a'}]]);
+    }
     const maxVal = Math.max(1, ...rows.map(r => Math.abs(num(r[1]))), ...rows.flatMap(r => r[2].map(x => Math.abs(num(x.value)))));
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827'; ctx.font = 'bold 34px Arial'; ctx.fillText('GRAFICAS DEL EVENTO', 42, 54);
@@ -2947,7 +2959,10 @@ window.__ceDisableLegacyBarGraficas = true;
     wsRes.getRow(r++).height = 8;
     x.text(wsRes,r,1,'Donacion de producto','white',true); x.euro(wsRes,r++,2,op.donation,'white',true);
     wsRes.getRow(r++).height = 8;
-    [['INGRESO TOTAL',op.presupuesto,'white'],['GASTOS PREVISTOS',op.gastosPrevistos,'white'],['GASTOS REALIZADOS',op.gastosRealizados,'white'],['PTE. COMPRA U OTROS GASTOS',op.pendiente,'warn'],['SALDO ACTUAL',op.saldoActual,op.saldoActual >= 0 ? 'ok' : 'bad'],['SALDO OPERATIVO',op.saldoOperativo,op.saldoOperativo >= 0 ? 'ok' : 'bad'],['VALORACION DEL EVENTO',op.valoracion,'white']].forEach(([label,val,fill]) => { x.text(wsRes,r,1,label,fill,true,fill==='warn'?'FFBE123C':'FF111827'); x.euro(wsRes,r++,2,val,fill,true); });
+    const opRowsV455 = [['INGRESO TOTAL',op.presupuesto,'white'],['GASTOS PREVISTOS',op.gastosPrevistos,'white'],['GASTOS REALIZADOS',op.gastosRealizados,'white'],['PTE. COMPRA U OTROS GASTOS',op.pendiente,'warn'],['SALDO ACTUAL',op.saldoActual,op.saldoActual >= 0 ? 'ok' : 'bad']];
+    if(Math.abs(num(op.donacionFinal)) > 0.004) opRowsV455.push(['DONACION',op.donacionFinal,'title']);
+    opRowsV455.push(['SALDO OPERATIVO',op.saldoOperativo,op.saldoOperativo >= 0 ? 'ok' : 'bad'],['VALORACION DEL EVENTO',op.valoracion,'white']);
+    opRowsV455.forEach(([label,val,fill]) => { x.text(wsRes,r,1,label,fill,true,fill==='warn'?'FFBE123C':(fill==='title'?'FFFFFFFF':'FF111827')); x.euro(wsRes,r++,2,val,fill,true); });
     r += 2; x.title(wsRes,r++,'GRAFICAS DEL CALCULOS POR AGRUPACION',5); wsRes.getRow(r++).height = 8;
     if(addImage(wb, wsRes, makeGroupingChart('segmento'), r, 1, 980, 360)){ for(let rr=r; rr<r+17; rr++) wsRes.getRow(rr).height = 20; r += 19; }
     if(addImage(wb, wsRes, makeGroupingChart('destino'), r, 1, 980, 360)){ for(let rr=r; rr<r+17; rr++) wsRes.getRow(rr).height = 20; }
@@ -2990,8 +3005,8 @@ window.__ceDisableLegacyBarGraficas = true;
     const wsGraf = x.sheet('GRAFICAS', [28,28,28,28,28,28,28]);
     x.title(wsGraf,1,'GRAFICAS DEL EVENTO',7);
     x.text(wsGraf,2,1,'Evento','soft',true); wsGraf.mergeCells(2,2,2,7); x.text(wsGraf,2,2,ev.titulo || '','soft');
-    addImage(wb, wsGraf, makeEventChart(), 3, 1, 1500, 775);
-    for(let rr = 3; rr <= 40; rr++) wsGraf.getRow(rr).height = 20;
+    addImage(wb, wsGraf, makeEventChart(), 3, 1, 1500, 880);
+    for(let rr = 3; rr <= 47; rr++) wsGraf.getRow(rr).height = 20;
     // v27.7: las hojas RESUMEN_MODULAR y GRAFICAS_MODULAR fueron útiles para auditoría,
     // pero ya no se añaden al INFOEVENTO por defecto porque ensuciaban el libro final.
     // Se mantienen disponibles sólo como herramientas standalone desde consola.
@@ -3010,12 +3025,12 @@ window.__ceDisableLegacyBarGraficas = true;
               sort:false, autoFilter:false, pivotTables:false, objects:false, scenarios:false
             });
           }catch(protectError){
-            console.warn('[ControlEvent v45.4] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
+            console.warn('[ControlEvent v45.5] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
           }
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v45.4] No se pudo aplicar protección final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v45.5] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }
@@ -3090,12 +3105,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-63-v259-app-facade.js ===== */
 
-/* ControlEvent v45.4 - JS legacy extraido de public/index.html. Bloque inline #63. */
+/* ControlEvent v45.5 - JS legacy extraido de public/index.html. Bloque inline #63. */
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v45.5';
+  const VERSION_FILE = 'ControlEvent_v45_5';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }

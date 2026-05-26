@@ -112,6 +112,7 @@ function normalizeBudget(raw = {}){
       pendienteCompra: money(operativa.pendiente ?? compras.pendientes),
       saldoActual: money(operativa.saldoActual ?? compras.saldoReal),
       saldoOperativo: money(operativa.saldoOperativo),
+      donacion: money(operativa.donacionFinal ?? operativa.donacion),
       valorDonado: money(operativa.valorDonado ?? donacionProducto.valorDonado),
       valoracionEvento: money(operativa.valoracionEvento)
     }
@@ -157,6 +158,16 @@ export function buildGraficasModel(options = {}){
   const segmento = normalizeBreakdown(options.segmento || callSummary('summaryBySegmento'));
   const destino = normalizeBreakdown(options.destino || callSummary('summaryByDestino'));
   const tiendaTicket = normalizeTicketRows(options.tiendaTicket || callSummary('summaryByTiendaTicket'));
+  const resumenCharts = [
+    {label:'Ingresos realizados', value:budget.operativa.ingresosRealizados},
+    {label:'Pendiente ingresos', value:budget.operativa.pendienteIngresos},
+    {label:'Comprado', value:budget.operativa.comprado},
+    {label:'Pendiente compra', value:budget.operativa.pendienteCompra},
+    {label:'Valor donado', value:budget.donacionProducto.valorDonado},
+    {label:'Saldo operativo', value:budget.operativa.saldoOperativo},
+    {label:'Valoración evento', value:budget.operativa.valoracionEvento}
+  ];
+  if(Math.abs(num(budget.operativa.donacion)) > 0.004) resumenCharts.splice(6, 0, {label:'DONACION', value:budget.operativa.donacion});
   return {
     version: GRAFICAS_SHEET_VERSION,
     generatedAt: new Date().toISOString(),
@@ -167,15 +178,7 @@ export function buildGraficasModel(options = {}){
     },
     budget,
     charts: {
-      resumen: [
-        {label:'Ingresos realizados', value:budget.operativa.ingresosRealizados},
-        {label:'Pendiente ingresos', value:budget.operativa.pendienteIngresos},
-        {label:'Comprado', value:budget.operativa.comprado},
-        {label:'Pendiente compra', value:budget.operativa.pendienteCompra},
-        {label:'Valor donado', value:budget.donacionProducto.valorDonado},
-        {label:'Saldo operativo', value:budget.operativa.saldoOperativo},
-        {label:'Valoración evento', value:budget.operativa.valoracionEvento}
-      ],
+      resumen: resumenCharts,
       segmento,
       destino,
       tiendaTicket

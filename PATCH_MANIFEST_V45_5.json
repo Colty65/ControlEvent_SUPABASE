@@ -1,0 +1,16 @@
+{
+  "version": "ControlEvent v45.5",
+  "from": "ControlEvent v45.4",
+  "changes": [
+    "Nuevo campo DONACION en RESUMEN PRESUPUESTARIO/OPERATIVA",
+    "Quesos SALDO ACTUAL y DONACION en GRAFICAS",
+    "Globo de SALDO OPERATIVO pulsable y encolumnado con fondo del mismo color",
+    "Barra DONACION en hoja GRAFICAS de INFOEVENTO si no es cero",
+    "Versión unificada en app, cache, BACKUP e INFOEVENTO"
+  ],
+  "preserved": [
+    "cambio de evento",
+    "INFOEVENTO legacy",
+    "BACKUP legacy"
+  ]
+}
