@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v46.0",
-  "versionFile": "ControlEvent_v46_0",
+  "version": "ControlEvent v46.1",
+  "versionFile": "ControlEvent_v46_1",
   "base": "ControlEvent v45.4",
   "notes": [
     "Cambios de edición/borrado sin pérdida de posición de ventana.",

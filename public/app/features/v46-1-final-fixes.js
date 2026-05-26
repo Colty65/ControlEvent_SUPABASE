@@ -1,15 +1,15 @@
-/* ControlEvent v46.0 - ajustes finales sobre v45.4 estable.
-   - Edición/borrado sin saltar al principio, con marca visual y destrucción animada.
+/* ControlEvent v46.1 - ajustes finales sobre v45.4 estable.
+   - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
-   - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados.
+   - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.0';
-  const VERSION_FILE = 'ControlEvent_v46_0';
+  const VERSION = 'ControlEvent v46.1';
+  const VERSION_FILE = 'ControlEvent_v46_1';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
-  const INSTALLED = '__ceV460FinalFixes';
+  const INSTALLED = '__ceV461FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -123,14 +123,13 @@
   const sum = values => values.reduce((a,b) => a + Number(b || 0), 0);
 
   function injectStyle(){
-    if($('ceV460Style')) return;
+    if($('ceV461Style')) return;
     const style = document.createElement('style');
-    style.id = 'ceV460Style';
+    style.id = 'ceV461Style';
     style.textContent = `
-      .ce-v46-modified{background:#111827!important;border-color:#000!important;box-shadow:0 0 0 3px rgba(17,24,39,.18),0 18px 38px rgba(0,0,0,.20)!important;transition:background .20s ease,box-shadow .20s ease,transform .20s ease;}
-      .ce-v46-modified label,.ce-v46-modified .field label,.ce-v46-modified .hint,.ce-v46-modified .badge-active{color:#fff!important;font-weight:950!important;}
-      .ce-v46-modified input,.ce-v46-modified select,.ce-v46-modified textarea{font-weight:900!important;border:2px solid #111827!important;box-shadow:0 0 0 2px rgba(255,255,255,.38)!important;}
-      .ce-v46-modified .modify{background:#fff!important;color:#111827!important;border-color:#fff!important;font-weight:950!important;}
+      .ce-v46-modified{font-weight:900!important;transition:font-weight .20s ease;}
+      .ce-v46-modified,.ce-v46-modified *{font-weight:900!important;}
+      .ce-v46-modified input,.ce-v46-modified select,.ce-v46-modified textarea{font-weight:900!important;}
       .ce-v46-deleting{animation:ceV46Destroy 1.5s ease-in forwards!important;overflow:hidden!important;pointer-events:none!important;transform-origin:center;}
       @keyframes ceV46Destroy{0%{opacity:1;transform:scale(1) rotate(0);filter:none;max-height:420px;}18%{transform:scale(1.012) rotate(.35deg);filter:contrast(1.1);}42%{transform:scale(.985) rotate(-.35deg);background:#111827;color:#fff;}72%{opacity:.38;transform:scale(.94) rotate(.65deg);max-height:420px;}100%{opacity:0;transform:scale(.82) rotate(-1.3deg);max-height:0;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;border-width:0;}}
       .ce-v46-pies{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -154,13 +153,13 @@
     try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+(?:\.\d+){1,2}/i.test(el.textContent || '')) el.textContent = VERSION; }); }catch(_){ }
     try{
       const proto = HTMLAnchorElement.prototype;
-      if(!proto.click.__ceV460Version){
+      if(!proto.click.__ceV461Version){
         const oldClick = proto.click;
         const wrapped = function(){
           try{ if(this.download) this.download = String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE); }catch(_){ }
           return oldClick.apply(this, arguments);
         };
-        wrapped.__ceV460Version = true;
+        wrapped.__ceV461Version = true;
         proto.click = wrapped;
       }
     }catch(_){ }
@@ -183,7 +182,7 @@
   }
   function cardFor(action,id){
     let btn = document.querySelector(`button[data-action="${cssEsc(action)}"][data-id="${cssEsc(id)}"]`);
-    return btn?.closest?.('.itemcard,.summary-card,.card,.rowline') || null;
+    return btn?.closest?.('.itemcard,.summary-card,.card,.rowline,tr,li,[data-record-id],[data-id]') || null;
   }
   function markModified(action,id, scroll){
     restoreScroll(scroll);
@@ -355,10 +354,58 @@
     const id = btn.dataset.id;
     return deleteAfterAnimation(btn, ev, () => { st().compras = arr('compras').filter(c => !same(c.id, id)); });
   }
+
+  function accessRenderNow(){
+    try{ if(typeof renderAcceso === 'function') renderAcceso(); }catch(_){ }
+    try{ if(typeof renderPermissions === 'function') renderPermissions(); }catch(_){ }
+    try{ if(typeof renderMaintenanceTabs === 'function') renderMaintenanceTabs(); }catch(_){ }
+  }
+  async function saveAcceso(btn, ev){
+    if(!isGD()) return block(ev, 'Solo GD puede mantener ACCESO.');
+    const oldId = norm(btn.dataset.id || '');
+    const identificacion = norm(getVal('edit-acceso-identificacion', oldId) || oldId);
+    const nombre = norm(getVal('edit-acceso-nombre', oldId));
+    const nivel = upper(getVal('edit-acceso-nivel', oldId) || 'RO') || 'RO';
+    const clave = String(getVal('edit-acceso-clave', oldId) || '');
+    if(!identificacion || !nombre){ return block(ev, 'Identificación y nombre son obligatorios.'); }
+    const scroll = captureScroll(); stop(ev);
+    try{
+      const payload = {identificacion, nombre, nivel, existingId: oldId};
+      if(clave) payload.clave = clave;
+      const res = await fetch('/api/access-users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      const data = await res.json().catch(() => ({}));
+      if(!res.ok || !data.ok) throw new Error(data.error || 'No se pudo guardar el usuario de acceso.');
+      try{ if(typeof fetchAccessUsers === 'function') await fetchAccessUsers(); }catch(_){ }
+      accessRenderNow(); applyVersion(); markModified('save-acceso', identificacion || oldId, scroll);
+    }catch(error){ alert(error?.message || 'No se pudo guardar el usuario de acceso.'); restoreScroll(scroll); }
+    return false;
+  }
+  async function deleteAcceso(btn, ev){
+    if(!isGD()) return block(ev, 'Solo GD puede mantener ACCESO.');
+    const id = norm(btn.dataset.id || '');
+    if(!id) return block(ev, 'No se encuentra el usuario de acceso.');
+    try{ if((window.authUser?.identificacion || '') === id) return block(ev, 'No puedes eliminar el acceso con el que estás logado.'); }catch(_){ }
+    stop(ev);
+    if(!confirm('¿Eliminar este usuario de acceso?')) return false;
+    const scroll = captureScroll();
+    const card = btn.closest?.('.itemcard,.rowline,.card,tr,li,[data-id]');
+    if(card){ card.querySelectorAll('button,input,select,textarea').forEach(el => { try{ el.disabled = true; }catch(_){ } }); card.classList.add('ce-v46-deleting'); }
+    setTimeout(async () => {
+      try{
+        const res = await fetch('/api/access-users/' + encodeURIComponent(id), {method:'DELETE'});
+        const data = await res.json().catch(() => ({}));
+        if(!res.ok || !data.ok) throw new Error(data.error || 'No se pudo eliminar el usuario de acceso.');
+        try{ if(typeof fetchAccessUsers === 'function') await fetchAccessUsers(); }catch(_){ }
+        accessRenderNow(); applyVersion(); restoreScroll(scroll);
+      }catch(error){ alert(error?.message || 'No se pudo eliminar el usuario de acceso.'); accessRenderNow(); restoreScroll(scroll); }
+    }, card ? 1500 : 0);
+    return false;
+  }
+
   function handleTableAction(ev){
     const btn = ev.target?.closest?.('button[data-action]'); if(!btn) return;
     const action = btn.dataset.action || '';
-    if(!/^(save|delete)-(persona|evento|tienda|producto|collab|compra|donacion)$/.test(action)) return;
+    if(!/^(save|delete)-(persona|evento|tienda|producto|collab|compra|donacion|acceso)$/.test(action)) return;
     if(action === 'save-persona') return savePersona(btn, ev);
     if(action === 'save-tienda') return saveTienda(btn, ev);
     if(action === 'save-producto') return saveProducto(btn, ev);
@@ -366,6 +413,7 @@
     if(action === 'save-collab') return saveCollab(btn, ev);
     if(action === 'save-compra') return saveCompra(btn, ev);
     if(action === 'save-donacion') return saveDonacion(btn, ev);
+    if(action === 'save-acceso') return saveAcceso(btn, ev);
     if(action === 'delete-persona') return deleteGeneral(action, 'personas', btn, ev);
     if(action === 'delete-tienda') return deleteGeneral(action, 'tiendas', btn, ev);
     if(action === 'delete-producto') return deleteGeneral(action, 'productos', btn, ev);
@@ -373,6 +421,7 @@
     if(action === 'delete-collab') return deleteCollab(btn, ev);
     if(action === 'delete-compra') return deleteCompra(btn, ev);
     if(action === 'delete-donacion') return deleteDonacion(btn, ev);
+    if(action === 'delete-acceso') return deleteAcceso(btn, ev);
   }
 
   function chartData(){
@@ -420,25 +469,25 @@
   }
   function incomeLines(rows){
     if(!rows.length) return ['Sin registros'];
-    return ['Nombre | Ingreso | Importe', ...rows.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
+    return ['INGRESOS | Nombre | Ingreso | Importe', ...rows.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
   }
   function donationLines(rows){
     if(!rows.length) return ['Sin registros'];
-    return ['Donante | Producto | Cant. | Precio | Total', ...rows.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    return ['DONACIONES | Donante | Producto | Cant. | Precio | Total', ...rows.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function expenseLines(rows){
     if(!rows.length) return ['Sin registros'];
-    return ['Tienda | Ticket | Producto | Cant. | Precio | Total', ...rows.map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    return ['GASTOS | Tienda | Ticket | Producto | Cant. | Precio | Total', ...rows.map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
-    return ['SALDO ACTUAL', 'Concepto | Importe', `Ingresos realizados | ${moneyF(income)}`, `Gastos realizados | ${moneyF(expense)}`, `SALDO ACTUAL | ${moneyF(saldo)}`, '', 'INGRESOS REALIZADOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS REALIZADOS', ...limited(expenseLines(expenseRows))];
+    return ['SALDO ACTUAL', 'TOTAL | Importe', `Ingresos realizados | ${moneyF(income)}`, `Gastos realizados | ${moneyF(expense)}`, `SALDO ACTUAL | ${moneyF(saldo)}`, '', 'INGRESOS REALIZADOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS REALIZADOS', ...limited(expenseLines(expenseRows))];
   }
   function saldoOperativoLines(incomeRows, expenseRows, income, expense, saldo){
-    return ['SALDO OPERATIVO', 'Concepto | Importe', `Ingreso total previsto | ${moneyF(income)}`, `Gasto total previsto | ${moneyF(expense)}`, `SALDO OPERATIVO | ${moneyF(saldo)}`, '', 'INGRESOS INCLUIDOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS INCLUIDOS', ...limited(expenseLines(expenseRows))];
+    return ['SALDO OPERATIVO', 'TOTAL | Importe', `Ingreso total previsto | ${moneyF(income)}`, `Gasto total previsto | ${moneyF(expense)}`, `SALDO OPERATIVO | ${moneyF(saldo)}`, '', 'INGRESOS INCLUIDOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS INCLUIDOS', ...limited(expenseLines(expenseRows))];
   }
   function valoracionLines(expenseRows, donationRows, expenses, donations, valoracion, pending){
-    return ['VALORACION DEL EVENTO', 'Concepto | Importe', `Gastos previstos | ${moneyF(expenses)}`, `Donación de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows)), '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows))];
+    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Gastos previstos | ${moneyF(expenses)}`, `Donación de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows)), '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows))];
   }
   function polar(cx, cy, r, angle){ const rad = (angle - 90) * Math.PI / 180; return {x:cx + r * Math.cos(rad), y:cy + r * Math.sin(rad)}; }
   function arcPath(cx, cy, r, start, end){ const s = polar(cx,cy,r,end), e = polar(cx,cy,r,start); const large = end - start <= 180 ? 0 : 1; return `M ${cx} ${cy} L ${s.x.toFixed(3)} ${s.y.toFixed(3)} A ${r} ${r} 0 ${large} 0 ${e.x.toFixed(3)} ${e.y.toFixed(3)} Z`; }
@@ -474,7 +523,7 @@
   function destinoBars(){
     const rows = destinoRows(); const maxVal = Math.max(1, ...rows.flatMap(r => [Number(r.comprado||0), Number(r.donado||0), Number(r.pendiente||0)]));
     const total = rows.reduce((a,b) => a + Number(b.total || 0), 0);
-    const item = (r,key,label,color,lines) => { const value = Number(r[key] || 0); if(Math.abs(value) <= 0) return ''; const h = Math.max(18, value / maxVal * 145); const tip = `${r.label} - ${label}: ${moneyF(value)}\n${(lines?.length ? lines : ['Sin productos']).join('\n')}`; return `<div class="ce-v434-mini-col" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="${esc(color)}" data-ce-tip-layout-v21="chart"><div class="ce-v434-mini-value">${esc(moneyF(value))}</div><div class="ce-v434-mini-stick" style="height:${h}px;background:${color}"></div><div class="ce-v434-mini-label">${esc(label)}</div></div>`; };
+    const item = (r,key,label,color,lines) => { const value = Number(r[key] || 0); if(Math.abs(value) <= 0) return ''; const h = Math.max(18, value / maxVal * 145); const header = label === 'Comprado' ? 'COMPRADO' : (label === 'Donado' ? 'DONADO' : 'PTE. COMPRA'); const body = (lines?.length ? lines : ['Sin productos']); const tip = `${r.label} - ${label}: ${moneyF(value)}\n${header}\n${body.join('\n')}`; return `<div class="ce-v434-mini-col" data-ce-tip-v21="${esc(tip)}" data-tip-bg-v21="${esc(color)}" data-ce-tip-layout-v21="chart"><div class="ce-v434-mini-value">${esc(moneyF(value))}</div><div class="ce-v434-mini-stick" style="height:${h}px;background:${color}"></div><div class="ce-v434-mini-label">${esc(label)}</div></div>`; };
     const cards = rows.map(r => `<div class="ce-v434-destino-card"><div class="ce-v434-destino-title"><span>${esc(r.label)}</span><strong>${esc(moneyF(r.total))}</strong></div><div class="ce-v434-mini-bars">${item(r,'comprado','Comprado','#dc2626',r.listComprado)}${item(r,'donado','Donado','#f59e0b',r.listDonado)}${item(r,'pendiente','Pte.Compra','#fb7185',r.listPendiente)}</div></div>`).join('');
     return `<div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Por destino</span><strong>${esc(moneyF(total))}</strong></div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte.Compra</span></div><div class="ce-v434-destino-bars">${cards || '<div class="empty">Sin datos por destino.</div>'}</div></div>`;
   }
@@ -491,13 +540,13 @@
     const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = sig;
-    wrap.dataset.ceStableChart = 'v46.0';
+    wrap.dataset.ceStableChart = 'v46.1';
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
   function installGraficas(){
     try{ renderGraficas = renderGraficasV460; }catch(_){ }
     window.renderGraficas = renderGraficasV460;
-    window.ControlEventV460 = {...(window.ControlEventV460 || {}), version:VERSION, renderGraficas:renderGraficasV460};
+    window.ControlEventV461 = {...(window.ControlEventV461 || {}), version:VERSION, renderGraficas:renderGraficasV460}; window.ControlEventV460 = {...(window.ControlEventV460 || {}), version:VERSION, renderGraficas:renderGraficasV460};
     try{ window.ControlEventV434 = {...(window.ControlEventV434 || {}), renderGraficas:renderGraficasV460}; window.ControlEventV435 = window.ControlEventV434; window.ControlEventV436 = window.ControlEventV434; }catch(_){ }
     if(graficasVisible()) setTimeout(() => renderGraficasV460({force:true}), 30);
   }
@@ -513,7 +562,7 @@
       const fn = window.exportExcel;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.info = false; });
       throw new Error('No se ha encontrado un motor seguro para INFOEVENTO.');
-    }catch(error){ exportLocks.info = false; console.error('[v46.0] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.info = false; console.error('[v46.1] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function directBackup(){
     if(exportLocks.backup) return false; exportLocks.backup = true;
@@ -521,24 +570,24 @@
       const engine = window.__ceV257?.exportSeedWorkbook;
       if(typeof engine === 'function') return Promise.resolve(engine()).finally(() => { exportLocks.backup = false; });
       const excel = window.ControlEventExcel;
-      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-direct'})).finally(() => { exportLocks.backup = false; });
+      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-1-direct'})).finally(() => { exportLocks.backup = false; });
       const fn = window.exportSeedWorkbook;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.backup = false; });
       throw new Error('No se ha encontrado un motor seguro para Descarga de datos.');
-    }catch(error){ exportLocks.backup = false; console.error('[v46.0] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.backup = false; console.error('[v46.1] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function installExportGuard(){
     try{
-      if(!window.__ceV460ExportPatched){
+      if(!window.__ceV461ExportPatched){
         const infoWrapper = function(){ return directInfoEvento(); };
         const backupWrapper = function(){ return directBackup(); };
-        infoWrapper.__ceV460Direct = true; backupWrapper.__ceV460Direct = true;
+        infoWrapper.__ceV461Direct = true; backupWrapper.__ceV461Direct = true;
         try{ Object.defineProperty(infoWrapper, '__ceExcelFacade', {value:true}); Object.defineProperty(infoWrapper, '__ceExcelFacadeName', {value:'exportExcel'}); }catch(_){ }
         try{ Object.defineProperty(backupWrapper, '__ceExcelFacade', {value:true}); Object.defineProperty(backupWrapper, '__ceExcelFacadeName', {value:'exportSeedWorkbook'}); }catch(_){ }
         try{ exportExcel = infoWrapper; }catch(_){ }
         try{ exportSeedWorkbook = backupWrapper; }catch(_){ }
         window.exportExcel = infoWrapper; window.exportSeedWorkbook = backupWrapper;
-        window.__ceV460ExportPatched = true;
+        window.__ceV461ExportPatched = true;
       }
     }catch(_){ }
   }
@@ -565,9 +614,10 @@
     injectStyle(); applyVersion(); installGraficas(); installExportGuard(); wrapRender();
   }
 
+  window.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleExportClick, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,120,600,1600,3000].forEach(ms => setTimeout(install, ms));
-  window.ControlEventV460 = {version:VERSION, renderGraficas:renderGraficasV460, install, directInfoEvento, directBackup};
+  window.ControlEventV461 = {version:VERSION, renderGraficas:renderGraficasV460, install, directInfoEvento, directBackup}; window.ControlEventV460 = window.ControlEventV461;
 })();
