@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v45-5';
+const CACHE_NAME = 'controlevent-shell-v45-6';
 // V30.12: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
@@ -39,7 +39,7 @@ const SHELL_ASSETS = [
   '/app/features/v45-0-maintenance-fixes.js',
   '/app/features/v45-1-budget-labels.js',
   '/app/features/v45-2-role-refresh.js',
-  '/app/features/v45-5-donacion-operativa.js',
+  '/app/features/v45-6-donacion-operativa.js',
   '/app/features/event-delete-cascade-v33.7.js',
   '/modules/module-loader.js',
   '/modules/menu-registry.js',

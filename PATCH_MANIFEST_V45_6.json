@@ -1,0 +1,15 @@
+{
+  "version": "ControlEvent v45.6",
+  "base": "ControlEvent v45.5",
+  "description": "Ajuste de DONACION: solo se calcula si existe z_DEV_IRPF ELA y se pinta siempre azul marino con letra blanca/negrita en UI e INFOEVENTO.",
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/v45-6-donacion-operativa.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/modules/excel/graficas-sheet.js",
+    "routes/export.routes.js",
+    "public/modules/excel/backup.js"
+  ]
+}

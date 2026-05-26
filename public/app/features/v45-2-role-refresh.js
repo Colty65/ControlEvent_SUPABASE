@@ -1,4 +1,4 @@
-/* ControlEvent v45.5 - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v45.6 - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
    - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v45.5';
-  const VERSION_FILE = 'ControlEvent_v45_5';
+  const VERSION = 'ControlEvent v45.6';
+  const VERSION_FILE = 'ControlEvent_v45_6';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',
@@ -36,7 +36,7 @@
     if(typeof window[name] === 'function') return window[name];
     return safe(() => Function('return (typeof '+name+' === "function") ? '+name+' : null')(), null);
   }
-  function call(name, args){ const fn = getGlobalFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.5] Error en '+name, error); return undefined; } }
+  function call(name, args){ const fn = getGlobalFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v45.6] Error en '+name, error); return undefined; } }
   function st(){ return safe(() => (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}, window.state || window.ControlEventApp?.state || {}); }
   function auth(){ return safe(() => (typeof authUser !== 'undefined' && authUser) || window.authUser || window.ControlEventApp?.authUser || null, window.authUser || window.ControlEventApp?.authUser || null); }
   function role(){ return String(auth()?.nivel || '').toUpperCase(); }
@@ -106,7 +106,7 @@
   }
   function clearRoleResiduesForWritable(){
     if(isRO()) return;
-    // v45.5: al pasar de RO a GD/RW, limpiar restos de display:none!important y clases de ocultación del rol anterior.
+    // v45.6: al pasar de RO a GD/RW, limpiar restos de display:none!important y clases de ocultación del rol anterior.
     Object.values(PANEL_BY_TAB).forEach(id => {
       const panel = $(id);
       if(!panel) return;
@@ -287,12 +287,12 @@
       setTimeout(() => { try{ window.ControlEventV447?.install?.(); }catch(_){ } syncRoleMenu(); }, 80);
       setTimeout(() => {
         const tab = defaultTabForRole(currentTab());
-        try{ window.ControlEventViewRefreshStabilizer?.hydrate?.(tab, 'v45.5-soft-refresh'); }catch(_){ }
+        try{ window.ControlEventViewRefreshStabilizer?.hydrate?.(tab, 'v45.6-soft-refresh'); }catch(_){ }
       }, 180);
       softNotice('Datos refrescados.');
       return true;
     }catch(error){
-      console.warn('[v45.5] refresco limpio', error);
+      console.warn('[v45.6] refresco limpio', error);
       softNotice('No se pudo refrescar. Usa Salir/Entrar si continúa.');
       return false;
     }finally{

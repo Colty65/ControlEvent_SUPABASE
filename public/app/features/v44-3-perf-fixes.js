@@ -1,10 +1,10 @@
-/* ControlEvent v45.5 - Optimización controlada de render y gráficas.
+/* ControlEvent v45.6 - Optimización controlada de render y gráficas.
    Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v45.5';
-  const VERSION_FILE = 'ControlEvent_v45_5';
+  const VERSION = 'ControlEvent v45.6';
+  const VERSION_FILE = 'ControlEvent_v45_6';
   const HEAVY_GROUPS = {
     ingresos: ['collabList','ingresosSummaryGrid'],
     compras: ['comprasList'],
@@ -20,7 +20,7 @@
   function call(name, args){
     const fn = window[name];
     if(typeof fn !== 'function') return undefined;
-    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v45.5] Error en ' + name, error); return undefined; }
+    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v45.6] Error en ' + name, error); return undefined; }
   }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
@@ -162,7 +162,7 @@
     const wrapped = async function(){
       const result = await old.apply(this, arguments);
       setTimeout(() => {
-        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v45.5] render tras cambio de evento', error); }
+        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v45.6] render tras cambio de evento', error); }
       }, 0);
       return result;
     };

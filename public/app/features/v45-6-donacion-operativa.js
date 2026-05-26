@@ -1,9 +1,9 @@
-/* ControlEvent v45.5 - DONACION operativa, quesos SALDO ACTUAL/DONACION y barra INFOEVENTO.
+/* ControlEvent v45.6 - DONACION operativa, quesos SALDO ACTUAL/DONACION y barra INFOEVENTO.
    Cambio ligero: no toca el flujo de cambio de evento ni la carga de datos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.5';
-  const VERSION_FILE = 'ControlEvent_v45_5';
+  const VERSION = 'ControlEvent v45.6';
+  const VERSION_FILE = 'ControlEvent_v45_6';
   const DARK_BLUE = '#0b1f3a';
   const SALDO_OK = '#0f766e';
   const SALDO_BAD = '#7f1d1d';
@@ -53,9 +53,12 @@
     const n = fold(personName(row));
     return n === 'Z_DEV_IRPF ELA' || n.includes('Z_DEV_IRPF ELA') || n.includes('Z DEV IRPF ELA');
   }
-  function irpfElaAmount(){
-    return ingresos().filter(r => isIrpfEla(r) && fold(r.situacion || r.ingreso || r.tipoIngreso || '') !== 'PENDIENTE').reduce((a,r)=>a+incomeTotal(r),0);
+  function irpfElaInfo(){
+    const rows = ingresos().filter(r => isIrpfEla(r));
+    const valid = rows.filter(r => fold(r.situacion || r.ingreso || r.tipoIngreso || '') !== 'PENDIENTE');
+    return {exists: rows.length > 0, amount: valid.reduce((a,r)=>a+incomeTotal(r),0)};
   }
+  function irpfElaAmount(){ return irpfElaInfo().amount; }
   function budget(){ try{ if(typeof budgetSummary === 'function') return budgetSummary() || {}; }catch(_){ } return {}; }
   function computed(){
     const b = budget();
@@ -66,9 +69,11 @@
     const gastosPrevistos = num(op.gastosPrevistos ?? (num(op.gastoCompras)+num(op.gastosOrganizacion)+num(op.pendiente)));
     const ingresoTotal = num(op.ingresos ?? op.presupuesto ?? b.ingresosDinero?.totalComprometido ?? ingresos().reduce((a,r)=>a+incomeTotal(r),0));
     const saldoOperativo = Number.isFinite(Number(op.saldoOperativo)) ? num(op.saldoOperativo) : ingresoTotal - gastosPrevistos;
-    const irpf = irpfElaAmount();
-    const donacion = saldoActual - irpf;
-    return {ingresosRealizados,gastosRealizados,saldoActual,ingresoTotal,gastosPrevistos,saldoOperativo,irpf,donacion};
+    const irpfInfo = irpfElaInfo();
+    const irpf = irpfInfo.exists ? irpfInfo.amount : 0;
+    const donacion = irpfInfo.exists ? (saldoActual - irpf) : 0;
+    const showDonacion = !!irpfInfo.exists && Math.abs(donacion) > EPS;
+    return {ingresosRealizados,gastosRealizados,saldoActual,ingresoTotal,gastosPrevistos,saldoOperativo,irpf,donacion,hasIrpfEla:!!irpfInfo.exists,showDonacion};
   }
   function formulaTip(kind, c){
     if(kind === 'saldoActual') return `Concepto | Fórmula | Importe\nSALDO ACTUAL | Ingresos realizados - Gastos realizados | ${money(c.saldoActual)}\nIngresos realizados |  | ${money(c.ingresosRealizados)}\nGastos realizados |  | ${money(c.gastosRealizados)}`;
@@ -80,8 +85,14 @@
     const style = document.createElement('style');
     style.id = 'ceV455Style';
     style.textContent = `
-      .ce-v455-donacion-row strong{color:#111827!important;}
-      .ce-v455-donacion-row .ce-v455-donacion-value{background:${DARK_BLUE}!important;color:#fff!important;font-weight:950!important;font-size:1.18rem!important;padding:5px 10px!important;border-radius:10px!important;box-shadow:inset 0 -1px 0 rgba(255,255,255,.18);}
+      .ce-v455-donacion-row{background:${DARK_BLUE}!important;color:#fff!important;border-radius:12px!important;padding:7px 10px!important;box-shadow:0 10px 24px rgba(11,31,58,.18)!important;}
+      .ce-v455-donacion-row strong{color:#fff!important;font-weight:950!important;}
+      .ce-v455-donacion-row .ce-v455-donacion-value{background:${DARK_BLUE}!important;color:#fff!important;font-weight:950!important;font-size:1.18rem!important;padding:5px 10px!important;border-radius:10px!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.20);}
+      .ce-v455-extra-pie[data-v455-pie="DONACION"]{background:${DARK_BLUE}!important;color:#fff!important;border-color:${DARK_BLUE}!important;box-shadow:0 12px 28px rgba(11,31,58,.22)!important;}
+      .ce-v455-extra-pie[data-v455-pie="DONACION"] .ce-v434-pie-title span,
+      .ce-v455-extra-pie[data-v455-pie="DONACION"] .ce-v434-pie-title strong,
+      .ce-v455-extra-pie[data-v455-pie="DONACION"] .ce-v434-legend span{color:#fff!important;font-weight:950!important;}
+      .ce-v455-extra-pie[data-v455-pie="DONACION"] .ce-v434-pie-svg circle[fill="#fff"]{fill:rgba(255,255,255,.94)!important;}
       .ce-v455-extra-pie .ce-v434-pie-title strong{color:#111827;}
       #ceTooltipV21.ce-v21-layout-chartdarkv455{color:#fff!important;border-color:rgba(255,255,255,.25)!important;box-shadow:0 16px 44px rgba(2,6,23,.34)!important;}
       #ceTooltipV21.ce-v21-layout-chartdarkv455 *{color:#fff!important;}
@@ -104,7 +115,7 @@
     const c = computed();
     const sig = [eventId(), c.saldoActual, c.irpf, c.donacion].join('|');
     const existing = wrap.querySelector('.ce-v455-donacion-row');
-    if(Math.abs(c.donacion) <= EPS){ if(existing) existing.remove(); return; }
+    if(!c.showDonacion){ if(existing) existing.remove(); return; }
     if(existing && existing.getAttribute('data-v455-sig') === sig) return;
     if(existing) existing.remove();
     const after = wrap.querySelector('[data-v251-op="saldoActual"]') || Array.from(wrap.querySelectorAll('.budget-row')).find(r => /SALDO\s+ACTUAL/i.test(r.textContent || ''));
@@ -146,7 +157,7 @@
     pies.querySelectorAll('.ce-v455-extra-pie').forEach(x => x.remove());
     const saldoColor = c.saldoActual >= 0 ? SALDO_OK : SALDO_BAD;
     pies.insertAdjacentHTML('beforeend', pieCard('SALDO ACTUAL', c.saldoActual, saldoColor, formulaTip('saldoActual', c)));
-    if(Math.abs(c.donacion) > EPS) pies.insertAdjacentHTML('beforeend', pieCard('DONACION', c.donacion, DONACION_COLOR, formulaTip('donacion', c)));
+    if(c.showDonacion) pies.insertAdjacentHTML('beforeend', pieCard('DONACION', c.donacion, DONACION_COLOR, formulaTip('donacion', c)));
     pies.setAttribute('data-v455-sig', sig);
   }
   function donationFromBudget(b){
@@ -154,8 +165,9 @@
     const ingresosRealizados = num(op.ingresoDinero ?? b?.ingresosDinero?.totalIngresado ?? ingresos().filter(r => fold(r.situacion || '') !== 'PENDIENTE').reduce((a,r)=>a+incomeTotal(r),0));
     const gastosRealizados = num(op.gastosRealizados ?? ((op.gastoCompras != null || op.gastosOrganizacion != null) ? num(op.gastoCompras)+num(op.gastosOrganizacion) : 0));
     const saldoActual = Number.isFinite(Number(op.saldoActual)) ? num(op.saldoActual) : ingresosRealizados - gastosRealizados;
-    const irpf = irpfElaAmount();
-    return {irpf, donacion: saldoActual - irpf};
+    const irpfInfo = irpfElaInfo();
+    const irpf = irpfInfo.exists ? irpfInfo.amount : 0;
+    return {irpf, donacion: irpfInfo.exists ? (saldoActual - irpf) : 0, hasIrpfEla: !!irpfInfo.exists, showDonacion: !!irpfInfo.exists && Math.abs(saldoActual - irpf) > EPS};
   }
   function patchBudgetSummary(){
     const old = (typeof budgetSummary === 'function') ? budgetSummary : window.budgetSummary;
@@ -165,7 +177,15 @@
       try{
         const op = b.operativa || {};
         const d = donationFromBudget(b);
-        b.operativa = Object.assign({}, op, {zDevIrpfEla:d.irpf, donacion:d.donacion, donacionFinal:d.donacion});
+        const nextOp = Object.assign({}, op, {zDevIrpfEla:d.irpf, zDevIrpfElaExists:d.hasIrpfEla, hasIrpfEla:d.hasIrpfEla});
+        if(d.showDonacion){
+          nextOp.donacion = d.donacion;
+          nextOp.donacionFinal = d.donacion;
+        }else{
+          delete nextOp.donacion;
+          delete nextOp.donacionFinal;
+        }
+        b.operativa = nextOp;
       }catch(_){ }
       return b;
     };
@@ -179,7 +199,7 @@
     scheduled = true;
     setTimeout(()=>{
       scheduled = false;
-      try{ patchBudgetSummary(); enhanceBudget(); enhanceGraficas(); }catch(e){ console.warn('[v45.5] donacion operativa', e); }
+      try{ patchBudgetSummary(); enhanceBudget(); enhanceGraficas(); }catch(e){ console.warn('[v45.6] donacion operativa', e); }
     }, 60);
   }
   function wrapRender(name){
