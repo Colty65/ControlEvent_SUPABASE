@@ -140,9 +140,31 @@ function isFacadeFunction(fn, name){
   return typeof fn === 'function' && (fn.__ceExcelFacade === true || fn.__ceExcelFacadeName === name);
 }
 
-function rememberLegacyAction(name, fn){
+function legacyBridgeCandidate(name){
+  const bridge = (typeof window !== 'undefined' && window.__ceV257) ? window.__ceV257 : null;
+  if(name === 'exportExcel' && typeof bridge?.exportExcel === 'function') return bridge.exportExcel;
+  if(name === 'exportSeedWorkbook' && typeof bridge?.exportSeedWorkbook === 'function') return bridge.exportSeedWorkbook;
+  return null;
+}
+
+function isDynamicAppExcelProxy(fn, name){
+  if(typeof fn !== 'function') return false;
+  // La fachada ControlEventApp.actions.* creada por el legacy llama dinámicamente a
+  // window.exportExcel/window.exportSeedWorkbook. Si capturamos esa función como
+  // motor legacy y después window.* ya apunta a la fachada modular, se produce:
+  // fachada -> módulo -> "legacy" proxy -> fachada -> ... RangeError.
+  try{
+    const src = Function.prototype.toString.call(fn);
+    if(name === 'exportExcel') return /window\.exportExcel/.test(src);
+    if(name === 'exportSeedWorkbook') return /window\.exportSeedWorkbook/.test(src);
+  }catch(_){ }
+  return false;
+}
+
+function rememberLegacyAction(name, fn, source = 'unknown'){
   if(typeof fn !== 'function') return null;
   if(isFacadeFunction(fn, name)) return legacyEngines.get(name) || null;
+  if(source === 'app-actions' && isDynamicAppExcelProxy(fn, name)) return legacyEngines.get(name) || null;
   if(!legacyEngines.has(name)) legacyEngines.set(name, fn);
   return legacyEngines.get(name) || fn;
 }
@@ -150,17 +172,19 @@ function rememberLegacyAction(name, fn){
 export function captureLegacyExcelActions(){
   ['exportExcel','exportSeedWorkbook'].forEach(name => {
     const app = resolveApp();
-    const fromApp = app?.actions?.[name] || app?.[name];
+    const bridge = legacyBridgeCandidate(name);
     const fromWindow = window[name];
-    rememberLegacyAction(name, fromWindow);
-    rememberLegacyAction(name, fromApp);
+    const fromApp = app?.actions?.[name] || app?.[name];
+    rememberLegacyAction(name, bridge, 'legacy-bridge-v257');
+    rememberLegacyAction(name, fromWindow, 'window');
+    rememberLegacyAction(name, fromApp, 'app-actions');
   });
   return getLegacyActionInfo();
 }
 
 export function getLegacyAction(name){
   captureLegacyExcelActions();
-  return legacyEngines.get(name) || null;
+  return legacyEngines.get(name) || legacyBridgeCandidate(name) || null;
 }
 
 export function getLegacyActionInfo(){
@@ -199,11 +223,9 @@ export function listExcelModules(){
 }
 
 export async function invokeLegacyExcelAction(name, args = [], options = {}){
-  const legacy = getLegacyAction(name) || resolveExcelAction(name, {preferLegacy:true});
-  if(typeof legacy !== 'function'){
-    const fallback = () => callAction(name, ...(Array.isArray(args) ? args : [args]));
-    if(typeof fallback === 'function') return fallback();
-    throw new Error(`No se ha encontrado el motor legacy Excel ${name}.`);
+  const legacy = getLegacyAction(name) || legacyBridgeCandidate(name);
+  if(typeof legacy !== 'function' || isFacadeFunction(legacy, name) || isDynamicAppExcelProxy(legacy, name)){
+    throw new Error(`No se ha encontrado un motor legacy Excel seguro para ${name}.`);
   }
   return legacy.apply(options.thisArg || window, Array.isArray(args) ? args : [args]);
 }

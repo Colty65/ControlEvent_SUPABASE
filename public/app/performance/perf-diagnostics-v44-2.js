@@ -1,9 +1,9 @@
-/* ControlEvent v45.3 - Diagnóstico de rendimiento robusto.
+/* ControlEvent v45.4 - Diagnóstico de rendimiento robusto.
    Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v45.3';
+  const VERSION = 'ControlEvent v45.4';
   const START_MS = (performance && performance.now) ? performance.now() : Date.now();
   const MAX_EVENTS = 120;
   const MAX_ERRORS = 30;
@@ -208,13 +208,13 @@
     return true;
   }
   function installRenderOptimizer(){
-    // v45.3: el diagnóstico ya NO limpia automáticamente el DOM.
-    // La limpieza global de v44.2/v45.3 era útil para medir, pero generaba demasiadas pasadas
+    // v45.4: el diagnóstico ya NO limpia automáticamente el DOM.
+    // La limpieza global de v44.2/v45.4 era útil para medir, pero generaba demasiadas pasadas
     // y podía convertirse en otro proceso pesado. Aquí solo se mantienen métricas y una acción manual.
     if(renderOptimizer.installed) return;
     renderOptimizer.installed = true;
     renderOptimizer.mode = 'diagnostic-only-no-auto-prune';
-    renderOptimizer.lastReason = 'v45.3: limpieza automática desactivada';
+    renderOptimizer.lastReason = 'v45.4: limpieza automática desactivada';
   }
 
   function sample(reason){
@@ -389,7 +389,7 @@
         ${cell('Errores', state.counters.errors)}
       </div>
       <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, gráficas ${r.renderizado?.graficas||0}\nOptimización DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
-Optimización v45.3: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
+Optimización v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
       <pre>${htmlEscape(events || 'Sin eventos recientes')}</pre>
       <div class="actions">
         <button type="button" id="cePerf442Copy">Copiar informe</button>
@@ -483,7 +483,7 @@ Optimización v45.3: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${windo
 
   function ensureUi(){
     injectCss();
-    // v45.3: no recrear el botón/panel en cada refresco de instalación.
+    // v45.4: no recrear el botón/panel en cada refresco de instalación.
     // El intervalo de instalación anterior eliminaba el panel abierto y por eso PERF aparecía un instante y desaparecía.
     const old441Btn = byId('cePerf441Button');
     if(old441Btn) old441Btn.remove();
@@ -560,7 +560,7 @@ Optimización v45.3: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${windo
   else install();
   window.addEventListener('load', () => setTimeout(install, 80), {once:true});
   ['controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));
-  // v45.3: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentación activa en móvil/tablet/RO.
+  // v45.4: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentación activa en móvil/tablet/RO.
   setInterval(() => {
     install();
     if(state.opened) updatePanel();

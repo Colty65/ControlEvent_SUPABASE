@@ -1,0 +1,20 @@
+{
+  "version": "ControlEvent v45.4",
+  "versionFile": "ControlEvent_v45_4",
+  "base": "ControlEvent v45.3",
+  "focus": "Corrección de INFOEVENTO y descarga de datos sin modificar el modelo de generación de Excel",
+  "files": [
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/sw.js",
+    "index.html"
+  ],
+  "notes": [
+    "Se captura de forma preferente window.__ceV257.exportExcel y window.__ceV257.exportSeedWorkbook como motores legacy seguros.",
+    "Se evita capturar ControlEventApp.actions.exportExcel/exportSeedWorkbook cuando son proxies dinámicos hacia window.*.",
+    "No se reimplementa ni se inventa INFOEVENTO/BACKUP; se mantiene el generador existente."
+  ]
+}
