@@ -1,7 +1,0 @@
-ControlEvent v45.7
-
-Corrección ligera sobre v45.5:
-- El nuevo campo DONACION solo se muestra si existe en el evento un ingreso/persona llamado z_DEV_IRPF ELA.
-- Si no existe z_DEV_IRPF ELA, no se calcula ni se muestra DONACION aunque el saldo actual no sea cero.
-- DONACION se pinta siempre en azul marino con letra blanca y negrita en RESUMEN/INFOEVENTO, GRAFICAS y Resumen presupuestario/OPERATIVA.
-- Se mantiene intacta la lógica de cambio de evento y la generación base de INFOEVENTO/BACKUP.

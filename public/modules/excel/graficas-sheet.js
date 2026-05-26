@@ -112,8 +112,6 @@ function normalizeBudget(raw = {}){
       pendienteCompra: money(operativa.pendiente ?? compras.pendientes),
       saldoActual: money(operativa.saldoActual ?? compras.saldoReal),
       saldoOperativo: money(operativa.saldoOperativo),
-      hasIrpfEla: !!(operativa.hasIrpfEla || operativa.zDevIrpfElaExists),
-      donacion: money((operativa.hasIrpfEla || operativa.zDevIrpfElaExists) ? (operativa.donacionFinal ?? operativa.donacion) : 0),
       valorDonado: money(operativa.valorDonado ?? donacionProducto.valorDonado),
       valoracionEvento: money(operativa.valoracionEvento)
     }
@@ -159,16 +157,6 @@ export function buildGraficasModel(options = {}){
   const segmento = normalizeBreakdown(options.segmento || callSummary('summaryBySegmento'));
   const destino = normalizeBreakdown(options.destino || callSummary('summaryByDestino'));
   const tiendaTicket = normalizeTicketRows(options.tiendaTicket || callSummary('summaryByTiendaTicket'));
-  const resumenCharts = [
-    {label:'Ingresos realizados', value:budget.operativa.ingresosRealizados},
-    {label:'Pendiente ingresos', value:budget.operativa.pendienteIngresos},
-    {label:'Comprado', value:budget.operativa.comprado},
-    {label:'Pendiente compra', value:budget.operativa.pendienteCompra},
-    {label:'Valor donado', value:budget.donacionProducto.valorDonado},
-    {label:'Saldo operativo', value:budget.operativa.saldoOperativo},
-    {label:'Valoración evento', value:budget.operativa.valoracionEvento}
-  ];
-  if(budget.operativa.hasIrpfEla && Math.abs(num(budget.operativa.donacion)) > 0.004) resumenCharts.splice(6, 0, {label:'DONACION', value:budget.operativa.donacion});
   return {
     version: GRAFICAS_SHEET_VERSION,
     generatedAt: new Date().toISOString(),
@@ -179,7 +167,15 @@ export function buildGraficasModel(options = {}){
     },
     budget,
     charts: {
-      resumen: resumenCharts,
+      resumen: [
+        {label:'Ingresos realizados', value:budget.operativa.ingresosRealizados},
+        {label:'Pendiente ingresos', value:budget.operativa.pendienteIngresos},
+        {label:'Comprado', value:budget.operativa.comprado},
+        {label:'Pendiente compra', value:budget.operativa.pendienteCompra},
+        {label:'Valor donado', value:budget.donacionProducto.valorDonado},
+        {label:'Saldo operativo', value:budget.operativa.saldoOperativo},
+        {label:'Valoración evento', value:budget.operativa.valoracionEvento}
+      ],
       segmento,
       destino,
       tiendaTicket
@@ -197,7 +193,7 @@ export function buildGraficasRows(model = buildGraficasModel()){
 }
 function styleTitle(cell){ cell.font={bold:true,size:16}; cell.alignment={vertical:'middle',horizontal:'left'}; }
 function styleHeader(cell){ cell.font={bold:true}; cell.alignment={vertical:'middle',horizontal:'center',wrapText:true}; cell.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
-function styleCell(cell, index, value){
+function styleCell(cell, index){
   cell.alignment={vertical:'middle',horizontal:index < 2 ? 'left' : 'right',wrapText:true};
   cell.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
   if(typeof cell.value === 'number') cell.numFmt = '#,##0.00 €;[Red]-#,##0.00 €';
@@ -205,15 +201,10 @@ function styleCell(cell, index, value){
 }
 function putRow(ws, rowNumber, values, styler = styleCell){
   const row = ws.getRow(rowNumber);
-  const isDonacionRow = String(values?.[0] ?? '').toUpperCase() === 'RESUMEN' && String(values?.[1] ?? '').toUpperCase() === 'DONACION';
   values.forEach((value, index) => {
     const cell = row.getCell(index + 1);
     cell.value = value;
     if(styler) styler(cell, index, value);
-    if(isDonacionRow){
-      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF0B1F3A'}};
-      cell.font = {bold:true, color:{argb:'FFFFFFFF'}};
-    }
   });
   row.commit?.();
   return row;

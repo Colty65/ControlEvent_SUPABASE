@@ -1,7 +1,0 @@
-ControlEvent v45.7
-
-- DONACION deja de depender de z_DEV_IRPF ELA.
-- DONACION se muestra cuando el evento tiene el colaborador PEÑA_DONA_A_FUNDACION y su situación no está pendiente de ingreso.
-- Si PEÑA_DONA_A_FUNDACION está como Pte. de ingreso, DONACION no aparece. Al pasarlo a Banco/Bizum/Efectivo, aparece como donación realizada.
-- El importe DONACION es el importe pagado de PEÑA_DONA_A_FUNDACION.
-- Se mantiene el color azul marino con letra blanca y negrita en RESUMEN, GRAFICAS e INFOEVENTO.
