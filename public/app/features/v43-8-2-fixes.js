@@ -1,9 +1,9 @@
-/* ControlEvent v45.4 - menú móvil estable y versión unificada.
+/* ControlEvent v46.0 - menú móvil estable y versión unificada.
    Parche defensivo: no toca INFOEVENTO, BACKUP, COMPRAS ni DONACIONES. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v46.0';
+  const VERSION_FILE = 'ControlEvent_v46_0';
   const MOBILE_MAX = 760;
   const $ = id => document.getElementById(id);
 

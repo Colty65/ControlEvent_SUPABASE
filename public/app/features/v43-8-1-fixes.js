@@ -1,9 +1,9 @@
-/* ControlEvent v45.4 - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v46.0 - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v45.4';
-  const VERSION_FILE = 'ControlEvent_v45_4';
+  const VERSION = 'ControlEvent v46.0';
+  const VERSION_FILE = 'ControlEvent_v46_0';
   const $ = id => document.getElementById(id);
 
   function st(){
