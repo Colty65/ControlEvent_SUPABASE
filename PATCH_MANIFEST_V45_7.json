@@ -1,0 +1,12 @@
+{
+  "version": "45.7",
+  "base": "45.6",
+  "description": "DONACION por colaborador PEÑA_DONA_A_FUNDACION pagado/no pendiente, sin depender de z_DEV_IRPF ELA.",
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/v45-7-donacion-operativa.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js"
+  ]
+}

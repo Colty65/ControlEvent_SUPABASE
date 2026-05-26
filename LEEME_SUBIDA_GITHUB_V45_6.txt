@@ -1,4 +1,4 @@
-ControlEvent v45.6
+ControlEvent v45.7
 
 Corrección ligera sobre v45.5:
 - El nuevo campo DONACION solo se muestra si existe en el evento un ingreso/persona llamado z_DEV_IRPF ELA.
