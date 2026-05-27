@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v46.3",
+  "version": "ControlEvent v46.4",
   "base": "v30.6",
   "notes": "v43.8.2: estabiliza Menú móvil tras Planificación inicial y unifica versión en cabecera, INFOEVENTO y BACKUP sin tocar motores Excel.",
   "mobileLitePreserved": true,

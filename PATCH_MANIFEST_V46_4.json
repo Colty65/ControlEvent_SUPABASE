@@ -1,0 +1,10 @@
+{
+  "version": "ControlEvent v46.4",
+  "versionFile": "ControlEvent_v46_4",
+  "base": "ControlEvent v46.3",
+  "changes": [
+    "INGRESOS: justificante fotográfico por ingreso, con adjuntar/ver/cambiar/eliminar.",
+    "Marca de modificación en negrita para todos los mantenimientos indicados.",
+    "Sin cambios en el efecto de eliminación."
+  ]
+}
