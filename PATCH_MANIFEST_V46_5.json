@@ -1,0 +1,18 @@
+{
+  "version": "ControlEvent v46.5",
+  "base": "ControlEvent v46.4",
+  "files": [
+    "public/app/features/v46-5-final-fixes.js",
+    "public/app/features/v46-4-final-fixes.js",
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "package.json"
+  ],
+  "notes": [
+    "Justificantes de ingresos compactos con miniatura clicable.",
+    "Miniaturas de justificantes en globos de ingresos de Resumen presupuestario y GRAFICAS.",
+    "Ordenacion de productos en globos de GRAFICAS.",
+    "Cache y version actualizados a v46.5."
+  ]
+}

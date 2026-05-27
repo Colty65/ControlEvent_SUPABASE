@@ -1,12 +1,12 @@
-/* ControlEvent v46.4 - ajustes finales sobre v45.4 estable.
+/* ControlEvent v46.5 - ajustes finales sobre v45.4 estable.
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.4';
-  const VERSION_FILE = 'ControlEvent_v46_4';
+  const VERSION = 'ControlEvent v46.5';
+  const VERSION_FILE = 'ControlEvent_v46_5';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const INSTALLED = '__ceV464FinalFixes';
@@ -592,12 +592,23 @@
     return ['Nombre | Ingreso | Importe', ...rows.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
   }
   function donationLines(rows){
-    if(!rows.length) return ['Donante | Producto | Cant. | Precio | Total', 'Sin registros'];
-    return ['Donante | Producto | Cant. | Precio | Total', ...rows.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
+      const da = donorName(a) || 'Sin donante'; const db = donorName(b) || 'Sin donante';
+      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
+      return da.localeCompare(db, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+    });
+    if(!sorted.length) return ['Donante | Producto | Cant. | Precio | Total', 'Sin registros'];
+    return ['Donante | Producto | Cant. | Precio | Total', ...sorted.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function expenseLines(rows){
-    if(!rows.length) return ['Ticket | Tienda | Producto | Cant. | Precio | Total', 'Sin registros'];
-    return ['Ticket | Tienda | Producto | Cant. | Precio | Total', ...rows.map(r => `${r.ticketDonacion || 'Pte.Compra'} | ${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
+      const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
+      const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
+      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
+      return ta.localeCompare(tb, 'es', {sensitivity:'base'}) || sa.localeCompare(sb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+    });
+    if(!sorted.length) return ['Ticket | Tienda | Producto | Cant. | Precio | Total', 'Sin registros'];
+    return ['Ticket | Tienda | Producto | Cant. | Precio | Total', ...sorted.map(r => `${r.ticketDonacion || 'Pte.Compra'} | ${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
   }
   function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
@@ -641,7 +652,7 @@
   }
   function hasDestinoValues(row){ return Math.abs(Number(row?.comprado || 0)) > 0 || Math.abs(Number(row?.donado || 0)) > 0 || Math.abs(Number(row?.pendiente || 0)) > 0; }
   function destinoRows(){
-    try{ if(typeof summaryByDestino === 'function') return (summaryByDestino() || []).filter(hasDestinoValues); }catch(_){ }
+    // v46.5: se calcula aquí para garantizar cabeceras y ordenación homogénea en los globos.
     const compras = comprasRows();
     const destinos = Array.from(new Set(compras.map(c => c.producto?.destino || productoBy(c.productoId)?.destino || 'Sin destino'))).filter(Boolean);
     return destinos.map(k => {
@@ -684,7 +695,7 @@
     const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = sig;
-    wrap.dataset.ceStableChart = 'v46.4';
+    wrap.dataset.ceStableChart = 'v46.5';
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
   function installGraficas(){
@@ -785,7 +796,7 @@
       const fn = window.exportExcel;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.info = false; });
       throw new Error('No se ha encontrado un motor seguro para INFOEVENTO.');
-    }catch(error){ exportLocks.info = false; console.error('[v46.4] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.info = false; console.error('[v46.5] INFOEVENTO', error); alert(`No se pudo descargar INFOEVENTO.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function directBackup(){
     if(exportLocks.backup) return false; exportLocks.backup = true;
@@ -793,11 +804,11 @@
       const engine = window.__ceV257?.exportSeedWorkbook;
       if(typeof engine === 'function') return Promise.resolve(engine()).finally(() => { exportLocks.backup = false; });
       const excel = window.ControlEventExcel;
-      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-4-direct'})).finally(() => { exportLocks.backup = false; });
+      if(excel && typeof excel.run === 'function') return Promise.resolve(excel.run('backup', {source:'v46-5-direct'})).finally(() => { exportLocks.backup = false; });
       const fn = window.exportSeedWorkbook;
       if(typeof fn === 'function' && fn.__ceExcelFacade !== true) return Promise.resolve(fn()).finally(() => { exportLocks.backup = false; });
       throw new Error('No se ha encontrado un motor seguro para Descarga de datos.');
-    }catch(error){ exportLocks.backup = false; console.error('[v46.4] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
+    }catch(error){ exportLocks.backup = false; console.error('[v46.5] BACKUP', error); alert(`No se pudo descargar la descarga de datos.\n\n${error?.name || 'Error'}: ${error?.message || error}`); return false; }
   }
   function installExportGuard(){
     try{
@@ -839,7 +850,7 @@
 
   window.addEventListener('click', handleChartTooltipClick, true);
   document.addEventListener('click', handleIngresoReceiptClick, true);
-  // v46.4: no cerrar globos al usar ruleta/ascensor; se cierran al perder foco/click fuera.
+  // v46.5: no cerrar globos al usar ruleta/ascensor; se cierran al perder foco/click fuera.
   window.addEventListener('resize', () => closeTipV462(false), true);
   window.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleTableAction, true);
