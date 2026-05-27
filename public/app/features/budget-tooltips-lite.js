@@ -379,6 +379,7 @@
   }
 
   function shouldIgnoreActivation(event){
+    if(event?.target?.closest?.('.ce-v465-modal,[data-ce-preserve-tooltip]')) return true;
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && box.contains(event.target)) return true;
     if(now() - lastOpenAt < 80) return true;
@@ -400,6 +401,7 @@
     if(activateFromEvent(event)) return;
   }, {capture:true, passive:false});
   document.addEventListener('click', event => {
+    if(event.target?.closest?.('.ce-v465-modal,[data-ce-preserve-tooltip]')) return;
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && box.contains(event.target)) return;
     if(activateFromEvent(event)) return;
@@ -407,23 +409,26 @@
     hideLegacyBudgetTooltips();
   }, true);
   document.addEventListener('pointerdown', event => {
+    if(event.target?.closest?.('.ce-v465-modal,[data-ce-preserve-tooltip]')) return;
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && !box.contains(event.target) && !event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row')) hideTooltip();
     hideLegacyBudgetTooltips();
   }, true);
   document.addEventListener('focusin', event => {
+    if(event.target?.closest?.('.ce-v465-modal,[data-ce-preserve-tooltip]')) return;
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open') && !box.contains(event.target) && !event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row')) hideTooltip();
     hideLegacyBudgetTooltips();
   }, true);
   document.addEventListener('keydown', event => {
+    if(document.querySelector('.ce-v465-modal,[data-ce-preserve-tooltip]')) return;
     if(event.key === 'Escape') hideTooltip();
     if((event.key === 'Enter' || event.key === ' ') && activateFromEvent(event)) return;
   }, true);
   window.addEventListener('resize', hideTooltip, true);
   window.addEventListener('orientationchange', hideTooltip, true);
   window.addEventListener('scroll', event => {
-    // v46.6: no cerrar globos al mover la ruleta o el ascensor.
+    // v46.7: no cerrar globos al mover la ruleta o el ascensor.
     // Se cierran solo al pulsar fuera/perder foco o con Escape.
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open')) return;

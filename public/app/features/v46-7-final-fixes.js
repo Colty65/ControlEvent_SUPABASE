@@ -1,4 +1,4 @@
-/* ControlEvent v46.7 - justificantes compactos, miniaturas en globos y ordenación estable de productos.
+/* ControlEvent v46.7 - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
@@ -7,7 +7,7 @@
   'use strict';
   const VERSION = 'ControlEvent v46.7';
   const VERSION_FILE = 'ControlEvent_v46_7';
-  const INSTALLED = '__ceV465FinalFixes';
+  const INSTALLED = '__ceV467FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -73,17 +73,24 @@
     return parseEuro(ev?.precio || 0) * Number(row?.numero || 0) + parseEuro(row?.importe || row?.importeVoluntario || 0);
   }
   function ingresoInfo(id){
-    const row = arr('colaboradores').find(x => same(x.id, id)) || collabRows().find(x => same(x.id, id)) || {};
+    // v46.7: priorizar la fila enriquecida por collabsForEvent(), porque ahí ya se aplica
+    // correctamente la regla SOCIO / NO SOCIO. Antes, al leer primero el registro crudo,
+    // los NO SOCIO mostraban como obligatorio el precio del evento y duplicaban el total.
+    const enriched = collabRows().find(x => same(x.id, id)) || null;
+    const raw = arr('colaboradores').find(x => same(x.id, id)) || null;
+    const row = enriched || raw || {};
     const persona = row.persona || personaBy(row.personaId);
-    const rango = persona?.rango || '';
+    const rango = persona?.rango || row.rango || row.personaRango || '';
     const nombre = persona?.nombre || personName(row.personaId) || 'Sin nombre';
     const ev = selectedEv();
     const precio = parseEuro(ev?.precio || 0);
     const numero = Number(row.numero || 0);
-    const obligatorio = precio * numero;
-    const voluntario = parseEuro(row.importe || row.importeVoluntario || 0);
-    const total = row.total !== undefined ? parseEuro(row.total) : obligatorio + voluntario;
-    return {id, row, nombre, rango, situacion: row.situacion || row.ingreso || 'Pendiente', numero, obligatorio, voluntario, total};
+    const parts = row.__ceV259Parts || {};
+    const esSocio = up(rango) === 'SOCIO';
+    const obligatorio = parseEuro(parts.obligatorio ?? row.base ?? row.importeObligatorio ?? (esSocio ? precio * numero : 0));
+    const voluntario = parseEuro(parts.voluntario ?? row.donation ?? row.importeVoluntario ?? row.voluntario ?? row.importe ?? 0);
+    const total = parseEuro(parts.total ?? row.total ?? (obligatorio + voluntario));
+    return {id, row, nombre, rango, situacion: row.situacion || row.ingreso || row.formaPago || 'Pendiente', numero, obligatorio, voluntario, total};
   }
 
   function receiptStore(){ const s = st(); if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {}; return s.ticketImages; }
@@ -150,6 +157,7 @@
     const info = ingresoInfo(id);
     const ov = document.createElement('div');
     ov.className = 'ce-v465-modal';
+    ov.setAttribute('data-ce-preserve-tooltip', '1');
     ov.innerHTML = `<div class="ce-v465-modal-card" role="dialog" aria-modal="true">
       <div class="ce-v465-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div>
       <div class="ce-v465-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody>
@@ -164,7 +172,16 @@
     </div>`;
     document.body.appendChild(ov);
     try{ ov.querySelector('[data-close]')?.focus({preventScroll:true}); }catch(_){ }
-    ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) ov.remove(); });
+    const close = (ev) => {
+      try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ }
+      try{ ov.remove(); }catch(_){ }
+      // El globo origen no debe perderse al cerrar la foto. Se re-enriquecen miniaturas
+      // por si el navegador ha movido el foco durante la apertura/cierre del visor.
+      [0,40,120].forEach(ms => setTimeout(() => { try{ enrichOpenTooltips(); }catch(_){ } }, ms));
+      return false;
+    };
+    ov.addEventListener('pointerdown', ev => { try{ ev.stopPropagation(); }catch(_){ } }, true);
+    ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) close(e); }, true);
   }
   async function attachReceipt(id){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return; }
@@ -324,9 +341,9 @@
   document.addEventListener('wheel', keepTooltipFocusOnInternalScroll, true);
   document.addEventListener('scroll', keepTooltipFocusOnInternalScroll, true);
   document.addEventListener('touchmove', keepTooltipFocusOnInternalScroll, true);
-  document.addEventListener('keydown', ev => { if(ev.key === 'Escape') document.querySelector('.ce-v465-modal')?.remove(); }, true);
+  document.addEventListener('keydown', ev => { if(ev.key === 'Escape'){ const m=document.querySelector('.ce-v465-modal'); if(m){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){} m.remove(); [0,40,120].forEach(ms=>setTimeout(()=>{ try{ enrichOpenTooltips(); }catch(_){} },ms)); } } }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,260,700,1500,3000].forEach(ms => setTimeout(install, ms));
   setInterval(() => { compactIngresoReceipts(); enrichOpenTooltips(); applyVersion(); }, 1600);
-  window.ControlEventV465 = {version:VERSION, versionFile:VERSION_FILE, compactIngresoReceipts, enrichOpenTooltips, showReceiptModal};
+  window.ControlEventV467 = {version:VERSION, versionFile:VERSION_FILE, compactIngresoReceipts, enrichOpenTooltips, showReceiptModal}; window.ControlEventV465 = window.ControlEventV467;
 })();

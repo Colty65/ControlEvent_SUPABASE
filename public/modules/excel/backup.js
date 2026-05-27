@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v46.6';
-const BACKUP_VERSION_FILE = 'ControlEvent_v46_6';
+const BACKUP_VERSION = 'ControlEvent v46.7';
+const BACKUP_VERSION_FILE = 'ControlEvent_v46_7';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 

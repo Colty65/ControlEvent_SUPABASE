@@ -1,10 +1,10 @@
-/* ControlEvent v46.6 - justificantes de INGRESOS y marca negrita post-modificación.
+/* ControlEvent v46.7 - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.6';
-  const VERSION_FILE = 'ControlEvent_v46_6';
+  const VERSION = 'ControlEvent v46.7';
+  const VERSION_FILE = 'ControlEvent_v46_7';
   const INSTALLED = '__ceV464JustificantesNegrita';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
