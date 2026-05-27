@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.3",
+  "version": "ControlEvent v50.4",
   "base": "ControlEvent v50.1",
   "files": [
     "package.json",

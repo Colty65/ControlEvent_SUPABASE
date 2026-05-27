@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.3",
+  "version": "ControlEvent v50.4",
   "base": "ControlEvent v31.5",
   "files_changed": [
     "routes/export.routes.js",

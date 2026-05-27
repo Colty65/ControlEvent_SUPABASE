@@ -1,4 +1,4 @@
-/* ControlEvent v50.3 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.4 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.3';
-  const VERSION_FILE = 'ControlEvent_v50_3';
+  const VERSION = 'ControlEvent v50.4';
+  const VERSION_FILE = 'ControlEvent_v50_4';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -308,6 +308,7 @@
 
   function collabCardId(card){ return card?.querySelector?.('button[data-action="save-collab"][data-id],button[data-action="delete-collab"][data-id],select[data-action="edit-collab-persona"][data-id],input[data-action="edit-collab-numero"][data-id],[data-action="edit-collab-situacion"][data-id]')?.dataset?.id || ''; }
   function compactIngresoReceipts(){
+    return;
     injectStyle();
     const wrap = $('collabList'); if(!wrap) return;
     wrap.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools').forEach(el => { try{ el.remove(); }catch(_){ } });

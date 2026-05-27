@@ -1,9 +1,9 @@
-ControlEvent v50.3
+ControlEvent v50.4
 
 Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
 
 Cambios principales:
-- BACKUP/METADATOS: VERSION = ControlEvent v50.3 y VERSION_FICHERO = ControlEvent_v31_8.
+- BACKUP/METADATOS: VERSION = ControlEvent v50.4 y VERSION_FICHERO = ControlEvent_v31_8.
 - Mapa de recursos: botón flotante de inicio con icono ⌂.
 - PC/iPad: botón centrado a la derecha.
 - iPhone/Android: botón encima de Menú.

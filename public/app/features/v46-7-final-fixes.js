@@ -1,12 +1,12 @@
-/* ControlEvent v50.3 - justificantes de ingresos corregidos y retorno al globo origen.
+/* ControlEvent v50.4 - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.3';
-  const VERSION_FILE = 'ControlEvent_v50_3';
+  const VERSION = 'ControlEvent v50.4';
+  const VERSION_FILE = 'ControlEvent_v50_4';
   const INSTALLED = '__ceV467FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -217,6 +217,7 @@
     return card?.querySelector?.('button[data-action="save-collab"][data-id],button[data-action="delete-collab"][data-id],select[data-action="edit-collab-persona"][data-id],input[data-action="edit-collab-numero"][data-id],[data-action="edit-collab-situacion"][data-id]')?.dataset?.id || '';
   }
   function compactIngresoReceipts(){
+    return;
     injectStyle();
     // Oculta y retira los controles largos heredados para que no ocupen la línea.
     document.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools').forEach(el => { try{ el.remove(); }catch(_){ } });

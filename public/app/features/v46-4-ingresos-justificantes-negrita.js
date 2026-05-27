@@ -1,10 +1,10 @@
-/* ControlEvent v50.3 - justificantes de INGRESOS y marca negrita post-modificación.
+/* ControlEvent v50.4 - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.3';
-  const VERSION_FILE = 'ControlEvent_v50_3';
+  const VERSION = 'ControlEvent v50.4';
+  const VERSION_FILE = 'ControlEvent_v50_4';
   const INSTALLED = '__ceV464JustificantesNegrita';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -135,6 +135,7 @@
     return card?.querySelector?.('button[data-action="save-collab"][data-id],button[data-action="delete-collab"][data-id],select[data-action="edit-collab-persona"][data-id],input[data-action="edit-collab-numero"][data-id],[data-action="edit-collab-situacion"][data-id]')?.dataset?.id || '';
   }
   function injectReceiptTools(){
+    return;
     injectStyle();
     const wrap = $('collabList'); if(!wrap) return;
     wrap.querySelectorAll('.ce-ingreso-receipt-tools-v463').forEach(el => { try{ el.remove(); }catch(_){ } });
