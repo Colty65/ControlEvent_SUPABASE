@@ -1,24 +1,14 @@
 {
-  "version": "ControlEvent v50.8",
-  "base": "v50.4 corregida sin v50.7",
-  "notes": "v50.8: se retira la capa v50.7 que reposicionaba mal globos; se unifica la version en scripts cargados para evitar parpadeo; dock movil real inferior para Salir/Refrescar; cierre tactil reforzado de globos.",
-  "mobileLitePreserved": true,
-  "functionalAreasUntouched": [
-    "INFOEVENTOS",
-    "BACKUP",
-    "Excel",
-    "Compras",
-    "Donaciones",
-    "Operativa",
-    "public/app/features/v43-8-2-fixes.js"
+  "version": "ControlEvent v50.9",
+  "base": "v50.8",
+  "notes": "v50.9: login interceptado antes de manejadores antiguos para ocultar authOverlay; bloque unico visible de justificante dentro de fichas de INGRESOS en movil/desktop usando las mismas claves que globos; sin temporizador permanente de version.",
+  "changed_files": [
+    "public/app/features/v50-9-final-fixes.js",
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json"
   ],
-  "newFiles": [
-    "public/app/features/v50-8-final-fixes.js"
-  ],
-  "scriptsIntentionallyNotLoaded": [
-    "public/app/features/v50-5-final-fixes.js",
-    "public/app/features/v50-6-final-fixes.js",
-    "public/app/features/v50-7-final-fixes.js"
-  ],
-  "build": "v50.8"
+  "build": "v50.9"
 }
