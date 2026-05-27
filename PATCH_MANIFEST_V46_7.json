@@ -1,11 +1,11 @@
 {
-  "version": "ControlEvent v46.7",
-  "versionFile": "ControlEvent_v46_7",
+  "version": "ControlEvent v46.8",
+  "versionFile": "ControlEvent_v46_8",
   "base": "ControlEvent v46.6",
   "changes": [
     "Corregido cálculo mostrado en visor de justificante para ingresos NO SOCIO.",
     "Se conserva el globo de origen al cerrar la foto del justificante.",
     "Se ignoran clicks/foco del visor de justificante para evitar cierre de globos de GRAFICAS y RESUMEN.",
-    "Cache y version actualizados a v46.7."
+    "Cache y version actualizados a v46.8."
   ]
 }

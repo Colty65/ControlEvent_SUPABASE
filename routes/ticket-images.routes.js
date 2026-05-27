@@ -13,7 +13,11 @@ router.post('/ticket-images', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/ticket-images', asyncHandler(async (req, res) => {
-  res.json(await deleteImage({ eventId: req.query.eventId || '', key: req.query.key || '' }));
+  const body = req.body || {};
+  res.json(await deleteImage({
+    eventId: req.query.eventId || body.eventId || '',
+    key: req.query.key || body.key || ''
+  }));
 }));
 
 export default router;

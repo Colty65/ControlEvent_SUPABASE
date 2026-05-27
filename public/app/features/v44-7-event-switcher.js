@@ -1,11 +1,11 @@
-/* ControlEvent v46.7 - selector de evento unificado y render activo único.
+/* ControlEvent v46.8 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v46.7';
-  const VERSION_FILE = 'ControlEvent_v46_7';
+  const VERSION = 'ControlEvent v46.8';
+  const VERSION_FILE = 'ControlEvent_v46_8';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';

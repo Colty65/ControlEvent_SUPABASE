@@ -428,7 +428,7 @@
   window.addEventListener('resize', hideTooltip, true);
   window.addEventListener('orientationchange', hideTooltip, true);
   window.addEventListener('scroll', event => {
-    // v46.7: no cerrar globos al mover la ruleta o el ascensor.
+    // v46.8: no cerrar globos al mover la ruleta o el ascensor.
     // Se cierran solo al pulsar fuera/perder foco o con Escape.
     const box = $(TOOLTIP_ID);
     if(box && box.classList.contains('open')) return;

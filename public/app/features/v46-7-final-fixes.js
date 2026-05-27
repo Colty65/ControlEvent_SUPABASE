@@ -1,12 +1,12 @@
-/* ControlEvent v46.7 - justificantes de ingresos corregidos y retorno al globo origen.
+/* ControlEvent v46.8 - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.7';
-  const VERSION_FILE = 'ControlEvent_v46_7';
+  const VERSION = 'ControlEvent v46.8';
+  const VERSION_FILE = 'ControlEvent_v46_8';
   const INSTALLED = '__ceV467FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -73,7 +73,7 @@
     return parseEuro(ev?.precio || 0) * Number(row?.numero || 0) + parseEuro(row?.importe || row?.importeVoluntario || 0);
   }
   function ingresoInfo(id){
-    // v46.7: priorizar la fila enriquecida por collabsForEvent(), porque ahí ya se aplica
+    // v46.8: priorizar la fila enriquecida por collabsForEvent(), porque ahí ya se aplica
     // correctamente la regla SOCIO / NO SOCIO. Antes, al leer primero el registro crudo,
     // los NO SOCIO mostraban como obligatorio el precio del evento y duplicaban el total.
     const enriched = collabRows().find(x => same(x.id, id)) || null;
