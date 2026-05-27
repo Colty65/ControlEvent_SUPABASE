@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.0",
+  "version": "ControlEvent v50.1",
   "base": "ControlEvent v46.4",
   "files": [
     "public/app/features/v46-6-final-fixes.js",

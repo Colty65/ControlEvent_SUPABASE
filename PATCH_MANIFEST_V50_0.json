@@ -1,11 +1,11 @@
 {
-  "version": "ControlEvent v50.0",
+  "version": "ControlEvent v50.1",
   "from": "ControlEvent v46.9",
   "changes": [
     "PRODUCTOS: Modificar se intercepta con una mecánica propia temprana para conservar la posición de la ventana, evitar el salto al inicio y marcar en negrita el registro modificado.",
     "Justificantes de INGRESOS: sincronización reforzada con /api/ticket-images, con prioridad servidor cuando el navegador no tenga imagen local.",
     "Servidor/Supabase: protección no destructiva para no pisar imágenes existentes con referencias vacías al guardar estado.",
-    "Versión actualizada a ControlEvent v50.0 / ControlEvent_v50_0 en cabecera, cache, INFOEVENTO, BACKUP, nombres de descarga y rutas de exportación."
+    "Versión actualizada a ControlEvent v50.1 / ControlEvent_v50_1 en cabecera, cache, INFOEVENTO, BACKUP, nombres de descarga y rutas de exportación."
   ],
   "mainFiles": [
     "public/index.html",

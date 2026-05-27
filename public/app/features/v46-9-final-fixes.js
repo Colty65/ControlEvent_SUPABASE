@@ -1,4 +1,4 @@
-/* ControlEvent v50.0 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.1 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.0';
-  const VERSION_FILE = 'ControlEvent_v50_0';
+  const VERSION = 'ControlEvent v50.1';
+  const VERSION_FILE = 'ControlEvent_v50_1';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -264,7 +264,7 @@
       <img class="ce-v468-modal-img" alt="Justificante de ingreso" src="${esc(src)}">
     </div>`;
     document.body.appendChild(ov);
-    // v50.0: mantener vivo/restaurado el globo origen mientras el visor esta encima.
+    // v50.1: mantener vivo/restaurado el globo origen mientras el visor esta encima.
     try{
       ov.__ceKeepTooltipTimer = setInterval(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), 250);
       [20,90,220,520].forEach(ms => setTimeout(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), ms));
@@ -287,7 +287,7 @@
         if(!/^image\//i.test(file.type || '')){ alert('Selecciona una imagen para el justificante.'); return; }
         const src = await readImageAsDataUrl(file);
         setReceiptLocal(id, src); compactIngresoReceipts(); renderNow(); restoreScroll(scroll);
-        try{ const url = await uploadReceiptToServer(id, src); if(url) setReceiptLocal(id, url, {key:primaryKey(id), url, pathname:url}); }catch(error){ console.warn('[v50.0] justificante no subido, queda copia local/estado', error); }
+        try{ const url = await uploadReceiptToServer(id, src); if(url) setReceiptLocal(id, url, {key:primaryKey(id), url, pathname:url}); }catch(error){ console.warn('[v50.1] justificante no subido, queda copia local/estado', error); }
         saveNow();
         [80,220,520,1000].forEach(ms => setTimeout(() => { compactIngresoReceipts(); enrichOpenTooltips(); restoreScroll(scroll); }, ms));
       }catch(error){ alert('No se pudo adjuntar el justificante. ' + (error?.message || error)); restoreScroll(scroll); }

@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.0",
+  "version": "ControlEvent v50.1",
   "base": "ControlEvent v31.3",
   "changes": [
     "package.json y package-lock.json regenerados como JSON válido",
