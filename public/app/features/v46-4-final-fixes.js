@@ -1,12 +1,12 @@
-/* ControlEvent v46.8 - ajustes finales sobre v45.4 estable.
+/* ControlEvent v46.9 - ajustes finales sobre v45.4 estable.
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.8';
-  const VERSION_FILE = 'ControlEvent_v46_8';
+  const VERSION = 'ControlEvent v46.9';
+  const VERSION_FILE = 'ControlEvent_v46_9';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const INSTALLED = '__ceV464FinalFixes';

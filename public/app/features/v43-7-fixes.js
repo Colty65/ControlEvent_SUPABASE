@@ -1,8 +1,8 @@
-/* ControlEvent v46.8 - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
+/* ControlEvent v46.9 - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.8';
-  const VERSION_FILE = 'ControlEvent_v46_8';
+  const VERSION = 'ControlEvent v46.9';
+  const VERSION_FILE = 'ControlEvent_v46_9';
   const PROTECTION_PASSWORD = 'open_excel_arrastre';
   let backupBusy = false;
   let infoBusy = false;

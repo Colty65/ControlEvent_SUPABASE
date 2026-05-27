@@ -1,8 +1,8 @@
-ControlEvent v46.8
+ControlEvent v46.9
 
 Cambios principales:
 - INGRESOS: adjuntar, ver, cambiar y eliminar foto del justificante del ingreso.
 - La foto queda asociada al ingreso del evento activo y viaja dentro de ticketImages en la descarga de datos.
 - En PRODUCTOS, EVENTOS, TIENDAS, PERSONAS, ACCESO, INGRESOS, DONACIONES y COMPRAS, al pulsar Modificar y concluir la modificación, todos los campos del registro quedan en negrita.
 - Se mantiene el efecto de eliminación existente.
-- Versión actualizada a ControlEvent v46.8 / ControlEvent_v46_8.
+- Versión actualizada a ControlEvent v46.9 / ControlEvent_v46_9.

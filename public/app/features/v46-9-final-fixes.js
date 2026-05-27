@@ -8,7 +8,7 @@
   'use strict';
   const VERSION = 'ControlEvent v46.9';
   const VERSION_FILE = 'ControlEvent_v46_9';
-  const INSTALLED = '__ceV468FinalFixes';
+  const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -186,9 +186,9 @@
   }
 
   function injectStyle(){
-    if($('ceV468FinalStyle')) return;
+    if($('ceV469FinalStyle')) return;
     const style = document.createElement('style');
-    style.id = 'ceV468FinalStyle';
+    style.id = 'ceV469FinalStyle';
     style.textContent = `
       .ce-v468-modified-product,.ce-v468-modified-product *{font-weight:900!important;}
       .ce-v468-modified-product input,.ce-v468-modified-product select,.ce-v468-modified-product textarea,.ce-v468-modified-product button{font-weight:900!important;}
@@ -287,7 +287,7 @@
         if(!/^image\//i.test(file.type || '')){ alert('Selecciona una imagen para el justificante.'); return; }
         const src = await readImageAsDataUrl(file);
         setReceiptLocal(id, src); compactIngresoReceipts(); renderNow(); restoreScroll(scroll);
-        try{ const url = await uploadReceiptToServer(id, src); if(url) setReceiptLocal(id, url, {key:primaryKey(id), url, pathname:url}); }catch(error){ console.warn('[v46.8] justificante no subido, queda copia local/estado', error); }
+        try{ const url = await uploadReceiptToServer(id, src); if(url) setReceiptLocal(id, url, {key:primaryKey(id), url, pathname:url}); }catch(error){ console.warn('[v46.9] justificante no subido, queda copia local/estado', error); }
         saveNow();
         [80,220,520,1000].forEach(ms => setTimeout(() => { compactIngresoReceipts(); enrichOpenTooltips(); restoreScroll(scroll); }, ms));
       }catch(error){ alert('No se pudo adjuntar el justificante. ' + (error?.message || error)); restoreScroll(scroll); }
@@ -460,7 +460,7 @@
     injectStyle(); applyVersion(); migrateLocalIngresoReceipts(); hydrateEventReceipts(false); compactIngresoReceipts(); enrichOpenTooltips(); applyProductBold(); wrapRender(); installObserver();
   }
 
-  window.addEventListener('click', handleClick, true); // window-capture: se adelanta al manejador v46.8 de document.
+  window.addEventListener('click', handleClick, true); // window-capture: se adelanta al manejador v46.7/v46.8 de document.
   document.addEventListener('wheel', keepInside, true);
   document.addEventListener('scroll', keepInside, true);
   document.addEventListener('touchmove', keepInside, true);
@@ -469,5 +469,5 @@
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,260,700,1500,3000,6000].forEach(ms => setTimeout(install, ms));
   setInterval(() => { hydrateEventReceipts(false); compactIngresoReceipts(); enrichOpenTooltips(); applyProductBold(); applyVersion(); }, 2200);
-  window.ControlEventV468 = {version:VERSION, versionFile:VERSION_FILE, hydrateEventReceipts, migrateLocalIngresoReceipts, compactIngresoReceipts, showReceiptModal, applyProductBold};
+  window.ControlEventV469 = {version:VERSION, versionFile:VERSION_FILE, hydrateEventReceipts, migrateLocalIngresoReceipts, compactIngresoReceipts, showReceiptModal, applyProductBold};
 })();

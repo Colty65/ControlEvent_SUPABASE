@@ -1,12 +1,12 @@
-/* ControlEvent v46.8 - justificantes de ingresos corregidos y retorno al globo origen.
+/* ControlEvent v46.9 - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.8';
-  const VERSION_FILE = 'ControlEvent_v46_8';
+  const VERSION = 'ControlEvent v46.9';
+  const VERSION_FILE = 'ControlEvent_v46_9';
   const INSTALLED = '__ceV467FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
