@@ -1,0 +1,33 @@
+{
+  "version": "ControlEvent v50.5",
+  "base": "ControlEvent v50.4",
+  "type": "final-fixes-layer",
+  "files_added": [
+    "public/app/features/v50-5-final-fixes.js",
+    "LEEME_SUBIDA_GITHUB_V50_5.txt",
+    "PATCH_MANIFEST_V50_5.json"
+  ],
+  "files_modified": [
+    "public/index.html",
+    "public/app/version.js",
+    "index.html",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/sw.js"
+  ],
+  "fixes": [
+    "RO menu stable with only allowed tabs",
+    "mobile logout/refresh visible despite hidden original container",
+    "logout returns cleanly to auth overlay instead of blurred blocked screen",
+    "tooltip/table headers reordered when appended after data",
+    "lightweight photo viewer for iPad/mobile tooltip images"
+  ],
+  "validation": [
+    "node --check public/app/features/v50-5-final-fixes.js",
+    "node --check public/app/features/v50-4-final-fixes.js",
+    "node --check public/app/features/v50-2-final-fixes.js",
+    "json validation for package.json, package-lock.json and build-metrics.json",
+    "node --check public/sw.js"
+  ]
+}
