@@ -1,4 +1,4 @@
-ControlEvent v31.8
+ControlEvent v50.0
 
 Subir todo el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
 Especialmente importante: package.json, package-lock.json, public/index.html, public/sw.js y public/app/features/*.js.

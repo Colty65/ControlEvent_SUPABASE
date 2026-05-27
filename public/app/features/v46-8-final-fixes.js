@@ -1,4 +1,4 @@
-/* ControlEvent v46.9 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.0 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v46.9';
-  const VERSION_FILE = 'ControlEvent_v46_9';
+  const VERSION = 'ControlEvent v50.0';
+  const VERSION_FILE = 'ControlEvent_v50_0';
   const INSTALLED = '__ceV468FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -264,7 +264,7 @@
       <img class="ce-v468-modal-img" alt="Justificante de ingreso" src="${esc(src)}">
     </div>`;
     document.body.appendChild(ov);
-    // v46.9: mantener vivo/restaurado el globo origen mientras el visor esta encima.
+    // v50.0: mantener vivo/restaurado el globo origen mientras el visor esta encima.
     try{
       ov.__ceKeepTooltipTimer = setInterval(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), 250);
       [20,90,220,520].forEach(ms => setTimeout(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), ms));

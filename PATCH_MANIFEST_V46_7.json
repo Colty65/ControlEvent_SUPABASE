@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v46.9",
-  "versionFile": "ControlEvent_v46_9",
+  "version": "ControlEvent v50.0",
+  "versionFile": "ControlEvent_v50_0",
   "base": "ControlEvent v46.6",
   "changes": [
     "Corregido cálculo mostrado en visor de justificante para ingresos NO SOCIO.",
