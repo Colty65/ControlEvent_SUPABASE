@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.7",
-  "base": "v50.4 + recuperacion selectiva",
-  "notes": "v50.7: se dejan de cargar los visores interceptores v50.5/v50.6 para recuperar el comportamiento anterior de fotos con texto; se mantiene salida limpia, menu RO estable, botones moviles y cabeceras de globos.",
+  "version": "ControlEvent v50.8",
+  "base": "v50.4 corregida sin v50.7",
+  "notes": "v50.8: se retira la capa v50.7 que reposicionaba mal globos; se unifica la version en scripts cargados para evitar parpadeo; dock movil real inferior para Salir/Refrescar; cierre tactil reforzado de globos.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -13,11 +13,12 @@
     "public/app/features/v43-8-2-fixes.js"
   ],
   "newFiles": [
-    "public/app/features/v50-7-final-fixes.js"
+    "public/app/features/v50-8-final-fixes.js"
   ],
   "scriptsIntentionallyNotLoaded": [
     "public/app/features/v50-5-final-fixes.js",
-    "public/app/features/v50-6-final-fixes.js"
+    "public/app/features/v50-6-final-fixes.js",
+    "public/app/features/v50-7-final-fixes.js"
   ],
-  "build": "v50.7"
+  "build": "v50.8"
 }
