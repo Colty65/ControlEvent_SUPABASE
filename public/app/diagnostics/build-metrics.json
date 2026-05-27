@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.6",
-  "base": "v30.6",
-  "notes": "v50.6: sanea Salir, reentrada automática, botones móviles y visor ligero de fotos en iPad sin tocar motores Excel/datos.",
+  "version": "ControlEvent v50.7",
+  "base": "v50.4 + recuperacion selectiva",
+  "notes": "v50.7: se dejan de cargar los visores interceptores v50.5/v50.6 para recuperar el comportamiento anterior de fotos con texto; se mantiene salida limpia, menu RO estable, botones moviles y cabeceras de globos.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -13,12 +13,11 @@
     "public/app/features/v43-8-2-fixes.js"
   ],
   "newFiles": [
-    "public/app/features/budget-tooltips-lite.js",
-    "public/app/features/summary-tienda-sort-fix.js",
-    "public/app/features/v41-3-fixes.js",
-    "public/app/features/v43-7-fixes.js",
-    "public/app/features/v43-8-1-fixes.js",
+    "public/app/features/v50-7-final-fixes.js"
+  ],
+  "scriptsIntentionallyNotLoaded": [
+    "public/app/features/v50-5-final-fixes.js",
     "public/app/features/v50-6-final-fixes.js"
   ],
-  "build": "v50.6"
+  "build": "v50.7"
 }
