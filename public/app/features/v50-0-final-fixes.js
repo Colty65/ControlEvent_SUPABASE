@@ -1,12 +1,12 @@
-/* ControlEvent v50.1 - estabilización PRODUCTOS y justificantes de INGRESOS.
+/* ControlEvent v50.2 - estabilización PRODUCTOS y justificantes de INGRESOS.
    - PRODUCTOS usa una mecánica propia y temprana de Modificar para no saltar al inicio.
    - La fila modificada queda en negrita como en el resto de mantenimientos.
    - Los justificantes de ingresos se sincronizan con /api/ticket-images con criterio servidor-no-destructivo.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.1';
-  const VERSION_FILE = 'ControlEvent_v50_1';
+  const VERSION = 'ControlEvent v50.2';
+  const VERSION_FILE = 'ControlEvent_v50_2';
   const INSTALLED = '__ceV500FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

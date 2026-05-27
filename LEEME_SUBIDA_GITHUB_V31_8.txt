@@ -1,4 +1,4 @@
-ControlEvent v50.1 - SOLO SUBIR GITHUB
+ControlEvent v50.2 - SOLO SUBIR GITHUB
 
 Subir sustituyendo los archivos anteriores.
 

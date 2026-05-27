@@ -1,4 +1,4 @@
-ControlEvent v50.1
+ControlEvent v50.2
 
 Cambios principales:
 - PRODUCTOS: al Modificar conserva posición y marca el registro completo en negrita.
