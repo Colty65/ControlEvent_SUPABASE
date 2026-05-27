@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.5",
+  "version": "ControlEvent v50.6",
   "base": "v30.6",
-  "notes": "v43.8.2: estabiliza Menú móvil tras Planificación inicial y unifica versión en cabecera, INFOEVENTO y BACKUP sin tocar motores Excel.",
+  "notes": "v50.6: sanea Salir, reentrada automática, botones móviles y visor ligero de fotos en iPad sin tocar motores Excel/datos.",
   "mobileLitePreserved": true,
   "functionalAreasUntouched": [
     "INFOEVENTOS",
@@ -17,7 +17,8 @@
     "public/app/features/summary-tienda-sort-fix.js",
     "public/app/features/v41-3-fixes.js",
     "public/app/features/v43-7-fixes.js",
-    "public/app/features/v43-8-1-fixes.js"
+    "public/app/features/v43-8-1-fixes.js",
+    "public/app/features/v50-6-final-fixes.js"
   ],
-  "build": "v43.8.2"
+  "build": "v50.6"
 }
