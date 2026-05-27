@@ -1,9 +1,9 @@
-/* ControlEvent v50.2 - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v50.3 - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.2';
-  const VERSION_FILE = 'ControlEvent_v50_2';
+  const VERSION = 'ControlEvent v50.3';
+  const VERSION_FILE = 'ControlEvent_v50_3';
   const $ = id => document.getElementById(id);
 
   function st(){

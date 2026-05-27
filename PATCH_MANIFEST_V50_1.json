@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.2",
-  "version_file": "ControlEvent_v50_2",
+  "version": "ControlEvent v50.3",
+  "version_file": "ControlEvent_v50_3",
   "base": "ControlEvent v50.0",
   "files": [
     "LEEME_HOTFIX_V31_6_1.txt",
@@ -33,8 +33,8 @@
     "PATCH_MANIFEST_V46_7.json",
     "LEEME_SUBIDA_GITHUB_V46_9.txt",
     "PATCH_MANIFEST_V50_0.json",
-    "LEEME_SUBIDA_GITHUB_V50_2.txt",
-    "PATCH_MANIFEST_V50_2.json",
+    "LEEME_SUBIDA_GITHUB_V50_3.txt",
+    "PATCH_MANIFEST_V50_3.json",
     "lib/supabase-normalized.js",
     "public/index.html",
     "public/sw.js",

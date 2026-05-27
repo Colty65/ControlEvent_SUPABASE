@@ -1,4 +1,4 @@
-/* ControlEvent v50.2 - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v50.3 - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
    - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.2';
-  const VERSION_FILE = 'ControlEvent_v50_2';
+  const VERSION = 'ControlEvent v50.3';
+  const VERSION_FILE = 'ControlEvent_v50_3';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',
@@ -184,6 +184,8 @@
       #ceSoftRefreshNotice.visible{opacity:1;transform:translateY(0);}
       .ce-v452-hidden-role{display:none!important;}
       body.ce-role-ro-v452 #tabIngresosBtn,body.ce-role-ro-v452 #tabDonacionesBtn,body.ce-role-ro-v452 #tabComprasBtn,body.ce-role-ro-v452 #tabPlanificacionBtn{display:none!important;}
+      body:not(.ce-role-gd-v452) #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      @media(max-width:760px){#btnLogout:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 6px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6200!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:54px!important;height:34px!important;padding:0 9px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.18)!important;font-size:12px!important;font-weight:900!important;pointer-events:auto!important;}#btnSoftRefresh:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 66px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6199!important;height:34px!important;min-width:72px!important;padding:0 8px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.14)!important;font-size:11px!important;font-weight:850!important;pointer-events:auto!important;}}
     `;
     document.head.appendChild(style);
   }
@@ -375,5 +377,6 @@
   else install();
   ['load','controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 50)));
   [120, 700, 1500].forEach(ms => setTimeout(install, ms));
-  setInterval(() => { setRefreshVisible(); syncRoleMenu(); }, window.ControlEventLowResource?.interval?.(2200) || 2200);
+  // v50.3: evitar refresco visual continuo de menús por rol; solo se mantiene visible el botón Refrescar/Salir.
+  setInterval(() => { setRefreshVisible(); }, window.ControlEventLowResource?.interval?.(12000) || 12000);
 })();

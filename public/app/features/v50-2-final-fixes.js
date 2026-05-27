@@ -1,4 +1,4 @@
-/* ControlEvent v50.2 - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
+/* ControlEvent v50.3 - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
    - RW no ve Planificación inicial ni hay parpadeo de menú.
    - En móvil/iPhone/Android las opciones disponibles quedan siempre visibles; se oculta el botón Menú.
    - Botones inferiores visibles también en móvil para GD/RW, compactos y solo pulsables en el icono.
@@ -9,8 +9,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.2';
-  const VERSION_FILE = 'ControlEvent_v50_2';
+  const VERSION = 'ControlEvent v50.3';
+  const VERSION_FILE = 'ControlEvent_v50_3';
   const INSTALLED = '__ceV502FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -53,7 +53,7 @@
   function isFinalizado(ev){ return up((ev || selectedEv())?.situacion || '') === 'FINALIZADO'; }
   function hasEvent(){ return !!selectedId() && !!selectedEv(); }
   function getFn(name){ try{ if(typeof window[name] === 'function') return window[name]; }catch(_){ } try{ return Function('return (typeof '+name+' === "function") ? '+name+' : null')(); }catch(_){ return null; } }
-  function call(name){ const fn=getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn(); }catch(error){ console.warn('[v50.2] '+name, error); return undefined; } }
+  function call(name){ const fn=getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn(); }catch(error){ console.warn('[v50.3] '+name, error); return undefined; } }
   function setCurrentTab(tab){
     const next = defaultTabForRole(tab);
     try{ currentMainTab = next; }catch(_){ }
@@ -131,6 +131,12 @@
       .ce-v502-receipt-btn.danger{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;}
       .ce-v502-receipt-empty{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:34px!important;height:34px!important;min-width:34px!important;border-radius:9px!important;background:#f8fafc!important;border:1px dashed #cbd5e1!important;color:#64748b!important;}
       .ce-v502-hidden-role{display:none!important;}
+      /* v50.3: menú estable por rol. Planificación queda oculta por defecto y solo se muestra para GD. */
+      body.ce-v502-ready #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-v502-ready.ce-role-gd-v502 #tabPlanificacionBtn{display:flex!important;visibility:visible!important;pointer-events:auto!important;}
+      body.ce-v502-ready.ce-role-rw-v502 #tabPlanificacionBtn,body.ce-v502-ready.ce-role-ro-v502 #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      /* v50.3: salida cómoda en móvil sin depender de giro horizontal. */
+      @media(max-width:760px){body.ce-v502-ready #btnLogout:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 6px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6200!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:54px!important;height:34px!important;padding:0 9px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.18)!important;font-size:12px!important;font-weight:900!important;pointer-events:auto!important;}body.ce-v502-ready #btnSoftRefresh:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 66px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6199!important;height:34px!important;min-width:72px!important;padding:0 8px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.14)!important;font-size:11px!important;font-weight:850!important;pointer-events:auto!important;}}
     `;
     document.head.appendChild(style);
   }
@@ -268,13 +274,18 @@
   function collabIdFromCard(card){ return card?.querySelector?.('button[data-action="save-collab"][data-id],button[data-action="delete-collab"][data-id],select[data-action="edit-collab-persona"][data-id],input[data-action="edit-collab-numero"][data-id],[data-action="edit-collab-situacion"][data-id]')?.dataset?.id || ''; }
   function compactReceipts(){
     const wrap=$('collabList'); if(!wrap) return; injectStyle();
-    wrap.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools,.ce-v465-receipt-strip:not(.ce-v502-receipt-strip)').forEach(el => { try{ el.remove(); }catch(_){ } });
+    // Retirar herramientas antiguas sin tocar la ficha si ya está estable.
+    wrap.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools,.ce-v465-receipt-strip:not(.ce-v502-receipt-strip),.ce-v501-receipt-strip').forEach(el => { try{ el.remove(); }catch(_){ } });
     wrap.querySelectorAll('.itemcard,.rowline,.card').forEach(card => {
       const id=collabIdFromCard(card); if(!id) return; const src=receiptSrc(id); const locked=isFinalizado(); const writable=canWrite() && !locked;
       const html = `${src ? `<button type="button" class="ce-v502-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v502" data-id="${esc(id)}"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v502-receipt-empty" title="Sin justificante">📷</span>`}${writable ? `<button type="button" class="ce-v502-receipt-btn" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v502" data-id="${esc(id)}">📎</button>${src ? `<button type="button" class="ce-v502-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v502" data-id="${esc(id)}">🗑</button>` : ''}` : ''}`;
-      let box=card.querySelector('.ce-v502-receipt-strip');
+      let boxes=Array.from(card.querySelectorAll('.ce-v502-receipt-strip'));
+      let box=boxes.shift();
+      boxes.forEach(x => { try{ x.remove(); }catch(_){ } });
       if(!box){ box=document.createElement('div'); box.className='ce-v502-receipt-strip'; const actions=card.querySelector('button[data-action="save-collab"]')?.parentElement || card.querySelector('button[data-action="delete-collab"]')?.parentElement || card; try{ actions.appendChild(box); }catch(_){ card.appendChild(box); } }
-      box.innerHTML=html; box.dataset.receiptHas=String(!!src); box.dataset.locked=String(locked); box.dataset.role=role();
+      const nextSig = JSON.stringify({html, src:!!src, locked, writable, role:role()});
+      if(box.dataset.sig !== nextSig){ box.innerHTML=html; box.dataset.sig=nextSig; }
+      box.dataset.receiptHas=String(!!src); box.dataset.locked=String(locked); box.dataset.role=role();
     });
   }
   function receiptInfo(id){
@@ -291,7 +302,7 @@
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev); }
     if(isFinalizado()){ alert('Evento finalizado. Solo se puede ver el justificante.'); return stop(ev); }
     const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.position='fixed'; input.style.left='-9999px'; document.body.appendChild(input);
-    input.addEventListener('change', async () => { try{ const f=input.files && input.files[0]; if(!f) return; if(!/^image\//i.test(f.type || '')){ alert('Selecciona una imagen.'); return; } const src=await readImage(f); setReceiptLocal(id,src); compactReceipts(); try{ await uploadReceipt(id,src); }catch(error){ console.warn('[v50.2] Justificante no subido aún, queda protegido localmente.', error); } saveNow(); compactReceipts(); hydrateReceipts(true); }catch(error){ alert('No se pudo adjuntar el justificante. '+(error?.message || error)); } finally{ try{ input.remove(); }catch(_){ } } }, {once:true});
+    input.addEventListener('change', async () => { try{ const f=input.files && input.files[0]; if(!f) return; if(!/^image\//i.test(f.type || '')){ alert('Selecciona una imagen.'); return; } const src=await readImage(f); setReceiptLocal(id,src); compactReceipts(); try{ await uploadReceipt(id,src); }catch(error){ console.warn('[v50.3] Justificante no subido aún, queda protegido localmente.', error); } saveNow(); compactReceipts(); hydrateReceipts(true); }catch(error){ alert('No se pudo adjuntar el justificante. '+(error?.message || error)); } finally{ try{ input.remove(); }catch(_){ } } }, {once:true});
     input.click(); return stop(ev);
   }
   async function removeReceipt(id, ev){
@@ -321,20 +332,28 @@
   }
   function handleEventChange(){ applyEventStatus(); hydrateReceipts(true); scheduleRepair(currentTab(), 'event-change'); [120,500,1200,2500].forEach(ms => setTimeout(() => { applyRoleMenu(); applyEventStatus(); compactReceipts(); }, ms)); }
 
+  // v50.3: se elimina el observador global de todo el DOM porque reescribía controles de justificante y provocaba temblores en RW/RO.
   let mo=null;
-  function installObserver(){ if(mo) return; mo=new MutationObserver(() => { clearTimeout(installObserver._t); installObserver._t=setTimeout(() => { applyVersion(); applyRoleMenu(); applyEventStatus(); compactReceipts(); applyProductBold(); }, 70); }); try{ mo.observe(document.body,{childList:true,subtree:true}); }catch(_){ } }
-  function wrapRender(){ const old=getFn('render'); if(!old || old.__ceV502Wrapped) return; const wrapped=function(){ const ret=old.apply(this, arguments); [30,100,260,700,1400].forEach(ms => setTimeout(() => { applyRoleMenu(); applyEventStatus(); compactReceipts(); applyProductBold(); hydrateReceipts(false); scheduleRepair(currentTab(),'after-render'); }, ms)); return ret; }; wrapped.__ceV502Wrapped=true; try{ render=wrapped; }catch(_){ } window.render=wrapped; }
-  function install(){ injectStyle(); applyVersion(); applyRoleMenu(); applyEventStatus(); preserveReceiptsBeforeSave(); hydrateReceipts(false); compactReceipts(); applyProductBold(); wrapSaveState(); wrapRender(); installObserver(); scheduleRepair(currentTab(),'install'); }
+  function installObserver(){ return; }
+  function wrapRender(){ const old=getFn('render'); if(!old || old.__ceV502Wrapped) return; const wrapped=function(){ const ret=old.apply(this, arguments); [40,180,650].forEach(ms => setTimeout(() => { applyRoleMenu(); applyEventStatus(); compactReceipts(); applyProductBold(); hydrateReceipts(false); }, ms)); setTimeout(() => scheduleRepair(currentTab(),'after-render'), 260); return ret; }; wrapped.__ceV502Wrapped=true; try{ render=wrapped; }catch(_){ } window.render=wrapped; }
+  function install(){ injectStyle(); applyVersion(); applyRoleMenu(); applyEventStatus(); preserveReceiptsBeforeSave(); hydrateReceipts(false); compactReceipts(); applyProductBold(); wrapSaveState(); wrapRender(); installObserver(); }
 
   window.addEventListener('pointerdown', handlePointerDown, true);
   window.addEventListener('mousedown', handlePointerDown, true);
   window.addEventListener('touchstart', handlePointerDown, {capture:true, passive:true});
+  function isReceiptTarget(ev){ return ev.target?.closest?.('[data-action="ingreso-receipt-view-v502"],[data-action="ingreso-receipt-add-v502"],[data-action="ingreso-receipt-delete-v502"],.ce-v502-receipt-thumb,.ce-v502-receipt-btn'); }
+  function stopReceiptOnly(ev){ if(isReceiptTarget(ev)){ try{ ev.stopPropagation(); ev.stopImmediatePropagation?.(); }catch(_){ } } }
+  window.addEventListener('pointerdown', stopReceiptOnly, true);
+  window.addEventListener('touchstart', stopReceiptOnly, {capture:true, passive:false});
+  window.addEventListener('pointerup', function(ev){ if(isReceiptTarget(ev)) return handleReceiptEvent(ev); }, true);
   window.addEventListener('click', handleReceiptEvent, true);
-  window.addEventListener('touchend', function(ev){ const btn=ev.target?.closest?.('[data-action="ingreso-receipt-view-v502"],[data-action="ingreso-receipt-add-v502"],[data-action="ingreso-receipt-delete-v502"],.ce-v502-receipt-thumb,.ce-v502-receipt-btn'); if(btn) return handleReceiptEvent(ev); }, {capture:true, passive:false});
+  window.addEventListener('touchend', function(ev){ if(isReceiptTarget(ev)) return handleReceiptEvent(ev); }, {capture:true, passive:false});
   window.addEventListener('click', handleNav, true);
   window.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') handleEventChange(); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,240,700,1500,3000,6000].forEach(ms => setTimeout(install, ms));
-  setInterval(() => { install(); hydrateReceipts(false); repairVisibleData(currentTab(),'watchdog'); }, window.ControlEventLowResource?.interval?.(1800) || 1800);
+  // v50.3: sin watchdog visual cada 1,8s. Solo sincronización ligera y espaciada para no provocar temblores ni duplicar controles.
+  setInterval(() => { hydrateReceipts(false); applyEventStatus(); }, window.ControlEventLowResource?.interval?.(15000) || 15000);
   window.ControlEventV502 = {version:VERSION, versionFile:VERSION_FILE, applyRoleMenu, applyEventStatus, repairVisibleData, hydrateReceipts, compactReceipts, applyProductBold};
+  window.ControlEventV503 = window.ControlEventV502;
 })();

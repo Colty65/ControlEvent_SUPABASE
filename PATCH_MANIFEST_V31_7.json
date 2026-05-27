@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.2",
+  "version": "ControlEvent v50.3",
   "base": "ControlEvent v31.6.1 estable",
   "changes": [
     "Mapa de recursos: fichas de producto compactas",
