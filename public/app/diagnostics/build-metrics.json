@@ -1,8 +1,8 @@
 {
-  "version": "v50.22",
-  "base": "v50.13",
-  "notes": "v50.19: retira de carga las dos capas anteriores que interferian en el flujo de evento; login -> CE sin evento -> eleccion de evento -> rehidratacion completa; Refres conserva evento/pestana; visor ligero para Just. en globos de Resumen sin tocar justificantes de INGRESOS; version/caches unificadas.",
+  "version": "v50.23",
+  "base": "v50.22",
+  "notes": "v50.23: rehidratacion final de globos tras cambio de usuario/evento; version visible y INFOEVENTO unificados; Refres en verde Excel mientras actualiza y blanco al finalizar.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v50.19",
-  "versionLabel": "ControlEvent v50.22"
+  "build": "v50.23",
+  "versionLabel": "ControlEvent v50.23"
 }

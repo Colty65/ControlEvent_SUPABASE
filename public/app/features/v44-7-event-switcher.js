@@ -1,11 +1,11 @@
-/* ControlEvent v50.220 - selector de evento unificado y render activo único.
+/* ControlEvent v50.23 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.220';
-  const VERSION_FILE = 'ControlEvent_v50_220';
+  const VERSION = 'ControlEvent v50.23';
+  const VERSION_FILE = 'ControlEvent_v50_23';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v25_event_chosen';
@@ -387,6 +387,7 @@
       shell();
       ensureEventPlaceholder();
       notice('Datos cargados. Elige evento en el desplegable.');
+      try{ window.ControlEventV5023?.afterLoginWelcome?.('v44-7-login'); }catch(_){ }
       setTimeout(() => { try{ if(isGD()) call('fetchAccessUsers'); }catch(_){ } }, 0);
       return false;
     }catch(err){
@@ -500,6 +501,7 @@
     call('renderLockState');
     finishTransition();
     applyVersion();
+    try{ window.ControlEventV5023?.afterRenderActive?.(active, 'v44-7-renderActive'); }catch(_){ }
   }
   function queueActive(tab, token, options = {}){
     const active = setTab(tab || currentTab());
@@ -570,6 +572,7 @@
     showLoading(targetTab, wasEvent ? 'Cargando nuevo evento...' : 'Cargando evento seleccionado...');
     notice(wasEvent ? 'Cargando nuevo evento… preparando ventana activa' : 'Cargando evento seleccionado… preparando Gráficas');
     queueActive(targetTab, token, {delay: options.delay});
+    try{ window.ControlEventV5023?.afterEventSelected?.(id, 'v44-7-selectEvent'); }catch(_){ }
     return false;
   }
   function renderV447(options = {}){

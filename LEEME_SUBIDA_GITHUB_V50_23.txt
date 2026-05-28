@@ -1,0 +1,10 @@
+ControlEvent v50.23
+
+Base: v50.22.
+
+Cambios funcionales limitados:
+1) Rehidratacion de globos tras Salir + login con otro usuario + seleccion de evento.
+2) Version unificada en cabecera, descargas e INFOEVENTO: ControlEvent v50.23 / ControlEvent_v50_23.
+3) Boton Refres/Refrescar en verde Excel mientras actualiza y fondo blanco al terminar.
+
+No se han tocado los justificantes dentro de INGRESOS, ni motores de compras/donaciones/Excel salvo textos de version.
