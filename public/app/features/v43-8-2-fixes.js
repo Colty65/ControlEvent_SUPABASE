@@ -1,9 +1,9 @@
-/* ControlEvent v50.12 - menú móvil estable y versión unificada.
+/* ControlEvent v50.13 - menú móvil estable y versión unificada.
    Parche defensivo: no toca INFOEVENTO, BACKUP, COMPRAS ni DONACIONES. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.12';
-  const VERSION_FILE = 'ControlEvent_v50_12';
+  const VERSION = 'ControlEvent v50.13';
+  const VERSION_FILE = 'ControlEvent_v50_13';
   const MOBILE_MAX = 760;
   const $ = id => document.getElementById(id);
 

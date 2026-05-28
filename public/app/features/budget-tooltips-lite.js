@@ -1,9 +1,9 @@
-/* ControlEvent v50.12 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v50.13 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.12';
+  const VERSION = 'ControlEvent v50.13';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -187,7 +187,7 @@
     return ref || storeName(row) || 'Sin donante';
   }
 
-  // v50.12: las fotos de justificantes también deben verse y ampliarse en los globos de INGRESADO SOCIOS / NO SOCIOS.
+  // v50.13: las fotos de justificantes también deben verse y ampliarse en los globos de INGRESADO SOCIOS / NO SOCIOS.
   const RECEIPT_BACKUP_KEYS = ['ControlEvent_ingreso_receipts_v502','ControlEvent_ingreso_receipts_v468'];
   function same(a,b){ return String(a ?? '') === String(b ?? ''); }
   function srcOfReceipt(value){
@@ -286,12 +286,13 @@
       return true;
     }).sort((a,b) => cmp(incomeParts(a).nombre, incomeParts(b).nombre));
     const total = rows.reduce((sum, item) => sum + incomeParts(item).total, 0);
-    const includePhotos = rows.some(item => receiptSrcForIncome(incomeParts(item).id));
-    const headers = includePhotos ? ['Foto','Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'] : ['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'];
+    // v50.13: no insertar la foto como primera columna.
+    // Los justificantes de estos globos los añade el sistema estable anterior como columna final "Just.",
+    // igual que en los globos de GRAFICAS, para conservar datos + foto y el visor con texto.
+    const headers = ['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'];
     const table = tableHtml(headers, rows.map(item => {
       const p = incomeParts(item);
-      const values = [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total)];
-      return includePhotos ? [receiptThumbCell(p.id, p.nombre), ...values] : values;
+      return [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total)];
     }));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table};
   }

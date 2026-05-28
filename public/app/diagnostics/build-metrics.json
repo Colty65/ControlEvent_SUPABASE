@@ -1,15 +1,7 @@
 {
-  "version": "ControlEvent v50.12",
-  "base": "v50.11",
-  "notes": "v50.12: conserva justificantes de INGRESOS ya funcionando; corrige globos de Resumen Presupuestario en iPhone con cierre tactil y ampliacion de fotos; restaura dock movil Salir/Refrescar; elimina negrita/parpadeo visual en mantenimiento de PRODUCTOS; unifica rotulos/cache a v50.12.",
-  "checks": [
-    "node --check public/app/features/budget-tooltips-lite.js",
-    "node --check public/app/features/v50-12-final-fixes.js",
-    "node --check public/app/features/v50-11-final-fixes.js",
-    "node --check public/app/features/v50-10-final-fixes.js",
-    "node --check public/app/features/v50-9-final-fixes.js",
-    "node --check public/sw.js",
-    "json package.json/package-lock.json/PATCH_MANIFEST_V50_12.json"
-  ],
-  "build": "v50.12"
+  "version": "ControlEvent v50.13",
+  "base": "v50.12",
+  "notes": "v50.13: no toca justificantes de INGRESOS; recupera columna final Just. en globos de Resumen Presupuestario; dock movil Refres/Salir abajo derecha; elimina observador v50.12 de PRODUCTOS; obliga a elegir evento tras login; cache/version v50.13.",
+  "generatedAt": "2026-05-28T00:00:00+02:00",
+  "build": "v50.13"
 }

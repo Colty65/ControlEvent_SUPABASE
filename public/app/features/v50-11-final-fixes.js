@@ -1,21 +1,21 @@
-/* ControlEvent v50.12 - ajuste quirurgico sobre v50.10.
+/* ControlEvent v50.13 - ajuste quirurgico sobre v50.13.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
-   - Version: fija una unica version visible sin cargar v50.8.
+   - Version: fija una unica version visible sin cargar v50.13.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
    - No toca el visor ni el flujo de fotos de INGRESOS/tickets.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.12';
-  const VERSION_FILE = 'ControlEvent_v50_12';
+  const VERSION = 'ControlEvent v50.13';
+  const VERSION_FILE = 'ControlEvent_v50_13';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEYS = ['ControlEvent_v26_9_session'];
   const LOGOUT_KEYS = [
-    'ControlEvent_v50_12_logout_at',
+    'ControlEvent_v50_13_logout_at',
     'ControlEvent_v50_10_logout_at',
     'ControlEvent_v50_9_logout_at',
     'ControlEvent_v50_8_logout_at'

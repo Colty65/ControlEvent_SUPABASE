@@ -1,0 +1,31 @@
+{
+  "version": "ControlEvent v50.13",
+  "base": "ControlEvent v50.12",
+  "date": "2026-05-28",
+  "changes": [
+    "No se toca la gestion de justificantes dentro del listado INGRESOS, que queda como en v50.12/v50.11 funcionando en iPad y moviles.",
+    "RESUMEN PRESUPUESTARIO: se retira la foto como primera columna en los globos de Ingresado socios/no socios y se recupera la columna final Just. del sistema estable usado tambien en GRAFICAS.",
+    "RESUMEN PRESUPUESTARIO tactil: se refuerza apertura de justificantes desde .ce-v465-tip-thumb y cierre de globo con aspa o tocando fuera.",
+    "Movil: se crea dock independiente con botones Refres y Salir apilados abajo a la derecha, pegados al margen.",
+    "PRODUCTOS: se deja de cargar v50-12-final-fixes.js para eliminar el MutationObserver que causaba negrita/parpadeo; v50.13 aplica solo CSS pasivo y limpieza puntual.",
+    "Login: se fuerza elegir evento despues de entrar, evitando restaurar automaticamente el ultimo evento.",
+    "Version/cache actualizadas a v50.13."
+  ],
+  "files_added": [
+    "public/app/features/v50-13-final-fixes.js",
+    "PATCH_MANIFEST_V50_13.json",
+    "LEEME_SUBIDA_GITHUB_V50_13.txt"
+  ],
+  "files_modified": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/budget-tooltips-lite.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json"
+  ],
+  "files_not_loaded_anymore": [
+    "public/app/features/v50-12-final-fixes.js"
+  ]
+}

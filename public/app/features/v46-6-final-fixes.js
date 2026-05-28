@@ -1,12 +1,12 @@
-/* ControlEvent v50.12 - justificantes compactos, miniaturas en globos y ordenación estable de productos.
+/* ControlEvent v50.13 - justificantes compactos, miniaturas en globos y ordenación estable de productos.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.12';
-  const VERSION_FILE = 'ControlEvent_v50_12';
+  const VERSION = 'ControlEvent v50.13';
+  const VERSION_FILE = 'ControlEvent_v50_13';
   const INSTALLED = '__ceV465FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

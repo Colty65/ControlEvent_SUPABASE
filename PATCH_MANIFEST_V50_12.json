@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.12",
+  "version": "ControlEvent v50.13",
   "base": "ControlEvent v50.11",
   "created": "2026-05-28",
   "scope": [
@@ -10,8 +10,8 @@
   ],
   "files_added": [
     "public/app/features/v50-12-final-fixes.js",
-    "LEEME_SUBIDA_GITHUB_V50_12.txt",
-    "PATCH_MANIFEST_V50_12.json"
+    "LEEME_SUBIDA_GITHUB_V50_13.txt",
+    "PATCH_MANIFEST_V50_13.json"
   ],
   "files_modified": [
     "public/index.html",
