@@ -1,4 +1,6 @@
 {
-  "version": "v50.20",
-  "notes": "v50.20: refresco en sitio conservando evento/pestana; oculta CE al cargar evento; estabiliza visor de justificantes en globos de Graficas/Resumen; version/cache unificadas."
+  "version": "v50.21",
+  "notes": "v50.21: corrección puntual del flujo Salir -> Login -> CE + Selecciona evento, evitando que se herede selectedEventId del usuario anterior y que los globos queden a medias.",
+  "base": "v50.20",
+  "date": "2026-05-28"
 }
