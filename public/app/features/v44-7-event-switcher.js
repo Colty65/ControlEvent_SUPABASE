@@ -1,14 +1,15 @@
-/* ControlEvent v50.25 - selector de evento unificado y render activo único.
+/* ControlEvent v50.26 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.25';
-  const VERSION_FILE = 'ControlEvent_v50_25';
+  const VERSION = 'ControlEvent v50.26';
+  const VERSION_FILE = 'ControlEvent_v50_26';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
-  const OLD_CHOSEN_KEY = 'ControlEvent_v50_25_event_chosen';
+  const OLD_CHOSEN_KEY = 'ControlEvent_v50_26_event_chosen';
+  const LEGACY_CHOSEN_KEYS = ['ce_v250_event_chosen','ControlEvent_v50_25_event_chosen','ControlEvent_v50_24_event_chosen','controlevent_v5022_user_picked_event'];
   const STORAGE_FALLBACK = 'controlevent_v6_4';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
@@ -115,9 +116,9 @@
     try{ window.__ceCurrentMainTab = next; }catch(_){ }
     return next;
   }
-  function markChosen(){ try{ sessionStorage.setItem(CHOSEN_KEY, '1'); sessionStorage.setItem(OLD_CHOSEN_KEY, '1'); }catch(_){ } }
-  function clearChosen(){ try{ sessionStorage.removeItem(CHOSEN_KEY); sessionStorage.removeItem(OLD_CHOSEN_KEY); }catch(_){ } }
-  function chosen(){ return safe(() => sessionStorage.getItem(CHOSEN_KEY) === '1' || sessionStorage.getItem(OLD_CHOSEN_KEY) === '1', false); }
+  function markChosen(){ try{ [CHOSEN_KEY, OLD_CHOSEN_KEY, ...LEGACY_CHOSEN_KEYS].forEach(k => sessionStorage.setItem(k, '1')); }catch(_){ } }
+  function clearChosen(){ try{ [CHOSEN_KEY, OLD_CHOSEN_KEY, ...LEGACY_CHOSEN_KEYS].forEach(k => sessionStorage.removeItem(k)); }catch(_){ } }
+  function chosen(){ return safe(() => [CHOSEN_KEY, OLD_CHOSEN_KEY, ...LEGACY_CHOSEN_KEYS].some(k => sessionStorage.getItem(k) === '1'), false); }
   function rememberEvent(id){ if(!hasValidEvent(id)) return; try{ sessionStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } try{ localStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } }
   function persistLocal(){
     // v45.4: el cambio de evento NO debe serializar todo el estado.
@@ -369,7 +370,7 @@
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       try{ authUser = data.user; }catch(_){ }
       window.authUser = data.user;
-      try{ localStorage.setItem('ControlEvent_v50_25_session', JSON.stringify(data.user || null)); }catch(_){ }
+      try{ localStorage.setItem('ControlEvent_v50_26_session', JSON.stringify(data.user || null)); }catch(_){ }
       const c = $('loginClave'); if(c) c.value = '';
       try{ st().selectedEventId = ''; }catch(_){ }
       clearChosen();

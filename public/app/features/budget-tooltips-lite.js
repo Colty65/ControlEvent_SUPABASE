@@ -1,9 +1,9 @@
-/* ControlEvent v50.24 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v50.26 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
+  const VERSION = 'ControlEvent v50.26';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -460,16 +460,21 @@
     clearTimeout(sanitizeTimer);
     sanitizeTimer = setTimeout(sanitizeBudgetPanels, 0);
   }
+  function rehydrateBudgetLite(reason){
+    try{ patchRenderBudget(); }catch(_){ }
+    try{ sanitizeBudgetPanels(); }catch(_){ }
+    try{ hideLegacyBudgetTooltips(); }catch(_){ }
+  }
   try{ document.body.classList.add('ce-budget-tips-lite-active-v307'); }catch(_){ }
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [0, 60, 180, 500, 1100, 2200].forEach(ms => setTimeout(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, ms));
-  setInterval(() => { sanitizeBudgetPanels(); hideLegacyBudgetTooltips(); }, window.ControlEventLowResource?.interval?.(1600) || 1600);
-  try{
-    const observer = new MutationObserver(() => scheduleSanitize());
-    observer.observe(document.documentElement, {childList:true, subtree:true});
-  }catch(_){ }
-  window.addEventListener('controlevent:runtime-ready', () => { patchRenderBudget(); sanitizeBudgetPanels(); });
-  window.ControlEventBudgetLiteTips = {version: VERSION, sanitize: sanitizeBudgetPanels, hide: hideTooltip};
+  [0, 80, 240, 700, 1400].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
+  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready'].forEach(evt => {
+    window.addEventListener(evt, () => setTimeout(() => rehydrateBudgetLite(evt), 60));
+  });
+  document.addEventListener('click', event => {
+    if(event.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(() => rehydrateBudgetLite('resumen-tab'), 180);
+  }, true);
+  window.ControlEventBudgetLiteTips = {version: VERSION, sanitize: sanitizeBudgetPanels, rehydrate: rehydrateBudgetLite, hide: hideTooltip};
 })();
