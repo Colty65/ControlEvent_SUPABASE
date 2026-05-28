@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v31.3",
-  "base": "ControlEvent v30.12",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Mapa de recursos sin observador global continuo",
     "Filtro responsables SOCIO estable",

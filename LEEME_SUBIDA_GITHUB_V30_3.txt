@@ -1,4 +1,4 @@
-ControlEvent v30.3 - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Sube el contenido de este ZIP al repositorio, sustituyendo los archivos existentes.
 

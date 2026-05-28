@@ -1,4 +1,4 @@
-# ControlEvent v28.2 - Mantenimiento diferido para móvil
+# ControlEvent v50.24 - Mantenimiento diferido para móvil
 
 Versión conservadora centrada en suavizar la entrada a **Mantenimiento** en móvil.
 

@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v30.8",
-  "base": "ControlEvent v30.7",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Mapa de recursos",
     "ordenacion tienda-ticket-producto",

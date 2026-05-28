@@ -1,4 +1,4 @@
-# ControlEvent v27.4 - GRAFICAS modular integrado en INFOEVENTO en modo auditoría
+# ControlEvent v50.24 - GRAFICAS modular integrado en INFOEVENTO en modo auditoría
 
 Versión progresiva sobre v27.3.
 

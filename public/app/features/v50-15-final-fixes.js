@@ -1,4 +1,4 @@
-/* ControlEvent v50.229 - entrada limpia tras login y proteccion de globos.
+/* ControlEvent v50.24 - entrada limpia tras login y proteccion de globos.
    - Tras /api/login, el primer /api/state se entrega con selectedEventId='' para obligar a elegir evento.
    - Pantalla neutra con logo CE y selector EVENTO en "Selecciona evento..." hasta que el usuario elija.
    - Evita que en iPhone/iPad el toque que abre el globo de Resumen dispare automaticamente la primera foto.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.229';
-  const VERSION_FILE = 'ControlEvent_v50_229';
+  const VERSION = 'ControlEvent v50.24';
+  const VERSION_FILE = 'ControlEvent_v50_24';
   const INSTALLED = '__ceV5015FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -16,7 +16,7 @@
   const SELECT_KEYS = [
     'controlevent_v229_selected_event_id',
     'controlevent_v44_event_chosen_after_login',
-    'ControlEvent_v25_event_chosen',
+    'ControlEvent_v50_24_event_chosen',
     'ce_v250_event_chosen',
     'ce_event_chosen'
   ];
@@ -206,7 +206,7 @@
       const id = String(ev.target.value || '');
       if(id){
         clearForcePicker();
-        try{ sessionStorage.setItem('controlevent_v44_event_chosen_after_login','1'); sessionStorage.setItem('ControlEvent_v25_event_chosen','1'); sessionStorage.setItem('ce_v250_event_chosen','1'); }catch(_){ }
+        try{ sessionStorage.setItem('controlevent_v44_event_chosen_after_login','1'); sessionStorage.setItem('ControlEvent_v50_24_event_chosen','1'); sessionStorage.setItem('ce_v250_event_chosen','1'); }catch(_){ }
         try{ document.body.classList.remove('ce-v5015-awaiting-event','ce-v44-awaiting-event'); }catch(_){ }
       }else{
         markForcePicker();

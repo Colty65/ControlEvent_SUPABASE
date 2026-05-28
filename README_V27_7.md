@@ -1,4 +1,4 @@
-# ControlEvent v27.7 - Diagnóstico de mantenimiento estable
+# ControlEvent v50.24 - Diagnóstico de mantenimiento estable
 
 Versión conservadora. No toca funcionalmente INFOEVENTO, BACKUP, carga de datos ni guardado.
 

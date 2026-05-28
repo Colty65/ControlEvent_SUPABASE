@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v46.1",
-  "versionFile": "ControlEvent_v46_1",
-  "base": "ControlEvent v45.4",
+  "version": "ControlEvent v50.24",
+  "versionFile": "ControlEvent_v50_24",
+  "base": "ControlEvent v50.24",
   "notes": [
     "Cambios de edición/borrado sin pérdida de posición de ventana.",
     "INFOEVENTO y BACKUP reforzados contra recursión.",

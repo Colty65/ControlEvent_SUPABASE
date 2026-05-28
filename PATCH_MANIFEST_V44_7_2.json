@@ -13,6 +13,6 @@
   "notes": [
     "No se modifica la operativa de guardado de compras, donaciones, INFOEVENTO ni BACKUP.",
     "La selección de evento sigue siendo preferencia local y no dispara pushStateToServer.",
-    "El service worker pasa a cache controlevent-shell-v44-7-3."
+    "El service worker pasa a cache controlevent-shell-v50-24."
   ]
 }

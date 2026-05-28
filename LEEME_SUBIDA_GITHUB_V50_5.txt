@@ -1,4 +1,4 @@
-ControlEvent v50.5 - Corrección quirúrgica sobre v50.4
+ControlEvent v50.24 - Corrección quirúrgica sobre v50.4
 
 Subida limpia desde la carpeta completa del repositorio.
 
@@ -29,10 +29,10 @@ Fichero nuevo principal:
 - public/app/features/v50-5-final-fixes.js
 
 Carga añadida al final de public/index.html:
-- ./app/features/v50-5-final-fixes.js?v=50.5
+- ./app/features/v50-5-final-fixes.js?v=50.24
 
 Service worker:
-- Cache actualizado a controlevent-shell-v50-5
+- Cache actualizado a controlevent-shell-v50-24
 - Añadido v50-5-final-fixes.js a la precarga
 
 Verificaciones realizadas:

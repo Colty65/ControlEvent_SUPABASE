@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v31.3",
-  "base": "ControlEvent v31.0",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Mapa de recursos: buscador manual con botón/Enter",
     "Mapa de recursos: cabecera de productos donados simplificada con valor estimado",

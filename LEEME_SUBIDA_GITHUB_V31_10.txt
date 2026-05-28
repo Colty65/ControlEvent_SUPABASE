@@ -1,4 +1,4 @@
-ControlEvent v31.10
+ControlEvent v50.24
 
 Subir todos los archivos de este paquete a GitHub/Vercel.
 

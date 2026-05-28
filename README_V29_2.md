@@ -1,4 +1,4 @@
-# ControlEvent v29.2
+# ControlEvent v50.24
 
 Versión enfocada a rendimiento en iPad/Android modestos.
 

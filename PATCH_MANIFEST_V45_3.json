@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v45.3",
-  "versionFile": "ControlEvent_v45_3",
-  "from": "ControlEvent v45.2",
+  "version": "ControlEvent v50.24",
+  "versionFile": "ControlEvent_v50_24",
+  "from": "ControlEvent v50.24",
   "changes": [
     "PERF persistente en PC para GD/RW",
     "Refrescar reforzado junto a Salir",

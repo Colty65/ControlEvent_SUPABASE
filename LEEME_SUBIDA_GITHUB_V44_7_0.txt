@@ -1,4 +1,4 @@
-ControlEvent v44.7.0
+ControlEvent v50.24
 
 Versión de replanteamiento del cambio de evento.
 

@@ -1,4 +1,4 @@
-# ControlEvent v29.3
+# ControlEvent v50.24
 
 Versión de limpieza visual basada en **v29.2**, que fue la versión donde se corrigió la lentitud en iPad y Android.
 
@@ -11,8 +11,8 @@ Mantener la fluidez conseguida en v29.2, pero ocultar el indicador `LITE ON` y e
 - El modo LITE/turbo sigue funcionando en iPad y Android.
 - El indicador de diagnóstico ya no aparece en producción.
 - El panel de diagnóstico solo se muestra usando `?ceDiag=1`.
-- Se actualiza la versión visible a **ControlEvent v29.3**.
-- Se actualiza el cache del service worker a `controlevent-shell-v29-3`.
+- Se actualiza la versión visible a **ControlEvent v50.24**.
+- Se actualiza el cache del service worker a `controlevent-shell-v50-24`.
 - No se modifica la lógica de datos, BACKUP, INFOEVENTOS, Excel ni formularios.
 
 ## Comprobación rápida

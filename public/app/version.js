@@ -1,2 +1,1 @@
-export const VERSION = 'ControlEvent v50.23';
-export const VERSION_FILE = 'ControlEvent_v50_23';
+window.ControlEventVersion={version:'ControlEvent v50.24',versionFile:'ControlEvent_v50_24'};

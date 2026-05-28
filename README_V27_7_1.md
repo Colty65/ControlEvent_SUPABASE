@@ -1,4 +1,4 @@
-# ControlEvent v27.7.1 - Ajuste diagnóstico mantenimiento
+# ControlEvent v50.24 - Ajuste diagnóstico mantenimiento
 
 Versión correctiva conservadora.
 

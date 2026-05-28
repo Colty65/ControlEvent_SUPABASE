@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v30.11",
+  "version": "ControlEvent v50.24",
   "base": "V30.10_RESCATE estable / legacy v30.7",
   "changed": [
     "public/index.html",
@@ -14,5 +14,5 @@
     "package.json",
     "package-lock.json"
   ],
-  "cache": "controlevent-shell-v30-11"
+  "cache": "controlevent-shell-v50-24"
 }

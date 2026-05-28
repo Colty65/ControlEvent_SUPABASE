@@ -1,4 +1,4 @@
-# ControlEvent v30.5
+# ControlEvent v50.24
 
 Versión basada en la v30.4 estable de rendimiento.
 
@@ -11,4 +11,4 @@ Versión basada en la v30.4 estable de rendimiento.
 - Nuevo globo ligero por clic, sin `mousemove`, sin hover continuo y con tabla desplazable.
 - No se modifica el comportamiento de **OPERATIVA**, que ya funcionaba bien.
 - No se modifica la lógica de INFOEVENTO, BACKUP, Excel ni cálculos principales.
-- Nuevo cache del service worker: `controlevent-shell-v30-5`.
+- Nuevo cache del service worker: `controlevent-shell-v50-24`.

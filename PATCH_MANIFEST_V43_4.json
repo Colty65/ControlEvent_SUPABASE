@@ -1,13 +1,13 @@
 {
-  "version": "ControlEvent v43.6",
-  "from": "ControlEvent v43.3",
+  "version": "ControlEvent v50.24",
+  "from": "ControlEvent v50.24",
   "changes": [
     "Corrección de buscadores en COMPRAS y DONACIONES para no coincidir siempre con el primer registro por culpa de las opciones internas de los desplegables.",
     "Refuerzo de GRAFICAS para mantener diagramas de queso y Por destino sin que se superponga la gráfica anterior.",
     "Barras de Por destino más anchas y pulsables.",
     "Eliminación de la línea y botón de plegar/desplegar en RESUMEN PRESUPUESTARIO.",
     "Renombrado de fichas en MAPA DE RECURSOS.",
-    "Actualización de versión a ControlEvent v43.6."
+    "Actualización de versión a ControlEvent v50.24."
   ],
   "files": [
     "public/index.html",

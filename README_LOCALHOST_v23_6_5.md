@@ -1,4 +1,4 @@
-# ControlEvent v23.6.5 localhost
+# ControlEvent v50.24 localhost
 
 Versión de estabilización local.
 

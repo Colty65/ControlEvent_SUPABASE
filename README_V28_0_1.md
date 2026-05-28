@@ -1,4 +1,4 @@
-# ControlEvent v28.1.1
+# ControlEvent v50.24
 
 Corrección conservadora sobre v28.0.
 

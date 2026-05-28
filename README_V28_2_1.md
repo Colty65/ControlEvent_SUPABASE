@@ -1,4 +1,4 @@
-# ControlEvent v28.2.1 - Corrección proxy de mantenimiento diferido
+# ControlEvent v50.24 - Corrección proxy de mantenimiento diferido
 
 Corrección pequeña sobre v28.2.
 

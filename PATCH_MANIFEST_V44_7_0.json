@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v44.7.0",
-  "from": "ControlEvent v44.5.1",
+  "version": "ControlEvent v50.24",
+  "from": "ControlEvent v50.24",
   "type": "event-switcher-rethink",
   "files": [
     "public/index.html",

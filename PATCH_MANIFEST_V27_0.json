@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v27.0",
-  "base": "ControlEvent v26.9",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "purpose": "Excel modular public facade; exportExcel/exportSeedWorkbook pass through ControlEventExcel while legacy engine remains encapsulated.",
   "indexHtml": {
     "lines": 447,

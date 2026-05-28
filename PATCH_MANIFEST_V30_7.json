@@ -1,12 +1,12 @@
 {
-  "version": "ControlEvent v30.7",
-  "base": "ControlEvent v30.6",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Corrección de sintaxis e instalación de budget-tooltips-lite.js.",
     "Globos de INGRESOS EN DINERO y DONACION DE PRODUCTO activados por delegación inmediata en filas reales.",
     "Bloqueo reforzado de restos de globos heredados que podían tapar pulsaciones en iPad/iPhone/Android.",
     "Cierre de globo al perder foco/pulsar fuera/scroll/orientación/resize/Escape.",
     "Nuevo refuerzo public/app/features/summary-tienda-sort-fix.js para ordenar Por tienda y Ticket por Tienda o Ticket.",
-    "Nuevo cache controlevent-shell-v30-7."
+    "Nuevo cache controlevent-shell-v50-24."
   ]
 }

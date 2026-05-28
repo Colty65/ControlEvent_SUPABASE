@@ -1,4 +1,4 @@
-ControlEvent v30.2 - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Sube los archivos de este paquete respetando las carpetas.
 

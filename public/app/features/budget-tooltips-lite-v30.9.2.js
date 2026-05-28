@@ -1,9 +1,9 @@
-/* ControlEvent v30.9.2.2 - Globos ligeros de resumen presupuestario.
+/* ControlEvent v50.24 - Globos ligeros de resumen presupuestario.
    No intercepta login ni la app general: solo actúa dentro de #budgetLayout.
    Refuerza DONACION DE PRODUCTO en iPhone/Android con detección por punto táctil. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30.9.2.2';
+  const VERSION = 'ControlEvent v50.24';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV309';
   const LEGACY_TIP_ATTRS = ['title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip-v21','data-tip-bg-v21','data-ce-tip-layout-v21','data-ce-tip-lazy-v250','data-ce-tip-bg','data-ce-tip-layout','data-tip-bg-v196','data-tip-bg-v1952','data-tip-bg-v21','data-ce-tip-layout-v20','data-ce-tip-layout-v21','data-ce-tip-layout-v196','data-ce-tip-black'];
   const LEGACY_TOOLTIP_IDS = ['ceTooltipV181','ceTooltipV190','ceTooltipV1952','ceTooltipV196','ceTooltipV21'];

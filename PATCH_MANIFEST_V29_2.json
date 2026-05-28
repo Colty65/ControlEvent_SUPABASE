@@ -8,7 +8,7 @@
     "Render general ligero: solo repinta la pestaña visible y evita renderBudget/renderGraficas/mantenimiento si están ocultos.",
     "Mantenimiento ligero: repinta solo la subpestaña visible.",
     "Suaviza requestAnimationFrame, timeouts cortos, scrollIntoView smooth y efectos visuales en modo LITE.",
-    "Actualizado cache del service worker a controlevent-shell-v29-2."
+    "Actualizado cache del service worker a controlevent-shell-v50-24."
   ],
   "test": "En iPad/Android debe verse 'LITE ON · ocultos N · turbo'. En PC/iPhone no debe aparecer el botón salvo con ?ceDiag=1."
 }

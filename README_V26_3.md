@@ -1,6 +1,6 @@
-# ControlEvent v26.9 - Modularización de backend
+# ControlEvent v50.24 - Modularización de backend
 
-Versión generada sobre `ControlEvent v26.2`.
+Versión generada sobre `ControlEvent v50.24`.
 
 ## Objetivo
 

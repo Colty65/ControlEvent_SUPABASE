@@ -1,4 +1,4 @@
-# ControlEvent v27.0 - Excel modular public facade
+# ControlEvent v50.24 - Excel modular public facade
 
 Esta versión inicia la extracción real de Excel del legacy sin cambiar el motor estable de generación.
 

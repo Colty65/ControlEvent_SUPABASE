@@ -1,4 +1,4 @@
-ControlEvent v29.4 - limpieza opcional
+ControlEvent v50.24 - limpieza opcional
 
 Si quieres dejar el repo limpio, puedes borrar archivos antiguos de versiones previas que ya no se usen, especialmente legacy-bundle-before/after de versiones anteriores.
 

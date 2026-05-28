@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v31.3",
+  "version": "ControlEvent v50.24",
   "base": "v30.6",
   "notes": "v30.7 mantiene rendimiento, corrige la instalación de globos de presupuesto y refuerza la ordenación por Tienda/Ticket.",
   "mobileLitePreserved": true,

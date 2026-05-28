@@ -1,4 +1,4 @@
-ControlEvent v44.7.1
+ControlEvent v50.24
 
 Corrección de estabilidad sobre v44.7.0.
 

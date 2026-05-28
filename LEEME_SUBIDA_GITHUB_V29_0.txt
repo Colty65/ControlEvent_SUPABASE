@@ -1,4 +1,4 @@
-ControlEvent v29.0 - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Este paquete es para repositorios que ya tienen la v28.6.1.
 
@@ -20,4 +20,4 @@ Después de subirlo, si GitHub conserva archivos antiguos, puedes borrar:
 
 No es obligatorio borrarlos para que V29.0 funcione.
 
-Si el móvil sigue cargando una versión antigua, abre la app y fuerza recarga o borra caché/datos del sitio. El service worker de v29.0 usa cache nueva: controlevent-shell-v29-0.
+Si el móvil sigue cargando una versión antigua, abre la app y fuerza recarga o borra caché/datos del sitio. El service worker de v29.0 usa cache nueva: controlevent-shell-v50-24.

@@ -1,4 +1,4 @@
-ControlEvent v44.7.3
+ControlEvent v50.24
 
 Corrección de estabilización del login y cambio de evento sobre la base v44.7.1.
 

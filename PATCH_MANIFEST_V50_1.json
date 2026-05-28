@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.4",
-  "version_file": "ControlEvent_v50_4",
-  "base": "ControlEvent v50.0",
+  "version": "ControlEvent v50.24",
+  "version_file": "ControlEvent_v50_24",
+  "base": "ControlEvent v50.24",
   "files": [
     "LEEME_HOTFIX_V31_6_1.txt",
     "LEEME_SUBIDA_GITHUB_V31_4.txt",

@@ -1,4 +1,4 @@
-# ControlEvent v27.4.8
+# ControlEvent v50.24
 
 Corrección precisa de protección Excel y limpieza de standalones modulares.
 

@@ -1,4 +1,4 @@
-# ControlEvent v27.2
+# ControlEvent v50.24
 
 Fase segura de modularización Excel: RESUMEN ya tiene escritor ExcelJS modular real en `public/modules/excel/resumen-sheet.js`.
 
@@ -22,7 +22,7 @@ La descarga normal INFOEVENTO y BACKUP deben seguir funcionando como en v27.0.2/
 
 ## Versiones
 
-- Interfaz: `ControlEvent v27.2`
-- INFOEVENTO: `ControlEvent_v27_2_INFOEVENTO-...xlsx`
-- BACKUP: `ControlEvent_v27_2_BACKUP_TODOS_...xlsx`
-- Cache PWA: `controlevent-shell-v27-2`
+- Interfaz: `ControlEvent v50.24`
+- INFOEVENTO: `ControlEvent_v50_24_INFOEVENTO-...xlsx`
+- BACKUP: `ControlEvent_v50_24_BACKUP_TODOS_...xlsx`
+- Cache PWA: `controlevent-shell-v50-24`

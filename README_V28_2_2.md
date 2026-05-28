@@ -1,4 +1,4 @@
-# ControlEvent v28.2.2 - Corrección API real de mantenimiento diferido
+# ControlEvent v50.24 - Corrección API real de mantenimiento diferido
 
 Corrección pequeña sobre v28.2.1.
 

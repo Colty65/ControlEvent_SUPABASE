@@ -1,15 +1,15 @@
-ControlEvent v29.3 - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Esta versión parte de v29.2, que fue la versión con buen rendimiento en iPad/Android.
 
 Sube el contenido de este paquete al repositorio, sustituyendo los archivos anteriores.
 
 Cambios principales:
-- Versión visible: ControlEvent v29.3.
+- Versión visible: ControlEvent v50.24.
 - Mantiene el modo LITE/turbo en iPad y Android.
 - Oculta el indicador LITE ON/OFF en uso normal.
 - Diagnóstico disponible solo con ?ceDiag=1.
-- Nuevo cache del service worker: controlevent-shell-v29-3.
+- Nuevo cache del service worker: controlevent-shell-v50-24.
 
 Después de subir:
 1. Abrir la app en PC/iPhone: debe ir muy rápida y sin indicador LITE.

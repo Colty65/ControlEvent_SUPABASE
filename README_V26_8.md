@@ -1,4 +1,4 @@
-# ControlEvent v26.9 - Mapa de funciones legacy y duplicados
+# ControlEvent v50.24 - Mapa de funciones legacy y duplicados
 
 Versión de análisis seguro posterior a v26.7.
 

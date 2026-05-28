@@ -1,10 +1,10 @@
-ControlEvent v50.4
+ControlEvent v50.24
 
 Cambios principales:
 - Evita la duplicación de miniaturas de justificantes en globos de Resumen presupuestario y GRAFICAS.
 - Refuerza la restauración del globo origen al cerrar el visor grande del justificante.
 - Refuerza la marca en negrita de registros modificados en Mnto. PRODUCTOS.
-- Actualiza versión a ControlEvent v50.4 / ControlEvent_v50_4 en cabecera, cache, INFOEVENTO, BACKUP y nombres de descarga.
+- Actualiza versión a ControlEvent v50.24 / ControlEvent_v50_24 en cabecera, cache, INFOEVENTO, BACKUP y nombres de descarga.
 
 Subida recomendada:
 1. Subir el ZIP completo si se quiere evitar mezcla de versiones.

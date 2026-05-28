@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v26.9",
-  "base": "ControlEvent v26.8",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "modified": [
     "README_V26_3.md",
     "README_V26_4.md",

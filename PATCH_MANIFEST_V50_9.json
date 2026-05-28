@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.9",
+  "version": "ControlEvent v50.24",
   "source": "ControlEvent_SUPABASE-main_V50_8.zip",
   "purpose": "Corrección puntual de login superpuesto y justificantes de INGRESOS no visibles en iPhone/Android.",
   "files_added": [

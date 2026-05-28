@@ -1,4 +1,4 @@
-# ControlEvent v26.9 - Index slim legacy JS
+# ControlEvent v50.24 - Index slim legacy JS
 
 ## Objetivo
 
@@ -10,8 +10,8 @@ Seguir adelgazando `public/index.html` sin cambiar comportamiento funcional.
 - Se crean 63 ficheros JS clásicos en `public/app/legacy/`.
 - Se mantiene el orden exacto de ejecución mediante etiquetas `<script src="...">` en la misma posición del HTML.
 - El `index.html` queda sin bloques `<style>` y sin scripts inline con contenido.
-- Se actualiza la versión a `ControlEvent v26.9`.
-- Se actualiza caché PWA a `controlevent-shell-v26-9`.
+- Se actualiza la versión a `ControlEvent v50.24`.
+- Se actualiza caché PWA a `controlevent-shell-v50-24`.
 - Diagnóstico actualizado con métricas de adelgazamiento de v26.5 y v26.9.
 
 ## Métricas

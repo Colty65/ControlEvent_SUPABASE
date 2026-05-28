@@ -1,4 +1,4 @@
-ControlEvent v50.4 - SOLO SUBIR GITHUB
+ControlEvent v50.24 - SOLO SUBIR GITHUB
 
 Subir sustituyendo los archivos anteriores.
 
@@ -8,4 +8,4 @@ Cambios:
 - El marcado es visual/local y no modifica datos reales.
 - No se toca el resto de la app.
 
-Tras subir, cerrar pestañas antiguas o forzar recarga para usar cache controlevent-shell-v31-8.
+Tras subir, cerrar pestañas antiguas o forzar recarga para usar cache controlevent-shell-v50-24.

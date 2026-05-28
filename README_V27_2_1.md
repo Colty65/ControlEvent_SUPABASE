@@ -1,4 +1,4 @@
-# ControlEvent v27.2.1 - Corrección carga BACKUP precio referencia PRODUCTOS
+# ControlEvent v50.24 - Corrección carga BACKUP precio referencia PRODUCTOS
 
 Versión correctiva sobre v27.2.
 

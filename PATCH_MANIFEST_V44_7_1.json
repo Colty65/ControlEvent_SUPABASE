@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v44.7.1",
-  "versionFile": "ControlEvent_v44_7_1",
-  "base": "ControlEvent v44.7.0",
+  "version": "ControlEvent v50.24",
+  "versionFile": "ControlEvent_v50_24",
+  "base": "ControlEvent v50.24",
   "type": "stability-hotfix",
   "changes": [
     "El cambio de evento deja de serializar todo el estado en localStorage.",

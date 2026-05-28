@@ -1,4 +1,4 @@
-ControlEvent v44.3
+ControlEvent v50.24
 
 Base: v44.2.
 
@@ -7,6 +7,6 @@ Cambios principales:
 - GRAFICAS deja de pintar primero las barras antiguas antes del queso + Por destino.
 - RESUMEN no genera GRAFICAS si GRAFICAS no está visible.
 - PERF cuenta tarjetas reales renderizadas en COMPRAS/DONACIONES.
-- Versión unificada a ControlEvent v44.3 / ControlEvent_v44_3.
+- Versión unificada a ControlEvent v50.24 / ControlEvent_v50_24.
 
 No se ha cambiado la lógica de guardado de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.

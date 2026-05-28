@@ -1,18 +1,18 @@
-/* ControlEvent v50.23 - ajuste minimo sobre v50.9.
+/* ControlEvent v50.24 - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.23';
-  const VERSION_FILE = 'ControlEvent_v50_23';
+  const VERSION = 'ControlEvent v50.24';
+  const VERSION_FILE = 'ControlEvent_v50_24';
   const INSTALLED = '__ceV5010FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEYS = ['ControlEvent_v26_9_session'];
-  const LOGOUT_KEYS = ['ControlEvent_v50_23_logout_at','ControlEvent_v50_23_logout_at','ControlEvent_v50_23_logout_at'];
+  const SESSION_KEYS = ['ControlEvent_v50_24_session'];
+  const LOGOUT_KEYS = ['ControlEvent_v50_24_logout_at','ControlEvent_v50_24_logout_at','ControlEvent_v50_24_logout_at'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const isMobile = () => safe(() => window.matchMedia('(max-width: 900px)').matches, innerWidth <= 900);

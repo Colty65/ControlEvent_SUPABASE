@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.13",
-  "base": "ControlEvent v50.11",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "created": "2026-05-28",
   "scope": [
     "budget tooltip mobile close/photo enlargement",

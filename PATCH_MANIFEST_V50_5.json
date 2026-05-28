@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.5",
-  "base": "ControlEvent v50.4",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "type": "final-fixes-layer",
   "files_added": [
     "public/app/features/v50-5-final-fixes.js",

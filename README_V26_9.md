@@ -1,4 +1,4 @@
-# ControlEvent v26.9 - Limpieza segura del legacy
+# ControlEvent v50.24 - Limpieza segura del legacy
 
 Versión de continuidad sobre v26.8.
 
@@ -8,8 +8,8 @@ Primera limpieza segura del legacy: la app sigue usando 2 bundles activos, pero 
 
 ## Cambios
 
-- Versión visual y PWA: `ControlEvent v26.9`.
-- Cache PWA: `controlevent-shell-v26-9`.
+- Versión visual y PWA: `ControlEvent v50.24`.
+- Cache PWA: `controlevent-shell-v50-24`.
 - Bundles legacy activos:
   - `public/app/legacy/legacy-bundle-before-modules-v26.9.js`
   - `public/app/legacy/legacy-bundle-after-modules-v26.9.js`

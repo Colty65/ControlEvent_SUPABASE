@@ -1,6 +1,6 @@
-# ControlEvent v23.6.7 como base Supabase
+# ControlEvent v50.24 como base Supabase
 
-Esta carpeta parte de la version funcional `ControlEvent_v23_6_7_localhost`.
+Esta carpeta parte de la version funcional `ControlEvent_v50_24_localhost`.
 
 Se mantiene el modo local original:
 

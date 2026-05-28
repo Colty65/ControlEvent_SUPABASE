@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.9",
-  "base": "ControlEvent v50.7 sobre v50.4",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24 sobre v50.4",
   "summary": "Retira la carga de v50.7, unifica versiones para evitar parpadeo, mueve Salir/Refrescar a dock inferior movil y refuerza cierre de globos.",
   "added": [
     "public/app/features/v50-8-final-fixes.js",

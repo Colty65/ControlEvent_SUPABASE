@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.4",
-  "base": "ControlEvent v31.4",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "files_changed": [
     "public/app/features/mapa-productos.js",
     "public/app/styles/app.css",

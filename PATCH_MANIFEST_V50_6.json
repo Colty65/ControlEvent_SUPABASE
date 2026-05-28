@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.6",
-  "base": "ControlEvent v50.5",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "date": "2026-05-28",
   "changed_files": [
     "public/index.html",

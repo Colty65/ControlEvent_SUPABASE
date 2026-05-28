@@ -1,4 +1,4 @@
-ControlEvent v30.1 - Solo subir a GitHub
+ControlEvent v50.24 - Solo subir a GitHub
 
 1) Sube todos los archivos y carpetas de este ZIP respetando la estructura.
 2) Si GitHub pregunta, reemplaza los existentes.

@@ -1,4 +1,4 @@
-# ControlEvent v31.3
+# ControlEvent v50.24
 
 Versión basada en v31.1 para corregir el comportamiento de Mapa de recursos.
 
@@ -9,4 +9,4 @@ Versión basada en v31.1 para corregir el comportamiento de Mapa de recursos.
 - Con **Todos los responsables**, el importe de la ficha Donado producto debe coincidir con el valor estimado de la cabecera inferior.
 - Al pulsar la ficha **Donado producto**, el sistema se posiciona de forma reforzada en la cabecera de productos donados.
 - Se mantiene la búsqueda manual de productos por botón Buscar o Enter.
-- Cache nuevo: `controlevent-shell-v31-3`.
+- Cache nuevo: `controlevent-shell-v50-24`.

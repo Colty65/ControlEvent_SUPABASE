@@ -1,4 +1,4 @@
-ControlEvent v50.18
+ControlEvent v50.24
 ===================
 
 Base: v50.14.
@@ -7,7 +7,7 @@ Correcciones aplicadas:
 1. Entrada desde login: al validar el usuario, el primer estado cargado fuerza selectedEventId='' para que el selector EVENTO quede en "Selecciona evento..." y se muestre la pantalla limpia con el logo CE grande. Los datos y globos se inicializan solo cuando el usuario elige evento.
 2. Globos de Resumen Presupuestario en iPhone/iPad: se evita que el mismo toque que abre el globo dispare automaticamente la primera foto del listado. La foto solo se abre al pulsar expresamente en la miniatura Just.
 3. Se mantiene intacta la gestion de justificantes dentro de INGRESOS y tickets, que ya funcionaba correctamente.
-4. Version unificada a ControlEvent v50.18, con cache PWA controlevent-shell-v50-18.
+4. Version unificada a ControlEvent v50.24, con cache PWA controlevent-shell-v50-24.
 
 Archivos principales:
 - public/app/features/v50-15-final-fixes.js

@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.4",
-  "base": "ControlEvent v50.1",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "files": [
     "package.json",
     "package-lock.json",

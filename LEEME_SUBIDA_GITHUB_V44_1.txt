@@ -1,10 +1,10 @@
-ControlEvent v44.1
+ControlEvent v50.24
 
 Versión de diagnóstico de rendimiento sobre v44.0.
 
 Cambios:
 - Añadido panel PERF no intrusivo para medir memoria JS, nodos DOM, renders, activaciones de módulos, long tasks y errores.
 - Botón PERF abajo a la izquierda. Permite copiar un informe para analizarlo después.
-- Actualizada versión a ControlEvent v44.1 / ControlEvent_v44_1.
+- Actualizada versión a ControlEvent v50.24 / ControlEvent_v50_24.
 
 No se cambia la lógica funcional de COMPRAS, DONACIONES, INFOEVENTO, BACKUP, GRAFICAS ni MAPA DE RECURSOS.

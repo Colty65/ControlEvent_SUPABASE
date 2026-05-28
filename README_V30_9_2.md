@@ -1,4 +1,4 @@
-# ControlEvent v30.9.2
+# ControlEvent v50.24
 
 Corrección de despliegue sobre v30.9:
 

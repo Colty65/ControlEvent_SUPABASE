@@ -1,4 +1,4 @@
-# ControlEvent v29.1 - Diagnóstico y modo ligero visible para iPad/Android
+# ControlEvent v50.24 - Diagnóstico y modo ligero visible para iPad/Android
 
 Versión generada sobre la base estable v29.0 / v28.6.1.
 
@@ -8,7 +8,7 @@ La v29.0 funcionaba correctamente, incluido INFOEVENTO y BACKUP, pero seguía le
 
 ## Cambios principales
 
-- Versión visible actualizada a `ControlEvent v29.1`.
+- Versión visible actualizada a `ControlEvent v50.24`.
 - Nuevo arranque temprano `public/app/performance/low-resource-boot.js`.
 - Indicador visual inferior: `⚡ LITE ON` o `⚡ LITE OFF`.
 - Tocando el indicador se abre un panel de diagnóstico con:

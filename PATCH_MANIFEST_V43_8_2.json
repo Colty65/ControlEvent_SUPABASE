@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v43.8.2",
-  "base": "ControlEvent v43.8.1",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Menú móvil estable tras Planificación inicial.",
     "Versión unificada en scripts activos y descargas.",

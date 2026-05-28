@@ -1,7 +1,7 @@
 {
   "version": "v30.0",
   "base": "v29.4",
-  "appVersion": "ControlEvent v30.0",
+  "appVersion": "ControlEvent v50.24",
   "type": "functional",
   "changes": [
     "Nueva opción de menú: Mapa de productos",

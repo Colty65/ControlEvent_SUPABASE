@@ -1,4 +1,4 @@
-# ControlEvent v26.9 — Estabilización y diagnóstico modular
+# ControlEvent v50.24 — Estabilización y diagnóstico modular
 
 Esta versión continúa después de la v26.3. El plan inicial ya dejó creadas las capas de cálculo, vistas, mantenimiento, Excel/tickets y backend modular. La v26.9 no intenta borrar todavía código del `index.html`; añade una capa de comprobación para poder seguir desmontando el monolito con menos riesgo.
 

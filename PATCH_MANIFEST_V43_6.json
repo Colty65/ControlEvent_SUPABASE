@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v43.6",
-  "desde": "ControlEvent v43.5",
+  "version": "ControlEvent v50.24",
+  "desde": "ControlEvent v50.24",
   "tipo": "parche correctivo",
   "objetivo": "Eliminar el parpadeo de GRAFICAS y reducir gasto de recursos",
   "cambios": [

@@ -1,4 +1,4 @@
-ControlEvent v30.9 - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Sube el contenido de este ZIP al repositorio.
 
@@ -14,4 +14,4 @@ Si GitHub conserva archivos antiguos, no pasa nada si quedan, porque index.html 
 - public/app/features/mapa-recursos-v30.9.js
 - public/app/features/budget-tooltips-lite-v30.9.js
 
-Cache nuevo: controlevent-shell-v30-9
+Cache nuevo: controlevent-shell-v50-24
