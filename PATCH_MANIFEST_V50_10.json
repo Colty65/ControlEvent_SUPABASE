@@ -1,0 +1,27 @@
+{
+  "version": "50.10.0",
+  "base": "50.9.0",
+  "changes": [
+    "Logout no deja la pantalla borrosa ni body.auth-locked activo",
+    "El overlay de login se muestra limpio al salir",
+    "El dock móvil Salir/Refrescar se oculta al cerrar sesión",
+    "El bloque de justificante de INGRESOS se recoloca al extremo derecho del registro"
+  ],
+  "files_added": [
+    "public/app/features/v50-10-final-fixes.js",
+    "LEEME_SUBIDA_GITHUB_V50_10.txt",
+    "PATCH_MANIFEST_V50_10.json"
+  ],
+  "files_modified": [
+    "public/app/features/v50-8-final-fixes.js",
+    "public/app/features/v50-9-final-fixes.js",
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/diagnostics/build-metrics.json"
+  ]
+}

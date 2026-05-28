@@ -1,8 +1,8 @@
-/* ControlEvent v50.9 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
+/* ControlEvent v50.10 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.9';
-  const VERSION_FILE = 'ControlEvent_v50_9';
+  const VERSION = 'ControlEvent v50.10';
+  const VERSION_FILE = 'ControlEvent_v50_10';
   const $ = id => document.getElementById(id);
   const now = () => Date.now();
   let lastHomeAt = 0;

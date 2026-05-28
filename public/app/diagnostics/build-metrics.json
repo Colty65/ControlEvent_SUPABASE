@@ -1,14 +1,16 @@
 {
-  "version": "ControlEvent v50.9",
-  "base": "v50.8",
-  "notes": "v50.9: login interceptado antes de manejadores antiguos para ocultar authOverlay; bloque unico visible de justificante dentro de fichas de INGRESOS en movil/desktop usando las mismas claves que globos; sin temporizador permanente de version.",
+  "version": "ControlEvent v50.10",
+  "base": "v50.9",
+  "notes": "v50.10: Salir no deja pantalla borrosa; login se muestra limpio; justificante/adjuntar/borrar de INGRESOS recolocado al extremo derecho del registro.",
   "changed_files": [
+    "public/app/features/v50-8-final-fixes.js",
     "public/app/features/v50-9-final-fixes.js",
+    "public/app/features/v50-10-final-fixes.js",
     "public/index.html",
     "public/sw.js",
     "public/app/version.js",
     "package.json",
     "package-lock.json"
   ],
-  "build": "v50.9"
+  "build": "v50.10"
 }

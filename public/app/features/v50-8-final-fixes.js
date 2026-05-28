@@ -1,4 +1,4 @@
-/* ControlEvent v50.9 - correccion de estabilidad sin temporizadores de version.
+/* ControlEvent v50.10 - correccion de estabilidad sin temporizadores de version.
    - No se carga v50.7: se evita la restauracion agresiva de globos que los mandaba a la esquina.
    - Version unificada actualizando las constantes de los scripts cargados a v50.8.
    - Salir/Refrescar en movil se mueven a un dock real inferior, fuera del selector de evento.
@@ -7,14 +7,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.9';
-  const VERSION_FILE = 'ControlEvent_v50_9';
+  const VERSION = 'ControlEvent v50.10';
+  const VERSION_FILE = 'ControlEvent_v50_10';
   const INSTALLED = '__ceV508FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEY = 'ControlEvent_v26_9_session';
-  const LOGOUT_KEY = 'ControlEvent_v50_9_logout_at';
+  const LOGOUT_KEY = 'ControlEvent_v50_10_logout_at';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const BTN = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
   const PANEL = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
@@ -89,6 +89,8 @@
     style.textContent = `
       body.ce-authenticated-v508 #authOverlay{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;}
       body.ce-logged-out-v508 #authOverlay{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:200000!important;}
+      body.ce-logged-out-v508 .app,body.ce-logged-out-v508 .footer{filter:none!important;pointer-events:none!important;user-select:none!important;}
+      body.ce-logged-out-v508 #ceMobileActionDockV508{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       body.ce-role-ro-v508 #tabIngresosBtn,body.ce-role-ro-v508 #tabDonacionesBtn,body.ce-role-ro-v508 #tabComprasBtn,body.ce-role-ro-v508 #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       body.ce-role-ro-v508 #mainTabs.tabs{display:grid!important;grid-template-columns:repeat(3,48px)!important;justify-content:center!important;justify-items:center!important;gap:10px!important;overflow:visible!important;transition:none!important;animation:none!important;}
       body.ce-role-ro-v508 #tabResumenBtn{order:1!important;}body.ce-role-ro-v508 #tabMapaBtn{order:2!important;}body.ce-role-ro-v508 #tabGraficasBtn{order:3!important;}
@@ -205,7 +207,8 @@
     try{ if(window.ControlEventApp) window.ControlEventApp.authUser = null; }catch(_){ }
     document.body.classList.remove('ce-authenticated-v508','ce-role-ro-v508','ce-role-rw-v508','ce-role-gd-v508','ce-authenticated-v504','ce-role-ro-v504','ce-role-rw-v504','ce-role-gd-v504','mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
     document.documentElement.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
-    document.body.classList.add('auth-locked','ce-logged-out-v508');
+    document.body.classList.remove('auth-locked');
+    document.body.classList.add('ce-logged-out-v508');
     ['brandCurrentUserName','currentUserName'].forEach(id => { const el=$(id); if(el) el.textContent='Sin acceso'; });
     ['brandCurrentUserMeta','currentUserLevel'].forEach(id => { const el=$(id); if(el) el.textContent=''; });
     ['loginIdentificacion','loginClave','changeNewPassword1','changeNewPassword2'].forEach(id => { const el=$(id); if(el) el.value=''; });

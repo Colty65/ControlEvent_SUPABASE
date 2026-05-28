@@ -1,4 +1,4 @@
-/* ControlEvent v50.9 - correccion puntual sobre v50.8.
+/* ControlEvent v50.10 - correccion puntual sobre v50.8.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -6,14 +6,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.9';
-  const VERSION_FILE = 'ControlEvent_v50_9';
+  const VERSION = 'ControlEvent v50.10';
+  const VERSION_FILE = 'ControlEvent_v50_10';
   const INSTALLED = '__ceV509FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEY = 'ControlEvent_v26_9_session';
-  const LOGOUT_KEY_508 = 'ControlEvent_v50_9_logout_at';
+  const LOGOUT_KEY_508 = 'ControlEvent_v50_10_logout_at';
   const BACKUP_KEYS = ['ControlEvent_ingreso_receipts_v502','ControlEvent_ingreso_receipts_v468'];
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -109,9 +109,9 @@
       body.ce-v509-authenticated{filter:none!important;}
       body.ce-v509-authenticated .auth-overlay{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       #collabList .ce-v504-receipt-strip,#collabList .ce-v502-receipt-strip,#collabList .ce-v501-receipt-strip,#collabList .ce-v465-receipt-strip,#collabList .ce-v464-receipt-tools,#collabList .ce-ingreso-receipt-tools-v463{display:none!important;visibility:hidden!important;width:0!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;pointer-events:none!important;}
-      #collabList .ce-v509-receipt-field{display:flex!important;flex-direction:column!important;gap:4px!important;align-items:flex-start!important;justify-content:flex-end!important;min-width:112px!important;position:relative!important;z-index:20!important;}
+      #collabList .ce-v509-receipt-field{display:flex!important;flex-direction:column!important;gap:4px!important;align-items:flex-end!important;justify-content:flex-end!important;justify-self:end!important;min-width:118px!important;position:relative!important;z-index:20!important;order:98!important;margin-left:auto!important;text-align:right!important;}
       #collabList .ce-v509-receipt-field>label{font-size:11px!important;font-weight:800!important;color:#475569!important;line-height:1.15!important;}
-      #collabList .ce-v509-receipt-strip{display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;min-height:36px!important;white-space:nowrap!important;pointer-events:auto!important;touch-action:manipulation!important;}
+      #collabList .ce-v509-receipt-strip{display:inline-flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;min-height:36px!important;white-space:nowrap!important;pointer-events:auto!important;touch-action:manipulation!important;}
       #collabList .ce-v509-receipt-thumb,#collabList .ce-v509-receipt-btn{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;border-radius:10px!important;border:1px solid #cbd5e1!important;background:#fff!important;color:#0f172a!important;padding:0!important;margin:0!important;cursor:pointer!important;box-shadow:0 1px 3px rgba(15,23,42,.12)!important;position:relative!important;z-index:22!important;pointer-events:auto!important;touch-action:manipulation!important;font-size:18px!important;line-height:1!important;}
       #collabList .ce-v509-receipt-thumb img{width:32px!important;height:32px!important;display:block!important;object-fit:cover!important;border-radius:8px!important;pointer-events:none!important;}
       #collabList .ce-v509-receipt-btn.danger{background:#fee2e2!important;border-color:#fecaca!important;color:#991b1b!important;}
@@ -127,8 +127,8 @@
       .ce-v509-modal-img{max-width:100%!important;max-height:78vh!important;object-fit:contain!important;border-radius:13px!important;background:#f1f5f9!important;justify-self:center!important;align-self:center!important;}
       @media(max-width:900px){
         #collabList .rowline.collab{grid-template-columns:1fr!important;}
-        #collabList .ce-v509-receipt-field{min-width:0!important;width:100%!important;padding:6px 0 2px!important;}
-        #collabList .ce-v509-receipt-strip{width:100%!important;}
+        #collabList .ce-v509-receipt-field{min-width:0!important;width:100%!important;padding:6px 0 2px!important;align-items:flex-end!important;text-align:right!important;}
+        #collabList .ce-v509-receipt-strip{width:auto!important;max-width:100%!important;align-self:flex-end!important;justify-content:flex-end!important;}
         .ce-v509-modal-card{grid-template-columns:1fr!important;width:calc(100vw - 18px)!important;max-height:92vh!important;padding:10px!important;}
         .ce-v509-modal-img{max-height:58vh!important;}
       }
@@ -297,14 +297,10 @@
     field.className = 'field ce-v509-receipt-field';
     field.innerHTML = '<label>Justificante</label><div class="ce-v509-receipt-strip"></div>';
     const row = card.querySelector('.rowline.collab') || card.querySelector('.rowline') || card;
-    const fields = Array.from(row.querySelectorAll(':scope > .field'));
-    const ingresoField = fields.find(f => up(f.querySelector('label')?.textContent || '') === 'INGRESO');
-    if(ingresoField && ingresoField.parentNode === row) ingresoField.insertAdjacentElement('afterend', field);
-    else {
-      const actions = row.querySelector('button[data-action="save-collab"]')?.parentElement || row.querySelector('button[data-action="delete-collab"]')?.parentElement;
-      if(actions && actions.parentNode === row) row.insertBefore(field, actions);
-      else row.appendChild(field);
-    }
+    const actions = row.querySelector('button[data-action="save-collab"]')?.parentElement || row.querySelector('button[data-action="delete-collab"]')?.parentElement;
+    // v50.10: el justificante debe quedar al extremo derecho del registro, no en mitad de la ficha.
+    if(actions && actions.parentNode === row) actions.insertAdjacentElement('afterend', field);
+    else row.appendChild(field);
     return field;
   }
   function normalizeReceiptFields(){
