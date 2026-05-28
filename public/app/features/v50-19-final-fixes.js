@@ -1,4 +1,4 @@
-/* ControlEvent v50.21 - estabilización final de login, selección de evento y globos.
+/* ControlEvent v50.22 - estabilización final de login, selección de evento y globos.
    Objetivo: no sumar capas conflictivas. Se apoya en v44-7-event-switcher como único flujo de evento.
    - La app siempre arranca pidiendo login: se desactiva la reanudación automática por localStorage.
    - Tras login: pantalla CE grande + selector "Selecciona evento...", sin evento precargado.
@@ -8,8 +8,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.21';
-  const VERSION_FILE = 'ControlEvent_v50_21';
+  const VERSION = 'ControlEvent v50.22';
+  const VERSION_FILE = 'ControlEvent_v50_22';
   const INSTALLED = '__ceV5019FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -178,18 +178,10 @@
   }
   function showLogin(){
     removeSession(); clearChosen(); forgetEvent();
-    // v50.21: al salir se debe matar tambien el evento anterior.
-    // Si queda selectedEventId vivo, al entrar con otro usuario los mantenimientos
-    // programados montan Resumen/Graficas a medias antes de que el login termine.
-    try{ const s = st(); if(s) s.selectedEventId = ''; }catch(_){ }
-    try{ const sel = $('selectedEvent'); if(sel) sel.value = ''; }catch(_){ }
-    try{ setLexical('currentMainTab', 'graficas'); window.__ceCurrentMainTab = 'graficas'; }catch(_){ }
-    try{ clearDynamicPanels(); Object.values(PANEL_BY_TAB).forEach(id => $(id)?.classList.add('hidden')); }catch(_){ }
-    try{ const msg = $('noEventMessage'); if(msg){ msg.classList.add('hidden'); msg.style.removeProperty('display'); } }catch(_){ }
     setLexical('authUser', null); setLexical('authBusy', false);
     try{ window.authUser = null; }catch(_){ }
     try{ if(window.ControlEventApp) window.ControlEventApp.authUser = null; }catch(_){ }
-    try{ document.body.classList.remove('ce-v5019-authenticated','ce-v5019-has-event','ce-v5019-awaiting-event','ce-v5020-has-event','ce-v5021-awaiting-event','ce-v44-awaiting-event'); document.body.classList.add('ce-v5019-logged-out','auth-locked'); }catch(_){ }
+    try{ document.body.classList.remove('ce-v5019-authenticated','ce-v5019-has-event','ce-v5019-awaiting-event','ce-v44-awaiting-event'); document.body.classList.add('ce-v5019-logged-out','auth-locked'); }catch(_){ }
     const ov = $('authOverlay');
     if(ov){
       ov.classList.remove('hidden'); ov.removeAttribute('hidden'); ov.setAttribute('aria-hidden','false');

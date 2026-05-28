@@ -1,4 +1,4 @@
-/* ControlEvent v50.21 - ajuste quirurgico sobre v50.19.
+/* ControlEvent v50.22 - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
@@ -7,18 +7,18 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.21';
-  const VERSION_FILE = 'ControlEvent_v50_21';
+  const VERSION = 'ControlEvent v50.22';
+  const VERSION_FILE = 'ControlEvent_v50_22';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEYS = ['ControlEvent_v26_9_session'];
   const LOGOUT_KEYS = [
-    'ControlEvent_v50_21_logout_at',
-    'ControlEvent_v50_21_logout_at',
-    'ControlEvent_v50_21_logout_at',
-    'ControlEvent_v50_21_logout_at'
+    'ControlEvent_v50_22_logout_at',
+    'ControlEvent_v50_22_logout_at',
+    'ControlEvent_v50_22_logout_at',
+    'ControlEvent_v50_22_logout_at'
   ];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -107,12 +107,6 @@
     SESSION_KEYS.forEach(k => safe(() => localStorage.removeItem(k), null));
     safe(() => sessionStorage.removeItem('ce_v250_event_chosen'), null);
     safe(() => sessionStorage.removeItem('ce_event_chosen'), null);
-    safe(() => sessionStorage.removeItem('controlevent_v44_event_chosen_after_login'), null);
-    safe(() => sessionStorage.removeItem('ControlEvent_v25_event_chosen'), null);
-    safe(() => sessionStorage.removeItem('controlevent_v229_selected_event_id'), null);
-    safe(() => localStorage.removeItem('controlevent_v229_selected_event_id'), null);
-    try{ const s = getLexical('state') || window.state || window.ControlEventApp?.state; if(s) s.selectedEventId = ''; }catch(_){ }
-    try{ const sel = $('selectedEvent'); if(sel) sel.value = ''; }catch(_){ }
     setLexical('authUser', null);
     setLexical('accessUsers', []);
     setLexical('authBusy', false);

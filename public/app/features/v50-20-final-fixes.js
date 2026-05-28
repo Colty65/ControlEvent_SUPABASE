@@ -1,12 +1,12 @@
-/* ControlEvent v50.21 - refresco en sitio y cierre visual del flujo evento.
+/* ControlEvent v50.22 - refresco en sitio y cierre visual del flujo evento.
    Cambios funcionales concentrados:
    - Refres/Refrescar actualiza /api/state y repinta la ventana activa sin volver a CE ni cambiar a otra pestaña.
    - Al elegir/cargar evento se oculta de forma real la pantalla CE en móvil/iPad.
    - Visor de justificantes de globos visible por encima en iPad/iPhone, sin tocar justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.21';
-  const VERSION_FILE = 'ControlEvent_v50_21';
+  const VERSION = 'ControlEvent v50.22';
+  const VERSION_FILE = 'ControlEvent_v50_22';
   const INSTALLED = '__ceV5020FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -23,7 +23,7 @@
   const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);
   const setLexical = (name, value) => safe(() => Function('value', name + ' = value;')(value), undefined);
   const getFn = name => safe(() => (typeof window[name] === 'function') ? window[name] : Function('return (typeof '+name+' === "function") ? '+name+' : null;')(), null);
-  const call = (name, args) => { const fn = getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v50.21] Error en '+name, error); return undefined; } };
+  const call = (name, args) => { const fn = getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v50.20] Error en '+name, error); return undefined; } };
   const st = () => getLexical('state') || window.state || window.ControlEventApp?.state || {};
   const auth = () => getLexical('authUser') || window.authUser || window.ControlEventApp?.authUser || null;
   const arr = k => Array.isArray(st()[k]) ? st()[k] : [];
@@ -167,13 +167,13 @@
     const active = showOnlyTab(tab || currentTab());
     try{ window.ControlEventV447?.renderActive?.(active); }
     catch(error){
-      console.warn('[v50.21] renderActive fallback', error);
+      console.warn('[v50.20] renderActive fallback', error);
       call('renderHeader'); call('renderMainSelectors');
       if(active === 'ingresos'){ call('renderIngresosSummary'); call('renderColabs'); }
       else if(active === 'donaciones') call('renderDonaciones');
       else if(active === 'compras') call('renderCompras');
       else if(active === 'resumen') call('renderBudget');
-      else if(active === 'graficas') call('renderGraficas', [{force:true, reason:reason || 'v50.21'}]);
+      else if(active === 'graficas') call('renderGraficas', [{force:true, reason:reason || 'v50.20'}]);
       else if(active === 'mapa') call('renderMapaProductos');
       else if(active === 'planificacion') { try{ window.showPlanificacionInicial?.(); }catch(_){ } }
     }
@@ -201,7 +201,7 @@
       renderActiveOnly(keepTab, 'refresh-in-place');
       return false;
     }catch(error){
-      console.warn('[v50.21] Refres en sitio falló', error);
+      console.warn('[v50.20] Refres en sitio falló', error);
       renderActiveOnly(keepTab, 'refresh-fallback');
       return false;
     }finally{

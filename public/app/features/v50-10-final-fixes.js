@@ -1,18 +1,18 @@
-/* ControlEvent v50.21 - ajuste minimo sobre v50.9.
+/* ControlEvent v50.22 - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.21';
-  const VERSION_FILE = 'ControlEvent_v50_21';
+  const VERSION = 'ControlEvent v50.22';
+  const VERSION_FILE = 'ControlEvent_v50_22';
   const INSTALLED = '__ceV5010FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEYS = ['ControlEvent_v26_9_session'];
-  const LOGOUT_KEYS = ['ControlEvent_v50_21_logout_at','ControlEvent_v50_21_logout_at','ControlEvent_v50_21_logout_at'];
+  const LOGOUT_KEYS = ['ControlEvent_v50_22_logout_at','ControlEvent_v50_22_logout_at','ControlEvent_v50_22_logout_at'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const isMobile = () => safe(() => window.matchMedia('(max-width: 900px)').matches, innerWidth <= 900);
@@ -107,12 +107,6 @@
     LOGOUT_KEYS.forEach(k => safe(() => sessionStorage.setItem(k, String(Date.now())), null));
     SESSION_KEYS.forEach(k => safe(() => localStorage.removeItem(k), null));
     safe(() => sessionStorage.removeItem('ce_v250_event_chosen'), null);
-    safe(() => sessionStorage.removeItem('controlevent_v44_event_chosen_after_login'), null);
-    safe(() => sessionStorage.removeItem('ControlEvent_v25_event_chosen'), null);
-    safe(() => sessionStorage.removeItem('controlevent_v229_selected_event_id'), null);
-    safe(() => localStorage.removeItem('controlevent_v229_selected_event_id'), null);
-    try{ const s = getLexical('state') || window.state || window.ControlEventApp?.state; if(s) s.selectedEventId = ''; }catch(_){ }
-    try{ const sel = $('selectedEvent'); if(sel) sel.value = ''; }catch(_){ }
     setLexical('authUser', null);
     try{ window.authUser = null; }catch(_){ }
     try{ window.__CONTROL_EVENT_USER__ = null; }catch(_){ }
