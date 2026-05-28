@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.15",
+  "version": "ControlEvent v50.16",
   "base": "v50.13",
-  "notes": "v50.15: no toca justificantes de INGRESOS/tickets; retira forzado de seleccion de evento de v50.13; restaura globos de Resumen Presupuestario con tabla + Just.; evita apertura automatica de primera foto; dock movil Refres/Salir abajo derecha; limpia parpadeo/negrita de PRODUCTOS; cache/version v50.15.",
+  "notes": "v50.16: no toca justificantes de INGRESOS/tickets; retira forzado de seleccion de evento de v50.13; restaura globos de Resumen Presupuestario con tabla + Just.; evita apertura automatica de primera foto; dock movil Refres/Salir abajo derecha; limpia parpadeo/negrita de PRODUCTOS; cache/version v50.16.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v50.15"
+  "build": "v50.16"
 }

@@ -1,4 +1,4 @@
-/* ControlEvent v50.15 - entrada limpia tras login y proteccion de globos.
+/* ControlEvent v50.16 - entrada limpia tras login y proteccion de globos.
    - Tras /api/login, el primer /api/state se entrega con selectedEventId='' para obligar a elegir evento.
    - Pantalla neutra con logo CE y selector EVENTO en "Selecciona evento..." hasta que el usuario elija.
    - Evita que en iPhone/iPad el toque que abre el globo de Resumen dispare automaticamente la primera foto.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.15';
-  const VERSION_FILE = 'ControlEvent_v50_15';
+  const VERSION = 'ControlEvent v50.16';
+  const VERSION_FILE = 'ControlEvent_v50_16';
   const INSTALLED = '__ceV5015FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -72,6 +72,11 @@
   }
   function mustForcePicker(){
     if(!authRef()) return false;
+    // v50.16: si el usuario ya ha elegido un evento valido, no seguir forzando selectedEventId=''
+    // en futuras llamadas a /api/state. Esto evitaba que Refres volviera a la pantalla inicial
+    // y podia dejar los globos sin inicializar tras elegir evento.
+    const selected = String(stateRef().selectedEventId || document.getElementById('selectedEvent')?.value || '');
+    if(selected && hasValidEvent(selected)){ clearForcePicker(); return false; }
     if(safe(() => sessionStorage.getItem(FORCE_KEY), '')) return true;
     return !stateForcedOnce && loginStateWindowUntil && now() < loginStateWindowUntil;
   }

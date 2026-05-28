@@ -1,15 +1,15 @@
-/* ControlEvent v50.15 - correccion conservadora sobre v50.15.
-   - Retira efectos de v50.15: no fuerza seleccion de evento tras login para no dejar datos a medias.
+/* ControlEvent v50.16 - correccion conservadora sobre v50.16.
+   - Retira efectos de v50.16: no fuerza seleccion de evento tras login para no dejar datos a medias.
    - Recupera globos de Resumen Presupuestario con tabla + columna final Just. del sistema v46.9.
    - Evita apertura automatica de la primera foto en moviles/iPad: solo se abre justificante al tocar la miniatura Just.
    - Dock movil Refres/Salir, uno encima de otro, abajo derecha pegado al margen.
    - Limpieza visual de PRODUCTOS sin observadores ni bucles.
-   - Version: ControlEvent v50.15.
+   - Version: ControlEvent v50.16.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.15';
-  const VERSION_FILE = 'ControlEvent_v50_15';
+  const VERSION = 'ControlEvent v50.16';
+  const VERSION_FILE = 'ControlEvent_v50_16';
   const INSTALLED = '__ceV5014FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

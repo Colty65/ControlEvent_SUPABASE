@@ -1,18 +1,18 @@
-/* ControlEvent v50.15 - ajuste minimo sobre v50.9.
+/* ControlEvent v50.16 - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.15';
-  const VERSION_FILE = 'ControlEvent_v50_15';
+  const VERSION = 'ControlEvent v50.16';
+  const VERSION_FILE = 'ControlEvent_v50_16';
   const INSTALLED = '__ceV5010FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEYS = ['ControlEvent_v26_9_session'];
-  const LOGOUT_KEYS = ['ControlEvent_v50_15_logout_at','ControlEvent_v50_9_logout_at','ControlEvent_v50_8_logout_at'];
+  const LOGOUT_KEYS = ['ControlEvent_v50_16_logout_at','ControlEvent_v50_9_logout_at','ControlEvent_v50_8_logout_at'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const isMobile = () => safe(() => window.matchMedia('(max-width: 900px)').matches, innerWidth <= 900);
@@ -160,7 +160,7 @@
     // En movil, si quedaron estilos inline del dock anterior tras salir, se limpiarán al salir con showLoginClean.
   }
 
-  // Captura temprana: el listener de v50.15 puede dispararse antes; por eso tambien se ha corregido directamente v50-8-final-fixes.js.
+  // Captura temprana: el listener de v50.16 puede dispararse antes; por eso tambien se ha corregido directamente v50-8-final-fixes.js.
   window.addEventListener('click', ev => { if(ev.target?.closest?.('#btnLogout')) return cleanLogout(ev); }, {capture:true, passive:false});
   window.addEventListener('touchend', ev => { if(ev.target?.closest?.('#btnLogout')) return cleanLogout(ev); }, {capture:true, passive:false});
   window.addEventListener('click', () => setTimeout(moveIngresoReceiptFields, 30), true);
