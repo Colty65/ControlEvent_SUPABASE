@@ -1,14 +1,14 @@
-/* ControlEvent v50.24 - selector de evento unificado y render activo único.
+/* ControlEvent v50.25 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v50.25';
+  const VERSION_FILE = 'ControlEvent_v50_25';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
-  const OLD_CHOSEN_KEY = 'ControlEvent_v50_24_event_chosen';
+  const OLD_CHOSEN_KEY = 'ControlEvent_v50_25_event_chosen';
   const STORAGE_FALLBACK = 'controlevent_v6_4';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
@@ -369,7 +369,7 @@
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       try{ authUser = data.user; }catch(_){ }
       window.authUser = data.user;
-      try{ localStorage.setItem('ControlEvent_v50_24_session', JSON.stringify(data.user || null)); }catch(_){ }
+      try{ localStorage.setItem('ControlEvent_v50_25_session', JSON.stringify(data.user || null)); }catch(_){ }
       const c = $('loginClave'); if(c) c.value = '';
       try{ st().selectedEventId = ''; }catch(_){ }
       clearChosen();
@@ -476,6 +476,39 @@
     if(typeof stable === 'function') return stable({force:true, reason:'v45.4-active-only'});
     return call('renderGraficas');
   }
+  function markEventReadyForTips(reason){
+    if(!auth() || !hasValidEvent()) return;
+    try{
+      document.body.classList.remove(
+        'auth-locked',
+        'ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5018-awaiting-event',
+        'ce-v5019-awaiting-event','ce-v5021-awaiting-event','ce-v5022-awaiting-event','ce-v5024-awaiting-event','ce-v5025-awaiting-event',
+        'ce-v5019-logged-out','ce-v5022-logged-out'
+      );
+      document.body.classList.add('ce-v5019-authenticated','ce-v5020-has-event','ce-v5022-has-event','ce-v5025-has-event');
+    }catch(_){ }
+    const msg = $('noEventMessage');
+    if(msg){
+      msg.classList.add('hidden');
+      msg.setAttribute('aria-hidden','true');
+      msg.style.setProperty('display','none','important');
+      msg.style.setProperty('visibility','hidden','important');
+      msg.style.setProperty('pointer-events','none','important');
+      msg.style.setProperty('max-height','0','important');
+      msg.style.setProperty('overflow','hidden','important');
+    }
+    const run = () => {
+      if(!auth() || !hasValidEvent()) return;
+      try{ window.ControlEventBudgetLiteTips?.sanitize?.(); }catch(_){ }
+      try{ window.ControlEventV469?.hydrateEventReceipts?.(false); }catch(_){ }
+      try{ window.ControlEventV469?.compactIngresoReceipts?.(); }catch(_){ }
+      try{ window.ControlEventV469?.enrichOpenTooltips?.(); }catch(_){ }
+      try{ window.ControlEventV467?.enrichOpenTooltips?.(); }catch(_){ }
+      try{ window.dispatchEvent(new CustomEvent('controlevent:event-ready', {detail:{eventId:currentEventId(), tab:currentTab(), reason:reason || 'v50.25'}})); }catch(_){ }
+      applyVersion();
+    };
+    [0,80,220,520,1000,1800].forEach(ms => setTimeout(run, ms));
+  }
   function renderActive(tab){
     if(!hasValidEvent()) return;
     const requested = tab || currentTab();
@@ -499,6 +532,7 @@
     call('renderPermissions');
     call('renderLockState');
     finishTransition();
+    markEventReadyForTips('renderActive:'+active);
     applyVersion();
   }
   function queueActive(tab, token, options = {}){
@@ -739,6 +773,7 @@
     selectEvent,
     render: renderV447,
     renderActive,
+    markEventReadyForTips,
     state: transition
   };
 

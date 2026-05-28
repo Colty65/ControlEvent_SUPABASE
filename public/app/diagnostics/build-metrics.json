@@ -1,8 +1,8 @@
 {
-  "version": "50.24.0",
+  "version": "50.25.0",
   "base": "v50.13",
   "notes": "v50.19: retira de carga las dos capas anteriores que interferian en el flujo de evento; login -> CE sin evento -> eleccion de evento -> rehidratacion completa; Refres conserva evento/pestana; visor ligero para Just. en globos de Resumen sin tocar justificantes de INGRESOS; version/caches unificadas.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
   "build": "v50.19",
-  "versionLabel": "ControlEvent v50.24"
+  "versionLabel": "ControlEvent v50.25"
 }

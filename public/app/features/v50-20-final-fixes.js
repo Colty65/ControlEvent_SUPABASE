@@ -1,12 +1,12 @@
-/* ControlEvent v50.24 - refresco en sitio y cierre visual del flujo evento.
+/* ControlEvent v50.25 - refresco en sitio y cierre visual del flujo evento.
    Cambios funcionales concentrados:
    - Refres/Refrescar actualiza /api/state y repinta la ventana activa sin volver a CE ni cambiar a otra pestaña.
    - Al elegir/cargar evento se oculta de forma real la pantalla CE en móvil/iPad.
    - Visor de justificantes de globos visible por encima en iPad/iPhone, sin tocar justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v50.25';
+  const VERSION_FILE = 'ControlEvent_v50_25';
   const INSTALLED = '__ceV5020FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
