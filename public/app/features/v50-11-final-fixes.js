@@ -1,24 +1,24 @@
-/* ControlEvent v50.18 - ajuste quirurgico sobre v50.18.
+/* ControlEvent v50.19 - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
-   - Version: fija una unica version visible sin cargar v50.18.
+   - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
    - No toca el visor ni el flujo de fotos de INGRESOS/tickets.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.18';
-  const VERSION_FILE = 'ControlEvent_v50_18';
+  const VERSION = 'ControlEvent v50.19';
+  const VERSION_FILE = 'ControlEvent_v50_19';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEYS = ['ControlEvent_v26_9_session'];
   const LOGOUT_KEYS = [
-    'ControlEvent_v50_18_logout_at',
-    'ControlEvent_v50_10_logout_at',
-    'ControlEvent_v50_9_logout_at',
-    'ControlEvent_v50_8_logout_at'
+    'ControlEvent_v50_19_logout_at',
+    'ControlEvent_v50_19_logout_at',
+    'ControlEvent_v50_19_logout_at',
+    'ControlEvent_v50_19_logout_at'
   ];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };

@@ -1,4 +1,4 @@
-/* ControlEvent v50.18 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.19 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.18';
-  const VERSION_FILE = 'ControlEvent_v50_18';
+  const VERSION = 'ControlEvent v50.19';
+  const VERSION_FILE = 'ControlEvent_v50_19';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -236,10 +236,12 @@
   function closeReceiptModal(ov, snapshot, ev){
     stop(ev || {});
     try{ if(ov && ov.__ceKeepTooltipTimer) clearInterval(ov.__ceKeepTooltipTimer); }catch(_){ }
-    try{ ov.remove(); }catch(_){ }
+    document.querySelectorAll('.ce-v468-modal').forEach(modal => {
+      try{ if(modal.__ceKeepTooltipTimer) clearInterval(modal.__ceKeepTooltipTimer); modal.remove(); }catch(_){ }
+    });
     document.body.classList.remove('ce-v468-preserve-tooltips');
-    restoreTooltipSnapshot(snapshot || lastTooltipSnapshot);
-    [0,40,120,240].forEach(ms => setTimeout(() => { try{ enrichOpenTooltips(); restoreTooltipSnapshot(snapshot || lastTooltipSnapshot); }catch(_){ } }, ms));
+    // Restauración única del globo origen: sin intervalos ni reintentos que lo relancen al cerrar o perder foco.
+    try{ restoreTooltipSnapshot(snapshot || lastTooltipSnapshot); enrichOpenTooltips(); }catch(_){ }
     return false;
   }
   function showReceiptModal(id, ev){
@@ -263,12 +265,9 @@
       </tbody></table></div>
       <img class="ce-v468-modal-img" alt="Justificante de ingreso" src="${esc(src)}">
     </div>`;
+    document.querySelectorAll('.ce-v468-modal').forEach(modal => { try{ if(modal.__ceKeepTooltipTimer) clearInterval(modal.__ceKeepTooltipTimer); modal.remove(); }catch(_){ } });
     document.body.appendChild(ov);
-    // v50.1: mantener vivo/restaurado el globo origen mientras el visor esta encima.
-    try{
-      ov.__ceKeepTooltipTimer = setInterval(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), 250);
-      [20,90,220,520].forEach(ms => setTimeout(() => restoreTooltipSnapshot(snapshot || lastTooltipSnapshot), ms));
-    }catch(_){ }
+    // v50.19: sin temporizador de restauración permanente; era la causa de globos que volvían a lanzarse y cierres dobles.
     ov.addEventListener('pointerdown', e => { try{ e.stopPropagation(); e.stopImmediatePropagation(); }catch(_){ } }, true);
     ov.addEventListener('wheel', e => { try{ e.stopPropagation(); }catch(_){ } }, true);
     ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) return closeReceiptModal(ov, snapshot, e); try{ e.stopPropagation(); }catch(_){ } }, true);
@@ -374,7 +373,7 @@
   }
   function enrichOpenTooltips(){ enrichGraphTooltip(); enrichBudgetTooltip(); dedupeReceiptThumbColumns(); }
 
-  // v50.18: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
+  // v50.19: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
   // y registros en negrita aleatoria al modificar. La gestión de justificantes queda intacta.
   const modifiedProducts = new Set();
   function productNodes(id){ return []; }

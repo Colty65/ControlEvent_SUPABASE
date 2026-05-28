@@ -10,20 +10,20 @@
   'use strict';
   const VERSION = 'ControlEvent v50.19';
   const VERSION_FILE = 'ControlEvent_v50_19';
-  const INSTALLED = '__ceV5018FinalFixes';
+  const INSTALLED = '__ceV5019FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const SESSION_KEY = 'ControlEvent_v26_9_session';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const DOCK_ID = 'ceMobileActionDockV518';
-  const STYLE_ID = 'ceV5018FinalStyle';
+  const STYLE_ID = 'ceV5019FinalStyle';
   const BUDGET_TIP_ID = 'ceBudgetLiteTooltipV307';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
   const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
   const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v25_event_chosen','ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event'];
-  const AWAITING_CLASSES = ['ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5018-awaiting-event'];
+  const AWAITING_CLASSES = ['ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5019-awaiting-event'];
   const OLD_DOCKS = ['ceMobileActionDockV508','ceMobileActionDockV514','ceMobileActionDockV517'];
 
   const $ = id => document.getElementById(id);
@@ -79,14 +79,14 @@
       #${DOCK_ID}{display:none;visibility:hidden;position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 1px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 2px)!important;left:auto!important;top:auto!important;z-index:190000!important;flex-direction:column!important;gap:2px!important;align-items:flex-end!important;justify-content:flex-end!important;opacity:.58!important;pointer-events:none!important;}
       #${DOCK_ID}:active,#${DOCK_ID}:focus-within{opacity:.98!important;}
       #${DOCK_ID} button{pointer-events:auto!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;width:52px!important;min-width:52px!important;height:27px!important;min-height:27px!important;border-radius:999px!important;border:1px solid rgba(15,23,42,.16)!important;background:rgba(255,255,255,.72)!important;color:#111827!important;box-shadow:0 4px 12px rgba(15,23,42,.14)!important;font-size:10px!important;font-weight:900!important;line-height:1!important;margin:0!important;padding:0 5px!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;}
-      body.auth-locked #${DOCK_ID},body.ce-v5018-logged-out #${DOCK_ID},body:not(.ce-v5018-authenticated) #${DOCK_ID}{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.auth-locked #${DOCK_ID},body.ce-v5019-logged-out #${DOCK_ID},body:not(.ce-v5019-authenticated) #${DOCK_ID}{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       @media(min-width:901px){#${DOCK_ID}{display:none!important;visibility:hidden!important;}}
-      body.ce-v5018-awaiting-event #noEventMessage{display:flex!important;align-items:center!important;justify-content:center!important;min-height:48vh!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;}
-      body.ce-v5018-awaiting-event #selectedEvent{outline:2px solid rgba(245,158,11,.72)!important;box-shadow:0 0 0 4px rgba(245,158,11,.14)!important;}
-      .ce-v5018-welcome{width:min(560px,92vw);margin:22px auto;text-align:center;padding:30px 22px;border-radius:28px;background:rgba(255,255,255,.92);box-shadow:0 20px 50px rgba(15,23,42,.12);border:1px solid rgba(148,163,184,.22);}
-      .ce-v5018-welcome img{display:block;width:min(220px,52vw);height:auto;margin:0 auto 18px auto;border-radius:34px;filter:drop-shadow(0 16px 28px rgba(15,23,42,.24));}
-      .ce-v5018-welcome h2{margin:0 0 8px 0;font-size:clamp(21px,3.2vw,31px);letter-spacing:-.02em;color:#0f172a;}
-      .ce-v5018-welcome p{margin:0;color:#475569;font-size:15px;line-height:1.45;}
+      body.ce-v5019-awaiting-event #noEventMessage{display:flex!important;align-items:center!important;justify-content:center!important;min-height:48vh!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;}
+      body.ce-v5019-awaiting-event #selectedEvent{outline:2px solid rgba(245,158,11,.72)!important;box-shadow:0 0 0 4px rgba(245,158,11,.14)!important;}
+      .ce-v5019-welcome{width:min(560px,92vw);margin:22px auto;text-align:center;padding:30px 22px;border-radius:28px;background:rgba(255,255,255,.92);box-shadow:0 20px 50px rgba(15,23,42,.12);border:1px solid rgba(148,163,184,.22);}
+      .ce-v5019-welcome img{display:block;width:min(220px,52vw);height:auto;margin:0 auto 18px auto;border-radius:34px;filter:drop-shadow(0 16px 28px rgba(15,23,42,.24));}
+      .ce-v5019-welcome h2{margin:0 0 8px 0;font-size:clamp(21px,3.2vw,31px);letter-spacing:-.02em;color:#0f172a;}
+      .ce-v5019-welcome p{margin:0;color:#475569;font-size:15px;line-height:1.45;}
       #${BUDGET_TIP_ID}.open{pointer-events:auto!important;z-index:4200!important;}
       #${BUDGET_TIP_ID} .ce-budget-lite-close{position:sticky!important;top:0!important;float:right!important;z-index:14!important;min-width:44px!important;min-height:44px!important;font-size:26px!important;line-height:1!important;touch-action:manipulation!important;}
       #${BUDGET_TIP_ID} .ce-budget-lite-table-wrap{overflow:auto!important;-webkit-overflow-scrolling:touch!important;max-width:100%!important;}
@@ -152,15 +152,15 @@
     clearChosen(); forgetEvent();
     injectStyle(); applyVersion(); ensureEventPlaceholder();
     try{
-      document.body.classList.remove('auth-locked','ce-v5018-logged-out','ce-v5018-has-event');
-      document.body.classList.add('ce-v5018-authenticated','ce-v5018-awaiting-event','ce-v44-awaiting-event');
+      document.body.classList.remove('auth-locked','ce-v5019-logged-out','ce-v5019-has-event');
+      document.body.classList.add('ce-v5019-authenticated','ce-v5019-awaiting-event','ce-v44-awaiting-event');
       ['ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event'].forEach(c => document.body.classList.remove(c));
     }catch(_){ }
     Object.values(PANEL_BY_TAB).forEach(id => $(id)?.classList.add('hidden'));
     const msg = $('noEventMessage');
     if(msg){
       msg.classList.remove('hidden');
-      msg.innerHTML = '<div class="ce-v5018-welcome"><img src="./assets/icons/controlevent-welcome-v44.png" alt="ControlEvent"><h2>Selecciona un evento para trabajar</h2><p>Elige el evento en el desplegable superior para cargar los datos y activar todos los globos.</p></div>';
+      msg.innerHTML = '<div class="ce-v5019-welcome"><img src="./assets/icons/controlevent-welcome-v44.png" alt="ControlEvent"><h2>Selecciona un evento para trabajar</h2><p>Elige el evento en el desplegable superior para cargar los datos y activar todos los globos.</p></div>';
     }
     clearDynamicPanels();
     ensureMobileDock();
@@ -169,7 +169,7 @@
   }
   function hideLoginOverlay(){
     if(!auth()) return;
-    try{ document.body.classList.remove('auth-locked','ce-v5018-logged-out'); document.body.classList.add('ce-v5018-authenticated'); }catch(_){ }
+    try{ document.body.classList.remove('auth-locked','ce-v5019-logged-out'); document.body.classList.add('ce-v5019-authenticated'); }catch(_){ }
     const ov = $('authOverlay');
     if(ov){
       ov.classList.add('hidden'); ov.setAttribute('aria-hidden','true');
@@ -181,7 +181,7 @@
     setLexical('authUser', null); setLexical('authBusy', false);
     try{ window.authUser = null; }catch(_){ }
     try{ if(window.ControlEventApp) window.ControlEventApp.authUser = null; }catch(_){ }
-    try{ document.body.classList.remove('ce-v5018-authenticated','ce-v5018-has-event','ce-v5018-awaiting-event','ce-v44-awaiting-event'); document.body.classList.add('ce-v5018-logged-out','auth-locked'); }catch(_){ }
+    try{ document.body.classList.remove('ce-v5019-authenticated','ce-v5019-has-event','ce-v5019-awaiting-event','ce-v44-awaiting-event'); document.body.classList.add('ce-v5019-logged-out','auth-locked'); }catch(_){ }
     const ov = $('authOverlay');
     if(ov){
       ov.classList.remove('hidden'); ov.removeAttribute('hidden'); ov.setAttribute('aria-hidden','false');
@@ -195,8 +195,8 @@
   }
 
   function patchFetchForLoginState(){
-    if(window.__ceV5018FetchPatched || typeof window.fetch !== 'function') return;
-    window.__ceV5018FetchPatched = true;
+    if(window.__ceV5019FetchPatched || typeof window.fetch !== 'function') return;
+    window.__ceV5019FetchPatched = true;
     const oldFetch = window.fetch.bind(window);
     window.fetch = function(input, init){
       const url = String((input && input.url) || input || '');
@@ -240,20 +240,20 @@
     return false;
   }
   function observeBudgetOpen(){
-    if(window.__ceV5018BudgetOpenObserver) return;
-    window.__ceV5018BudgetOpenObserver = true;
+    if(window.__ceV5019BudgetOpenObserver) return;
+    window.__ceV5019BudgetOpenObserver = true;
     try{
       const mo = new MutationObserver(() => {
         const box = $(BUDGET_TIP_ID);
-        if(box && box.classList.contains('open') && !box.dataset.ceV5018OpenedAt) box.dataset.ceV5018OpenedAt = String(Date.now());
-        if(box && !box.classList.contains('open')) delete box.dataset.ceV5018OpenedAt;
+        if(box && box.classList.contains('open') && !box.dataset.ceV5019OpenedAt) box.dataset.ceV5019OpenedAt = String(Date.now());
+        if(box && !box.classList.contains('open')) delete box.dataset.ceV5019OpenedAt;
       });
       mo.observe(document.documentElement, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
     }catch(_){ }
   }
   function openBudgetReceiptThumb(btn, ev){
     const box = $(BUDGET_TIP_ID);
-    const openedAt = Number(box?.dataset?.ceV5018OpenedAt || 0);
+    const openedAt = Number(box?.dataset?.ceV5019OpenedAt || 0);
     // Evita que el mismo toque que abre el globo caiga accidentalmente sobre la primera miniatura.
     if(openedAt && Date.now() - openedAt < 650) return stop(ev);
     if(Date.now() - lastThumbOpenAt < 500) return stop(ev);
@@ -269,8 +269,9 @@
     const close = ev?.target?.closest?.('.ce-v468-modal [data-close]');
     if(!modal || !close) return undefined;
     stop(ev);
-    safe(() => modal.remove(), null);
-    safe(() => window.ControlEventV469?.enrichOpenTooltips?.(), null);
+    try{ if(modal.__ceKeepTooltipTimer) clearInterval(modal.__ceKeepTooltipTimer); }catch(_){ }
+    try{ document.body.classList.remove('ce-v468-preserve-tooltips'); }catch(_){ }
+    document.querySelectorAll('.ce-v468-modal').forEach(m => { try{ if(m.__ceKeepTooltipTimer) clearInterval(m.__ceKeepTooltipTimer); m.remove(); }catch(_){ } });
     return false;
   }
 
@@ -298,8 +299,8 @@
   function finalizeSelectedEvent(id, reason){
     if(!hasValidEvent(id)) return;
     try{
-      document.body.classList.remove(...AWAITING_CLASSES, 'auth-locked','ce-v5018-logged-out');
-      document.body.classList.add('ce-v5018-authenticated','ce-v5018-has-event');
+      document.body.classList.remove(...AWAITING_CLASSES, 'auth-locked','ce-v5019-logged-out');
+      document.body.classList.add('ce-v5019-authenticated','ce-v5019-has-event');
     }catch(_){ }
     const msg = $('noEventMessage'); if(msg) msg.classList.add('hidden');
     const s = st(); if(s) s.selectedEventId = String(id);
@@ -320,7 +321,7 @@
   }
   function patchChangeSelected(){
     const old = getFn('changeSelectedEvent') || window.changeSelectedEvent;
-    if(typeof old !== 'function' || old.__ceV5018Wrapped) return;
+    if(typeof old !== 'function' || old.__ceV5019Wrapped) return;
     const wrapped = function(value){
       const id = String(value || '');
       if(!id || !eventById(id)){
@@ -333,7 +334,7 @@
       finally{ afterEventSelected(id, 'changeSelectedEvent'); }
       return ret;
     };
-    wrapped.__ceV5018Wrapped = true;
+    wrapped.__ceV5019Wrapped = true;
     setLexical('changeSelectedEvent', wrapped);
     window.changeSelectedEvent = wrapped;
     try{ if(window.ControlEventApp?.actions) window.ControlEventApp.actions.changeSelectedEvent = wrapped; }catch(_){ }
@@ -380,24 +381,20 @@
       document.body.appendChild(dock);
     }
     const show = isMobileLike() && !!auth() && !document.body?.classList.contains('auth-locked');
-    try{ document.body.classList.toggle('ce-v5018-authenticated', !!auth() && !document.body.classList.contains('auth-locked')); }catch(_){ }
+    try{ document.body.classList.toggle('ce-v5019-authenticated', !!auth() && !document.body.classList.contains('auth-locked')); }catch(_){ }
     dock.style.setProperty('display', show ? 'flex' : 'none', 'important');
     dock.style.setProperty('visibility', show ? 'visible' : 'hidden', 'important');
   }
 
   function installHandlers(){
-    if(window.__ceV5018Handlers) return;
-    window.__ceV5018Handlers = true;
+    if(window.__ceV5019Handlers) return;
+    window.__ceV5019Handlers = true;
     ['click','touchend','pointerup'].forEach(type => {
       window.addEventListener(type, ev => {
         if(ev.target?.closest?.('#ceBtnRefresV518')) return refreshHere(ev);
         if(ev.target?.closest?.('#ceBtnSalirV518,#btnLogout')) return logout(ev);
-        const close = ev.target?.closest?.('.ce-v468-modal [data-close]');
-        if(close) return closeReceiptModal(ev);
         const closeBudget = ev.target?.closest?.(`#${BUDGET_TIP_ID} .ce-budget-lite-close`);
         if(closeBudget) return closeBudgetTooltip(ev);
-        const thumb = ev.target?.closest?.(`#${BUDGET_TIP_ID} .ce-v465-tip-thumb,#ceTooltipV21 .ce-v465-tip-thumb`);
-        if(thumb) return openBudgetReceiptThumb(thumb, ev);
       }, {capture:true, passive:false});
     });
     document.addEventListener('change', ev => {
@@ -424,7 +421,7 @@
     observeBudgetOpen();
     ensureMobileDock();
     // Si una sesión fue reanudada por el legacy antes de que este parche cargara, se devuelve a login.
-    if(auth() && !loginFlowActiveUntil && Date.now() < (window.__ceV5018BootAt || 0) + 6500){
+    if(auth() && !loginFlowActiveUntil && Date.now() < (window.__ceV5019BootAt || 0) + 6500){
       showLogin();
       return;
     }
@@ -437,7 +434,7 @@
     }
   }
 
-  window.__ceV5018BootAt = Date.now();
+  window.__ceV5019BootAt = Date.now();
   function install(){
     removeSession(); applyVersion(); injectStyle(); patchFetchForLoginState(); patchChangeSelected(); installHandlers(); observeBudgetOpen(); ensureMobileDock();
     if(auth()) hideLoginOverlay();
@@ -447,5 +444,5 @@
 
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,250,650,1400,2600,4800].forEach(ms => setTimeout(() => { bootGuard(); install(); }, ms));
-  window.ControlEventV5018 = {version:VERSION, versionFile:VERSION_FILE, install, showAwaitingEvent, afterEventSelected, refreshHere, logout, applyVersion, ensureMobileDock};
+  window.ControlEventV5019 = {version:VERSION, versionFile:VERSION_FILE, install, showAwaitingEvent, afterEventSelected, refreshHere, logout, applyVersion, ensureMobileDock};
 })();
