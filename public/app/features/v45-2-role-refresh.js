@@ -1,4 +1,4 @@
-/* ControlEvent v50.19 - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v50.20 - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
    - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.19';
-  const VERSION_FILE = 'ControlEvent_v50_19';
+  const VERSION = 'ControlEvent v50.20';
+  const VERSION_FILE = 'ControlEvent_v50_20';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',
@@ -258,6 +258,9 @@
     return target;
   }
   async function refreshActive(reason){
+    if(window.ControlEventV5020 && typeof window.ControlEventV5020.refreshInPlace === 'function'){
+      return window.ControlEventV5020.refreshInPlace();
+    }
     if(refreshState.busy){ softNotice('Ya se está refrescando...'); return false; }
     if(!auth()){ softNotice('No hay usuario identificado.'); return false; }
     const btn = $('btnSoftRefresh');

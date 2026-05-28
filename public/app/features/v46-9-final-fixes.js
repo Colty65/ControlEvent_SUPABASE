@@ -1,4 +1,4 @@
-/* ControlEvent v50.19 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.20 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.19';
-  const VERSION_FILE = 'ControlEvent_v50_19';
+  const VERSION = 'ControlEvent v50.20';
+  const VERSION_FILE = 'ControlEvent_v50_20';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -425,6 +425,6 @@
   document.addEventListener('click', () => setTimeout(enrichOpenTooltips, 40), true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,260,700,1500,3000,6000].forEach(ms => setTimeout(install, ms));
-  setInterval(() => { hydrateEventReceipts(false); compactIngresoReceipts(); enrichOpenTooltips(); applyProductBold(); applyVersion(); }, 2200);
-  window.ControlEventV469 = {version:VERSION, versionFile:VERSION_FILE, hydrateEventReceipts, migrateLocalIngresoReceipts, compactIngresoReceipts, showReceiptModal, applyProductBold};
+  setInterval(() => { if(document.querySelector('.ce-v468-modal')) return; hydrateEventReceipts(false); compactIngresoReceipts(); enrichOpenTooltips(); applyProductBold(); applyVersion(); }, window.ControlEventLowResource?.interval?.(12000) || 12000);
+  window.ControlEventV469 = {version:VERSION, versionFile:VERSION_FILE, hydrateEventReceipts, migrateLocalIngresoReceipts, compactIngresoReceipts, enrichOpenTooltips, showReceiptModal, applyProductBold};
 })();

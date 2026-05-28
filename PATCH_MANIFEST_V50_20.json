@@ -1,0 +1,26 @@
+{
+  "version": "v50.20",
+  "base": "v50.19",
+  "date": "2026-05-28",
+  "summary": "Refresco en sitio sin volver a pantalla CE; cierre real de pantalla CE al cargar evento; estabilizacion del visor de justificantes en globos de Graficas/Resumen para iPad/moviles; version y cache unificadas.",
+  "functional_changes": [
+    "El boton Refres/Refrescar actualiza /api/state preservando evento y pestana activa.",
+    "Al cargar un evento se oculta noEventMessage/CE con clases y estilos de seguridad en moviles/iPad.",
+    "El visor ce-v468-modal queda por encima y visible en iPad/iPhone, sin tocar la gestion de justificantes dentro de INGRESOS.",
+    "El refresco legacy v45-2 delega en la funcion central v50.20 para evitar que selectEvent devuelva a la pantalla CE.",
+    "El mantenimiento periodico de justificantes v46-9 se pausa mientras hay foto abierta y reduce la frecuencia para evitar bloqueos."
+  ],
+  "files_changed_functionally": [
+    "public/app/features/v50-20-final-fixes.js",
+    "public/app/features/v45-2-role-refresh.js",
+    "public/app/features/v46-9-final-fixes.js"
+  ],
+  "version_cache_files": [
+    "public/index.html",
+    "public/app/version.js",
+    "public/sw.js",
+    "package.json",
+    "package-lock.json",
+    "build-metrics.json"
+  ]
+}
