@@ -1,10 +1,10 @@
-/* ControlEvent v50.10 - Optimización controlada de render y gráficas.
+/* ControlEvent v50.11 - Optimización controlada de render y gráficas.
    Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.10';
-  const VERSION_FILE = 'ControlEvent_v50_10';
+  const VERSION = 'ControlEvent v50.11';
+  const VERSION_FILE = 'ControlEvent_v50_11';
   const HEAVY_GROUPS = {
     ingresos: ['collabList','ingresosSummaryGrid'],
     compras: ['comprasList'],
@@ -20,7 +20,7 @@
   function call(name, args){
     const fn = window[name];
     if(typeof fn !== 'function') return undefined;
-    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v50.10] Error en ' + name, error); return undefined; }
+    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v50.11] Error en ' + name, error); return undefined; }
   }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
@@ -162,7 +162,7 @@
     const wrapped = async function(){
       const result = await old.apply(this, arguments);
       setTimeout(() => {
-        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v50.10] render tras cambio de evento', error); }
+        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v50.11] render tras cambio de evento', error); }
       }, 0);
       return result;
     };

@@ -1,16 +1,17 @@
 {
-  "version": "ControlEvent v50.10",
-  "base": "v50.9",
-  "notes": "v50.10: Salir no deja pantalla borrosa; login se muestra limpio; justificante/adjuntar/borrar de INGRESOS recolocado al extremo derecho del registro.",
+  "version": "ControlEvent v50.11",
+  "base": "v50.10",
+  "notes": "v50.11: salida vuelve siempre a login limpio; se elimina la carga de v50.8 para evitar alternancia de cabecera; filas pendientes de INGRESOS y COMPRAS en rojo; no se toca el flujo de fotos de ingresos/tickets.",
   "changed_files": [
-    "public/app/features/v50-8-final-fixes.js",
+    "public/app/features/v50-11-final-fixes.js",
     "public/app/features/v50-9-final-fixes.js",
     "public/app/features/v50-10-final-fixes.js",
     "public/index.html",
     "public/sw.js",
     "public/app/version.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
     "package.json",
     "package-lock.json"
   ],
-  "build": "v50.10"
+  "build": "v50.11"
 }
