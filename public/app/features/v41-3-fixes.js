@@ -1,8 +1,8 @@
-/* ControlEvent v50.11 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v50.12 - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.11';
-  const VERSION_FILE = 'ControlEvent_v50_11';
+  const VERSION = 'ControlEvent v50.12';
+  const VERSION_FILE = 'ControlEvent_v50_12';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();

@@ -1,0 +1,28 @@
+{
+  "version": "ControlEvent v50.12",
+  "base": "ControlEvent v50.11",
+  "created": "2026-05-28",
+  "scope": [
+    "budget tooltip mobile close/photo enlargement",
+    "mobile logout/refresh dock restored",
+    "product maintenance visual stabilization",
+    "version/cache unification"
+  ],
+  "files_added": [
+    "public/app/features/v50-12-final-fixes.js",
+    "LEEME_SUBIDA_GITHUB_V50_12.txt",
+    "PATCH_MANIFEST_V50_12.json"
+  ],
+  "files_modified": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/budget-tooltips-lite.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json"
+  ],
+  "intentionally_not_touched": [
+    "INGRESOS justificante/ticket viewer logic from v50.9/v50.10/v50.11"
+  ]
+}
