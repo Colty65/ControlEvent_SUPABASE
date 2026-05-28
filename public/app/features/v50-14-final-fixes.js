@@ -1,15 +1,15 @@
-/* ControlEvent v50.14 - correccion conservadora sobre v50.14.
-   - Retira efectos de v50.14: no fuerza seleccion de evento tras login para no dejar datos a medias.
+/* ControlEvent v50.15 - correccion conservadora sobre v50.15.
+   - Retira efectos de v50.15: no fuerza seleccion de evento tras login para no dejar datos a medias.
    - Recupera globos de Resumen Presupuestario con tabla + columna final Just. del sistema v46.9.
    - Evita apertura automatica de la primera foto en moviles/iPad: solo se abre justificante al tocar la miniatura Just.
    - Dock movil Refres/Salir, uno encima de otro, abajo derecha pegado al margen.
    - Limpieza visual de PRODUCTOS sin observadores ni bucles.
-   - Version: ControlEvent v50.14.
+   - Version: ControlEvent v50.15.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.14';
-  const VERSION_FILE = 'ControlEvent_v50_14';
+  const VERSION = 'ControlEvent v50.15';
+  const VERSION_FILE = 'ControlEvent_v50_15';
   const INSTALLED = '__ceV5014FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -183,6 +183,11 @@
         // Solo abrir justificante si se toca expresamente la miniatura Just. ya creada por v46.9.
         const thumb = target.closest?.(`#${BUDGET_TIP_ID} .ce-v465-tip-thumb`);
         if(thumb){
+          const box = $(BUDGET_TIP_ID);
+          const openedAt = Number(box?.dataset?.ceBudgetOpenedAt || 0);
+          // En iPhone/iPad el mismo toque que abre el globo puede caer sobre la primera miniatura.
+          // Bloqueamos solo esa pulsacion sintetica inicial; despues la miniatura abre normal.
+          if(openedAt && Date.now() - openedAt < 700) return stop(ev);
           const id = thumb.dataset.id || '';
           const api = window.ControlEventV469 || window.ControlEventV467 || window.ControlEventV465;
           if(id && api && typeof api.showReceiptModal === 'function'){

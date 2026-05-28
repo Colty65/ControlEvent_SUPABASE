@@ -1,9 +1,9 @@
-/* ControlEvent v50.14 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v50.15 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.14';
+  const VERSION = 'ControlEvent v50.15';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -194,6 +194,8 @@
     const box = ensureTooltip();
     hideLegacyBudgetTooltips();
     box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
+    box.dataset.ceBudgetOpenedAt = String(Date.now());
+    box.dataset.ceBudgetLastTitle = String(title || '');
     box.classList.add('open');
     box.removeAttribute('aria-hidden');
     lastOpenAt = now();

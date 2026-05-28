@@ -1,4 +1,4 @@
-/* ControlEvent v50.14 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.15 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.14';
-  const VERSION_FILE = 'ControlEvent_v50_14';
+  const VERSION = 'ControlEvent v50.15';
+  const VERSION_FILE = 'ControlEvent_v50_15';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -374,7 +374,7 @@
   }
   function enrichOpenTooltips(){ enrichGraphTooltip(); enrichBudgetTooltip(); dedupeReceiptThumbColumns(); }
 
-  // v50.14: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
+  // v50.15: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
   // y registros en negrita aleatoria al modificar. La gestión de justificantes queda intacta.
   const modifiedProducts = new Set();
   function productNodes(id){ return []; }

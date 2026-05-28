@@ -1,8 +1,8 @@
-/* ControlEvent v50.14 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
+/* ControlEvent v50.15 - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.14';
-  const VERSION_FILE = 'ControlEvent_v50_14';
+  const VERSION = 'ControlEvent v50.15';
+  const VERSION_FILE = 'ControlEvent_v50_15';
   const HOME_ID = 'ceGlobalFloatingHomeButton';
   let lastHomeAt = 0;
   let lastDonationToggle = {id:'', at:0};
