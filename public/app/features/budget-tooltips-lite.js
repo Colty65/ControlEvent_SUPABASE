@@ -1,9 +1,9 @@
-/* ControlEvent v50.13 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v50.14 - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.13';
+  const VERSION = 'ControlEvent v50.14';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -153,7 +153,6 @@
     const total = Number(totalBase || 0);
     const pending = up(incomeSitu(row)) === 'PENDIENTE';
     return {
-      id: String(row.id || row.record_id || row.uuid || ''),
       nombre: norm(p.nombre || row.nombre || 'Sin nombre'),
       rango: norm(p.rango || row.rango || ''),
       numero: n,
@@ -187,53 +186,8 @@
     return ref || storeName(row) || 'Sin donante';
   }
 
-  // v50.13: las fotos de justificantes también deben verse y ampliarse en los globos de INGRESADO SOCIOS / NO SOCIOS.
-  const RECEIPT_BACKUP_KEYS = ['ControlEvent_ingreso_receipts_v502','ControlEvent_ingreso_receipts_v468'];
-  function same(a,b){ return String(a ?? '') === String(b ?? ''); }
-  function srcOfReceipt(value){
-    if(!value) return '';
-    if(typeof value === 'string') return value;
-    if(typeof value === 'object') return value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.base64 || '';
-    return '';
-  }
-  function jsonGet(key){ try{ return JSON.parse(localStorage.getItem(key) || '{}') || {}; }catch(_){ return {}; } }
-  function receiptStores(){
-    const s = stateRef();
-    if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
-    if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object') s.ticketImageRefs = {};
-    return {store:s.ticketImages, refs:s.ticketImageRefs};
-  }
-  function receiptKeysForIncome(id){
-    const ev = selectedEventId();
-    const sid = String(id || '');
-    return [
-      `${ev}|INGRESO:${sid}`,
-      `${ev}|INGRESO|${sid}`,
-      `INGRESO:${ev}|${sid}`,
-      `INGRESO:${sid}`,
-      `INGRESO|${sid}`,
-      sid
-    ];
-  }
-  function receiptSrcForIncome(id){
-    if(!id) return '';
-    const {store, refs} = receiptStores();
-    const keys = receiptKeysForIncome(id);
-    for(const k of keys){ const src = srcOfReceipt(store[k]); if(src) return src; }
-    for(const k of keys){ const src = srcOfReceipt(refs[k]); if(src) return src; }
-    for(const backupKey of RECEIPT_BACKUP_KEYS){ const backup = jsonGet(backupKey); for(const k of keys){ const src = srcOfReceipt(backup[k]); if(src) return src; } }
-    return '';
-  }
-  function rawHtml(value){ return {__ceRawHtml:true, html:String(value || '')}; }
-  function cellHtml(value){ return value && value.__ceRawHtml ? value.html : esc(value); }
-  function receiptThumbCell(id, label){
-    const src = receiptSrcForIncome(id);
-    if(!src) return rawHtml('<span class="ce-budget-lite-no-photo">—</span>');
-    return rawHtml(`<button type="button" class="ce-budget-lite-photo-btn" data-ce-v512-budget-photo="1" data-id="${esc(id)}" data-name="${esc(label || '')}" data-src="${esc(src)}" aria-label="Ver justificante"><img src="${esc(src)}" alt="Justificante de ingreso" /></button>`);
-  }
-
   function tableHtml(headers, rows){
-    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(cell => `<td>${cellHtml(cell)}</td>`).join('')}</tr>`).join('');
+    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
     return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
   function showTooltip(title, totalLabel, totalValue, table){
@@ -286,11 +240,7 @@
       return true;
     }).sort((a,b) => cmp(incomeParts(a).nombre, incomeParts(b).nombre));
     const total = rows.reduce((sum, item) => sum + incomeParts(item).total, 0);
-    // v50.13: no insertar la foto como primera columna.
-    // Los justificantes de estos globos los añade el sistema estable anterior como columna final "Just.",
-    // igual que en los globos de GRAFICAS, para conservar datos + foto y el visor con texto.
-    const headers = ['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'];
-    const table = tableHtml(headers, rows.map(item => {
+    const table = tableHtml(['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'], rows.map(item => {
       const p = incomeParts(item);
       return [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total)];
     }));

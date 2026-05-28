@@ -1,4 +1,4 @@
-/* ControlEvent v50.13 - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
+/* ControlEvent v50.14 - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
    - Un solo conjunto visible de controles de justificante en INGRESOS.
    - iPad: controles de justificante tratados como boton tactil propio, igual que tickets.
    - Salir/Refrescar visibles en movil vertical.
@@ -8,8 +8,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.13';
-  const VERSION_FILE = 'ControlEvent_v50_13';
+  const VERSION = 'ControlEvent v50.14';
+  const VERSION_FILE = 'ControlEvent_v50_14';
   const INSTALLED = '__ceV504FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

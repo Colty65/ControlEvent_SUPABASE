@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.13",
-  "base": "v50.12",
-  "notes": "v50.13: no toca justificantes de INGRESOS; recupera columna final Just. en globos de Resumen Presupuestario; dock movil Refres/Salir abajo derecha; elimina observador v50.12 de PRODUCTOS; obliga a elegir evento tras login; cache/version v50.13.",
+  "version": "ControlEvent v50.14",
+  "base": "v50.13",
+  "notes": "v50.14: no toca justificantes de INGRESOS/tickets; retira forzado de seleccion de evento de v50.13; restaura globos de Resumen Presupuestario con tabla + Just.; evita apertura automatica de primera foto; dock movil Refres/Salir abajo derecha; limpia parpadeo/negrita de PRODUCTOS; cache/version v50.14.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v50.13"
+  "build": "v50.14"
 }

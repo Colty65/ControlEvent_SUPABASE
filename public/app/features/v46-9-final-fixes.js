@@ -1,4 +1,4 @@
-/* ControlEvent v50.13 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v50.14 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.13';
-  const VERSION_FILE = 'ControlEvent_v50_13';
+  const VERSION = 'ControlEvent v50.14';
+  const VERSION_FILE = 'ControlEvent_v50_14';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -374,59 +374,16 @@
   }
   function enrichOpenTooltips(){ enrichGraphTooltip(); enrichBudgetTooltip(); dedupeReceiptThumbColumns(); }
 
+  // v50.14: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
+  // y registros en negrita aleatoria al modificar. La gestión de justificantes queda intacta.
   const modifiedProducts = new Set();
-  function productNodes(id){
-    const safe = cssEsc(id);
-    const wrap = $('productosList') || document;
-    const selectors = [
-      `button[data-action="save-producto"][data-id="${safe}"]`,
-      `input[data-action="edit-producto-nombre"][data-id="${safe}"]`,
-      `select[data-action="edit-producto-segmento"][data-id="${safe}"]`,
-      `select[data-action="edit-producto-destino"][data-id="${safe}"]`,
-      `input[data-action="edit-producto-precio"][data-id="${safe}"]`,
-      `[data-id="${safe}"]`
-    ];
-    const found = [];
-    selectors.forEach(sel => { try{ wrap.querySelectorAll(sel).forEach(el => { if(el && !found.includes(el)) found.push(el); }); }catch(_){ } });
-    return found;
-  }
-  function commonContainer(nodes){
-    if(!nodes || !nodes.length) return null;
-    const preferred = nodes[0].closest?.('.itemcard,.rowline,.card,tr,li,[data-record-id],.maintenance-card,.product-card,.producto-card,.grid-card');
-    if(preferred && nodes.every(n => preferred.contains(n))) return preferred;
-    let cur = nodes[0];
-    while(cur && cur !== document.body){
-      if(nodes.every(n => cur.contains(n)) && cur.id !== 'productosList') return cur;
-      cur = cur.parentElement;
-    }
-    return preferred || nodes[0];
-  }
-  function markBoldElement(el){
-    if(!el) return;
-    try{ el.classList.add('ce-v468-modified-product','ce-v464-modified','ce-v46-modified'); }catch(_){ }
-    try{ el.style.setProperty('font-weight','900','important'); }catch(_){ }
-    try{ el.querySelectorAll('*').forEach(child => child.style.setProperty('font-weight','900','important')); }catch(_){ }
-  }
-  function productCard(id){
-    const nodes = productNodes(id);
-    return commonContainer(nodes);
-  }
-  function applyProductBold(){
-    modifiedProducts.forEach(id => {
-      const nodes = productNodes(id);
-      const card = commonContainer(nodes);
-      if(card) markBoldElement(card);
-      nodes.forEach(n => { markBoldElement(n); const field=n.closest?.('.field'); if(field) markBoldElement(field); });
-    });
-  }
-  function rememberProductModified(btn){
-    const id=btn?.dataset?.id || '';
-    if(!id) return;
-    modifiedProducts.add(String(id));
-    try{ localStorage.setItem('ControlEvent_productos_modificados_v469', JSON.stringify(Array.from(modifiedProducts))); }catch(_){ }
-    [0,30,80,160,320,640,1000,1800,3200,5200].forEach(ms => setTimeout(applyProductBold, ms));
-  }
-  try{ JSON.parse(localStorage.getItem('ControlEvent_productos_modificados_v469') || '[]').forEach(id => modifiedProducts.add(String(id))); }catch(_){ }
+  function productNodes(id){ return []; }
+  function commonContainer(nodes){ return null; }
+  function markBoldElement(el){ return; }
+  function productCard(id){ return null; }
+  function applyProductBold(){ return; }
+  function rememberProductModified(btn){ return; }
+  try{ localStorage.removeItem('ControlEvent_productos_modificados_v469'); }catch(_){ }
 
   function applyVersion(){
     try{ document.title = VERSION; document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE}; }catch(_){ }
