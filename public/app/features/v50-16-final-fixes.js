@@ -1,12 +1,12 @@
-/* ControlEvent v50.16 - correccion puntual sobre v50.16.
+/* ControlEvent v50.17 - correccion puntual sobre v50.17.
    - No toca justificantes de INGRESOS ni tickets.
    - Al elegir evento, desbloquea el estado de espera y reinstala/sanea globos.
    - El boton Refres recarga en sitio conservando evento y pestana actual.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.16';
-  const VERSION_FILE = 'ControlEvent_v50_16';
+  const VERSION = 'ControlEvent v50.17';
+  const VERSION_FILE = 'ControlEvent_v50_17';
   const INSTALLED = '__ceV5016FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -122,7 +122,7 @@
 
   function callRenderPieces(tab){
     const active = setTab(tab || currentTab());
-    try{ window.ControlEventModules?.activate?.(active, {reason:'v50.16-refresh-active'}); }catch(_){ }
+    try{ window.ControlEventModules?.activate?.(active, {reason:'v50.17-refresh-active'}); }catch(_){ }
     if(!hasValidEvent()) return;
     try{ window.renderHeader?.(); }catch(_){ }
     try{ window.renderPermissions?.(); }catch(_){ }
@@ -131,7 +131,7 @@
       try{ window.renderBudget?.(); }catch(_){ }
     }
     if(active === 'graficas'){
-      try{ window.renderGraficas?.({force:true, reason:'v50.16-refresh-active'}); }catch(_){ try{ window.renderGraficas?.(); }catch(__){ } }
+      try{ window.renderGraficas?.({force:true, reason:'v50.17-refresh-active'}); }catch(_){ try{ window.renderGraficas?.(); }catch(__){ } }
     }
     if(active === 'ingresos'){
       try{ window.renderIngresosSummary?.(); }catch(_){ }
@@ -198,7 +198,7 @@
         const data = await res.json();
         mergeFreshStatePreservingContext(data, eventId);
       }
-    }catch(error){ console.warn('[v50.16] No se pudo refrescar estado en sitio', error); }
+    }catch(error){ console.warn('[v50.17] No se pudo refrescar estado en sitio', error); }
     clearAwaitingVisualState();
     callRenderPieces(tab);
     burstHydrate('refresh-in-place');
@@ -261,7 +261,7 @@
   }
 
   function patchV5015ForceLogic(){
-    // v50.16 dejaba una marca de "forzar selector" que podia seguir activa tras escoger evento.
+    // v50.17 dejaba una marca de "forzar selector" que podia seguir activa tras escoger evento.
     // Si ya hay evento valido, la anulamos antes de cualquier refresco o /api/state posterior.
     if(hasValidEvent()) clearForcePickerState();
   }

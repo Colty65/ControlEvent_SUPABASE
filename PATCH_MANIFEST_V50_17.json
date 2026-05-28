@@ -1,0 +1,17 @@
+{
+  "version": "ControlEvent v50.17",
+  "created_at": "2026-05-28 12:42:44",
+  "base": "ControlEvent_SUPABASE-main_V50_16.zip",
+  "changes": [
+    "Removed v50-15-final-fixes.js and v50-16-final-fixes.js from index.html and service-worker cache list.",
+    "Added public/app/features/v50-17-final-fixes.js.",
+    "Login/event flow: neutral CE screen until event selection, then full rehydration.",
+    "Mobile Refres/Salir dock v50.17, with Refres preserving event and current tab.",
+    "Budget tooltip receipt thumbnails retagged to a safe lightweight modal for iPad/iPhone.",
+    "Version, cache and package metadata updated to v50.17."
+  ],
+  "do_not_touch_confirmed": [
+    "Existing justificante management inside INGRESOS was not changed.",
+    "Ticket/INGRESOS receipt strips from v50.9/v50.10 remain loaded."
+  ]
+}
