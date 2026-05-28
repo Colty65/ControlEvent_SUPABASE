@@ -1,5 +1,5 @@
-/* ControlEvent v50.17 - flujo único login/evento y globos estables.
-   - Retira la dependencia de los parches v50.15/v50.17: no intercepta /api/state.
+/* ControlEvent v50.18 - flujo único login/evento y globos estables.
+   - Retira la dependencia de los parches v50.15/v50.18: no intercepta /api/state.
    - Tras login: estado neutro con CE grande y selector "Selecciona evento...".
    - Tras elegir evento: limpia marcas de espera, carga/rehidrata ventanas y globos.
    - Refres: actualiza en el mismo evento y pestaña.
@@ -7,8 +7,8 @@
    - No toca el bloque de justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.17';
-  const VERSION_FILE = 'ControlEvent_v50_17';
+  const VERSION = 'ControlEvent v50.18';
+  const VERSION_FILE = 'ControlEvent_v50_18';
   const INSTALLED = '__ceV5017FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -35,7 +35,7 @@
   const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);
   const setLexical = (name, value) => safe(() => Function('value', name + ' = value;')(value), undefined);
   const getFn = name => safe(() => (typeof window[name] === 'function') ? window[name] : Function('return (typeof '+name+' === "function") ? '+name+' : null;')(), null);
-  const call = (name, args) => { const fn = getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v50.17] Error en '+name, error); return undefined; } };
+  const call = (name, args) => { const fn = getFn(name); if(typeof fn !== 'function') return undefined; try{ return fn.apply(window, args || []); }catch(error){ console.warn('[v50.18] Error en '+name, error); return undefined; } };
   const st = () => getLexical('state') || window.state || window.ControlEventApp?.state || {};
   const auth = () => getLexical('authUser') || window.authUser || window.ControlEventApp?.authUser || null;
   const arr = k => Array.isArray(st()[k]) ? st()[k] : [];
@@ -175,7 +175,7 @@
   function renderTabContents(tab){
     if(!hasValidEvent()) return;
     const active = setTab(tab || currentTab());
-    try{ window.ControlEventModules?.activate?.(active, {reason:'v50.17-render-tab'}); }catch(_){ }
+    try{ window.ControlEventModules?.activate?.(active, {reason:'v50.18-render-tab'}); }catch(_){ }
     call('renderHeader'); call('renderMainSelectors');
     switch(active){
       case 'ingresos': call('renderIngresosSummary'); call('renderColabs'); break;
@@ -184,7 +184,7 @@
       case 'mapa': call('renderMapaProductos'); break;
       case 'planificacion': if(typeof window.showPlanificacionInicial === 'function') safe(() => window.showPlanificacionInicial(), null); else safe(() => window.ControlEventPlanificacion?.show?.(), null); break;
       case 'resumen': call('renderBudget'); safe(() => window.ControlEventBudgetLiteTips?.sanitize?.(), null); retagBudgetThumbs(); break;
-      case 'graficas': call('renderGraficas', [{force:true, reason:'v50.17'}]); break;
+      case 'graficas': call('renderGraficas', [{force:true, reason:'v50.18'}]); break;
     }
     call('renderPermissions'); call('renderLockState'); applyVersion(); ensureMobileDock();
   }
@@ -197,7 +197,7 @@
     call('renderHeader'); call('renderMainSelectors'); call('renderIngresosSummary'); call('renderColabs'); call('renderDonaciones'); call('renderCompras');
     if(originalTab === 'resumen') { call('renderBudget'); safe(() => window.ControlEventBudgetLiteTips?.sanitize?.(), null); }
     if(originalTab === 'mapa') call('renderMapaProductos');
-    if(originalTab === 'graficas') call('renderGraficas', [{force:true, reason:'v50.17-warm'}]);
+    if(originalTab === 'graficas') call('renderGraficas', [{force:true, reason:'v50.18-warm'}]);
     setTab(originalTab);
     try{ window.ControlEventV447?.renderActive?.(originalTab); }catch(_){ }
     hydrateAfterRender(reason || 'warm');
@@ -230,7 +230,7 @@
       clearForceMarkers(); markChosen(); rememberEvent(id);
       let ret;
       try{ ret = old.apply(this, arguments); }
-      catch(error){ console.warn('[v50.17] changeSelectedEvent original falló; uso selectEvent directo', error); ret = undefined; }
+      catch(error){ console.warn('[v50.18] changeSelectedEvent original falló; uso selectEvent directo', error); ret = undefined; }
       try{
         if(String(currentEventId()) !== id && window.ControlEventV447?.selectEvent){
           window.ControlEventV447.selectEvent(id, {force:true, delay:isMobileLike()?160:40});
@@ -264,7 +264,7 @@
     try{
       const res = await fetch('/api/state', {cache:'no-store'});
       if(res.ok){ const data = await res.json(); mergeFreshStatePreserving(data, eventId); }
-    }catch(error){ console.warn('[v50.17] Refres no pudo leer /api/state', error); }
+    }catch(error){ console.warn('[v50.18] Refres no pudo leer /api/state', error); }
     finalizeEventVisuals(eventId);
     setTab(tab);
     renderTabContents(tab);

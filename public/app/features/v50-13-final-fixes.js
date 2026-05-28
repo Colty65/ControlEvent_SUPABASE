@@ -1,16 +1,16 @@
-/* ControlEvent v50.17 - correccion puntual sobre la version anterior.
+/* ControlEvent v50.18 - correccion puntual sobre la version anterior.
    - No toca los justificantes del listado de INGRESOS, que ya funcionan en iPad/moviles.
    - RESUMEN PRESUPUESTARIO: vuelve a usar columna final "Just." y refuerza ampliar/cerrar en tactil.
    - Dock movil independiente Salir / Refres abajo derecha, pegado al margen.
    - PRODUCTOS: elimina negrita/parpadeo sin observadores permanentes.
    - Login: obliga a elegir evento tras entrar, sin restaurar automaticamente el ultimo.
-   - Version: ControlEvent v50.17.
+   - Version: ControlEvent v50.18.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.17';
-  const VERSION_FILE = 'ControlEvent_v50_17';
+  const VERSION = 'ControlEvent v50.18';
+  const VERSION_FILE = 'ControlEvent_v50_18';
   const INSTALLED = '__ceV5013FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -272,7 +272,7 @@
         msg.innerHTML = '<div class="ce-v5013-welcome"><h2>Selecciona un evento para trabajar</h2><p>Elige el evento en el desplegable superior.</p></div>';
       }
     }
-    try{ window.ControlEventV447?.render?.({force:true, delay:0, reason:reason || 'v50.17-login-event-choice'}); }catch(_){ }
+    try{ window.ControlEventV447?.render?.({force:true, delay:0, reason:reason || 'v50.18-login-event-choice'}); }catch(_){ }
   }
   function scheduleForceEventChoice(){ [80,220,520,1000,1700,2600].forEach(ms => setTimeout(() => forceEventChoice('login'), ms)); }
 
