@@ -1,8 +1,8 @@
-/* ControlEvent v50.24 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
+/* ControlEvent v1.0/pr - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
    Evita depender del onclick inline, que en algunas capas antiguas no se ejecutaba. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
+  const VERSION = 'ControlEvent v1.0/pr';
   const ROOT_ID = 'summaryTiendaTicket';
 
   function $(id){ return document.getElementById(id); }

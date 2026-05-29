@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - ajuste puntual sobre v50.19.
+/* ControlEvent v1.0/pr - ajuste puntual sobre v50.19.
    - No toca el bloque de justificantes de INGRESOS, que queda funcionando en iPad/móvil.
    - Resumen Presupuestario: cierre táctil fiable de globos y ampliación de fotos anexas.
    - Móvil: vuelve a crear el dock inferior Salir / Refrescar fuera de cabecera y selector de evento.
@@ -8,8 +8,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v1.0/pr';
+  const VERSION_FILE = 'ControlEvent_v1_0_pr';
   const INSTALLED = '__ceV5012FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - flujo único login/evento y globos estables.
+/* ControlEvent v1.0/pr - flujo único login/evento y globos estables.
    - Retira la dependencia de los parches v50.15/v50.19: no intercepta /api/state.
    - Tras login: estado neutro con CE grande y selector "Selecciona evento...".
    - Tras elegir evento: limpia marcas de espera, carga/rehidrata ventanas y globos.
@@ -7,8 +7,8 @@
    - No toca el bloque de justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v1.0/pr';
+  const VERSION_FILE = 'ControlEvent_v1_0_pr';
   const INSTALLED = '__ceV5017FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

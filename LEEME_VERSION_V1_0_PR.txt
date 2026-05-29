@@ -1,0 +1,11 @@
+ControlEvent v1.0/pr
+
+Base funcional: v50.27.
+Cambio realizado: SOLO versionado.
+
+No se han tocado módulos operativos, justificantes, globos, login, refresco, Excel funcional ni motores de datos.
+Se actualizan rótulos visibles, versión de cabecera, metadatos, cache PWA, package y textos usados por INFOEVENTO/exportaciones.
+
+Versión visible: ControlEvent v1.0/pr
+Versión para ficheros/export: ControlEvent_v1_0_pr
+Cache PWA: controlevent-shell-v1-0-pr
