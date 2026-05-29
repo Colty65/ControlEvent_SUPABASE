@@ -1,1 +1,1 @@
-window.ControlEventVersion={version:'ControlEvent v50.27',versionFile:'ControlEvent_v50_27'};
+window.ControlEventVersion={version:'ControlEvent v2.0-pr',versionFile:'ControlEvent_v2_0_pr'};

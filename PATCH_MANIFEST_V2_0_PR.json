@@ -1,0 +1,14 @@
+{
+  "version": "v2.0-pr",
+  "base": "v50.27",
+  "focus": [
+    "version unificada",
+    "justificantes de INGRESOS persistidos en servidor igual que Por tienda y Ticket",
+    "cache-busting de fotos entre dispositivos"
+  ],
+  "functional_files": [
+    "public/app/features/v50-4-final-fixes.js",
+    "lib/supabase-normalized.js"
+  ],
+  "notes": "No se modifica el flujo estable de Salir/Login de v50.27."
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v50-27';
+const CACHE_NAME = 'controlevent-shell-v2-0-pr';
 // V30.13: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
