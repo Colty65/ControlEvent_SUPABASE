@@ -1,0 +1,15 @@
+{
+  "version": "ControlEvent v2.2_prod",
+  "base": "v2.1_prod sobre v50.27 estable",
+  "changes": [
+    "Nombres de INFOEVENTO normalizados a ControlEvent_v2_2_prod_INFOEVENTO-Evento_aaaammdd.xlsx",
+    "Nombres de BACKUP normalizados a ControlEvent_v2_2_prod_BACKUP_TODOS_o_Evento_aaaammdd_hhmmss.xlsx",
+    "Carga BACKUP con cierre limpio, estado visible y guardado confirmado en BBDD"
+  ],
+  "not_touched": [
+    "fotos de INGRESOS",
+    "flujo Salir/Login",
+    "globos",
+    "motores de datos"
+  ]
+}

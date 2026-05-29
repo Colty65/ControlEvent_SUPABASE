@@ -1,0 +1,24 @@
+ControlEvent v2.2_prod
+
+Base usada: v2.1_prod generada desde v50.27 estable.
+
+Cambios realizados:
+1. Nombres de INFOEVENTO normalizados:
+   ControlEvent_v2_2_prod_INFOEVENTO-<Evento>_aaaammdd.xlsx
+
+2. Nombres de BACKUP normalizados:
+   ControlEvent_v2_2_prod_BACKUP_TODOS_aaaammdd_hhmmss.xlsx
+   ControlEvent_v2_2_prod_BACKUP_<Evento>_aaaammdd_hhmmss.xlsx
+
+3. Carga de BACKUP:
+   - Evita final violento al importar.
+   - Deshabilita temporalmente el botón Importar datos.
+   - Muestra estado claro: cargando, guardando en BBDD y finalizado.
+   - Fuerza guardado confirmado en /api/state al terminar.
+
+No se han tocado:
+- fotos de INGRESOS que ya funcionan bien,
+- flujo Salir/Login,
+- globos,
+- motores de INGRESOS/DONACIONES/COMPRAS,
+- Excel funcional salvo nombres/versiones.
