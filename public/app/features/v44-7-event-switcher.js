@@ -1,15 +1,15 @@
-/* ControlEvent v50.27 - selector de evento unificado y render activo único.
+/* ControlEvent v2.1_prod - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
-  const OLD_CHOSEN_KEY = 'ControlEvent_v50_27_event_chosen';
-  const LEGACY_CHOSEN_KEYS = ['ce_v250_event_chosen','ControlEvent_v50_25_event_chosen','ControlEvent_v50_24_event_chosen','controlevent_v5022_user_picked_event'];
+  const OLD_CHOSEN_KEY = 'ControlEvent_v2_1_prod_event_chosen';
+  const LEGACY_CHOSEN_KEYS = ['ce_v250_event_chosen','ControlEvent_v2_1_prod_event_chosen','ControlEvent_v2_1_prod_event_chosen','controlevent_v5022_user_picked_event'];
   const STORAGE_FALLBACK = 'controlevent_v6_4';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
@@ -137,7 +137,7 @@
     try{
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
         const t = el.textContent || '';
-        if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION);
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
       });
     }catch(_){ }
     try{
@@ -370,7 +370,7 @@
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       try{ authUser = data.user; }catch(_){ }
       window.authUser = data.user;
-      try{ localStorage.removeItem('ControlEvent_v50_27_session'); }catch(_){ } // v50.27: no persistir sesion ligera
+      try{ localStorage.removeItem('ControlEvent_v2_1_prod_session'); }catch(_){ } // v50.27: no persistir sesion ligera
       const c = $('loginClave'); if(c) c.value = '';
       try{ st().selectedEventId = ''; }catch(_){ }
       clearChosen();

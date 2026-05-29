@@ -1,4 +1,4 @@
-/* ControlEvent v50.27 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v2.1_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -386,7 +386,7 @@
 
   function applyVersion(){
     try{ document.title = VERSION; document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE}; }catch(_){ }
-    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+(?:\.\d+){1,2}/i.test(el.textContent || '')) el.textContent = VERSION; }); }catch(_){ }
+    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; }); }catch(_){ }
   }
   function handleClick(ev){
     const btn = ev.target?.closest?.('[data-action="ingreso-receipt-add-v465"],[data-action="ingreso-receipt-view-v465"],[data-action="ingreso-receipt-delete-v465"],.ce-v465-tip-thumb,button[data-action="save-producto"]');

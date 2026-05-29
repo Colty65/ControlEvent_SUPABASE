@@ -1,18 +1,18 @@
-/* ControlEvent v50.27 - ajuste minimo sobre v50.9.
+/* ControlEvent v2.1_prod - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV5010FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEYS = ['ControlEvent_v50_27_session'];
-  const LOGOUT_KEYS = ['ControlEvent_v50_27_logout_at','ControlEvent_v50_27_logout_at','ControlEvent_v50_27_logout_at'];
+  const SESSION_KEYS = ['ControlEvent_v2_1_prod_session'];
+  const LOGOUT_KEYS = ['ControlEvent_v2_1_prod_logout_at','ControlEvent_v2_1_prod_logout_at','ControlEvent_v2_1_prod_logout_at'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const isMobile = () => safe(() => window.matchMedia('(max-width: 900px)').matches, innerWidth <= 900);
@@ -49,7 +49,7 @@
       window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE};
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
         const t = el.textContent || '';
-        if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION);
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
       });
     }catch(_){ }
   }

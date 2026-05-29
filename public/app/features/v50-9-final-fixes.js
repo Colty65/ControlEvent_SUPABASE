@@ -1,4 +1,4 @@
-/* ControlEvent v50.27 - correccion puntual sobre v50.19.
+/* ControlEvent v2.1_prod - correccion puntual sobre v50.19.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -6,14 +6,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV509FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEY = 'ControlEvent_v50_27_session';
-  const LOGOUT_KEY_508 = 'ControlEvent_v50_27_logout_at';
+  const SESSION_KEY = 'ControlEvent_v2_1_prod_session';
+  const LOGOUT_KEY_508 = 'ControlEvent_v2_1_prod_logout_at';
   const BACKUP_KEYS = ['ControlEvent_ingreso_receipts_v502','ControlEvent_ingreso_receipts_v468'];
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -154,7 +154,7 @@
       window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE};
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
         const t=el.textContent || '';
-        if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION);
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(t)) el.textContent = t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
       });
     }catch(_){ }
   }
@@ -205,7 +205,7 @@
       const data = await res.json().catch(() => ({}));
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       safe(() => sessionStorage.removeItem(LOGOUT_KEY_508), null);
-      safe(() => sessionStorage.removeItem('ControlEvent_v50_27_logout_at'), null);
+      safe(() => sessionStorage.removeItem('ControlEvent_v2_1_prod_logout_at'), null);
       await loadFreshState();
       setLexical('authUser', data.user);
       window.authUser = data.user;
@@ -231,7 +231,36 @@
     return false;
   }
 
-  function readImage(file){ return new Promise((resolve,reject) => { const r=new FileReader(); r.onload=()=>resolve(String(r.result||'')); r.onerror=()=>reject(r.error || new Error('No se pudo leer la imagen.')); r.readAsDataURL(file); }); }
+  function readRawImage(file){ return new Promise((resolve,reject) => { const r=new FileReader(); r.onload=()=>resolve(String(r.result||'')); r.onerror=()=>reject(r.error || new Error('No se pudo leer la imagen.')); r.readAsDataURL(file); }); }
+  async function readImage(file){
+    const raw = await readRawImage(file);
+    if(!dataUrl(raw)) return raw;
+    return await new Promise(resolve => {
+      try{
+        const img = new Image();
+        img.onload = () => {
+          try{
+            const w = img.naturalWidth || img.width || 0;
+            const h = img.naturalHeight || img.height || 0;
+            if(!w || !h) return resolve(raw);
+            const maxSide = 1200;
+            const maxPixels = 1200 * 900;
+            const ratio = Math.min(1, maxSide / Math.max(w, h), Math.sqrt(maxPixels / Math.max(1, w * h)));
+            if(ratio >= 0.98 && raw.length < 900000) return resolve(raw);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(w * ratio));
+            canvas.height = Math.max(1, Math.round(h * ratio));
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return resolve(raw);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.78));
+          }catch(_){ resolve(raw); }
+        };
+        img.onerror = () => resolve(raw);
+        img.src = raw;
+      }catch(_){ resolve(raw); }
+    });
+  }
   async function uploadReceipt(id, src){
     if(!id || !selectedId() || !dataUrl(src)) return src;
     const res = await fetch('/api/ticket-images', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({eventId:selectedId(), key:keyOnly(id), dataUrl:src})});
@@ -334,23 +363,29 @@
   }
   async function attachReceipt(id, ev){
     stop(ev || window.event || {});
-    if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return false; }
-    if(isFinalizado()){ alert('Evento finalizado. Solo se puede ver el justificante.'); return false; }
+    const now = Date.now();
+    const busy = attachReceipt._busy || {};
+    if(busy.id === String(id || '') && now - (busy.at || 0) < 1800) return false;
+    attachReceipt._busy = {id:String(id || ''), at:now};
+    if(!canWrite()){ alert('No autorizado para modificar justificantes.'); attachReceipt._busy = null; return false; }
+    if(isFinalizado()){ alert('Evento finalizado. Solo se puede ver el justificante.'); attachReceipt._busy = null; return false; }
     const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.position='fixed'; input.style.left='-9999px'; input.style.top='-9999px'; document.body.appendChild(input);
     input.addEventListener('change', async () => {
       try{
         const file = input.files && input.files[0]; if(!file) return;
         if(!/^image\//i.test(file.type || '')){ alert('Selecciona una imagen.'); return; }
         const src = await readImage(file);
-        setReceiptLocal(id, src); normalizeReceiptFields();
-        try{ await uploadReceipt(id, src); }catch(error){ console.warn('[v50.9] justificante queda local hasta poder subir', error); }
+        const url = await uploadReceipt(id, src);
+        if(url) setReceiptLocal(id, url);
+        normalizeReceiptFields();
         call('saveState');
         await hydrateReceipts(true);
         normalizeReceiptFields();
-      }catch(error){ alert('No se pudo adjuntar el justificante. ' + (error?.message || error)); }
-      finally{ try{ input.remove(); }catch(_){ } }
+      }catch(error){ alert('No se pudo adjuntar el justificante en servidor. No se deja copia solo local. ' + (error?.message || error)); }
+      finally{ try{ input.remove(); }catch(_){ } setTimeout(() => { attachReceipt._busy = null; }, 350); }
     }, {once:true});
     input.click();
+    setTimeout(() => { if(attachReceipt._busy && attachReceipt._busy.id === String(id || '')) attachReceipt._busy = null; }, 8000);
     return false;
   }
   async function removeReceipt(id, ev){
@@ -367,6 +402,11 @@
     if(!btn) return;
     const id = btn.dataset.id || ''; if(!id) return;
     const action = btn.getAttribute('data-ce-v509-receipt');
+    const sig = `${action}|${id}`;
+    const now = Date.now();
+    const last = handleReceipt._last || {};
+    if(last.sig === sig && now - (last.at || 0) < 900) return stop(ev || {});
+    handleReceipt._last = {sig, at:now};
     if(action === 'view') return showReceipt(id, ev);
     if(action === 'add') return attachReceipt(id, ev);
     if(action === 'delete') return removeReceipt(id, ev);
@@ -405,7 +445,7 @@
   // Login se captura en window para adelantarse a manejadores document antiguos que dejaban el overlay encima.
   window.addEventListener('click', ev => { if(ev.target?.closest?.('#btnLogin')) return loginV509(ev); }, {capture:true, passive:false});
   window.addEventListener('keydown', ev => { if(ev.key === 'Enter' && ev.target?.closest?.('#authOverlay') && ($('loginIdentificacion') === ev.target || $('loginClave') === ev.target)) return loginV509(ev); }, {capture:true, passive:false});
-  ['click','pointerup','touchend'].forEach(type => window.addEventListener(type, ev => { if(ev.target?.closest?.('[data-ce-v509-receipt]')) return handleReceipt(ev); }, {capture:true, passive:false}));
+  ['click','touchend'].forEach(type => window.addEventListener(type, ev => { if(ev.target?.closest?.('[data-ce-v509-receipt]')) return handleReceipt(ev); }, {capture:true, passive:false}));
   window.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(() => hydrateReceipts(true).then(() => normalizeReceiptFields()), 180); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:modules-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
   [0,100,400,1200].forEach(ms => setTimeout(install, ms));

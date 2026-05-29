@@ -1,9 +1,9 @@
-/* ControlEvent v50.24 - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v2.1_prod - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -50,7 +50,7 @@
     try{ document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; }catch(_){ }
     try{
       document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
-        if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
       });
     }catch(_){ }
   }

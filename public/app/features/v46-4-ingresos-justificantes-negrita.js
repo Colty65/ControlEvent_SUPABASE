@@ -1,10 +1,10 @@
-/* ControlEvent v50.24 - justificantes de INGRESOS y marca negrita post-modificación.
+/* ControlEvent v2.1_prod - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV464JustificantesNegrita';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -180,7 +180,7 @@
   }
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; });
     try{ window.ControlEventV464 = Object.assign(window.ControlEventV464 || {}, {version:VERSION, versionFile:VERSION_FILE, injectReceiptTools, applyModifiedMarks}); }catch(_){ }
   }
   function install(){ injectStyle(); applyVersion(); injectReceiptTools(); applyModifiedMarks(); installObserver(); }

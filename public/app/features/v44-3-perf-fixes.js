@@ -1,10 +1,10 @@
-/* ControlEvent v50.24 - Optimización controlada de render y gráficas.
+/* ControlEvent v2.1_prod - Optimización controlada de render y gráficas.
    Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const HEAVY_GROUPS = {
     ingresos: ['collabList','ingresosSummaryGrid'],
     compras: ['comprasList'],
@@ -20,7 +20,7 @@
   function call(name, args){
     const fn = window[name];
     if(typeof fn !== 'function') return undefined;
-    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v50.24] Error en ' + name, error); return undefined; }
+    try{ return fn.apply(window, args || []); }catch(error){ console.warn('[ControlEvent v2.1_prod] Error en ' + name, error); return undefined; }
   }
   function currentTab(){
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
@@ -162,7 +162,7 @@
     const wrapped = async function(){
       const result = await old.apply(this, arguments);
       setTimeout(() => {
-        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v50.24] render tras cambio de evento', error); }
+        try{ pruneInactive(currentTab(), 'event-change'); renderV443(); }catch(error){ console.warn('[ControlEvent v2.1_prod] render tras cambio de evento', error); }
       }, 0);
       return result;
     };
@@ -193,7 +193,7 @@
     // v45.1: actualización ligera de versión. Evita recorrer todo el DOM en cada instalación.
     document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
       const t = el.textContent || '';
-      if(/ControlEvent\s+v\d+(?:\.\d+)*/.test(t)) el.textContent = t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/g, VERSION);
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/.test(t)) el.textContent = t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/g, VERSION);
     });
     try{ document.body.dataset.ceVersion = VERSION; }catch(_){ }
     try{ window.VERSION = VERSION; window.VERSION_FILE = VERSION_FILE; }catch(_){ }

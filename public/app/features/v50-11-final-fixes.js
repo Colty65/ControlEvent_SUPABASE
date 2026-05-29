@@ -1,4 +1,4 @@
-/* ControlEvent v50.27 - ajuste quirurgico sobre v50.19.
+/* ControlEvent v2.1_prod - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
@@ -7,18 +7,18 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEYS = ['ControlEvent_v50_27_session'];
+  const SESSION_KEYS = ['ControlEvent_v2_1_prod_session'];
   const LOGOUT_KEYS = [
-    'ControlEvent_v50_27_logout_at',
-    'ControlEvent_v50_27_logout_at',
-    'ControlEvent_v50_27_logout_at',
-    'ControlEvent_v50_27_logout_at'
+    'ControlEvent_v2_1_prod_logout_at',
+    'ControlEvent_v2_1_prod_logout_at',
+    'ControlEvent_v2_1_prod_logout_at',
+    'ControlEvent_v2_1_prod_logout_at'
   ];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -97,7 +97,7 @@
       window.ControlEventVersion = {version: VERSION, versionFile: VERSION_FILE};
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
         const text = el.textContent || '';
-        if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(text)) el.textContent = text.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION);
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(text)) el.textContent = text.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
       });
     }catch(_){ }
   }

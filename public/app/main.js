@@ -13,7 +13,7 @@ import { installMobileLiteOptimizer } from './performance/mobile-lite.js';
 function applyVersion(){
   document.title = VERSION;
   document.querySelectorAll('.appname span,.appname-stack span').forEach(element => {
-    if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(element.textContent || '')) element.textContent = VERSION;
+    if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(element.textContent || '')) element.textContent = VERSION;
   });
   document.body.dataset.ceVersion = VERSION;
 }

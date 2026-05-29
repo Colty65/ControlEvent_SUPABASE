@@ -1,4 +1,4 @@
-/* ControlEvent v50.27 - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
+/* ControlEvent v2.1_prod - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
    - Un solo conjunto visible de controles de justificante en INGRESOS.
    - iPad: controles de justificante tratados como boton tactil propio, igual que tickets.
    - Salir/Refrescar visibles en movil vertical.
@@ -8,8 +8,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const INSTALLED = '__ceV504FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -105,7 +105,7 @@
 
   function applyVersion(){
     try{ document.title=VERSION; document.body.dataset.ceVersion=VERSION; window.__ceVersion=VERSION; window.VERSION=VERSION; window.VERSION_FILE=VERSION_FILE; window.ControlEventVersion={version:VERSION,versionFile:VERSION_FILE}; }catch(_){ }
-    try{ document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => { const t=el.textContent||''; if(/ControlEvent\s+v\d+(?:\.\d+)*/i.test(t)) el.textContent=t.replace(/ControlEvent\s+v\d+(?:\.\d+)*/ig, VERSION); }); }catch(_){ }
+    try{ document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => { const t=el.textContent||''; if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(t)) el.textContent=t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION); }); }catch(_){ }
   }
 
   function applyRoleMenu(){

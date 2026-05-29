@@ -1,9 +1,9 @@
-/* ControlEvent v50.24 - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
+/* ControlEvent v2.1_prod - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
    No toca el flujo de cambio de evento de v44.7.x. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const EVENT_GD_MSG = 'Solo GD puede eliminar eventos.';
   const OK_MSG = 'Se puede eliminar. No hay dependencias.';
@@ -63,7 +63,7 @@
     try{ document.body.dataset.ceVersion = VERSION; window.__ceVersion = VERSION; }catch(_){ }
     try{
       document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
-        if(/ControlEvent\s+v\d+(?:\.\d+){1,2}/i.test(el.textContent || '')) el.textContent = VERSION;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
       });
     }catch(_){ }
     try{

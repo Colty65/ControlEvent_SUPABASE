@@ -1,14 +1,14 @@
-/* ControlEvent v50.24 - corrección mínima sobre v44.0:
+/* ControlEvent v2.1_prod - corrección mínima sobre v44.0:
    - navegación de Planificación inicial sin contaminar el resto de pestañas;
    - entrada desde login siempre con selección de evento pendiente;
    - pantalla limpia con icono mientras se selecciona evento.
    No toca COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
-  const OLD_CHOSEN_KEY = 'ControlEvent_v50_24_event_chosen';
+  const OLD_CHOSEN_KEY = 'ControlEvent_v2_1_prod_event_chosen';
   const WELCOME_ICON = './assets/icons/controlevent-welcome-v44.png';
   const WORK_PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas'];
   const TAB_BY_BUTTON = {
@@ -37,7 +37,7 @@
     try{ window.__ceVersion = VERSION; if(document.body) document.body.dataset.ceVersion = VERSION; }catch(_){ }
     try{
       document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
-        if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
       });
     }catch(_){ }
     try{

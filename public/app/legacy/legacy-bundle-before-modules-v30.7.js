@@ -1,9 +1,9 @@
-/* ControlEvent v50.27 - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v2.1_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-01.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #1. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #1. */
 const STORAGE_KEY = 'controlevent_v6_4';
 const PERSONA_RANGOS = ['SOCIO','DONANTE','NO SOCIO'];
 const PAYMENT_OPTIONS = ['Efectivo','Banco','Bizum','Pendiente'];
@@ -2074,7 +2074,7 @@ async function exportSeedWorkbook(){
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2166,7 +2166,7 @@ async function exportSeedWorkbook(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'ControlEvent_v50_27_descarga_datos.xlsx';
+  a.download = 'ControlEvent_v2_1_prod_descarga_datos.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -2194,7 +2194,7 @@ async function exportExcel(){
   const tiendaRows = summaryByTiendaTicket();
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2391,7 +2391,7 @@ async function exportExcel(){
   const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
   let r = 1;
   mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v50.27 - ©oltyLAB ’26');
+  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v2.1_prod - ©oltyLAB ’26');
   putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
   putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
   wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -2527,7 +2527,7 @@ async function exportExcel(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v50_27.xlsx`;
+  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v2_1_prod.xlsx`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -3396,7 +3396,7 @@ function donorOptions(){
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
@@ -3446,7 +3446,7 @@ function donorOptions(){
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v50_27_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v2_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -3823,7 +3823,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-02.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #2. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #2. */
 (function(){
   const $ = id => document.getElementById(id);
 
@@ -3853,7 +3853,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v50_27-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
+    return `ControlEvent_v2_1_prod-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
   }
   function graphData(){
     const b = budgetSummary();
@@ -4429,7 +4429,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = summaryByTiendaTicket();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -4510,7 +4510,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
     let r = 1;
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v50.27 - ©oltyLAB ’26');
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v2.1_prod - ©oltyLAB ’26');
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
     wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -4741,7 +4741,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   };
 
   window.socioResponsableOptions = function(){
@@ -5230,7 +5230,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-03.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #3. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #3. */
 /* ==== FIX FINAL V14.3 TIENDA EN COMPRAS ==== */
 (function(){
   const byId = (id) => document.getElementById(id);
@@ -5377,7 +5377,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-04.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #4. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #4. */
 /* ==== FIX V14.3 DONACIONES EN POR TIENDA/TICKET ==== */
 (function(){
   const donorNameFromRow = (c) => {
@@ -5525,7 +5525,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-05.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #5. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #5. */
 /* ==== FIX V14.3 RESUMEN DONACIONES POR DONANTE ==== */
 (function(){
   const donorNameFromAny = (c) => {
@@ -5646,7 +5646,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-06.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #6. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #6. */
 /* ==== V14.4 FIX AGRUPACIÓN TIENDA/TICKET/DONACIÓN ==== */
 (function(){
   function donorGroupingName(c){
@@ -5761,7 +5761,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-07.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #7. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #7. */
 /* ==== V14.4 CORRECCIÓN FINAL AGRUPACIÓN TIENDA/TICKET ==== */
 (function(){
   function holderNameForRow(c){
@@ -5849,7 +5849,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-08.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #8. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #8. */
 /* ==== V14.4 CORRECCIÓN 2 DONANTE REAL EN AGRUPACIÓN ==== */
 (function(){
   function holderNameForRowV2(c){
@@ -5946,7 +5946,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-09.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #9. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #9. */
 /* ==== V15.0 FILTRO TKxx EN AGR.TIENDA-TICKET ==== */
 (function(){
   const prevSummaryByTiendaTicket = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket : null;
@@ -5976,7 +5976,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-10.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #10. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #10. */
 /* ==== V15.1 AJUSTES ==== */
 (function(){
   function allPersonasSorted(){
@@ -6114,7 +6114,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-11.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #11. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #11. */
 /* ==== V15.2 EXCEL GRAFICAS + NOMBRE FICHERO ==== */
 (function(){
   function filenameV152(ev){
@@ -6128,7 +6128,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
 
   exportExcel = async function(){
@@ -6155,7 +6155,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket() : [];
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6347,7 +6347,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-12.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #12. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #12. */
 /* ==== V15.3: GRAFICAS EXCEL + NOMBRE DESCARGA + PRECIO COMPRAS ==== */
 (function(){
   const $ = (id) => document.getElementById(id);
@@ -6367,7 +6367,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = filenameV153;
 
@@ -6383,7 +6383,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         return;
       }
       const wb = new ExcelJS.Workbook();
-      wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+      wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
       wb.created = new Date();
 
       const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6433,7 +6433,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'ControlEvent_v50_27_descarga_datos.xlsx';
+      a.download = 'ControlEvent_v2_1_prod_descarga_datos.xlsx';
       a.click();
       URL.revokeObjectURL(a.href);
     };
@@ -6687,7 +6687,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-13.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #13. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #13. */
 /* ==== V16.0 PATCH FINAL ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -7148,7 +7148,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV160;
 
@@ -7258,7 +7258,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7313,7 +7313,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v50_27_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v2_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -7345,7 +7345,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v50.27 - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v2.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7561,7 +7561,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-14.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #14. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #14. */
 /* ==== V16.2 REWORK ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -7882,7 +7882,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-15.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #15. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #15. */
 /* ==== V16.2 FIXES ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -8217,7 +8217,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-16.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #16. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #16. */
 /* ==== V16.3 FIX DONANTE + SALDO OPERATIVO ==== */
 (function(){
   const esc = v => typeof escapeHtml === 'function' ? escapeHtml(v) : String(v ?? '');
@@ -8496,10 +8496,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-17.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #17. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #17. */
 /* ==== V16.4 FIXES: EXCEL, GRAFICAS, COMPRAS, AGRUPACION, TICKETS ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
+  const VERSION = 'ControlEvent v2.1_prod';
   const $v164 = id => document.getElementById(id);
   const escV164 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   const fmtMoneyV164 = v => {
@@ -8943,7 +8943,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV164;
 
@@ -8976,7 +8976,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v50_27_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v2_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -9120,7 +9120,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 /* ==== V17.2 FIXES: EXCEL RESUMEN, ORDENACIONES Y DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
+  const VERSION = 'ControlEvent v2.1_prod';
   const $v171 = id => document.getElementById(id);
   const normV171 = v => String(v ?? '').trim();
   const escV171 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));
@@ -9355,7 +9355,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v50_27_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v2_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV171;
 
@@ -9494,7 +9494,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const hh = pad(date.getHours());
     const mi = pad(date.getMinutes());
     const ss = pad(date.getSeconds());
-    return `Emitido por “©oltyLAB ’26_ControlEvent_v50_27_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
+    return `Emitido por “©oltyLAB ’26_ControlEvent_v2_1_prod_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
 
   async function exportExcelV171(){
@@ -9751,10 +9751,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-18-v180-tooltips-and-grouping-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #18. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #18. */
 /* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÓN Y AGRUPACIÓN DE DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
+  const VERSION = 'ControlEvent v2.1_prod';
   const norm = v => String(v ?? '').trim();
   const fmt = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
@@ -9934,11 +9934,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-19-v181-backup-tooltip-excel-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #19. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #19. */
 /* ==== V18.1: tooltips redondeados, backup por evento y Excel INGRESOS ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const norm = v => String(v ?? '').trim();
   const normalize = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
@@ -10156,11 +10156,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-20-v190-integrity-tooltips-export-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #20. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #20. */
 /* ==== V19.0: globos con scroll, nombres de Excel/backup, precio € en backup e integridad al eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -10465,11 +10465,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-21-v1911-integrity-tooltips-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #21. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #21. */
 /* ==== V19.1.1: parte de v19.0; bloqueo real de dependencias y globos restaurados ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -10792,7 +10792,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function afterRender(){
@@ -10854,11 +10854,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-22-v192-tooltip-size-bold-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #22. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #22. */
 /* ==== V19.2: tamaño de globos y negritas en productos, donantes/personas e importes totales ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const getRawTip = el => {
@@ -10945,7 +10945,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function normalizeDownloadName(name){
@@ -10972,11 +10972,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-23-v193-tooltip-click-sort-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #23. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #23. */
 /* ==== V19.3: globos por clic, orden alfabético y negrita controlada ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11265,7 +11265,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function normalizeDownloadName(name){
@@ -11312,7 +11312,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-24-v171-pwa-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #24. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #24. */
 (function(){
   const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -11373,11 +11373,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-25-v194-tooltip-excel-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #25. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #25. */
 /* ==== V19.4: los globos no cambian al mover el cursor y el botón Excel queda cableado de forma directa ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11579,7 +11579,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v50_27/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v2_1_prod/ig, VERSION_FILE);
     return n;
   }
   const currentAnchorClick = HTMLAnchorElement.prototype.click;
@@ -11624,7 +11624,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function afterRenderV194(){
@@ -11656,11 +11656,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-26-v1952-tooltip-excel-fix-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #26. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #26. */
 /* ==== V19.5.2: recupera globos y Excel desde v19.4, evitando interferencias de parches antiguos ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11893,7 +11893,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v50_27_\d(?:_\d+)?/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v2_1_prod_\d(?:_\d+)?/ig, VERSION_FILE);
     return n;
   }
   if(!HTMLAnchorElement.prototype.click.__v1952Wrapped){
@@ -11945,7 +11945,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function afterRenderV1952(){
@@ -12001,11 +12001,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-27-v196-tooltip-behavior-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #27. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #27. */
 /* ==== V19.6: comportamiento de Por tienda y Ticket aplicado a todos los globos ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -12212,7 +12212,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span, .appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
   }
   function normalizeDownloadName(name){
@@ -12276,11 +12276,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-28-v200-tooltip-format-delete-maint-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #28. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #28. */
 /* ==== V20.0: formato de globos, mantenimiento robusto y avisos en eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const BLOCK_MSG = 'No autorizado. Tiene dependencias';
   const OK_MSG = 'Se puede eliminar. No hay dependencias';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
@@ -12561,7 +12561,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span, .appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION; });
+    document.querySelectorAll('.appname span, .appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; });
   }
   function normalizeDownloadName(name){ return String(name || '').replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE); }
   if(!HTMLAnchorElement.prototype.click.__v200Wrapped){
@@ -12596,11 +12596,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-29-v201-final-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #29. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #29. */
 /* ==== V20.1: formato fino de globos y botones mantenimiento/carga ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12800,7 +12800,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span, .appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION; });
+    document.querySelectorAll('.appname span, .appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; });
   }
   function normalizeDownloadNames(){
     const prev = HTMLAnchorElement.prototype.click;
@@ -12870,11 +12870,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-30-v202-final-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #30. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #30. */
 /* ==== V20.2: toggle mantenimiento, carga sin selector automático, globos y fotos ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12912,7 +12912,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent = VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent = VERSION; });
   }
   function normalizeDownloads(){
     const proto = HTMLAnchorElement.prototype;
@@ -13059,10 +13059,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-31-v210-patch-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #31. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #31. */
 /* ==== V21.0: producto duplicado permitido si cambia la tienda + globos estables ==== */
 (function(){
-  const VERSION='ControlEvent v50.27'; const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod'; const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13077,7 +13077,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function maybeJumpFromInputs(){const productId=$('buyProducto')?.value||''; const tiendaId=$('buyTienda')?.value||''; if(!productId)return false; const found=findCompraSameProductStore(productId,tiendaId); if(!found)return false; jumpToCompra(found); return true;}
   document.addEventListener('change',function(ev){const t=ev.target; if(!t||!['buyProducto','buyTienda'].includes(t.id))return; if(typeof isLocked==='function'&&isLocked())return; try{if(typeof updateBuyPreview==='function')updateBuyPreview();}catch(_){} if(maybeJumpFromInputs()){ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();}},true);
   window.addCompra = addCompra = function(){try{if(!selectedEvent())return;}catch(_){if(!selectedId())return;} const productId=$('buyProducto')?.value||''; if(!productId)return; const tiendaId=$('buyTienda')?.value||''; const found=findCompraSameProductStore(productId,tiendaId); if(found){jumpToCompra(found); return;} const rec={id:(typeof uid==='function'?uid():(Date.now()+'_'+Math.random().toString(36).slice(2))),eventId:selectedId(),productoId:productId,unidades:Number($('buyUnidades')?.value||0),precio:(typeof parseEuroInput==='function'?parseEuroInput($('buyPrecio')?.value||0):Number($('buyPrecio')?.value||0)),ticketDonacion:$('buyTicket')?.value||'',tiendaId:tiendaId,responsableId:$('buyResponsable')?.value||''}; if(!Array.isArray(st().compras))st().compras=[]; st().compras.push(rec); ['buyProducto','buyTienda','buyResponsable'].forEach(id=>{const el=$(id); if(el)el.value='';}); if($('buyUnidades'))$('buyUnidades').value='1.00'; if($('buyPrecio'))$('buyPrecio').value='0,00 €'; if($('buyTicket'))$('buyTicket').value=''; try{currentMainTab='compras'; showComprasEvent=true;}catch(_){} try{if(typeof render==='function')render();}catch(_){} setTimeout(()=>setFound(locateCompraRow(rec.id)),150);};
-  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;});}
+  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});}
   function normalizeDownloadName(){const proto=HTMLAnchorElement.prototype; if(proto.click.__v210Wrapped)return; const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v210Wrapped=true; proto.click=wrapped;}
   function getTipSource(el){for(const a of ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title']){const v=el.getAttribute?.(a); if(norm(v))return v;} return '';}
   function adoptTips(){document.querySelectorAll('[data-ce-tip-v196],[data-ce-tip-v1952],[data-ce-tip],[data-v181-tip],[data-tip],[title]').forEach(el=>{if(el.closest?.('button[data-action^="delete-"]'))return; const raw=getTipSource(el); if(!norm(raw))return; const layout=el.getAttribute('data-ce-tip-layout-v20')||el.getAttribute('data-ce-tip-layout-v21')||'default'; const bg=el.getAttribute('data-tip-bg-v196')||el.getAttribute('data-tip-bg-v1952')||el.getAttribute('data-tip-bg')||getComputedStyle(el).backgroundColor||'#fff'; el.setAttribute('data-ce-tip-v21',raw); el.setAttribute('data-ce-tip-layout-v21',layout); el.setAttribute('data-tip-bg-v21',bg); ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title'].forEach(a=>el.removeAttribute(a));}); ['ceTooltipV190','ceTooltipV1952','ceTooltipV196'].forEach(id=>{const t=$(id); if(t)t.style.display='none';});}
@@ -13097,10 +13097,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-32-v211-tooltip-final-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #32. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #32. */
 /* ==== V21.1: globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v50.27'; const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod'; const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
@@ -13136,7 +13136,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function applyGroupingTips(){[['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('·')[0]); if(!label)return; const d=groupingData(label,kind); const cols=card.querySelectorAll('.vbar-col'); [[0,'Compra',d.buy,d.totalBuy,'#dc2626','groupingv211buy'],[1,'Donado',d.donated,d.totalDonated,'#f59e0b','groupingv211don'],[2,'Pte.Compra u otros gastos',d.pending,d.totalPending,'#fb7185','groupingv211pending']].forEach(([idx,name,lines,total,bg,layout])=>{const text=`${title}\n${label}\n${name}\nTOTAL: ${money(total)}\n\n${lines.length?lines.join('\n'):'Sin productos'}`; const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});}
   function closeTip(){const tip=$('ceTooltipV21'); if(tip)tip.style.display='none';}
   let hoverTimer=null; function wireCloseOnBlur(){const tip=$('ceTooltipV21'); const check=()=>{clearTimeout(hoverTimer); hoverTimer=setTimeout(()=>{const tip=$('ceTooltipV21'); if(!tip||tip.style.display==='none')return; const insideTip=tip.matches(':hover'); const insideOwner=!!document.querySelector('[data-ce-tip-v21]:hover'); if(!insideTip&&!insideOwner)closeTip();},160);}; document.addEventListener('mousemove',check,true); document.addEventListener('focusin',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},true); document.addEventListener('click',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},false);}
-  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;}); const proto=HTMLAnchorElement.prototype; if(!proto.click.__v211Wrapped){const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v211Wrapped=true; proto.click=wrapped;}}
+  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); const proto=HTMLAnchorElement.prototype; if(!proto.click.__v211Wrapped){const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v211Wrapped=true; proto.click=wrapped;}}
   function applyAll(){refreshVersion(); applyBudgetIncomeTips(); applyGroupingTips();}
   const prevRender=typeof render==='function'?render:null; if(prevRender&&!prevRender.__v211Wrapped){const wrapped=function(){const ret=prevRender.apply(this,arguments); setTimeout(applyAll,160); setTimeout(applyAll,520); return ret;}; wrapped.__v211Wrapped=true; render=wrapped; window.render=render;}
   ['DOMContentLoaded','load'].forEach(evt=>window.addEventListener(evt,()=>{setTimeout(applyAll,220); setTimeout(applyAll,900); setTimeout(applyAll,1600);}));
@@ -13148,11 +13148,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-33-v212-final-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #33. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #33. */
 /* ==== V21.2: separación CARGA/MANTENIMIENTO, backup y globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).toUpperCase();
@@ -13184,7 +13184,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;});
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});
     const proto=HTMLAnchorElement.prototype;
     if(!proto.click.__v212Wrapped){
       const prev=proto.click;
@@ -13299,11 +13299,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-34-v213-final-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #34. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #34. */
 /* ==== V21.3.1: cabeceras primero, globos reencolumnados e INFOEVENTO sin fallback; muestra error real ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13392,7 +13392,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const out=[]; let cur=null,total=0,grand=0; rows.forEach((c,i)=>{const tk=kind==='current'?'GASTOS CORRIENTES':(ticket(c)||'PTE.COMPRA'); if(cur!==null&&tk!==cur){out.push(`TOTAL ${cur} | | | | ${money(total)}`); out.push(''); total=0;} cur=tk; const v=value(c); total+=v; grand+=v; out.push(`${tk} | ${storeName(c)} | ${productName(c)} | ${num(Number(c.unidades||0))} uds x ${money(price(c))} | ${money(v)}`); if(i===rows.length-1)out.push(`TOTAL ${tk} | | | | ${money(total)}`);}); return {rows:out,total:grand};
   }
   function normalizeDownloads(){const proto=HTMLAnchorElement.prototype; if(proto.click.__v213Wrapped)return; const prev=proto.click; const wrapped=function(){try{if(this.download){this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE).replace(/[\\/:*?"<>|]+/g,'_').replace(/_+\.xlsx$/,'.xlsx');}}catch(_){} return prev.apply(this,arguments);}; wrapped.__v213Wrapped=true; proto.click=wrapped;}
-  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;}); normalizeDownloads();}
+  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); normalizeDownloads();}
   async function safeInfoEventoExport(){
     await (typeof ensureExcelJS==='function'?ensureExcelJS():Promise.resolve());
     const wb=new ExcelJS.Workbook(); wb.creator=VERSION+' - ©oltyLAB ’26'; wb.created=new Date();
@@ -13423,7 +13423,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return await previousExport.apply(this,arguments);
     }catch(err){
       window.__ultimoErrorInfoEvento=err;
-      console.group('ERROR INFOEVENTO - ControlEvent v50.27');
+      console.group('ERROR INFOEVENTO - ControlEvent v2.1_prod');
       console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o código.', err);
       try{console.error('Stack:', err&&err.stack?err.stack:'Sin stack disponible');}catch(_){}
       try{console.log('Evento activo:', ev());}catch(_){}
@@ -13446,7 +13446,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-35.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #35. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #35. */
 /* ==== V21.3.2: helper global para comentarios Excel INFOEVENTO completo ==== */
 var addCellNote = window.addCellNote || function(cell, text){
   if(!cell || !text) return;
@@ -13466,13 +13466,13 @@ var addCellNote = window.addCellNote || function(cell, text){
 };
 window.addCellNote = addCellNote;
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   function refreshVersionV2132(){
     try{ document.title = VERSION; }catch(_){ }
     try{
       document.querySelectorAll('.appname span,.appname-stack span').forEach(function(el){
-        if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
       });
     }catch(_){ }
   }
@@ -13506,11 +13506,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-36-v214-donaciones-grafica-fix.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #36. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #36. */
 /* ==== V21.4: donaciones duplicadas por Producto+Donante y corrección gráfico ingresos socio ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13661,7 +13661,7 @@ window.addCellNote = addCellNote;
   window.graphPartsV164 = graphPartsFixed;
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; });
     try{
       const proto = HTMLAnchorElement.prototype;
       if(!proto.click.__v214Wrapped){
@@ -13681,13 +13681,13 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-37-v2141-graph-income-socio-strict-fix.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #37. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #37. */
 /* ==== V21.4.1: corrección estricta Socios Banco/Bizum/Efectivo = Número x Precio evento ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
+  const VERSION='ControlEvent v2.1_prod';
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
-    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){}
+    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){}
   }
   function run(){
     refreshVersion();
@@ -13704,11 +13704,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-38-v215-minimal-fix-donaciones-excel-fotos.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #38. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #38. */
 /* ==== V21.5: solo corrige fotos INFOEVENTO y duplicidad Donaciones Producto+Donante ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13868,7 +13868,7 @@ window.addCellNote = addCellNote;
 
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent = VERSION; }); }catch(_){ }
+    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent = VERSION; }); }catch(_){ }
     try{
       const proto = HTMLAnchorElement.prototype;
       if(!proto.click.__v215Wrapped){
@@ -13888,11 +13888,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-39-v216-excel-ticket-images-protection-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #39. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #39. */
 /* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protección reforzada ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
   function st(){ try{ if(typeof state !== 'undefined') return state; }catch(_){ } return window.state || {}; }
@@ -14001,7 +14001,7 @@ window.addCellNote = addCellNote;
   }
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION; });
     try{
       const proto=HTMLAnchorElement.prototype;
       if(!proto.click.__v216Wrapped){
@@ -14022,11 +14022,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-40-v217-final-ticket-images-book-protection-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #40. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #40. */
 /* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protección open_excel_arrastre ==== */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const EXCEL_PASSWORD = 'open_excel_arrastre';
   const WORKBOOK_PASSWORD_HASH = 'D184';
   const norm = v => String(v ?? '').trim();
@@ -14234,7 +14234,7 @@ window.addCellNote = addCellNote;
 
   function refreshVersion(){
     try{ document.title=VERSION; }catch(_){ }
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION; });
   }
   function apply(){ refreshVersion(); patchExcelJSAddImage(); patchProtectionAndDownloads(); try{ normalizeTicketImagesForExcelV217(); }catch(_){ } }
   window.addEventListener('DOMContentLoaded',()=>{ setTimeout(apply,250); setTimeout(apply,1000); });
@@ -14248,11 +14248,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-41-v225-clean-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #41. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #41. */
 /* ==== V22.5: corrección limpia de fotos de tickets y claves ACCESOS ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const EXCEL_PASSWORD='open_excel_arrastre';
   const DB_NAME='controlevent_ticket_images_v225';
   const DB_STORE='images';
@@ -14267,7 +14267,7 @@ window.addCellNote = addCellNote;
 
   function updateVersion(){
     try{document.title=VERSION;}catch(_){ }
-    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;});}catch(_){ }
+    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});}catch(_){ }
   }
   window.emittedByTextV171=function(date=new Date()){
     const pad=n=>String(n).padStart(2,'0');
@@ -14554,11 +14554,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-42-v226-mobile-responsive-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #42. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #42. */
 /* ==== v22.8: menú móvil y navegación responsive ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   function $(id){return document.getElementById(id)}
   function clickId(id){const el=$(id); if(el){el.click(); closeDrawer();}}
   function ensureMobileMenu(){
@@ -14600,7 +14600,7 @@ window.addCellNote = addCellNote;
   function closeDrawer(){document.body.classList.remove('mobile-drawer-open')}
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){ }
-    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){ }
+    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){ }
     try{const proto=HTMLAnchorElement.prototype; if(!proto.click.__v226Wrapped){const prev=proto.click; const w=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){ } return prev.apply(this,arguments);}; w.__v226Wrapped=true; proto.click=w;}}catch(_){ }
   }
   function applyMobileHelpers(){
@@ -14621,7 +14621,7 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-43-v227-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #43. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #43. */
 (function(){
   'use strict';
   const VERSION='v22.8';
@@ -14792,11 +14792,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-44-v228-role-permissions-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #44. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #44. */
 /* ==== v22.8: criterios de opciones y permisos por nivel GD/RW/RO ==== */
 (function(){
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   function $(id){return document.getElementById(id)}
   function role(){try{return String((typeof authUser!=='undefined'&&authUser&&authUser.nivel)||'').toUpperCase();}catch(_){return '';}}
   function isGD(){return role()==='GD'}
@@ -14901,7 +14901,7 @@ window.addCellNote = addCellNote;
   }
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){ }
-    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){ }
+    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){ }
     try{const proto=HTMLAnchorElement.prototype; if(!proto.click.__v228Wrapped){const prev=proto.click; const w=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){ } return prev.apply(this,arguments);}; w.__v228Wrapped=true; proto.click=w;}}catch(_){ }
   }
   function applyAll(){refreshVersion(); guardPhotoFns(); applyRoleVisibility();}
@@ -14920,12 +14920,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-45-v229-event-access-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #45. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #45. */
 /* ==== v22.9: correcciones de evento finalizado y claves ACCESOS ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const ACCESS_CACHE_KEY='controlevent_v229_access_clear_cache';
   const $=id=>document.getElementById(id);
@@ -15068,7 +15068,7 @@ window.addCellNote = addCellNote;
 
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){ }
-    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;});}catch(_){ }
+    try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});}catch(_){ }
     try{const proto=HTMLAnchorElement.prototype; if(!proto.click.__v229){const prev=proto.click; const w=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; w.__v229=true; proto.click=w;}}catch(_){ }
   }
   function applyAll(){refreshVersion(); enforceSelectedEvent(); applyFinalizedConsulta();}
@@ -15084,12 +15084,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-46-v233-estabilizacion-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #46. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #46. */
 /* ==== v23.3 ESTABILIZACIÓN: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15124,7 +15124,7 @@ window.addCellNote = addCellNote;
   // 1) Versión visible y descargas.
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
-    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION; });
+    document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION; });
     const proto=HTMLAnchorElement.prototype;
     if(!proto.__ce_v233_click){const old=proto.click; proto.click=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/g,VERSION_FILE);}catch(_){} return old.apply(this,arguments);}; proto.__ce_v233_click=true;}
   }
@@ -15258,12 +15258,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-47-v234-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #47. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #47. */
 /* ==== v23.4: claves, gráfico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15310,7 +15310,7 @@ window.addCellNote = addCellNote;
   function table(title,header,lines,totalLabel,total){return [title,'',header].concat(lines.length?lines:['Sin registros'],'',`${totalLabel}: ${money(total||0)}`).join('\n');}
   function totalize(data,keyFn,valFn,label){const out=[];let prev=null,sub=0;data.forEach((r,i)=>{const k=keyFn(r)||'Sin grupo'; if(prev!==null&&k!==prev){out.push(`${label} ${prev} | | | | ${money(sub)}`);out.push('');sub=0;} prev=k; out.push(r.__line); sub+=valFn(r); if(i===data.length-1)out.push(`${label} ${k} | | | | ${money(sub)}`);});return out;}
 
-  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;}); try{const proto=HTMLAnchorElement.prototype;if(!proto.__ce_v234_click){const old=proto.click;proto.click=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/g,VERSION_FILE);}catch(_){}return old.apply(this,arguments);};proto.__ce_v234_click=true;}}catch(_){} }
+  function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); try{const proto=HTMLAnchorElement.prototype;if(!proto.__ce_v234_click){const old=proto.click;proto.click=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/g,VERSION_FILE);}catch(_){}return old.apply(this,arguments);};proto.__ce_v234_click=true;}}catch(_){} }
 
   // Claves: deja un solo botón estable por campo y elimina el primero/duplicados anteriores.
   function ensureOneToggle(input){
@@ -15383,12 +15383,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-48-v235-final-fixes-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #48. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #48. */
 /* ==== v23.6.4: permisos GD/RW/RO, evento finalizado consultable, fotos solo visuales y TOTAL ESTIMADO ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15400,7 +15400,7 @@ window.addCellNote = addCellNote;
   function isFinalized(){return up(currentEvent().situacion)==='FINALIZADO';}
   function setEnabled(el,on=true){if(!el)return;el.disabled=!on;el.readOnly=!on;el.classList.toggle('locked',!on);el.classList.toggle('ce-v225-ro-disabled',!on);el.style.pointerEvents=on?'auto':'none';el.style.opacity=on?'1':'';if(on){el.removeAttribute('aria-disabled');}else{el.setAttribute('aria-disabled','true');}}
   function show(el,on=true){if(!el)return;el.classList.toggle('hidden',!on);el.style.display=on?'':'none';el.style.visibility=on?'visible':'hidden';el.disabled=!on;el.style.pointerEvents=on?'auto':'none';el.style.opacity=on?'1':'';}
-  function updateVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||''))el.textContent=VERSION;});}
+  function updateVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});}
 
   function applyRoleAndFinalized(){
     const r=role();
@@ -15504,12 +15504,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-49-v2364-local-stability-script.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #49. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #49. */
 /* ==== v23.6.4 local: no precargar state pesado, no localStorage pesado, fotos como archivos ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const SESSION_KEY='ControlEvent_v50_27_session';
+  const VERSION='ControlEvent v2.1_prod';
+  const SESSION_KEY='ControlEvent_v2_1_prod_session';
   const $=id=>document.getElementById(id);
   const stateRef=()=>{ try{return state;}catch(_){return window.state||{};} };
   const eventId=()=>String(stateRef().selectedEventId||'');
@@ -15691,12 +15691,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-50-v2364-income-total-and-version-fix.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #50. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #50. */
 /* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versión Excel correcta ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const up = v => String(v ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const num = v => Number(v || 0) || 0;
   function getState(){ try{return state;}catch(_){return window.state||{};} }
@@ -15817,12 +15817,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-51-v2365-income-total-and-issuedby-final-fix.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #51. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #51. */
 /* ==== v23.6.5 local: corrección final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   function parseNum(v){
@@ -15983,7 +15983,7 @@ window.addCellNote = addCellNote;
   }
   function patchVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION; }); }catch(_){ }
+    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el => { if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION; }); }catch(_){ }
     try{ window.emittedByTextV171 = emittedBy; emittedByTextV171 = emittedBy; }catch(_){ window.emittedByTextV171 = emittedBy; }
     try{
       const oldFile = typeof window.xlsxFilename === 'function' ? window.xlsxFilename : null;
@@ -16013,12 +16013,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-52-v2366-direct-income-chart-fix.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #52. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #52. */
 /* ==== v23.6.6 local: cálculo directo y único de INGRESOS por TOTAL real ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v50.27';
-  const VERSION_FILE='ControlEvent_v50_27';
+  const VERSION='ControlEvent v2.1_prod';
+  const VERSION_FILE='ControlEvent_v2_1_prod';
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const $=id=>document.getElementById(id);
@@ -16125,7 +16125,7 @@ window.addCellNote = addCellNote;
   }
   function patch(){
     try{ document.title=VERSION; }catch(_){ }
-    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent||'')) el.textContent=VERSION; }); }catch(_){ }
+    try{ document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION; }); }catch(_){ }
     try{ window.graphDataV160=graphDataFixed; graphDataV160=graphDataFixed; }catch(_){ window.graphDataV160=graphDataFixed; }
     try{ window.graphDataV143=graphDataFixed; graphDataV143=graphDataFixed; }catch(_){ window.graphDataV143=graphDataFixed; }
     try{ window.graphData=graphDataFixed; graphData=graphDataFixed; }catch(_){ window.graphData=graphDataFixed; }
@@ -16144,12 +16144,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-53-v240-fixes.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #53. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #53. */
 /* ==== v24.0: tienda/ticket pendiente, graficas limpias, orden ingresos y fotos INFOEVENTO ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -16489,7 +16489,7 @@ window.addCellNote = addCellNote;
   function refreshVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
     try{
       window.emittedByTextV171 = function(date = new Date()){
@@ -16512,7 +16512,7 @@ window.addCellNote = addCellNote;
         const prev = proto.click;
         const wrapped = function(){
           try{
-            if(this.download) this.download = String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE).replace(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/ig, VERSION);
+            if(this.download) this.download = String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE).replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
           }catch(_){ }
           return prev.apply(this, arguments);
         };
@@ -16685,10 +16685,10 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-54-v241-fixes.js ===== */
 
-/* ControlEvent v50.27 - JS legacy extraido de public/index.html. Bloque inline #54. */
+/* ControlEvent v2.1_prod - JS legacy extraido de public/index.html. Bloque inline #54. */
 (function(){
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v2_1_prod';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const norm = v => String(v ?? '').trim();
@@ -16911,7 +16911,7 @@ window.addCellNote = addCellNote;
   function applyVersionV241(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname span,.appname-stack span').forEach(el => {
-      if(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/i.test(el.textContent || '')) el.textContent = VERSION;
+      if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
     });
     try{
       window.emittedByTextV171 = function(date = new Date()){
@@ -16940,7 +16940,7 @@ window.addCellNote = addCellNote;
             if(this.download){
               this.download = String(this.download)
                 .replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig, VERSION_FILE)
-                .replace(/ControlEvent\s+v\d+\.\d+(?:\.\d+)?/ig, VERSION);
+                .replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION);
             }
           }catch(_){ }
           return prev.apply(this, arguments);
