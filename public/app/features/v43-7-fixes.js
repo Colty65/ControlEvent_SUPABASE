@@ -1,8 +1,8 @@
-/* ControlEvent v1.0/pr - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
+/* ControlEvent v50.27 - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v1.0/pr';
-  const VERSION_FILE = 'ControlEvent_v1_0_pr';
+  const VERSION = 'ControlEvent v50.27';
+  const VERSION_FILE = 'ControlEvent_v50_27';
   const PROTECTION_PASSWORD = 'open_excel_arrastre';
   let backupBusy = false;
   let infoBusy = false;
@@ -234,7 +234,7 @@
     });
   }
   async function tryServerBackup(scope){
-    const res = await fetch(`/api/export/backup?scope=${encodeURIComponent(scope)}&eventId=${encodeURIComponent(selectedEventId())}&v=1.0-pr`, {cache:'no-store'});
+    const res = await fetch(`/api/export/backup?scope=${encodeURIComponent(scope)}&eventId=${encodeURIComponent(selectedEventId())}&v=50.24`, {cache:'no-store'});
     if(!res.ok) throw new Error(await res.text().catch(()=>`HTTP ${res.status}`));
     const ct = String(res.headers.get('content-type') || '').toLowerCase();
     if(ct.includes('text/html')) throw new Error('La ruta de backup del servidor no devolvió un Excel');

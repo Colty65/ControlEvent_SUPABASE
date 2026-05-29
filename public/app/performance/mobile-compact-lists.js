@@ -1,7 +1,7 @@
-/* ControlEvent v1.0/pr - Modo móvil compacto para listas pesadas.
+/* ControlEvent v50.24 - Modo móvil compacto para listas pesadas.
    Objetivo: reducir DOM en iPad/Android sin tocar INFOEVENTO, BACKUP ni datos. */
 (function(){
-  const VERSION = 'ControlEvent v1.0/pr';
+  const VERSION = 'ControlEvent v50.24';
   const STORE = 'controlevent:v28.10:mobileCompactLists';
   const DEFAULT_PAGE = 12;
   const PRODUCT_PAGE = 24;
@@ -307,7 +307,7 @@
     full(kind){ if(kind && stateLocal.full.hasOwnProperty(kind)){ stateLocal.full[kind] = true; rerender(); } return api.inspect(); },
     compact(kind){ if(kind && stateLocal.full.hasOwnProperty(kind)){ stateLocal.full[kind] = false; rerender(); } return api.inspect(); },
     inspect(){ return {...stateLocal, userAgent:navigator.userAgent, deviceMemory:navigator.deviceMemory || null}; },
-    print(){ const r = api.inspect(); console.group('[ControlEventMobileCompactLists/ControlEvent v1.0/pr] Listas compactas móviles'); console.log('Estado', r); console.groupEnd(); return r; }
+    print(){ const r = api.inspect(); console.group('[ControlEventMobileCompactLists/ControlEvent v50.24] Listas compactas móviles'); console.log('Estado', r); console.groupEnd(); return r; }
   };
   window.ControlEventMobileCompactLists = api;
   function init(){

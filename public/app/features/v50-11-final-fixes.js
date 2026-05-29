@@ -1,4 +1,4 @@
-/* ControlEvent v1.0/pr - ajuste quirurgico sobre v50.19.
+/* ControlEvent v50.27 - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
@@ -7,8 +7,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v1.0/pr';
-  const VERSION_FILE = 'ControlEvent_v1_0_pr';
+  const VERSION = 'ControlEvent v50.27';
+  const VERSION_FILE = 'ControlEvent_v50_27';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

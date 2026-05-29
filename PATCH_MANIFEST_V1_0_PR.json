@@ -1,9 +1,0 @@
-{
-  "version": "v1.0/pr",
-  "base": "v50.27",
-  "scope": "version-only",
-  "displayVersion": "ControlEvent v1.0/pr",
-  "fileVersion": "ControlEvent_v1_0_pr",
-  "cache": "controlevent-shell-v1-0-pr",
-  "note": "No logic changes. Only version labels, cache busting, package metadata, and INFOEVENTO/export version strings."
-}

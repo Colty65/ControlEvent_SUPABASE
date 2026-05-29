@@ -1,4 +1,4 @@
-/* ControlEvent v1.0/pr - estilos extraidos de public/index.html.
+/* ControlEvent v50.24 - estilos extraidos de public/index.html.
    Mantiene el mismo orden que los <style> legacy para no alterar precedencias. */
 
 /* ===== 01. inline-style-01  ===== */
@@ -1175,14 +1175,14 @@ body.ce-v257-gd #newProductoPrecio{
 .ce-budget-lite-table td:nth-child(n+2):not(:first-child){font-variant-numeric:tabular-nums;}
 @media(max-width:760px){.ce-budget-lite-tooltip-v306{width:calc(100vw - 18px);max-height:78vh;border-radius:18px;padding:10px}.ce-budget-lite-table{font-size:11px}.ce-budget-lite-table th,.ce-budget-lite-table td{padding:6px 8px}.ce-budget-lite-title{font-size:13px}.ce-budget-lite-total strong{font-size:15px}}
 
-/* ControlEvent v1.0/pr - bloqueo de globos presupuestarios heredados en móvil/tablet */
+/* ControlEvent v50.24 - bloqueo de globos presupuestarios heredados en móvil/tablet */
 .ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 #ceTooltipV21.ce-budget-legacy-suppressed-v306,#ceTooltipV190.ce-budget-legacy-suppressed-v306,#ceTooltipV181.ce-budget-legacy-suppressed-v306,#ceTooltipV1952.ce-budget-legacy-suppressed-v306,#ceTooltipV196.ce-budget-legacy-suppressed-v306{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 .ce-v306-budget-lite-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(15,23,42,.10);}
 .ce-v306-budget-lite-row:active{filter:brightness(.98);transform:translateY(1px);}
 .ce-budget-lite-tooltip-v306[aria-hidden="true"]{display:none!important;}
 
-/* ControlEvent v1.0/pr - refuerzo globos presupuestarios y orden tienda/ticket */
+/* ControlEvent v50.24 - refuerzo globos presupuestarios y orden tienda/ticket */
 .ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 #ceTooltipV21.ce-budget-legacy-suppressed-v307,#ceTooltipV190.ce-budget-legacy-suppressed-v307,#ceTooltipV181.ce-budget-legacy-suppressed-v307,#ceTooltipV1952.ce-budget-legacy-suppressed-v307,#ceTooltipV196.ce-budget-legacy-suppressed-v307{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.socios .budget-subrow,
@@ -1257,20 +1257,20 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-donation-row{grid-template-columns:1.35fr .45fr .7fr .75fr .75fr;}
 }
 
-/* ControlEvent v1.0/pr - ajustes Mapa de recursos */
+/* ControlEvent v50.24 - ajustes Mapa de recursos */
 .mapa-metric.jump-donados{cursor:pointer;outline:none;}
 .mapa-metric.jump-donados:hover,.mapa-metric.jump-donados:focus{box-shadow:0 0 0 3px rgba(34,197,94,.18);transform:translateY(-1px);}
 .mapa-only-donations-head.mapa-donation-head-focus{box-shadow:0 0 0 4px rgba(34,197,94,.22);}
 .mapa-only-donations-head strong{line-height:1.35;}
 
 
-/* ControlEvent v1.0/pr - Mapa de recursos: retorno desde productos donados */
+/* ControlEvent v50.24 - Mapa de recursos: retorno desde productos donados */
 .mapa-donations-footer{display:flex;justify-content:center;margin:14px 0 4px;}
 .mapa-donations-footer button{font-weight:900;border-radius:999px;padding:9px 16px;}
 .mapa-metric.jump-donados{user-select:none;-webkit-user-select:none;touch-action:manipulation;}
 
 
-/* ControlEvent v1.0/pr - Mapa de recursos: botón flotante Volver arriba */
+/* ControlEvent v50.24 - Mapa de recursos: botón flotante Volver arriba */
 #tabMapaProductos .mapa-floating-top{
   position:fixed;
   right:18px;
@@ -1300,7 +1300,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 }
 
 
-/* ControlEvent v1.0/pr - Mapa de recursos: botón flotante inicio responsive */
+/* ControlEvent v50.24 - Mapa de recursos: botón flotante inicio responsive */
 #tabMapaProductos .mapa-floating-top{display:none!important;}
 #ceMapaFloatingHomeButton.mapa-floating-home{
   position:fixed;
@@ -1341,7 +1341,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   }
 }
 
-/* ControlEvent v1.0/pr - Mapa de recursos: fichas de producto compactas */
+/* ControlEvent v50.24 - Mapa de recursos: fichas de producto compactas */
 .mapa-product-card.mapa-product-card-compact{
   margin-top:8px;
   padding:10px 12px 10px 15px;
@@ -1440,7 +1440,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-compact-line > div.need{grid-column:1 / -1;}
 }
 
-/* ControlEvent v1.0/pr - Mapa de recursos: fichas donadas compactas y marcado de compra en tienda */
+/* ControlEvent v50.24 - Mapa de recursos: fichas donadas compactas y marcado de compra en tienda */
 .mapa-product-actions{
   display:flex;
   align-items:flex-end;
@@ -1509,7 +1509,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-card.donation-only-compact .mapa-donation-row.donation-only-row .donor{grid-column:1 / -1;}
 }
 
-/* ControlEvent v1.0/pr - ajuste final: TKxx bloqueado y donaciones más limpias */
+/* ControlEvent v50.24 - ajuste final: TKxx bloqueado y donaciones más limpias */
 .mapa-product-card.compra-card.purchased-locked .mapa-product-actions{align-items:flex-start;}
 .mapa-product-card.compra-card.purchased-locked .mapa-product-actions:after{
   content:"✓ Ya comprado";
@@ -1533,7 +1533,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .mapa-product-card.compra-card.purchased-locked .mapa-product-actions:after{font-size:10px;padding:5px 8px;margin-top:4px;}
 }
 
-/* ==== ControlEvent v1.0/pr: Planificación inicial ==== */
+/* ==== ControlEvent v50.24: Planificación inicial ==== */
 #tabPlanificacionBtn{position:relative;}
 #tabPlanificacionBtn.active{background:#111827;color:#fff;border-color:#111827;}
 .mobile-menu-action[data-target="tabPlanificacionBtn"].primary{background:#111827;color:#fff;border-color:#111827;}
@@ -1579,7 +1579,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .plan-confidence{justify-self:start;}
 }
 
-/* ==== ControlEvent v1.0/pr: ajustes Planificación inicial ==== */
+/* ==== ControlEvent v50.24: ajustes Planificación inicial ==== */
 .plan-search-line{display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap;}
 .plan-search-line input{flex:1 1 260px;min-width:180px;}
 .plan-product-card.plan-found{outline:3px solid #f59e0b;box-shadow:0 0 0 6px rgba(245,158,11,.18),0 8px 24px rgba(15,23,42,.10);}
@@ -1596,7 +1596,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 @media (max-width:620px){.plan-product-grid.replica-grid{grid-template-columns:1fr;}}
 
 
-/* ControlEvent v1.0/pr - posición reforzada de casitas flotantes */
+/* ControlEvent v50.24 - posición reforzada de casitas flotantes */
 #ceMapaFloatingHomeButton.mapa-floating-home,
 .ce-maint-floating-top-v40{
   position:fixed;
@@ -1617,7 +1617,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   }
 }
 
-/* ControlEvent v1.0/pr - menú en una línea, casitas y móvil */
+/* ControlEvent v50.24 - menú en una línea, casitas y móvil */
 #mainTabs{grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:5px!important;}
 #mainTabs .tab{min-width:0!important;padding:8px 8px!important;}
 #mainTabs .tab .tabicon{font-size:36px!important;line-height:1!important;}

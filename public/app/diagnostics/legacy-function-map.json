@@ -1,6 +1,6 @@
 {
   "version": "ControlEvent legacy map v27.0",
-  "generatedFor": "ControlEvent v1.0/pr",
+  "generatedFor": "ControlEvent v50.24",
   "generatedAt": "2026-05-18",
   "notes": "Mapa diagnóstico heredado de v27.0 con rutas actualizadas a v27.0; sirve para limpieza segura del legacy.",
   "summary": {

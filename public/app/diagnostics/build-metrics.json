@@ -1,9 +1,8 @@
 {
-  "version": "1.0.0-pr",
+  "version": "50.27.0",
   "base": "v50.25",
-  "notes": "v1.0/pr: misma base funcional que v50.27; cambio exclusivo de version/rotulos/caches/INFOEVENTO, sin tocar logica operativa.",
+  "notes": "v50.27: retira de carga las dos capas anteriores que interferian en el flujo de evento; login -> CE sin evento -> eleccion de evento -> rehidratacion completa; Refres conserva evento/pestana; visor ligero para Just. en globos de Resumen sin tocar justificantes de INGRESOS; version/caches unificadas.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v1.0/pr",
-  "versionLabel": "ControlEvent v1.0/pr",
-  "date": "2026-05-28"
+  "build": "v50.27",
+  "versionLabel": "ControlEvent v50.27"
 }
