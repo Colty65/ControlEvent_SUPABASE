@@ -1,11 +1,11 @@
-/* ControlEvent v1.0.1/pr - selector de evento unificado y render activo único.
+/* ControlEvent v50.27 - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v1.0.1/pr';
-  const VERSION_FILE = 'ControlEvent_v1_0_1_pr';
+  const VERSION = 'ControlEvent v50.27';
+  const VERSION_FILE = 'ControlEvent_v50_27';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v50_27_event_chosen';
@@ -370,7 +370,7 @@
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       try{ authUser = data.user; }catch(_){ }
       window.authUser = data.user;
-      try{ localStorage.removeItem('ControlEvent_v50_27_session'); }catch(_){ } // v1.0/pr: no persistir sesion ligera
+      try{ localStorage.removeItem('ControlEvent_v50_27_session'); }catch(_){ } // v50.27: no persistir sesion ligera
       const c = $('loginClave'); if(c) c.value = '';
       try{ st().selectedEventId = ''; }catch(_){ }
       clearChosen();

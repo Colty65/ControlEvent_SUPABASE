@@ -1,9 +1,9 @@
-/* ControlEvent v1.0.1/pr - Mapa de recursos
+/* ControlEvent v50.24 - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v1.0.1/pr';
+  const VERSION = 'ControlEvent v50.24';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';

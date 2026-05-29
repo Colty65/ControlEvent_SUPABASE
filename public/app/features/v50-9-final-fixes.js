@@ -1,4 +1,4 @@
-/* ControlEvent v1.0.1/pr - correccion puntual sobre v50.19.
+/* ControlEvent v50.27 - correccion puntual sobre v50.19.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v1.0.1/pr';
-  const VERSION_FILE = 'ControlEvent_v1_0_1_pr';
+  const VERSION = 'ControlEvent v50.27';
+  const VERSION_FILE = 'ControlEvent_v50_27';
   const INSTALLED = '__ceV509FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
