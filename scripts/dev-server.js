@@ -274,7 +274,7 @@ app.get('/api/diagnostics', async (req, res) => {
 app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 app.listen(PORT, () => {
-  console.log('ControlEvent v2.0-pr localhost JSON local');
+  console.log('ControlEvent v50.24 localhost JSON local');
   console.log(`Abre: http://localhost:${PORT}`);
   console.log('Usuarios: admin/admin, rw/rw, ro/ro');
   console.log(`Datos: ${DATA_DIR}`);

@@ -1,4 +1,4 @@
-/* ControlEvent v2.0-pr - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
+/* ControlEvent v50.27 - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
    - Un solo conjunto visible de controles de justificante en INGRESOS.
    - iPad: controles de justificante tratados como boton tactil propio, igual que tickets.
    - Salir/Refrescar visibles en movil vertical.
@@ -8,8 +8,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v2.0-pr';
-  const VERSION_FILE = 'ControlEvent_v2_0_pr';
+  const VERSION = 'ControlEvent v50.27';
+  const VERSION_FILE = 'ControlEvent_v50_27';
   const INSTALLED = '__ceV504FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -149,37 +149,9 @@
   }
   function setReceiptLocal(id, src, ref){ if(!id || !src) return; const k=fullKey(id); const store=imageStore(), refs=st().ticketImageRefs || {}; store[k]=src; refs[k]=ref && typeof ref === 'object' ? {...ref,key:k,url:src,pathname:ref.pathname||src} : {key:k,url:src,pathname:src}; backupPut(k,src); }
   function deleteReceiptLocal(id){ const store=imageStore(), refs=st().ticketImageRefs || {}; legacyKeys(id).forEach(k => { try{ delete store[k]; delete refs[k]; }catch(_){ } }); backupDelete(id); }
-  // v2.0-pr: INGRESOS usa el mismo criterio que Por tienda y Ticket: comprimir antes de subir
-  // y no dejar una foto solo local si el servidor no confirma la escritura.
-  function readImage(file){
-    return new Promise((resolve,reject) => {
-      const r=new FileReader();
-      r.onerror=()=>reject(r.error || new Error('No se pudo leer la imagen.'));
-      r.onload=()=>{
-        const img=new Image();
-        img.onerror=()=>reject(new Error('Imagen no válida.'));
-        img.onload=()=>{
-          try{
-            const max=1100;
-            let w=img.naturalWidth || img.width || 0;
-            let h=img.naturalHeight || img.height || 0;
-            if(!w || !h){ resolve(String(r.result||'')); return; }
-            const ratio=Math.min(max/w,max/h,1);
-            w=Math.round(w*ratio); h=Math.round(h*ratio);
-            const canvas=document.createElement('canvas');
-            canvas.width=w; canvas.height=h;
-            canvas.getContext('2d').drawImage(img,0,0,w,h);
-            resolve(canvas.toDataURL('image/jpeg',0.78));
-          }catch(error){ reject(error); }
-        };
-        img.src=String(r.result||'');
-      };
-      r.readAsDataURL(file);
-    });
-  }
+  function readImage(file){ return new Promise((resolve,reject) => { const r=new FileReader(); r.onload=()=>resolve(String(r.result||'')); r.onerror=()=>reject(r.error || new Error('No se pudo leer la imagen.')); r.readAsDataURL(file); }); }
   async function uploadReceipt(id,src){
-    if(!id || !selectedId()) throw new Error('No hay evento seleccionado.');
-    if(!dataUrl(src)) throw new Error('La imagen no se ha podido preparar para subir.');
+    if(!id || !selectedId() || !dataUrl(src)) return src;
     const res=await fetch('/api/ticket-images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:selectedId(),key:keyOnly(id),dataUrl:src})});
     const payload=await res.json().catch(() => ({})); if(!res.ok || !payload.ok) throw new Error(payload.error || payload.message || 'No se pudo guardar la imagen.');
     const img=payload.image || {}, url=img.url || img.public_url || img.pathname || src; setReceiptLocal(id,url,{key:img.key||fullKey(id),url,pathname:img.pathname||url,contentType:img.contentType||img.content_type||'',size:img.size||img.size_bytes||0}); return url;
@@ -210,22 +182,7 @@
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev); }
     if(isFinalizado()){ alert('Evento finalizado. Solo se puede ver el justificante.'); return stop(ev); }
     const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.position='fixed'; input.style.left='-9999px'; input.style.top='-9999px'; document.body.appendChild(input);
-    input.addEventListener('change', async () => {
-      try{
-        const f=input.files && input.files[0];
-        if(!f) return;
-        if(!/^image\//i.test(f.type||'')){ alert('Selecciona una imagen.'); return; }
-        const src=await readImage(f);
-        // No se pinta como guardada hasta que /api/ticket-images confirma, igual que TKxx.
-        const url=await uploadReceipt(id,src);
-        if(!url) throw new Error('No se pudo guardar la foto en servidor.');
-        saveNow();
-        await hydrateReceipts(true);
-        normalizeReceipts();
-      }catch(error){
-        alert('No se pudo adjuntar el justificante. '+(error?.message || error));
-      } finally{ try{ input.remove(); }catch(_){ } }
-    }, {once:true});
+    input.addEventListener('change', async () => { try{ const f=input.files && input.files[0]; if(!f) return; if(!/^image\//i.test(f.type||'')){ alert('Selecciona una imagen.'); return; } const src=await readImage(f); setReceiptLocal(id,src); normalizeReceipts(); try{ await uploadReceipt(id,src); }catch(error){ console.warn('[v50.4] justificante queda local hasta poder subir', error); } saveNow(); normalizeReceipts(); hydrateReceipts(true); }catch(error){ alert('No se pudo adjuntar el justificante. '+(error?.message || error)); } finally{ try{ input.remove(); }catch(_){ } } }, {once:true});
     input.click(); return stop(ev);
   }
   async function removeReceipt(id,ev){

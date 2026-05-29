@@ -1,8 +1,8 @@
 {
-  "version": "2.0.0-pr",
+  "version": "50.27.0",
   "base": "v50.25",
-  "notes": "v2.0-pr: base estable v50.27; version unificada y justificantes de INGRESOS subidos al servidor igual que Por tienda y Ticket.",
+  "notes": "v50.27: retira de carga las dos capas anteriores que interferian en el flujo de evento; login -> CE sin evento -> eleccion de evento -> rehidratacion completa; Refres conserva evento/pestana; visor ligero para Just. en globos de Resumen sin tocar justificantes de INGRESOS; version/caches unificadas.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v2.0-pr",
-  "versionLabel": "ControlEvent v2.0-pr"
+  "build": "v50.27",
+  "versionLabel": "ControlEvent v50.27"
 }
