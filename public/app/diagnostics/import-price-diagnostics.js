@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
+/* ControlEvent v1.0.1/pr - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
 (function(){
   const VERSION = 'v30.7';
   const num = v => {

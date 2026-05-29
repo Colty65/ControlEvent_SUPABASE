@@ -1,0 +1,15 @@
+ControlEvent v1.0.1/pr
+
+Base funcional: v1.0/pr, procedente de v50.27.
+
+Cambios aplicados:
+- Sincronización ligera de justificantes de INGRESOS entre dispositivos mediante /api/ticket-images.
+- Evita que las URL de imágenes queden cacheadas entre dispositivos añadiendo cache-busting solo al servirlas.
+- Refres en móviles: se pinta en verde Excel mientras actualiza y vuelve a blanco al terminar.
+- Versión unificada en cabecera, caché PWA, package e INFOEVENTO/exportaciones.
+
+No se han tocado motores de INGRESOS, DONACIONES, COMPRAS, login duro de Salir, Excel funcional ni flujos que ya funcionaban.
+
+Versión visible: ControlEvent v1.0.1/pr
+Versión para ficheros/export: ControlEvent_v1_0_1_pr
+Cache PWA: controlevent-shell-v1-0-1-pr

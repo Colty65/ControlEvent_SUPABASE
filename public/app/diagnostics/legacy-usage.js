@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - Perfilador de uso legacy bajo demanda.
+/* ControlEvent v1.0.1/pr - Perfilador de uso legacy bajo demanda.
    No se activa solo. Sólo envuelve funciones globales cuando el usuario ejecuta
    ControlEventLegacyUsage.start(). Sirve para saber qué parte del legacy se usa
    realmente antes de borrar o diferir código. */

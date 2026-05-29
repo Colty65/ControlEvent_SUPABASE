@@ -1,0 +1,9 @@
+{
+  "version": "v1.0.1/pr",
+  "base": "v1.0/pr",
+  "scope": "photo-sync-mobile-refresh-version",
+  "displayVersion": "ControlEvent v1.0.1/pr",
+  "fileVersion": "ControlEvent_v1_0_1_pr",
+  "cache": "controlevent-shell-v1-0-1-pr",
+  "note": "Superseded by PATCH_MANIFEST_V1_0_1_PR.json. v1.0.1/pr keeps v1.0/pr logic and adds photo sync/cache-busting and Refres mobile feedback."
+}

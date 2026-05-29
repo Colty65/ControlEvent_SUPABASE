@@ -1,12 +1,12 @@
-/* ControlEvent v50.27 - ajustes visuales PRODUCTOS, eventos finalizados y navegación compacta.
+/* ControlEvent v1.0.1/pr - ajustes visuales PRODUCTOS, eventos finalizados y navegación compacta.
    - PRODUCTOS usa una mecánica propia y temprana de Modificar para no saltar al inicio.
    - La fila modificada queda en negrita como en el resto de mantenimientos.
    - Los justificantes de ingresos se sincronizan con /api/ticket-images con criterio servidor-no-destructivo.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.27';
-  const VERSION_FILE = 'ControlEvent_v50_27';
+  const VERSION = 'ControlEvent v1.0.1/pr';
+  const VERSION_FILE = 'ControlEvent_v1_0_1_pr';
   const INSTALLED = '__ceV501FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

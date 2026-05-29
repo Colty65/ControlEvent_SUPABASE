@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - Diagnóstico de carga móvil/rendimiento.
+/* ControlEvent v1.0.1/pr - Diagnóstico de carga móvil/rendimiento.
    Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
 import { VERSION } from '../version.js';
 
