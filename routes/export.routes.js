@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v50.24';
-const BACKUP_VERSION_FILE = 'ControlEvent_v50_24';
+const BACKUP_VERSION = 'ControlEvent v2.3_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v2_3_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -28,7 +28,7 @@ function stamp(date = new Date()){
 function backupFileName(scope, title){
   const s = stamp();
   const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
-  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
+  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.yyyy}${s.mm}${s.dd}_${s.hh}${s.mi}${s.ss}.xlsx`;
 }
 function plainRow(row){
   if(!row || typeof row !== 'object') return row;
@@ -233,7 +233,10 @@ async function buildBackupWorkbook(fullState, scope){
 }
 
 router.get('/export/backup', asyncHandler(async (req, res) => {
-  const scope = String(req.query.scope || 'TODOS');
+  let scope = String(req.query.scope || 'TODOS');
+  const eventId = String(req.query.eventId || '').trim();
+  if(scope === 'all') scope = 'TODOS';
+  if(scope === 'event' && eventId) scope = eventId;
   const state = normalizeState(await getState());
   const { wb, filename, counts } = await buildBackupWorkbook(state, scope);
   const buffer = await wb.xlsx.writeBuffer();

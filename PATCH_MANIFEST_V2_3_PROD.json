@@ -1,0 +1,22 @@
+{
+  "version": "v2.3_prod",
+  "base": "v2.1_prod estable",
+  "changes": [
+    "BACKUP generado por defecto desde estado confirmado de la app para evitar Excel solo con cabeceras.",
+    "Nombres INFOEVENTO y BACKUP normalizados.",
+    "Version unificada ControlEvent v2.3_prod / ControlEvent_v2_3_prod."
+  ],
+  "not_touched": [
+    "login",
+    "salir",
+    "fotos de INGRESOS",
+    "globos",
+    "motores de datos",
+    "fluidez movil"
+  ],
+  "functional_files": [
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "public/app/features/v2-3-prod-final-fixes.js"
+  ]
+}
