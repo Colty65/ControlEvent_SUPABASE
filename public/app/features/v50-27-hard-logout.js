@@ -1,10 +1,10 @@
-/* ControlEvent v3.0_prod - Salir duro y logon limpio.
+/* ControlEvent v3.1_prod - Salir duro y logon limpio.
    Objetivo: reproducir el estado que funciona con Ctrl+F5 + nuevo login.
    No rehidrata globos, no usa MutationObserver, no usa setInterval. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3.0_prod';
-  const VERSION_FILE = 'ControlEvent_v3_0_prod';
+  const VERSION = 'ControlEvent v3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v3_1_prod';
   if(window.__ceV5027HardLogout) return;
   window.__ceV5027HardLogout = true;
 
@@ -38,10 +38,20 @@
     return out;
   }
 
+  function escapeRegExpV300(text){
+    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function replaceVersionFilePrefixV300(text){
+    const out = String(text || '')
+      .replace(/ControlEvent_v\d+(?:_\d+){1,3}(?:_prod)+(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\.xlsx(?:$|\?|\b)|$)/ig, VERSION_FILE)
+      .replace(/ControlEvent_v\d+(?:_\d+){1,3}(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\.xlsx(?:$|\?|\b)|$)/ig, VERSION_FILE);
+    return out.replace(new RegExp(`${escapeRegExpV300(VERSION_FILE)}(?:_prod)+(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\\.xlsx(?:$|\\?|\\b)|$)`, 'ig'), VERSION_FILE);
+  }
+
   function replaceVersionText(text){
-    return normalizeDownloadNameV300(String(text || '')
-      .replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION)
-      .replace(/ControlEvent_v[0-9][0-9A-Za-z._-]*/ig, VERSION_FILE));
+    return normalizeDownloadNameV300(replaceVersionFilePrefixV300(String(text || '')
+      .replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION)));
   }
 
 
@@ -106,9 +116,9 @@
       });
     });
     [
-      'ControlEvent_v3_0_prod_session','ControlEvent_v3_0_prod_session','ControlEvent_v3_0_prod_session','ControlEvent_v3_0_prod_session','ControlEvent_v26_9_session',
+      'ControlEvent_v3_1_prod_session','ControlEvent_v3_1_prod_session','ControlEvent_v3_1_prod_session','ControlEvent_v3_1_prod_session','ControlEvent_v26_9_session',
       'ce_v250_event_chosen','ce_event_chosen','controlevent_v44_event_chosen_after_login',
-      'controlevent_v229_selected_event_id','ControlEvent_v3_0_prod_selected_event','ControlEvent_v3_0_prod_selected_event','ControlEvent_v3_0_prod_selected_event','ControlEvent_v3_0_prod_selected_event'
+      'controlevent_v229_selected_event_id','ControlEvent_v3_1_prod_selected_event','ControlEvent_v3_1_prod_selected_event','ControlEvent_v3_1_prod_selected_event','ControlEvent_v3_1_prod_selected_event'
     ].forEach(key => { safe(() => sessionStorage.removeItem(key)); safe(() => localStorage.removeItem(key)); });
   }
 
@@ -135,7 +145,7 @@
     cleanStorage();
     clearRuntime();
     safe(() => fetch('/api/logout', {method:'POST', cache:'no-store', keepalive:true}).catch(()=>{}));
-    safe(() => { sessionStorage.setItem('ControlEvent_v3_0_prod_hard_logout_at', String(Date.now())); });
+    safe(() => { sessionStorage.setItem('ControlEvent_v3_1_prod_hard_logout_at', String(Date.now())); });
     const base = window.location.origin + window.location.pathname;
     window.location.replace(base + '?ce_hard_logout=' + Date.now());
     return false;
@@ -166,7 +176,7 @@
   }
 
   function ensureLoginCleanAfterHardLogout(){
-    const recent = Number(safe(() => sessionStorage.getItem('ControlEvent_v3_0_prod_hard_logout_at')) || 0);
+    const recent = Number(safe(() => sessionStorage.getItem('ControlEvent_v3_1_prod_hard_logout_at')) || 0);
     if(!recent || Date.now() - recent > 12000) return;
     cleanStorage();
     clearRuntime();

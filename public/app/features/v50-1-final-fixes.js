@@ -1,12 +1,12 @@
-/* ControlEvent v3.0_prod - ajustes visuales PRODUCTOS, eventos finalizados y navegación compacta.
+/* ControlEvent v3.1_prod - ajustes visuales PRODUCTOS, eventos finalizados y navegación compacta.
    - PRODUCTOS usa una mecánica propia y temprana de Modificar para no saltar al inicio.
    - La fila modificada queda en negrita como en el resto de mantenimientos.
    - Los justificantes de ingresos se sincronizan con /api/ticket-images con criterio servidor-no-destructivo.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3.0_prod';
-  const VERSION_FILE = 'ControlEvent_v3_0_prod';
+  const VERSION = 'ControlEvent v3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v3_1_prod';
   const INSTALLED = '__ceV501FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
