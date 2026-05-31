@@ -1,6 +1,6 @@
 {
-  "version": "v50.22",
-  "notes": "v50.20: refresco en sitio conservando evento/pestana; oculta CE al cargar evento; estabiliza visor de justificantes en globos de Graficas/Resumen; version/cache unificadas.",
-  "versionLabel": "ControlEvent v50.24",
+  "version": "3.5.0-prod",
+  "notes": "v3.5_prod: recuperacion defensiva de INGRESOS y bloqueo de guardados completos con colecciones vacias.",
+  "versionLabel": "ControlEvent v3.5_prod",
   "generatedAt": "2026-05-28T00:00:00+02:00"
 }

@@ -1,8 +1,8 @@
 {
-  "version": "3.4.0-prod",
+  "version": "3.5.0-prod",
   "base": "v50.25",
-  "notes": "v3.4_prod: base v50.27 estable; correccion de justificantes de INGRESOS para subida real comprimida y un solo selector de archivo; version con patron robusto sin sufijos repetidos.",
+  "notes": "v3.5_prod: guarda de recuperacion de INGRESOS desde /api/state y bloqueo de guardados completos con colecciones vacias; no toca BACKUP, INFOEVENTO ni login.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v3.4_prod",
-  "versionLabel": "ControlEvent v3.4_prod"
+  "build": "v3.5_prod",
+  "versionLabel": "ControlEvent v3.5_prod"
 }

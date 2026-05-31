@@ -1,4 +1,4 @@
-/* ControlEvent v3.4_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v3.5_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
