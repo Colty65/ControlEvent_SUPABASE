@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v2.3_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v2_3_prod';
+const BACKUP_VERSION = 'ControlEvent v2.4_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v2_4_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -233,10 +233,7 @@ async function buildBackupWorkbook(fullState, scope){
 }
 
 router.get('/export/backup', asyncHandler(async (req, res) => {
-  let scope = String(req.query.scope || 'TODOS');
-  const eventId = String(req.query.eventId || '').trim();
-  if(scope === 'all') scope = 'TODOS';
-  if(scope === 'event' && eventId) scope = eventId;
+  const scope = String(req.query.scope || 'TODOS');
   const state = normalizeState(await getState());
   const { wb, filename, counts } = await buildBackupWorkbook(state, scope);
   const buffer = await wb.xlsx.writeBuffer();

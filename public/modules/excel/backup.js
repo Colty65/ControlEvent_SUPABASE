@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v2.3_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v2_3_prod';
+const BACKUP_VERSION = 'ControlEvent v2.4_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v2_4_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -53,11 +53,8 @@ async function downloadServerBackup(scope){
     try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }catch(_){ detail = await response.text().catch(()=> ''); }
     throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
   }
-  let serverCounts = null;
-  try{ serverCounts = JSON.parse(decodeURIComponent(response.headers.get('x-controlevent-backup-counts') || '')); }catch(_){ serverCounts = null; }
   const blob = await response.blob();
   if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
-  if(serverCounts && countFromCountsObject(serverCounts) === 0) throw new Error('El servidor generó un backup sin registros. Se usará generación cliente.');
   const filename = filenameFromDisposition(response.headers.get('content-disposition')) || backupFileName(scope, scope);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -122,11 +119,6 @@ function countsFor(state){
     compras: rows(state,'compras').length,
     ticketImages: Object.keys(state?.ticketImages || {}).length
   };
-}
-function countFromCountsObject(counts){
-  if(!counts || typeof counts !== 'object') return 0;
-  return ['eventos','personas','tiendas','productos','colaboradores','compras','ticketImages']
-    .reduce((total, key) => total + (Number(counts[key]) || 0), 0);
 }
 function chooseBackupScope(state){
   return new Promise(resolve => {
@@ -268,17 +260,9 @@ export async function run(options = {}){
   const scopedCounts = countsFor(scoped);
   const dataCount = countRows(scoped);
   console.info('[ControlEventExcel/v33.7] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
-  // v2.3_prod: para evitar ficheros de BACKUP con solo cabeceras se genera por defecto
-  // desde el estado confirmado que ve la app. El servidor queda como opción explícita.
-  if(options?.preferServerBackup === true){
-    try{
-      const serverResult = await downloadServerBackup(scope);
-      console.info('[ControlEventExcel/v33.7] Backup generado por servidor', serverResult);
-      return {...serverResult, counts, scopedCounts};
-    }catch(serverError){
-      console.warn('[ControlEventExcel/v33.7] Fallback a backup cliente', serverError);
-    }
-  }
+  // v2.4_prod: el BACKUP se genera siempre en cliente desde el estado completo ya leído
+  // de /api/state o, si éste llega incompleto, desde el estado vivo de la app.
+  // Evita aceptar un .xlsx de servidor con sólo cabeceras como si fuera correcto.
   if(dataCount === 0){
     alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');
     return null;
