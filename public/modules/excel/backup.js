@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v2.4_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v2_4_prod';
+const BACKUP_VERSION = 'ControlEvent v50.24';
+const BACKUP_VERSION_FILE = 'ControlEvent_v50_24';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -32,7 +32,7 @@ function stamp(date = new Date()){
 function backupFileName(scope, title){
   const s = stamp();
   const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
-  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.yyyy}${s.mm}${s.dd}_${s.hh}${s.mi}${s.ss}.xlsx`;
+  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
 }
 function backupServerUrl(scope){
   const params = new URLSearchParams({scope: scope || 'TODOS', t: String(Date.now())});
@@ -260,9 +260,13 @@ export async function run(options = {}){
   const scopedCounts = countsFor(scoped);
   const dataCount = countRows(scoped);
   console.info('[ControlEventExcel/v33.7] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
-  // v2.4_prod: el BACKUP se genera siempre en cliente desde el estado completo ya leído
-  // de /api/state o, si éste llega incompleto, desde el estado vivo de la app.
-  // Evita aceptar un .xlsx de servidor con sólo cabeceras como si fuera correcto.
+  try{
+    const serverResult = await downloadServerBackup(scope);
+    console.info('[ControlEventExcel/v33.7] Backup generado por servidor', serverResult);
+    return {...serverResult, counts, scopedCounts};
+  }catch(serverError){
+    console.warn('[ControlEventExcel/v33.7] Fallback a backup cliente', serverError);
+  }
   if(dataCount === 0){
     alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');
     return null;
