@@ -1,15 +1,18 @@
-/* ControlEvent v3.1_prod - visor grande de justificantes de INGRESOS y globo de tickets sin duplicados. */
+/* ControlEvent v3.2_prod - visor grande de justificantes de INGRESOS y globo de tickets sin duplicados. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v3.1_prod';
-  const VERSION_FILE = 'ControlEvent_v3_1_prod';
+  const VERSION = 'ControlEvent v3.2_prod';
+  const VERSION_FILE = 'ControlEvent_v3_2_prod';
   const STYLE_ID = 'ceV310PhotoViewerStyle';
   const MODAL_ID = 'ceV310PhotoViewer';
   const LEGACY_MODAL_IDS = ['ceV300PhotoViewer'];
   let lastOpenSig = '';
   let lastOpenAt = 0;
   let suppressOpenUntil = 0;
+  let hydrateBusy = false;
+  let lastHydrateEvent = '';
+  let lastHydrateAt = 0;
 
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -31,6 +34,121 @@
   }
   function isFinalizedEvent(){
     return String(currentEvent().situacion || '').trim().toUpperCase() === 'FINALIZADO';
+  }
+  function currentEventId(){
+    const s = appState();
+    const ev = currentEvent();
+    return String(ev.id || s.selectedEventId || '');
+  }
+  function srcOf(value){
+    if(!value) return '';
+    if(typeof value === 'string') return value.trim();
+    if(typeof value === 'object') return String(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.base64 || '').trim();
+    return '';
+  }
+  function ensureImageStores(){
+    const s = appState();
+    if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
+    if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object') s.ticketImageRefs = {};
+    return {images:s.ticketImages, refs:s.ticketImageRefs};
+  }
+  function mergeImageRef(key, value){
+    key = String(key || '').trim();
+    const src = srcOf(value);
+    if(!key || !src) return false;
+    const {images, refs} = ensureImageStores();
+    let changed = false;
+    if(srcOf(images[key]) !== src){ images[key] = src; changed = true; }
+    const ref = value && typeof value === 'object' ? {...value, key, url:src, pathname:value.pathname || src} : {key, url:src, pathname:src};
+    if(srcOf(refs[key]) !== src){ refs[key] = ref; changed = true; }
+    return changed;
+  }
+  function refreshPhotoScreens(){
+    try{
+      const api = window.__ceV240;
+      if($('summaryTiendaTicket') && api && typeof api.summaryByTiendaTicket === 'function' && typeof window.renderSummaryList === 'function'){
+        window.renderSummaryList('summaryTiendaTicket', api.summaryByTiendaTicket());
+      }else if($('summaryTiendaTicket') && typeof window.renderBudget === 'function'){
+        window.renderBudget();
+      }
+    }catch(_){ }
+    try{ window.ControlEventV509?.normalizeReceiptFields?.(); }catch(_){ }
+    forceVisibleViewTargets();
+  }
+  async function hydrateEventImages(force){
+    const eventId = currentEventId();
+    if(!eventId || hydrateBusy) return false;
+    const now = Date.now();
+    if(!force && eventId === lastHydrateEvent && now - lastHydrateAt < 6000) return false;
+    hydrateBusy = true;
+    lastHydrateEvent = eventId;
+    lastHydrateAt = now;
+    let changed = false;
+    try{
+      const res = await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}`, {cache:'no-store'});
+      const payload = await res.json().catch(() => ({}));
+      if(!res.ok || !payload || !payload.images) return false;
+      Object.entries(payload.images || {}).forEach(([rawKey, value]) => {
+        const key = String(rawKey || '').includes('|') ? String(rawKey || '') : `${eventId}|${String(rawKey || '')}`;
+        if(mergeImageRef(key, value)) changed = true;
+        if(!String(rawKey || '').includes('|') && mergeImageRef(String(rawKey || ''), value)) changed = true;
+      });
+    }catch(error){
+      console.warn('[ControlEvent v3.2_prod] No se pudieron hidratar fotos desde BBDD.', error);
+    }finally{
+      hydrateBusy = false;
+    }
+    return changed;
+  }
+  function hydrateAndRefresh(force){
+    hydrateEventImages(force).then(changed => {
+      if(changed) refreshPhotoScreens();
+      else forceVisibleViewTargets();
+    }).catch(() => forceVisibleViewTargets());
+  }
+  function pruneEmptyImagePayload(payload){
+    if(!payload || typeof payload !== 'object') return payload;
+    const persistedSrc = value => {
+      let src = '';
+      if(typeof value === 'string') src = value;
+      else if(value && typeof value === 'object') src = value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || '';
+      src = String(src || '').trim();
+      return /^data:image\//i.test(src) ? '' : src;
+    };
+    ['ticketImages','ticketImageRefs'].forEach(name => {
+      if(!payload[name] || typeof payload[name] !== 'object') return;
+      const clean = {};
+      Object.entries(payload[name]).forEach(([key, value]) => {
+        if(persistedSrc(value)) clean[key] = value;
+      });
+      if(Object.keys(clean).length) payload[name] = clean;
+      else delete payload[name];
+    });
+    return payload;
+  }
+  function patchFetchPersistence(){
+    if(typeof window.fetch !== 'function' || window.fetch.__ceV32PhotoPersistence) return;
+    const oldFetch = window.fetch.bind(window);
+    const wrapped = function(input, init){
+      const url = String(typeof input === 'string' ? input : (input && input.url) || '');
+      const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+      let nextInit = init;
+      if(method === 'PUT' && /\/api\/state(?:$|\?)/.test(url) && init && typeof init.body === 'string'){
+        try{
+          const payload = pruneEmptyImagePayload(JSON.parse(init.body));
+          nextInit = {...init, body:JSON.stringify(payload)};
+        }catch(_){ }
+      }
+      const result = oldFetch(input, nextInit);
+      if(/\/api\/ticket-images(?:$|\?)/.test(url) && (method === 'POST' || method === 'DELETE')){
+        Promise.resolve(result).then(res => {
+          if(res && res.ok) [120, 520, 1400].forEach(ms => setTimeout(() => hydrateAndRefresh(true), ms));
+        }).catch(() => {});
+      }
+      return result;
+    };
+    wrapped.__ceV32PhotoPersistence = true;
+    window.fetch = wrapped;
   }
 
   function applyVersion(){
@@ -55,6 +173,20 @@
       #collabList .ce-v509-receipt-thumb,
       #collabList .ce-v465-receipt-thumb{
         display:inline-flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;cursor:zoom-in!important;
+      }
+      body.ce-v235-finalizado #tabIngresos.app-lockable,
+      body.ce-v235-finalizado #tabIngresos.app-lockable.locked,
+      body.ce-finalizado-consulta #tabIngresos.app-lockable.locked,
+      body.ce-v233-final-consulta #tabIngresos.app-lockable.locked{
+        opacity:1!important;filter:none!important;pointer-events:auto!important;user-select:auto!important;
+      }
+      body.ce-v235-finalizado #collabList,
+      body.ce-v235-finalizado #collabList .itemcard,
+      body.ce-v235-finalizado #collabList .rowline,
+      body.ce-v235-finalizado #collabList .ce-v509-receipt-field,
+      body.ce-v235-finalizado #collabList .ce-v509-receipt-strip,
+      body.ce-v235-finalizado #collabList [data-ce-v509-receipt="view"]{
+        pointer-events:auto!important;visibility:visible!important;opacity:1!important;
       }
       #ceBudgetLiteTooltipV307{
         max-height:min(86vh,760px)!important;overflow:auto!important;pointer-events:auto!important;
@@ -108,6 +240,16 @@
         el.style.setProperty('cursor', 'zoom-in', 'important');
       }catch(_){ }
     });
+    if(isFinalizedEvent()){
+      document.querySelectorAll('#tabIngresos.app-lockable,#tabIngresos.app-lockable.locked,#collabList,#collabList .itemcard,#collabList .rowline,#collabList .ce-v509-receipt-field,#collabList .ce-v509-receipt-strip').forEach(el => {
+        try{
+          el.classList.remove('locked');
+          el.style.setProperty('pointer-events', 'auto', 'important');
+          el.style.setProperty('opacity', '1', 'important');
+          el.style.setProperty('filter', 'none', 'important');
+        }catch(_){ }
+      });
+    }
     document.querySelectorAll('#ceBudgetLiteTooltipV307 button').forEach(btn => {
       try{
         btn.disabled = false;
@@ -213,10 +355,13 @@
   function install(){
     injectStyle();
     applyVersion();
+    patchFetchPersistence();
     forceVisibleViewTargets();
+    hydrateAndRefresh(false);
   }
 
   document.addEventListener('click', handlePhotoEvent, {capture:true, passive:false});
+  document.addEventListener('pointerup', handlePhotoEvent, {capture:true, passive:false});
   ['pointerup','touchend'].forEach(type => {
     document.addEventListener(type, handleModalEvent, {capture:true, passive:false});
   });
@@ -227,9 +372,10 @@
     window.addEventListener(evt, () => setTimeout(install, 30));
   });
   document.addEventListener('change', event => {
-    if(event.target?.id === 'selectedEvent') [120,500,1200].forEach(ms => setTimeout(install, ms));
+    if(event.target?.id === 'selectedEvent') [120,500,1200].forEach(ms => setTimeout(() => { install(); hydrateAndRefresh(true); }, ms));
   }, true);
   [0,120,500,1400,2800].forEach(ms => setTimeout(install, ms));
+  [700,1800,3600].forEach(ms => setTimeout(() => hydrateAndRefresh(true), ms));
 
-  window.ControlEventV310Photos = {version: VERSION, install, open: openPhoto, close: closePhoto};
+  window.ControlEventV310Photos = {version: VERSION, install, open: openPhoto, close: closePhoto, hydrate:hydrateAndRefresh};
 })();
