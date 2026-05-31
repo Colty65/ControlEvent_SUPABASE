@@ -1,8 +1,8 @@
-/* ControlEvent v3.3_prod - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
+/* ControlEvent v3.4_prod - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3.3_prod';
-  const VERSION_FILE = 'ControlEvent_v3_3_prod';
+  const VERSION = 'ControlEvent v3.4_prod';
+  const VERSION_FILE = 'ControlEvent_v3_4_prod';
   const PROTECTION_PASSWORD = 'open_excel_arrastre';
   let backupBusy = false;
   let infoBusy = false;

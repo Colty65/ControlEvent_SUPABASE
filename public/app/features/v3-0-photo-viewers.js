@@ -1,9 +1,9 @@
-/* ControlEvent v3.3_prod - visor grande de justificantes y fotos de tickets con refresco controlado. */
+/* ControlEvent v3.4_prod - visor de fotos sin doble apertura; base estable v3.2. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v3.3_prod';
-  const VERSION_FILE = 'ControlEvent_v3_3_prod';
+  const VERSION = 'ControlEvent v3.4_prod';
+  const VERSION_FILE = 'ControlEvent_v3_4_prod';
   const STYLE_ID = 'ceV310PhotoViewerStyle';
   const MODAL_ID = 'ceV310PhotoViewer';
   const LEGACY_MODAL_IDS = ['ceV300PhotoViewer'];
@@ -14,9 +14,6 @@
   let lastHydrateEvent = '';
   let lastHydrateAt = 0;
   let activeOrigin = null;
-  let pendingRefreshAfterClose = false;
-  let deletePatched = false;
-  let renderHooksPatched = false;
 
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -43,13 +40,6 @@
     const s = appState();
     const ev = currentEvent();
     return String(ev.id || s.selectedEventId || '');
-  }
-  function role(){
-    try{ return String((window.authUser || authUser || {}).nivel || '').trim().toUpperCase(); }catch(_){ return String(window.authUser?.nivel || '').trim().toUpperCase(); }
-  }
-  function canEditPhotos(){
-    const r = role();
-    return (r === 'GD' || r === 'RW') && !isFinalizedEvent();
   }
   function srcOf(value){
     if(!value) return '';
@@ -86,6 +76,17 @@
     try{ window.ControlEventV509?.normalizeReceiptFields?.(); }catch(_){ }
     forceVisibleViewTargets();
   }
+  function refreshTicketScreens(){
+    try{
+      const api = window.__ceV240;
+      if($('summaryTiendaTicket') && api && typeof api.summaryByTiendaTicket === 'function' && typeof window.renderSummaryList === 'function'){
+        window.renderSummaryList('summaryTiendaTicket', api.summaryByTiendaTicket());
+      }else if($('summaryTiendaTicket') && typeof window.renderBudget === 'function'){
+        window.renderBudget();
+      }
+    }catch(_){ }
+    forceVisibleViewTargets();
+  }
   async function hydrateEventImages(force){
     const eventId = currentEventId();
     if(!eventId || hydrateBusy) return false;
@@ -105,7 +106,7 @@
         if(!String(rawKey || '').includes('|') && mergeImageRef(String(rawKey || ''), value)) changed = true;
       });
     }catch(error){
-      console.warn('[ControlEvent v3.3_prod] No se pudieron hidratar fotos desde BBDD.', error);
+      console.warn('[ControlEvent v3.4_prod] No se pudieron hidratar fotos desde BBDD.', error);
     }finally{
       hydrateBusy = false;
     }
@@ -113,14 +114,8 @@
   }
   function hydrateAndRefresh(force){
     hydrateEventImages(force).then(changed => {
-      if(changed || force){
-        if($(MODAL_ID)){
-          pendingRefreshAfterClose = true;
-          forceVisibleViewTargets();
-        }else{
-          refreshPhotoScreens();
-        }
-      }
+      if(changed) refreshPhotoScreens();
+      else if(force) refreshTicketScreens();
       else forceVisibleViewTargets();
     }).catch(() => forceVisibleViewTargets());
   }
@@ -145,7 +140,7 @@
     return payload;
   }
   function patchFetchPersistence(){
-    if(typeof window.fetch !== 'function' || window.fetch.__ceV33PhotoPersistence) return;
+    if(typeof window.fetch !== 'function' || window.fetch.__ceV34PhotoPersistence) return;
     const oldFetch = window.fetch.bind(window);
     const wrapped = function(input, init){
       const url = String(typeof input === 'string' ? input : (input && input.url) || '');
@@ -165,133 +160,8 @@
       }
       return result;
     };
-    wrapped.__ceV33PhotoPersistence = true;
+    wrapped.__ceV34PhotoPersistence = true;
     window.fetch = wrapped;
-  }
-
-  function cleanLabel(label){
-    return String(label || '').split('·')[0].trim();
-  }
-  function ticketToken(label){
-    const m = String(label || '').toUpperCase().match(/\b(?:TK|TICKET)\s*[-_]*\s*[A-Z0-9]+\b/);
-    return m ? m[0].replace(/\s+/g, '') : '';
-  }
-  function ticketImageKey(label, eventId){
-    try{ if(typeof window.ticketImageStateKey === 'function') return window.ticketImageStateKey(label, eventId); }catch(_){ }
-    try{ if(typeof ticketImageStateKey === 'function') return ticketImageStateKey(label, eventId); }catch(_){ }
-    return `${eventId || currentEventId()}|${String(label || '')}`;
-  }
-  function imageCandidateKeys(label){
-    const eventId = currentEventId();
-    const base = String(label || '').trim();
-    const clean = cleanLabel(base);
-    const out = [];
-    const add = value => {
-      value = String(value || '').trim();
-      if(value && !out.includes(value)) out.push(value);
-    };
-    [base, clean].forEach(value => {
-      if(!value) return;
-      add(value);
-      add(ticketImageKey(value, eventId));
-      add(`${eventId}|${value}`);
-    });
-    const parts = clean.split('|').map(x => x.trim()).filter(Boolean);
-    if(parts.length >= 2){
-      const [store, tk] = parts;
-      [tk, `${store}|${tk}`, `${store} | ${tk}`, `${tk}|${store}`, `${tk} | ${store}`].forEach(value => {
-        add(value);
-        add(ticketImageKey(value, eventId));
-        add(`${eventId}|${value}`);
-      });
-    }
-    const tk = ticketToken(base);
-    if(tk){
-      add(tk);
-      add(ticketImageKey(tk, eventId));
-      add(`${eventId}|${tk}`);
-    }
-    return out;
-  }
-  function relatedImageKeys(label){
-    const eventId = currentEventId();
-    const direct = imageCandidateKeys(label);
-    const found = new Set(direct);
-    const wanted = cleanLabel(label).toUpperCase();
-    const tk = ticketToken(label);
-    const store = wanted.split('|')[0]?.trim() || '';
-    const matches = key => {
-      const raw = String(key || '');
-      if(eventId && raw.includes('|') && !raw.startsWith(`${eventId}|`)) return false;
-      const rest = raw.replace(`${eventId}|`, '').toUpperCase();
-      if(direct.includes(raw)) return true;
-      if(wanted && rest === wanted) return true;
-      if(tk && rest.includes(tk) && (!store || rest.includes(store))) return true;
-      return false;
-    };
-    const s = appState();
-    [s.ticketImages || {}, s.ticketImageRefs || {}].forEach(storeObj => {
-      Object.keys(storeObj).forEach(key => { if(matches(key)) found.add(key); });
-    });
-    return Array.from(found).filter(Boolean);
-  }
-  function patchTicketPhotoDelete(){
-    if(deletePatched) return;
-    const oldRemove = window.removeTicketImage;
-    const wrapped = async function(encoded){
-      const label = decodeURIComponent(String(encoded || ''));
-      if(!label) return false;
-      if(!canEditPhotos()){
-        alert(isFinalizedEvent() ? 'Evento finalizado: solo se permite visualizar fotos.' : 'Usuario sin permiso para eliminar fotos.');
-        return false;
-      }
-      if(!confirm('¿Eliminar la foto asociada a este ticket?')) return false;
-      const eventId = currentEventId();
-      const keys = relatedImageKeys(label);
-      let ok = false;
-      for(const key of keys){
-        try{
-          const res = await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}&key=${encodeURIComponent(key)}`, {method:'DELETE'});
-          ok = ok || !!res.ok;
-        }catch(error){
-          console.warn('[ControlEvent v3.3_prod] No se pudo eliminar foto de ticket', key, error);
-        }
-      }
-      const s = appState();
-      keys.forEach(key => {
-        try{ if(s.ticketImages) delete s.ticketImages[key]; }catch(_){ }
-        try{ if(s.ticketImageRefs) delete s.ticketImageRefs[key]; }catch(_){ }
-      });
-      try{ if(typeof window.saveState === 'function') window.saveState(); else if(typeof saveState === 'function') saveState(); }catch(_){ }
-      refreshPhotoScreens();
-      setTimeout(() => hydrateAndRefresh(true), ok ? 450 : 900);
-      return false;
-    };
-    wrapped.__ceV33Delete = true;
-    wrapped.__cePrevious = oldRemove;
-    window.removeTicketImage = wrapped;
-    window.removeTicketImageV202 = wrapped;
-    try{ removeTicketImage = wrapped; }catch(_){ }
-    try{ removeTicketImageV202 = wrapped; }catch(_){ }
-    deletePatched = true;
-  }
-  function patchPhotoRenderHooks(){
-    if(renderHooksPatched) return;
-    const wrapRender = name => {
-      let fn = null;
-      try{ fn = window[name] || Function('return (typeof '+name+' === "function") ? '+name+' : null;')(); }catch(_){ fn = window[name]; }
-      if(typeof fn !== 'function' || fn.__ceV33PhotoHydrate) return;
-      const wrapped = function(){
-        const ret = fn.apply(this, arguments);
-        [120, 650].forEach(ms => setTimeout(() => hydrateAndRefresh(true), ms));
-        return ret;
-      };
-      wrapped.__ceV33PhotoHydrate = true;
-      window[name] = wrapped;
-      try{ Function('fn', name + ' = fn;')(wrapped); }catch(_){ }
-    };
-    wrapRender('render');
-    renderHooksPatched = true;
   }
 
   function applyVersion(){
@@ -446,7 +316,6 @@
       if(ctx && document.contains(ctx)){
         ctx.style.setProperty('pointer-events', 'auto', 'important');
         if(ctx.id === 'ceTicketModalV234' || ctx.id === 'ceTicketImageModalV225') ctx.classList.add('visible');
-        if(ctx.id === 'ceV509ReceiptModal') ctx.style.setProperty('display', 'flex', 'important');
       }
       if(origin.el && document.contains(origin.el)){
         origin.el.focus?.({preventScroll:true});
@@ -461,10 +330,6 @@
     if(event) stop(event);
     removeOwnModals();
     restoreOrigin();
-    if(pendingRefreshAfterClose){
-      pendingRefreshAfterClose = false;
-      setTimeout(refreshPhotoScreens, 80);
-    }
     setTimeout(forceVisibleViewTargets, 40);
     return false;
   }
@@ -507,17 +372,10 @@
       const src = modalIngreso.currentSrc || modalIngreso.src || '';
       if(src) return {src, title:'Justificante de ingreso'};
     }
-    const modalTicket = target?.closest?.('#ceTicketModalV234 img,#ceTicketImageModalV225 img,#ceBudgetLiteTooltipV307 img.ticket-thumb');
-    if(modalTicket){
-      const src = modalTicket.currentSrc || modalTicket.src || '';
+    const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 img.ticket-thumb,#ceTicketModalV234 img,#ceTicketImageModalV225 img');
+    if(ticketImg){
+      const src = ticketImg.currentSrc || ticketImg.src || '';
       if(src) return {src, title:'Foto de ticket'};
-    }
-    if(isFinalizedEvent()){
-      const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb');
-      if(ticketImg && !ticketImg.closest?.('#ceBudgetLiteTooltipV307')){
-        const src = ticketImg.currentSrc || ticketImg.src || '';
-        if(src) return {src, title:'Foto de ticket'};
-      }
     }
     return null;
   }
@@ -543,8 +401,6 @@
     injectStyle();
     applyVersion();
     patchFetchPersistence();
-    patchTicketPhotoDelete();
-    patchPhotoRenderHooks();
     forceVisibleViewTargets();
     hydrateAndRefresh(false);
   }
@@ -565,6 +421,6 @@
   [0,120,500,1400,2800].forEach(ms => setTimeout(install, ms));
   [700,1800,3600].forEach(ms => setTimeout(() => hydrateAndRefresh(true), ms));
 
-  window.ControlEventV330Photos = {version: VERSION, install, open: openPhoto, close: closePhoto, hydrate:hydrateAndRefresh};
-  window.ControlEventV310Photos = window.ControlEventV330Photos;
+  window.ControlEventV340Photos = {version: VERSION, install, open: openPhoto, close: closePhoto, hydrate:hydrateAndRefresh};
+  window.ControlEventV310Photos = window.ControlEventV340Photos;
 })();
