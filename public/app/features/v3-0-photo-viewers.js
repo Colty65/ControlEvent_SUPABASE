@@ -17,6 +17,21 @@
     try{ event?.preventDefault?.(); event?.stopPropagation?.(); event?.stopImmediatePropagation?.(); }catch(_){ }
     return false;
   };
+  function appState(){
+    try{ if(window.state && typeof window.state === 'object') return window.state; }catch(_){ }
+    try{ if(typeof state !== 'undefined' && state) return state; }catch(_){ }
+    return {};
+  }
+  function currentEvent(){
+    try{ if(typeof window.selectedEvent === 'function') return window.selectedEvent() || {}; }catch(_){ }
+    try{ if(typeof selectedEvent === 'function') return selectedEvent() || {}; }catch(_){ }
+    const s = appState();
+    const id = String(s.selectedEventId || '');
+    return (Array.isArray(s.eventos) ? s.eventos : []).find(ev => String(ev.id) === id) || {};
+  }
+  function isFinalizedEvent(){
+    return String(currentEvent().situacion || '').trim().toUpperCase() === 'FINALIZADO';
+  }
 
   function applyVersion(){
     try{
@@ -45,8 +60,12 @@
         max-height:min(86vh,760px)!important;overflow:auto!important;pointer-events:auto!important;
       }
       #ceBudgetLiteTooltipV307 button,
-      #summaryTiendaTicket button{
+      #summaryTiendaTicket .ticket-actions,
+      #summaryTiendaTicket img.ticket-thumb{
         pointer-events:auto!important;
+      }
+      #summaryTiendaTicket img.ticket-thumb{
+        display:inline-block!important;visibility:visible!important;opacity:1!important;cursor:zoom-in!important;
       }
       #ceBudgetLiteTooltipV307 img.ticket-thumb,
       #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb{
@@ -89,12 +108,30 @@
         el.style.setProperty('cursor', 'zoom-in', 'important');
       }catch(_){ }
     });
-    document.querySelectorAll('#ceBudgetLiteTooltipV307 button,#summaryTiendaTicket button').forEach(btn => {
+    document.querySelectorAll('#ceBudgetLiteTooltipV307 button').forEach(btn => {
       try{
         btn.disabled = false;
         btn.removeAttribute('disabled');
         btn.removeAttribute('aria-disabled');
         btn.style.setProperty('pointer-events', 'auto', 'important');
+      }catch(_){ }
+    });
+    document.querySelectorAll('#summaryTiendaTicket .ticket-actions').forEach(el => {
+      try{
+        el.style.setProperty('display', 'inline-flex', 'important');
+        el.style.setProperty('align-items', 'center', 'important');
+        el.style.setProperty('gap', '8px', 'important');
+        el.style.setProperty('pointer-events', 'auto', 'important');
+      }catch(_){ }
+    });
+    document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb').forEach(img => {
+      try{
+        img.removeAttribute('aria-disabled');
+        img.style.setProperty('display', 'inline-block', 'important');
+        img.style.setProperty('visibility', 'visible', 'important');
+        img.style.setProperty('opacity', '1', 'important');
+        img.style.setProperty('pointer-events', 'auto', 'important');
+        img.style.setProperty('cursor', 'zoom-in', 'important');
       }catch(_){ }
     });
   }
@@ -145,6 +182,13 @@
       const img = tipIngreso.querySelector?.('img') || tipIngreso;
       const src = img?.currentSrc || img?.src || '';
       if(src) return {src, title:'Justificante de ingreso'};
+    }
+    if(isFinalizedEvent()){
+      const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb');
+      if(ticketImg && !ticketImg.closest?.('#ceBudgetLiteTooltipV307')){
+        const src = ticketImg.currentSrc || ticketImg.src || '';
+        if(src) return {src, title:'Foto de ticket'};
+      }
     }
     return null;
   }

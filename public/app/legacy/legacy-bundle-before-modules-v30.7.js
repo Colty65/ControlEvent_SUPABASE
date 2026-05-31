@@ -16249,18 +16249,21 @@ window.addCellNote = addCellNote;
     const parts = cleanLabel(label).split('|').map(x=>up(x)).filter(Boolean);
     const wantStore = parts[0] || '';
     const id = eventId();
+    const ticketOnly = [];
     for(const bag of stores){
       for(const [k,v] of Object.entries(bag)){
         const ks = String(k);
         if(id && ks.includes('|') && !ks.startsWith(id + '|')) continue;
         const rest = up(ks.replace(id + '|',''));
-        if(tk && rest.includes(tk) && (!wantStore || rest.includes(wantStore))){
+        if(tk && rest.includes(tk)){
           const found = imageValue(v);
-          if(found) return found;
+          if(!found) continue;
+          if(!wantStore || rest.includes(wantStore)) return found;
+          ticketOnly.push(found);
         }
       }
     }
-    return '';
+    return ticketOnly.length === 1 ? ticketOnly[0] : '';
   }
   function setTip(el, text, bg = '#fff', layout = 'default'){
     if(!el || !norm(text)) return;
@@ -17039,4 +17042,3 @@ window.addCellNote = addCellNote;
 })();
 
 ;/* ===== END legacy-inline-54-v241-fixes.js ===== */
-

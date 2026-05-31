@@ -176,6 +176,25 @@ async function protectWorkbook(wb){
     }catch(_){ }
   }
 }
+function backupVersionText(value){
+  if(typeof value !== 'string') return value;
+  const oldFile = 'ControlEvent_' + 'v3_' + '0_prod';
+  const oldText = 'ControlEvent ' + 'v3.' + '0_prod';
+  const oldTextAlt = 'ControlEvent ' + 'v3_' + '0_prod';
+  return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
+}
+function enforceBackupVersion(wb){
+  try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }
+  try{ wb.lastModifiedBy = BACKUP_VERSION; }catch(_){ }
+  try{
+    (wb.worksheets || []).forEach(ws => {
+      ws.eachRow(row => row.eachCell(cell => {
+        const next = backupVersionText(cell.value);
+        if(next !== cell.value) cell.value = next;
+      }));
+    });
+  }catch(_){ }
+}
 async function buildBackupWorkbook(fullState, scope){
   const scoped = scopedBackupState(fullState, scope);
   const dataCount = countRows(scoped);
@@ -237,6 +256,7 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
   await protectWorkbook(wb);
+  enforceBackupVersion(wb);
   return {wb, filename: backupFileName(scope, selectedTitle), counts: scopedCounts};
 }
 

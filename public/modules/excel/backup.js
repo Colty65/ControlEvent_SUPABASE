@@ -257,7 +257,27 @@ async function protectWorkbook(wb){
     }catch(_){ }
   }
 }
+function backupVersionText(value){
+  if(typeof value !== 'string') return value;
+  const oldFile = 'ControlEvent_' + 'v3_' + '0_prod';
+  const oldText = 'ControlEvent ' + 'v3.' + '0_prod';
+  const oldTextAlt = 'ControlEvent ' + 'v3_' + '0_prod';
+  return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
+}
+function enforceBackupVersion(wb){
+  try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }
+  try{ wb.lastModifiedBy = BACKUP_VERSION; }catch(_){ }
+  try{
+    (wb.worksheets || []).forEach(ws => {
+      ws.eachRow(row => row.eachCell(cell => {
+        const next = backupVersionText(cell.value);
+        if(next !== cell.value) cell.value = next;
+      }));
+    });
+  }catch(_){ }
+}
 async function downloadWorkbook(wb, filename){
+  enforceBackupVersion(wb);
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');

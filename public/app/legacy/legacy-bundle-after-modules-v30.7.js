@@ -2784,7 +2784,27 @@ window.__ceDisableLegacyBarGraficas = true;
     ws.addImage(id, {tl:{col:c - 1 + 0.05, row:r - 1 + 0.05}, ext:{width,height}, editAs:'oneCell'});
     return true;
   }
+  function workbookVersionText(value){
+    if(typeof value !== 'string') return value;
+    const oldFile = 'ControlEvent_' + 'v3_' + '0_prod';
+    const oldText = 'ControlEvent ' + 'v3.' + '0_prod';
+    const oldTextAlt = 'ControlEvent ' + 'v3_' + '0_prod';
+    return value.split(oldFile).join(VERSION_FILE).split(oldText).join(VERSION).split(oldTextAlt).join(VERSION);
+  }
+  function enforceWorkbookVersion(wb){
+    try{ wb.creator = `${VERSION} - ©oltyLAB '26`; }catch(_){ }
+    try{ wb.lastModifiedBy = VERSION; }catch(_){ }
+    try{
+      (wb.worksheets || []).forEach(ws => {
+        ws.eachRow(row => row.eachCell(cell => {
+          const next = workbookVersionText(cell.value);
+          if(next !== cell.value) cell.value = next;
+        }));
+      });
+    }catch(_){ }
+  }
   async function downloadWorkbook(wb, filename){
+    enforceWorkbookVersion(wb);
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
