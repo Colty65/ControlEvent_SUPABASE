@@ -1,8 +1,8 @@
 {
-  "version": "3.5.0-prod",
+  "version": "3.6.0-prod",
   "base": "v50.25",
-  "notes": "v3.5_prod: guarda de recuperacion de INGRESOS desde /api/state y bloqueo de guardados completos con colecciones vacias; no toca BACKUP, INFOEVENTO ni login.",
+  "notes": "v3.6_prod: acceso robusto contra diferencias de mayusculas/espacios; mantiene recuperacion defensiva de INGRESOS y no toca BACKUP ni INFOEVENTO.",
   "generatedAt": "2026-05-28T00:00:00+02:00",
-  "build": "v3.5_prod",
-  "versionLabel": "ControlEvent v3.5_prod"
+  "build": "v3.6_prod",
+  "versionLabel": "ControlEvent v3.6_prod"
 }

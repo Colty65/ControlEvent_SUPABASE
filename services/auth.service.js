@@ -37,10 +37,34 @@ export async function listUsers() {
   return (await getUsers(await fallbackUsers())).map(publicUser);
 }
 
+function normalizeIdent(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFKC')
+    .toUpperCase();
+}
+
+function normalizeClave(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/\r?\n/g, '')
+    .trim();
+}
+
+function sameIdent(a, b) {
+  return normalizeIdent(a) === normalizeIdent(b);
+}
+
+function sameClave(stored, provided) {
+  const rawStored = String(stored ?? '');
+  const rawProvided = String(provided ?? '');
+  return rawStored === rawProvided || normalizeClave(rawStored) === normalizeClave(rawProvided);
+}
+
 export async function login({ identificacion, clave } = {}) {
   const users = await getUsers(await fallbackUsers());
-  const user = users.find(item => String(item.identificacion) === String(identificacion || ''));
-  if (!user || String(user.clave || '') !== String(clave || '')) {
+  const user = users.find(item => sameIdent(item.identificacion, identificacion));
+  if (!user || !sameClave(user.clave, clave)) {
     const err = new Error('Identificacion o clave no validos.');
     err.status = 401;
     throw err;
