@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v50.24';
-const BACKUP_VERSION_FILE = 'ControlEvent_v50_24';
+const BACKUP_VERSION = 'ControlEvent v3.0_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v3_0_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -32,7 +32,7 @@ function stamp(date = new Date()){
 function backupFileName(scope, title){
   const s = stamp();
   const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
-  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
+  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.yyyy}${s.mm}${s.dd}_${s.hh}${s.mi}${s.ss}.xlsx`;
 }
 function backupServerUrl(scope){
   const params = new URLSearchParams({scope: scope || 'TODOS', t: String(Date.now())});
@@ -79,6 +79,12 @@ function normalizeState(value){
   const state = cloneState(value);
   for(const key of COLLECTIONS) if(!Array.isArray(state[key])) state[key] = [];
   state.ticketImages = state.ticketImages && typeof state.ticketImages === 'object' ? state.ticketImages : {};
+  const refs = state.ticketImageRefs && typeof state.ticketImageRefs === 'object' ? state.ticketImageRefs : {};
+  Object.entries(refs).forEach(([key, ref]) => {
+    if(state.ticketImages[key]) return;
+    if(typeof ref === 'string') state.ticketImages[key] = ref;
+    else if(ref && typeof ref === 'object') state.ticketImages[key] = ref.base64 || ref.dataUrl || ref.dataURL || ref.image || ref.src || ref.public_url || ref.publicUrl || ref.url || ref.pathname || ref.storage_path || ref.path || '';
+  });
   return state;
 }
 async function fetchServerState(){
@@ -87,27 +93,41 @@ async function fetchServerState(){
   return normalizeState(await res.json());
 }
 function fallbackState(){
-  const appState = window.ControlEventApp?.state;
-  const globalState = window.state;
-  const candidates = [appState, globalState, window.__CONTROL_EVENT_STATE__].map(normalizeState);
+  const localState = (() => {
+    try{
+      const raw = localStorage.getItem('controlevent_v6_4');
+      return raw ? JSON.parse(raw) : null;
+    }catch(_){ return null; }
+  })();
+  const candidates = [
+    window.ControlEventApp?.state,
+    window.ControlEventRuntime?.app?.state,
+    window.__ceV258?.app?.state,
+    window.state,
+    window.__CONTROL_EVENT_STATE__,
+    localState
+  ].map(normalizeState);
   candidates.sort((a,b) => countRows(b) - countRows(a));
   return candidates[0] || normalizeState({});
 }
 async function getBestState(){
   let source = 'server';
   let state = null;
+  let serverCounts = null;
   try{ state = await fetchServerState(); }
   catch(error){
     console.warn('[ControlEventExcel/v33.7] No se pudo leer /api/state; se usa estado de la app.', error);
     source = 'app-fallback';
     state = fallbackState();
   }
+  serverCounts = countsFor(state);
   const app = fallbackState();
   if(countRows(app) > countRows(state)){
     source = source === 'server' ? 'app-fallback-mas-completo' : source;
     state = app;
   }
-  return {state: normalizeState(state), source, counts: countsFor(state)};
+  const normalized = normalizeState(state);
+  return {state: normalized, source, counts: countsFor(normalized), serverCounts, appCounts: countsFor(app), useServerBackup: source === 'server'};
 }
 function countsFor(state){
   return {
@@ -253,19 +273,23 @@ export async function run(options = {}){
     alert('Solo GD puede realizar descarga de datos.');
     return null;
   }
-  const {state, source, counts} = await getBestState();
+  const {state, source, counts, serverCounts, appCounts, useServerBackup} = await getBestState();
   const scope = options.scope || await chooseBackupScope(state);
   if(!scope) return null;
   const scoped = scopedBackupState(state, scope);
   const scopedCounts = countsFor(scoped);
   const dataCount = countRows(scoped);
-  console.info('[ControlEventExcel/v33.7] Descarga de datos solicitada', {source, counts, scope, scopedCounts});
-  try{
-    const serverResult = await downloadServerBackup(scope);
-    console.info('[ControlEventExcel/v33.7] Backup generado por servidor', serverResult);
-    return {...serverResult, counts, scopedCounts};
-  }catch(serverError){
-    console.warn('[ControlEventExcel/v33.7] Fallback a backup cliente', serverError);
+  console.info('[ControlEventExcel/v33.7] Descarga de datos solicitada', {source, counts, serverCounts, appCounts, scope, scopedCounts});
+  if(useServerBackup){
+    try{
+      const serverResult = await downloadServerBackup(scope);
+      console.info('[ControlEventExcel/v33.7] Backup generado por servidor', serverResult);
+      return {...serverResult, counts, scopedCounts};
+    }catch(serverError){
+      console.warn('[ControlEventExcel/v33.7] Fallback a backup cliente', serverError);
+    }
+  }else{
+    console.warn('[ControlEventExcel/v33.7] Se omite /api/export/backup porque el estado de la app contiene mas datos que el servidor.', {source, serverCounts, appCounts});
   }
   if(dataCount === 0){
     alert('No hay datos que descargar. La descarga se ha cancelado para evitar un Excel solo con cabeceras.');
@@ -282,6 +306,7 @@ export async function run(options = {}){
   const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
   const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
   const now = stamp();
+  const totalCounts = countsFor(state);
 
   addRows('METADATOS', ['CAMPO','VALOR'], [
     ['VERSION', BACKUP_VERSION],
@@ -297,8 +322,11 @@ export async function run(options = {}){
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
     ['REGISTROS_COMPRAS', scopedCounts.compras],
     ['REGISTROS_TICKETS', scopedCounts.ticketImages],
+    ['TOTAL_ORIGEN_EVENTOS', totalCounts.eventos],
+    ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
+    ['TOTAL_ORIGEN_PRODUCTOS', totalCounts.productos],
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
-    ['NOTA', 'Las imagenes grandes de tickets se dividen en TICKETS_PARTES para evitar ficheros Excel corruptos.']
+    ['NOTA', 'Exportacion generada con clonado plano y tickets divididos para evitar RangeError.']
   ]);
   addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
@@ -310,11 +338,12 @@ export async function run(options = {}){
   addRows('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
   const ticketRows = [], partRows = [];
   Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
-    const evCode = eventCode[ticketEventIdFromKey(fullKey)] || '';
+    const eventToken = ticketEventIdFromKey(fullKey);
+    const evCode = eventCode[eventToken] || '';
     const key = ticketInnerKeyFromKey(fullKey);
     const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
-    const parts = splitLongText(data, 30000);
-    ticketRows.push([evCode, key, '', data.length <= 30000 ? data : '', data.length > 30000 ? 'DIVIDIDA_EN_TICKETS_PARTES' : '']);
+    const parts = splitLongText(data, 8000);
+    ticketRows.push([evCode, key, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_V41_2' : 'SIN_IMAGEN']);
     parts.forEach((part, idx) => partRows.push([evCode, key, idx + 1, parts.length, part]));
   });
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);

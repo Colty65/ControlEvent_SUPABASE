@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - correccion de estabilidad sin temporizadores de version.
+/* ControlEvent v3.0_prod - correccion de estabilidad sin temporizadores de version.
    - No se carga v50.7: se evita la restauracion agresiva de globos que los mandaba a la esquina.
    - Version unificada actualizando las constantes de los scripts cargados a v50.19.
    - Salir/Refrescar en movil se mueven a un dock real inferior, fuera del selector de evento.
@@ -7,14 +7,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV508FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEY = 'ControlEvent_v50_24_session';
-  const LOGOUT_KEY = 'ControlEvent_v50_24_logout_at';
+  const SESSION_KEY = 'ControlEvent_v3_0_prod_session';
+  const LOGOUT_KEY = 'ControlEvent_v3_0_prod_logout_at';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const BTN = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
   const PANEL = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};

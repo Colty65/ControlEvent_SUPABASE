@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - recuperacion estable sobre v50.4.
+/* ControlEvent v3.0_prod - recuperacion estable sobre v50.4.
    Objetivo: NO sustituir los visores que ya funcionaban.
    - Retira de la carga efectiva los visores interceptores v50.5/v50.6 desde index.html.
    - Mantiene salida limpia sin reentrada automatica.
@@ -10,14 +10,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV507FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEY = 'ControlEvent_v50_24_session';
-  const LOGOUT_KEY = 'ControlEvent_v50_24_logout_at';
+  const SESSION_KEY = 'ControlEvent_v3_0_prod_session';
+  const LOGOUT_KEY = 'ControlEvent_v3_0_prod_logout_at';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
   const BTN = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};

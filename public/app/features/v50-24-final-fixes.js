@@ -1,12 +1,12 @@
-/* ControlEvent v2.1_prod - emergencia contra bloqueo de login por v50.23.
+/* ControlEvent v3.0_prod - emergencia contra bloqueo de login por v50.23.
    - No usa MutationObserver global ni bucles permanentes.
    - Mantiene login escribible.
    - Refres/Refrescar se marca en verde Excel durante la actualización.
    - Versión unificada solo con aplicaciones puntuales, sin observador infinito. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v2.1_prod';
-  const VERSION_FILE = 'ControlEvent_v2_1_prod';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV5024FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -40,10 +40,36 @@
     document.head.appendChild(style);
   }
 
+  function stampV300(date = new Date()){
+    const p = n => String(n).padStart(2, '0');
+    return {ymd: `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}`, hms: `${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`};
+  }
+
+  function normalizeYmdV300(value){
+    const s = String(value || '');
+    if(/^20\d{6}$/.test(s)) return s;
+    if(/^\d{8}$/.test(s)) return `${s.slice(4)}${s.slice(2,4)}${s.slice(0,2)}`;
+    return stampV300().ymd;
+  }
+
+  function normalizeDownloadNameV300(text){
+    let out = String(text || '');
+    if(!/\.xlsx(?:$|\?)/i.test(out)) return out;
+    out = out.replace(new RegExp(`(${VERSION_FILE}_INFOEVENTO-.+?)_(\\d{8})(?:[-_](\\d{2})[:_]*(\\d{2})[:_]*(\\d{2}))?\\.xlsx$`, 'i'), (_m, prefix, date, hh, mi, ss) => {
+      const fallback = stampV300();
+      return `${prefix}_${normalizeYmdV300(date)}_${hh && mi && ss ? `${hh}${mi}${ss}` : fallback.hms}.xlsx`;
+    });
+    out = out.replace(new RegExp(`(${VERSION_FILE}_BACKUP_.+?)_(\\d{8})(?:[-_](\\d{2})[:_]*(\\d{2})[:_]*(\\d{2}))?\\.xlsx$`, 'i'), (_m, prefix, date, hh, mi, ss) => {
+      const fallback = stampV300();
+      return `${prefix}_${normalizeYmdV300(date)}_${hh && mi && ss ? `${hh}${mi}${ss}` : fallback.hms}.xlsx`;
+    });
+    return out;
+  }
+
   function replaceVersionText(text){
-    return String(text || '')
+    return normalizeDownloadNameV300(String(text || '')
       .replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/ig, VERSION)
-      .replace(/ControlEvent_v[0-9][0-9A-Za-z._-]*/ig, VERSION_FILE);
+      .replace(/ControlEvent_v[0-9][0-9A-Za-z._-]*/ig, VERSION_FILE));
   }
 
   function applyVersionOnce(){

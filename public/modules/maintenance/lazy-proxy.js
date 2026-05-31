@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - Proxy ligero para mantenimiento diferido.
+/* ControlEvent v3.0_prod - Proxy ligero para mantenimiento diferido.
    Evita ReferenceError si se consulta ControlEventMaintenance antes de abrir Mantenimiento. */
 import { VERSION } from '../../app/version.js';
 

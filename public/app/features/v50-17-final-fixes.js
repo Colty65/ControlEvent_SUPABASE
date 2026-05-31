@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - flujo único login/evento y globos estables.
+/* ControlEvent v3.0_prod - flujo único login/evento y globos estables.
    - Retira la dependencia de los parches v50.15/v50.19: no intercepta /api/state.
    - Tras login: estado neutro con CE grande y selector "Selecciona evento...".
    - Tras elegir evento: limpia marcas de espera, carga/rehidrata ventanas y globos.
@@ -7,8 +7,8 @@
    - No toca el bloque de justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV5017FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -18,9 +18,9 @@
   const STYLE_ID = 'ceV5017FinalStyle';
   const BUDGET_TIP_ID = 'ceBudgetLiteTooltipV307';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
-  const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v50_24_event_chosen','ce_v5017_event_chosen'];
+  const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v3_0_prod_event_chosen','ce_v5017_event_chosen'];
   const FORCE_KEYS = ['ce_v5015_force_event_picker_after_login','ce_v5013_require_event_choice','ce_v5013_user_picked_event'];
-  const STORAGE_SESSION_KEY = 'ControlEvent_v50_24_session';
+  const STORAGE_SESSION_KEY = 'ControlEvent_v3_0_prod_session';
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
   const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};

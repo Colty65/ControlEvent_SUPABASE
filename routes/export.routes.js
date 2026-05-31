@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v50.24';
-const BACKUP_VERSION_FILE = 'ControlEvent_v50_24';
+const BACKUP_VERSION = 'ControlEvent v3.0_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v3_0_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -28,7 +28,7 @@ function stamp(date = new Date()){
 function backupFileName(scope, title){
   const s = stamp();
   const label = scope === 'TODOS' ? 'TODOS' : cleanFilePart(title || scope || 'EVENTO');
-  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.dd}${s.mm}${s.yyyy}_${s.hh}_${s.mi}_${s.ss}.xlsx`;
+  return `${BACKUP_VERSION_FILE}_BACKUP_${label}_${s.yyyy}${s.mm}${s.dd}_${s.hh}${s.mi}${s.ss}.xlsx`;
 }
 function plainRow(row){
   if(!row || typeof row !== 'object') return row;
@@ -46,15 +46,22 @@ function normalizeTicketImage(value){
   if(value == null) return '';
   if(typeof value === 'string') return value;
   if(typeof value !== 'object') return String(value);
-  return value.base64 || value.dataUrl || value.dataURL || value.image || value.src || value.url || value.filename || value.name || '';
+  return value.base64 || value.dataUrl || value.dataURL || value.image || value.src || value.public_url || value.publicUrl || value.url || value.pathname || value.storage_path || value.path || value.filename || value.name || '';
 }
 function normalizeState(value){
   const source = value && typeof value === 'object' ? value : {};
   const state = {};
   for (const key of COLLECTIONS) state[key] = Array.isArray(source[key]) ? source[key].map(plainRow) : [];
   state.ticketImages = {};
-  const ticketImages = source.ticketImages && typeof source.ticketImages === 'object' ? source.ticketImages : {};
-  Object.entries(ticketImages).forEach(([key, image]) => { state.ticketImages[String(key)] = normalizeTicketImage(image); });
+  const imageSources = [
+    source.ticketImages && typeof source.ticketImages === 'object' ? source.ticketImages : {},
+    source.ticketImageRefs && typeof source.ticketImageRefs === 'object' ? source.ticketImageRefs : {}
+  ];
+  imageSources.forEach(ticketImages => {
+    Object.entries(ticketImages).forEach(([key, image]) => {
+      if(!state.ticketImages[String(key)]) state.ticketImages[String(key)] = normalizeTicketImage(image);
+    });
+  });
   return state;
 }
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
@@ -219,7 +226,8 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
   const ticketRows = [], partRows = [];
   Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
-    const evCode = eventCode[ticketEventIdFromKey(fullKey)] || '';
+    const eventToken = ticketEventIdFromKey(fullKey);
+    const evCode = eventCode[eventToken] || '';
     const key = ticketInnerKeyFromKey(fullKey);
     const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
     const parts = splitLongText(data, 8000);

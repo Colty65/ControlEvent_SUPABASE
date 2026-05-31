@@ -16,7 +16,7 @@
     'ce-v5019-logged-out','ce-v5022-logged-out'
   ];
   const HAS_EVENT_CLASSES = ['ce-v5019-authenticated','ce-v5020-has-event','ce-v5022-has-event','ce-v5025-has-event'];
-  const SESSION_KEYS_TO_CLEAR_ON_LOGOUT = ['ControlEvent_v50_25_session','ControlEvent_v50_24_session'];
+  const SESSION_KEYS_TO_CLEAR_ON_LOGOUT = ['ControlEvent_v50_25_session','ControlEvent_v3_0_prod_session'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);

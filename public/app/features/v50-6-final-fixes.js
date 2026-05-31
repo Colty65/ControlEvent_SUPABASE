@@ -1,4 +1,4 @@
-/* ControlEvent v50.24 - saneamiento de efectos colaterales v50.5.
+/* ControlEvent v3.0_prod - saneamiento de efectos colaterales v50.5.
    - Salir real: limpia sesion ligera localStorage y evita reentrada automatica.
    - Evita flicker de pantalla inicial/login durante renders autentificados en iPad.
    - Mueve Salir/Refrescar en movil/iPad a esquina inferior derecha, compactos y semitransparentes.
@@ -7,14 +7,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v50.24';
-  const VERSION_FILE = 'ControlEvent_v50_24';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV506FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEY = 'ControlEvent_v50_24_session';
-  const LOGOUT_KEY = 'ControlEvent_v50_24_logout_at';
+  const SESSION_KEY = 'ControlEvent_v3_0_prod_session';
+  const LOGOUT_KEY = 'ControlEvent_v3_0_prod_logout_at';
   const PHOTO_SELECTOR = [
     '.ce-v504-receipt-thumb',
     '[data-ce-v504-receipt="view"]',
