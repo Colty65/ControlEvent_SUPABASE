@@ -1,11 +1,11 @@
-/* ControlEvent v7.0_prod - cierre final de versión, Excel y visores sin bucles periódicos.
+/* ControlEvent v7.1_prod - cierre final de versión, Excel y visores sin bucles periódicos.
    Alcance: no cambia datos, Supabase ni render general. Evita setInterval y sólo actúa por eventos reales. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.0_prod';
-  const VERSION_FILE = 'ControlEvent_v7_0_prod';
-  const INSTALLED = '__ceV70ProdFinalFix';
+  const VERSION = 'ControlEvent v7.1_prod';
+  const VERSION_FILE = 'ControlEvent_v7_1_prod';
+  const INSTALLED = '__ceV71ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -26,6 +26,11 @@
     return String(value == null ? '' : value)
       .replace(/ControlEvent_v\d+(?:_\d+){1,4}(?:_prod)?/ig, VERSION_FILE)
       .replace(/ControlEvent\s+v\d+(?:\.\d+){1,4}(?:_prod)?/ig, VERSION);
+  }
+
+
+  function forceVersionSoon(){
+    [0,40,120,360,900,1800].forEach(ms => setTimeout(applyVersion, ms));
   }
 
   function applyVersion(){
@@ -77,8 +82,8 @@
   function patchAnchorDownloads(){
     const proto = window.HTMLAnchorElement && HTMLAnchorElement.prototype;
     const nativeClick = window.HTMLElement && HTMLElement.prototype && HTMLElement.prototype.click;
-    if(!proto || !nativeClick || proto.__ceV70DownloadPatched) return;
-    proto.__ceV70DownloadPatched = true;
+    if(!proto || !nativeClick || proto.__ceV71DownloadPatched) return;
+    proto.__ceV71DownloadPatched = true;
     const oldSetAttribute = proto.setAttribute;
     proto.setAttribute = function(name, value){
       if(String(name || '').toLowerCase() === 'download') value = normalizeDownloadName(value);
@@ -102,8 +107,8 @@
     return value;
   }
   function scrubWorkbook(wb){
-    if(!wb || wb.__ceV70Scrubbed) return wb;
-    wb.__ceV70Scrubbed = true;
+    if(!wb || wb.__ceV71Scrubbed) return wb;
+    wb.__ceV71Scrubbed = true;
     safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - ©oltyLAB '26`); }, null);
     safe(() => { wb.lastModifiedBy = VERSION; }, null);
     safe(() => {
@@ -114,15 +119,15 @@
     return wb;
   }
   function patchWorkbookInstance(wb){
-    if(!wb || wb.__ceV70WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
-    wb.__ceV70WritePatched = true;
+    if(!wb || wb.__ceV71WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
+    wb.__ceV71WritePatched = true;
     const oldWriteBuffer = wb.xlsx.writeBuffer.bind(wb.xlsx);
     wb.xlsx.writeBuffer = function(){ scrubWorkbook(wb); return oldWriteBuffer.apply(this, arguments); };
     return wb;
   }
   function patchExcelJS(){
     const X = window.ExcelJS;
-    if(!X || !X.Workbook || X.__ceV70WorkbookPatched) return false;
+    if(!X || !X.Workbook || X.__ceV71WorkbookPatched) return false;
     const Original = X.Workbook;
     function WorkbookPatched(){
       const wb = new Original(...arguments);
@@ -130,18 +135,18 @@
     }
     try{ WorkbookPatched.prototype = Original.prototype; Object.setPrototypeOf(WorkbookPatched, Original); }catch(_){ }
     X.Workbook = WorkbookPatched;
-    X.__ceV70WorkbookPatched = true;
+    X.__ceV71WorkbookPatched = true;
     return true;
   }
   function wrapEnsureExcelJS(){
     const fn = window.ensureExcelJS;
-    if(typeof fn !== 'function' || fn.__ceV70EnsureWrapped) return;
+    if(typeof fn !== 'function' || fn.__ceV71EnsureWrapped) return;
     const wrapped = async function(){
       const res = await fn.apply(this, arguments);
       patchExcelJS();
       return res;
     };
-    wrapped.__ceV70EnsureWrapped = true;
+    wrapped.__ceV71EnsureWrapped = true;
     window.ensureExcelJS = wrapped;
   }
 
@@ -160,9 +165,9 @@
     ['pointerdown','click','touchstart'].forEach(type => document.addEventListener(type, ev => closeModalFrom(ev.target, ev), {capture:true, passive:false}));
   }
   function injectStyle(){
-    if(document.getElementById('ceV70FinalStyle')) return;
+    if(document.getElementById('ceV71FinalStyle')) return;
     const style = document.createElement('style');
-    style.id = 'ceV70FinalStyle';
+    style.id = 'ceV71FinalStyle';
     style.textContent = `
       #ceV401PcPhotoModal .ce-v401-pc-modal-close,
       #ceV40TicketPhotoModal .ce-v40-modal-close,
@@ -186,14 +191,16 @@
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded','controlevent:excel-before-run'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
   document.addEventListener('click', ev => { if(ev.target?.closest?.('#btnExportExcel,#btnExportSeed,a[download]')) install(); }, true);
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 20); }, true);
+  document.addEventListener('click', forceVersionSoon, true);
+  ['controlevent:event-loaded','controlevent:module-mounted','controlevent:app-ready'].forEach(evt => window.addEventListener(evt, forceVersionSoon));
   [0,100,500,1200,3000].forEach(ms => setTimeout(install, ms));
   safe(() => {
     const header = document.querySelector('.appname,.appname-stack') || document.body;
     if(header){
-      const mo = new MutationObserver(() => { clearTimeout(mo.__ceV70t); mo.__ceV70t = setTimeout(applyVersion, 40); });
+      const mo = new MutationObserver(() => { clearTimeout(mo.__ceV71t); mo.__ceV71t = setTimeout(applyVersion, 40); });
       mo.observe(header, {childList:true, characterData:true, subtree:true});
     }
   }, null);
 
-  window.ControlEventV70ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
+  window.ControlEventV71ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
 })();

@@ -1,12 +1,12 @@
-/* ControlEvent v5.1.0_prod - refresco en sitio y cierre visual del flujo evento.
+/* ControlEvent v7.1_prod - refresco en sitio y cierre visual del flujo evento.
    Cambios funcionales concentrados:
    - Refres/Refrescar actualiza /api/state y repinta la ventana activa sin volver a CE ni cambiar a otra pestaña.
    - Al elegir/cargar evento se oculta de forma real la pantalla CE en móvil/iPad.
    - Visor de justificantes de globos visible por encima en iPad/iPhone, sin tocar justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v5.1.0_prod';
-  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
+  const VERSION = 'ControlEvent v7.1_prod';
+  const VERSION_FILE = 'ControlEvent_v7_1_prod';
   const INSTALLED = '__ceV5020FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

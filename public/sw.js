@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v7-0-prod';
+const CACHE_NAME = 'controlevent-shell-v7-1-prod';
 // V30.13: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
@@ -53,8 +53,8 @@ const SHELL_ASSETS = [
   '/app/features/v50-26-final-fixes.js',
   '/app/features/v50-27-hard-logout.js',
   '/app/features/v4-0-1-pc-photo-fix.js',
-  '/app/features/v7-0-prod-final-fix.js',
-  '/app/features/v7-0-ios-finalizado-ingresos-photo-fix.js',
+  '/app/features/v7-1-prod-final-fix.js',
+  '/app/features/v7-1-ios-finalizado-ingresos-photo-fix.js',
           '/app/features/v46-4-final-fixes.js',
   '/app/features/v46-7-final-fixes.js',
   '/app/features/v46-9-final-fixes.js',

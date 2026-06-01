@@ -1,26 +1,26 @@
-/* ControlEvent v7.0_prod - FIX iOS/iPadOS: fotos de INGRESOS en Finalizado con información lateral y conservación del globo origen.
-   Alcance: solo visor iOS/iPadOS finalizado. No cambia datos, Excel, BACKUP ni render general. */
+/* ControlEvent v7.1_prod - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
+   Alcance: solo visor iOS/iPadOS para fotos de INGRESOS en evento Finalizado. Sin cambios de datos, Excel ni render general. */
 (function(){
   'use strict';
 
-  const INSTALLED = '__ceV70IosFinalizadoIngresosPhotoFix';
+  const INSTALLED = '__ceV71IosFinalizadoIngresosPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const MODAL_ID = 'ceV70IosFinalizadoIngresoPhotoModal';
-  const STYLE_ID = 'ceV70IosFinalizadoIngresoPhotoStyle';
-  const OPEN_CLASS = 'ce-v70-ios-finalizado-ingreso-photo-open';
-  const ACTIVE_CLASS = 'ce-v70-ios-finalizado-ingreso-photo-active';
+  const MODAL_ID = 'ceV71IosFinalizadoIngresoPhotoModal';
+  const STYLE_ID = 'ceV71IosFinalizadoIngresoPhotoStyle';
+  const OPEN_CLASS = 'ce-v71-ios-ingreso-photo-open';
+  const ACTIVE_CLASS = 'ce-v71-ios-ingreso-photo-active';
   let suppressUntil = 0;
   let lastSig = '';
   let lastAt = 0;
-  let lastTooltipState = null;
+  let lastTooltipSnapshot = null;
 
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
   const norm = v => String(v ?? '').trim();
-  const up = v => norm(v).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+  const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
 
   function isiOSLike(){
@@ -77,90 +77,109 @@
     return img ? String(img.currentSrc || img.src || '').trim() : '';
   }
   function idFrom(el){ return norm(el?.dataset?.id || el?.getAttribute?.('data-id') || el?.closest?.('[data-id]')?.dataset?.id || ''); }
-  function ingresoRow(id){ return rows('colaboradores').find(r => same(r.id, id)) || {}; }
-  function personaFor(row){ return row.persona || rows('personas').find(p => same(p.id, row.personaId)) || {}; }
+  function ingresoRow(id){
+    const enriched = safe(() => (typeof collabsForEvent === 'function' ? collabsForEvent() : null), null);
+    if(Array.isArray(enriched)){ const row = enriched.find(r => same(r.id, id)); if(row) return row; }
+    return rows('colaboradores').find(r => same(r.id, id)) || {};
+  }
+  function personaFor(row){ return row?.persona || rows('personas').find(p => same(p.id, row?.personaId)) || {}; }
   function rowTextFor(node){
     const row = node?.closest?.('.summary-item,.budget-row,.itemcard,.rowline,.chart-row,tr,#ceBudgetLiteTooltipV307,#ceTooltipV21,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip');
-    const owner = node?.closest?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]') || row?.closest?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]') || row?.querySelector?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]');
-    const tip = owner?.getAttribute?.('data-ce-tip-v21') || owner?.getAttribute?.('data-tip') || owner?.getAttribute?.('data-ce-tip') || '';
+    const tipOwner = node?.closest?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]') || row?.querySelector?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]');
+    const tip = tipOwner?.getAttribute?.('data-ce-tip-v21') || tipOwner?.getAttribute?.('data-tip') || tipOwner?.getAttribute?.('data-ce-tip') || '';
     return norm(tip || row?.innerText || node?.alt || node?.title || '');
   }
   function ingresoInfoText(trigger, id){
-    const raw = id ? ingresoRow(id) : {};
-    const persona = personaFor(raw);
+    const row = id ? ingresoRow(id) : {};
+    const persona = personaFor(row);
     const ev = currentEvent() || {};
-    const numero = Number(raw.numero || 0) || 0;
+    const numero = Number(row.numero || 0) || 0;
     const precio = parseNum(ev.precio || 0);
-    const rango = norm(persona.rango || raw.rango || '');
-    const obligatorio = up(rango) === 'SOCIO' ? precio * numero : parseNum(raw.obligatorio || raw.importeObligatorio || 0);
-    const voluntario = parseNum(raw.donation ?? raw.importeVoluntario ?? raw.importe ?? raw.voluntario ?? 0);
-    const total = parseNum(raw.total ?? raw.totalIngreso ?? (obligatorio + voluntario));
+    const rango = norm(persona.rango || row.rango || row.personaRango || '');
+    const parts = row.__ceV259Parts || {};
+    const obligatorio = parseNum(parts.obligatorio ?? row.base ?? row.importeObligatorio ?? (up(rango) === 'SOCIO' ? precio * numero : 0));
+    const voluntario = parseNum(parts.voluntario ?? row.donation ?? row.importeVoluntario ?? row.voluntario ?? row.importe ?? 0);
+    const total = parseNum(parts.total ?? row.total ?? row.totalIngreso ?? (obligatorio + voluntario));
+    const nombre = norm(persona.nombre || row.nombre || row.personaNombre || '');
+    const situacion = norm(row.situacion || row.ingreso || row.formaPago || 'Pendiente');
     const lines = [];
-    const nombre = norm(persona.nombre || raw.nombre || '');
     if(nombre) lines.push(nombre);
-    if(norm(raw.situacion || raw.formaPago || raw.ingreso || '')) lines.push(`Situación|${norm(raw.situacion || raw.formaPago || raw.ingreso || 'Pendiente')}`);
+    if(situacion) lines.push(`Situación|${situacion}`);
     if(rango) lines.push(`Rango|${rango}`);
-    if(numero || id) lines.push(`Nº personas|${String(numero)}`);
+    if(id || numero) lines.push(`Nº personas|${String(numero)}`);
     if(id) lines.push(`Importe obligatorio|${money(obligatorio)}`);
     if(id) lines.push(`Importe voluntario|${money(voluntario)}`);
     if(id) lines.push(`Total ingreso|${money(total)}`);
     const fallback = rowTextFor(trigger);
-    return (lines.length ? lines.join('
-') : fallback) || 'Justificante de ingreso';
+    return (lines.length ? lines.join('\n') : fallback) || 'Justificante de ingreso';
   }
   function renderInfoHtml(text){
-    const lines = String(text || '').split(/
-+/).map(line => line.trim()).filter(Boolean);
+    const lines = String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean);
     const out = [];
     lines.forEach(line => {
       if(line.includes('|')){
         const parts = line.split('|').map(x => x.trim());
-        out.push(`<div class="ce-v70-ios-info-row"><span>${esc(parts[0])}</span><strong>${esc(parts.slice(1).join(' | '))}</strong></div>`);
+        out.push(`<div class="ce-v71-ios-info-row"><span>${esc(parts[0])}</span><strong>${esc(parts.slice(1).join(' | '))}</strong></div>`);
       }else{
-        out.push(`<div class="ce-v70-ios-info-title">${esc(line)}</div>`);
+        out.push(`<div class="ce-v71-ios-info-title">${esc(line)}</div>`);
       }
     });
-    return out.join('') || '<div class="ce-v70-ios-info-title">Justificante de ingreso</div>';
+    return out.join('') || '<div class="ce-v71-ios-info-title">Justificante de ingreso</div>';
   }
 
+  function isVisibleTip(el){
+    if(!el) return false;
+    const cs = safe(() => getComputedStyle(el), null);
+    return !!cs && cs.display !== 'none' && cs.visibility !== 'hidden' && (el.classList.contains('open') || el.offsetParent !== null || el.getBoundingClientRect().width > 0);
+  }
   function captureTooltip(trigger){
-    const tip = trigger?.closest?.('#ceTooltipV21,#ceBudgetLiteTooltipV307,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip');
+    const tip = trigger?.closest?.('#ceTooltipV21,#ceBudgetLiteTooltipV307,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip') || ['ceTooltipV21','ceBudgetLiteTooltipV307'].map($).find(isVisibleTip) || null;
     if(!tip) return null;
     const rect = safe(() => tip.getBoundingClientRect(), null);
     return {
-      el: tip,
+      id: tip.id || '',
+      html: tip.outerHTML || '',
       scrollTop: tip.scrollTop || 0,
       scrollLeft: tip.scrollLeft || 0,
-      display: tip.style.display || '',
-      visibility: tip.style.visibility || '',
-      pointerEvents: tip.style.pointerEvents || '',
-      left: tip.style.left || '',
-      top: tip.style.top || '',
-      right: tip.style.right || '',
-      bottom: tip.style.bottom || '',
-      rectLeft: rect ? rect.left : null,
-      rectTop: rect ? rect.top : null,
-      open: tip.classList?.contains('open') || tip.classList?.contains('show') || tip.classList?.contains('visible') || tip.classList?.contains('ce-v462-tip-open') || tip.id === 'ceTooltipV21'
+      left: tip.style.left || '', top: tip.style.top || '', right: tip.style.right || '', bottom: tip.style.bottom || '',
+      display: tip.style.display || '', visibility: tip.style.visibility || '', pointerEvents: tip.style.pointerEvents || '',
+      rectLeft: rect ? rect.left : null, rectTop: rect ? rect.top : null,
+      className: tip.className || ''
     };
   }
   function restoreTooltip(){
-    const s = lastTooltipState;
-    if(!s?.el || !s.el.isConnected) return;
+    const s = lastTooltipSnapshot;
+    if(!s) return;
+    let el = s.id ? $(s.id) : null;
     try{
-      const el = s.el;
+      if(!el && s.html){
+        const holder = document.createElement('div');
+        holder.innerHTML = s.html;
+        el = holder.firstElementChild;
+        if(el) document.body.appendChild(el);
+      }
+      if(!el) return;
       el.style.removeProperty('display');
       el.style.removeProperty('visibility');
       el.style.removeProperty('pointer-events');
       if(s.display && s.display !== 'none') el.style.display = s.display;
+      else el.style.display = el.style.display || 'block';
       if(s.visibility && s.visibility !== 'hidden') el.style.visibility = s.visibility;
+      else el.style.visibility = 'visible';
       if(s.pointerEvents) el.style.pointerEvents = s.pointerEvents;
       if(s.left) el.style.left = s.left;
       if(s.top) el.style.top = s.top;
       if(s.right) el.style.right = s.right;
       if(s.bottom) el.style.bottom = s.bottom;
-      if(s.open){ el.classList.add('open'); el.classList.add('ce-v462-tip-open'); el.removeAttribute('aria-hidden'); }
+      el.className = s.className || el.className;
+      el.classList.add('open');
+      if(el.id === 'ceTooltipV21') el.classList.add('ce-v462-tip-open');
+      el.removeAttribute('aria-hidden');
       el.scrollTop = s.scrollTop || 0;
       el.scrollLeft = s.scrollLeft || 0;
+      if(el.id === 'ceTooltipV21' || !el.id){
+        el.style.setProperty('z-index','600000','important');
+      }
     }catch(_){ }
   }
 
@@ -210,40 +229,22 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      body.${ACTIVE_CLASS} #tabIngresos,
-      body.${ACTIVE_CLASS} #tabIngresos *,
-      body.${ACTIVE_CLASS} #collabList,
-      body.${ACTIVE_CLASS} #collabList *,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 *,
-      body.${ACTIVE_CLASS} #ceTooltipV21,
-      body.${ACTIVE_CLASS} #ceTooltipV21 *{pointer-events:auto!important;}
-      body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v465"],
-      body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v502"],
-      body.${ACTIVE_CLASS} #collabList [data-ce-v509-receipt="view"],
-      body.${ACTIVE_CLASS} #collabList .ce-v465-receipt-thumb,
-      body.${ACTIVE_CLASS} #collabList .ce-v502-receipt-thumb,
-      body.${ACTIVE_CLASS} #collabList .ce-v504-receipt-thumb,
-      body.${ACTIVE_CLASS} #collabList .ce-v509-receipt-thumb,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb,
-      body.${ACTIVE_CLASS} #ceTooltipV21 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
-      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307,
-      body.${OPEN_CLASS} #ceTooltipV21{visibility:hidden!important;pointer-events:none!important;}
-      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *,
-      body.${OPEN_CLASS} #ceTooltipV21 *{pointer-events:none!important;}
+      body.${ACTIVE_CLASS} #tabIngresos,body.${ACTIVE_CLASS} #tabIngresos *,body.${ACTIVE_CLASS} #collabList,body.${ACTIVE_CLASS} #collabList *,body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307,body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 *,body.${ACTIVE_CLASS} #ceTooltipV21,body.${ACTIVE_CLASS} #ceTooltipV21 *{pointer-events:auto!important;}
+      body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v465"],body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v502"],body.${ACTIVE_CLASS} #collabList [data-ce-v509-receipt="view"],body.${ACTIVE_CLASS} #collabList .ce-v465-receipt-thumb,body.${ACTIVE_CLASS} #collabList .ce-v502-receipt-thumb,body.${ACTIVE_CLASS} #collabList .ce-v504-receipt-thumb,body.${ACTIVE_CLASS} #collabList .ce-v509-receipt-thumb,body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb,body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb,body.${ACTIVE_CLASS} #ceTooltipV21 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307,body.${OPEN_CLASS} #ceTooltipV21{visibility:hidden!important;pointer-events:none!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *,body.${OPEN_CLASS} #ceTooltipV21 *{pointer-events:none!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:2147483647!important;background:rgba(2,6,23,.88)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:8px!important;box-sizing:border-box!important;transform:none!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;}
-      #${MODAL_ID} .ce-v70-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;gap:8px!important;align-items:stretch!important;justify-content:stretch!important;}
-      #${MODAL_ID} .ce-v70-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
-      #${MODAL_ID} .ce-v70-ios-body{width:100%!important;max-height:84vh!important;display:grid!important;grid-template-columns:minmax(128px,38vw) minmax(0,1fr)!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
-      #${MODAL_ID} .ce-v70-ios-info{align-self:stretch!important;max-height:82vh!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;color:#fff!important;background:rgba(15,23,42,.76)!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:10px!important;padding:8px!important;font-size:11px!important;line-height:1.22!important;box-sizing:border-box!important;}
-      #${MODAL_ID} .ce-v70-ios-info-title{font-weight:950!important;font-size:12px!important;margin:0 0 8px!important;color:#fff!important;}
-      #${MODAL_ID} .ce-v70-ios-info-row{border-top:1px solid rgba(255,255,255,.18)!important;padding:6px 0!important;display:block!important;}
-      #${MODAL_ID} .ce-v70-ios-info-row span{display:block!important;color:#cbd5e1!important;font-weight:800!important;margin-bottom:2px!important;}
-      #${MODAL_ID} .ce-v70-ios-info-row strong{display:block!important;color:#fff!important;font-weight:950!important;word-break:break-word!important;}
+      #${MODAL_ID} .ce-v71-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;gap:8px!important;align-items:stretch!important;justify-content:stretch!important;}
+      #${MODAL_ID} .ce-v71-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
+      #${MODAL_ID} .ce-v71-ios-body{width:100%!important;max-height:84vh!important;display:grid!important;grid-template-columns:minmax(128px,38vw) minmax(0,1fr)!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
+      #${MODAL_ID} .ce-v71-ios-info{align-self:stretch!important;max-height:82vh!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;color:#fff!important;background:rgba(15,23,42,.76)!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:10px!important;padding:8px!important;font-size:11px!important;line-height:1.22!important;box-sizing:border-box!important;}
+      #${MODAL_ID} .ce-v71-ios-info-title{font-weight:950!important;font-size:12px!important;margin:0 0 8px!important;color:#fff!important;}
+      #${MODAL_ID} .ce-v71-ios-info-row{border-top:1px solid rgba(255,255,255,.18)!important;padding:6px 0!important;display:block!important;}
+      #${MODAL_ID} .ce-v71-ios-info-row span{display:block!important;color:#cbd5e1!important;font-weight:800!important;margin-bottom:2px!important;}
+      #${MODAL_ID} .ce-v71-ios-info-row strong{display:block!important;color:#fff!important;font-weight:950!important;word-break:break-word!important;}
       #${MODAL_ID} img{display:block!important;max-width:calc(98vw - 145px)!important;max-height:82vh!important;width:auto!important;height:auto!important;object-fit:contain!important;background:#fff!important;border-radius:10px!important;box-shadow:0 18px 70px rgba(0,0,0,.52)!important;justify-self:center!important;align-self:center!important;}
-      #${MODAL_ID} .ce-v70-ios-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:2147483647!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;pointer-events:auto!important;}
-      @media (max-width: 380px){#${MODAL_ID} .ce-v70-ios-body{grid-template-columns:minmax(120px,42vw) minmax(0,1fr)!important;gap:6px!important;} #${MODAL_ID} img{max-width:calc(98vw - 134px)!important;} #${MODAL_ID} .ce-v70-ios-info{font-size:10.5px!important;padding:6px!important;}}
+      #${MODAL_ID} .ce-v71-ios-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:2147483647!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;pointer-events:auto!important;}
+      @media (max-width:380px){#${MODAL_ID} .ce-v71-ios-body{grid-template-columns:minmax(120px,42vw) minmax(0,1fr)!important;gap:6px!important;} #${MODAL_ID} img{max-width:calc(98vw - 134px)!important;} #${MODAL_ID} .ce-v71-ios-info{font-size:10.5px!important;padding:6px!important;}}
     `;
     document.head.appendChild(style);
   }
@@ -264,8 +265,7 @@
     stop(ev);
     try{ $(MODAL_ID)?.remove(); }catch(_){ }
     try{ document.body?.classList.remove(OPEN_CLASS); }catch(_){ }
-    [0,60,180].forEach(ms => setTimeout(restoreTooltip, ms));
-    setTimeout(() => { try{ document.body?.classList.remove(OPEN_CLASS); }catch(_){ } }, 0);
+    [0,60,180,360].forEach(ms => setTimeout(restoreTooltip, ms));
     return false;
   }
   function openModal(photo, ev){
@@ -275,7 +275,7 @@
     if(sig === lastSig && now - lastAt < 650) return stop(ev);
     lastSig = sig; lastAt = now;
     stop(ev);
-    lastTooltipState = captureTooltip(photo.trigger);
+    lastTooltipSnapshot = captureTooltip(photo.trigger);
     hideKnownPhotoModals();
     try{ $(MODAL_ID)?.remove(); }catch(_){ }
     try{ document.body?.classList.add(OPEN_CLASS); }catch(_){ }
@@ -284,7 +284,7 @@
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.setAttribute('data-ce-preserve-tooltip','1');
-    modal.innerHTML = `<div class="ce-v70-ios-card"><div class="ce-v70-ios-title">${esc(photo.title || 'Foto')}</div><div class="ce-v70-ios-body"><div class="ce-v70-ios-info">${renderInfoHtml(photo.info)}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"></div><button type="button" class="ce-v70-ios-close">Cerrar</button></div>`;
+    modal.innerHTML = `<div class="ce-v71-ios-card"><div class="ce-v71-ios-title">${esc(photo.title || 'Foto')}</div><div class="ce-v71-ios-body"><div class="ce-v71-ios-info">${renderInfoHtml(photo.info)}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"></div><button type="button" class="ce-v71-ios-close">Cerrar</button></div>`;
     document.body.appendChild(modal);
     setTimeout(hideKnownPhotoModals, 0);
     return false;
@@ -300,7 +300,7 @@
     const modal = $(MODAL_ID);
     if(!modal) return undefined;
     const target = ev.target;
-    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v70-ios-close`)) return closeModal(ev);
+    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v71-ios-close`)) return closeModal(ev);
     try{ ev.stopPropagation(); }catch(_){ }
     return undefined;
   }
@@ -319,5 +319,5 @@
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 80); }, true);
   [0,160,700,1800].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV70IosFinalizadoIngresosPhotoFix = {install, open:openModal, close:closeModal};
+  window.ControlEventV71IosFinalizadoIngresosPhotoFix = {install, open:openModal, close:closeModal};
 })();

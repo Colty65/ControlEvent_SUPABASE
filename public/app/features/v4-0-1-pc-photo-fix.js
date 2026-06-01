@@ -1,4 +1,4 @@
-/* ControlEvent v7.0_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v7.1_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.0_prod';
-  const VERSION_FILE = 'ControlEvent_v7_0_prod';
+  const VERSION = 'ControlEvent v7.1_prod';
+  const VERSION_FILE = 'ControlEvent_v7_1_prod';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -216,7 +216,6 @@
     modal.id = MODAL_ID;
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('data-ce-preserve-tooltip', '1');
     modal.setAttribute('data-ce-v401-kind', kind);
     modal.innerHTML = `<div class="ce-v401-pc-modal-box">
       <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
