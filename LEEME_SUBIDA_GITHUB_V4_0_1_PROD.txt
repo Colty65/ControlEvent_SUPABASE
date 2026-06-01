@@ -1,0 +1,26 @@
+ControlEvent v4.0.1_prod
+
+Base: ControlEvent v4.0_prod.
+
+Cambio quirurgico solicitado:
+- Solo PC / evento FINALIZADO.
+- Refuerza el visor de justificantes de INGRESOS en la propia ventana de INGRESOS y en los globos de RESUMEN/GRAFICAS.
+- Refuerza el visor de TICKETS manteniendo informacion del TKxx a la izquierda.
+- Añade cierre fiable con boton "✕ Cerrar", clic en fondo y tecla Escape.
+
+Alcance expresamente NO tocado:
+- iPad, iPhone y Android quedan fuera del parche por deteccion de dispositivo/puntero.
+- No se toca login, carga de datos, Supabase, INFOEVENTO, BACKUP, compras, donaciones ni mantenimiento.
+
+Archivos principales modificados/añadidos:
+- public/index.html: version visible y carga final del parche.
+- public/app/features/v4-0-1-pc-photo-fix.js: parche PC aislado.
+- public/app/version.js, index.html, package.json, build-metrics.json: identificacion de version.
+
+Prueba recomendada:
+1) Subir ZIP completo o aplicar parche.
+2) Abrir en PC con refresco fuerte del navegador (Ctrl+F5).
+3) Elegir evento FINALIZADO.
+4) Probar INGRESOS: miniatura justificante debe ampliar y cerrar.
+5) Probar RESUMEN/GRAFICAS: globos con justificantes deben ampliar y cerrar.
+6) Probar TICKETS: foto debe ampliar con informacion a la izquierda y cerrar con boton, fondo o Escape.
