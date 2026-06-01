@@ -1,4 +1,11 @@
-ControlEvent v6.1_prod
-Base: versión estable anterior indicada por el usuario.
-Cambios: version unificada, cierre fotos abajo-derecha separado de Salir, retorno de globo en GRAFICAS, visor iPhone Finalizado para justificantes de INGRESOS.
-Sin setInterval ni bucles periodicos nuevos.
+ControlEvent v6.1_prod - PARCHE MINIMO SOBRE v5.1.0_prod
+
+Base usada: ControlEvent_SUPABASE-main_V5_1_0_PROD.zip
+
+Cambios:
+- Version activa a ControlEvent v6.1_prod / ControlEvent_v6_1_prod.
+- Cerrar de visores de foto abajo a la derecha para no pisar Salir.
+- Proteccion corta para que Cerrar no dispare Salir por accidente.
+- GRAFICAS: al cerrar una foto abierta desde un globo, se restaura el globo origen.
+- iPhone + evento Finalizado: apertura de fotos de INGRESOS en ventana INGRESOS y globos.
+- Sin setInterval ni bucles periodicos nuevos.

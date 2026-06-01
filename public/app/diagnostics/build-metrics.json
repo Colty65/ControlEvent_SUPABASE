@@ -1,7 +1,7 @@
 {
   "version": "5.0.0-prod",
-  "base": "v50.25",
-  "notes": "v6.1_prod: base estable anterior; cierre de fotos separado de Salir, retorno de globo en GRAFICAS, visor iPhone Finalizado y versión unificada.",
+  "base": "v5.1.0_prod",
+  "notes": "v6.1_prod desde v5.1.0: cierre foto abajo, retorno a globo en GRAFICAS, iPhone finalizado INGRESOS, version unificada.",
   "generatedAt": "2026-06-01T00:00:00+02:00",
   "build": "v6.1_prod",
   "versionLabel": "ControlEvent v6.1_prod",
