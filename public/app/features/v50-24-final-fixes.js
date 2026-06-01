@@ -1,12 +1,12 @@
-/* ControlEvent v5.1.0_prod - emergencia contra bloqueo de login por v50.23.
+/* ControlEvent v4.0_prod - emergencia contra bloqueo de login por v50.23.
    - No usa MutationObserver global ni bucles permanentes.
    - Mantiene login escribible.
    - Refres/Refrescar se marca en verde Excel durante la actualización.
    - Versión unificada solo con aplicaciones puntuales, sin observador infinito. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v5.1.0_prod';
-  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
+  const VERSION = 'ControlEvent v4.0_prod';
+  const VERSION_FILE = 'ControlEvent_v4_0_prod';
   const INSTALLED = '__ceV5024FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

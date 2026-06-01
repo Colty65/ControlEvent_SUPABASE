@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod RESTORE LIMPIO
+# ControlEvent v50.24 RESTORE LIMPIO
 
 Paquete completo revisado para restaurar la versión estable v28.6.1 en GitHub/Vercel.
 
@@ -20,7 +20,7 @@ En tu carpeta real del repo conserva sólo:
 Borra el resto y copia dentro el contenido de esta carpeta, de forma que `package.json` quede en la raíz del repo.
 
 Después, en GitHub Desktop:
-1. Commit: `Restaurar ControlEvent v5.1.0_prod estable`
+1. Commit: `Restaurar ControlEvent v50.24 estable`
 2. Push origin
 
 ## Comprobación en producción
@@ -33,6 +33,6 @@ ControlEventActiveRender.print()
 ```
 
 Debe indicar:
-- `ControlEvent v5.1.0_prod`
+- `ControlEvent v50.24`
 - `ExcelJS loaded: false`
 - `ActiveRender enabled: false`

@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "created": "2026-05-24",
   "changes": [
     "Recupera casita global de subir arriba en ventanas donde había desaparecido, manteniendo las específicas de Mapa de recursos y mantenimiento.",

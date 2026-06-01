@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "notes": [
     "Menús RW/RO estabilizados sin refresco visual continuo.",
     "Justificantes de ingresos no se reescriben si el HTML no cambia, evitando duplicados y temblores.",

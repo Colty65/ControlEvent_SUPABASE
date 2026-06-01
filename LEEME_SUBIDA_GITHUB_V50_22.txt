@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Base efectiva: v50.20 estable.
 

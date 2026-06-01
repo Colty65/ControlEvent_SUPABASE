@@ -1,7 +1,7 @@
 {
   "version": "v30.1",
   "base": "v30.0",
-  "appVersion": "ControlEvent v5.1.0_prod",
+  "appVersion": "ControlEvent v50.24",
   "type": "functional-fix",
   "changes": [
     "Mapa de productos convertido en pantalla estable propia",

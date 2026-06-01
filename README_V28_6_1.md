@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - ActiveRender desactivado por defecto
+# ControlEvent v50.24 - ActiveRender desactivado por defecto
 
 Versión correctiva sobre v28.6.
 

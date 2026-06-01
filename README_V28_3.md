@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Diagnóstico de peso legacy
+# ControlEvent v50.24 - Diagnóstico de peso legacy
 
 Versión conservadora orientada a preparar la limpieza real del bundle legacy sin tocar la operativa.
 

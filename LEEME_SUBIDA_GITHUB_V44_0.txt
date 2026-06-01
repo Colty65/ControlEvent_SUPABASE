@@ -1,9 +1,9 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Partir de v43.8.8. Cambios mínimos:
 - Planificación inicial deja de quedarse pegada al cambiar a otras pestañas.
 - Se refuerza apertura de Planificación inicial desde menú móvil.
 - Tras login se obliga a seleccionar evento y se muestra una pantalla limpia con icono.
-- Versión actualizada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod.
+- Versión actualizada a ControlEvent v50.24 / ControlEvent_v50_24.
 
 No se toca la lógica de COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS.

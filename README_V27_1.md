@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod
+# ControlEvent v50.24
 
 ## Objetivo
 
@@ -27,9 +27,9 @@ ControlEventExcel.info()
 
 ## Versiones esperadas
 
-- `ControlEvent v5.1.0_prod`
-- `ControlEvent_v5_1_0_prod_INFOEVENTO-...xlsx`
-- `ControlEvent_v5_1_0_prod_BACKUP_TODOS_...xlsx`
+- `ControlEvent v50.24`
+- `ControlEvent_v50_24_INFOEVENTO-...xlsx`
+- `ControlEvent_v50_24_BACKUP_TODOS_...xlsx`
 - cache PWA: `controlevent-shell-v50-24`
 
 ## Líneas de index.html

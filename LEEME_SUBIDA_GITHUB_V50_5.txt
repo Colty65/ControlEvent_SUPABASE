@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - Corrección quirúrgica sobre v50.4
+ControlEvent v50.24 - Corrección quirúrgica sobre v50.4
 
 Subida limpia desde la carpeta completa del repositorio.
 

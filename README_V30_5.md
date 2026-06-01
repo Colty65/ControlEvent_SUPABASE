@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod
+# ControlEvent v50.24
 
 Versión basada en la v30.4 estable de rendimiento.
 

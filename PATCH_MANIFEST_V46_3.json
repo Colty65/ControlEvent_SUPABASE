@@ -1,12 +1,12 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "versionFile": "ControlEvent_v5_1_0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
+  "versionFile": "ControlEvent_v50_24",
+  "base": "ControlEvent v50.24",
   "notes": [
     "Por destino: cabecera y datos de Comprado/Pte.Compra en orden Ticket, Tienda, Producto, Cant., Precio, Total.",
     "Globos de GRAFICAS y Resumen presupuestario ya no se cierran al usar ruleta o ascensor; se cierran al salir/click fuera/Escape.",
     "INGRESOS permite adjuntar, ver, cambiar y eliminar foto del justificante de ingreso.",
     "Justificantes de ingreso se guardan en ticketImages con clave INGRESO y viajan en la descarga de datos como imágenes del evento.",
-    "Versión actualizada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod."
+    "Versión actualizada a ControlEvent v50.24 / ControlEvent_v50_24."
   ]
 }

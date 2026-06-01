@@ -1,6 +1,6 @@
-# ControlEvent v5.1.0_prod
+# ControlEvent v50.24
 
-Base: ControlEvent v5.1.0_prod estable.
+Base: ControlEvent v50.24 estable.
 
 Cambios limitados a Mapa de recursos:
 

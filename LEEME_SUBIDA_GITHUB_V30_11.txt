@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Subir TODO el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
 Esta versión parte de V30.10_RESCATE estable, corrige la numeración visible y añade Mapa de recursos.

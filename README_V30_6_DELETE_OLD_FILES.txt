@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Si estás subiendo el paquete reducido a GitHub, elimina o sustituye los antiguos ficheros legacy v30.5:
 - public/app/legacy/legacy-bundle-before-modules-v30.5.js

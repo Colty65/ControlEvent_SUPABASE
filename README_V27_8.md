@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod
+# ControlEvent v50.24
 
 Fase conservadora de optimización móvil: añade diagnóstico de carga/rendimiento sin tocar la operativa estable.
 

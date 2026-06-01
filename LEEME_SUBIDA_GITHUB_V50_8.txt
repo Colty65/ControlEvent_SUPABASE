@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 ===================
 
 Base: ZIP v50.7 generado desde v50.4.
@@ -12,7 +12,7 @@ Objetivo de esta version:
 
 Cambios aplicados:
 1) Version unificada
-   - Actualizadas las constantes de los scripts cargados a ControlEvent v5.1.0_prod.
+   - Actualizadas las constantes de los scripts cargados a ControlEvent v50.24.
    - v50.8 no usa setInterval para cambiar la version de cabecera.
    - Evita el parpadeo entre v50.4 y v50.8.
 

@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
   "base": "V30.10_RESCATE estable / legacy v30.7",
   "changed": [
     "public/index.html",

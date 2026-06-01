@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - PARCHE MINIMO CORRECTIVO
+ControlEvent v50.24 - PARCHE MINIMO CORRECTIVO
 
 Instalacion:
 1) Descomprimir este ZIP.
@@ -9,7 +9,7 @@ Instalacion:
 Incluye mas archivos que el parche anterior porque la version visible y Excel/backup tambien estaban en bundles legacy y rutas de exportacion. No incluye package.json ni package-lock.json para evitar los errores de Vercel anteriores.
 
 Corrige:
-- Version visible/control interno: ControlEvent v5.1.0_prod.
+- Version visible/control interno: ControlEvent v50.24.
 - Cache: controlevent-shell-v50-24.
 - Planificacion inicial replica ingresos del evento modelo, no todos los socios maestros.
 - La ficha de ingresos muestra SOCIOS/NO SOCIOS del evento finalizado elegido.

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Este paquete es para repositorios que ya tienen la v28.6.1.
 

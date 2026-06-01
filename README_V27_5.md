@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Integridad de datos y estabilización post-Excel
+# ControlEvent v50.24 - Integridad de datos y estabilización post-Excel
 
 Versión conservadora posterior a v27.4.8.
 

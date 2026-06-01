@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - RESUMEN modular integrado en INFOEVENTO en modo auditoría
+# ControlEvent v50.24 - RESUMEN modular integrado en INFOEVENTO en modo auditoría
 
 Versión progresiva sobre v27.2.2.
 

@@ -1,9 +1,9 @@
 ControlEvent v5.1.0_prod
 
 Cambios quirúrgicos:
-- Versión unificada: cabecera, app/version.js, service worker/cache, INFOEVENTO y BACKUP.
-- INFOEVENTO: saneo de nombre de fichero sin repetición de fecha/hora y saneo interno del libro antes de writeBuffer.
-- PC: visor de fotos de INGRESOS/TICKETS en Finalizado sin restauraciones inventadas de globos; el globo queda debajo y no se recoloca arriba a la izquierda.
-- PC: botón Cerrar del visor queda abajo a la derecha, negro sobre blanco, y se amplía la columna de datos.
+- Versión unificada en cabecera, app/version.js, cache, INFOEVENTO y BACKUP.
+- INFOEVENTO: nombre de fichero sin repetición de fecha/hora y saneo interno del libro antes de generar el XLSX.
+- PC: visor de fotos de INGRESOS/TICKETS en Finalizado sin restauraciones inventadas de globos; el globo queda en su sitio debajo del visor.
+- PC: botón Cerrar del visor abajo a la derecha, negro sobre blanco, y columna de datos más ancha.
 - Móvil: cierre reforzado de modales de fotos de Ingresado socios/no socios.
 - Rendimiento: eliminado el parche v5.0.0 con setInterval y eliminado el setInterval del parche PC. No se añaden bucles periódicos.

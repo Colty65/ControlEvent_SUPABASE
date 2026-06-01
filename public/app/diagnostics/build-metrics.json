@@ -1,9 +1,9 @@
 {
   "version": "5.0.0-prod",
   "base": "v50.25",
-  "notes": "v5.1.0_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
+  "notes": "v5.1.1_prod: versión INFOEVENTO interna, retorno a globo origen en GRAFICAS/RESUMEN y fallback iPhone para justificantes.",
   "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v5.1.0_prod",
-  "versionLabel": "ControlEvent v5.1.0_prod",
-  "versionFile": "ControlEvent_v5_1_0_prod"
+  "build": "v5.1.1_prod",
+  "versionLabel": "ControlEvent v5.1.1_prod",
+  "versionFile": "ControlEvent_v5_1_1_prod"
 }

@@ -1,4 +1,4 @@
-/* ControlEvent v5.1.0_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v5.1.1_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v5.1.0_prod';
-  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
+  const VERSION = 'ControlEvent v5.1.1_prod';
+  const VERSION_FILE = 'ControlEvent_v5_1_1_prod';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -66,6 +66,77 @@
 
   let lastOpenSig = '';
   let lastOpenAt = 0;
+  let lastTooltipSnapshot = null;
+
+  function visibleTooltipRoots(){
+    const nodes = Array.from(document.querySelectorAll('#ceBudgetLiteTooltipV307,#ceTooltipV21,#ceV462Tooltip,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip'));
+    return nodes.filter((el, idx, arr) => {
+      if(!el || arr.indexOf(el) !== idx) return false;
+      const cs = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      const visible = cs.display !== 'none' && cs.visibility !== 'hidden' && rect.width > 8 && rect.height > 8;
+      return visible || el.classList.contains('open');
+    });
+  }
+  function clampTooltip(el){
+    if(!el) return;
+    try{
+      const rect = el.getBoundingClientRect();
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      let left = rect.left;
+      let top = rect.top;
+      if(!Number.isFinite(left) || left < 8) left = 8;
+      if(!Number.isFinite(top) || top < 8) top = 8;
+      if(left + rect.width > vw - 8) left = Math.max(8, vw - rect.width - 8);
+      if(top + rect.height > vh - 8) top = Math.max(8, vh - rect.height - 8);
+      el.style.setProperty('position','fixed','important');
+      el.style.setProperty('left', Math.round(left) + 'px', 'important');
+      el.style.setProperty('top', Math.round(top) + 'px', 'important');
+      el.style.setProperty('right','auto','important');
+      el.style.setProperty('bottom','auto','important');
+      el.style.setProperty('max-width','calc(100vw - 16px)','important');
+      el.style.setProperty('max-height','82vh','important');
+      el.style.setProperty('overflow','auto','important');
+      el.style.setProperty('z-index','600000','important');
+    }catch(_){ }
+  }
+  function captureTooltipSnapshot(trigger){
+    const roots = visibleTooltipRoots();
+    const fromTrigger = trigger?.closest?.('#ceBudgetLiteTooltipV307,#ceTooltipV21,#ceV462Tooltip,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip');
+    const selected = fromTrigger ? [fromTrigger] : roots;
+    if(!selected.length) return null;
+    return selected.map(el => ({
+      id: el.id || '',
+      html: el.outerHTML,
+      scrollTop: el.scrollTop || 0,
+      scrollLeft: el.scrollLeft || 0
+    }));
+  }
+  function restoreTooltipSnapshot(snapshot){
+    if(!snapshot || !snapshot.length) return;
+    snapshot.forEach(item => {
+      try{
+        let el = item.id ? document.getElementById(item.id) : null;
+        if(!el){
+          const holder = document.createElement('div');
+          holder.innerHTML = item.html;
+          el = holder.firstElementChild;
+          if(el) document.body.appendChild(el);
+        }
+        if(!el) return;
+        el.removeAttribute('aria-hidden');
+        el.classList.add('open');
+        el.style.setProperty('display','block','important');
+        el.style.setProperty('visibility','visible','important');
+        el.style.setProperty('opacity','1','important');
+        clampTooltip(el);
+        el.scrollTop = item.scrollTop || 0;
+        el.scrollLeft = item.scrollLeft || 0;
+      }catch(_){ }
+    });
+    try{ window.ControlEventV469?.enrichOpenTooltips?.(); }catch(_){ }
+  }
 
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -194,11 +265,12 @@
     return blocks.join('') || '<div class="ce-v401-pc-info-title">Sin detalle asociado</div>';
   }
 
-  function closeAll(ev){
+  function closeAll(ev, restore){
     if(ev) stop(ev);
     safe(() => $(MODAL_ID)?.remove(), null);
     OLD_MODAL_IDS.forEach(id => safe(() => $(id)?.remove(), null));
     document.querySelectorAll('.ce-v5017-budget-modal,.ce-v512-budget-photo-modal,.ce-v504-modal,.ce-v505-photo-modal,.ce-v506-photo-modal,.ce-v508-photo-modal,.ce-v465-modal,.ce-v468-modal,.ce-receipt-modal-v463').forEach(el => safe(() => el.remove(), null));
+    if(restore) setTimeout(() => restoreTooltipSnapshot(lastTooltipSnapshot), 20);
     return false;
   }
   function openModal(kind, trigger, src, ev){
@@ -208,6 +280,7 @@
     if(sig === lastOpenSig && now - lastOpenAt < 650) return stop(ev);
     lastOpenSig = sig;
     lastOpenAt = now;
+    lastTooltipSnapshot = captureTooltipSnapshot(trigger) || lastTooltipSnapshot;
     closeAll();
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
@@ -265,11 +338,11 @@
 
   function handlePointerStart(ev){
     const target = ev.target;
-    if(target?.closest?.(`#${MODAL_ID} [data-close],#${MODAL_ID} .ce-v401-pc-modal-close`)) return closeAll(ev);
-    if(target === $(MODAL_ID)) return closeAll(ev);
-    if(target?.closest?.('#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV40TicketPhotoModal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV310PhotoViewer [data-close],#ceV509ReceiptModal [data-close],.ce-v5017-budget-modal [data-close],.ce-v512-budget-photo-modal [data-close]')) return closeAll(ev);
+    if(target?.closest?.(`#${MODAL_ID} [data-close],#${MODAL_ID} .ce-v401-pc-modal-close`)) return closeAll(ev, true);
+    if(target === $(MODAL_ID)) return closeAll(ev, true);
+    if(target?.closest?.('#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV40TicketPhotoModal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV310PhotoViewer [data-close],#ceV509ReceiptModal [data-close],.ce-v5017-budget-modal [data-close],.ce-v512-budget-photo-modal [data-close]')) return closeAll(ev, true);
     const oldBackdrop = target?.closest?.('#ceV40TicketPhotoModal,#ceV310PhotoViewer,#ceV509ReceiptModal,.ce-v5017-budget-modal,.ce-v512-budget-photo-modal');
-    if(oldBackdrop && target === oldBackdrop) return closeAll(ev);
+    if(oldBackdrop && target === oldBackdrop) return closeAll(ev, true);
     if(!active()) return undefined;
 
     const receipt = target?.closest?.(RECEIPT_SELECTOR + ',[data-ce-v401-pc-receipt]');
@@ -288,8 +361,8 @@
   }
   function handleModalClick(ev){
     const target = ev.target;
-    if(target?.closest?.(`#${MODAL_ID} [data-close],#${MODAL_ID} .ce-v401-pc-modal-close`)) return closeAll(ev);
-    if(target === $(MODAL_ID)) return closeAll(ev);
+    if(target?.closest?.(`#${MODAL_ID} [data-close],#${MODAL_ID} .ce-v401-pc-modal-close`)) return closeAll(ev, true);
+    if(target === $(MODAL_ID)) return closeAll(ev, true);
     if(target?.closest?.(`#${MODAL_ID}`)){ try{ ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ } }
     return undefined;
   }
@@ -384,7 +457,7 @@
   ['pointerdown','mousedown'].forEach(type => window.addEventListener(type, handlePointerStart, {capture:true, passive:false}));
   ['pointerdown','click'].forEach(type => window.addEventListener(type, () => { applyVersion(); installSafeDownloadClick(); }, {capture:true, passive:true}));
   window.addEventListener('click', handleModalClick, {capture:true, passive:false});
-  window.addEventListener('keydown', ev => { if(ev.key === 'Escape' && ($(MODAL_ID) || OLD_MODAL_IDS.some(id => $(id)))) return closeAll(ev); }, true);
+  window.addEventListener('keydown', ev => { if(ev.key === 'Escape' && ($(MODAL_ID) || OLD_MODAL_IDS.some(id => $(id)))) return closeAll(ev, true); }, true);
   document.addEventListener('click', ev => { applyVersion(); installSafeDownloadClick(); const a = ev.target?.closest?.('a[download]'); if(a && a.download) a.download = safeDownloadName(a.download); }, true);
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') [60,240,650,1400].forEach(ms => setTimeout(install, ms)); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));

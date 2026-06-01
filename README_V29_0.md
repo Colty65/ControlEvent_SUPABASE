@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Render visible-only para iPad/Android
+# ControlEvent v50.24 - Render visible-only para iPad/Android
 
 Versión generada sobre la base estable v28.6.1.
 
@@ -8,7 +8,7 @@ Mejorar la fluidez en iPad y Android sin volver a activar `ControlEventActiveRen
 
 ## Cambios principales
 
-- Versión visible actualizada a `ControlEvent v5.1.0_prod`.
+- Versión visible actualizada a `ControlEvent v50.24`.
 - Nuevos bundles legacy renombrados a `legacy-bundle-before-modules-v29.0.js` y `legacy-bundle-after-modules-v29.0.js`.
 - Nuevo optimizador `ControlEventMobileLite`, activado por defecto.
 - `ControlEventMobileLite` evita repintar pantallas ocultas: Ingresos, Compras, Donaciones, Resumen, Gráficas y Mantenimiento.

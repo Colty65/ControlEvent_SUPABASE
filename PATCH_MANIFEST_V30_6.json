@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
+  "base": "ControlEvent v50.24",
   "changes": [
     "Cierre de globos ligeros al perder foco o pulsar fuera.",
     "Bloqueo de globos heredados SOCIOS/INGRESADO SOCIOS y DONACION DE PRODUCTO que se quedaban visibles en móvil/tablet.",

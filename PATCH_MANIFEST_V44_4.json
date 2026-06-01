@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "versionFile": "ControlEvent_v5_1_0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v50.24",
+  "versionFile": "ControlEvent_v50_24",
+  "base": "ControlEvent v50.24",
   "createdAt": "2026-05-25 09:35:57",
   "changes": [
     "PERF refresca automáticamente al cambiar de ventana/evento mientras está abierto.",

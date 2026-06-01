@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Perfilador de uso legacy
+# ControlEvent v50.24 - Perfilador de uso legacy
 
 Versión conservadora. No cambia la operativa estable.
 

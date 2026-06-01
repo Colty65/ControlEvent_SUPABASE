@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Esta versión corrige el fallo de la v30.9.1: el index.html apuntaba a JS v30.9.1 que no existían.
 Por eso se veía la app sin login y sin datos.

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v50.24
 
 Base: v44.7.2 estable.
 Objetivo: cambios estéticos y de acceso sin alterar el flujo rápido de cambio de evento introducido en v44.7.x.

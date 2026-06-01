@@ -1,0 +1,10 @@
+ControlEvent v5.1.1_prod
+
+Cambios quirurgicos sobre v5.1.0_prod:
+- Version visible y version de fichero a ControlEvent v5.1.1_prod / ControlEvent_v5_1_1_prod.
+- INFOEVENTO: se fuerza internamente el texto Emitido por con ControlEvent_v5_1_1_prod.
+- INFOEVENTO: se mantiene saneo de nombre sin repetir fecha/hora.
+- BACKUP no se ha tocado en logica funcional.
+- GRAFICAS/RESUMEN: al abrir una foto desde un globo, al cerrar se restaura el globo origen y su scroll, con posicion acotada a la ventana.
+- iPhone: fallback exclusivo para abrir en grande justificantes de ingresos.
+- Rendimiento: sin setInterval ni observadores globales pesados; solo eventos y observador limitado a cabecera/titulo.

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
+ControlEvent v50.24 - SOLO SUBIR A GITHUB
 
 Esta versión parte de la V29.4 estable y añade la opción de menú "Mapa de productos".
 
@@ -10,7 +10,7 @@ Pasos recomendados:
 5. En iPad/Android, cierra la pestaña anterior y abre de nuevo la app para evitar caché antigua.
 
 Comprobaciones rápidas:
-- La cabecera debe mostrar ControlEvent v5.1.0_prod.
+- La cabecera debe mostrar ControlEvent v50.24.
 - Debe aparecer el icono 🧭 del nuevo menú.
 - La opción "Mapa de productos" debe estar disponible para usuarios GD, RW y RO.
 - En esa pantalla, las compras deben salir agrupadas por Tienda + Producto.
