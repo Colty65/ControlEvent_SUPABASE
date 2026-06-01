@@ -1,9 +1,9 @@
-/* ControlEvent v50.24 - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v5.1.0_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v50.24';
+  const VERSION = 'ControlEvent v5.1.0_prod';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',

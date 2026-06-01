@@ -1,9 +1,9 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
-Base: ControlEvent v50.24 estable aportada por el usuario.
+Base: ControlEvent v5.1.0_prod estable aportada por el usuario.
 
 Cambios principales:
-- Versión actualizada a ControlEvent v50.24 / ControlEvent_v50_24 en cabecera, service worker/cache, BACKUP, INFOEVENTO, rutas de exportación y nombres de descarga.
+- Versión actualizada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod en cabecera, service worker/cache, BACKUP, INFOEVENTO, rutas de exportación y nombres de descarga.
 - Edición de INGRESOS, DONACIONES, COMPRAS y mantenimientos sin salto al inicio de ventana. El registro modificado queda marcado visualmente en negro y negrita.
 - Borrado permitido con efecto visual de destrucción durante 1,5 segundos antes de desaparecer.
 - Borrado de PERSONAS, PRODUCTOS y TIENDAS bloqueado si existen dependencias, mostrando: "No es posible, tiene dependencias.".

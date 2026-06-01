@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
   "base": "v30.6",
   "notes": "v31.6 corrige metadatos de BACKUP y ajusta el botón flotante de Mapa de recursos por dispositivo.",
   "mobileLitePreserved": true,

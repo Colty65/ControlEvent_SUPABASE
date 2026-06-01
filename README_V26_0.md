@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 ## Objetivo de esta versión
 
@@ -23,7 +23,7 @@ public/app/domain/
 - `window.ControlEventRuntime.domain` queda disponible tras el arranque.
 - `window.ControlEventDomain` queda disponible para depuración.
 - `app.calculationsV259` queda disponible junto a los cálculos legacy.
-- La versión visible pasa a `ControlEvent v50.24`.
+- La versión visible pasa a `ControlEvent v5.1.0_prod`.
 - El cache PWA pasa a `controlevent-shell-v50-24` para forzar actualización.
 
 ## Modo de funcionamiento

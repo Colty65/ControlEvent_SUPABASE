@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.24",
-  "base": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "changes": [
     "package.json y package-lock.json regenerados como JSON válido",
     "Mapa de recursos: buscador limpia el texto al finalizar la búsqueda",

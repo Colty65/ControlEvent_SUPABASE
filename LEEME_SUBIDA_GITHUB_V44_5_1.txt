@@ -1,9 +1,9 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Versión de recuperación desde v44.4 tras detectar que v44.5 impedía seleccionar eventos.
 
 Cambios:
 - Retirada la optimización v44.5 que interceptaba el cambio de evento y dejaba la app en la pantalla del icono CE.
 - Se mantiene el comportamiento estable de v44.4.
-- Actualizada versión a ControlEvent v50.24 / ControlEvent_v50_24.
+- Actualizada versión a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod.
 - No se toca la lógica de COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS.

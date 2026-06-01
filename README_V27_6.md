@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Diagnóstico de formularios principales
+# ControlEvent v5.1.0_prod - Diagnóstico de formularios principales
 
 Versión conservadora posterior a v27.5. No toca funcionalmente INFOEVENTO, BACKUP, carga de datos ni tickets.
 

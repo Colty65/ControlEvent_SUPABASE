@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Hotpath cache legacy para móvil
+# ControlEvent v5.1.0_prod - Hotpath cache legacy para móvil
 
 Versión conservadora de rendimiento. No toca INFOEVENTO, BACKUP ni la carga de datos.
 

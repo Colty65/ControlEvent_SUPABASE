@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Corrección de estabilización Excel después de v27.4.3.
 

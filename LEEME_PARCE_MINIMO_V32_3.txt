@@ -1,4 +1,4 @@
-ControlEvent v50.24 - Parche mínimo
+ControlEvent v5.1.0_prod - Parche mínimo
 
 Aplicar encima de la versión actual V32.x.
 

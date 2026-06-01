@@ -1,6 +1,6 @@
 {
   "version": "30.12",
-  "base": "ControlEvent_v50_24_RESCATE",
+  "base": "ControlEvent_v5_1_0_prod_RESCATE",
   "changes": [
     "Mapa de recursos con filtro multiple por responsables SOCIO",
     "Ordenacion por Tienda, Pte. Comprar/TKxx y Producto",

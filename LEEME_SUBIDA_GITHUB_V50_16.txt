@@ -1,7 +1,7 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Cambios puntuales sobre v50.15:
 - Al elegir evento tras login se limpia la marca de espera de evento y se rehidratan los globos de Resumen Presupuestario.
 - El boton movil Refres recarga el estado en sitio, conservando evento y pestana actual.
 - Se mantiene intacta la gestion de justificantes de INGRESOS y tickets.
-- Version unificada a ControlEvent v50.24 y cache PWA controlevent-shell-v50-24.
+- Version unificada a ControlEvent v5.1.0_prod y cache PWA controlevent-shell-v50-24.

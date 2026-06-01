@@ -1,4 +1,4 @@
-ControlEvent v50.24 - PARCHE MINIMO SOLO CAMBIOS
+ControlEvent v5.1.0_prod - PARCHE MINIMO SOLO CAMBIOS
 
 Este paquete NO es una app completa. Es un parche pequeño para subir encima de la V32.0 que ya está en GitHub/Vercel.
 

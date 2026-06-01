@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Versión de estabilización después de las pruebas de Excel standalone.
 

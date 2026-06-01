@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Correcciones:
 - package.json y package-lock.json validados como JSON real para Vercel.

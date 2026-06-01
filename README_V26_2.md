@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Modularización Excel y tickets/fotos
+# ControlEvent v5.1.0_prod - Modularización Excel y tickets/fotos
 
 Esta versión continúa el plan de modularización sobre v26.1.
 
@@ -76,7 +76,7 @@ Comprobar:
 ## Versión
 
 ```text
-ControlEvent v50.24
-ControlEvent_v50_24
+ControlEvent v5.1.0_prod
+ControlEvent_v5_1_0_prod
 controlevent-shell-v50-24
 ```

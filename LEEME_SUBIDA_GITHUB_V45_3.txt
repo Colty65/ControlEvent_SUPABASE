@@ -1,8 +1,8 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Corrección de estabilidad sobre v45.2:
 - PERF solo PC GD/RW y panel persistente al pulsar.
 - Botón Refrescar reforzado para reentrada limpia sin cerrar sesión.
 - Limpieza de restos de permisos al cambiar de RO a GD/RW o al revés.
-- Versión unificada a ControlEvent v50.24 / ControlEvent_v50_24 en cabecera, cache, BACKUP, INFOEVENTO y descargas.
+- Versión unificada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod en cabecera, cache, BACKUP, INFOEVENTO y descargas.
 - No se toca el flujo de cambio de evento conseguido en v44.7.x/v45.x salvo limpieza de restos de rol.

@@ -1,4 +1,4 @@
-/* ControlEvent v5.0.0_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v5.1.0_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v5.0.0_prod';
-  const VERSION_FILE = 'ControlEvent_v5_0_0_prod';
+  const VERSION = 'ControlEvent v5.1.0_prod';
+  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -194,73 +194,11 @@
     return blocks.join('') || '<div class="ce-v401-pc-info-title">Sin detalle asociado</div>';
   }
 
-
-  let lastTooltipSnapshot = null;
-  const TOOLTIP_SELECTOR = '#ceBudgetLiteTooltipV307,#ceTooltipV21,#ceV462Tooltip,#ceTooltipV190,#ceTooltipV181,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-tooltip-v181,.ce-tooltip-v190';
-  function isVisibleTooltip(el){
-    return safe(() => {
-      const cs = getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity || 1) !== 0 && r.width > 0 && r.height > 0;
-    }, false);
-  }
-  function tooltipFrom(source){
-    return source?.closest?.(TOOLTIP_SELECTOR) || null;
-  }
-  function rememberTooltip(source){
-    // Solo se recuerda/restaura el globo real desde el que se pulsó la foto.
-    // Si se abre desde INGRESOS o desde RESUMEN/TICKETS en pantalla, NO se restaura ningún globo ajeno de GRAFICAS.
-    const el = tooltipFrom(source);
-    if(!el || !isVisibleTooltip(el)){ lastTooltipSnapshot = null; return null; }
-    lastTooltipSnapshot = {
-      el,
-      id: el.id || '',
-      className: el.className || '',
-      style: el.getAttribute('style') || '',
-      html: el.innerHTML,
-      scrollTop: el.scrollTop || 0,
-      scrollLeft: el.scrollLeft || 0,
-      rect: safe(() => el.getBoundingClientRect(), null)
-    };
-    return lastTooltipSnapshot;
-  }
-  function restoreTooltip(){
-    const item = lastTooltipSnapshot;
-    if(!item) return;
-    let el = item.el && document.contains(item.el) ? item.el : (item.id ? $(item.id) : null);
-    if(!el) return;
-    try{
-      if(!el.innerHTML && item.html) el.innerHTML = item.html;
-      el.className = item.className || el.className;
-      el.setAttribute('style', item.style || '');
-      if(item.rect){
-        const w = Math.max(220, Math.min(item.rect.width || 360, window.innerWidth - 16));
-        const h = Math.max(120, Math.min(item.rect.height || 260, window.innerHeight - 16));
-        const left = Math.min(Math.max(8, Math.round(item.rect.left)), Math.max(8, window.innerWidth - w - 8));
-        const top = Math.min(Math.max(8, Math.round(item.rect.top)), Math.max(8, window.innerHeight - h - 8));
-        el.style.setProperty('position', 'fixed', 'important');
-        el.style.setProperty('left', left + 'px', 'important');
-        el.style.setProperty('top', top + 'px', 'important');
-        el.style.setProperty('max-width', 'calc(100vw - 16px)', 'important');
-        el.style.setProperty('max-height', 'calc(100vh - 16px)', 'important');
-      }
-      el.style.setProperty('display', 'block', 'important');
-      el.style.setProperty('visibility','visible','important');
-      el.style.setProperty('opacity','1','important');
-      el.style.setProperty('pointer-events','auto','important');
-      el.scrollTop = item.scrollTop || 0;
-      el.scrollLeft = item.scrollLeft || 0;
-    }catch(_){ }
-  }
-  function restoreTooltipSoon(){ if(!lastTooltipSnapshot) return; [30,100,220,420].forEach(ms => setTimeout(restoreTooltip, ms)); }
-
-  function closeAll(ev, options){
-    const shouldRestore = !options || options.restore !== false;
+  function closeAll(ev){
     if(ev) stop(ev);
     safe(() => $(MODAL_ID)?.remove(), null);
     OLD_MODAL_IDS.forEach(id => safe(() => $(id)?.remove(), null));
     document.querySelectorAll('.ce-v5017-budget-modal,.ce-v512-budget-photo-modal,.ce-v504-modal,.ce-v505-photo-modal,.ce-v506-photo-modal,.ce-v508-photo-modal,.ce-v465-modal,.ce-v468-modal,.ce-receipt-modal-v463').forEach(el => safe(() => el.remove(), null));
-    if(shouldRestore) restoreTooltipSoon();
     return false;
   }
   function openModal(kind, trigger, src, ev){
@@ -270,8 +208,7 @@
     if(sig === lastOpenSig && now - lastOpenAt < 650) return stop(ev);
     lastOpenSig = sig;
     lastOpenAt = now;
-    const tooltipSnapshot = rememberTooltip(trigger);
-    closeAll(null, {restore:false});
+    closeAll();
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
     const info = isTicket ? rowTextFor(trigger) : ingresoInfo(trigger);
@@ -280,12 +217,11 @@
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('data-ce-v401-kind', kind);
-    if(tooltipSnapshot) modal.setAttribute('data-ce-v401-tooltip-origin', '1');
     modal.innerHTML = `<div class="ce-v401-pc-modal-box">
       <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
       <div class="ce-v401-pc-modal-info">${renderInfoHtml(info)}</div>
       <img class="ce-v401-pc-modal-img" alt="${esc(title)}" src="${esc(src)}">
-      <div class="ce-v401-pc-modal-foot"><button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button></div>
+      <button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button>
     </div>`;
     document.body.appendChild(modal);
     safe(() => modal.querySelector('[data-close]')?.focus({preventScroll:true}), null);
@@ -358,16 +294,56 @@
     return undefined;
   }
 
+  function escapeRegExp(text){ return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function safeDownloadName(name){
+    let out = String(name || '');
+    out = out.replace(/ControlEvent_v\d+(?:_\d+){1,4}(?:_prod){0,3}/ig, VERSION_FILE);
+    out = out.replace(new RegExp(escapeRegExp(VERSION_FILE) + '(?:_prod)+', 'ig'), VERSION_FILE);
+    return out;
+  }
+  const CLICK_WRAP_FLAGS = [
+    '__ceV411Version','__ceV412Version','__ceV413Version','__ceV434Version','__ceV437Version',
+    '__ceV4381DownloadName','__ceV4382DownloadName','__ceV440VersionFile','__ceV447VersionFile',
+    '__ceV450Version','__ceV461Version','__ceV5024VersionFile','__ceV5025VersionFile',
+    '__v192Wrapped','__v193Wrapped','__v194Wrapped','__v1952Wrapped','__v196Wrapped','__v200Wrapped',
+    '__v201Wrapped','__v202Wrapped','__v210Wrapped','__v211Wrapped','__v212Wrapped','__v213Wrapped','__v2132Wrapped',
+    '__v214Wrapped','__v215Wrapped','__v216Wrapped','__v217Wrapped','__v226Wrapped','__v228Wrapped','__v228RoleWrapped',
+    '__v240Wrapped','__v241Wrapped','__v250Wrapped','__v251Wrapped','__v252Wrapped','__v253Wrapped','__v253FinalWrapped',
+    '__v254Wrapped','__v255Wrapped','__v257Wrapped'
+  ];
+  function markClickFlags(fn){
+    CLICK_WRAP_FLAGS.forEach(flag => { try{ fn[flag] = true; }catch(_){ } });
+    try{ fn.__ceV401NativeSafeDownloadClick = true; }catch(_){ }
+    return fn;
+  }
+  function installSafeDownloadClick(){
+    try{
+      const proto = HTMLAnchorElement && HTMLAnchorElement.prototype;
+      const nativeClick = HTMLElement && HTMLElement.prototype && HTMLElement.prototype.click;
+      if(!proto || typeof nativeClick !== 'function') return;
+      if(proto.click && proto.click.__ceV401NativeSafeDownloadClick){ markClickFlags(proto.click); return; }
+      const safeClick = function(){
+        try{ if(this && this.download) this.download = safeDownloadName(this.download); }catch(_){ }
+        return nativeClick.call(this);
+      };
+      proto.click = markClickFlags(safeClick);
+    }catch(_){ }
+  }
+
   function applyVersion(){
     try{
       document.title = VERSION;
-      document.body.dataset.ceVersion = VERSION;
+      if(document.body){
+        document.body.dataset.ceVersion = VERSION;
+      }
       window.__ceVersion = VERSION;
       window.VERSION = VERSION;
       window.VERSION_FILE = VERSION_FILE;
       window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE};
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
-        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
+        const txt = el.textContent || '';
+        if(el === document.body) return;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(txt) || el.matches('[data-ce-version-label]')) el.textContent = VERSION;
       });
     }catch(_){ }
   }
@@ -380,17 +356,16 @@
       .ce-v401-pc-thumb img{width:32px!important;height:32px!important;display:block!important;object-fit:cover!important;border-radius:8px!important;pointer-events:none!important;}
       img.ce-v401-pc-ticket-thumb{display:inline-block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;cursor:zoom-in!important;max-width:44px!important;max-height:44px!important;object-fit:cover!important;border-radius:8px!important;border:1px solid #cbd5e1!important;background:#fff!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:10000080!important;background:rgba(2,6,23,.84)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1460px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(420px,540px) minmax(360px,1fr)!important;gap:12px!important;overflow:auto!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1420px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(380px,520px) minmax(420px,1fr)!important;gap:12px!important;overflow:auto!important;position:relative!important;}
       #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-foot{grid-column:1/-1!important;display:flex!important;justify-content:flex-end!important;align-items:center!important;padding-top:8px!important;background:#fff!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;border:1px solid #cbd5e1!important;background:#fff!important;color:#0f172a!important;border-radius:10px!important;padding:8px 14px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:96px!important;min-height:40px!important;box-shadow:0 1px 4px rgba(15,23,42,.14)!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:82vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;grid-column:2!important;justify-self:end!important;position:sticky!important;bottom:0!important;z-index:4!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:9px 16px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:104px!important;min-height:42px!important;box-shadow:0 1px 5px rgba(15,23,42,.18)!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:84vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
       #${MODAL_ID} .ce-v401-pc-info-title{font-weight:950!important;margin:5px 0 8px!important;color:#0f172a!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info table{width:100%!important;border-collapse:collapse!important;margin:8px 0!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info td{border-bottom:1px solid #e5e7eb!important;padding:5px 6px!important;vertical-align:top!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info td:first-child{font-weight:900!important;color:#475569!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info td:last-child{text-align:right!important;font-weight:850!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-img{display:block!important;max-width:100%!important;max-height:82vh!important;object-fit:contain!important;border-radius:12px!important;background:#f8fafc!important;justify-self:center!important;align-self:start!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-img{display:block!important;max-width:100%!important;max-height:84vh!important;object-fit:contain!important;border-radius:12px!important;background:#f8fafc!important;justify-self:center!important;align-self:start!important;}
       body.ce-v401-pc-finalizado #tabIngresos,body.ce-v401-pc-finalizado #collabList,body.ce-v401-pc-finalizado #collabList .itemcard,body.ce-v401-pc-finalizado #collabList .rowline,body.ce-v401-pc-finalizado #summaryTiendaTicket,body.ce-v401-pc-finalizado #ceBudgetLiteTooltipV307,body.ce-v401-pc-finalizado #ceTooltipV21{pointer-events:auto!important;filter:none!important;opacity:1!important;visibility:visible!important;}
     `;
     document.head.appendChild(style);
@@ -401,20 +376,19 @@
   function install(){
     injectStyle();
     applyVersion();
+    installSafeDownloadClick();
     markBody();
     patchVisiblePcThumbs();
   }
 
   ['pointerdown','mousedown'].forEach(type => window.addEventListener(type, handlePointerStart, {capture:true, passive:false}));
+  ['pointerdown','click'].forEach(type => window.addEventListener(type, () => { applyVersion(); installSafeDownloadClick(); }, {capture:true, passive:true}));
   window.addEventListener('click', handleModalClick, {capture:true, passive:false});
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape' && ($(MODAL_ID) || OLD_MODAL_IDS.some(id => $(id)))) return closeAll(ev); }, true);
+  document.addEventListener('click', ev => { applyVersion(); installSafeDownloadClick(); const a = ev.target?.closest?.('a[download]'); if(a && a.download) a.download = safeDownloadName(a.download); }, true);
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') [60,240,650,1400].forEach(ms => setTimeout(install, ms)); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
   [0,120,500,1200,2600,5000].forEach(ms => setTimeout(install, ms));
-  safe(() => {
-    const mo = new MutationObserver(() => { clearTimeout(mo.__ceV401t); mo.__ceV401t = setTimeout(install, 80); });
-    mo.observe(document.documentElement, {childList:true, subtree:true});
-  }, null);
 
-  window.ControlEventV401PcPhotoFix = {version:VERSION, versionFile:VERSION_FILE, install, close:closeAll, restoreTooltip};
+  window.ControlEventV401PcPhotoFix = {version:VERSION, versionFile:VERSION_FILE, install, close:closeAll};
 })();

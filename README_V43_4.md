@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Cambios principales:
 
@@ -11,4 +11,4 @@ Cambios principales:
   - NECESIDAD VALORADA -> VALORACION DEL EVENTO
   - COMPRAS PRODUCTO -> COMPRAS
   - DONADO PRODUCTO -> DONACION DE PRODUCTO
-- Versión actualizada a ControlEvent v50.24 en cabecera, PWA, service worker, exportaciones y nombres de descarga.
+- Versión actualizada a ControlEvent v5.1.0_prod en cabecera, PWA, service worker, exportaciones y nombres de descarga.

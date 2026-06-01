@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.24",
-  "versionFile": "ControlEvent_v50_24",
-  "base": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "changes": [
     "RESUMEN PRESUPUESTARIO/OPERATIVA: PRESUPUESTO => INGRESO TOTAL",
     "RESUMEN PRESUPUESTARIO/INGRESOS EN DINERO: INGRESOS EN DINERO / INGRESO DINERO => INGRESOS",

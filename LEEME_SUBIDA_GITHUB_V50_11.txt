@@ -1,10 +1,10 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Version generada desde v50.10.
 
 Cambios:
 - SALIR: vuelve a mostrar siempre la ventana de Login, limpiando sesion ligera y estados visuales autenticados.
-- CABECERA/VERSION: se deja de cargar v50-8-final-fixes.js y se unifican las constantes visibles a ControlEvent v50.24 para evitar alternancia v50.8/v50.10.
+- CABECERA/VERSION: se deja de cargar v50-8-final-fixes.js y se unifican las constantes visibles a ControlEvent v5.1.0_prod para evitar alternancia v50.8/v50.10.
 - INGRESOS: registros con situacion Pendiente/Pte. en letra roja; resto en negro.
 - COMPRAS: registros con Pte.Compra/pendiente o sin ticket en letra roja; TKxx y GASTOS CORRIENTES en negro.
 - NO se toca el sistema de fotos de justificantes/tickets de INGRESOS.

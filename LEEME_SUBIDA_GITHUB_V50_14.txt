@@ -1,4 +1,4 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Corrección conservadora posterior a v50.13.
 
@@ -8,7 +8,7 @@ Cambios:
 - En móvil/iPad, los justificantes de esos globos solo se abren si se toca la miniatura Just.; se evita que se abra automáticamente la primera foto del evento.
 - Dock móvil Refres/Salir, uno encima de otro, abajo a la derecha y pegado al margen.
 - Limpieza de negritas/parpadeos de PRODUCTOS sin observadores permanentes.
-- Versión y caché unificadas a ControlEvent v50.24 / controlevent-shell-v50-24.
+- Versión y caché unificadas a ControlEvent v5.1.0_prod / controlevent-shell-v50-24.
 
 IMPORTANTE:
 No se ha tocado la gestión de justificantes dentro de INGRESOS ni tickets, que funcionaba correctamente en v50.13.
