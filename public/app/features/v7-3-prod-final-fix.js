@@ -1,10 +1,10 @@
-/* ControlEvent v7.3.2_prod - cierre de versión y descarga/Excel sin carga periódica.
+/* ControlEvent v7.3_prod - cierre de versión y descarga/Excel sin carga periódica.
    Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.3.2_prod';
-  const VERSION_FILE = 'ControlEvent_v7_3_2_prod';
+  const VERSION = 'ControlEvent v7.3_prod';
+  const VERSION_FILE = 'ControlEvent_v7_3_prod';
   const INSTALLED = '__ceV73ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -25,7 +25,7 @@
   function normalizeText(value){
     return String(value == null ? '' : value)
       .replace(/ControlEvent_v\d+(?:_\d+){1,4}(?:_prod)?/ig, VERSION_FILE)
-      .replace(/ControlEvent\s+v\d+(?:[._]\d+){1,4}(?:_prod)?/ig, VERSION);
+      .replace(/ControlEvent\s+v\d+(?:\.\d+){1,4}(?:_prod)?/ig, VERSION);
   }
   function applyVersion(){
     safe(() => { if(document.title !== VERSION) document.title = VERSION; }, null);
