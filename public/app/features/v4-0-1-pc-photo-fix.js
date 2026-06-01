@@ -293,16 +293,56 @@
     return undefined;
   }
 
+  function escapeRegExp(text){ return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function safeDownloadName(name){
+    let out = String(name || '');
+    out = out.replace(/ControlEvent_v\d+(?:_\d+){1,4}(?:_prod){0,3}/ig, VERSION_FILE);
+    out = out.replace(new RegExp(escapeRegExp(VERSION_FILE) + '(?:_prod)+', 'ig'), VERSION_FILE);
+    return out;
+  }
+  const CLICK_WRAP_FLAGS = [
+    '__ceV411Version','__ceV412Version','__ceV413Version','__ceV434Version','__ceV437Version',
+    '__ceV4381DownloadName','__ceV4382DownloadName','__ceV440VersionFile','__ceV447VersionFile',
+    '__ceV450Version','__ceV461Version','__ceV5024VersionFile','__ceV5025VersionFile',
+    '__v192Wrapped','__v193Wrapped','__v194Wrapped','__v1952Wrapped','__v196Wrapped','__v200Wrapped',
+    '__v201Wrapped','__v202Wrapped','__v210Wrapped','__v211Wrapped','__v212Wrapped','__v213Wrapped','__v2132Wrapped',
+    '__v214Wrapped','__v215Wrapped','__v216Wrapped','__v217Wrapped','__v226Wrapped','__v228Wrapped','__v228RoleWrapped',
+    '__v240Wrapped','__v241Wrapped','__v250Wrapped','__v251Wrapped','__v252Wrapped','__v253Wrapped','__v253FinalWrapped',
+    '__v254Wrapped','__v255Wrapped','__v257Wrapped'
+  ];
+  function markClickFlags(fn){
+    CLICK_WRAP_FLAGS.forEach(flag => { try{ fn[flag] = true; }catch(_){ } });
+    try{ fn.__ceV401NativeSafeDownloadClick = true; }catch(_){ }
+    return fn;
+  }
+  function installSafeDownloadClick(){
+    try{
+      const proto = HTMLAnchorElement && HTMLAnchorElement.prototype;
+      const nativeClick = HTMLElement && HTMLElement.prototype && HTMLElement.prototype.click;
+      if(!proto || typeof nativeClick !== 'function') return;
+      if(proto.click && proto.click.__ceV401NativeSafeDownloadClick){ markClickFlags(proto.click); return; }
+      const safeClick = function(){
+        try{ if(this && this.download) this.download = safeDownloadName(this.download); }catch(_){ }
+        return nativeClick.call(this);
+      };
+      proto.click = markClickFlags(safeClick);
+    }catch(_){ }
+  }
+
   function applyVersion(){
     try{
       document.title = VERSION;
-      document.body.dataset.ceVersion = VERSION;
+      if(document.body){
+        document.body.dataset.ceVersion = VERSION;
+      }
       window.__ceVersion = VERSION;
       window.VERSION = VERSION;
       window.VERSION_FILE = VERSION_FILE;
       window.ControlEventVersion = {version:VERSION, versionFile:VERSION_FILE};
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
-        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent || '')) el.textContent = VERSION;
+        const txt = el.textContent || '';
+        if(el === document.body) return;
+        if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(txt) || el.matches('[data-ce-version-label]')) el.textContent = VERSION;
       });
     }catch(_){ }
   }
@@ -335,20 +375,25 @@
   function install(){
     injectStyle();
     applyVersion();
+    installSafeDownloadClick();
     markBody();
     patchVisiblePcThumbs();
   }
 
   ['pointerdown','mousedown'].forEach(type => window.addEventListener(type, handlePointerStart, {capture:true, passive:false}));
+  ['pointerdown','click'].forEach(type => window.addEventListener(type, () => { applyVersion(); installSafeDownloadClick(); }, {capture:true, passive:true}));
   window.addEventListener('click', handleModalClick, {capture:true, passive:false});
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape' && ($(MODAL_ID) || OLD_MODAL_IDS.some(id => $(id)))) return closeAll(ev); }, true);
+  document.addEventListener('click', ev => { applyVersion(); installSafeDownloadClick(); const a = ev.target?.closest?.('a[download]'); if(a && a.download) a.download = safeDownloadName(a.download); }, true);
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') [60,240,650,1400].forEach(ms => setTimeout(install, ms)); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
   [0,120,500,1200,2600,5000].forEach(ms => setTimeout(install, ms));
   safe(() => {
     const mo = new MutationObserver(() => { clearTimeout(mo.__ceV401t); mo.__ceV401t = setTimeout(install, 80); });
-    mo.observe(document.documentElement, {childList:true, subtree:true});
+    mo.observe(document.documentElement, {childList:true, characterData:true, subtree:true});
   }, null);
+
+  setInterval(() => { applyVersion(); installSafeDownloadClick(); }, 1500);
 
   window.ControlEventV401PcPhotoFix = {version:VERSION, versionFile:VERSION_FILE, install, close:closeAll};
 })();

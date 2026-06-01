@@ -1,8 +1,10 @@
 {
-  "version": "4.0.1-prod",
+  "version": "4.0.0-prod",
   "base": "v50.25",
-  "notes": "v4.0.1_prod: parche quirurgico PC para visor de fotos en eventos finalizados (INGRESOS y TICKETS); sin cambios en moviles/tablets, login, datos ni Excel.",
-  "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v4.0.1_prod",
-  "versionLabel": "ControlEvent v4.0.1_prod"
+  "notes": "v4.0_prod: acceso robusto contra diferencias de mayusculas/espacios; mantiene recuperacion defensiva de INGRESOS y no toca BACKUP ni INFOEVENTO.",
+  "generatedAt": "2026-05-28T00:00:00+02:00",
+  "build": "v4.0_prod",
+  "versionLabel": "ControlEvent v4.0.1_prod",
+  "versionFile": "ControlEvent_v4_0_1_prod",
+  "packageVersion": "4.0.1-prod"
 }

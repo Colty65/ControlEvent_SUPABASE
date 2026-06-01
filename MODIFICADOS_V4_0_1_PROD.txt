@@ -1,7 +1,13 @@
-public/index.html
-public/app/version.js
-public/app/features/v4-0-1-pc-photo-fix.js
-package.json
-index.html
+Archivos modificados respecto a v4.0_prod:
+
 build-metrics.json
+index.html
+package.json
+public/index.html
+public/sw.js
+public/app/version.js
 public/app/diagnostics/build-metrics.json
+public/app/features/v4-0-1-pc-photo-fix.js
+LEEME_SUBIDA_GITHUB_V4_0_1_PROD.txt
+MODIFICADOS_V4_0_1_PROD.txt
+PATCH_MANIFEST_V4_0_1_PROD.json
