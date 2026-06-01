@@ -1,4 +1,4 @@
-/* ControlEvent v5.1.0_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v6.1_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v5.1.0_prod';
-  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
+  const VERSION = 'ControlEvent v6.1_prod';
+  const VERSION_FILE = 'ControlEvent_v6_1_prod';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -66,6 +66,8 @@
 
   let lastOpenSig = '';
   let lastOpenAt = 0;
+  let lastTooltipSnapshotV61 = null;
+  let blockLogoutUntilV61 = 0;
 
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -73,6 +75,44 @@
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const safe = (fn, fb) => { try{ const value = fn(); return value === undefined ? fb : value; }catch(_){ return fb; } };
   const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
+
+  function markPhotoClosedV61(){ blockLogoutUntilV61 = Date.now() + 700; try{ window.__cePhotoCloseBlockLogoutUntil = Math.max(window.__cePhotoCloseBlockLogoutUntil || 0, blockLogoutUntilV61); }catch(_){ } }
+  function visibleTooltipV61(el){
+    if(!el) return false;
+    const cs = safe(() => getComputedStyle(el), null);
+    const r = safe(() => el.getBoundingClientRect(), null);
+    return !!(cs && r && cs.display !== 'none' && cs.visibility !== 'hidden' && Number(r.width) > 0 && Number(r.height) > 0);
+  }
+  function captureTooltipSnapshotV61(trigger){
+    const tip = trigger?.closest?.('#ceTooltipV21,#ceBudgetLiteTooltipV307,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip') || document.getElementById('ceTooltipV21') || null;
+    if(!visibleTooltipV61(tip)) return null;
+    const r = safe(() => tip.getBoundingClientRect(), null);
+    return {html:tip.outerHTML, id:tip.id || '', left:r ? r.left : null, top:r ? r.top : null, width:r ? r.width : null, height:r ? r.height : null, scrollTop:tip.scrollTop || 0, scrollLeft:tip.scrollLeft || 0};
+  }
+  function restoreTooltipSnapshotV61(snapshot){
+    if(!snapshot || !snapshot.html) return;
+    let restored = null;
+    try{
+      if(snapshot.id){ const old = document.getElementById(snapshot.id); if(old && !visibleTooltipV61(old)) old.remove(); else if(old && visibleTooltipV61(old)) { restored = old; } }
+      if(!restored){ const div = document.createElement('div'); div.innerHTML = snapshot.html; restored = div.firstElementChild; if(restored) document.body.appendChild(restored); }
+      if(!restored) return;
+      restored.setAttribute('data-ce-v61-restored-tooltip','1');
+      if(restored.id === 'ceBudgetLiteTooltipV307') restored.classList.add('open');
+      const maxLeft = Math.max(8, window.innerWidth - (snapshot.width || 420) - 8);
+      const maxTop = Math.max(8, window.innerHeight - Math.min(snapshot.height || 260, window.innerHeight - 16) - 8);
+      const left = Math.max(8, Math.min(snapshot.left == null ? 24 : snapshot.left, maxLeft));
+      const top = Math.max(8, Math.min(snapshot.top == null ? 80 : snapshot.top, maxTop));
+      restored.style.setProperty('display','block','important');
+      restored.style.setProperty('visibility','visible','important');
+      restored.style.setProperty('opacity','1','important');
+      restored.style.setProperty('pointer-events','auto','important');
+      restored.style.setProperty('position','fixed','important');
+      restored.style.setProperty('left', left + 'px', 'important');
+      restored.style.setProperty('top', top + 'px', 'important');
+      restored.style.setProperty('z-index','10000060','important');
+      try{ restored.scrollTop = snapshot.scrollTop || 0; restored.scrollLeft = snapshot.scrollLeft || 0; }catch(_){ }
+    }catch(_){ }
+  }
 
   function isPcLike(){
     const ua = navigator.userAgent || '';
@@ -194,11 +234,14 @@
     return blocks.join('') || '<div class="ce-v401-pc-info-title">Sin detalle asociado</div>';
   }
 
-  function closeAll(ev){
+  function closeAll(ev, opts){
     if(ev) stop(ev);
-    safe(() => $(MODAL_ID)?.remove(), null);
+    const current = $(MODAL_ID);
+    const snapshot = current?.__ceV61TooltipSnapshot || lastTooltipSnapshotV61;
+    safe(() => current?.remove(), null);
     OLD_MODAL_IDS.forEach(id => safe(() => $(id)?.remove(), null));
     document.querySelectorAll('.ce-v5017-budget-modal,.ce-v512-budget-photo-modal,.ce-v504-modal,.ce-v505-photo-modal,.ce-v506-photo-modal,.ce-v508-photo-modal,.ce-v465-modal,.ce-v468-modal,.ce-receipt-modal-v463').forEach(el => safe(() => el.remove(), null));
+    if(!opts || !opts.silent){ markPhotoClosedV61(); [0,60,160,320].forEach(ms => setTimeout(() => restoreTooltipSnapshotV61(snapshot), ms)); }
     return false;
   }
   function openModal(kind, trigger, src, ev){
@@ -208,7 +251,9 @@
     if(sig === lastOpenSig && now - lastOpenAt < 650) return stop(ev);
     lastOpenSig = sig;
     lastOpenAt = now;
-    closeAll();
+    const tooltipSnapshotV61 = captureTooltipSnapshotV61(trigger);
+    if(tooltipSnapshotV61) lastTooltipSnapshotV61 = tooltipSnapshotV61;
+    closeAll(null, {silent:true});
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
     const info = isTicket ? rowTextFor(trigger) : ingresoInfo(trigger);
@@ -217,6 +262,7 @@
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('data-ce-v401-kind', kind);
+    modal.__ceV61TooltipSnapshot = tooltipSnapshotV61 || null;
     modal.innerHTML = `<div class="ce-v401-pc-modal-box">
       <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
       <div class="ce-v401-pc-modal-info">${renderInfoHtml(info)}</div>
@@ -265,6 +311,7 @@
 
   function handlePointerStart(ev){
     const target = ev.target;
+    if(Date.now() < blockLogoutUntilV61 && target?.closest?.('#btnLogout,.user-actions')) return stop(ev);
     if(target?.closest?.(`#${MODAL_ID} [data-close],#${MODAL_ID} .ce-v401-pc-modal-close`)) return closeAll(ev);
     if(target === $(MODAL_ID)) return closeAll(ev);
     if(target?.closest?.('#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV40TicketPhotoModal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV310PhotoViewer [data-close],#ceV509ReceiptModal [data-close],.ce-v5017-budget-modal [data-close],.ce-v512-budget-photo-modal [data-close]')) return closeAll(ev);
@@ -358,7 +405,7 @@
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:10000080!important;background:rgba(2,6,23,.84)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
       #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1420px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(380px,520px) minmax(420px,1fr)!important;gap:12px!important;overflow:auto!important;position:relative!important;}
       #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;grid-column:2!important;justify-self:end!important;position:sticky!important;bottom:0!important;z-index:4!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:9px 16px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:104px!important;min-height:42px!important;box-shadow:0 1px 5px rgba(15,23,42,.18)!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;position:fixed!important;right:18px!important;bottom:18px!important;z-index:10000095!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:10px 18px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:112px!important;min-height:44px!important;box-shadow:0 2px 10px rgba(15,23,42,.22)!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:84vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
       #${MODAL_ID} .ce-v401-pc-info-title{font-weight:950!important;margin:5px 0 8px!important;color:#0f172a!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info table{width:100%!important;border-collapse:collapse!important;margin:8px 0!important;}

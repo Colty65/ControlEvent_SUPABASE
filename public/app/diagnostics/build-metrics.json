@@ -1,9 +1,9 @@
 {
-  "version": "6.0-prod",
+  "version": "5.0.0-prod",
   "base": "v50.25",
-  "notes": "v6.0_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
+  "notes": "v6.1_prod: base estable anterior; cierre de fotos separado de Salir, retorno de globo en GRAFICAS, visor iPhone Finalizado y versión unificada.",
   "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v6.0_prod",
-  "versionLabel": "ControlEvent v6.0_prod",
-  "versionFile": "ControlEvent_v6_0_prod"
+  "build": "v6.1_prod",
+  "versionLabel": "ControlEvent v6.1_prod",
+  "versionFile": "ControlEvent_v6_1_prod"
 }

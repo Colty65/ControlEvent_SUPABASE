@@ -1,0 +1,4 @@
+ControlEvent v6.1_prod
+Base: versión estable anterior indicada por el usuario.
+Cambios: version unificada, cierre fotos abajo-derecha separado de Salir, retorno de globo en GRAFICAS, visor iPhone Finalizado para justificantes de INGRESOS.
+Sin setInterval ni bucles periodicos nuevos.
