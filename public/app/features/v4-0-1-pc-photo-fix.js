@@ -196,11 +196,7 @@
 
 
   let lastTooltipSnapshot = null;
-  function tooltipRoots(){
-    const byId = ['ceBudgetLiteTooltipV307','ceTooltipV21','ceV462Tooltip','ceTooltipV190','ceTooltipV181'].map($).filter(Boolean);
-    const byClass = Array.from(document.querySelectorAll('.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-tooltip-v181,.ce-tooltip-v190'));
-    return byId.concat(byClass).filter((el, idx, arr) => el && arr.indexOf(el) === idx);
-  }
+  const TOOLTIP_SELECTOR = '#ceBudgetLiteTooltipV307,#ceTooltipV21,#ceV462Tooltip,#ceTooltipV190,#ceTooltipV181,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-tooltip-v181,.ce-tooltip-v190';
   function isVisibleTooltip(el){
     return safe(() => {
       const cs = getComputedStyle(el);
@@ -208,14 +204,15 @@
       return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity || 1) !== 0 && r.width > 0 && r.height > 0;
     }, false);
   }
+  function tooltipFrom(source){
+    return source?.closest?.(TOOLTIP_SELECTOR) || null;
+  }
   function rememberTooltip(source){
-    const roots = tooltipRoots().filter(isVisibleTooltip);
-    if(!roots.length && source){
-      const own = source.closest?.('#ceBudgetLiteTooltipV307,#ceTooltipV21,#ceV462Tooltip,#ceTooltipV190,#ceTooltipV181,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-tooltip-v181,.ce-tooltip-v190');
-      if(own) roots.push(own);
-    }
-    if(!roots.length) return;
-    lastTooltipSnapshot = roots.map(el => ({
+    // Solo se recuerda/restaura el globo real desde el que se pulsó la foto.
+    // Si se abre desde INGRESOS o desde RESUMEN/TICKETS en pantalla, NO se restaura ningún globo ajeno de GRAFICAS.
+    const el = tooltipFrom(source);
+    if(!el || !isVisibleTooltip(el)){ lastTooltipSnapshot = null; return null; }
+    lastTooltipSnapshot = {
       el,
       id: el.id || '',
       className: el.className || '',
@@ -224,33 +221,38 @@
       scrollTop: el.scrollTop || 0,
       scrollLeft: el.scrollLeft || 0,
       rect: safe(() => el.getBoundingClientRect(), null)
-    }));
+    };
+    return lastTooltipSnapshot;
   }
   function restoreTooltip(){
-    const snap = lastTooltipSnapshot;
-    if(!snap || !snap.length) return;
-    snap.forEach(item => {
-      let el = item.el && document.contains(item.el) ? item.el : (item.id ? $(item.id) : null);
-      if(!el) return;
-      try{
-        if(!el.innerHTML && item.html) el.innerHTML = item.html;
-        el.className = item.className || el.className;
-        el.setAttribute('style', item.style || '');
-        if(item.rect){
-          el.style.setProperty('position', 'fixed', 'important');
-          el.style.setProperty('left', Math.max(4, Math.round(item.rect.left)) + 'px', 'important');
-          el.style.setProperty('top', Math.max(4, Math.round(item.rect.top)) + 'px', 'important');
-        }
-        el.style.setProperty('display', 'block', 'important');
-        el.style.setProperty('visibility','visible','important');
-        el.style.setProperty('opacity','1','important');
-        el.style.setProperty('pointer-events','auto','important');
-        el.scrollTop = item.scrollTop || 0;
-        el.scrollLeft = item.scrollLeft || 0;
-      }catch(_){ }
-    });
+    const item = lastTooltipSnapshot;
+    if(!item) return;
+    let el = item.el && document.contains(item.el) ? item.el : (item.id ? $(item.id) : null);
+    if(!el) return;
+    try{
+      if(!el.innerHTML && item.html) el.innerHTML = item.html;
+      el.className = item.className || el.className;
+      el.setAttribute('style', item.style || '');
+      if(item.rect){
+        const w = Math.max(220, Math.min(item.rect.width || 360, window.innerWidth - 16));
+        const h = Math.max(120, Math.min(item.rect.height || 260, window.innerHeight - 16));
+        const left = Math.min(Math.max(8, Math.round(item.rect.left)), Math.max(8, window.innerWidth - w - 8));
+        const top = Math.min(Math.max(8, Math.round(item.rect.top)), Math.max(8, window.innerHeight - h - 8));
+        el.style.setProperty('position', 'fixed', 'important');
+        el.style.setProperty('left', left + 'px', 'important');
+        el.style.setProperty('top', top + 'px', 'important');
+        el.style.setProperty('max-width', 'calc(100vw - 16px)', 'important');
+        el.style.setProperty('max-height', 'calc(100vh - 16px)', 'important');
+      }
+      el.style.setProperty('display', 'block', 'important');
+      el.style.setProperty('visibility','visible','important');
+      el.style.setProperty('opacity','1','important');
+      el.style.setProperty('pointer-events','auto','important');
+      el.scrollTop = item.scrollTop || 0;
+      el.scrollLeft = item.scrollLeft || 0;
+    }catch(_){ }
   }
-  function restoreTooltipSoon(){ [30,100,220,420].forEach(ms => setTimeout(restoreTooltip, ms)); }
+  function restoreTooltipSoon(){ if(!lastTooltipSnapshot) return; [30,100,220,420].forEach(ms => setTimeout(restoreTooltip, ms)); }
 
   function closeAll(ev, options){
     const shouldRestore = !options || options.restore !== false;
@@ -268,7 +270,7 @@
     if(sig === lastOpenSig && now - lastOpenAt < 650) return stop(ev);
     lastOpenSig = sig;
     lastOpenAt = now;
-    rememberTooltip(trigger);
+    const tooltipSnapshot = rememberTooltip(trigger);
     closeAll(null, {restore:false});
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
@@ -278,10 +280,12 @@
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('data-ce-v401-kind', kind);
+    if(tooltipSnapshot) modal.setAttribute('data-ce-v401-tooltip-origin', '1');
     modal.innerHTML = `<div class="ce-v401-pc-modal-box">
-      <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span><button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button></div>
+      <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
       <div class="ce-v401-pc-modal-info">${renderInfoHtml(info)}</div>
       <img class="ce-v401-pc-modal-img" alt="${esc(title)}" src="${esc(src)}">
+      <div class="ce-v401-pc-modal-foot"><button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button></div>
     </div>`;
     document.body.appendChild(modal);
     safe(() => modal.querySelector('[data-close]')?.focus({preventScroll:true}), null);
@@ -376,8 +380,9 @@
       .ce-v401-pc-thumb img{width:32px!important;height:32px!important;display:block!important;object-fit:cover!important;border-radius:8px!important;pointer-events:none!important;}
       img.ce-v401-pc-ticket-thumb{display:inline-block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;cursor:zoom-in!important;max-width:44px!important;max-height:44px!important;object-fit:cover!important;border-radius:8px!important;border:1px solid #cbd5e1!important;background:#fff!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:10000080!important;background:rgba(2,6,23,.84)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1320px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(260px,380px) minmax(360px,1fr)!important;gap:12px!important;overflow:auto!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1460px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(420px,540px) minmax(360px,1fr)!important;gap:12px!important;overflow:auto!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-foot{grid-column:1/-1!important;display:flex!important;justify-content:flex-end!important;align-items:center!important;padding-top:8px!important;background:#fff!important;}
       #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;border:1px solid #cbd5e1!important;background:#fff!important;color:#0f172a!important;border-radius:10px!important;padding:8px 14px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:96px!important;min-height:40px!important;box-shadow:0 1px 4px rgba(15,23,42,.14)!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:82vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
       #${MODAL_ID} .ce-v401-pc-info-title{font-weight:950!important;margin:5px 0 8px!important;color:#0f172a!important;}

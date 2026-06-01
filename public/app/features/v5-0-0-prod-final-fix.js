@@ -40,17 +40,15 @@
     n = n.replace(/ControlEvent\s+v\d+(?:\.\d+){1,3}(?:_prod)?/ig, VERSION);
     if(/descarga_datos\.xlsx$/i.test(n)) n = `${VERSION_FILE}_BACKUP_TODOS_${ymd(now)}_${hms(now)}.xlsx`;
     if(/_BACKUP_/i.test(n)){
-      n = n.replace(/^(?:.*?)(ControlEvent_v\d+(?:_\d+){1,3}(?:_prod)?)_BACKUP_/i, `${VERSION_FILE}_BACKUP_`);
-      if(!/^ControlEvent_v5_0_0_prod_BACKUP_/i.test(n)){
-        const tail = n.replace(/^.*?_BACKUP_/i, '');
-        n = `${VERSION_FILE}_BACKUP_${tail}`;
-      }
+      n = n.replace(/^.*?_BACKUP_/i, `${VERSION_FILE}_BACKUP_`);
     }
     if(/INFOEVENTO/i.test(n)){
-      const titleMatch = n.match(/INFOEVENTO[-_](.*?)(?:_\d{8})?\.xlsx$/i);
-      const title = clean(titleMatch && titleMatch[1] ? titleMatch[1] : currentEventTitle());
-      const dateMatch = n.match(/_(\d{8})\.xlsx$/);
-      n = `${VERSION_FILE}_INFOEVENTO-${title}_${dateMatch ? dateMatch[1] : ymd(now)}.xlsx`;
+      const body = (n.match(/INFOEVENTO[-_](.*?)\.xlsx$/i) || [null, currentEventTitle()])[1] || currentEventTitle();
+      const dateHits = Array.from(String(body).matchAll(/_(\d{8})(?:[_-]?(?:\d{6}|\d{2}:?\d{2}:?\d{2}))?/g));
+      const date = dateHits.length ? dateHits[0][1] : ymd(now);
+      const titleRaw = dateHits.length ? String(body).slice(0, dateHits[0].index) : body;
+      const title = clean(titleRaw || currentEventTitle());
+      n = `${VERSION_FILE}_INFOEVENTO-${title}_${date}.xlsx`;
     }
     n = n.replace(/[\\/:*?"<>|]+/g, '_').replace(/_+\.xlsx$/i, '.xlsx').replace(/__+/g,'_');
     return n;
@@ -81,6 +79,8 @@
     };
   }
   function normalizeExistingAnchors(){ safe(() => document.querySelectorAll('a[download]').forEach(a => { a.download = normalizeDownloadName(a.download); }), null); }
+  function emitted(date = new Date()){ const p = n => String(n).padStart(2,'0'); return `Emitido por "(c)oltyLAB '26_${VERSION_FILE}_${p(date.getDate())}${p(date.getMonth()+1)}${date.getFullYear()}_${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}"`; }
+  function patchEmittedText(){ safe(() => { window.emittedByTextV171 = emitted; try{ emittedByTextV171 = emitted; }catch(_){ } }, null); }
 
   let lastTooltipSnapshot = null;
   function tooltipRoots(){
@@ -125,8 +125,11 @@
     safe(() => { const mo = new MutationObserver(muts => { muts.forEach(m => Array.from(m.removedNodes || []).forEach(node => { if(node?.nodeType === 1 && (node.id === 'ceV401PcPhotoModal' || node.querySelector?.('#ceV401PcPhotoModal'))) restoreSoon(); })); }); mo.observe(document.documentElement, {childList:true, subtree:true}); }, null);
   }
 
-  function install(){ applyVersion(); patchAnchorDownloads(); normalizeExistingAnchors(); }
-  patchPhotoReturn();
+  function install(){ applyVersion(); patchAnchorDownloads(); normalizeExistingAnchors(); patchEmittedText(); }
+  // v5.0.0_prod fix: el retorno a globos queda centralizado en v4-0-1-pc-photo-fix.js.
+  // Este módulo ya no restaura globos de forma genérica porque podía reabrir uno de GRAFICAS
+  // al cerrar una foto abierta desde INGRESOS o RESUMEN/TICKETS.
+  // patchPhotoReturn();
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
   document.addEventListener('click', () => setTimeout(install, 20), true);
   document.addEventListener('change', () => setTimeout(install, 20), true);

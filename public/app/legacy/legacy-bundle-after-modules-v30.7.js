@@ -2419,8 +2419,8 @@ window.__ceDisableLegacyBarGraficas = true;
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v4.0_prod';
-  const VERSION_FILE = 'ControlEvent_v4_0_prod';
+  const VERSION = 'ControlEvent v5.0.0_prod';
+  const VERSION_FILE = 'ControlEvent_v5_0_0_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -2687,7 +2687,8 @@ window.__ceDisableLegacyBarGraficas = true;
   }
   function infoFileName(ev){
     const t = stamp();
-    return `${VERSION_FILE}_INFOEVENTO-${cleanFilePart(ev?.titulo || 'evento')}_${t.yyyy}${t.mm}${t.dd}_${t.hh}${t.mi}${t.ss}.xlsx`;
+    // v5.0.0_prod fix: INFOEVENTO debe llevar una sola fecha final, sin hora repetida.
+    return `${VERSION_FILE}_INFOEVENTO-${cleanFilePart(ev?.titulo || 'evento')}_${t.yyyy}${t.mm}${t.dd}.xlsx`;
   }
   function backupFileName(scope = 'TODOS', eventTitle = 'TODOS'){
     const t = stamp();

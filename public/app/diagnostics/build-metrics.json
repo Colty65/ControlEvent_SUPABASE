@@ -1,8 +1,8 @@
 {
   "version": "5.0.0-prod",
   "base": "v50.25",
-  "notes": "v5.0.0_prod: versión unificada y retorno al globo tras cerrar fotos en PC finalizado.",
-  "generatedAt": "2026-06-01T00:00:00+02:00",
+  "notes": "v5.0.0_prod fix2: INFOEVENTO emite v5 interno/nombre sin duplicar fechas; visor PC solo restaura el globo origen; cierre ticket abajo derecha; refuerzo móvil en justificantes de ingresos.",
+  "generatedAt": "2026-06-01T13:35:00+02:00",
   "build": "v5.0.0_prod",
   "versionLabel": "ControlEvent v5.0.0_prod",
   "versionFile": "ControlEvent_v5_0_0_prod"
