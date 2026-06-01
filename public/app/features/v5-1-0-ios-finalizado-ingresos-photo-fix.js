@@ -1,4 +1,4 @@
-/* ControlEvent v5.1.0_prod - FIX único iPhone/iPadOS: fotos de INGRESOS en evento Finalizado por encima de globos.
+/* ControlEvent v5.1.0_prod - FIX único iPhone/iPadOS: fotos de INGRESOS en evento Finalizado por encima de globos, incluyendo GRAFICAS.
    Alcance: solo visor iOS/iPadOS finalizado. No cambia versión, Excel, BACKUP, cache ni módulos de datos. */
 (function(){
   'use strict';
@@ -81,7 +81,11 @@
       '#tabIngresos .ce-v509-receipt-thumb',
       '#ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb',
       '#ceBudgetLiteTooltipV307 .ce-v465-tip-thumb',
-      '#ceBudgetLiteTooltipV307 [data-ce-v512-budget-photo]'
+      '#ceBudgetLiteTooltipV307 [data-ce-v512-budget-photo]',
+      '#ceTooltipV21 .ce-v465-tip-thumb',
+      '#ceTooltipV21 [data-action="ingreso-receipt-view-v465"]',
+      '#ceTooltipV21 [data-ce-v512-budget-photo]',
+      '#tabGraficas .ce-v465-tip-thumb'
     ].join(','));
     if(!trigger) return null;
     const id = trigger.dataset?.id || trigger.closest?.('[data-id]')?.dataset?.id || '';
@@ -109,7 +113,9 @@
       body.${ACTIVE_CLASS} #collabList,
       body.${ACTIVE_CLASS} #collabList *,
       body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 *{pointer-events:auto!important;}
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 *,
+      body.${ACTIVE_CLASS} #ceTooltipV21,
+      body.${ACTIVE_CLASS} #ceTooltipV21 *{pointer-events:auto!important;}
       body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v465"],
       body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v502"],
       body.${ACTIVE_CLASS} #collabList [data-ce-v509-receipt="view"],
@@ -118,9 +124,12 @@
       body.${ACTIVE_CLASS} #collabList .ce-v504-receipt-thumb,
       body.${ACTIVE_CLASS} #collabList .ce-v509-receipt-thumb,
       body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb,
-      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
-      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307{visibility:hidden!important;pointer-events:none!important;}
-      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *{pointer-events:none!important;}
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb,
+      body.${ACTIVE_CLASS} #ceTooltipV21 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307,
+      body.${OPEN_CLASS} #ceTooltipV21{visibility:hidden!important;pointer-events:none!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *,
+      body.${OPEN_CLASS} #ceTooltipV21 *{pointer-events:none!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:2147483647!important;background:rgba(2,6,23,.88)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;box-sizing:border-box!important;transform:none!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;}
       #${MODAL_ID} .ce-v510-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
       #${MODAL_ID} .ce-v510-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
@@ -132,7 +141,7 @@
   function refreshBodyFlag(){ try{ document.body?.classList.toggle(ACTIVE_CLASS, active()); }catch(_){ } }
   function hideKnownPhotoModals(){
     try{
-      document.querySelectorAll('#ceV310PhotoViewer,#ceV509ReceiptModal,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v465-modal,.ce-v464-receipt-modal,.ce-receipt-modal-v463').forEach(el => {
+      document.querySelectorAll('#ceV310PhotoViewer,#ceV509ReceiptModal,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v468-modal,.ce-v465-modal,.ce-v464-receipt-modal,.ce-receipt-modal-v463').forEach(el => {
         if(el.id === MODAL_ID) return;
         el.classList?.remove?.('visible','open');
         el.setAttribute?.('aria-hidden','true');
