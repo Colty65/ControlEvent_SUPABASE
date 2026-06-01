@@ -5,7 +5,7 @@
 
   const VERSION = 'ControlEvent v7.3_prod';
   const VERSION_FILE = 'ControlEvent_v7_3_prod';
-  const INSTALLED = '__ceV72ProdFinalFix';
+  const INSTALLED = '__ceV73ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -71,8 +71,8 @@
   function patchAnchorDownloads(){
     const proto = window.HTMLAnchorElement && HTMLAnchorElement.prototype;
     const nativeClick = window.HTMLElement && HTMLElement.prototype && HTMLElement.prototype.click;
-    if(!proto || !nativeClick || proto.__ceV72DownloadPatched) return;
-    proto.__ceV72DownloadPatched = true;
+    if(!proto || !nativeClick || proto.__ceV73DownloadPatched) return;
+    proto.__ceV73DownloadPatched = true;
     const oldSetAttribute = proto.setAttribute;
     proto.setAttribute = function(name, value){
       if(String(name || '').toLowerCase() === 'download') value = normalizeDownloadName(value);
@@ -93,35 +93,35 @@
     return value;
   }
   function scrubWorkbook(wb){
-    if(!wb || wb.__ceV72Scrubbed) return wb;
-    wb.__ceV72Scrubbed = true;
+    if(!wb || wb.__ceV73Scrubbed) return wb;
+    wb.__ceV73Scrubbed = true;
     safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - ©oltyLAB '26`); }, null);
     safe(() => { wb.lastModifiedBy = VERSION; }, null);
     safe(() => { (wb.worksheets || []).forEach(ws => { ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); })); }); }, null);
     return wb;
   }
   function patchWorkbookInstance(wb){
-    if(!wb || wb.__ceV72WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
-    wb.__ceV72WritePatched = true;
+    if(!wb || wb.__ceV73WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
+    wb.__ceV73WritePatched = true;
     const oldWriteBuffer = wb.xlsx.writeBuffer.bind(wb.xlsx);
     wb.xlsx.writeBuffer = function(){ scrubWorkbook(wb); return oldWriteBuffer.apply(this, arguments); };
     return wb;
   }
   function patchExcelJS(){
     const X = window.ExcelJS;
-    if(!X || !X.Workbook || X.__ceV72WorkbookPatched) return false;
+    if(!X || !X.Workbook || X.__ceV73WorkbookPatched) return false;
     const Original = X.Workbook;
     function WorkbookPatched(){ return patchWorkbookInstance(new Original(...arguments)); }
     try{ WorkbookPatched.prototype = Original.prototype; Object.setPrototypeOf(WorkbookPatched, Original); }catch(_){ }
     X.Workbook = WorkbookPatched;
-    X.__ceV72WorkbookPatched = true;
+    X.__ceV73WorkbookPatched = true;
     return true;
   }
   function wrapEnsureExcelJS(){
     const fn = window.ensureExcelJS;
-    if(typeof fn !== 'function' || fn.__ceV72EnsureWrapped) return;
+    if(typeof fn !== 'function' || fn.__ceV73EnsureWrapped) return;
     const wrapped = async function(){ const res = await fn.apply(this, arguments); patchExcelJS(); return res; };
-    wrapped.__ceV72EnsureWrapped = true;
+    wrapped.__ceV73EnsureWrapped = true;
     window.ensureExcelJS = wrapped;
   }
   function closeModalFrom(target, ev){
@@ -132,14 +132,14 @@
     return undefined;
   }
   function installCloseRescue(){
-    if(window.__ceV72CloseRescueInstalled) return;
-    window.__ceV72CloseRescueInstalled = true;
+    if(window.__ceV73CloseRescueInstalled) return;
+    window.__ceV73CloseRescueInstalled = true;
     ['pointerdown','touchstart','click'].forEach(type => document.addEventListener(type, ev => closeModalFrom(ev.target, ev), {capture:true, passive:false}));
   }
   function injectStyle(){
-    if(document.getElementById('ceV72FinalStyle')) return;
+    if(document.getElementById('ceV73FinalStyle')) return;
     const style = document.createElement('style');
-    style.id = 'ceV72FinalStyle';
+    style.id = 'ceV73FinalStyle';
     style.textContent = `
       #ceV401PcPhotoModal .ce-v401-pc-modal-close,#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV310PhotoViewer .ce-v310-photo-close,#ceV502ReceiptModal [data-close],#ceV468ReceiptModal [data-close],#ceV465ReceiptModal [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close]{background:#fff!important;color:#000!important;border:1px solid #111827!important;z-index:10000090!important;pointer-events:auto!important;touch-action:manipulation!important;}
       @media (max-width:760px){.ce-v468-modal-card,.ce-v465-modal-card,.ce-v310-photo-box,.ce-v40-modal-box{position:relative!important;padding-bottom:58px!important;} .ce-v468-modal [data-close],.ce-v465-modal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV40TicketPhotoModal .ce-v40-modal-close{position:sticky!important;bottom:8px!important;float:right!important;}}
@@ -156,5 +156,5 @@
   document.addEventListener('click', ev => { if(ev.target?.closest?.('#btnExportExcel,#btnExportSeed,a[download]')) install(); }, true);
   [0,160,650,1800].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV72ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
+  window.ControlEventV73ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
 })();

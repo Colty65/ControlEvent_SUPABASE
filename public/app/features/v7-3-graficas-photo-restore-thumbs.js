@@ -2,7 +2,7 @@
    Alcance: Android restaura el globo al cerrar foto; todos los dispositivos hidratan miniaturas del globo activo bajo demanda. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV72GraficasPhotoRestoreThumbs';
+  const INSTALLED = '__ceV73GraficasPhotoRestoreThumbs';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -80,7 +80,7 @@
     el.id = s.id || 'ceTooltipV21';
     el.className = s.className || el.className || '';
     el.classList.add('open','ce-v462-tip-open');
-    el.setAttribute('data-ce-v72-restored-graph-tip','1');
+    el.setAttribute('data-ce-v73-restored-graph-tip','1');
     el.removeAttribute('aria-hidden');
     el.style.removeProperty('display');
     el.style.removeProperty('visibility');
@@ -115,7 +115,7 @@
           btn.appendChild(img);
         }
         if(img.src !== src) img.src = src;
-        try{ img.loading = 'eager'; img.decoding = 'sync'; img.setAttribute('fetchpriority','high'); }catch(_){ }
+        try{ img.loading = 'eager'; img.decoding = 'async'; img.removeAttribute('fetchpriority'); }catch(_){ }
         try{
           btn.style.setProperty('visibility','visible','important');
           btn.style.setProperty('opacity','1','important');
@@ -135,7 +135,6 @@
       safe(() => window.ControlEventV467?.enrichOpenTooltips?.(), null);
       safe(() => window.ControlEventBudgetLiteTips?.sanitize?.(), null);
       hydrateTooltipThumbs();
-      installTipObservers();
     }, 55);
   }
   function installTipObservers(){
@@ -172,9 +171,9 @@
     if(ev.target?.closest?.('#tabGraficas,#eventChartWrap,#ceTooltipV21,#ceBudgetLiteTooltipV307')) requestHydrate(type);
   }, {capture:true, passive:true}));
   document.addEventListener('keydown', ev => { if(isAndroid() && ev.key === 'Escape') scheduleRestore(); }, true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(() => { requestHydrate(evt); installTipObservers(); }, 80)));
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(() => { requestHydrate(evt) }, 80)));
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(() => { lastGraphTipSnapshot = null; requestHydrate('event-change'); }, 120); }, true);
-  [160,900].forEach(ms => setTimeout(() => { requestHydrate('boot'); installTipObservers(); }, ms));
+  [160,900].forEach(ms => setTimeout(() => { requestHydrate('boot') }, ms));
 
-  window.ControlEventV72GraficasPhotoRestoreThumbs = {version:VERSION, versionFile:VERSION_FILE, hydrate:hydrateTooltipThumbs, restore:restoreGraphTip};
+  window.ControlEventV73GraficasPhotoRestoreThumbs = {version:VERSION, versionFile:VERSION_FILE, hydrate:hydrateTooltipThumbs, restore:restoreGraphTip};
 })();

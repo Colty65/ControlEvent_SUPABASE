@@ -3,14 +3,14 @@
 (function(){
   'use strict';
 
-  const INSTALLED = '__ceV72IosFinalizadoIngresosPhotoFix';
+  const INSTALLED = '__ceV73IosFinalizadoIngresosPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const MODAL_ID = 'ceV72IosFinalizadoIngresoPhotoModal';
-  const STYLE_ID = 'ceV72IosFinalizadoIngresoPhotoStyle';
-  const OPEN_CLASS = 'ce-v72-ios-ingreso-photo-open';
-  const ACTIVE_CLASS = 'ce-v72-ios-ingreso-photo-active';
+  const MODAL_ID = 'ceV73IosFinalizadoIngresoPhotoModal';
+  const STYLE_ID = 'ceV73IosFinalizadoIngresoPhotoStyle';
+  const OPEN_CLASS = 'ce-v73-ios-ingreso-photo-open';
+  const ACTIVE_CLASS = 'ce-v73-ios-ingreso-photo-active';
   let suppressUntil = 0;
   let lastSig = '';
   let lastAt = 0;
@@ -119,12 +119,12 @@
     lines.forEach(line => {
       if(line.includes('|')){
         const parts = line.split('|').map(x => x.trim());
-        out.push(`<div class="ce-v72-ios-info-row"><span>${esc(parts[0])}</span><strong>${esc(parts.slice(1).join(' | '))}</strong></div>`);
+        out.push(`<div class="ce-v73-ios-info-row"><span>${esc(parts[0])}</span><strong>${esc(parts.slice(1).join(' | '))}</strong></div>`);
       }else{
-        out.push(`<div class="ce-v72-ios-info-title">${esc(line)}</div>`);
+        out.push(`<div class="ce-v73-ios-info-title">${esc(line)}</div>`);
       }
     });
-    return out.join('') || '<div class="ce-v72-ios-info-title">Justificante de ingreso</div>';
+    return out.join('') || '<div class="ce-v73-ios-info-title">Justificante de ingreso</div>';
   }
 
   function isVisibleTip(el){
@@ -234,17 +234,17 @@
       body.${OPEN_CLASS} #ceBudgetLiteTooltipV307,body.${OPEN_CLASS} #ceTooltipV21{visibility:hidden!important;pointer-events:none!important;}
       body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *,body.${OPEN_CLASS} #ceTooltipV21 *{pointer-events:none!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:2147483647!important;background:rgba(2,6,23,.88)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:8px!important;box-sizing:border-box!important;transform:none!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;}
-      #${MODAL_ID} .ce-v72-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;gap:8px!important;align-items:stretch!important;justify-content:stretch!important;}
-      #${MODAL_ID} .ce-v72-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
-      #${MODAL_ID} .ce-v72-ios-body{width:100%!important;max-height:84vh!important;display:grid!important;grid-template-columns:minmax(128px,38vw) minmax(0,1fr)!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
-      #${MODAL_ID} .ce-v72-ios-info{align-self:stretch!important;max-height:82vh!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;color:#fff!important;background:rgba(15,23,42,.76)!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:10px!important;padding:8px!important;font-size:11px!important;line-height:1.22!important;box-sizing:border-box!important;}
-      #${MODAL_ID} .ce-v72-ios-info-title{font-weight:950!important;font-size:12px!important;margin:0 0 8px!important;color:#fff!important;}
-      #${MODAL_ID} .ce-v72-ios-info-row{border-top:1px solid rgba(255,255,255,.18)!important;padding:6px 0!important;display:block!important;}
-      #${MODAL_ID} .ce-v72-ios-info-row span{display:block!important;color:#cbd5e1!important;font-weight:800!important;margin-bottom:2px!important;}
-      #${MODAL_ID} .ce-v72-ios-info-row strong{display:block!important;color:#fff!important;font-weight:950!important;word-break:break-word!important;}
+      #${MODAL_ID} .ce-v73-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;gap:8px!important;align-items:stretch!important;justify-content:stretch!important;}
+      #${MODAL_ID} .ce-v73-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
+      #${MODAL_ID} .ce-v73-ios-body{width:100%!important;max-height:84vh!important;display:grid!important;grid-template-columns:minmax(128px,38vw) minmax(0,1fr)!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
+      #${MODAL_ID} .ce-v73-ios-info{align-self:stretch!important;max-height:82vh!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;color:#fff!important;background:rgba(15,23,42,.76)!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:10px!important;padding:8px!important;font-size:11px!important;line-height:1.22!important;box-sizing:border-box!important;}
+      #${MODAL_ID} .ce-v73-ios-info-title{font-weight:950!important;font-size:12px!important;margin:0 0 8px!important;color:#fff!important;}
+      #${MODAL_ID} .ce-v73-ios-info-row{border-top:1px solid rgba(255,255,255,.18)!important;padding:6px 0!important;display:block!important;}
+      #${MODAL_ID} .ce-v73-ios-info-row span{display:block!important;color:#cbd5e1!important;font-weight:800!important;margin-bottom:2px!important;}
+      #${MODAL_ID} .ce-v73-ios-info-row strong{display:block!important;color:#fff!important;font-weight:950!important;word-break:break-word!important;}
       #${MODAL_ID} img{display:block!important;max-width:calc(98vw - 145px)!important;max-height:82vh!important;width:auto!important;height:auto!important;object-fit:contain!important;background:#fff!important;border-radius:10px!important;box-shadow:0 18px 70px rgba(0,0,0,.52)!important;justify-self:center!important;align-self:center!important;}
-      #${MODAL_ID} .ce-v72-ios-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:2147483647!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;pointer-events:auto!important;}
-      @media (max-width:380px){#${MODAL_ID} .ce-v72-ios-body{grid-template-columns:minmax(120px,42vw) minmax(0,1fr)!important;gap:6px!important;} #${MODAL_ID} img{max-width:calc(98vw - 134px)!important;} #${MODAL_ID} .ce-v72-ios-info{font-size:10.5px!important;padding:6px!important;}}
+      #${MODAL_ID} .ce-v73-ios-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:2147483647!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;pointer-events:auto!important;}
+      @media (max-width:380px){#${MODAL_ID} .ce-v73-ios-body{grid-template-columns:minmax(120px,42vw) minmax(0,1fr)!important;gap:6px!important;} #${MODAL_ID} img{max-width:calc(98vw - 134px)!important;} #${MODAL_ID} .ce-v73-ios-info{font-size:10.5px!important;padding:6px!important;}}
     `;
     document.head.appendChild(style);
   }
@@ -284,7 +284,7 @@
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.setAttribute('data-ce-preserve-tooltip','1');
-    modal.innerHTML = `<div class="ce-v72-ios-card"><div class="ce-v72-ios-title">${esc(photo.title || 'Foto')}</div><div class="ce-v72-ios-body"><div class="ce-v72-ios-info">${renderInfoHtml(photo.info)}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"></div><button type="button" class="ce-v72-ios-close">Cerrar</button></div>`;
+    modal.innerHTML = `<div class="ce-v73-ios-card"><div class="ce-v73-ios-title">${esc(photo.title || 'Foto')}</div><div class="ce-v73-ios-body"><div class="ce-v73-ios-info">${renderInfoHtml(photo.info)}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"></div><button type="button" class="ce-v73-ios-close">Cerrar</button></div>`;
     document.body.appendChild(modal);
     setTimeout(hideKnownPhotoModals, 0);
     return false;
@@ -300,7 +300,7 @@
     const modal = $(MODAL_ID);
     if(!modal) return undefined;
     const target = ev.target;
-    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v72-ios-close`)) return closeModal(ev);
+    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v73-ios-close`)) return closeModal(ev);
     try{ ev.stopPropagation(); }catch(_){ }
     return undefined;
   }
@@ -319,5 +319,5 @@
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 80); }, true);
   [0,160,700,1800].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV72IosFinalizadoIngresosPhotoFix = {install, open:openModal, close:closeModal};
+  window.ControlEventV73IosFinalizadoIngresosPhotoFix = {install, open:openModal, close:closeModal};
 })();
