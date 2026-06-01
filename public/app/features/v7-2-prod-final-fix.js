@@ -1,11 +1,11 @@
-/* ControlEvent v7.1_prod - cierre final de versión, Excel y visores sin bucles periódicos.
-   Alcance: no cambia datos, Supabase ni render general. Evita setInterval y sólo actúa por eventos reales. */
+/* ControlEvent v7.2_prod - cierre de versión y descarga/Excel sin carga periódica.
+   Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.1_prod';
-  const VERSION_FILE = 'ControlEvent_v7_1_prod';
-  const INSTALLED = '__ceV71ProdFinalFix';
+  const VERSION = 'ControlEvent v7.2_prod';
+  const VERSION_FILE = 'ControlEvent_v7_2_prod';
+  const INSTALLED = '__ceV72ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -27,14 +27,8 @@
       .replace(/ControlEvent_v\d+(?:_\d+){1,4}(?:_prod)?/ig, VERSION_FILE)
       .replace(/ControlEvent\s+v\d+(?:\.\d+){1,4}(?:_prod)?/ig, VERSION);
   }
-
-
-  function forceVersionSoon(){
-    [0,40,120,360,900,1800].forEach(ms => setTimeout(applyVersion, ms));
-  }
-
   function applyVersion(){
-    safe(() => { document.title = VERSION; }, null);
+    safe(() => { if(document.title !== VERSION) document.title = VERSION; }, null);
     safe(() => {
       window.__ceVersion = VERSION;
       window.VERSION = VERSION;
@@ -45,28 +39,24 @@
     safe(() => {
       document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
         const txt = el.textContent || '';
-        if(/ControlEvent\s+v/i.test(txt) || el.matches('[data-ce-version-label]')) el.textContent = VERSION;
+        if((/ControlEvent\s+v/i.test(txt) || el.matches('[data-ce-version-label]')) && txt !== VERSION) el.textContent = VERSION;
       });
     }, null);
   }
-
   function currentEventTitle(){
     const sel = document.getElementById('selectedEvent');
     const raw = sel?.selectedOptions?.[0]?.textContent || sel?.options?.[sel.selectedIndex]?.textContent || '';
     return clean(raw.replace(/^\s*(FINALIZADO|EN CURSO)\s*[-–:]?\s*/i,''));
   }
-
   function normalizeDownloadName(name){
     let n = normalizeText(name || '');
     if(!n) return n;
     const now = new Date();
     n = n.replace(/[\\/:*?"<>|]+/g, '_').replace(/__+/g,'_');
-
     if(/INFOEVENTO/i.test(n)){
       const after = n.split(/INFOEVENTO[-_]/i)[1] || '';
       let base = after.replace(/\.xlsx$/i,'');
-      base = base.replace(/(?:_\d{8}(?:_\d{6})?)+$/g, '');
-      base = base.replace(/(?:_\d{8})+$/g, '');
+      base = base.replace(/(?:_\d{8}(?:_\d{6})?)+$/g, '').replace(/(?:_\d{8})+$/g, '');
       const date = (n.match(/_(\d{8})(?:_\d{6})?(?:_\d{8}(?:_\d{6})?)*\.xlsx$/i) || [])[1] || ymd(now);
       n = `${VERSION_FILE}_INFOEVENTO-${clean(base || currentEventTitle())}_${date}.xlsx`;
     }else if(/BACKUP/i.test(n) || /descarga_datos\.xlsx$/i.test(n)){
@@ -78,12 +68,11 @@
     }
     return n.replace(/_+\.xlsx$/i,'.xlsx').replace(/__+/g,'_');
   }
-
   function patchAnchorDownloads(){
     const proto = window.HTMLAnchorElement && HTMLAnchorElement.prototype;
     const nativeClick = window.HTMLElement && HTMLElement.prototype && HTMLElement.prototype.click;
-    if(!proto || !nativeClick || proto.__ceV71DownloadPatched) return;
-    proto.__ceV71DownloadPatched = true;
+    if(!proto || !nativeClick || proto.__ceV72DownloadPatched) return;
+    proto.__ceV72DownloadPatched = true;
     const oldSetAttribute = proto.setAttribute;
     proto.setAttribute = function(name, value){
       if(String(name || '').toLowerCase() === 'download') value = normalizeDownloadName(value);
@@ -94,113 +83,78 @@
       return nativeClick.call(this);
     };
   }
-
   function scrubValue(value){
     if(typeof value === 'string') return normalizeText(value);
     if(value && typeof value === 'object'){
-      if(Array.isArray(value.richText)){
-        return {...value, richText:value.richText.map(part => ({...part, text:normalizeText(part.text || '')}))};
-      }
+      if(Array.isArray(value.richText)) return {...value, richText:value.richText.map(part => ({...part, text:normalizeText(part.text || '')}))};
       if(typeof value.text === 'string') return {...value, text:normalizeText(value.text)};
       if(typeof value.result === 'string') return {...value, result:normalizeText(value.result)};
     }
     return value;
   }
   function scrubWorkbook(wb){
-    if(!wb || wb.__ceV71Scrubbed) return wb;
-    wb.__ceV71Scrubbed = true;
+    if(!wb || wb.__ceV72Scrubbed) return wb;
+    wb.__ceV72Scrubbed = true;
     safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - ©oltyLAB '26`); }, null);
     safe(() => { wb.lastModifiedBy = VERSION; }, null);
-    safe(() => {
-      (wb.worksheets || []).forEach(ws => {
-        ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); }));
-      });
-    }, null);
+    safe(() => { (wb.worksheets || []).forEach(ws => { ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); })); }); }, null);
     return wb;
   }
   function patchWorkbookInstance(wb){
-    if(!wb || wb.__ceV71WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
-    wb.__ceV71WritePatched = true;
+    if(!wb || wb.__ceV72WritePatched || !wb.xlsx || typeof wb.xlsx.writeBuffer !== 'function') return wb;
+    wb.__ceV72WritePatched = true;
     const oldWriteBuffer = wb.xlsx.writeBuffer.bind(wb.xlsx);
     wb.xlsx.writeBuffer = function(){ scrubWorkbook(wb); return oldWriteBuffer.apply(this, arguments); };
     return wb;
   }
   function patchExcelJS(){
     const X = window.ExcelJS;
-    if(!X || !X.Workbook || X.__ceV71WorkbookPatched) return false;
+    if(!X || !X.Workbook || X.__ceV72WorkbookPatched) return false;
     const Original = X.Workbook;
-    function WorkbookPatched(){
-      const wb = new Original(...arguments);
-      return patchWorkbookInstance(wb);
-    }
+    function WorkbookPatched(){ return patchWorkbookInstance(new Original(...arguments)); }
     try{ WorkbookPatched.prototype = Original.prototype; Object.setPrototypeOf(WorkbookPatched, Original); }catch(_){ }
     X.Workbook = WorkbookPatched;
-    X.__ceV71WorkbookPatched = true;
+    X.__ceV72WorkbookPatched = true;
     return true;
   }
   function wrapEnsureExcelJS(){
     const fn = window.ensureExcelJS;
-    if(typeof fn !== 'function' || fn.__ceV71EnsureWrapped) return;
-    const wrapped = async function(){
-      const res = await fn.apply(this, arguments);
-      patchExcelJS();
-      return res;
-    };
-    wrapped.__ceV71EnsureWrapped = true;
+    if(typeof fn !== 'function' || fn.__ceV72EnsureWrapped) return;
+    const wrapped = async function(){ const res = await fn.apply(this, arguments); patchExcelJS(); return res; };
+    wrapped.__ceV72EnsureWrapped = true;
     window.ensureExcelJS = wrapped;
   }
-
   function closeModalFrom(target, ev){
     const modal = target?.closest?.(MODAL_SELECTORS.join(','));
     if(!modal) return undefined;
     const close = target.closest?.(CLOSE_SELECTORS);
-    if(close || target === modal){
-      stop(ev);
-      safe(() => modal.remove(), null);
-      return false;
-    }
+    if(close || target === modal){ stop(ev); safe(() => modal.remove(), null); return false; }
     return undefined;
   }
   function installCloseRescue(){
-    ['pointerdown','click','touchstart'].forEach(type => document.addEventListener(type, ev => closeModalFrom(ev.target, ev), {capture:true, passive:false}));
+    if(window.__ceV72CloseRescueInstalled) return;
+    window.__ceV72CloseRescueInstalled = true;
+    ['pointerdown','touchstart','click'].forEach(type => document.addEventListener(type, ev => closeModalFrom(ev.target, ev), {capture:true, passive:false}));
   }
   function injectStyle(){
-    if(document.getElementById('ceV71FinalStyle')) return;
+    if(document.getElementById('ceV72FinalStyle')) return;
     const style = document.createElement('style');
-    style.id = 'ceV71FinalStyle';
+    style.id = 'ceV72FinalStyle';
     style.textContent = `
-      #ceV401PcPhotoModal .ce-v401-pc-modal-close,
-      #ceV40TicketPhotoModal .ce-v40-modal-close,
-      #ceV310PhotoViewer .ce-v310-photo-close,
-      #ceV502ReceiptModal [data-close],#ceV468ReceiptModal [data-close],#ceV465ReceiptModal [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close]{background:#fff!important;color:#000!important;border:1px solid #111827!important;z-index:10000090!important;pointer-events:auto!important;touch-action:manipulation!important;}
-      @media (max-width: 760px){.ce-v468-modal-card,.ce-v465-modal-card,.ce-v310-photo-box,.ce-v40-modal-box{position:relative!important;padding-bottom:58px!important;} .ce-v468-modal [data-close],.ce-v465-modal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV40TicketPhotoModal .ce-v40-modal-close{position:sticky!important;bottom:8px!important;float:right!important;}}
+      #ceV401PcPhotoModal .ce-v401-pc-modal-close,#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV310PhotoViewer .ce-v310-photo-close,#ceV502ReceiptModal [data-close],#ceV468ReceiptModal [data-close],#ceV465ReceiptModal [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close]{background:#fff!important;color:#000!important;border:1px solid #111827!important;z-index:10000090!important;pointer-events:auto!important;touch-action:manipulation!important;}
+      @media (max-width:760px){.ce-v468-modal-card,.ce-v465-modal-card,.ce-v310-photo-box,.ce-v40-modal-box{position:relative!important;padding-bottom:58px!important;} .ce-v468-modal [data-close],.ce-v465-modal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV40TicketPhotoModal .ce-v40-modal-close{position:sticky!important;bottom:8px!important;float:right!important;}}
     `;
     document.head.appendChild(style);
   }
-
   function install(){
-    applyVersion();
-    patchAnchorDownloads();
-    wrapEnsureExcelJS();
-    patchExcelJS();
-    injectStyle();
+    applyVersion(); patchAnchorDownloads(); wrapEnsureExcelJS(); patchExcelJS(); injectStyle(); installCloseRescue();
     safe(() => document.querySelectorAll('a[download]').forEach(a => { a.download = normalizeDownloadName(a.download); }), null);
   }
 
-  installCloseRescue();
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded','controlevent:excel-before-run'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
+  document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 30); }, true);
   document.addEventListener('click', ev => { if(ev.target?.closest?.('#btnExportExcel,#btnExportSeed,a[download]')) install(); }, true);
-  document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 20); }, true);
-  document.addEventListener('click', forceVersionSoon, true);
-  ['controlevent:event-loaded','controlevent:module-mounted','controlevent:app-ready'].forEach(evt => window.addEventListener(evt, forceVersionSoon));
-  [0,100,500,1200,3000].forEach(ms => setTimeout(install, ms));
-  safe(() => {
-    const header = document.querySelector('.appname,.appname-stack') || document.body;
-    if(header){
-      const mo = new MutationObserver(() => { clearTimeout(mo.__ceV71t); mo.__ceV71t = setTimeout(applyVersion, 40); });
-      mo.observe(header, {childList:true, characterData:true, subtree:true});
-    }
-  }, null);
+  [0,160,650,1800].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV71ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
+  window.ControlEventV72ProdFinalFix = {version:VERSION, versionFile:VERSION_FILE, install, normalizeDownloadName, patchExcelJS};
 })();
