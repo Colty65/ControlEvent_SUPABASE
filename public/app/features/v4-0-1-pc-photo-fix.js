@@ -1,4 +1,4 @@
-/* ControlEvent v6.1_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v5.1.0_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v6.1_prod';
-  const VERSION_FILE = 'ControlEvent_v6_1_prod';
+  const VERSION = 'ControlEvent v5.1.0_prod';
+  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -66,7 +66,6 @@
 
   let lastOpenSig = '';
   let lastOpenAt = 0;
-  let activeOrigin = null;
 
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -195,60 +194,11 @@
     return blocks.join('') || '<div class="ce-v401-pc-info-title">Sin detalle asociado</div>';
   }
 
-  function captureFloatingOrigin(trigger){
-    const ctx = trigger?.closest?.('#ceBudgetLiteTooltipV307,#ceTooltipV21,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-v5017-budget-modal,.ce-v512-budget-photo-modal') || null;
-    if(!ctx){ activeOrigin = null; return; }
-    const rect = ctx.getBoundingClientRect();
-    activeOrigin = {
-      context: ctx,
-      contextId: ctx.id || '',
-      html: ctx.outerHTML || '',
-      rect: {left:rect.left, top:rect.top, width:rect.width, height:rect.height},
-      scrollTop: ctx.scrollTop || 0
-    };
-  }
-  function restoreFloatingOrigin(){
-    const origin = activeOrigin;
-    activeOrigin = null;
-    if(!origin) return;
-    try{
-      let ctx = origin.context;
-      if(!ctx || !document.contains(ctx)){
-        const wrap = document.createElement('div');
-        wrap.innerHTML = origin.html || '';
-        ctx = wrap.firstElementChild;
-        if(ctx){
-          if(origin.contextId && document.getElementById(origin.contextId)) document.getElementById(origin.contextId).remove();
-          ctx.setAttribute('data-ce-restored-tooltip','1');
-          document.body.appendChild(ctx);
-        }
-      }
-      if(!ctx) return;
-      ctx.removeAttribute('aria-hidden');
-      ctx.classList.add('open','visible','show');
-      ctx.style.setProperty('display','block','important');
-      ctx.style.setProperty('visibility','visible','important');
-      ctx.style.setProperty('opacity','1','important');
-      ctx.style.setProperty('pointer-events','auto','important');
-      ctx.style.setProperty('z-index','600000','important');
-      if(origin.rect){
-        ctx.style.setProperty('position','fixed','important');
-        ctx.style.setProperty('left', Math.max(8, Math.min(origin.rect.left, window.innerWidth - Math.max(origin.rect.width, 260) - 8)) + 'px','important');
-        ctx.style.setProperty('top', Math.max(8, Math.min(origin.rect.top, window.innerHeight - Math.max(origin.rect.height, 120) - 8)) + 'px','important');
-        ctx.style.setProperty('max-width','calc(100vw - 16px)','important');
-        ctx.style.setProperty('max-height','calc(100vh - 16px)','important');
-        ctx.style.setProperty('overflow','auto','important');
-      }
-      if(origin.scrollTop) ctx.scrollTop = origin.scrollTop;
-    }catch(_){ }
-  }
-  function closeAll(ev, restore = true){
+  function closeAll(ev){
     if(ev) stop(ev);
     safe(() => $(MODAL_ID)?.remove(), null);
     OLD_MODAL_IDS.forEach(id => safe(() => $(id)?.remove(), null));
     document.querySelectorAll('.ce-v5017-budget-modal,.ce-v512-budget-photo-modal,.ce-v504-modal,.ce-v505-photo-modal,.ce-v506-photo-modal,.ce-v508-photo-modal,.ce-v465-modal,.ce-v468-modal,.ce-receipt-modal-v463').forEach(el => safe(() => el.remove(), null));
-    try{ window.__ceBlockLogoutUntil = Date.now() + 700; }catch(_){ }
-    if(restore) restoreFloatingOrigin();
     return false;
   }
   function openModal(kind, trigger, src, ev){
@@ -258,8 +208,7 @@
     if(sig === lastOpenSig && now - lastOpenAt < 650) return stop(ev);
     lastOpenSig = sig;
     lastOpenAt = now;
-    captureFloatingOrigin(trigger);
-    closeAll(null, false);
+    closeAll();
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
     const info = isTicket ? rowTextFor(trigger) : ingresoInfo(trigger);
@@ -407,9 +356,9 @@
       .ce-v401-pc-thumb img{width:32px!important;height:32px!important;display:block!important;object-fit:cover!important;border-radius:8px!important;pointer-events:none!important;}
       img.ce-v401-pc-ticket-thumb{display:inline-block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;cursor:zoom-in!important;max-width:44px!important;max-height:44px!important;object-fit:cover!important;border-radius:8px!important;border:1px solid #cbd5e1!important;background:#fff!important;}
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:10000080!important;background:rgba(2,6,23,.84)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1420px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px 12px 68px!important;display:grid!important;grid-template-columns:minmax(380px,520px) minmax(420px,1fr)!important;gap:12px!important;overflow:auto!important;position:relative!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1420px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(380px,520px) minmax(420px,1fr)!important;gap:12px!important;overflow:auto!important;position:relative!important;}
       #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
-      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;grid-column:2!important;justify-self:end!important;position:fixed!important;right:calc(16px + env(safe-area-inset-right))!important;bottom:calc(18px + env(safe-area-inset-bottom))!important;top:auto!important;left:auto!important;z-index:10000095!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:9px 16px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:112px!important;min-height:44px!important;box-shadow:0 1px 5px rgba(15,23,42,.18)!important;}
+      #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;grid-column:2!important;justify-self:end!important;position:sticky!important;bottom:0!important;z-index:4!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:9px 16px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:104px!important;min-height:42px!important;box-shadow:0 1px 5px rgba(15,23,42,.18)!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:84vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
       #${MODAL_ID} .ce-v401-pc-info-title{font-weight:950!important;margin:5px 0 8px!important;color:#0f172a!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info table{width:100%!important;border-collapse:collapse!important;margin:8px 0!important;}

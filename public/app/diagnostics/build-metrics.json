@@ -1,9 +1,9 @@
 {
   "version": "5.0.0-prod",
-  "base": "v5.1.0_prod",
-  "notes": "v6.1_prod desde v5.1.0: cierre foto abajo, retorno a globo en GRAFICAS, iPhone finalizado INGRESOS, version unificada.",
+  "base": "v50.25",
+  "notes": "v5.1.0_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
   "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v6.1_prod",
-  "versionLabel": "ControlEvent v6.1_prod",
-  "versionFile": "ControlEvent_v6_1_prod"
+  "build": "v5.1.0_prod",
+  "versionLabel": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod"
 }

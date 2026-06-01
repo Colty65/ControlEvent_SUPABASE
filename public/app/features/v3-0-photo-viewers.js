@@ -1,9 +1,9 @@
-/* ControlEvent v6.1_prod - visor de fotos sin doble apertura; base estable v3.2. */
+/* ControlEvent v5.1.0_prod - visor de fotos sin doble apertura; base estable v3.2. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v6.1_prod';
-  const VERSION_FILE = 'ControlEvent_v6_1_prod';
+  const VERSION = 'ControlEvent v5.1.0_prod';
+  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
   const STYLE_ID = 'ceV310PhotoViewerStyle';
   const MODAL_ID = 'ceV310PhotoViewer';
   const LEGACY_MODAL_IDS = ['ceV300PhotoViewer'];
@@ -35,15 +35,6 @@
   }
   function isFinalizedEvent(){
     return String(currentEvent().situacion || '').trim().toUpperCase() === 'FINALIZADO';
-  }
-  function isCoarsePointer(){
-    try{ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }catch(_){ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || ''); }
-  }
-  function isLikelyUserPhoto(img){
-    const src = String(img?.currentSrc || img?.src || '').trim();
-    if(!src) return false;
-    if(/assets\/icons|assets\/embedded|footer-|logo|apple-touch-icon|icon-192|icon-512/i.test(src)) return false;
-    return /^(data:image\/|blob:|https?:|\/api\/|\/storage\/)/i.test(src) || /\.(jpe?g|png|webp|gif)(?:[?#].*)?$/i.test(src);
   }
   function currentEventId(){
     const s = appState();
@@ -115,7 +106,7 @@
         if(!String(rawKey || '').includes('|') && mergeImageRef(String(rawKey || ''), value)) changed = true;
       });
     }catch(error){
-      console.warn('[ControlEvent v6.1_prod] No se pudieron hidratar fotos desde BBDD.', error);
+      console.warn('[ControlEvent v5.1.0_prod] No se pudieron hidratar fotos desde BBDD.', error);
     }finally{
       hydrateBusy = false;
     }
@@ -231,7 +222,7 @@
         background:rgba(2,6,23,.84)!important;padding:10px!important;
       }
       #${MODAL_ID} .ce-v310-photo-box{
-        width:min(1320px,98vw)!important;max-height:96vh!important;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;padding-bottom:58px!important;
+        width:min(1320px,98vw)!important;max-height:96vh!important;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;
       }
       #${MODAL_ID} .ce-v310-photo-head{
         width:100%!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;
@@ -239,8 +230,7 @@
       }
       #${MODAL_ID} .ce-v310-photo-close{
         appearance:none!important;border:1px solid rgba(255,255,255,.5)!important;background:#fff!important;color:#0f172a!important;border-radius:8px!important;
-        min-width:92px!important;min-height:42px!important;font-weight:900!important;cursor:pointer!important;pointer-events:auto!important;
-        position:fixed!important;right:calc(14px + env(safe-area-inset-right))!important;bottom:calc(18px + env(safe-area-inset-bottom))!important;top:auto!important;left:auto!important;z-index:10000020!important;
+        min-width:74px!important;min-height:38px!important;font-weight:900!important;cursor:pointer!important;pointer-events:auto!important;
       }
       #${MODAL_ID} img{
         display:block!important;max-width:98vw!important;max-height:88vh!important;object-fit:contain!important;border-radius:10px!important;background:#fff!important;
@@ -310,19 +300,11 @@
   function captureOrigin(event){
     const target = event?.target || null;
     const el = target?.nodeType === 1 ? target : target?.parentElement || null;
-    const context = el?.closest?.('#ceBudgetLiteTooltipV307,#ceV509ReceiptModal,#ceTicketModalV234,#ceTicketImageModalV225,#ceTooltipV21,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip,.ce-v5017-budget-modal,.ce-v512-budget-photo-modal') || null;
-    const rect = context ? context.getBoundingClientRect() : null;
-    const canClone = !!(context && context.id !== 'ceV509ReceiptModal' && context.id !== 'ceTicketModalV234' && context.id !== 'ceTicketImageModalV225');
     activeOrigin = {
       el,
       scrollX: window.scrollX || 0,
       scrollY: window.scrollY || 0,
-      context,
-      contextId: context?.id || '',
-      contextClass: context?.className || '',
-      contextHtml: canClone ? context.outerHTML : '',
-      rect: rect ? {left:rect.left, top:rect.top, width:rect.width, height:rect.height} : null,
-      contextScrollTop: context?.scrollTop || 0
+      context: el?.closest?.('#ceBudgetLiteTooltipV307,#ceV509ReceiptModal,#ceTicketModalV234,#ceTicketImageModalV225,#ceTooltipV21') || null
     };
   }
   function restoreOrigin(){
@@ -333,37 +315,7 @@
       const ctx = origin.context;
       if(ctx && document.contains(ctx)){
         ctx.style.setProperty('pointer-events', 'auto', 'important');
-        ctx.style.setProperty('display', 'block', 'important');
-        ctx.style.setProperty('visibility', 'visible', 'important');
-        ctx.style.setProperty('opacity', '1', 'important');
-        ctx.removeAttribute('aria-hidden');
-        ctx.classList.add('open','visible','show');
-        if(origin.contextScrollTop) ctx.scrollTop = origin.contextScrollTop;
-      }else if(origin.contextHtml){
-        const wrap = document.createElement('div');
-        wrap.innerHTML = origin.contextHtml;
-        const clone = wrap.firstElementChild;
-        if(clone){
-          if(origin.contextId && document.getElementById(origin.contextId)) document.getElementById(origin.contextId).remove();
-          clone.setAttribute('data-ce-restored-tooltip','1');
-          clone.removeAttribute('aria-hidden');
-          clone.classList.add('open','visible','show');
-          clone.style.setProperty('display','block','important');
-          clone.style.setProperty('visibility','visible','important');
-          clone.style.setProperty('opacity','1','important');
-          clone.style.setProperty('pointer-events','auto','important');
-          clone.style.setProperty('z-index','600000','important');
-          if(origin.rect){
-            clone.style.setProperty('position','fixed','important');
-            clone.style.setProperty('left', Math.max(8, Math.min(origin.rect.left, window.innerWidth - Math.max(origin.rect.width, 260) - 8)) + 'px','important');
-            clone.style.setProperty('top', Math.max(8, Math.min(origin.rect.top, window.innerHeight - Math.max(origin.rect.height, 120) - 8)) + 'px','important');
-            clone.style.setProperty('max-width','calc(100vw - 16px)','important');
-            clone.style.setProperty('max-height','calc(100vh - 16px)','important');
-            clone.style.setProperty('overflow','auto','important');
-          }
-          document.body.appendChild(clone);
-          if(origin.contextScrollTop) clone.scrollTop = origin.contextScrollTop;
-        }
+        if(ctx.id === 'ceTicketModalV234' || ctx.id === 'ceTicketImageModalV225') ctx.classList.add('visible');
       }
       if(origin.el && document.contains(origin.el)){
         origin.el.focus?.({preventScroll:true});
@@ -420,21 +372,10 @@
       const src = modalIngreso.currentSrc || modalIngreso.src || '';
       if(src) return {src, title:'Justificante de ingreso'};
     }
-    const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 img.ticket-thumb,#ceTooltipV21 img.ticket-thumb,#ceTicketModalV234 img,#ceTicketImageModalV225 img');
+    const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 img.ticket-thumb,#ceTicketModalV234 img,#ceTicketImageModalV225 img');
     if(ticketImg){
       const src = ticketImg.currentSrc || ticketImg.src || '';
       if(src) return {src, title:'Foto de ticket'};
-    }
-    const broadImg = target?.closest?.('#tabIngresos img,#collabList img,#ceBudgetLiteTooltipV307 img,#ceTooltipV21 img,.ce-v21-tooltip img,.ce-budget-tooltip img,.ce-tooltip img');
-    if(broadImg && isLikelyUserPhoto(broadImg)){
-      const src = broadImg.currentSrc || broadImg.src || '';
-      if(src) return {src, title:(broadImg.closest?.('#summaryTiendaTicket') ? 'Foto de ticket' : 'Justificante de ingreso')};
-    }
-    const container = target?.closest?.('#tabIngresos [data-ce-v509-receipt="view"],#tabIngresos .ce-v509-receipt-strip,#tabIngresos .ce-v465-receipt-strip,#ceBudgetLiteTooltipV307 .ce-v465-tip-thumb,#ceTooltipV21 .ce-v465-tip-thumb,.ce-v21-tooltip .ce-v465-tip-thumb,.ce-budget-tooltip .ce-v465-tip-thumb');
-    const img2 = container?.querySelector?.('img');
-    if(img2 && isLikelyUserPhoto(img2)){
-      const src = img2.currentSrc || img2.src || '';
-      if(src) return {src, title:'Justificante de ingreso'};
     }
     return null;
   }
@@ -449,8 +390,6 @@
   }
 
   function handlePhotoEvent(event){
-    if(event.type !== 'click' && !isCoarsePointer()) return undefined;
-    if(document.getElementById('ceV401PcPhotoModal')) return undefined;
     if(handleModalEvent(event) === false) return false;
     if(Date.now() < suppressOpenUntil) return undefined;
     const photo = resolvePhotoTarget(event.target);
@@ -468,7 +407,7 @@
 
   document.addEventListener('click', handlePhotoEvent, {capture:true, passive:false});
   ['pointerup','touchend'].forEach(type => {
-    document.addEventListener(type, handlePhotoEvent, {capture:true, passive:false});
+    document.addEventListener(type, handleModalEvent, {capture:true, passive:false});
   });
   document.addEventListener('keydown', event => {
     if(event.key === 'Escape' && $(MODAL_ID)) return closePhoto(event);
