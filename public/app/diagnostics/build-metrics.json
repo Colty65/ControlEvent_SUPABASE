@@ -1,9 +1,9 @@
 {
   "version": "5.0.0-prod",
   "base": "v50.25",
-  "notes": "v7.3.1_prod: INFOEVENTO interno actualizado; carga inicial y BACKUP disponibles aunque el evento esté Finalizado.",
+  "notes": "v7.3.2_prod: iOS Finalizado con información en visor de INGRESOS, retorno al globo origen y versión activa normalizada.",
   "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v7.3.1_prod",
-  "versionLabel": "ControlEvent v7.3.1_prod",
-  "versionFile": "ControlEvent_v7_3_1_prod"
+  "build": "v7.3.2_prod",
+  "versionLabel": "ControlEvent v7.3.2_prod",
+  "versionFile": "ControlEvent_v7_3_2_prod"
 }

@@ -1,9 +1,9 @@
-/* ControlEvent v7.3.1_prod - visor de fotos sin doble apertura; base estable v3.2. */
+/* ControlEvent v7.3.2_prod - visor de fotos sin doble apertura; base estable v3.2. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.3.1_prod';
-  const VERSION_FILE = 'ControlEvent_v7_3_1_prod';
+  const VERSION = 'ControlEvent v7.3.2_prod';
+  const VERSION_FILE = 'ControlEvent_v7_3_2_prod';
   const STYLE_ID = 'ceV310PhotoViewerStyle';
   const MODAL_ID = 'ceV310PhotoViewer';
   const LEGACY_MODAL_IDS = ['ceV300PhotoViewer'];
@@ -106,7 +106,7 @@
         if(!String(rawKey || '').includes('|') && mergeImageRef(String(rawKey || ''), value)) changed = true;
       });
     }catch(error){
-      console.warn('[ControlEvent v7.3.1_prod] No se pudieron hidratar fotos desde BBDD.', error);
+      console.warn('[ControlEvent v7.3.2_prod] No se pudieron hidratar fotos desde BBDD.', error);
     }finally{
       hydrateBusy = false;
     }

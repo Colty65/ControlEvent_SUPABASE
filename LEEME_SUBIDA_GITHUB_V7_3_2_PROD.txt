@@ -1,0 +1,9 @@
+ControlEvent v7.3.2_prod
+Base: v7.3_prod.
+
+Cambios limitados:
+- INFOEVENTO interno normalizado a ControlEvent_v7_3_2_prod mediante el motor real de exportación.
+- Carga inicial permitida para usuario GD aunque el evento seleccionado esté Finalizado.
+- Descarga BACKUP permitida para usuario GD aunque el evento seleccionado esté Finalizado.
+- No se modifica el motor de BACKUP ni el contenido de los datos exportados.
+- Sin setInterval ni bucles periódicos nuevos.
