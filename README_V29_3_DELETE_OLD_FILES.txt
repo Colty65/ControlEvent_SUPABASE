@@ -1,4 +1,4 @@
-ControlEvent v50.24 - limpieza de archivos antiguos
+ControlEvent v5.1.0_prod - limpieza de archivos antiguos
 
 Para una subida limpia a GitHub, conserva los archivos incluidos en este paquete y elimina del repositorio archivos legacy antiguos que no estén referenciados por index.html o sw.js.
 

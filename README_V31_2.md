@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Versión basada en v31.1 para corregir el comportamiento de Mapa de recursos.
 

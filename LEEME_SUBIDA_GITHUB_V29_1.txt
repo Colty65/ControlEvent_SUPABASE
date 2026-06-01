@@ -1,4 +1,4 @@
-ControlEvent v50.24 - SOLO SUBIR A GITHUB
+ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
 
 Este paquete contiene solo los archivos que hay que sustituir/subir para pasar de v29.0 a v29.1.
 

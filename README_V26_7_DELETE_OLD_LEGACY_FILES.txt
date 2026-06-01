@@ -1,4 +1,4 @@
-ControlEvent v50.24 - archivos legacy individuales eliminados
+ControlEvent v5.1.0_prod - archivos legacy individuales eliminados
 
 En v26.9 estos archivos ya no son necesarios porque se han agrupado en dos bundles.
 Si actualizas manualmente desde GitHub web, puedes dejarlos sin subir cambios; no se cargan desde index.html.

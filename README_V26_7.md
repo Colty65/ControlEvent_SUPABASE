@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Bundle legacy y reducción de peticiones
+# ControlEvent v5.1.0_prod - Bundle legacy y reducción de peticiones
 
 Versión de optimización posterior a v26.6.
 

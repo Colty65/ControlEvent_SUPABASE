@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v4.0.1_prod",
-  "versionFile": "ControlEvent_v4_0_1_prod",
-  "base": "ControlEvent v4.0_prod",
+  "version": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "scope": "Parche quirurgico PC para visor de fotos en evento Finalizado",
   "mobileTabletUntouched": true,
   "modifiedFiles": [

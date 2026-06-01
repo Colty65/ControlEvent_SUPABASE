@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.24",
-  "base": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "changes": [
     "Mapa de productos registrado como pestaña oficial",
     "RO puede usar Mapa sin retorno automático a Resumen",

@@ -1,4 +1,4 @@
-ControlEvent v50.24 - SOLO SUBIR GITHUB
+ControlEvent v5.1.0_prod - SOLO SUBIR GITHUB
 
 Subir todo el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
 

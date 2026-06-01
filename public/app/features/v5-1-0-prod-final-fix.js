@@ -1,11 +1,11 @@
-/* ControlEvent v5.1.1_prod - cierre final de versión, Excel y visores sin bucles periódicos.
+/* ControlEvent v5.1.0_prod - cierre final de versión, Excel y visores sin bucles periódicos.
    Alcance: no cambia datos, Supabase ni render general. Evita setInterval y sólo actúa por eventos reales. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v5.1.1_prod';
-  const VERSION_FILE = 'ControlEvent_v5_1_1_prod';
-  const INSTALLED = '__ceV510ProdFinalFix_v511';
+  const VERSION = 'ControlEvent v5.1.0_prod';
+  const VERSION_FILE = 'ControlEvent_v5_1_0_prod';
+  const INSTALLED = '__ceV510ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -61,6 +61,7 @@
       const after = n.split(/INFOEVENTO[-_]/i)[1] || '';
       let base = after.replace(/\.xlsx$/i,'');
       base = base.replace(/(?:_\d{8}(?:_\d{6})?)+$/g, '');
+      base = base.replace(/(?:_\d{8})+$/g, '');
       const date = (n.match(/_(\d{8})(?:_\d{6})?(?:_\d{8}(?:_\d{6})?)*\.xlsx$/i) || [])[1] || ymd(now);
       n = `${VERSION_FILE}_INFOEVENTO-${clean(base || currentEventTitle())}_${date}.xlsx`;
     }else if(/BACKUP/i.test(n) || /descarga_datos\.xlsx$/i.test(n)){
@@ -92,7 +93,9 @@
   function scrubValue(value){
     if(typeof value === 'string') return normalizeText(value);
     if(value && typeof value === 'object'){
-      if(Array.isArray(value.richText)) return {...value, richText:value.richText.map(part => ({...part, text:normalizeText(part.text || '')}))};
+      if(Array.isArray(value.richText)){
+        return {...value, richText:value.richText.map(part => ({...part, text:normalizeText(part.text || '')}))};
+      }
       if(typeof value.text === 'string') return {...value, text:normalizeText(value.text)};
       if(typeof value.result === 'string') return {...value, result:normalizeText(value.result)};
     }
@@ -103,7 +106,11 @@
     wb.__ceV510Scrubbed = true;
     safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - ©oltyLAB '26`); }, null);
     safe(() => { wb.lastModifiedBy = VERSION; }, null);
-    safe(() => (wb.worksheets || []).forEach(ws => ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); }))), null);
+    safe(() => {
+      (wb.worksheets || []).forEach(ws => {
+        ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); }));
+      });
+    }, null);
     return wb;
   }
   function patchWorkbookInstance(wb){
@@ -117,7 +124,10 @@
     const X = window.ExcelJS;
     if(!X || !X.Workbook || X.__ceV510WorkbookPatched) return false;
     const Original = X.Workbook;
-    function WorkbookPatched(){ const wb = new Original(...arguments); return patchWorkbookInstance(wb); }
+    function WorkbookPatched(){
+      const wb = new Original(...arguments);
+      return patchWorkbookInstance(wb);
+    }
     try{ WorkbookPatched.prototype = Original.prototype; Object.setPrototypeOf(WorkbookPatched, Original); }catch(_){ }
     X.Workbook = WorkbookPatched;
     X.__ceV510WorkbookPatched = true;
@@ -126,7 +136,11 @@
   function wrapEnsureExcelJS(){
     const fn = window.ensureExcelJS;
     if(typeof fn !== 'function' || fn.__ceV510EnsureWrapped) return;
-    const wrapped = async function(){ const res = await fn.apply(this, arguments); patchExcelJS(); return res; };
+    const wrapped = async function(){
+      const res = await fn.apply(this, arguments);
+      patchExcelJS();
+      return res;
+    };
     wrapped.__ceV510EnsureWrapped = true;
     window.ensureExcelJS = wrapped;
   }
@@ -135,7 +149,11 @@
     const modal = target?.closest?.(MODAL_SELECTORS.join(','));
     if(!modal) return undefined;
     const close = target.closest?.(CLOSE_SELECTORS);
-    if(close || target === modal){ stop(ev); safe(() => modal.remove(), null); return false; }
+    if(close || target === modal){
+      stop(ev);
+      safe(() => modal.remove(), null);
+      return false;
+    }
     return undefined;
   }
   function installCloseRescue(){
@@ -146,7 +164,10 @@
     const style = document.createElement('style');
     style.id = 'ceV510FinalStyle';
     style.textContent = `
-      #ceV401PcPhotoModal .ce-v401-pc-modal-close,#ceV40TicketPhotoModal .ce-v40-modal-close,#ceV310PhotoViewer .ce-v310-photo-close,#ceV502ReceiptModal [data-close],#ceV468ReceiptModal [data-close],#ceV465ReceiptModal [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close]{background:#fff!important;color:#000!important;border:1px solid #111827!important;z-index:10000090!important;pointer-events:auto!important;touch-action:manipulation!important;}
+      #ceV401PcPhotoModal .ce-v401-pc-modal-close,
+      #ceV40TicketPhotoModal .ce-v40-modal-close,
+      #ceV310PhotoViewer .ce-v310-photo-close,
+      #ceV502ReceiptModal [data-close],#ceV468ReceiptModal [data-close],#ceV465ReceiptModal [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close]{background:#fff!important;color:#000!important;border:1px solid #111827!important;z-index:10000090!important;pointer-events:auto!important;touch-action:manipulation!important;}
       @media (max-width: 760px){.ce-v468-modal-card,.ce-v465-modal-card,.ce-v310-photo-box,.ce-v40-modal-box{position:relative!important;padding-bottom:58px!important;} .ce-v468-modal [data-close],.ce-v465-modal [data-close],#ceV310PhotoViewer .ce-v310-photo-close,#ceV40TicketPhotoModal .ce-v40-modal-close{position:sticky!important;bottom:8px!important;float:right!important;}}
     `;
     document.head.appendChild(style);
@@ -167,7 +188,7 @@
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 20); }, true);
   [0,100,500,1200,3000].forEach(ms => setTimeout(install, ms));
   safe(() => {
-    const header = document.querySelector('.appname,.appname-stack');
+    const header = document.querySelector('.appname,.appname-stack') || document.body;
     if(header){
       const mo = new MutationObserver(() => { clearTimeout(mo.__ceV510t); mo.__ceV510t = setTimeout(applyVersion, 40); });
       mo.observe(header, {childList:true, characterData:true, subtree:true});

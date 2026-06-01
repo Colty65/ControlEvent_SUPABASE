@@ -1,4 +1,4 @@
-ControlEvent v50.24 - PARCHE MINIMO SOLO CAMBIOS
+ControlEvent v5.1.0_prod - PARCHE MINIMO SOLO CAMBIOS
 
 Aplicar sobre la versión actual con V32.1 ya subida.
 

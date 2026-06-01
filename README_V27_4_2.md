@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Corrección menor sobre v27.4.1 para eliminar errores 404 de ExcelJS en producción al usar las herramientas standalone de RESUMEN_MODULAR y GRAFICAS_MODULAR.
 

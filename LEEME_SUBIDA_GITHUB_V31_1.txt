@@ -1,4 +1,4 @@
-ControlEvent v50.24
+ControlEvent v5.1.0_prod
 
 Subir todos los archivos de este ZIP al repositorio, sustituyendo los anteriores.
 

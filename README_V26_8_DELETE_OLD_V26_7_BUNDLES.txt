@@ -1,4 +1,4 @@
-ControlEvent v50.24 - archivos que ya no se cargan
+ControlEvent v5.1.0_prod - archivos que ya no se cargan
 
 Si subes la v26.9 completa o el parche, puedes borrar estos dos archivos antiguos:
 

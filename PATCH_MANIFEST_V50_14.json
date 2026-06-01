@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.24",
-  "versionFile": "ControlEvent_v50_24",
+  "version": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod",
   "base": "ControlEvent_SUPABASE-main_V50_13.zip",
   "loadedFinalFix": "public/app/features/v50-14-final-fixes.js",
   "removedFromLoad": [

@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Modularización de mantenimiento
+# ControlEvent v5.1.0_prod - Modularización de mantenimiento
 
 Versión generada sobre la v26.0 y conservando la corrección v25.9.1 de totales Excel.
 

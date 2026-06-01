@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v50.24",
-  "version_file": "ControlEvent_v50_24",
-  "base": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "version_file": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "changed_files": [
     "index.html",
     "public/index.html",

@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Corrección específica de GRAFICAS para eliminar el parpadeo y el consumo innecesario de recursos.
 
@@ -9,7 +9,7 @@ Corrección específica de GRAFICAS para eliminar el parpadeo y el consumo innec
 - GRAFICAS queda con un único render estable: diagramas de queso + Por destino.
 - Se añaden marcadores internos de compatibilidad para que los scripts legacy no intenten reconstruir las barras antiguas.
 - Las barras de Por destino se hacen más anchas para facilitar la pulsación.
-- Versión actualizada a ControlEvent v50.24.
+- Versión actualizada a ControlEvent v5.1.0_prod.
 
 ## Aplicación
 

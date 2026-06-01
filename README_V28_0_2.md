@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Corrección de consistencia de versión frontend/backend tras v28.0.1.
 
@@ -6,7 +6,7 @@ Corrección de consistencia de versión frontend/backend tras v28.0.1.
 
 - Unifica versión de backend en `server/paths.js`.
 - Unifica versión de BACKUP servidor en `routes/export.routes.js`.
-- El BACKUP vuelve a nombrarse con `ControlEvent_v50_24`.
+- El BACKUP vuelve a nombrarse con `ControlEvent_v5_1_0_prod`.
 - Mantiene ExcelJS bajo demanda de v28.0.
 - Mantiene la corrección de duplicados de v28.0.1.
 
@@ -18,4 +18,4 @@ fetch('/api/version').then(r=>r.json()).then(console.log)
 ControlEventExcel.info().excelJs
 ```
 
-El BACKUP debe llamarse `ControlEvent_v50_24_BACKUP_...xlsx`.
+El BACKUP debe llamarse `ControlEvent_v5_1_0_prod_BACKUP_...xlsx`.

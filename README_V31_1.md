@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Ajustes funcionales sobre V31.0 en Mapa de recursos.
 

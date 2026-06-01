@@ -1,4 +1,4 @@
-# ControlEvent v50.24
+# ControlEvent v5.1.0_prod
 
 Corrección específica de los Excel standalone modulares generados desde consola.
 

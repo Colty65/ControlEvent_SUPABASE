@@ -1,8 +1,8 @@
-ControlEvent v5.0.0_prod
+ControlEvent v5.1.0_prod
 
 Cambios quirúrgicos sobre v4.0.1_prod:
-- Cabecera y versión pública: ControlEvent v5.0.0_prod.
-- Descargas INFOEVENTO/BACKUP: se refuerza ControlEvent_v5_0_0_prod en nombres de archivo aunque existan wrappers antiguos.
+- Cabecera y versión pública: ControlEvent v5.1.0_prod.
+- Descargas INFOEVENTO/BACKUP: se refuerza ControlEvent_v5_1_0_prod en nombres de archivo aunque existan wrappers antiguos.
 - PC + evento FINALIZADO: al cerrar una foto abierta desde un globo se restaura el globo en la misma posición y scroll.
 
 No se toca lógica de datos, Supabase, login, compras/donaciones ni comportamiento móvil/tablet.

@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v50.24",
-  "base": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
   "changes": [
     "Mapa de recursos: fichas de productos donados compactas.",
     "Mapa de recursos: marcado visual local de fichas de compra como comprado ahora.",

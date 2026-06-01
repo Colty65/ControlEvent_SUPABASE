@@ -7,7 +7,7 @@ Esta version ya funciona en local contra Supabase. Para publicarla:
 Sube esta carpeta como repositorio:
 
 ```text
-ControlEvent_v50_24_base_supabase_localhost
+ControlEvent_v5_1_0_prod_base_supabase_localhost
 ```
 
 No subas:

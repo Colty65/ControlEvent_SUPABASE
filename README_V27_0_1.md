@@ -1,8 +1,8 @@
-# ControlEvent v50.24 - Corrección Excel/Backup
+# ControlEvent v5.1.0_prod - Corrección Excel/Backup
 
 Correcciones sobre v27.0:
 
-1. INFOEVENTO y textos emitidos pasan a usar `ControlEvent_v50_24` en el nombre de fichero y `ControlEvent v50.24` en metadatos.
+1. INFOEVENTO y textos emitidos pasan a usar `ControlEvent_v5_1_0_prod` en el nombre de fichero y `ControlEvent v5.1.0_prod` en metadatos.
 2. La descarga de datos/backup deja de depender sólo del estado legacy en memoria y se reconstruye desde `/api/state`, con fallback al estado de la app si el servidor no responde.
 3. Si el estado efectivo está vacío, se cancela la descarga para evitar un Excel con sólo cabeceras.
 4. El botón de descarga de datos queda redirigido al módulo `ControlEventExcel.run('backup')` cuando está disponible.

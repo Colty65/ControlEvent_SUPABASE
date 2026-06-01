@@ -1,13 +1,13 @@
 {
-  "version": "ControlEvent v50.24",
-  "from": "ControlEvent v50.24",
+  "version": "ControlEvent v5.1.0_prod",
+  "from": "ControlEvent v5.1.0_prod",
   "date": "2026-05-24",
   "changes": [
     "Corrige modificaciones de donaciones/compras evitando falso mensaje de duplicidad al editar.",
     "Oculta el mensaje flotante de borrado cuando no corresponde.",
     "Reordena fichas de Mapa de recursos y añade SALDO LÍMITE.",
     "Sustituye las exportaciones conflictivas de INFOEVENTO y BACKUP por rutas seguras que evitan Maximum call stack size exceeded.",
-    "Actualiza versión activa a ControlEvent v50.24."
+    "Actualiza versión activa a ControlEvent v5.1.0_prod."
   ],
   "files": [
     "public/index.html",

@@ -1,4 +1,4 @@
-ControlEvent v50.24 - limpieza recomendada en GitHub
+ControlEvent v5.1.0_prod - limpieza recomendada en GitHub
 
 Si vienes de v30.0, elimina o deja sin usar estos ficheros antiguos para evitar cache o cargas cruzadas:
 

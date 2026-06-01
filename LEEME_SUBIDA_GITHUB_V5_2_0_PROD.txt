@@ -1,0 +1,11 @@
+ControlEvent v5.2.0_prod - PARCHE desde v5.1.0
+
+Cambios limitados:
+- Version visible y publica a ControlEvent v5.2.0_prod.
+- INFOEVENTO y BACKUP: version interna y nombres con ControlEvent_v5_2_0_prod.
+- GRAFICAS: al cerrar una foto abierta desde un globo se restaura el globo origen, posicion y scroll.
+- iPhone: visor propio para justificantes de INGRESOS cuando Safari no abre el visor legado.
+- Miniaturas en globos marcadas como eager/high priority.
+- Sin setInterval ni bucles periodicos.
+
+Archivos modificados/anadidos: public/index.html, public/app/version.js, public/sw.js, public/modules/excel/backup.js, public/app/legacy/legacy-bundle-before-modules-v30.7.js, public/app/legacy/legacy-bundle-after-modules-v30.7.js, public/app/features/v5-2-0-prod-final-fix.js, routes/export.routes.js, package.json.

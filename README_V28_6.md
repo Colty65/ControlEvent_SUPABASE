@@ -1,4 +1,4 @@
-# ControlEvent v50.24 - Render activo por pantalla para móvil/tablet
+# ControlEvent v5.1.0_prod - Render activo por pantalla para móvil/tablet
 
 Versión conservadora para mejorar fluidez en iPad y Android.
 
