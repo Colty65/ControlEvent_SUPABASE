@@ -1,14 +1,16 @@
-/* ControlEvent v5.1.0_prod - parche único iPhone: ver justificantes de INGRESOS en evento Finalizado.
-   Alcance limitado: no cambia versión, Excel, BACKUP, cache, service worker, GRAFICAS ni rendimiento. */
+/* ControlEvent v5.1.0_prod - FIX único iPhone/iPadOS: fotos de INGRESOS en evento Finalizado por encima de globos.
+   Alcance: solo visor iOS/iPadOS finalizado. No cambia versión, Excel, BACKUP, cache ni módulos de datos. */
 (function(){
   'use strict';
 
-  const INSTALLED = '__ceV510IphoneFinalizadoIngresosPhoto';
+  const INSTALLED = '__ceV510IosFinalizadoIngresosPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const MODAL_ID = 'ceV510IphoneFinalizadoIngresoPhotoModal';
-  const STYLE_ID = 'ceV510IphoneFinalizadoIngresoPhotoStyle';
+  const MODAL_ID = 'ceV510IosFinalizadoIngresoPhotoModal';
+  const STYLE_ID = 'ceV510IosFinalizadoIngresoPhotoStyle';
+  const OPEN_CLASS = 'ce-v510-ios-finalizado-ingreso-photo-open';
+  const ACTIVE_CLASS = 'ce-v510-ios-finalizado-ingreso-photo-active';
   let suppressUntil = 0;
   let lastSig = '';
   let lastAt = 0;
@@ -20,13 +22,11 @@
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
 
-  function isIphone(){
+  function isiOSLike(){
     const ua = navigator.userAgent || '';
-    return /iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && Math.min(screen.width || 0, screen.height || 0) < 820);
+    return /iPhone|iPod|iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
-  function st(){
-    return safe(() => (typeof state !== 'undefined' && state) ? state : null, null) || window.state || window.ControlEventApp?.state || {};
-  }
+  function st(){ return safe(() => (typeof state !== 'undefined' && state) ? state : null, null) || window.state || window.ControlEventApp?.state || {}; }
   function rows(name){ return Array.isArray(st()[name]) ? st()[name] : []; }
   function currentEventId(){ return String(st().selectedEventId || $('selectedEvent')?.value || ''); }
   function currentEvent(){
@@ -34,7 +34,7 @@
     return safe(() => (typeof selectedEvent === 'function' ? selectedEvent() : null), null) || rows('eventos').find(e => String(e.id || '') === id) || {};
   }
   function isFinalizado(){ return up(currentEvent().situacion || '') === 'FINALIZADO'; }
-  function active(){ return isIphone() && isFinalizado(); }
+  function active(){ return isiOSLike() && isFinalizado(); }
 
   function receiptKeys(id){
     const ev = currentEventId();
@@ -95,10 +95,7 @@
     const y = touch ? touch.clientY : ev?.clientY;
     if(!Number.isFinite(x) || !Number.isFinite(y) || typeof document.elementsFromPoint !== 'function') return null;
     const stack = document.elementsFromPoint(x, y) || [];
-    for(const el of stack){
-      const found = resolveFromElement(el);
-      if(found) return found;
-    }
+    for(const el of stack){ const found = resolveFromElement(el); if(found) return found; }
     return null;
   }
 
@@ -107,36 +104,49 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      body.ce-v510-iphone-finalizado-ingresos-photo #tabIngresos,
-      body.ce-v510-iphone-finalizado-ingresos-photo #tabIngresos *,
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList,
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList *,
-      body.ce-v510-iphone-finalizado-ingresos-photo #ceBudgetLiteTooltipV307,
-      body.ce-v510-iphone-finalizado-ingresos-photo #ceBudgetLiteTooltipV307 *{pointer-events:auto!important;}
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList [data-action="ingreso-receipt-view-v465"],
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList [data-action="ingreso-receipt-view-v502"],
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList [data-ce-v509-receipt="view"],
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList .ce-v465-receipt-thumb,
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList .ce-v502-receipt-thumb,
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList .ce-v504-receipt-thumb,
-      body.ce-v510-iphone-finalizado-ingresos-photo #collabList .ce-v509-receipt-thumb,
-      body.ce-v510-iphone-finalizado-ingresos-photo #ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb,
-      body.ce-v510-iphone-finalizado-ingresos-photo #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
-      #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:350000!important;background:rgba(2,6,23,.86)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;box-sizing:border-box!important;}
-      #${MODAL_ID} .ce-v510-iphone-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;}
-      #${MODAL_ID} .ce-v510-iphone-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
+      body.${ACTIVE_CLASS} #tabIngresos,
+      body.${ACTIVE_CLASS} #tabIngresos *,
+      body.${ACTIVE_CLASS} #collabList,
+      body.${ACTIVE_CLASS} #collabList *,
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307,
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 *{pointer-events:auto!important;}
+      body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v465"],
+      body.${ACTIVE_CLASS} #collabList [data-action="ingreso-receipt-view-v502"],
+      body.${ACTIVE_CLASS} #collabList [data-ce-v509-receipt="view"],
+      body.${ACTIVE_CLASS} #collabList .ce-v465-receipt-thumb,
+      body.${ACTIVE_CLASS} #collabList .ce-v502-receipt-thumb,
+      body.${ACTIVE_CLASS} #collabList .ce-v504-receipt-thumb,
+      body.${ACTIVE_CLASS} #collabList .ce-v509-receipt-thumb,
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v5017-budget-thumb,
+      body.${ACTIVE_CLASS} #ceBudgetLiteTooltipV307 .ce-v465-tip-thumb{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(15,23,42,.12)!important;cursor:zoom-in!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307{visibility:hidden!important;pointer-events:none!important;}
+      body.${OPEN_CLASS} #ceBudgetLiteTooltipV307 *{pointer-events:none!important;}
+      #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:2147483647!important;background:rgba(2,6,23,.88)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;box-sizing:border-box!important;transform:none!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;}
+      #${MODAL_ID} .ce-v510-ios-card{width:100%!important;max-width:98vw!important;max-height:96vh!important;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;justify-content:center!important;}
+      #${MODAL_ID} .ce-v510-ios-title{align-self:stretch!important;color:#fff!important;font-weight:900!important;font-size:15px!important;line-height:1.15!important;text-align:left!important;padding-right:86px!important;}
       #${MODAL_ID} img{display:block!important;max-width:98vw!important;max-height:82vh!important;width:auto!important;height:auto!important;object-fit:contain!important;background:#fff!important;border-radius:10px!important;box-shadow:0 18px 70px rgba(0,0,0,.52)!important;}
-      #${MODAL_ID} .ce-v510-iphone-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:350010!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;}
+      #${MODAL_ID} .ce-v510-ios-close{position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 12px)!important;bottom:calc(env(safe-area-inset-bottom,0px) + 16px)!important;z-index:2147483647!important;background:#fff!important;color:#000!important;border:1px solid #111827!important;border-radius:10px!important;min-width:82px!important;min-height:42px!important;font-weight:900!important;font-size:14px!important;touch-action:manipulation!important;appearance:none!important;-webkit-appearance:none!important;pointer-events:auto!important;}
     `;
     document.head.appendChild(style);
   }
-  function refreshBodyFlag(){
-    try{ document.body?.classList.toggle('ce-v510-iphone-finalizado-ingresos-photo', active()); }catch(_){ }
+  function refreshBodyFlag(){ try{ document.body?.classList.toggle(ACTIVE_CLASS, active()); }catch(_){ } }
+  function hideKnownPhotoModals(){
+    try{
+      document.querySelectorAll('#ceV310PhotoViewer,#ceV509ReceiptModal,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v465-modal,.ce-v464-receipt-modal,.ce-receipt-modal-v463').forEach(el => {
+        if(el.id === MODAL_ID) return;
+        el.classList?.remove?.('visible','open');
+        el.setAttribute?.('aria-hidden','true');
+        el.style.setProperty('display','none','important');
+        el.style.setProperty('pointer-events','none','important');
+      });
+    }catch(_){ }
   }
   function closeModal(ev){
     suppressUntil = Date.now() + 500;
     stop(ev);
     try{ $(MODAL_ID)?.remove(); }catch(_){ }
+    try{ document.body?.classList.remove(OPEN_CLASS); }catch(_){ }
+    setTimeout(() => { try{ document.body?.classList.remove(OPEN_CLASS); }catch(_){ } }, 0);
     return false;
   }
   function openModal(photo, ev){
@@ -146,13 +156,16 @@
     if(sig === lastSig && now - lastAt < 650) return stop(ev);
     lastSig = sig; lastAt = now;
     stop(ev);
+    hideKnownPhotoModals();
     try{ $(MODAL_ID)?.remove(); }catch(_){ }
+    try{ document.body?.classList.add(OPEN_CLASS); }catch(_){ }
     const modal = document.createElement('div');
     modal.id = MODAL_ID;
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
-    modal.innerHTML = `<div class="ce-v510-iphone-card"><div class="ce-v510-iphone-title">${esc(photo.title || 'Foto')}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"><button type="button" class="ce-v510-iphone-close">Cerrar</button></div>`;
+    modal.innerHTML = `<div class="ce-v510-ios-card"><div class="ce-v510-ios-title">${esc(photo.title || 'Foto')}</div><img alt="${esc(photo.title || 'Foto ampliada')}" src="${esc(photo.src)}"><button type="button" class="ce-v510-ios-close">Cerrar</button></div>`;
     document.body.appendChild(modal);
+    setTimeout(hideKnownPhotoModals, 0);
     return false;
   }
   function handleOpen(ev){
@@ -166,19 +179,24 @@
     const modal = $(MODAL_ID);
     if(!modal) return undefined;
     const target = ev.target;
-    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v510-iphone-close`)) return closeModal(ev);
+    if(target === modal || target?.closest?.(`#${MODAL_ID} .ce-v510-ios-close`)) return closeModal(ev);
     try{ ev.stopPropagation(); }catch(_){ }
     return undefined;
   }
+  function eventHandler(ev){
+    if(handleClose(ev) === false) return false;
+    return handleOpen(ev);
+  }
   function install(){ injectStyle(); refreshBodyFlag(); }
 
-  ['touchend','pointerup','click'].forEach(type => {
-    document.addEventListener(type, ev => { if(handleClose(ev) === false) return false; return handleOpen(ev); }, {capture:true, passive:false});
+  ['touchstart','pointerdown','touchend','pointerup','click'].forEach(type => {
+    window.addEventListener(type, eventHandler, {capture:true, passive:false});
+    document.addEventListener(type, eventHandler, {capture:true, passive:false});
   });
   document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && $(MODAL_ID)) return closeModal(ev); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 80); }, true);
   [0,160,700,1800].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV510IphoneFinalizadoIngresosPhoto = {install, open:openModal, close:closeModal};
+  window.ControlEventV510IosFinalizadoIngresosPhotoFix = {install, open:openModal, close:closeModal};
 })();
