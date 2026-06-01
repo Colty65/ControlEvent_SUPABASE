@@ -1,12 +1,12 @@
-/* ControlEvent v3.6_prod - ajustes finales sobre v45.4 estable.
+/* ControlEvent v4.0_prod - ajustes finales sobre v45.4 estable.
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3.6_prod';
-  const VERSION_FILE = 'ControlEvent_v3_6_prod';
+  const VERSION = 'ControlEvent v4.0_prod';
+  const VERSION_FILE = 'ControlEvent_v4_0_prod';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const INSTALLED = '__ceV464FinalFixes';

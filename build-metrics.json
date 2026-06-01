@@ -1,6 +1,6 @@
 {
-  "version": "3.6.0-prod",
-  "notes": "v3.6_prod: acceso robusto contra diferencias de mayusculas/espacios; mantiene recuperacion defensiva de INGRESOS.",
-  "versionLabel": "ControlEvent v3.6_prod",
+  "version": "4.0.0-prod",
+  "notes": "v4.0_prod: acceso robusto contra diferencias de mayusculas/espacios; mantiene recuperacion defensiva de INGRESOS.",
+  "versionLabel": "ControlEvent v4.0_prod",
   "generatedAt": "2026-05-28T00:00:00+02:00"
 }

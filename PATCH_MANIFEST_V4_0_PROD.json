@@ -1,0 +1,10 @@
+{
+  "version": "v4.0_prod",
+  "base": "ControlEvent_SUPABASE-main_V3_6_PROD.zip",
+  "scope": [
+    "fotos INGRESOS/TICKETS en curso/finalizado",
+    "sincronizacion de fotos al entrar/cambiar evento/refrescar",
+    "version v4.0_prod"
+  ],
+  "notes": "No se toca login ni la logica de INFOEVENTO/BACKUP, salvo textos de version."
+}
