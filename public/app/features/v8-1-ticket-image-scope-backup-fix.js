@@ -1,9 +1,9 @@
-/* ControlEvent v8.3.1_prod - aislamiento de fotos TKxx por evento y refuerzo ligero de BACKUP.
+/* ControlEvent v8.3.2_prod - aislamiento de fotos TKxx por evento y refuerzo ligero de BACKUP.
    Sin intervalos: normaliza claves de fotos al cargar, cambiar evento, refrescar o guardar. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.3.1_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
+  const VERSION = 'ControlEvent v8.3.2_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_2_prod';
   const INSTALLED = '__ceV81TicketScopeFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

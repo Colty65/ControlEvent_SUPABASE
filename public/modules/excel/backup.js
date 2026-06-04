@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v8.3.1_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_3_1_prod';
+const BACKUP_VERSION = 'ControlEvent v8.3.2_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_3_2_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -171,9 +171,39 @@ async function chooseBackupScope(state){
   });
 }
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
-function makeCodes(items, prefix){
+function stableCodeFor(item, prefix, stableMap = {}){
+  const props = prefix === 'EV'
+    ? ['eventoCodigo','codigoEvento','eventCode','EVENTO_CODIGO']
+    : prefix === 'PE'
+      ? ['personaCodigo','codigoPersona','personCode','PERSONA_CODIGO']
+      : prefix === 'TI'
+        ? ['tiendaCodigo','codigoTienda','storeCode','TIENDA_CODIGO']
+        : ['productoCodigo','codigoProducto','productCode','PRODUCTO_CODIGO'];
+  const re = new RegExp('^' + prefix + '\\d+$','i');
+  for(const prop of props){
+    const code = norm(item?.[prop]);
+    if(re.test(code)) return code.toUpperCase();
+  }
+  const mapped = norm(stableMap?.[String(item?.id || '')]);
+  return re.test(mapped) ? mapped.toUpperCase() : '';
+}
+function makeCodes(items, prefix, stableMap = {}){
   const out = {};
-  (items || []).forEach((item, index) => { out[item.id] = prefix + String(index + 1).padStart(prefix === 'EV' ? 3 : 4, '0'); });
+  const used = new Set();
+  (items || []).forEach(item => {
+    const id = String(item?.id || '');
+    if(!id) return;
+    const code = stableCodeFor(item, prefix, stableMap);
+    if(code && !used.has(code)){ out[id] = code; used.add(code); }
+  });
+  let n = 1;
+  (items || []).forEach(item => {
+    const id = String(item?.id || '');
+    if(!id || out[id]) return;
+    let code;
+    do{ code = prefix + String(n++).padStart(prefix === 'EV' ? 3 : 4, '0'); }while(used.has(code));
+    out[id] = code; used.add(code);
+  });
   return out;
 }
 function ticketEventIdFromKey(key){ return String(key || '').split('|')[0] || ''; }
@@ -482,10 +512,11 @@ export async function run(options = {}){
   }
   const ExcelJS = await ensureExcelJS();
   const {wb, addRows} = setupWorkbook(ExcelJS);
-  const eventCode = makeCodes(dataRows(state, 'eventos'), 'EV');
-  const personCode = makeCodes(scoped.personas, 'PE');
-  const storeCode = makeCodes(scoped.tiendas, 'TI');
-  const productCode = makeCodes(scoped.productos, 'PR');
+  const eventCode = makeCodes(dataRows(state, 'eventos'), 'EV', state.eventCodeMap || {});
+  const entityMaps = state.entityCodeMaps || {};
+  const personCode = makeCodes(scoped.personas, 'PE', entityMaps.personas || {});
+  const storeCode = makeCodes(scoped.tiendas, 'TI', entityMaps.tiendas || {});
+  const productCode = makeCodes(scoped.productos, 'PR', entityMaps.productos || {});
   const productMap = byIdMap(scoped.productos);
   const selectedEvent = scope === 'TODOS' ? null : scoped.eventos.find(e => String(e.id) === String(scope));
   const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
