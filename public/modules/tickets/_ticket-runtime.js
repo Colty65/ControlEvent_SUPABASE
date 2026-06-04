@@ -34,7 +34,11 @@ export function getImage(label, eventId = selectedEventId()){
   const images = app?.state?.ticketImages || window.state?.ticketImages || {};
   const clean = normalizeLabel(label);
   const key = stateKey(clean, eventId);
-  return images[key] || images[clean] || images[`${eventId}|${clean}`] || '';
+  if(images[key]) return images[key];
+  if(images[`${eventId}|${clean}`]) return images[`${eventId}|${clean}`];
+  // Solo INGRESOS admite fallback legacy sin evento; TKxx debe quedar aislado por evento.
+  if(/^INGRESO[:|]/i.test(clean) && images[clean]) return images[clean];
+  return '';
 }
 
 export function setImage(label, dataUrl, eventId = selectedEventId()){

@@ -122,6 +122,13 @@ export function ticketImage(app, key){
   const state = getState(app);
   const images = state.ticketImages || {};
   const eventId = selectedEventId(app);
-  const rawKey = String(key || '');
-  return images[`${eventId}|${rawKey}`] || images[rawKey] || '';
+  const rawKey = String(key || '').trim();
+  if(!rawKey) return '';
+  const scopedKey = rawKey.startsWith(`${eventId}|`) ? rawKey : `${eventId}|${rawKey}`;
+  if(images[scopedKey]) return images[scopedKey];
+  // Los justificantes de INGRESOS conservan fallback legacy por id único.
+  // Las fotos TKxx no deben buscarse nunca por clave global (TK01/Tienda|TK01),
+  // porque esa clave se repite entre eventos.
+  if(/^INGRESO[:|]/i.test(rawKey) && images[rawKey]) return images[rawKey];
+  return '';
 }

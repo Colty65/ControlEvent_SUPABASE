@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v7.3_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v7_3_prod';
+const BACKUP_VERSION = 'ControlEvent v8.0_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_0_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -72,6 +72,63 @@ function makeCodes(items, prefix){
 }
 function ticketEventIdFromKey(key){ return String(key || '').split('|')[0] || ''; }
 function ticketInnerKeyFromKey(key){ const parts = String(key || '').split('|'); return parts.slice(1).join('|').trim(); }
+
+function ticketImageSource(value){
+  if(!value) return '';
+  if(typeof value === 'string') return norm(value);
+  if(value && typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.base64 || value.src || '');
+  return '';
+}
+function decodeBase64UrlText(value){
+  const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+  if(!raw) return '';
+  try{
+    if(typeof Buffer !== 'undefined') return Buffer.from(raw.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString('utf8');
+  }catch(_){ }
+  try{
+    const b64 = raw.replace(/-/g,'+').replace(/_/g,'/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    return decodeURIComponent(Array.prototype.map.call(atob(padded), ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  }catch(_){ return ''; }
+}
+function ticketEventIdFromImageValue(value){
+  const m = ticketImageSource(value).match(/\/ticket-images\/([^\/?#]+)\//i);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function ticketDecodedKeyFromImageValue(value){
+  const m = ticketImageSource(value).match(/\/ticket-images\/[^\/?#]+\/([^\/?#]+?)(?:\.[a-z0-9]+)?(?:[?#].*)?$/i);
+  return m ? decodeBase64UrlText(m[1]) : '';
+}
+function ticketBackupParts(fullKey, image, eventCode){
+  const rawKey = norm(fullKey);
+  const keyEvent = ticketEventIdFromKey(rawKey);
+  const keyInner = ticketInnerKeyFromKey(rawKey) || rawKey;
+  const srcEvent = ticketEventIdFromImageValue(image);
+  const decoded = ticketDecodedKeyFromImageValue(image);
+  let eventToken = eventCode[keyEvent] ? keyEvent : '';
+  let innerKey = keyInner;
+  if(decoded){
+    const decEvent = ticketEventIdFromKey(decoded);
+    const decInner = ticketInnerKeyFromKey(decoded) || decoded;
+    if(eventCode[decEvent]){ eventToken = eventToken || decEvent; innerKey = decInner || innerKey; }
+    else if(!eventToken && decInner) innerKey = decInner;
+  }
+  if(!eventToken && eventCode[srcEvent]) eventToken = srcEvent;
+  return {eventToken, eventCode: eventCode[eventToken] || '', innerKey: innerKey || rawKey};
+}
+function ticketImageBelongsToScope(key, value, all, eventIds){
+  const direct = String(ticketEventIdFromKey(key));
+  const srcEvent = String(ticketEventIdFromImageValue(value));
+  const decoded = ticketDecodedKeyFromImageValue(value);
+  const decodedEvent = decoded ? String(ticketEventIdFromKey(decoded)) : '';
+  const linkedEvent = eventIds.has(direct) ? direct : (eventIds.has(srcEvent) ? srcEvent : (eventIds.has(decodedEvent) ? decodedEvent : ''));
+  if(all){
+    // En TODOS se exportan fotos vinculadas a eventos existentes. Si la imagen revela un evento que ya no existe, se evita meter una fila huérfana con EVENTO_CODIGO vacío.
+    const anyEventToken = direct || srcEvent || decodedEvent;
+    return !anyEventToken || !!linkedEvent;
+  }
+  return !!linkedEvent;
+}
 function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
 function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
 function price(c, productMap){
@@ -111,7 +168,7 @@ function scopedBackupState(fullState, scope){
   const productos = all ? [...arr(fullState,'productos')] : arr(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const ticketImages = {};
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => {
-    if(all || eventIds.has(String(ticketEventIdFromKey(key)))) ticketImages[key] = value;
+    if(ticketImageBelongsToScope(key, value, all, eventIds)) ticketImages[key] = value;
   });
   return {eventos, personas, tiendas, productos, colaboradores, compras, ticketImages};
 }
@@ -245,9 +302,9 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
   const ticketRows = [], partRows = [];
   Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
-    const eventToken = ticketEventIdFromKey(fullKey);
-    const evCode = eventCode[eventToken] || '';
-    const key = ticketInnerKeyFromKey(fullKey);
+    const ticketPartsInfo = ticketBackupParts(fullKey, image, eventCode);
+    const evCode = ticketPartsInfo.eventCode;
+    const key = ticketPartsInfo.innerKey;
     const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
     const parts = splitLongText(data, 8000);
     ticketRows.push([evCode, key, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_V41_2' : 'SIN_IMAGEN']);

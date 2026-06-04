@@ -1,4 +1,4 @@
-/* ControlEvent v7.3_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
+/* ControlEvent v8.0_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
    Parche acotado sobre v4.0_prod:
    - No toca login.
    - No toca INFOEVENTO/BACKUP salvo textos de version globales.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v7.3_prod';
-  const VERSION_FILE = 'ControlEvent_v7_3_prod';
+  const VERSION = 'ControlEvent v8.0_prod';
+  const VERSION_FILE = 'ControlEvent_v8_0_prod';
   const INSTALLED = '__ceV40ProdPhotoSync';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -70,29 +70,47 @@
     refs[key] = ref;
     return changed;
   }
+  function decodeBase64UrlText(value){
+    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+    if(!raw) return '';
+    try{
+      const b64 = raw.replace(/-/g,'+').replace(/_/g,'/');
+      const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+      return decodeURIComponent(Array.prototype.map.call(atob(padded), ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }catch(_){ return ''; }
+  }
+  function decodedKeyFromImageValue(value){
+    const src = srcOf(value);
+    const m = src.match(/\/ticket-images\/([^\/?#]+)\/([^\/?#]+?)(?:\.[a-z0-9]+)?(?:[?#].*)?$/i);
+    if(!m) return '';
+    const decoded = decodeBase64UrlText(m[2]);
+    return decoded || '';
+  }
+  function addScopedVariant(set, ev, label){
+    label = cleanLabel(label);
+    if(!ev || !label) return;
+    if(label.startsWith(ev + '|')) set.add(label);
+    else set.add(ev + '|' + label);
+  }
   function addImageVariants(rawKey, value){
     const ev = eventId();
     const raw = norm(rawKey);
-    if(!raw) return false;
-    const variants = new Set([raw]);
-    let label = raw;
-    if(ev && raw.startsWith(ev + '|')){
-      label = raw.slice(ev.length + 1);
-      variants.add(label);
-    }else if(ev){
-      variants.add(ev + '|' + raw);
+    if(!raw || !ev) return false;
+    const variants = new Set();
+    const decoded = decodedKeyFromImageValue(value);
+    if(decoded){
+      if(decoded.startsWith(ev + '|')) variants.add(decoded);
+      else addScopedVariant(variants, ev, decoded);
     }
-    if(label){
-      variants.add(label);
-      const clean = label.replace(/\s*\|\s*/g, ' | ').trim();
-      variants.add(clean);
-      if(ev) variants.add(ev + '|' + clean);
+    // Si la URL trae clave codificada completa (evento|tienda|TKxx), no recrear la clave genérica raw TKxx.
+    if(raw.startsWith(ev + '|')) variants.add(raw);
+    else if(!decoded) addScopedVariant(variants, ev, raw);
+    const labels = Array.from(variants).map(k => k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k);
+    labels.forEach(label => {
+      addScopedVariant(variants, ev, label.replace(/\s*\|\s*/g, ' | '));
       const tk = ticketToken(label);
-      if(tk){
-        variants.add(tk);
-        if(ev) variants.add(ev + '|' + tk);
-      }
-    }
+      if(tk) addScopedVariant(variants, ev, tk);
+    });
     let changed = false;
     variants.forEach(k => { if(putImage(k, value)) changed = true; });
     return changed;
@@ -110,32 +128,39 @@
     const tk = ticketToken(base);
     const out = [];
     const add = v => { v = norm(v); if(v && !out.includes(v)) out.push(v); };
-    [base, clean].forEach(add);
-    if(ev){ [ev + '|' + base, ev + '|' + clean].forEach(add); }
+    const scoped = v => { v = norm(v); if(!v || !ev) return; add(v.startsWith(ev + '|') ? v : ev + '|' + v); };
+    [base, clean].forEach(scoped);
     const parts = clean.split('|').map(x => norm(x)).filter(Boolean);
     if(parts.length >= 2){
       const a = parts[0], b = parts[1];
-      [a+'|'+b, a+' | '+b, b+'|'+a, b+' | '+a, b].forEach(add);
-      if(ev) [ev+'|'+a+'|'+b, ev+'|'+a+' | '+b, ev+'|'+b+'|'+a, ev+'|'+b+' | '+a, ev+'|'+b].forEach(add);
+      [a+'|'+b, a+' | '+b, b+'|'+a, b+' | '+a, b].forEach(scoped);
     }
-    if(tk){ add(tk); if(ev) add(ev + '|' + tk); }
+    if(tk) scoped(tk);
     return out;
+  }
+  function imageValueEvent(value){
+    const src = srcOf(value);
+    const m = src.match(/\/ticket-images\/([^\/?#]+)\//i);
+    return m ? decodeURIComponent(m[1]) : '';
   }
   function findImage(label){
     const {images, refs} = stores();
     const bags = [images, refs];
+    const ev = eventId();
     for(const key of imageCandidates(label)){
       for(const bag of bags){ const src = srcOf(bag[key]); if(src) return src; }
     }
-    const ev = eventId();
     const tk = ticketToken(label);
     const wantStore = up(cleanLabel(label).split('|')[0] || '');
     const ticketOnly = [];
     for(const bag of bags){
       for(const [key, value] of Object.entries(bag || {})){
         const k = String(key || '');
+        const valueEvent = imageValueEvent(value);
         if(ev && k.includes('|') && !k.startsWith(ev + '|')) continue;
-        const rest = up(k.replace(ev + '|', ''));
+        if(ev && !k.includes('|') && valueEvent && valueEvent !== ev) continue;
+        if(ev && !k.includes('|') && !valueEvent) continue; // sin evento verificable, no usar fallback global TKxx
+        const rest = up(k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k);
         const src = srcOf(value);
         if(!src) continue;
         if(tk && rest.includes(tk)){
@@ -299,7 +324,7 @@
       const payload = await res.json().catch(() => ({}));
       const images = payload && payload.images ? payload.images : {};
       Object.entries(images).forEach(([rawKey, value]) => { if(addImageVariants(rawKey, value)) changed = true; });
-    }catch(error){ console.warn('[ControlEvent v7.3_prod] No se pudieron hidratar fotos.', error); }
+    }catch(error){ console.warn('[ControlEvent v8.0_prod] No se pudieron hidratar fotos.', error); }
     finally{ hydrateBusy = false; }
     return changed;
   }
