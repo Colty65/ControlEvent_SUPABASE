@@ -4,8 +4,8 @@ import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v8.1_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_1_prod';
+const BACKUP_VERSION = 'ControlEvent v8.2_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -122,47 +122,107 @@ function ticketToken(value){
   const match = norm(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
   return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
 }
-function isIngresoImageKey(value){ return /^INGRESO[:|]/i.test(norm(value)); }
-function ticketCanonicalInfo(key, value, eventIds){
+function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
+function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
+function dataRows(source, name){
+  if(typeof rows === 'function') return rows(source, name);
+  if(typeof arr === 'function') return arr(source, name);
+  return Array.isArray(source?.[name]) ? source[name] : [];
+}
+function ingresoInnerKey(value){
+  const m = norm(value).match(/INGRESO[:|]([^|\s]+)/i);
+  return m ? `INGRESO:${m[1]}` : '';
+}
+function stripEventPrefix(value, eventId){
+  let s = norm(value);
+  if(eventId && s.startsWith(eventId + '|')) s = norm(s.slice(eventId.length + 1));
+  return s;
+}
+function normalizeTicketInner(value){
+  let s = norm(value);
+  // Algunos alias heredados llegaron como INGRESO:id|TIENDA | TKxx. Para comparar con compras vivas,
+  // se toma solo la parte posterior si realmente contiene un TKxx.
+  if(/^INGRESO[:|]/i.test(s) && s.includes('|') && ticketToken(s)) s = norm(s.split('|').slice(1).join('|'));
+  const tk = ticketToken(s);
+  if(!tk) return '';
+  const left = norm(s.split('|')[0] || '');
+  if(left && left !== tk && !/^INGRESO[:|]/i.test(left)) return `${left} | ${tk}`;
+  return tk;
+}
+function buildLiveImageIndex(fullState, scopedEventIds){
+  const index = new Map();
+  const byEventToken = new Map();
+  const stores = byIdMap(dataRows(fullState, 'tiendas'));
+  const inScope = ev => ev && scopedEventIds.has(String(ev));
+  function add(eventId, innerKey, kind){
+    eventId = norm(eventId); innerKey = norm(innerKey);
+    if(!inScope(eventId) || !innerKey) return;
+    const canonicalKey = `${eventId}|${innerKey}`;
+    if(!index.has(canonicalKey)) index.set(canonicalKey, {eventToken:eventId, innerKey, canonicalKey, kind});
+    const tk = ticketToken(innerKey);
+    if(tk){
+      const mapKey = `${eventId}|${tk}`;
+      if(!byEventToken.has(mapKey)) byEventToken.set(mapKey, new Set());
+      byEventToken.get(mapKey).add(canonicalKey);
+    }
+  }
+  dataRows(fullState,'colaboradores').forEach(c => {
+    if(c?.id && c?.eventId) add(c.eventId, `INGRESO:${c.id}`, 'INGRESO');
+  });
+  dataRows(fullState,'compras').forEach(c => {
+    const tk = ticketToken(ticket(c));
+    if(!tk || isDonation(ticket(c))) return;
+    const storeName = norm(stores[String(c.tiendaId || '')]?.nombre || '');
+    add(c.eventId, storeName ? `${storeName} | ${tk}` : tk, 'TK');
+  });
+  return {index, byEventToken};
+}
+function candidateEventsForImage(key, value, scopedEventIds){
   const rawKey = norm(key);
   const srcEvent = norm(ticketEventIdFromImageValue(value));
   const decoded = norm(ticketDecodedKeyFromImageValue(value));
   const keyEvent = norm(ticketEventIdFromKey(rawKey));
-  const keyInner = norm(ticketInnerKeyFromKey(rawKey) || rawKey);
   const decEvent = decoded ? norm(ticketEventIdFromKey(decoded)) : '';
-  const decInner = decoded ? norm(ticketInnerKeyFromKey(decoded) || decoded) : '';
-  const eventToken = [decEvent, srcEvent, keyEvent].find(id => id && eventIds.has(id)) || '';
-  let innerKey = '';
-  if(eventToken && decEvent === eventToken && decInner) innerKey = decInner;
-  else if(eventToken && keyEvent === eventToken && keyInner) innerKey = keyInner;
-  else if(decInner) innerKey = decInner;
-  else innerKey = keyInner || rawKey;
-  if(eventToken && innerKey.startsWith(eventToken + '|')) innerKey = norm(innerKey.slice(eventToken.length + 1));
-  const hasTk = !!(ticketToken(rawKey) || ticketToken(decoded) || ticketToken(innerKey));
-  const hasIngreso = isIngresoImageKey(innerKey) || isIngresoImageKey(rawKey) || isIngresoImageKey(decoded);
-  if(hasTk && !eventToken) return null;
-  if(hasTk && /^TK\d+[A-Z0-9_-]*$/i.test(innerKey) && decoded && decInner && !/^TK\d+[A-Z0-9_-]*$/i.test(decInner)) innerKey = decInner;
-  if(hasTk && /^TK\d+[A-Z0-9_-]*$/i.test(innerKey) && !decoded && !eventToken) return null;
-  if(!hasTk && !hasIngreso && !eventToken) return null;
-  return {eventToken, innerKey: innerKey || rawKey, canonicalKey: eventToken ? `${eventToken}|${innerKey || rawKey}` : rawKey, hasTk, hasIngreso};
+  const out = [];
+  [decEvent, srcEvent, keyEvent].forEach(ev => { if(ev && scopedEventIds.has(ev) && !out.includes(ev)) out.push(ev); });
+  return out;
 }
-function ticketImageBelongsToScope(key, value, all, eventIds){
-  const info = ticketCanonicalInfo(key, value, eventIds);
-  if(!info) return false;
-  if(all) return !!info.eventToken || !info.hasTk;
-  return !!info.eventToken;
+function candidateInnersForImage(key, value, eventId){
+  const rawKey = norm(key);
+  const decoded = norm(ticketDecodedKeyFromImageValue(value));
+  const keyInner = stripEventPrefix(ticketInnerKeyFromKey(rawKey) || rawKey, eventId);
+  const decInner = decoded ? stripEventPrefix(ticketInnerKeyFromKey(decoded) || decoded, eventId) : '';
+  const out = [];
+  [decInner, keyInner, rawKey, decoded].forEach(v => { v = stripEventPrefix(v, eventId); if(v && !out.includes(v)) out.push(v); });
+  return out;
 }
-function addCanonicalTicketImage(out, key, value, eventIds){
-  const info = ticketCanonicalInfo(key, value, eventIds);
-  if(!info) return;
-  if(info.hasTk && (!info.eventToken || !info.innerKey)) return;
-  const canonicalKey = info.canonicalKey;
-  if(!canonicalKey) return;
-  if(!out[canonicalKey]) out[canonicalKey] = value;
+function liveCanonicalInfo(key, value, liveIndex, scopedEventIds){
+  const events = candidateEventsForImage(key, value, scopedEventIds);
+  for(const ev of events){
+    for(const inner of candidateInnersForImage(key, value, ev)){
+      const ing = ingresoInnerKey(inner);
+      if(ing){
+        const hit = liveIndex.index.get(`${ev}|${ing}`);
+        if(hit) return hit;
+      }
+      const tkInner = normalizeTicketInner(inner);
+      if(tkInner){
+        const exact = liveIndex.index.get(`${ev}|${tkInner}`);
+        if(exact) return exact;
+        const tk = ticketToken(tkInner);
+        const candidates = liveIndex.byEventToken.get(`${ev}|${tk}`);
+        // Solo se permite resolver una clave reducida TKxx si en ese evento hay una única compra viva con ese TKxx.
+        if(candidates && candidates.size === 1) return liveIndex.index.get([...candidates][0]);
+      }
+    }
+  }
+  return null;
 }
-
-function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
-function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
+function addCanonicalTicketImage(out, key, value, liveIndex, scopedEventIds){
+  const info = liveCanonicalInfo(key, value, liveIndex, scopedEventIds);
+  if(!info || !info.eventToken || !info.innerKey) return;
+  if(!out[info.canonicalKey]) out[info.canonicalKey] = value;
+}
 function price(c, productMap){
   const direct = num(c?.precio);
   if (direct) return direct;
@@ -177,10 +237,10 @@ function splitLongText(value, size = 8000){
 }
 function scopedBackupState(fullState, scope){
   const all = scope === 'TODOS';
-  const eventos = all ? [...arr(fullState,'eventos')] : arr(fullState,'eventos').filter(e => String(e.id) === String(scope));
+  const eventos = all ? [...dataRows(fullState,'eventos')] : dataRows(fullState,'eventos').filter(e => String(e.id) === String(scope));
   const eventIds = new Set(eventos.map(e => String(e.id)));
-  const colaboradores = arr(fullState,'colaboradores').filter(c => all || eventIds.has(String(c.eventId)));
-  const compras = arr(fullState,'compras').filter(c => all || eventIds.has(String(c.eventId)));
+  const colaboradores = dataRows(fullState,'colaboradores').filter(c => all || eventIds.has(String(c.eventId)));
+  const compras = dataRows(fullState,'compras').filter(c => all || eventIds.has(String(c.eventId)));
   const personIds = new Set();
   colaboradores.forEach(c => { if(c.personaId) personIds.add(String(c.personaId)); });
   compras.forEach(c => {
@@ -195,13 +255,13 @@ function scopedBackupState(fullState, scope){
     if(donor.startsWith('T:')) storeIds.add(donor.slice(2));
   });
   const productIds = new Set(compras.map(c => String(c.productoId || '')).filter(Boolean));
-  const personas = all ? [...arr(fullState,'personas')] : arr(fullState,'personas').filter(p => personIds.has(String(p.id)));
-  const tiendas = all ? [...arr(fullState,'tiendas')] : arr(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
-  const productos = all ? [...arr(fullState,'productos')] : arr(fullState,'productos').filter(p => productIds.has(String(p.id)));
+  const personas = all ? [...dataRows(fullState,'personas')] : dataRows(fullState,'personas').filter(p => personIds.has(String(p.id)));
+  const tiendas = all ? [...dataRows(fullState,'tiendas')] : dataRows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
+  const productos = all ? [...dataRows(fullState,'productos')] : dataRows(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const ticketImages = {};
-  Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => {
-    if(ticketImageBelongsToScope(key, value, all, eventIds)) addCanonicalTicketImage(ticketImages, key, value, eventIds);
-  });
+  const liveIndex = buildLiveImageIndex(fullState, eventIds);
+  Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
+  Object.entries(fullState.ticketImageRefs || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
   return {eventos, personas, tiendas, productos, colaboradores, compras, ticketImages};
 }
 function countsFor(state){
