@@ -1,4 +1,4 @@
-/* ControlEvent v8.3.2_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v8.4_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
@@ -25,14 +25,34 @@
   }
   function eventById(id){ return (st().eventos || []).find(e => String(e.id || '') === String(id || '')) || null; }
   function countTicketImages(eventId){
-    const imgs = st().ticketImages || {};
-    return Object.keys(imgs).filter(k => String(k).startsWith(String(eventId) + '|')).length;
+    const prefix = String(eventId) + '|';
+    const keys = new Set();
+    const addKeys = obj => {
+      if(!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach(k => { if(String(k).startsWith(prefix)) keys.add(String(k)); });
+    };
+    addKeys(st().ticketImages);
+    addKeys(st().ticketImageRefs);
+    return keys.size;
   }
-  function deleteTicketImages(eventId){
-    const imgs = st().ticketImages || {};
-    Object.keys(imgs).forEach(k => { if(String(k).startsWith(String(eventId) + '|')) delete imgs[k]; });
+  function deleteTicketImagesLocal(eventId){
+    const prefix = String(eventId) + '|';
+    ['ticketImages','ticketImageRefs'].forEach(name => {
+      const obj = st()[name];
+      if(!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach(k => { if(String(k).startsWith(prefix)) delete obj[k]; });
+    });
   }
-  function handleDelete(button, event){
+  async function deleteTicketImagesServer(eventId){
+    const url = '/api/ticket-images?eventId=' + encodeURIComponent(String(eventId || '')) + '&all=1';
+    const res = await fetch(url, { method: 'DELETE', cache: 'no-store' });
+    if(!res.ok){
+      const text = await res.text().catch(() => '');
+      throw new Error(text || ('HTTP ' + res.status + ' eliminando fotos del evento'));
+    }
+    return res.json().catch(() => ({ok:true}));
+  }
+  async function handleDelete(button, event){
     const eventId = button?.dataset?.id || '';
     if(!eventId) return;
     if(!isGD()) return;
@@ -76,10 +96,20 @@
     try{ ok2 = confirm('Confirmación final: ¿eliminar definitivamente el evento "' + esc(ev.titulo || '') + '" y todos sus ingresos/compras/donaciones?'); }catch(_){ ok2 = false; }
     if(!ok2) return;
 
+    const prevDisabled = !!button.disabled;
+    button.disabled = true;
+    try{
+      await deleteTicketImagesServer(eventId);
+    }catch(err){
+      button.disabled = prevDisabled;
+      try{ alert('No se han podido eliminar las fotos del evento en servidor. No se da de baja el evento para evitar referencias huérfanas.\n\n' + (err?.message || err)); }catch(_){ }
+      return;
+    }
+
     state.eventos = (state.eventos || []).filter(e => String(e.id || '') !== String(eventId));
     state.colaboradores = (state.colaboradores || []).filter(c => String(c.eventId || '') !== String(eventId));
     state.compras = (state.compras || []).filter(c => String(c.eventId || '') !== String(eventId));
-    deleteTicketImages(eventId);
+    deleteTicketImagesLocal(eventId);
     if(String(state.selectedEventId || '') === String(eventId)) state.selectedEventId = state.eventos?.[0]?.id || '';
     save();
     redraw();
@@ -87,6 +117,8 @@
 
   document.addEventListener('click', function(event){
     const button = event.target?.closest?.('button[data-action="delete-evento"]');
-    if(button) handleDelete(button, event);
+    if(button) handleDelete(button, event).catch(err => {
+      try{ alert('Error dando de baja el evento: ' + (err?.message || err)); }catch(_){ }
+    });
   }, true);
 })();

@@ -1,9 +1,9 @@
-/* ControlEvent v8.3.2_prod - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
+/* ControlEvent v8.4_prod - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
    Sin intervalos: normaliza solo en carga, cambio de evento, refresco, foto cambiada o descarga. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.3.2_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_2_prod';
+  const VERSION = 'ControlEvent v8.4_prod';
+  const VERSION_FILE = 'ControlEvent_v8_4_prod';
   const INSTALLED = '__ceV82TicketScopeFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

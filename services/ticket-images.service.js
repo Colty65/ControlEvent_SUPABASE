@@ -1,5 +1,6 @@
 import {
   deleteTicketImage as deleteTicketImageDb,
+  deleteTicketImagesForEvent as deleteTicketImagesForEventDb,
   imagesForEvent,
   uploadTicketImage as uploadTicketImageDb
 } from '../lib/supabase-normalized.js';
@@ -20,4 +21,14 @@ export async function uploadImage({ eventId, key, dataUrl } = {}) {
 export async function deleteImage({ eventId, key } = {}) {
   await deleteTicketImageDb({ eventId: eventId || '', key: key || '' });
   return { ok: true };
+}
+
+export async function deleteEventImages({ eventId } = {}) {
+  if (!eventId) {
+    const err = new Error('Falta eventId para eliminar fotos del evento.');
+    err.status = 400;
+    throw err;
+  }
+  const result = await deleteTicketImagesForEventDb(eventId);
+  return { ok: true, ...result };
 }
