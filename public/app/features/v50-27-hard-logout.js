@@ -1,10 +1,10 @@
-/* ControlEvent v8.2.3_prod - Salir duro y logon limpio.
+/* ControlEvent v8.3_prod - Salir duro y logon limpio.
    Objetivo: reproducir el estado que funciona con Ctrl+F5 + nuevo login.
    No rehidrata globos, no usa MutationObserver, no usa setInterval. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.2.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_2_3_prod';
+  const VERSION = 'ControlEvent v8.3_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_prod';
   if(window.__ceV5027HardLogout) return;
   window.__ceV5027HardLogout = true;
 
@@ -116,9 +116,9 @@
       });
     });
     [
-      'ControlEvent_v8_2_3_prod_session','ControlEvent_v8_2_3_prod_session','ControlEvent_v8_2_3_prod_session','ControlEvent_v8_2_3_prod_session','ControlEvent_v26_9_session',
+      'ControlEvent_v8_3_prod_session','ControlEvent_v8_3_prod_session','ControlEvent_v8_3_prod_session','ControlEvent_v8_3_prod_session','ControlEvent_v26_9_session',
       'ce_v250_event_chosen','ce_event_chosen','controlevent_v44_event_chosen_after_login',
-      'controlevent_v229_selected_event_id','ControlEvent_v8_2_3_prod_selected_event','ControlEvent_v8_2_3_prod_selected_event','ControlEvent_v8_2_3_prod_selected_event','ControlEvent_v8_2_3_prod_selected_event'
+      'controlevent_v229_selected_event_id','ControlEvent_v8_3_prod_selected_event','ControlEvent_v8_3_prod_selected_event','ControlEvent_v8_3_prod_selected_event','ControlEvent_v8_3_prod_selected_event'
     ].forEach(key => { safe(() => sessionStorage.removeItem(key)); safe(() => localStorage.removeItem(key)); });
   }
 
@@ -145,7 +145,7 @@
     cleanStorage();
     clearRuntime();
     safe(() => fetch('/api/logout', {method:'POST', cache:'no-store', keepalive:true}).catch(()=>{}));
-    safe(() => { sessionStorage.setItem('ControlEvent_v8_2_3_prod_hard_logout_at', String(Date.now())); });
+    safe(() => { sessionStorage.setItem('ControlEvent_v8_3_prod_hard_logout_at', String(Date.now())); });
     safe(() => { window.authUser = null; window.__CONTROL_EVENT_USER__ = null; if(window.ControlEventApp) window.ControlEventApp.authUser = null; });
     const ov = $('authOverlay');
     if(ov){
@@ -184,7 +184,7 @@
   }
 
   function ensureLoginCleanAfterHardLogout(){
-    const recent = Number(safe(() => sessionStorage.getItem('ControlEvent_v8_2_3_prod_hard_logout_at')) || 0);
+    const recent = Number(safe(() => sessionStorage.getItem('ControlEvent_v8_3_prod_hard_logout_at')) || 0);
     if(!recent || Date.now() - recent > 12000) return;
     cleanStorage();
     clearRuntime();
