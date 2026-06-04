@@ -1,5 +1,5 @@
 {
-  "version": "v28.2.1",
+  "version": "v28.2.2",
   "base": "v28.2",
   "changed": [
     "package-lock.json",
@@ -31,8 +31,8 @@
     "README_V28_2_1_DELETE_OLD_FILES.txt",
     "PATCH_MANIFEST_V28_2_1.json",
     "public/modules/maintenance/lazy-proxy.js",
-    "public/app/legacy/legacy-bundle-before-modules-v28.2.1.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.2.1.js"
+    "public/app/legacy/legacy-bundle-before-modules-v28.2.2.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.2.2.js"
   ],
   "delete_if_present": [
     "public/app/legacy/legacy-bundle-before-modules-v28.2.js",

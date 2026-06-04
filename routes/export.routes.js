@@ -2,10 +2,11 @@ import express from 'express';
 import ExcelJS from 'exceljs';
 import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
+import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v8.2.1_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_1_prod';
+const BACKUP_VERSION = 'ControlEvent v8.2.2_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_2_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -64,6 +65,48 @@ function normalizeState(value){
   });
   return state;
 }
+
+async function mergeTicketImagesFromDb(state, scope){
+  const out = state && typeof state === 'object' ? state : {};
+  if(!out.ticketImages || typeof out.ticketImages !== 'object') out.ticketImages = {};
+  if(!out.ticketImageRefs || typeof out.ticketImageRefs !== 'object') out.ticketImageRefs = {};
+  const scopeText = norm(scope || 'TODOS');
+  const eventIds = arr(out, 'eventos').map(e => norm(e?.id)).filter(Boolean);
+  const scopeIsAll = !scopeText || scopeText === 'TODOS';
+  const wantedIds = scopeIsAll ? eventIds : [scopeText];
+  if(!wantedIds.length) return out;
+  try{
+    let query = getSupabaseAdmin()
+      .from('ce_ticket_images')
+      .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
+      .order('image_key');
+    query = scopeIsAll ? query.in('event_id', wantedIds) : query.eq('event_id', scopeText);
+    const { data, error } = await query;
+    if(error) throw error;
+    (data || []).forEach(img => {
+      const eventId = norm(img?.event_id);
+      if(!eventId || !wantedIds.includes(eventId)) return;
+      const label = norm(img?.label || ticketInnerKeyFromKey(img?.image_key));
+      let key = norm(img?.image_key);
+      if(!key || ticketEventIdFromKey(key) !== eventId) key = label ? `${eventId}|${label}` : key;
+      const value = norm(img?.public_url || img?.pathname || img?.storage_path || '');
+      if(!key || !value) return;
+      out.ticketImages[key] = value;
+      out.ticketImageRefs[key] = {
+        key,
+        url: img?.public_url || value,
+        pathname: img?.pathname || img?.public_url || value,
+        storage_path: img?.storage_path || '',
+        contentType: img?.content_type || '',
+        size: img?.size_bytes || 0
+      };
+    });
+  }catch(err){
+    console.warn('[backup v8.2.2] No se pudo fusionar ce_ticket_images directamente:', err?.message || err);
+  }
+  return out;
+}
+
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
 function makeCodes(items, prefix){
   const out = {};
@@ -411,7 +454,7 @@ async function buildBackupWorkbook(fullState, scope){
 
 router.get('/export/backup', asyncHandler(async (req, res) => {
   const scope = String(req.query.scope || 'TODOS');
-  const state = normalizeState(await getState());
+  const state = await mergeTicketImagesFromDb(normalizeState(await getState()), scope);
   const { wb, filename, counts } = await buildBackupWorkbook(state, scope);
   const buffer = await wb.xlsx.writeBuffer();
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

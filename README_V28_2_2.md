@@ -1,6 +1,6 @@
 # ControlEvent v5.1.0_prod - Corrección API real de mantenimiento diferido
 
-Corrección pequeña sobre v28.2.1.
+Corrección pequeña sobre v28.2.2.
 
 ## Problema corregido
 

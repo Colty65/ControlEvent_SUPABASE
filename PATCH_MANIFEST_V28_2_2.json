@@ -1,6 +1,6 @@
 {
   "version": "v28.2.2",
-  "base": "v28.2.1",
+  "base": "v28.2.2",
   "changed": [
     "package-lock.json",
     "package.json",
@@ -34,8 +34,8 @@
     "public/app/legacy/legacy-bundle-after-modules-v28.2.2.js"
   ],
   "delete_if_present": [
-    "public/app/legacy/legacy-bundle-before-modules-v28.2.1.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.2.1.js"
+    "public/app/legacy/legacy-bundle-before-modules-v28.2.2.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.2.2.js"
   ],
   "index_lines": 445,
   "notes": "Corrige ControlEventMaintenance.loadAndPrint cuando el módulo real ya está cargado tras ensure()."
