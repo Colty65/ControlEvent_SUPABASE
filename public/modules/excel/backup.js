@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v8.0_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_0_prod';
+const BACKUP_VERSION = 'ControlEvent v8.1_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_1_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -195,30 +195,62 @@ function ticketBackupParts(fullKey, image, eventCode){
   const keyInner = ticketInnerKeyFromKey(rawKey) || rawKey;
   const srcEvent = ticketEventIdFromImageValue(image);
   const decoded = ticketDecodedKeyFromImageValue(image);
-  let eventToken = eventCode[keyEvent] ? keyEvent : '';
-  let innerKey = keyInner;
-  if(decoded){
-    const decEvent = ticketEventIdFromKey(decoded);
-    const decInner = ticketInnerKeyFromKey(decoded) || decoded;
-    if(eventCode[decEvent]){ eventToken = eventToken || decEvent; innerKey = decInner || innerKey; }
-    else if(!eventToken && decInner) innerKey = decInner;
-  }
-  if(!eventToken && eventCode[srcEvent]) eventToken = srcEvent;
+  const decEvent = decoded ? ticketEventIdFromKey(decoded) : '';
+  const decInner = decoded ? (ticketInnerKeyFromKey(decoded) || decoded) : '';
+  let eventToken = '';
+  if(eventCode[decEvent]) eventToken = decEvent;
+  else if(eventCode[srcEvent]) eventToken = srcEvent;
+  else if(eventCode[keyEvent]) eventToken = keyEvent;
+  let innerKey = '';
+  if(eventToken && decEvent === eventToken && decInner) innerKey = decInner;
+  else if(eventToken && keyEvent === eventToken && keyInner) innerKey = keyInner;
+  else innerKey = decInner || keyInner || rawKey;
+  if(eventToken && innerKey.startsWith(eventToken + '|')) innerKey = norm(innerKey.slice(eventToken.length + 1));
   return {eventToken, eventCode: eventCode[eventToken] || '', innerKey: innerKey || rawKey};
 }
-function ticketImageBelongsToScope(key, value, all, eventIds){
-  const direct = String(ticketEventIdFromKey(key));
-  const srcEvent = String(ticketEventIdFromImageValue(value));
-  const decoded = ticketDecodedKeyFromImageValue(value);
-  const decodedEvent = decoded ? String(ticketEventIdFromKey(decoded)) : '';
-  const linkedEvent = eventIds.has(direct) ? direct : (eventIds.has(srcEvent) ? srcEvent : (eventIds.has(decodedEvent) ? decodedEvent : ''));
-  if(all){
-    // En TODOS se exportan fotos vinculadas a eventos existentes. Si la imagen revela un evento que ya no existe, se evita meter una fila huérfana con EVENTO_CODIGO vacío.
-    const anyEventToken = direct || srcEvent || decodedEvent;
-    return !anyEventToken || !!linkedEvent;
-  }
-  return !!linkedEvent;
+function ticketToken(value){
+  const match = norm(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
+  return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
 }
+function isIngresoImageKey(value){ return /^INGRESO[:|]/i.test(norm(value)); }
+function ticketCanonicalInfo(key, value, eventIds){
+  const rawKey = norm(key);
+  const srcEvent = norm(ticketEventIdFromImageValue(value));
+  const decoded = norm(ticketDecodedKeyFromImageValue(value));
+  const keyEvent = norm(ticketEventIdFromKey(rawKey));
+  const keyInner = norm(ticketInnerKeyFromKey(rawKey) || rawKey);
+  const decEvent = decoded ? norm(ticketEventIdFromKey(decoded)) : '';
+  const decInner = decoded ? norm(ticketInnerKeyFromKey(decoded) || decoded) : '';
+  const eventToken = [decEvent, srcEvent, keyEvent].find(id => id && eventIds.has(id)) || '';
+  let innerKey = '';
+  if(eventToken && decEvent === eventToken && decInner) innerKey = decInner;
+  else if(eventToken && keyEvent === eventToken && keyInner) innerKey = keyInner;
+  else if(decInner) innerKey = decInner;
+  else innerKey = keyInner || rawKey;
+  if(eventToken && innerKey.startsWith(eventToken + '|')) innerKey = norm(innerKey.slice(eventToken.length + 1));
+  const hasTk = !!(ticketToken(rawKey) || ticketToken(decoded) || ticketToken(innerKey));
+  const hasIngreso = isIngresoImageKey(innerKey) || isIngresoImageKey(rawKey) || isIngresoImageKey(decoded);
+  if(hasTk && !eventToken) return null;
+  if(hasTk && /^TK\d+[A-Z0-9_-]*$/i.test(innerKey) && decoded && decInner && !/^TK\d+[A-Z0-9_-]*$/i.test(decInner)) innerKey = decInner;
+  if(hasTk && /^TK\d+[A-Z0-9_-]*$/i.test(innerKey) && !decoded && !eventToken) return null;
+  if(!hasTk && !hasIngreso && !eventToken) return null;
+  return {eventToken, innerKey: innerKey || rawKey, canonicalKey: eventToken ? `${eventToken}|${innerKey || rawKey}` : rawKey, hasTk, hasIngreso};
+}
+function ticketImageBelongsToScope(key, value, all, eventIds){
+  const info = ticketCanonicalInfo(key, value, eventIds);
+  if(!info) return false;
+  if(all) return !!info.eventToken || !info.hasTk;
+  return !!info.eventToken;
+}
+function addCanonicalTicketImage(out, key, value, eventIds){
+  const info = ticketCanonicalInfo(key, value, eventIds);
+  if(!info) return;
+  if(info.hasTk && (!info.eventToken || !info.innerKey)) return;
+  const canonicalKey = info.canonicalKey;
+  if(!canonicalKey) return;
+  if(!out[canonicalKey]) out[canonicalKey] = value;
+}
+
 function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
 function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
 function price(c, productMap){
@@ -252,7 +284,7 @@ function scopedBackupState(fullState, scope){
   const productos = all ? [...rows(fullState,'productos')] : rows(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const ticketImages = {};
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => {
-    if(ticketImageBelongsToScope(key, value, all, eventIds)) ticketImages[key] = value;
+    if(ticketImageBelongsToScope(key, value, all, eventIds)) addCanonicalTicketImage(ticketImages, key, value, eventIds);
   });
   return {eventos, personas, tiendas, productos, colaboradores, compras, ticketImages};
 }

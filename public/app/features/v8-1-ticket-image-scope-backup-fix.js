@@ -1,10 +1,10 @@
-/* ControlEvent v8.0_prod - aislamiento de fotos TKxx por evento y refuerzo ligero de BACKUP.
+/* ControlEvent v8.1_prod - aislamiento de fotos TKxx por evento y refuerzo ligero de BACKUP.
    Sin intervalos: normaliza claves de fotos al cargar, cambiar evento, refrescar o guardar. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
-  const INSTALLED = '__ceV80TicketScopeFix';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
+  const INSTALLED = '__ceV81TicketScopeFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -42,11 +42,11 @@
     const decoded = decodedKeyFromValue(value);
     let ev = '';
     let label = key;
-    const kp = key.split('|');
-    if(ids.has(kp[0])){ ev = kp[0]; label = kp.slice(1).join('|') || label; }
     const dp = decoded.split('|');
-    if(ids.has(dp[0])){ ev = ev || dp[0]; label = dp.slice(1).join('|') || label; }
+    if(ids.has(dp[0])){ ev = dp[0]; label = dp.slice(1).join('|') || label; }
     if(!ev && ids.has(srcEvent)) ev = srcEvent;
+    const kp = key.split('|');
+    if(!ev && ids.has(kp[0])){ ev = kp[0]; label = kp.slice(1).join('|') || label; }
     if(!ev) return {eventId:'', label:key, key};
     label = norm(label || key);
     if(label.startsWith(ev + '|')) label = label.slice(ev.length + 1);
@@ -74,7 +74,7 @@
         }
       });
     });
-    if(changed) window.dispatchEvent(new CustomEvent('controlevent:ticket-images-normalized-v8'));
+    if(changed) window.dispatchEvent(new CustomEvent('controlevent:ticket-images-normalized-v81'));
     return changed;
   }
   function applyVersion(){
@@ -84,7 +84,7 @@
   }
   function install(){ applyVersion(); normalizeStore(); }
   const oldFetch = window.fetch;
-  if(typeof oldFetch === 'function' && !oldFetch.__ceV80TicketScope){
+  if(typeof oldFetch === 'function' && !oldFetch.__ceV81TicketScope){
     window.fetch = function(input, init){
       const url = String(typeof input === 'string' ? input : input?.url || '');
       const res = oldFetch.apply(this, arguments);
@@ -93,11 +93,11 @@
       }
       return res;
     };
-    window.fetch.__ceV80TicketScope = true;
+    window.fetch.__ceV81TicketScope = true;
   }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:event-loaded','controlevent:ticket-image-changed','controlevent:excel-before-run'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 25)));
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(install, 30); }, true);
   document.addEventListener('click', ev => { if(ev.target?.closest?.('#btnRefrescar,#btnRefresh,#btnExportSeed,#btnExportExcel,#tabGraficasBtn,#tabResumenBtn')) setTimeout(install, 20); }, true);
   [0,180,800].forEach(ms => setTimeout(install, ms));
-  window.ControlEventV80TicketScopeFix = {version:VERSION, versionFile:VERSION_FILE, normalizeStore, canonicalFrom};
+  window.ControlEventV81TicketScopeFix = {version:VERSION, versionFile:VERSION_FILE, normalizeStore, canonicalFrom};
 })();

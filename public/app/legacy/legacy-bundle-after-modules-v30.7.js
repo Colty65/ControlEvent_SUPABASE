@@ -1,15 +1,15 @@
 window.__ceDisableLegacyBarGraficas = true;
-/* ControlEvent v8.0_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v8.1_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #55. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #55. */
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -239,12 +239,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-56-v251-core.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #56. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #56. */
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -587,12 +587,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-57-v252-core.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #57. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #57. */
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -876,12 +876,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-58-v253-core.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #58. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #58. */
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1231,12 +1231,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-59-v253-final-clean.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #59. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #59. */
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1556,12 +1556,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-60-v254-fixes.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #60. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #60. */
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -1994,12 +1994,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-61-v255-fixes.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #61. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #61. */
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -2415,12 +2415,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-62-v257-fixes.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #62. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #62. */
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -2856,11 +2856,16 @@ window.__ceDisableLegacyBarGraficas = true;
   function ticketEventIdFromImageValueV80(value){ const m=ticketImageSourceV80(value).match(/\/ticket-images\/([^\/?#]+)\//i); return m ? decodeURIComponent(m[1]) : ''; }
   function ticketDecodedKeyFromImageValueV80(value){ const m=ticketImageSourceV80(value).match(/\/ticket-images\/[^\/?#]+\/([^\/?#]+?)(?:\.[a-z0-9]+)?(?:[?#].*)?$/i); return m ? decodeBase64UrlTextV80(m[1]) : ''; }
   function ticketBackupPartsV80(fullKey,image,eventCode){
-    const rawKey=norm(fullKey); let eventToken=eventCode[ticketEventIdFromKey(rawKey)] ? ticketEventIdFromKey(rawKey) : ''; let innerKey=ticketInnerKeyFromKey(rawKey) || rawKey;
-    const decoded=ticketDecodedKeyFromImageValueV80(image); if(decoded){ const de=ticketEventIdFromKey(decoded); const di=ticketInnerKeyFromKey(decoded)||decoded; if(eventCode[de]){ eventToken=eventToken||de; innerKey=di||innerKey; } }
-    const srcEvent=ticketEventIdFromImageValueV80(image); if(!eventToken && eventCode[srcEvent]) eventToken=srcEvent;
-    return {eventCode:eventCode[eventToken]||'', innerKey:innerKey||rawKey};
+    const rawKey=norm(fullKey); const keyEvent=ticketEventIdFromKey(rawKey); const keyInner=ticketInnerKeyFromKey(rawKey) || rawKey;
+    const decoded=ticketDecodedKeyFromImageValueV80(image); const de=decoded ? ticketEventIdFromKey(decoded) : ''; const di=decoded ? (ticketInnerKeyFromKey(decoded)||decoded) : '';
+    const srcEvent=ticketEventIdFromImageValueV80(image); let eventToken='';
+    if(eventCode[de]) eventToken=de; else if(eventCode[srcEvent]) eventToken=srcEvent; else if(eventCode[keyEvent]) eventToken=keyEvent;
+    let innerKey=''; if(eventToken && de===eventToken && di) innerKey=di; else if(eventToken && keyEvent===eventToken && keyInner) innerKey=keyInner; else innerKey=di || keyInner || rawKey;
+    if(eventToken && innerKey.startsWith(eventToken+'|')) innerKey=norm(innerKey.slice(eventToken.length+1));
+    return {eventToken, eventCode:eventCode[eventToken]||'', innerKey:innerKey||rawKey};
   }
+  function ticketTokenV81(value){ const m=String(value||'').match(/\bTK\s*\d+[A-Z0-9_-]*\b/i); return m ? m[0].replace(/\s+/g,'').toUpperCase() : ''; }
+  function isIngresoTicketKeyV81(value){ return /^INGRESO[:|]/i.test(String(value||'').trim()); }
   function splitLongText(text, size = 30000){
     const value = String(text || '');
     const out = [];
@@ -2971,10 +2976,16 @@ window.__ceDisableLegacyBarGraficas = true;
     make('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
     make('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
     const ticketRows = [], partRows = [];
+    const seenTicketImageRowsV81 = new Set();
     Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
-      const eventToken = ticketEventIdFromKey(fullKey);
-      const evCode = eventCode[eventToken] || '';
-      const key = ticketInnerKeyFromKey(fullKey);
+      const info = ticketBackupPartsV80(fullKey, image, eventCode);
+      const evCode = info.eventCode || '';
+      const key = info.innerKey || ticketInnerKeyFromKey(fullKey);
+      const hasTk = !!(ticketTokenV81(fullKey) || ticketTokenV81(key));
+      if(hasTk && (!info.eventToken || !key)) return;
+      const rowId = (info.eventToken || '') + '|' + key;
+      if(seenTicketImageRowsV81.has(rowId)) return;
+      seenTicketImageRowsV81.add(rowId);
       const data = String(image || '');
       const parts = splitLongText(data, 8000);
       ticketRows.push([evCode, key, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_V41_2' : 'SIN_IMAGEN']);
@@ -3093,12 +3104,12 @@ window.__ceDisableLegacyBarGraficas = true;
               sort:false, autoFilter:false, pivotTables:false, objects:false, scenarios:false
             });
           }catch(protectError){
-            console.warn('[ControlEvent v8.0_prod] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
+            console.warn('[ControlEvent v8.1_prod] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
           }
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v8.0_prod] No se pudo aplicar protección final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v8.1_prod] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }
@@ -3173,12 +3184,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-63-v259-app-facade.js ===== */
 
-/* ControlEvent v8.0_prod - JS legacy extraido de public/index.html. Bloque inline #63. */
+/* ControlEvent v8.1_prod - JS legacy extraido de public/index.html. Bloque inline #63. */
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.0_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
+  const VERSION = 'ControlEvent v8.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_1_prod';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
