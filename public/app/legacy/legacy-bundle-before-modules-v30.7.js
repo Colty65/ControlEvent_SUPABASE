@@ -1,9 +1,9 @@
-/* ControlEvent v8.3_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v8.3.1_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-01.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #1. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #1. */
 const STORAGE_KEY = 'controlevent_v6_4';
 const PERSONA_RANGOS = ['SOCIO','DONANTE','NO SOCIO'];
 const PAYMENT_OPTIONS = ['Efectivo','Banco','Bizum','Pendiente'];
@@ -2074,7 +2074,7 @@ async function exportSeedWorkbook(){
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2166,7 +2166,7 @@ async function exportSeedWorkbook(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'ControlEvent_v8_3_prod_descarga_datos.xlsx';
+  a.download = 'ControlEvent_v8_3_1_prod_descarga_datos.xlsx';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -2194,7 +2194,7 @@ async function exportExcel(){
   const tiendaRows = summaryByTiendaTicket();
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+  wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2391,7 +2391,7 @@ async function exportExcel(){
   const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
   let r = 1;
   mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v8.3_prod - ©oltyLAB ’26');
+  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v8.3.1_prod - ©oltyLAB ’26');
   putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
   putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
   wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -2527,7 +2527,7 @@ async function exportExcel(){
   const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v8_3_prod.xlsx`;
+  link.download = `${(ev.titulo || 'evento').replace(/\s+/g,'_')}_ControlEvent_v8_3_1_prod.xlsx`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -3222,12 +3222,23 @@ function donorOptions(){
       const eventMap = {};
       const storeMap = {};
       const productMap = {};
+      const usedImportIdsV831 = new Set();
+      const stableImportIdV831 = (value, seed) => {
+        let id = String(value ?? '').trim();
+        if(!id) id = (typeof uid === 'function') ? uid() : ('id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+        if(usedImportIdsV831.has(id)){
+          // Solo evitamos colisión interna si el Excel está mal duplicado. Un ID válido del backup se respeta siempre que sea único.
+          id = (typeof uid === 'function') ? uid() : ('id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+        }
+        usedImportIdsV831.add(id);
+        return id;
+      };
 
       eventosRows.forEach(row => {
         const code = String(pick(row, ['EVENTO_CODIGO','CODIGO','ID'])).trim();
         const titulo = String(pick(row, ['EVENTO_TITULO','TITULO'])).trim();
         if(!code || !titulo) return;
-        const id = uid();
+        const id = stableImportIdV831(pick(row, ['EVENTO_ID','ID_EVENTO','EVENT_ID'], ''), code);
         eventMap[code] = id;
         baseState.eventos.push({
           id,
@@ -3244,7 +3255,7 @@ function donorOptions(){
         const code = String(pick(row, ['PERSONA_CODIGO','CODIGO','ID'])).trim();
         const nombre = String(pick(row, ['PERSONA_NOMBRE','NOMBRE'])).trim();
         if(!code || !nombre) return;
-        const id = uid();
+        const id = stableImportIdV831(pick(row, ['PERSONA_ID','ID_PERSONA','PERSON_ID'], ''), code);
         personMap[code] = id;
         const rangoRaw = String(pick(row, ['PERSONA_RANGO','RANGO'], 'SOCIO')).trim().toUpperCase();
         baseState.personas.push({id, nombre, rango: PERSONA_RANGOS.includes(rangoRaw) ? rangoRaw : 'SOCIO'});
@@ -3254,7 +3265,7 @@ function donorOptions(){
         const code = String(pick(row, ['TIENDA_CODIGO','CODIGO','ID'])).trim();
         const nombre = String(pick(row, ['TIENDA_NOMBRE','NOMBRE'])).trim();
         if(!code || !nombre) return;
-        const id = uid();
+        const id = stableImportIdV831(pick(row, ['TIENDA_ID','ID_TIENDA','STORE_ID'], ''), code);
         storeMap[code] = id;
         baseState.tiendas.push({id, nombre});
       });
@@ -3263,7 +3274,7 @@ function donorOptions(){
         const code = String(pick(row, ['PRODUCTO_CODIGO','CODIGO','ID'])).trim();
         const nombre = String(pick(row, ['PRODUCTO_NOMBRE','NOMBRE'])).trim();
         if(!code || !nombre) return;
-        const id = uid();
+        const id = stableImportIdV831(pick(row, ['PRODUCTO_ID','ID_PRODUCTO','PRODUCT_ID'], ''), code);
         productMap[code] = id;
         const precioReferencia = parseEuroInput(pick(row, [
           'PRODUCTO_PRECIO_REFERENCIA',
@@ -3289,7 +3300,7 @@ function donorOptions(){
         const personCode = String(pick(row, ['PERSONA_CODIGO'])).trim();
         if(!eventMap[eventCode] || !personMap[personCode]) return;
         baseState.colaboradores.push({
-          id: uid(),
+          id: stableImportIdV831(pick(row, ['INGRESO_ID','COLABORADOR_ID','ID_INGRESO','ID'], ''), `${eventCode}|${personCode}|INGRESO`),
           eventId: eventMap[eventCode],
           personaId: personMap[personCode],
           numero: Number(pick(row, ['NUMERO'], 0)) || 0,
@@ -3305,7 +3316,7 @@ function donorOptions(){
         const respCode = String(pick(row, ['RESPONSABLE_PERSONA_CODIGO','RESPONSABLE_CODIGO'], '')).trim();
         const storeCodeRaw = String(pick(row, ['TIENDA_CODIGO','TIENDA_O_DONANTE_CODIGO'], '')).trim();
         baseState.compras.push({
-          id: uid(),
+          id: stableImportIdV831(pick(row, ['COMPRA_ID','ID_COMPRA','ID'], ''), `${eventCode}|${productCode}|COMPRA|${pick(row, ['TICKET_U_OTROS_GASTOS','TICKET_DONACION','TICKET'], '')}`),
           eventId: eventMap[eventCode],
           productoId: productMap[productCode],
           unidades: Number(pick(row, ['UNIDADES','UD'], 0)) || 0,
@@ -3329,7 +3340,7 @@ function donorOptions(){
         else if(personMap[donorCode]) donorRef = 'P:' + personMap[donorCode];
         else if(storeMap[donorCode]) donorRef = 'T:' + storeMap[donorCode];
         baseState.compras.push({
-          id: uid(),
+          id: stableImportIdV831(pick(row, ['DONACION_ID','COMPRA_ID','ID_DONACION','ID_COMPRA','ID'], ''), `${eventCode}|${productCode}|DONACION|${pick(row, ['TIPO_DONACION','TICKET_DONACION'], '')}`),
           eventId: eventMap[eventCode],
           productoId: productMap[productCode],
           unidades: Number(pick(row, ['UNIDADES','UD'], 0)) || 0,
@@ -3396,7 +3407,7 @@ function donorOptions(){
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
@@ -3446,7 +3457,7 @@ function donorOptions(){
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v8_3_prod_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v8_3_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -3823,7 +3834,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-02.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #2. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #2. */
 (function(){
   const $ = id => document.getElementById(id);
 
@@ -3853,7 +3864,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v8_3_prod-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
+    return `ControlEvent_v8_3_1_prod-${cleanFilePart(ev?.titulo || 'evento')}_${dd}${mm}${yyyy}.xlsx`;
   }
   function graphData(){
     const b = budgetSummary();
@@ -4429,7 +4440,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = summaryByTiendaTicket();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -4510,7 +4521,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
     let r = 1;
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v8.3_prod - ©oltyLAB ’26');
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v8.3.1_prod - ©oltyLAB ’26');
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
     wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
@@ -4741,7 +4752,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const yyyy = String(d.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   };
 
   window.socioResponsableOptions = function(){
@@ -5230,7 +5241,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-03.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #3. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #3. */
 /* ==== FIX FINAL V14.3 TIENDA EN COMPRAS ==== */
 (function(){
   const byId = (id) => document.getElementById(id);
@@ -5377,7 +5388,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-04.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #4. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #4. */
 /* ==== FIX V14.3 DONACIONES EN POR TIENDA/TICKET ==== */
 (function(){
   const donorNameFromRow = (c) => {
@@ -5525,7 +5536,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-05.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #5. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #5. */
 /* ==== FIX V14.3 RESUMEN DONACIONES POR DONANTE ==== */
 (function(){
   const donorNameFromAny = (c) => {
@@ -5646,7 +5657,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-06.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #6. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #6. */
 /* ==== V14.4 FIX AGRUPACIÓN TIENDA/TICKET/DONACIÓN ==== */
 (function(){
   function donorGroupingName(c){
@@ -5761,7 +5772,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-07.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #7. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #7. */
 /* ==== V14.4 CORRECCIÓN FINAL AGRUPACIÓN TIENDA/TICKET ==== */
 (function(){
   function holderNameForRow(c){
@@ -5849,7 +5860,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-08.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #8. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #8. */
 /* ==== V14.4 CORRECCIÓN 2 DONANTE REAL EN AGRUPACIÓN ==== */
 (function(){
   function holderNameForRowV2(c){
@@ -5946,7 +5957,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-09.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #9. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #9. */
 /* ==== V15.0 FILTRO TKxx EN AGR.TIENDA-TICKET ==== */
 (function(){
   const prevSummaryByTiendaTicket = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket : null;
@@ -5976,7 +5987,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-10.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #10. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #10. */
 /* ==== V15.1 AJUSTES ==== */
 (function(){
   function allPersonasSorted(){
@@ -6114,7 +6125,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-11.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #11. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #11. */
 /* ==== V15.2 EXCEL GRAFICAS + NOMBRE FICHERO ==== */
 (function(){
   function filenameV152(ev){
@@ -6128,7 +6139,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
 
   exportExcel = async function(){
@@ -6155,7 +6166,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket() : [];
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6347,7 +6358,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-12.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #12. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #12. */
 /* ==== V15.3: GRAFICAS EXCEL + NOMBRE DESCARGA + PRECIO COMPRAS ==== */
 (function(){
   const $ = (id) => document.getElementById(id);
@@ -6367,7 +6378,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = filenameV153;
 
@@ -6383,7 +6394,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         return;
       }
       const wb = new ExcelJS.Workbook();
-      wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+      wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
       wb.created = new Date();
 
       const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6433,7 +6444,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'ControlEvent_v8_3_prod_descarga_datos.xlsx';
+      a.download = 'ControlEvent_v8_3_1_prod_descarga_datos.xlsx';
       a.click();
       URL.revokeObjectURL(a.href);
     };
@@ -6687,7 +6698,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-13.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #13. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #13. */
 /* ==== V16.0 PATCH FINAL ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -7148,7 +7159,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV160;
 
@@ -7258,7 +7269,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7313,7 +7324,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v8_3_prod_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v8_3_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -7345,7 +7356,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v8.3_prod - ©oltyLAB ’26';
+    wb.creator = 'ControlEvent v8.3.1_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7561,7 +7572,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-14.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #14. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #14. */
 /* ==== V16.2 REWORK ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -7882,7 +7893,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-15.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #15. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #15. */
 /* ==== V16.2 FIXES ==== */
 (function(){
   const $ = id => document.getElementById(id);
@@ -8217,7 +8228,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-16.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #16. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #16. */
 /* ==== V16.3 FIX DONANTE + SALDO OPERATIVO ==== */
 (function(){
   const esc = v => typeof escapeHtml === 'function' ? escapeHtml(v) : String(v ?? '');
@@ -8496,10 +8507,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-17.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #17. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #17. */
 /* ==== V16.4 FIXES: EXCEL, GRAFICAS, COMPRAS, AGRUPACION, TICKETS ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
   const $v164 = id => document.getElementById(id);
   const escV164 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   const fmtMoneyV164 = v => {
@@ -8943,7 +8954,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV164;
 
@@ -8976,7 +8987,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ControlEvent_v8_3_prod_descarga_datos.xlsx';
+    a.download = 'ControlEvent_v8_3_1_prod_descarga_datos.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -9120,7 +9131,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 /* ==== V17.2 FIXES: EXCEL RESUMEN, ORDENACIONES Y DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
   const $v171 = id => document.getElementById(id);
   const normV171 = v => String(v ?? '').trim();
   const escV171 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));
@@ -9355,7 +9366,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const dd = String(now.getDate()).padStart(2,'0');
     const mm = String(now.getMonth()+1).padStart(2,'0');
     const yyyy = String(now.getFullYear());
-    return `ControlEvent_v8_3_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
+    return `ControlEvent_v8_3_1_prod_INFOEVENTO-${title}_${yyyy}${mm}${dd}.xlsx`;
   }
   window.xlsxFilename = fileNameV171;
 
@@ -9494,7 +9505,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const hh = pad(date.getHours());
     const mi = pad(date.getMinutes());
     const ss = pad(date.getSeconds());
-    return `Emitido por “©oltyLAB ’26_ControlEvent_v8_3_prod_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
+    return `Emitido por “©oltyLAB ’26_ControlEvent_v8_3_1_prod_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
 
   async function exportExcelV171(){
@@ -9751,10 +9762,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-18-v180-tooltips-and-grouping-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #18. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #18. */
 /* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÓN Y AGRUPACIÓN DE DONACIONES ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
   const norm = v => String(v ?? '').trim();
   const fmt = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
@@ -9934,11 +9945,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-19-v181-backup-tooltip-excel-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #19. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #19. */
 /* ==== V18.1: tooltips redondeados, backup por evento y Excel INGRESOS ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const norm = v => String(v ?? '').trim();
   const normalize = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
@@ -10084,9 +10095,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     makeSheet('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre||'']));
     const wsProductosBackupV190 = makeSheet('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre||'', p.segmento||'', p.destino||'', Number((p.defaultPrecio ?? p.precio) || 0)]));
     try{ wsProductosBackupV190.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
-    makeSheet('INGRESOS', ['EVENTO_CODIGO','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId]||'', personCode[c.personaId]||'', Number(c.numero||0), c.situacion||'Pendiente', Number(c.importe||0)]));
-    makeSheet('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(c.ticketDonacion)).map(c => [eventCode[c.eventId]||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', storeCode[c.tiendaId]||'', personCode[c.responsableId]||'']));
-    makeSheet('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(c.ticketDonacion)).map(c => { const [kind,id] = String(c.donorRef||'').split(':'); return [eventCode[c.eventId]||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', kind==='P'?'PERSONA':(kind==='T'?'TIENDA':''), kind==='P' ? (personCode[id]||'') : (kind==='T' ? (storeCode[id]||'') : ''), personCode[c.responsableId]||'']; }));
+    makeSheet('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId]||'', c.id||'', personCode[c.personaId]||'', Number(c.numero||0), c.situacion||'Pendiente', Number(c.importe||0)]));
+    makeSheet('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(c.ticketDonacion)).map(c => [eventCode[c.eventId]||'', c.id||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', storeCode[c.tiendaId]||'', personCode[c.responsableId]||'']));
+    makeSheet('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(c.ticketDonacion)).map(c => { const [kind,id] = String(c.donorRef||'').split(':'); return [eventCode[c.eventId]||'', c.id||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', kind==='P'?'PERSONA':(kind==='T'?'TIENDA':''), kind==='P' ? (personCode[id]||'') : (kind==='T' ? (storeCode[id]||'') : ''), personCode[c.responsableId]||'']; }));
     const ticketRows = [], partRows = [];
     Object.entries(scoped.ticketImages || {}).forEach(([fullKey,img]) => {
       const evCode = eventCode[ticketEventId(fullKey)] || '';
@@ -10156,11 +10167,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-20-v190-integrity-tooltips-export-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #20. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #20. */
 /* ==== V19.0: globos con scroll, nombres de Excel/backup, precio € en backup e integridad al eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -10465,11 +10476,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-21-v1911-integrity-tooltips-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #21. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #21. */
 /* ==== V19.1.1: parte de v19.0; bloqueo real de dependencias y globos restaurados ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -10854,11 +10865,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-22-v192-tooltip-size-bold-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #22. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #22. */
 /* ==== V19.2: tamaño de globos y negritas en productos, donantes/personas e importes totales ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const getRawTip = el => {
@@ -10972,11 +10983,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-23-v193-tooltip-click-sort-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #23. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #23. */
 /* ==== V19.3: globos por clic, orden alfabético y negrita controlada ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11312,7 +11323,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-24-v171-pwa-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #24. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #24. */
 (function(){
   const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -11373,11 +11384,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-25-v194-tooltip-excel-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #25. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #25. */
 /* ==== V19.4: los globos no cambian al mover el cursor y el botón Excel queda cableado de forma directa ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11579,7 +11590,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v8_3_prod/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v8_3_1_prod/ig, VERSION_FILE);
     return n;
   }
   const currentAnchorClick = HTMLAnchorElement.prototype.click;
@@ -11656,11 +11667,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-26-v1952-tooltip-excel-fix-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #26. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #26. */
 /* ==== V19.5.2: recupera globos y Excel desde v19.4, evitando interferencias de parches antiguos ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -11893,7 +11904,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(name){
     let n = String(name || '');
     n = n.replace(/^ControlEvent_v\d+_\d+(?:_\d+)?/i, VERSION_FILE);
-    n = n.replace(/ControlEvent_v8_3_prod_\d(?:_\d+)?/ig, VERSION_FILE);
+    n = n.replace(/ControlEvent_v8_3_1_prod_\d(?:_\d+)?/ig, VERSION_FILE);
     return n;
   }
   if(!HTMLAnchorElement.prototype.click.__v1952Wrapped){
@@ -12001,11 +12012,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-27-v196-tooltip-behavior-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #27. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #27. */
 /* ==== V19.6: comportamiento de Por tienda y Ticket aplicado a todos los globos ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -12276,11 +12287,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-28-v200-tooltip-format-delete-maint-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #28. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #28. */
 /* ==== V20.0: formato de globos, mantenimiento robusto y avisos en eliminar ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const BLOCK_MSG = 'No autorizado. Tiene dependencias';
   const OK_MSG = 'Se puede eliminar. No hay dependencias';
   const DELETE_BLOCK_MSG = 'No se pueden eliminar datos sin previamente eliminar sus dependencia';
@@ -12596,11 +12607,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-29-v201-final-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #29. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #29. */
 /* ==== V20.1: formato fino de globos y botones mantenimiento/carga ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -12870,11 +12881,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-30-v202-final-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #30. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #30. */
 /* ==== V20.2: toggle mantenimiento, carga sin selector automático, globos y fotos ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13059,10 +13070,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-31-v210-patch-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #31. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #31. */
 /* ==== V21.0: producto duplicado permitido si cambia la tienda + globos estables ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod'; const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod'; const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13097,10 +13108,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-32-v211-tooltip-final-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #32. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #32. */
 /* ==== V21.1: globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod'; const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod'; const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
@@ -13148,11 +13159,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-33-v212-final-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #33. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #33. */
 /* ==== V21.2: separación CARGA/MANTENIMIENTO, backup y globos finales ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).toUpperCase();
@@ -13299,11 +13310,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-34-v213-final-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #34. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #34. */
 /* ==== V21.3.1: cabeceras primero, globos reencolumnados e INFOEVENTO sin fallback; muestra error real ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13423,7 +13434,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return await previousExport.apply(this,arguments);
     }catch(err){
       window.__ultimoErrorInfoEvento=err;
-      console.group('ERROR INFOEVENTO - ControlEvent v8.3_prod');
+      console.group('ERROR INFOEVENTO - ControlEvent v8.3.1_prod');
       console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o código.', err);
       try{console.error('Stack:', err&&err.stack?err.stack:'Sin stack disponible');}catch(_){}
       try{console.log('Evento activo:', ev());}catch(_){}
@@ -13446,7 +13457,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
 ;/* ===== BEGIN legacy-inline-35.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #35. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #35. */
 /* ==== V21.3.2: helper global para comentarios Excel INFOEVENTO completo ==== */
 var addCellNote = window.addCellNote || function(cell, text){
   if(!cell || !text) return;
@@ -13466,8 +13477,8 @@ var addCellNote = window.addCellNote || function(cell, text){
 };
 window.addCellNote = addCellNote;
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   function refreshVersionV2132(){
     try{ document.title = VERSION; }catch(_){ }
     try{
@@ -13506,11 +13517,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-36-v214-donaciones-grafica-fix.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #36. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #36. */
 /* ==== V21.4: donaciones duplicadas por Producto+Donante y corrección gráfico ingresos socio ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13681,10 +13692,10 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-37-v2141-graph-income-socio-strict-fix.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #37. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #37. */
 /* ==== V21.4.1: corrección estricta Socios Banco/Bizum/Efectivo = Número x Precio evento ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
     try{document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION;});}catch(_){}
@@ -13704,11 +13715,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-38-v215-minimal-fix-donaciones-excel-fotos.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #38. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #38. */
 /* ==== V21.5: solo corrige fotos INFOEVENTO y duplicidad Donaciones Producto+Donante ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -13888,11 +13899,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-39-v216-excel-ticket-images-protection-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #39. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #39. */
 /* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protección reforzada ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
   function st(){ try{ if(typeof state !== 'undefined') return state; }catch(_){ } return window.state || {}; }
@@ -14022,11 +14033,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-40-v217-final-ticket-images-book-protection-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #40. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #40. */
 /* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protección open_excel_arrastre ==== */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const EXCEL_PASSWORD = 'open_excel_arrastre';
   const WORKBOOK_PASSWORD_HASH = 'D184';
   const norm = v => String(v ?? '').trim();
@@ -14248,11 +14259,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-41-v225-clean-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #41. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #41. */
 /* ==== V22.5: corrección limpia de fotos de tickets y claves ACCESOS ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const EXCEL_PASSWORD='open_excel_arrastre';
   const DB_NAME='controlevent_ticket_images_v225';
   const DB_STORE='images';
@@ -14554,11 +14565,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-42-v226-mobile-responsive-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #42. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #42. */
 /* ==== v22.8: menú móvil y navegación responsive ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   function $(id){return document.getElementById(id)}
   function clickId(id){const el=$(id); if(el){el.click(); closeDrawer();}}
   function ensureMobileMenu(){
@@ -14621,7 +14632,7 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-43-v227-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #43. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #43. */
 (function(){
   'use strict';
   const VERSION='v22.8';
@@ -14792,11 +14803,11 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-44-v228-role-permissions-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #44. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #44. */
 /* ==== v22.8: criterios de opciones y permisos por nivel GD/RW/RO ==== */
 (function(){
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   function $(id){return document.getElementById(id)}
   function role(){try{return String((typeof authUser!=='undefined'&&authUser&&authUser.nivel)||'').toUpperCase();}catch(_){return '';}}
   function isGD(){return role()==='GD'}
@@ -14920,12 +14931,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-45-v229-event-access-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #45. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #45. */
 /* ==== v22.9: correcciones de evento finalizado y claves ACCESOS ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const ACCESS_CACHE_KEY='controlevent_v229_access_clear_cache';
   const $=id=>document.getElementById(id);
@@ -15084,12 +15095,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-46-v233-estabilizacion-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #46. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #46. */
 /* ==== v23.3 ESTABILIZACIÓN: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15258,12 +15269,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-47-v234-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #47. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #47. */
 /* ==== v23.4: claves, gráfico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15383,12 +15394,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-48-v235-final-fixes-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #48. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #48. */
 /* ==== v23.6.4: permisos GD/RW/RO, evento finalizado consultable, fotos solo visuales y TOTAL ESTIMADO ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -15504,12 +15515,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-49-v2364-local-stability-script.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #49. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #49. */
 /* ==== v23.6.4 local: no precargar state pesado, no localStorage pesado, fotos como archivos ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const SESSION_KEY='ControlEvent_v8_3_prod_session';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const SESSION_KEY='ControlEvent_v8_3_1_prod_session';
   const $=id=>document.getElementById(id);
   const stateRef=()=>{ try{return state;}catch(_){return window.state||{};} };
   const eventId=()=>String(stateRef().selectedEventId||'');
@@ -15703,12 +15714,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-50-v2364-income-total-and-version-fix.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #50. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #50. */
 /* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versión Excel correcta ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const up = v => String(v ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const num = v => Number(v || 0) || 0;
   function getState(){ try{return state;}catch(_){return window.state||{};} }
@@ -15829,12 +15840,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-51-v2365-income-total-and-issuedby-final-fix.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #51. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #51. */
 /* ==== v23.6.5 local: corrección final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   function parseNum(v){
@@ -16025,12 +16036,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-52-v2366-direct-income-chart-fix.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #52. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #52. */
 /* ==== v23.6.6 local: cálculo directo y único de INGRESOS por TOTAL real ==== */
 (function(){
   'use strict';
-  const VERSION='ControlEvent v8.3_prod';
-  const VERSION_FILE='ControlEvent_v8_3_prod';
+  const VERSION='ControlEvent v8.3.1_prod';
+  const VERSION_FILE='ControlEvent_v8_3_1_prod';
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const $=id=>document.getElementById(id);
@@ -16156,12 +16167,12 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-53-v240-fixes.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #53. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #53. */
 /* ==== v24.0: tienda/ticket pendiente, graficas limpias, orden ingresos y fotos INFOEVENTO ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -16701,10 +16712,10 @@ window.addCellNote = addCellNote;
 
 ;/* ===== BEGIN legacy-inline-54-v241-fixes.js ===== */
 
-/* ControlEvent v8.3_prod - JS legacy extraido de public/index.html. Bloque inline #54. */
+/* ControlEvent v8.3.1_prod - JS legacy extraido de public/index.html. Bloque inline #54. */
 (function(){
-  const VERSION = 'ControlEvent v8.3_prod';
-  const VERSION_FILE = 'ControlEvent_v8_3_prod';
+  const VERSION = 'ControlEvent v8.3.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_3_1_prod';
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const norm = v => String(v ?? '').trim();
