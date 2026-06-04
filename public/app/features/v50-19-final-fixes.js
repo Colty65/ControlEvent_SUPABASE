@@ -1,4 +1,4 @@
-/* ControlEvent v8.2_prod - estabilización final de login, selección de evento y globos.
+/* ControlEvent v8.2.1_prod - estabilización final de login, selección de evento y globos.
    Objetivo: no sumar capas conflictivas. Se apoya en v44-7-event-switcher como único flujo de evento.
    - La app siempre arranca pidiendo login: se desactiva la reanudación automática por localStorage.
    - Tras login: pantalla CE grande + selector "Selecciona evento...", sin evento precargado.
@@ -8,13 +8,13 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.2_prod';
-  const VERSION_FILE = 'ControlEvent_v8_2_prod';
+  const VERSION = 'ControlEvent v8.2.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_2_1_prod';
   const INSTALLED = '__ceV5019FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEYS = ['ControlEvent_v8_2_prod_session','ControlEvent_v8_2_prod_session'];
+  const SESSION_KEYS = ['ControlEvent_v8_2_1_prod_session','ControlEvent_v8_2_1_prod_session'];
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const DOCK_ID = 'ceMobileActionDockV518';
   const STYLE_ID = 'ceV5019FinalStyle';
@@ -22,7 +22,7 @@
   const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
   const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
-  const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v8_2_prod_event_chosen','ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event'];
+  const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v8_2_1_prod_event_chosen','ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event'];
   const AWAITING_CLASSES = ['ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5019-awaiting-event'];
   const OLD_DOCKS = ['ceMobileActionDockV508','ceMobileActionDockV514','ceMobileActionDockV517'];
 
