@@ -5,8 +5,8 @@ import { getState } from '../services/state.service.js';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v8.2.2_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_2_prod';
+const BACKUP_VERSION = 'ControlEvent v8.2.3_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_3_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -102,7 +102,7 @@ async function mergeTicketImagesFromDb(state, scope){
       };
     });
   }catch(err){
-    console.warn('[backup v8.2.2] No se pudo fusionar ce_ticket_images directamente:', err?.message || err);
+    console.warn('[backup v8.2.3] No se pudo fusionar ce_ticket_images directamente:', err?.message || err);
   }
   return out;
 }
@@ -395,7 +395,7 @@ async function buildBackupWorkbook(fullState, scope){
     err.status = 409;
     throw err;
   }
-  const eventCode = makeCodes(scoped.eventos, 'EV');
+  const eventCode = makeCodes(dataRows(fullState, 'eventos'), 'EV');
   const personCode = makeCodes(scoped.personas, 'PE');
   const storeCode = makeCodes(scoped.tiendas, 'TI');
   const productCode = makeCodes(scoped.productos, 'PR');

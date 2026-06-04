@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v8.2.2_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_2_prod';
+const BACKUP_VERSION = 'ControlEvent v8.2.3_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_2_3_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -127,7 +127,7 @@ async function getBestState(){
     state = app;
   }
   const normalized = normalizeState(state);
-  return {state: normalized, source, counts: countsFor(normalized), serverCounts, appCounts: countsFor(app), useServerBackup: source === 'server'};
+  return {state: normalized, source, counts: countsFor(normalized), serverCounts, appCounts: countsFor(app), useServerBackup: true};
 }
 function countsFor(state){
   return {
@@ -140,9 +140,25 @@ function countsFor(state){
     ticketImages: Object.keys(state?.ticketImages || {}).length
   };
 }
-function chooseBackupScope(state){
+async function freshBackupEvents(baseState){
+  const map = new Map();
+  const add = item => {
+    const id = String(item?.id || '').trim();
+    if(id && !map.has(id)) map.set(id, item);
+  };
+  try{
+    const res = await fetch('/api/state?t=' + Date.now(), {cache:'no-store'});
+    if(res.ok) rows(normalizeState(await res.json()), 'eventos').forEach(add);
+  }catch(_){ }
+  rows(baseState, 'eventos').forEach(add);
+  rows(window.ControlEventApp?.state || {}, 'eventos').forEach(add);
+  rows(window.ControlEventRuntime?.app?.state || {}, 'eventos').forEach(add);
+  rows(window.state || {}, 'eventos').forEach(add);
+  return Array.from(map.values());
+}
+async function chooseBackupScope(state){
+  const events = await freshBackupEvents(state);
   return new Promise(resolve => {
-    const events = rows(state, 'eventos');
     const selectedId = window.ControlEventApp?.state?.selectedEventId || state.selectedEventId || '';
     const overlay = document.createElement('div');
     overlay.className = 'ce-backup-overlay-v181';
@@ -466,7 +482,7 @@ export async function run(options = {}){
   }
   const ExcelJS = await ensureExcelJS();
   const {wb, addRows} = setupWorkbook(ExcelJS);
-  const eventCode = makeCodes(scoped.eventos, 'EV');
+  const eventCode = makeCodes(dataRows(state, 'eventos'), 'EV');
   const personCode = makeCodes(scoped.personas, 'PE');
   const storeCode = makeCodes(scoped.tiendas, 'TI');
   const productCode = makeCodes(scoped.productos, 'PR');
