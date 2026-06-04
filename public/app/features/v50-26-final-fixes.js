@@ -1,12 +1,12 @@
-/* ControlEvent v8.4_prod - logon limpio y globos rehidratados sin bucles pesados.
+/* ControlEvent v8.4.1_prod - logon limpio y globos rehidratados sin bucles pesados.
    - Marca TODAS las claves de evento elegido, incluida la antigua ce_v250_event_chosen.
    - Tras cambio de usuario + eleccion de evento, rehidrata globos de Resumen y Graficas.
    - No usa MutationObserver global ni setInterval.
    - Mantiene Refres en sitio y version unificada. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.4_prod';
-  const VERSION_FILE = 'ControlEvent_v8_4_prod';
+  const VERSION = 'ControlEvent v8.4.1_prod';
+  const VERSION_FILE = 'ControlEvent_v8_4_1_prod';
   const INSTALLED = '__ceV5026FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -14,14 +14,14 @@
   const CHOSEN_KEYS = [
     'ce_v250_event_chosen',
     'controlevent_v44_event_chosen_after_login',
-    'ControlEvent_v8_4_prod_event_chosen',
-    'ControlEvent_v8_4_prod_event_chosen',
-    'ControlEvent_v8_4_prod_event_chosen',
+    'ControlEvent_v8_4_1_prod_event_chosen',
+    'ControlEvent_v8_4_1_prod_event_chosen',
+    'ControlEvent_v8_4_1_prod_event_chosen',
     'controlevent_v5022_user_picked_event',
     'ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event'
   ];
-  const SELECT_KEYS = ['controlevent_v229_selected_event_id','ControlEvent_v8_4_prod_selected_event','ControlEvent_v8_4_prod_selected_event','ControlEvent_v8_4_prod_selected_event'];
-  const SESSION_KEYS = ['ControlEvent_v8_4_prod_session','ControlEvent_v8_4_prod_session','ControlEvent_v8_4_prod_session'];
+  const SELECT_KEYS = ['controlevent_v229_selected_event_id','ControlEvent_v8_4_1_prod_selected_event','ControlEvent_v8_4_1_prod_selected_event','ControlEvent_v8_4_1_prod_selected_event'];
+  const SESSION_KEYS = ['ControlEvent_v8_4_1_prod_session','ControlEvent_v8_4_1_prod_session','ControlEvent_v8_4_1_prod_session'];
   const AWAIT_CLASSES = ['ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5018-awaiting-event','ce-v5019-awaiting-event','ce-v5021-awaiting-event','ce-v5022-awaiting-event','ce-v5024-awaiting-event','ce-v5025-awaiting-event','ce-v5026-awaiting-event'];
   const HAS_CLASSES = ['ce-v5019-authenticated','ce-v5020-has-event','ce-v5022-has-event','ce-v5025-has-event','ce-v5026-has-event'];
   const PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas'];

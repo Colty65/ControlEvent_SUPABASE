@@ -1,4 +1,4 @@
-/* ControlEvent v8.4_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v8.4.1_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
@@ -51,6 +51,14 @@
       throw new Error(text || ('HTTP ' + res.status + ' eliminando fotos del evento'));
     }
     return res.json().catch(() => ({ok:true}));
+  }
+  function scheduleTicketImageCleanup(eventId){
+    // Segunda pasada no bloqueante: cubre retardos de guardado remoto o cualquier handler legado que haya persistido tarde.
+    window.setTimeout(() => {
+      deleteTicketImagesServer(eventId).catch(error => {
+        console.warn('[ControlEvent v8.4.1_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
+      });
+    }, 1400);
   }
   async function handleDelete(button, event){
     const eventId = button?.dataset?.id || '';
@@ -112,6 +120,7 @@
     deleteTicketImagesLocal(eventId);
     if(String(state.selectedEventId || '') === String(eventId)) state.selectedEventId = state.eventos?.[0]?.id || '';
     save();
+    scheduleTicketImageCleanup(eventId);
     redraw();
   }
 
