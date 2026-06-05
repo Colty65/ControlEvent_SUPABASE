@@ -1,0 +1,7 @@
+ControlEvent v8.4.1_prod - Parche minimo COMPRAS TK50
+
+Cambios aplicados sin cambiar version:
+- El desplegable de COMPRAS permite GASTOS CORRIENTES y TK01..TK50.
+- En COMPRAS, las opciones ya utilizadas en el evento se muestran en verde y con marca ✓.
+- Aplica tanto al alta de compra como a los desplegables de los registros existentes.
+- No se ha tocado la logica de guardado, backup, fotos, baja de eventos, ingresos, donaciones, resumen ni graficas.

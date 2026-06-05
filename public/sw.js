@@ -60,6 +60,7 @@ const SHELL_ASSETS = [
   '/app/features/v8-4-stable-ids.js',
   '/app/features/v8-4-ticket-image-scope-backup-fix.js',
   '/app/features/v8-4-ticket-images-visible-after-event.js',
+  '/app/features/v8-4-1-compras-tk50-used-colors.js',
           '/app/features/v46-4-final-fixes.js',
   '/app/features/v46-7-final-fixes.js',
   '/app/features/v46-9-final-fixes.js',
