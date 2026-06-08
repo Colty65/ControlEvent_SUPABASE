@@ -427,14 +427,15 @@ async function buildBackupWorkbook(fullState, scope){
     err.status = 409;
     throw err;
   }
-  const eventCode = makeCodes(dataRows(fullState, 'eventos'), 'EV', fullState.eventCodeMap || {});
+  // v8.4.1: para EVENTOS no se genera EVxxx. El identificador estable es el id real de ce_eventos.
+  const eventCode = Object.fromEntries(dataRows(fullState, 'eventos').map(e => [String(e?.id || ''), String(e?.id || '')]).filter(([id]) => id));
   const entityMaps = fullState.entityCodeMaps || {};
   const personCode = makeCodes(scoped.personas, 'PE', entityMaps.personas || {});
   const storeCode = makeCodes(scoped.tiendas, 'TI', entityMaps.tiendas || {});
   const productCode = makeCodes(scoped.productos, 'PR', entityMaps.productos || {});
   const productMap = byIdMap(scoped.productos);
   const selectedEvent = scope === 'TODOS' ? null : scoped.eventos.find(e => String(e.id) === String(scope));
-  const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
+  const selectedCode = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.id || scope || '');
   const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
   const now = stamp();
   const {wb, addRows} = setupWorkbook();
@@ -445,7 +446,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['VERSION_FICHERO', BACKUP_VERSION_FILE],
     ['FUENTE_DATOS', 'server-api-export'],
     ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle],
-    ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode],
+    ['EVENTO_ID', scope === 'TODOS' ? 'TODOS' : selectedCode],
     ['FECHA_DESCARGA', `${now.yyyy}${now.mm}${now.dd}-${now.hh}_${now.mi}_${now.ss}`],
     ['REGISTROS_EVENTOS', scopedCounts.eventos],
     ['REGISTROS_PERSONAS', scopedCounts.personas],
@@ -460,7 +461,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
     ['NOTA', 'Exportación generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
   ]);
-  addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+  addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
@@ -486,7 +487,10 @@ async function buildBackupWorkbook(fullState, scope){
 }
 
 router.get('/export/backup', asyncHandler(async (req, res) => {
-  const scope = String(req.query.scope || 'TODOS');
+  let scope = String(req.query.scope || 'TODOS');
+  const eventIdParam = norm(req.query.eventId || req.query.eventID || req.query.EVENTO_ID || '');
+  if (/^all$/i.test(scope)) scope = 'TODOS';
+  if (/^event$/i.test(scope) && eventIdParam) scope = eventIdParam;
   const state = await mergeTicketImagesFromDb(normalizeState(await getState()), scope);
   const { wb, filename, counts } = await buildBackupWorkbook(state, scope);
   const buffer = await wb.xlsx.writeBuffer();
