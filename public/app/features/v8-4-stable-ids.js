@@ -1,9 +1,9 @@
-/* ControlEvent v8.4.1_prod - códigos estables EV/PE/TI/PR y carga sin regenerar identidades.
+/* ControlEvent v8.5_prod - códigos estables EV/PE/TI/PR y carga sin regenerar identidades.
    Sin intervalos: actúa al cargar, al importar, al crear evento y antes de backup. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.4.1_prod';
-  const VERSION_FILE = 'ControlEvent_v8_4_1_prod';
+  const VERSION = 'ControlEvent v8.5_prod';
+  const VERSION_FILE = 'ControlEvent_v8_5_prod';
   if(window.__ceV832StableIds) return;
   window.__ceV832StableIds = true;
   const norm = v => String(v ?? '').trim();
@@ -140,9 +140,9 @@
         if(typeof window.ensureSheetJS === 'function') await window.ensureSheetJS();
         else if(typeof ensureSheetJS === 'function') await ensureSheetJS();
         maps = await readWorkbookCodeMaps();
-      }catch(err){ console.warn('[ControlEvent v8.4.1_prod] No se pudieron leer códigos estables del Excel antes de importar.', err); }
+      }catch(err){ console.warn('[ControlEvent v8.5_prod] No se pudieron leer códigos estables del Excel antes de importar.', err); }
       const ret = await old.apply(this, arguments);
-      try{ mergeCodeMaps(maps); applyVersion(); }catch(err){ console.warn('[ControlEvent v8.4.1_prod] No se pudieron aplicar códigos estables tras importar.', err); }
+      try{ mergeCodeMaps(maps); applyVersion(); }catch(err){ console.warn('[ControlEvent v8.5_prod] No se pudieron aplicar códigos estables tras importar.', err); }
       return ret;
     };
     wrapped.__ceV832StableIds = true;

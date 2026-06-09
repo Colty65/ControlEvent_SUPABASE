@@ -1,4 +1,4 @@
-ControlEvent v8.4.1_prod
+ControlEvent v8.5_prod
 
 Base: v8.4_prod.
 
@@ -23,9 +23,9 @@ No se ha tocado:
 - Rendimiento de pantallas.
 
 Versión:
-- ControlEvent v8.4.1_prod
-- ControlEvent_v8_4_1_prod
-- Cache PWA: controlevent-shell-v8-4-1-prod
+- ControlEvent v8.5_prod
+- ControlEvent_v8_5_prod
+- Cache PWA: controlevent-shell-v8-5-prod
 
 Recomendación:
 - Subir ZIP completo.

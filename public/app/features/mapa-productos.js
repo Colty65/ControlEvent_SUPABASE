@@ -1,9 +1,9 @@
-/* ControlEvent v8.4.1_prod - Mapa de recursos
+/* ControlEvent v8.5_prod - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.4.1_prod';
+  const VERSION = 'ControlEvent v8.5_prod';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -11,7 +11,7 @@
   const FILTER_ID = 'mapaResponsablesFilter';
   const SEARCH_ID = 'mapaProductoSearch';
   const KNOWN_PANELS = ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabResumen','tabGraficas'];
-  const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabResumenBtn','tabGraficasBtn'];
+  const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabResumenBtn','tabGraficasBtn'];
   let mapPinned = false;
   let selectedResponsables = null; // null = todos
   let productSearchText = '';
@@ -851,7 +851,7 @@
   }
 
   document.addEventListener('click', event => {
-    const other = event.target?.closest?.('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"],#ceMobileMenuBtn');
+    const other = event.target?.closest?.('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabDocumentosBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabDocumentosBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"],#ceMobileMenuBtn');
     if(other) { mapPinned = false; try{ window.__ceMapaProductosPinned = false; }catch(_){ } }
   }, false);
   document.addEventListener('change', event => { if(event.target && event.target.id === 'selectedEvent' && currentTab() === TAB_NAME){ setTimeout(() => forceShowMapa({reason:'event-change', scroll:false}), 60); } }, true);

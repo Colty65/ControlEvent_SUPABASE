@@ -1,4 +1,4 @@
-ControlEvent v8.4.1_prod - Corrección BACKUP con EVENTO_ID real
+ControlEvent v8.5_prod - Corrección BACKUP con EVENTO_ID real
 
 Cambio quirúrgico solicitado:
 - Se elimina el uso de EVxxx como identificador de evento en el BACKUP nuevo.
@@ -7,7 +7,7 @@ Cambio quirúrgico solicitado:
 - METADATOS: se usa EVENTO_ID en lugar de EVENTO_CODIGO.
 - La carga/importación se adapta para aceptar la hoja EVENTOS sin EVENTO_CODIGO y mapear por EVENTO_ID.
 - Se mantiene compatibilidad de lectura con backups antiguos que sí lleven EVENTO_CODIGO tipo EVxxx.
-- Se mantiene la versión visible y de fichero: v8.4.1_prod.
+- Se mantiene la versión visible y de fichero: v8.5_prod.
 - Se conservan los cambios anteriores de TK01..TK50 y tickets usados en verde.
 
 Archivos tocados:

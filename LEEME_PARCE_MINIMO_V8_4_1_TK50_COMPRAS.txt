@@ -1,4 +1,4 @@
-ControlEvent v8.4.1_prod - Parche minimo COMPRAS TK50
+ControlEvent v8.5_prod - Parche minimo COMPRAS TK50
 
 Cambios aplicados sin cambiar version:
 - El desplegable de COMPRAS permite GASTOS CORRIENTES y TK01..TK50.

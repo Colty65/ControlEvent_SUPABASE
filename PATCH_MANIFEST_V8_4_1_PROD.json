@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v8.4.1_prod",
+  "version": "ControlEvent v8.5_prod",
   "base": "ControlEvent v8.4_prod",
   "purpose": "Limpieza de CE_TICKET_IMAGES y Storage al dar de baja/eliminar un evento.",
   "modified_files": [

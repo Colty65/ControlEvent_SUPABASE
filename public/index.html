@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v8.4.1_prod</title>
-  <!-- ControlEvent v8.4.1_prod PWA / instalación móvil -->
+  <title>ControlEvent v8.5_prod</title>
+  <!-- ControlEvent v8.5_prod PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -72,7 +72,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span>ControlEvent v8.4.1_prod</span>
+          <span>ControlEvent v8.5_prod</span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -91,6 +91,7 @@
         <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
         <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
         <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de recursos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">🧭</span></button>
+        <button type="button" class="tab" id="tabDocumentosBtn" title="Documentos importantes del evento"><span class="tabicon">📁</span></button>
         <button type="button" class="tab hidden" id="tabPlanificacionBtn" aria-label="Planificación inicial"><span class="tabicon">🧠</span></button>
         <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
@@ -265,6 +266,22 @@
           <div id="mapaProductosSummary" class="mapa-summary-grid"></div>
           <div class="separator"></div>
           <div id="mapaProductosList"></div>
+        </div>
+      </div>
+
+      <div id="tabDocumentos" class="hidden">
+        <div class="card ce-docs-card">
+          <div class="section-title">
+            <div class="icon-badge">📁</div>
+            <div>
+              <h2>Documentos del evento</h2>
+              <p>Permisos, solicitudes y fotografías de documentación importante vinculada al evento.</p>
+            </div>
+          </div>
+          <div id="eventDocsWritePanel" class="ce-docs-write-panel"></div>
+          <div class="separator"></div>
+          <div id="eventDocsStatus" class="ce-docs-status hidden"></div>
+          <div id="eventDocsList" class="ce-docs-list"></div>
         </div>
       </div>
 
@@ -495,7 +512,7 @@
 
 <script src="./app/performance/low-resource-boot.js"></script>
 <script src="/api/bootstrap.js"></script>
-<script src="./app/features/event-delete-cascade-v33.7.js?v=8.4.1_prod"></script>
+<script src="./app/features/event-delete-cascade-v33.7.js?v=8.5_prod"></script>
 <script id="legacy-bundle-before-modules-v307" src="./app/legacy/legacy-bundle-before-modules-v30.7.js"></script>
 
 <script type="module" src="./modules/module-loader.js"></script>
@@ -510,49 +527,50 @@
 <script src="./app/features/maintenance-duplicates-v32.1.js"></script>
 <script src="./app/performance/low-resource-legacy-patch.js"></script>
 <script type="module" src="./app/main.js"></script>
-<script src="./app/features/v40-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v41-1-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v41-2-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v41-3-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v43-4-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v43-7-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v43-8-1-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v43-8-2-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v44-0-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/performance/perf-diagnostics-v44-2.js?v=8.4.1_prod"></script>
-<script src="./app/features/v44-3-perf-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v44-7-event-switcher.js?v=8.4.1_prod"></script>
-<script src="./app/features/v50-1-final-fixes.js?v=8.4.1_prod"></script>
-<script src="./app/features/v45-0-maintenance-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v45-1-budget-labels.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v45-2-role-refresh.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v46-4-ingresos-justificantes-negrita.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v46-4-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v46-7-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v46-9-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-2-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-4-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-9-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-10-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-11-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-19-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-20-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-22-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-24-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-26-final-fixes.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v50-27-hard-logout.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v3-0-photo-viewers.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v3-5-data-recovery-guard.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v4-0-prod-photo-sync.js?v=8.4.1_prod"></script>
+<script src="./app/features/v40-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v41-1-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v41-2-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v41-3-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v43-4-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v43-7-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v43-8-1-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v43-8-2-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v44-0-fixes.js?v=8.5_prod"></script>
+<script src="./app/performance/perf-diagnostics-v44-2.js?v=8.5_prod"></script>
+<script src="./app/features/v44-3-perf-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v44-7-event-switcher.js?v=8.5_prod"></script>
+<script src="./app/features/v50-1-final-fixes.js?v=8.5_prod"></script>
+<script src="./app/features/v45-0-maintenance-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v45-1-budget-labels.js?v=8.5_prod"></script>
+  <script src="./app/features/v45-2-role-refresh.js?v=8.5_prod"></script>
+  <script src="./app/features/v46-4-ingresos-justificantes-negrita.js?v=8.5_prod"></script>
+  <script src="./app/features/v46-4-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v46-7-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v46-9-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-2-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-4-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-9-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-10-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-11-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-19-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-20-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-22-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-24-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-26-final-fixes.js?v=8.5_prod"></script>
+  <script src="./app/features/v50-27-hard-logout.js?v=8.5_prod"></script>
+  <script src="./app/features/v3-0-photo-viewers.js?v=8.5_prod"></script>
+  <script src="./app/features/v3-5-data-recovery-guard.js?v=8.5_prod"></script>
+  <script src="./app/features/v4-0-prod-photo-sync.js?v=8.5_prod"></script>
 
-  <script src="./app/features/v4-0-1-pc-photo-fix.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v7-3-prod-final-fix.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v7-3-ios-finalizado-ingresos-photo-fix.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v7-3-graficas-photo-restore-thumbs.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v7-3-login-clean-no-preselect.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v8-4-ticket-image-scope-backup-fix.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v8-4-ticket-images-visible-after-event.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v8-4-1-compras-tk50-used-colors.js?v=8.4.1_prod"></script>
-  <script src="./app/features/v8-4-1-backup-eventid-format.js?v=8.4.1_prod"></script>
+  <script src="./app/features/v4-0-1-pc-photo-fix.js?v=8.5_prod"></script>
+  <script src="./app/features/v7-3-prod-final-fix.js?v=8.5_prod"></script>
+  <script src="./app/features/v7-3-ios-finalizado-ingresos-photo-fix.js?v=8.5_prod"></script>
+  <script src="./app/features/v7-3-graficas-photo-restore-thumbs.js?v=8.5_prod"></script>
+  <script src="./app/features/v7-3-login-clean-no-preselect.js?v=8.5_prod"></script>
+  <script src="./app/features/v8-4-ticket-image-scope-backup-fix.js?v=8.5_prod"></script>
+  <script src="./app/features/v8-4-ticket-images-visible-after-event.js?v=8.5_prod"></script>
+  <script src="./app/features/v8-4-1-compras-tk50-used-colors.js?v=8.5_prod"></script>
+  <script src="./app/features/v8-4-1-backup-eventid-format.js?v=8.5_prod"></script>
+  <script src="./app/features/v8-5-event-documents.js?v=8.5_prod"></script>
 </body>
 </html>

@@ -1,11 +1,11 @@
-/* ControlEvent v8.4.1_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
+/* ControlEvent v8.5_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
    - EVENTOS ya no exporta EVENTO_CODIGO.
    - En hojas relacionales, EVENTO_CODIGO contiene el id real de ce_eventos.
    - La importación acepta el nuevo formato y conserva EVENTO_ID. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.4.1_prod';
-  const VERSION_FILE = 'ControlEvent_v8_4_1_prod';
+  const VERSION = 'ControlEvent v8.5_prod';
+  const VERSION_FILE = 'ControlEvent_v8_5_prod';
   const INSTALLED = '__ceV841BackupEventIdFormat';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -118,7 +118,7 @@
   }
   async function downloadServerBackup(scope){
     const eventId = scope === 'TODOS' ? '' : scope;
-    const params = new URLSearchParams({scope: scope || 'TODOS', eventId, v:'8.4.1-eventid', t:String(Date.now())});
+    const params = new URLSearchParams({scope: scope || 'TODOS', eventId, v:'8.5-eventid', t:String(Date.now())});
     const response = await fetch(`/api/export/backup?${params.toString()}`, {cache:'no-store'});
     if(!response.ok){
       let detail = '';
@@ -257,7 +257,7 @@
     if(!scope) return;
     try{ return await downloadServerBackup(scope); }
     catch(serverError){
-      console.warn('[ControlEvent/v8.4.1] Backup servidor no disponible; se genera fallback cliente con EVENTO_ID.', serverError);
+      console.warn('[ControlEvent/v8.5] Backup servidor no disponible; se genera fallback cliente con EVENTO_ID.', serverError);
       return clientBackup(scope);
     }
   }
@@ -278,7 +278,7 @@
       wrapped.__ceEventIdFormat = true;
       try{ readSheetRows = wrapped; }catch(_){ }
       window.readSheetRows = wrapped;
-    }catch(err){ console.warn('[ControlEvent/v8.4.1] No se pudo adaptar importación EVENTO_ID.', err); }
+    }catch(err){ console.warn('[ControlEvent/v8.5] No se pudo adaptar importación EVENTO_ID.', err); }
   }
   function install(){
     patchImportRows();

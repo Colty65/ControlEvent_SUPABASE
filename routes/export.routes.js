@@ -5,8 +5,8 @@ import { getState } from '../services/state.service.js';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v8.4.1_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v8_4_1_prod';
+const BACKUP_VERSION = 'ControlEvent v8.5_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v8_5_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -427,7 +427,7 @@ async function buildBackupWorkbook(fullState, scope){
     err.status = 409;
     throw err;
   }
-  // v8.4.1: para EVENTOS no se genera EVxxx. El identificador estable es el id real de ce_eventos.
+  // v8.5: para EVENTOS no se genera EVxxx. El identificador estable es el id real de ce_eventos.
   const eventCode = Object.fromEntries(dataRows(fullState, 'eventos').map(e => [String(e?.id || ''), String(e?.id || '')]).filter(([id]) => id));
   const entityMaps = fullState.entityCodeMaps || {};
   const personCode = makeCodes(scoped.personas, 'PE', entityMaps.personas || {});

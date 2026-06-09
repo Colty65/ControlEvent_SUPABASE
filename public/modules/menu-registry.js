@@ -24,6 +24,12 @@ export const menuModules = [
     module: './views/mapa-productos.js'
   },
   {
+    name: 'documentos',
+    buttonId: 'tabDocumentosBtn',
+    viewId: 'tabDocumentos',
+    module: './views/documentos.js'
+  },
+  {
     name: 'resumen',
     buttonId: 'tabResumenBtn',
     viewId: 'tabResumen',

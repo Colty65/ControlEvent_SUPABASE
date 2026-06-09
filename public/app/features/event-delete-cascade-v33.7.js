@@ -1,4 +1,4 @@
-/* ControlEvent v8.4.1_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v8.5_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
@@ -56,7 +56,7 @@
     // Segunda pasada no bloqueante: cubre retardos de guardado remoto o cualquier handler legado que haya persistido tarde.
     window.setTimeout(() => {
       deleteTicketImagesServer(eventId).catch(error => {
-        console.warn('[ControlEvent v8.4.1_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
+        console.warn('[ControlEvent v8.5_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
       });
     }, 1400);
   }
@@ -77,6 +77,7 @@
     const donaciones = compras.filter(x => ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(String(x.ticketDonacion || '').trim()));
     const comprasNoDon = compras.length - donaciones.length;
     const ticketImgs = countTicketImages(eventId);
+    const docs = (state.eventDocuments || []).filter(x => String(x.eventId || '') === String(eventId));
 
     const msg = [
       'ATENCIÓN: baja definitiva de evento.',
@@ -88,7 +89,8 @@
       '• Ingresos/colaboradores del evento: ' + ingresos.length,
       '• Compras/gastos del evento: ' + comprasNoDon,
       '• Donaciones de producto del evento: ' + donaciones.length,
-      '• Imágenes de tickets del evento: ' + ticketImgs,
+      '• Imágenes de tickets/documentos del evento: ' + ticketImgs,
+      '• Fichas de documentos del evento: ' + docs.length,
       '',
       'NO se eliminarán PERSONAS, TIENDAS ni PRODUCTOS de las tablas generales, aunque solo hayan intervenido en este evento.',
       '',
@@ -118,6 +120,7 @@
     state.colaboradores = (state.colaboradores || []).filter(c => String(c.eventId || '') !== String(eventId));
     state.compras = (state.compras || []).filter(c => String(c.eventId || '') !== String(eventId));
     deleteTicketImagesLocal(eventId);
+    if(Array.isArray(state.eventDocuments)) state.eventDocuments = state.eventDocuments.filter(d => String(d.eventId || '') !== String(eventId));
     if(String(state.selectedEventId || '') === String(eventId)) state.selectedEventId = state.eventos?.[0]?.id || '';
     save();
     scheduleTicketImageCleanup(eventId);
