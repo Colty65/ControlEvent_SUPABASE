@@ -131,9 +131,19 @@
     const panel = $(PANEL_ID);
     const active = currentTab() === TAB;
     const hasEvent = !!selectedEvent();
-    if(panel){
-      panel.classList.toggle('hidden', !active || !hasEvent || !canSee());
-      panel.setAttribute('aria-hidden', (!active || !hasEvent || !canSee()) ? 'true' : 'false');
+    if(active){
+      // v8.5 ajuste: algunos refrescos tardios del legacy vuelven a mostrar INGRESOS/RESUMEN.
+      // Cuando Documentos es la pestaña activa, se fuerza una unica ventana visible.
+      PANELS.forEach(id => {
+        const el = $(id);
+        if(!el) return;
+        const shouldShow = id === PANEL_ID && hasEvent && canSee();
+        el.classList.toggle('hidden', !shouldShow);
+        el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+      });
+    }else if(panel){
+      panel.classList.add('hidden');
+      panel.setAttribute('aria-hidden', 'true');
     }
     if(active){
       BUTTONS.forEach(id => {
@@ -265,6 +275,9 @@
     BUTTONS.forEach(id => $(id)?.classList.toggle('active', id === BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => el.classList.toggle('primary', el.dataset.target === BUTTON_ID));
     renderEventDocuments();
+    // v8.5 ajuste: varios parches legacy repintan la pestaña inicial unos segundos despues.
+    // Mientras Documentos siga siendo la pestaña activa, reaseguramos que no aparezca RESUMEN/INGRESOS encima.
+    [0,80,240,700,1500,3000].forEach(ms => setTimeout(() => { if(currentTab() === TAB) renderVisibility(); }, ms));
     safe(() => document.body.classList.remove('mobile-drawer-open'), null);
   }
 
@@ -520,8 +533,19 @@
       const ret = old.apply(this, arguments);
       safe(() => {
         const active = currentTab() === TAB;
-        const panel = $(PANEL_ID);
-        if(panel) panel.classList.toggle('hidden', !active || !selectedEvent() || !canSee());
+        if(active){
+          const hasEvent = !!selectedEvent();
+          PANELS.forEach(id => {
+            const el = $(id);
+            if(!el) return;
+            const shouldShow = id === PANEL_ID && hasEvent && canSee();
+            el.classList.toggle('hidden', !shouldShow);
+            el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+          });
+        }else{
+          const panel = $(PANEL_ID);
+          if(panel) panel.classList.add('hidden');
+        }
         $(BUTTON_ID)?.classList.toggle('active', active);
       }, null);
       return ret;

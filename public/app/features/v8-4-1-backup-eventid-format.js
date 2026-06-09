@@ -59,6 +59,10 @@
     return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(up(ticket));
   }
   function ticket(row){ return norm(row?.ticketDonacion ?? row?.ticket ?? row?.ticketOtrosGastos ?? ''); }
+  function documentToken(value){
+    const match = norm(value).toUpperCase().match(/\bDOC\s*(\d+)\b/);
+    return match ? 'DOC' + String(Number(match[1])).padStart(2, '0') : '';
+  }
   function makeCodes(items, prefix, stableMap){
     const out = {}, used = new Set();
     const props = prefix === 'PE' ? ['personaCodigo','codigoPersona','personCode','PERSONA_CODIGO'] : prefix === 'TI' ? ['tiendaCodigo','codigoTienda','storeCode','TIENDA_CODIGO'] : ['productoCodigo','codigoProducto','productCode','PRODUCTO_CODIGO'];
@@ -137,6 +141,7 @@
     const eventIds = new Set(eventos.map(e => String(e.id)));
     const colaboradores = arr('colaboradores').filter(c => all || eventIds.has(String(c.eventId)));
     const compras = arr('compras').filter(c => all || eventIds.has(String(c.eventId)));
+    const eventDocuments = arr('eventDocuments').filter(doc => all || eventIds.has(String(doc.eventId)));
     const personIds = new Set();
     colaboradores.forEach(c => { if(c.personaId) personIds.add(String(c.personaId)); });
     compras.forEach(c => { if(c.responsableId) personIds.add(String(c.responsableId)); const d = norm(c.donorRef); if(d.startsWith('P:')) personIds.add(d.slice(2)); });
@@ -159,6 +164,7 @@
       productos: all ? arr('productos').slice() : arr('productos').filter(p => productIds.has(String(p.id))),
       colaboradores,
       compras,
+      eventDocuments,
       ticketImages
     };
   }
@@ -236,6 +242,13 @@
     sheet(wb, 'INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [c.eventId || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
     sheet(wb, 'COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [c.eventId || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), rowPrice(c, products), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
     sheet(wb, 'DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [c.eventId || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), rowPrice(c, products), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
+    sheet(wb, 'DOCUMENTOS', ['EVENTO_CODIGO','DOC_CODIGO','DOC_ID','FECHA','DESCRIPCION','CLAVE_IMAGEN','FOTO_URL'], (scoped.eventDocuments || []).map(doc => {
+      const code = documentToken(doc?.codigo || doc?.imageKey || doc?.id);
+      const key = doc?.eventId && code ? `${doc.eventId}|${code}` : '';
+      const image = key ? (scoped.ticketImages?.[key] || '') : '';
+      const imageText = typeof image === 'object' ? (image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || image.dataUrl || image.base64 || '') : String(image || '');
+      return [doc?.eventId || '', code, doc?.id || key, doc?.fecha || '', doc?.descripcion || '', code, imageText || doc?.imageUrl || ''];
+    }));
     const ticketRows = [], partRows = [];
     Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
       const eventId = eventFromKey(fullKey);

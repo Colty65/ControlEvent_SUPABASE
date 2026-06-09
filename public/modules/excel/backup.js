@@ -23,7 +23,7 @@ const num = value => {
 };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const rows = (state, key) => Array.isArray(state?.[key]) ? state[key] : [];
-const countRows = state => COLLECTIONS.reduce((total, key) => total + rows(state, key).length, 0) + Object.keys(state?.ticketImages || {}).length;
+const countRows = state => COLLECTIONS.reduce((total, key) => total + rows(state, key).length, 0) + Object.keys(state?.ticketImages || {}).length + rows(state, 'eventDocuments').length;
 const cleanFilePart = value => norm(value || 'SIN_TITULO').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'SIN_TITULO';
 function stamp(date = new Date()){
   const pad = n => String(n).padStart(2, '0');
@@ -78,6 +78,7 @@ function cloneState(value){
 function normalizeState(value){
   const state = cloneState(value);
   for(const key of COLLECTIONS) if(!Array.isArray(state[key])) state[key] = [];
+  state.eventDocuments = Array.isArray(state.eventDocuments) ? state.eventDocuments : [];
   state.ticketImages = state.ticketImages && typeof state.ticketImages === 'object' ? state.ticketImages : {};
   const refs = state.ticketImageRefs && typeof state.ticketImageRefs === 'object' ? state.ticketImageRefs : {};
   Object.entries(refs).forEach(([key, ref]) => {
@@ -137,6 +138,7 @@ function countsFor(state){
     productos: rows(state,'productos').length,
     colaboradores: rows(state,'colaboradores').length,
     compras: rows(state,'compras').length,
+    eventDocuments: rows(state,'eventDocuments').length,
     ticketImages: Object.keys(state?.ticketImages || {}).length
   };
 }
@@ -258,6 +260,13 @@ function ticketToken(value){
   const match = norm(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
   return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
 }
+function documentToken(value){
+  const match = norm(value).toUpperCase().match(/\bDOC\s*(\d+)\b/);
+  return match ? 'DOC' + String(Number(match[1])).padStart(2, '0') : '';
+}
+function normalizeDocumentInner(value){
+  return documentToken(value);
+}
 function isDonation(ticket){ return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(norm(ticket)); }
 function ticket(c){ return norm(c?.ticketDonacion ?? c?.ticket ?? c?.ticketOtrosGastos ?? ''); }
 function dataRows(source, name){
@@ -311,6 +320,10 @@ function buildLiveImageIndex(fullState, scopedEventIds){
     const storeName = norm(stores[String(c.tiendaId || '')]?.nombre || '');
     add(c.eventId, storeName ? `${storeName} | ${tk}` : tk, 'TK');
   });
+  dataRows(fullState,'eventDocuments').forEach(doc => {
+    const code = documentToken(doc?.codigo || doc?.imageKey || doc?.id);
+    if(doc?.eventId && code) add(doc.eventId, code, 'DOC');
+  });
   return {index, byEventToken};
 }
 function candidateEventsForImage(key, value, scopedEventIds){
@@ -340,6 +353,12 @@ function liveCanonicalInfo(key, value, liveIndex, scopedEventIds){
       if(ing){
         const hit = liveIndex.index.get(`${ev}|${ing}`);
         if(hit) return hit;
+      }
+      const docInner = normalizeDocumentInner(inner);
+      if(docInner){
+        const exactDoc = liveIndex.index.get(`${ev}|${docInner}`);
+        if(exactDoc) return exactDoc;
+        return {eventToken:ev, innerKey:docInner, canonicalKey:`${ev}|${docInner}`, kind:'DOC'};
       }
       const tkInner = normalizeTicketInner(inner);
       if(tkInner){
@@ -388,11 +407,12 @@ function scopedBackupState(fullState, scope){
   const personas = all ? [...dataRows(fullState,'personas')] : dataRows(fullState,'personas').filter(p => personIds.has(String(p.id)));
   const tiendas = all ? [...dataRows(fullState,'tiendas')] : dataRows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
   const productos = all ? [...dataRows(fullState,'productos')] : dataRows(fullState,'productos').filter(p => productIds.has(String(p.id)));
+  const eventDocuments = dataRows(fullState,'eventDocuments').filter(doc => all || eventIds.has(String(doc.eventId)));
   const ticketImages = {};
   const liveIndex = buildLiveImageIndex(fullState, eventIds);
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
   Object.entries(fullState.ticketImageRefs || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
-  return {eventos, personas, tiendas, productos, colaboradores, compras, ticketImages};
+  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, ticketImages};
 }
 function splitLongText(value, size = 30000){
   const text = String(value || '');
@@ -512,14 +532,15 @@ export async function run(options = {}){
   }
   const ExcelJS = await ensureExcelJS();
   const {wb, addRows} = setupWorkbook(ExcelJS);
-  const eventCode = makeCodes(dataRows(state, 'eventos'), 'EV', state.eventCodeMap || {});
+  // v8.5: EVENTO_CODIGO usa el id real de ce_eventos, no EVxxx.
+  const eventCode = Object.fromEntries(dataRows(state, 'eventos').map(e => [String(e?.id || ''), String(e?.id || '')]).filter(([id]) => id));
   const entityMaps = state.entityCodeMaps || {};
   const personCode = makeCodes(scoped.personas, 'PE', entityMaps.personas || {});
   const storeCode = makeCodes(scoped.tiendas, 'TI', entityMaps.tiendas || {});
   const productCode = makeCodes(scoped.productos, 'PR', entityMaps.productos || {});
   const productMap = byIdMap(scoped.productos);
   const selectedEvent = scope === 'TODOS' ? null : scoped.eventos.find(e => String(e.id) === String(scope));
-  const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
+  const selectedCode = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.id || scope || '');
   const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
   const now = stamp();
   const totalCounts = countsFor(state);
@@ -529,7 +550,7 @@ export async function run(options = {}){
     ['VERSION_FICHERO', BACKUP_VERSION_FILE],
     ['FUENTE_DATOS', source],
     ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle],
-    ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode],
+    ['EVENTO_ID', scope === 'TODOS' ? 'TODOS' : selectedCode],
     ['FECHA_DESCARGA', `${now.yyyy}${now.mm}${now.dd}-${now.hh}_${now.mi}_${now.ss}`],
     ['REGISTROS_EVENTOS', scopedCounts.eventos],
     ['REGISTROS_PERSONAS', scopedCounts.personas],
@@ -537,6 +558,7 @@ export async function run(options = {}){
     ['REGISTROS_PRODUCTOS', scopedCounts.productos],
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
     ['REGISTROS_COMPRAS', scopedCounts.compras],
+    ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
     ['REGISTROS_TICKETS', scopedCounts.ticketImages],
     ['TOTAL_ORIGEN_EVENTOS', totalCounts.eventos],
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
@@ -544,7 +566,7 @@ export async function run(options = {}){
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
     ['NOTA', 'Exportacion generada con clonado plano y tickets divididos para evitar RangeError.']
   ]);
-  addRows('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+  addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
@@ -552,6 +574,13 @@ export async function run(options = {}){
   addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
   addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
   addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
+  addRows('DOCUMENTOS', ['EVENTO_CODIGO','DOC_CODIGO','DOC_ID','FECHA','DESCRIPCION','CLAVE_IMAGEN','FOTO_URL'], (scoped.eventDocuments || []).map(doc => {
+    const code = documentToken(doc?.codigo || doc?.imageKey || doc?.id);
+    const key = doc?.eventId && code ? `${doc.eventId}|${code}` : '';
+    const image = key ? (scoped.ticketImages?.[key] || '') : '';
+    const imageText = typeof image === 'object' ? (image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || image.dataUrl || image.base64 || '') : String(image || '');
+    return [eventCode[doc?.eventId] || doc?.eventId || '', code, doc?.id || key, doc?.fecha || '', doc?.descripcion || '', code, imageText || doc?.imageUrl || ''];
+  }));
   const ticketRows = [], partRows = [];
   Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
     const ticketPartsInfo = ticketBackupParts(fullKey, image, eventCode);
