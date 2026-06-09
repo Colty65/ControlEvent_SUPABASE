@@ -14854,17 +14854,18 @@ window.addCellNote = addCellNote;
     const body=$('comprasSummaryBody'); if(!body)return;
     let box=$('ceRoInfoV228');
     if(isRO()){
-      if(!box){box=document.createElement('div'); box.id='ceRoInfoV228'; box.className='ce-ro-info-v228'; box.textContent='Modo consulta: este usuario puede consultar Resumen, Cálculos por agrupación y Gráficas. No puede añadir, modificar ni eliminar datos ni fotos.'; body.insertBefore(box,body.firstChild);} 
+      if(!box){box=document.createElement('div'); box.id='ceRoInfoV228'; box.className='ce-ro-info-v228'; box.textContent='Modo consulta: este usuario puede consultar Resumen, Cálculos por agrupación, Documentos y Gráficas. No puede añadir, modificar ni eliminar datos ni fotos.'; body.insertBefore(box,body.firstChild);} 
     }else if(box){box.remove();}
   }
   function switchToAllowedForRO(){
     if(!isRO())return;
     try{
-      const resumen=$('tabResumen'), graficas=$('tabGraficas'), mapa=$('tabMapaProductos');
+      const resumen=$('tabResumen'), graficas=$('tabGraficas'), mapa=$('tabMapaProductos'), documentos=$('tabDocumentos');
       const currentResumen=resumen&&!resumen.classList.contains('hidden');
       const currentGraficas=graficas&&!graficas.classList.contains('hidden');
       const currentMapa=mapa&&!mapa.classList.contains('hidden');
-      if(!currentResumen && !currentGraficas && !currentMapa){
+      const currentDocumentos=documentos&&!documentos.classList.contains('hidden');
+      if(!currentResumen && !currentGraficas && !currentMapa && !currentDocumentos){
         if(typeof currentMainTab!=='undefined') currentMainTab='resumen';
         if(typeof render==='function') render();
       }

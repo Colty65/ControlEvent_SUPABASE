@@ -103,11 +103,15 @@
   }
   function tabFromButtonId(id){ return TAB_BY_BUTTON[String(id || '')] || ''; }
   function currentTab(){
+    const memorized = safe(() => window.__ceCurrentMainTab || '', '');
+    // v8.5.2: DOCUMENTOS es una pestaña añadida por parche. Renders legacy antiguos
+    // pueden tocar currentMainTab a ingresos/resumen; no deben sacar al usuario de DOCUMENTOS.
+    if(String(memorized) === 'documentos' && (!auth() || roleAllowsTab('documentos'))) return 'documentos';
+    const appTab = safe(() => window.ControlEventApp?.navigation?.currentMainTab || '', '');
+    if(String(appTab) === 'documentos' && (!auth() || roleAllowsTab('documentos'))) return 'documentos';
     const lexical = safe(() => (typeof currentMainTab !== 'undefined' ? currentMainTab : ''), '');
     if(TABS.includes(String(lexical))) return String(lexical);
-    const appTab = safe(() => window.ControlEventApp?.navigation?.currentMainTab || '', '');
     if(TABS.includes(String(appTab))) return String(appTab);
-    const memorized = safe(() => window.__ceCurrentMainTab || '', '');
     if(TABS.includes(String(memorized))) return String(memorized);
     const visible = TABS.find(tab => { const panel = $(PANEL_BY_TAB[tab]); return panel && !panel.classList.contains('hidden'); });
     return visible || 'ingresos';
@@ -675,7 +679,7 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      notice(isRO() ? 'Usuario RO: solo Resumen, Mapa de recursos y Gráficas.' : 'Opción no disponible para este usuario.');
+      notice(isRO() ? 'Usuario RO: solo Resumen, Mapa de recursos, Documentos y Gráficas.' : 'Opción no disponible para este usuario.');
       setTimeout(() => { try{ shell(); }catch(_){ } }, 0);
       return false;
     }

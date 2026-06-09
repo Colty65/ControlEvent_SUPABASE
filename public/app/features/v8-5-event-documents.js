@@ -35,7 +35,16 @@
   const selectedEvent = () => arr('eventos').find(e => String(e?.id || '') === selectedEventId()) || null;
   const isFinalized = () => String(selectedEvent()?.situacion || 'En curso').toLowerCase() === 'finalizado';
   const canMaintainDocs = () => canWrite() && !!selectedEvent() && !isFinalized();
-  const currentTab = () => String(getLexical('currentMainTab') || app()?.navigation?.currentMainTab || 'ingresos');
+  const currentTab = () => {
+    // v8.5.2: la pestaña DOCUMENTOS la manda el selector unificado (window.__ceCurrentMainTab).
+    // Algunos renders legacy cambian la variable lexical a INGRESOS/RESUMEN unos segundos después;
+    // si el selector unificado recuerda DOCUMENTOS, mantenemos DOCUMENTOS como fuente fiable.
+    const memorized = String(safe(() => window.__ceCurrentMainTab || '', '') || '');
+    const appTab = String(safe(() => app()?.navigation?.currentMainTab || '', '') || '');
+    const lexical = String(getLexical('currentMainTab') || '');
+    if(memorized === TAB || appTab === TAB || lexical === TAB) return TAB;
+    return lexical || appTab || memorized || 'ingresos';
+  };
   const docKey = (eventId, code) => `${String(eventId || '').trim()}|${String(code || '').trim().toUpperCase()}`;
   const docCode = value => {
     const m = String(value || '').toUpperCase().match(/DOC\s*(\d+)/);
@@ -295,9 +304,9 @@
     BUTTONS.forEach(id => $(id)?.classList.toggle('active', id === BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => el.classList.toggle('primary', el.dataset.target === BUTTON_ID));
     renderEventDocuments();
-    // v8.5 ajuste: varios parches legacy repintan la pestaña inicial unos segundos despues.
+    // v8.5.2: varios parches legacy repintan la pestaña inicial unos segundos despues.
     // Mientras Documentos siga siendo la pestaña activa, reaseguramos que no aparezca RESUMEN/INGRESOS encima.
-    [0,80,240,700,1500,3000].forEach(ms => setTimeout(() => { if(currentTab() === TAB) renderVisibility(); }, ms));
+    [0,80,240,700,1500,3000,6000,9000].forEach(ms => setTimeout(() => { if(currentTab() === TAB) renderVisibility(); }, ms));
     safe(() => document.body.classList.remove('mobile-drawer-open'), null);
   }
 
@@ -659,8 +668,43 @@
     document.head.appendChild(style);
   }
 
+
+  function installExclusiveObserver(){
+    if(window.__ceV85DocsExclusiveObserver) return;
+    window.__ceV85DocsExclusiveObserver = true;
+    let pending = false;
+    const enforce = () => {
+      pending = false;
+      if(currentTab() !== TAB) return;
+      setDocumentsExclusive(true);
+      const panel = $(PANEL_ID);
+      if(panel && selectedEvent() && canSee()){
+        panel.classList.remove('hidden');
+        panel.setAttribute('aria-hidden','false');
+      }
+    };
+    const schedule = () => {
+      if(currentTab() !== TAB || pending) return;
+      pending = true;
+      if(typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(enforce);
+      else setTimeout(enforce, 0);
+    };
+    try{
+      const obs = new MutationObserver(schedule);
+      PANELS.forEach(id => {
+        const el = $(id);
+        if(el) obs.observe(el, {attributes:true, attributeFilter:['class','style','aria-hidden']});
+      });
+      window.__ceV85DocsExclusiveObserverInstance = obs;
+    }catch(_){ }
+    ['controlevent:event-ready','controlevent:module-mounted','controlevent:modules-ready','controlevent:runtime-ready'].forEach(evt => {
+      window.addEventListener(evt, () => setTimeout(schedule, 0));
+    });
+  }
+
   function install(){
     injectStyle();
+    installExclusiveObserver();
     ensureStateShape();
     ensureMobileButton();
     patchRenderTabVisibility();
