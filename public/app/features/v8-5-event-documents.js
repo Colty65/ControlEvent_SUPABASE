@@ -127,23 +127,49 @@
     if(typeof fn === 'function') safe(() => fn(), null);
   }
 
+  function setDocumentsExclusive(active){
+    const on = !!active && currentTab() === TAB;
+    safe(() => document.body.classList.toggle('ce-docs-active-v85', on), null);
+    PANELS.forEach(id => {
+      const el = $(id);
+      if(!el) return;
+      if(on){
+        const shouldShow = id === PANEL_ID && !!selectedEvent() && canSee();
+        el.classList.toggle('hidden', !shouldShow);
+        el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if(shouldShow){
+          el.removeAttribute('data-ce-docs-hidden-v85');
+          el.style.removeProperty('display');
+          el.style.removeProperty('visibility');
+          el.style.removeProperty('pointer-events');
+        }else{
+          el.setAttribute('data-ce-docs-hidden-v85', '1');
+          el.style.setProperty('display', 'none', 'important');
+          el.style.setProperty('visibility', 'hidden', 'important');
+          el.style.setProperty('pointer-events', 'none', 'important');
+        }
+      }else if(el.getAttribute('data-ce-docs-hidden-v85') === '1'){
+        el.removeAttribute('data-ce-docs-hidden-v85');
+        el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('pointer-events');
+      }
+    });
+  }
+
   function renderVisibility(){
     const panel = $(PANEL_ID);
     const active = currentTab() === TAB;
     const hasEvent = !!selectedEvent();
     if(active){
-      // v8.5 ajuste: algunos refrescos tardios del legacy vuelven a mostrar INGRESOS/RESUMEN.
-      // Cuando Documentos es la pestaña activa, se fuerza una unica ventana visible.
-      PANELS.forEach(id => {
-        const el = $(id);
-        if(!el) return;
-        const shouldShow = id === PANEL_ID && hasEvent && canSee();
-        el.classList.toggle('hidden', !shouldShow);
-        el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
-      });
-    }else if(panel){
-      panel.classList.add('hidden');
-      panel.setAttribute('aria-hidden', 'true');
+      // v8.5.1: blindaje real contra repintados legacy que levantaban RESUMEN DE INGRESOS.
+      setDocumentsExclusive(true);
+    }else{
+      setDocumentsExclusive(false);
+      if(panel){
+        panel.classList.add('hidden');
+        panel.setAttribute('aria-hidden', 'true');
+      }
     }
     if(active){
       BUTTONS.forEach(id => {
@@ -265,13 +291,7 @@
   function openDocuments(){
     if(!canSee()) return;
     setCurrentTab(TAB);
-    PANELS.forEach(id => {
-      const el = $(id);
-      if(!el) return;
-      const shouldShow = id === PANEL_ID && !!selectedEvent();
-      el.classList.toggle('hidden', !shouldShow);
-      if(shouldShow) el.removeAttribute('aria-hidden');
-    });
+    setDocumentsExclusive(true);
     BUTTONS.forEach(id => $(id)?.classList.toggle('active', id === BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => el.classList.toggle('primary', el.dataset.target === BUTTON_ID));
     renderEventDocuments();
@@ -283,6 +303,7 @@
 
   function closeDocumentsIfOtherTab(){
     if(currentTab() !== TAB){
+      setDocumentsExclusive(false);
       const panel = $(PANEL_ID);
       if(panel) panel.classList.add('hidden');
       $(BUTTON_ID)?.classList.remove('active');
@@ -534,15 +555,9 @@
       safe(() => {
         const active = currentTab() === TAB;
         if(active){
-          const hasEvent = !!selectedEvent();
-          PANELS.forEach(id => {
-            const el = $(id);
-            if(!el) return;
-            const shouldShow = id === PANEL_ID && hasEvent && canSee();
-            el.classList.toggle('hidden', !shouldShow);
-            el.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
-          });
+          setDocumentsExclusive(true);
         }else{
+          setDocumentsExclusive(false);
           const panel = $(PANEL_ID);
           if(panel) panel.classList.add('hidden');
         }
@@ -624,6 +639,8 @@
     style.textContent = `
       #mainTabs.tabs{grid-template-columns:repeat(auto-fit,minmax(64px,1fr))!important;}
       #tabDocumentosBtn .tabicon{font-size:44px;line-height:1}
+      body.ce-docs-active-v85 #tabIngresos,body.ce-docs-active-v85 #tabDonaciones,body.ce-docs-active-v85 #tabCompras,body.ce-docs-active-v85 #tabMapaProductos,body.ce-docs-active-v85 #tabPlanificacionInicial,body.ce-docs-active-v85 #tabResumen,body.ce-docs-active-v85 #tabGraficas,body.ce-docs-active-v85 #maintenanceWrapper{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-docs-active-v85 #tabDocumentos{display:block!important;visibility:visible!important;pointer-events:auto!important;}
       .ce-docs-card{background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
       .ce-docs-form{display:grid;grid-template-columns:minmax(140px,.6fr) minmax(240px,1.6fr) minmax(190px,1fr) auto;gap:10px;align-items:end}
       .ce-docs-form-desc textarea{min-height:58px;resize:vertical}
@@ -668,6 +685,7 @@
     list: docsForEvent,
     nextCode: nextDocCode,
     openModal,
-    closeModal
+    closeModal,
+    releaseExclusive: () => setDocumentsExclusive(false)
   };
 })();

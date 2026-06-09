@@ -3006,6 +3006,73 @@ window.__ceDisableLegacyBarGraficas = true;
     }
     await downloadWorkbook(wb, backupFileName(scope, selectedTitle));
   }
+  function docCodeV85(value){
+    const m = up(value).match(/DOC\s*(\d+)/);
+    return m ? 'DOC' + String(Number(m[1])).padStart(2, '0') : '';
+  }
+  function documentosInfoEventoRowsV85(){
+    const evId = currentEventId();
+    const imgs = st().ticketImages || {};
+    const byCode = new Map();
+    rows('eventDocuments').forEach(doc => {
+      if(String(doc?.eventId || '') !== evId) return;
+      const code = docCodeV85(doc?.codigo || doc?.imageKey || doc?.id);
+      if(!code) return;
+      const key = `${evId}|${code}`;
+      byCode.set(code, {
+        code,
+        fecha: norm(doc?.fecha || ''),
+        descripcion: norm(doc?.descripcion || ''),
+        image: imgs[key] || doc?.imageUrl || doc?.fotoUrl || ''
+      });
+    });
+    Object.entries(imgs).forEach(([key, value]) => {
+      const raw = norm(key);
+      if(!raw.startsWith(evId + '|')) return;
+      const code = docCodeV85(raw.slice(evId.length + 1));
+      if(!code || byCode.has(code)) return;
+      byCode.set(code, {code, fecha:'', descripcion:'Documento del evento', image:value || ''});
+    });
+    return Array.from(byCode.values()).sort((a,b) => a.code.localeCompare(b.code, 'es', {numeric:true}));
+  }
+  async function addDocumentosInfoEventoV85(wb, x){
+    if(!wb || !x) return;
+    try{
+      if((wb.worksheets || []).some(ws => up(ws?.name) === 'DOCUMENTOS DEL EVENTO')) return;
+      const docs = documentosInfoEventoRowsV85();
+      const ws = x.sheet('DOCUMENTOS DEL EVENTO', [14,14,62,42,28]);
+      x.title(ws,1,'DOCUMENTOS DEL EVENTO',5);
+      const ev = currentEvent();
+      x.text(ws,2,1,'Evento','soft',true); ws.mergeCells(2,2,2,5); x.text(ws,2,2,ev?.titulo || ev?.id || '','soft',true);
+      x.headers(ws,4,['Código','Fecha','Descripción','Foto/URL','Imagen']);
+      let rr = 5;
+      if(!docs.length){
+        x.text(ws,rr,1,'Sin documentos','soft',true); ws.mergeCells(rr,2,rr,5); x.text(ws,rr,2,'No hay documentos DOCXX asociados a este evento.','soft');
+        ws.getRow(rr).height = 28;
+        return;
+      }
+      for(const doc of docs.slice(0, 80)){
+        const src = norm(doc.image || '');
+        x.text(ws,rr,1,doc.code || 'DOC');
+        x.text(ws,rr,2,doc.fecha || '');
+        x.text(ws,rr,3,doc.descripcion || '');
+        x.text(ws,rr,4,src);
+        x.text(ws,rr,5,src ? 'Imagen adjunta' : '');
+        ws.getRow(rr).height = src ? 78 : 28;
+        if(src && rr < 35){
+          const img = await sourceToData(src);
+          if(img && addImage(wb, ws, img, rr, 5, 160, 95)){
+            x.text(ws,rr,5,'');
+          }
+        }
+        rr++;
+      }
+      try{ ws.autoFilter = {from:{row:4,column:1}, to:{row:4,column:5}}; }catch(_){ }
+    }catch(error){
+      console.warn('[ControlEvent v8.5_prod] No se pudo añadir DOCUMENTOS DEL EVENTO al INFOEVENTO.', error);
+    }
+  }
+
   async function exportExcelV257(){
     const ev = currentEvent();
     if(!ev || !ev.id){ alert('Elige un evento antes de sacar INFOEVENTO.'); return; }
@@ -3086,6 +3153,7 @@ window.__ceDisableLegacyBarGraficas = true;
     x.text(wsGraf,2,1,'Evento','soft',true); wsGraf.mergeCells(2,2,2,7); x.text(wsGraf,2,2,ev.titulo || '','soft');
     addImage(wb, wsGraf, makeEventChart(), 3, 1, 1500, 775);
     for(let rr = 3; rr <= 40; rr++) wsGraf.getRow(rr).height = 20;
+    await addDocumentosInfoEventoV85(wb, x);
     // v27.7: las hojas RESUMEN_MODULAR y GRAFICAS_MODULAR fueron útiles para auditoría,
     // pero ya no se añaden al INFOEVENTO por defecto porque ensuciaban el libro final.
     // Se mantienen disponibles sólo como herramientas standalone desde consola.

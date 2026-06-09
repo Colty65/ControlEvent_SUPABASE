@@ -410,6 +410,20 @@
     let tab = currentTab();
     if(auth() && !roleAllowsTab(tab)) tab = setTab(defaultTabForRole(tab));
     const hasEvent = hasValidEvent();
+    const docsActive = hasEvent && tab === 'documentos' && roleAllowsTab('documentos');
+    try{ document.body.classList.toggle('ce-docs-active-v85', docsActive); }catch(_){ }
+    if(!docsActive){
+      try{ window.ControlEventDocumentsV85?.releaseExclusive?.(); }catch(_){ }
+      ['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas','maintenanceWrapper'].forEach(id => {
+        const el = $(id);
+        if(el && el.getAttribute('data-ce-docs-hidden-v85') === '1'){
+          el.removeAttribute('data-ce-docs-hidden-v85');
+          el.style.removeProperty('display');
+          el.style.removeProperty('visibility');
+          el.style.removeProperty('pointer-events');
+        }
+      });
+    }
     TABS.forEach(name => {
       const allowed = roleAllowsTab(name);
       const panel = $(PANEL_BY_TAB[name]);

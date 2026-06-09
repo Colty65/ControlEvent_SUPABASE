@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v8-5-prod';
+const CACHE_NAME = 'controlevent-shell-v8-5-prod-docfix-1';
 // V30.13: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
@@ -63,6 +63,7 @@ const SHELL_ASSETS = [
   '/app/features/v8-4-1-compras-tk50-used-colors.js',
   '/app/features/v8-4-1-backup-eventid-format.js',
   '/app/features/v8-5-event-documents.js',
+  '/app/features/v8-5-documentos-excel.js',
           '/app/features/v46-4-final-fixes.js',
   '/app/features/v46-7-final-fixes.js',
   '/app/features/v46-9-final-fixes.js',

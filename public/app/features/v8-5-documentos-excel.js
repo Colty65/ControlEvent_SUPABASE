@@ -82,9 +82,9 @@
     const ev = currentEvent();
     const docs = docsForSelectedEvent();
     if(!ev || !docs.length) return;
-    const existing = (wb.worksheets || []).find(ws => upper(ws?.name) === 'DOCUMENTOS');
+    const existing = (wb.worksheets || []).find(ws => upper(ws?.name) === 'DOCUMENTOS DEL EVENTO');
     if(existing) return;
-    const ws = wb.addWorksheet('DOCUMENTOS');
+    const ws = wb.addWorksheet('DOCUMENTOS DEL EVENTO');
     ws.properties.defaultRowHeight = 21;
     ws.columns = [
       {width:14}, {width:14}, {width:56}, {width:34}, {width:24}
