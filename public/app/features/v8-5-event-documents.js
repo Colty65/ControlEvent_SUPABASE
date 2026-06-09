@@ -36,9 +36,9 @@
   const isFinalized = () => String(selectedEvent()?.situacion || 'En curso').toLowerCase() === 'finalizado';
   const canMaintainDocs = () => canWrite() && !!selectedEvent() && !isFinalized();
   const currentTab = () => {
-    // v8.5.2: la pestaña DOCUMENTOS la manda el selector unificado (window.__ceCurrentMainTab).
-    // Algunos renders legacy cambian la variable lexical a INGRESOS/RESUMEN unos segundos después;
-    // si el selector unificado recuerda DOCUMENTOS, mantenemos DOCUMENTOS como fuente fiable.
+    // v8.5.3: DOCUMENTOS queda bloqueado como pestaña activa hasta que el usuario pulse otra pestaña.
+    // Varios parches legacy repintan INGRESOS/RESUMEN y pisan currentMainTab sin ser una acción real del usuario.
+    if(window.__ceDocsForceActiveV85 === true) return TAB;
     const memorized = String(safe(() => window.__ceCurrentMainTab || '', '') || '');
     const appTab = String(safe(() => app()?.navigation?.currentMainTab || '', '') || '');
     const lexical = String(getLexical('currentMainTab') || '');
@@ -136,9 +136,110 @@
     if(typeof fn === 'function') safe(() => fn(), null);
   }
 
+  function ensureDocumentPanelPlacement(){
+    const panel = $(PANEL_ID);
+    const main = document.querySelector('.app .main') || $('mainTabs')?.parentElement || null;
+    if(!panel || !main) return;
+    const noEvent = $('noEventMessage');
+    const tabs = $('mainTabs');
+    const anchor = noEvent || tabs;
+    if(anchor && anchor.parentElement === main && anchor.nextElementSibling !== panel){
+      try{ anchor.insertAdjacentElement('afterend', panel); }catch(_){ }
+    }
+  }
+
+  function releaseDocumentsLock(){
+    window.__ceDocsForceActiveV85 = false;
+    if(window.__ceDocsWatchdogV85){ clearInterval(window.__ceDocsWatchdogV85); window.__ceDocsWatchdogV85 = null; }
+    setDocumentsExclusive(false);
+  }
+
+  function hideForeignMainChildren(on){
+    const main = document.querySelector('.app .main') || $('mainTabs')?.parentElement || null;
+    if(!main) return;
+    Array.from(main.children || []).forEach(el => {
+      if(!el || !el.id) return;
+      const keep = el.id === 'mainTabs' || el.id === PANEL_ID;
+      if(on){
+        if(keep){
+          if(el.id === PANEL_ID){
+            el.removeAttribute('data-ce-docs-main-hidden-v85');
+            el.style.removeProperty('display');
+            el.style.removeProperty('visibility');
+            el.style.removeProperty('pointer-events');
+          }
+          return;
+        }
+        el.setAttribute('data-ce-docs-main-hidden-v85','1');
+        el.style.setProperty('display','none','important');
+        el.style.setProperty('visibility','hidden','important');
+        el.style.setProperty('pointer-events','none','important');
+      }else if(el.getAttribute('data-ce-docs-main-hidden-v85') === '1'){
+        el.removeAttribute('data-ce-docs-main-hidden-v85');
+        el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('pointer-events');
+      }
+    });
+  }
+
+  function hideForeignPhotoArtifacts(on){
+    const selectors = [
+      '#ceTooltipV21','#ceTooltipV181','#ceTooltipV190','#ceBudgetLiteTooltipV307',
+      '#summaryTiendaTicket .ticket-actions','#summaryTiendaTicket img.ticket-thumb',
+      '#collabList .ce-v509-receipt-field','#collabList .ce-v509-receipt-strip','#collabList .ce-v509-receipt-thumb',
+      '#collabList .ce-v465-receipt-strip','#collabList .ce-v465-receipt-thumb',
+      '.ce-v465-tip-thumb','.ce-v509-receipt-thumb','.ce-v465-receipt-thumb',
+      '.ce-v401-pc-ticket-thumb','img.ticket-thumb'
+    ];
+    const nodes = new Set();
+    selectors.forEach(sel => safe(() => document.querySelectorAll(sel).forEach(el => nodes.add(el)), null));
+    nodes.forEach(el => {
+      if(!el || el.closest?.('#' + PANEL_ID) || el.closest?.('#ceDocModalV85')) return;
+      if(on){
+        el.setAttribute('data-ce-docs-artifact-hidden-v85','1');
+        el.style.setProperty('display','none','important');
+        el.style.setProperty('visibility','hidden','important');
+        el.style.setProperty('pointer-events','none','important');
+        el.style.setProperty('opacity','0','important');
+      }else if(el.getAttribute('data-ce-docs-artifact-hidden-v85') === '1'){
+        el.removeAttribute('data-ce-docs-artifact-hidden-v85');
+        el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('pointer-events');
+        el.style.removeProperty('opacity');
+      }
+    });
+  }
+
+  function enableDocumentViewControls(){
+    document.querySelectorAll('#' + PANEL_ID + ' .ce-doc-thumb-btn,#' + PANEL_ID + ' [data-doc-open],#ceDocModalV85 button,#ceDocModalV85 .ce-doc-modal-close-v85').forEach(el => {
+      try{
+        el.disabled = false;
+        el.removeAttribute('disabled');
+        el.removeAttribute('aria-disabled');
+        el.classList.remove('locked','ce-v225-ro-disabled');
+        el.style.setProperty('pointer-events','auto','important');
+        el.style.setProperty('opacity','1','important');
+        el.style.setProperty('filter','none','important');
+      }catch(_){ }
+    });
+  }
+
+  function startDocumentsWatchdog(){
+    if(window.__ceDocsWatchdogV85) return;
+    window.__ceDocsWatchdogV85 = setInterval(() => {
+      if(window.__ceDocsForceActiveV85 === true) setDocumentsExclusive(true);
+    }, window.ControlEventLowResource?.interval?.(420) || 420);
+  }
+
   function setDocumentsExclusive(active){
+    ensureDocumentPanelPlacement();
     const on = !!active && currentTab() === TAB;
     safe(() => document.body.classList.toggle('ce-docs-active-v85', on), null);
+    hideForeignMainChildren(on);
+    hideForeignPhotoArtifacts(on);
+    if(on) enableDocumentViewControls();
     PANELS.forEach(id => {
       const el = $(id);
       if(!el) return;
@@ -289,9 +390,15 @@
           </div>
         </div>`;
     }).join('');
+    enableDocumentViewControls();
   }
 
   function setCurrentTab(value){
+    if(value === TAB){
+      window.__ceDocsForceActiveV85 = true;
+      window.__ceDocsLastOpenAtV85 = Date.now();
+      startDocumentsWatchdog();
+    }
     setLexical('currentMainTab', value);
     safe(() => { if(app()?.navigation) app().navigation.currentMainTab = value; }, null);
     window.__ceCurrentMainTab = value;
@@ -300,6 +407,8 @@
   function openDocuments(){
     if(!canSee()) return;
     setCurrentTab(TAB);
+    ensureDocumentPanelPlacement();
+    startDocumentsWatchdog();
     setDocumentsExclusive(true);
     BUTTONS.forEach(id => $(id)?.classList.toggle('active', id === BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => el.classList.toggle('primary', el.dataset.target === BUTTON_ID));
@@ -621,7 +730,13 @@
     if(save){ event.preventDefault(); event.stopPropagation(); saveDoc(save.dataset.docSave); return false; }
     const del = target.closest('[data-doc-delete]');
     if(del){ event.preventDefault(); event.stopPropagation(); deleteDoc(del.dataset.docDelete).catch(error => { alert('No se pudo eliminar el documento: ' + (error?.message || error)); status('Error eliminando documento.', 'bad'); }); return false; }
-    if(target.closest('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabMapaBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabMapaBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"]')){
+    const otherTab = target.closest('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabMapaBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabMapaBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"]');
+    if(otherTab){
+      window.__ceDocsForceActiveV85 = false;
+      const rawId = otherTab.id || otherTab.dataset?.target || '';
+      const map = {tabIngresosBtn:'ingresos',tabDonacionesBtn:'donaciones',tabComprasBtn:'compras',tabMapaBtn:'mapa',tabResumenBtn:'resumen',tabGraficasBtn:'graficas'};
+      const next = map[rawId] || '';
+      if(next) setCurrentTab(next);
       setTimeout(closeDocumentsIfOtherTab, 0);
       setTimeout(renderVisibility, 120);
     }
@@ -648,8 +763,11 @@
     style.textContent = `
       #mainTabs.tabs{grid-template-columns:repeat(auto-fit,minmax(64px,1fr))!important;}
       #tabDocumentosBtn .tabicon{font-size:44px;line-height:1}
-      body.ce-docs-active-v85 #tabIngresos,body.ce-docs-active-v85 #tabDonaciones,body.ce-docs-active-v85 #tabCompras,body.ce-docs-active-v85 #tabMapaProductos,body.ce-docs-active-v85 #tabPlanificacionInicial,body.ce-docs-active-v85 #tabResumen,body.ce-docs-active-v85 #tabGraficas,body.ce-docs-active-v85 #maintenanceWrapper{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-docs-active-v85 .main > :not(#mainTabs):not(#tabDocumentos){display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-docs-active-v85 #tabIngresos,body.ce-docs-active-v85 #tabDonaciones,body.ce-docs-active-v85 #tabCompras,body.ce-docs-active-v85 #tabMapaProductos,body.ce-docs-active-v85 #tabPlanificacionInicial,body.ce-docs-active-v85 #tabResumen,body.ce-docs-active-v85 #tabGraficas,body.ce-docs-active-v85 #maintenanceWrapper,body.ce-docs-active-v85 #collabList,body.ce-docs-active-v85 #summaryTiendaTicket,body.ce-docs-active-v85 #ceBudgetLiteTooltipV307,body.ce-docs-active-v85 #ceTooltipV21,body.ce-docs-active-v85 #ceTooltipV181,body.ce-docs-active-v85 #ceTooltipV190{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-docs-active-v85 .ce-v509-receipt-thumb,body.ce-docs-active-v85 .ce-v465-receipt-thumb,body.ce-docs-active-v85 .ce-v465-tip-thumb,body.ce-docs-active-v85 img.ticket-thumb{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;}
       body.ce-docs-active-v85 #tabDocumentos{display:block!important;visibility:visible!important;pointer-events:auto!important;}
+      body.ce-docs-active-v85 #tabDocumentos .ce-doc-thumb-btn,body.ce-docs-active-v85 #tabDocumentos [data-doc-open],body.ce-docs-active-v85 #ceDocModalV85 button{pointer-events:auto!important;opacity:1!important;filter:none!important;}
       .ce-docs-card{background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
       .ce-docs-form{display:grid;grid-template-columns:minmax(140px,.6fr) minmax(240px,1.6fr) minmax(190px,1fr) auto;gap:10px;align-items:end}
       .ce-docs-form-desc textarea{min-height:58px;resize:vertical}
@@ -695,6 +813,8 @@
         const el = $(id);
         if(el) obs.observe(el, {attributes:true, attributeFilter:['class','style','aria-hidden']});
       });
+      const main = document.querySelector('.app .main');
+      if(main) obs.observe(main, {childList:true, subtree:true, attributes:true, attributeFilter:['class','style','aria-hidden','disabled']});
       window.__ceV85DocsExclusiveObserverInstance = obs;
     }catch(_){ }
     ['controlevent:event-ready','controlevent:module-mounted','controlevent:modules-ready','controlevent:runtime-ready'].forEach(evt => {
@@ -705,6 +825,7 @@
   function install(){
     injectStyle();
     installExclusiveObserver();
+    ensureDocumentPanelPlacement();
     ensureStateShape();
     ensureMobileButton();
     patchRenderTabVisibility();
