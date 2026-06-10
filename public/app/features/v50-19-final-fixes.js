@@ -19,9 +19,9 @@
   const DOCK_ID = 'ceMobileActionDockV518';
   const STYLE_ID = 'ceV5019FinalStyle';
   const BUDGET_TIP_ID = 'ceBudgetLiteTooltipV307';
-  const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
-  const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
-  const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
+  const TABS = ['ingresos','donaciones','compras','mapa','documentos','planificacion','resumen','graficas'];
+  const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',documentos:'tabDocumentos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
+  const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',documentos:'tabDocumentosBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
   const CHOSEN_KEYS = ['controlevent_v44_event_chosen_after_login','ControlEvent_v8_5_prod_event_chosen','ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event'];
   const AWAITING_CLASSES = ['ce-v44-awaiting-event','ce-v5013-force-event-choice','ce-v5015-awaiting-event','ce-v5017-awaiting-event','ce-v5019-awaiting-event'];
   const OLD_DOCKS = ['ceMobileActionDockV508','ceMobileActionDockV514','ceMobileActionDockV517'];
@@ -110,7 +110,7 @@
   function rememberEvent(id){ if(hasValidEvent(id)){ safe(() => sessionStorage.setItem(SELECT_KEY, String(id)), null); safe(() => localStorage.setItem(SELECT_KEY, String(id)), null); } }
   function roleAllowsTab(tab){
     if(!auth()) return false;
-    if(isRO()) return ['resumen','mapa','graficas'].includes(String(tab || ''));
+    if(isRO()) return ['resumen','mapa','documentos','graficas'].includes(String(tab || ''));
     if(String(tab || '') === 'planificacion') return role() === 'GD';
     return TABS.includes(String(tab || ''));
   }
@@ -283,15 +283,20 @@
   function renderActiveTab(tab){
     if(!hasValidEvent()) return;
     const active = setTab(tab || currentTab());
-    try{ window.ControlEventV447?.renderActive?.(active); }
-    catch(_){
+    if(active === 'documentos'){
       call('renderHeader'); call('renderMainSelectors');
-      if(active === 'ingresos'){ call('renderIngresosSummary'); call('renderColabs'); }
-      else if(active === 'donaciones') call('renderDonaciones');
-      else if(active === 'compras') call('renderCompras');
-      else if(active === 'resumen') call('renderBudget');
-      else if(active === 'graficas') call('renderGraficas', [{force:true, reason:'v50.19'}]);
-      else if(active === 'mapa') call('renderMapaProductos');
+      safe(() => window.ControlEventDocumentsV85?.open?.(), null);
+    }else{
+      try{ window.ControlEventV447?.renderActive?.(active); }
+      catch(_){
+        call('renderHeader'); call('renderMainSelectors');
+        if(active === 'ingresos'){ call('renderIngresosSummary'); call('renderColabs'); }
+        else if(active === 'donaciones') call('renderDonaciones');
+        else if(active === 'compras') call('renderCompras');
+        else if(active === 'resumen') call('renderBudget');
+        else if(active === 'graficas') call('renderGraficas', [{force:true, reason:'v50.19'}]);
+        else if(active === 'mapa') call('renderMapaProductos');
+      }
     }
     if(active === 'resumen') hydrateBudgetTips('render-active');
     applyVersion(); ensureMobileDock();
@@ -405,7 +410,7 @@
       }
     }, true);
     document.addEventListener('click', ev => {
-      const btn = ev.target?.closest?.('#tabResumenBtn,#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabGraficasBtn,#tabMapaBtn');
+      const btn = ev.target?.closest?.('#tabResumenBtn,#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabGraficasBtn,#tabMapaBtn,#tabDocumentosBtn');
       if(btn) [120,420,900].forEach(ms => setTimeout(() => { if(hasValidEvent()) { renderActiveTab(currentTab()); hydrateBudgetTips('tab-click'); } }, ms));
     }, true);
     document.addEventListener('keydown', ev => { if(ev.key === 'Escape'){ const m=document.querySelector('.ce-v468-modal'); if(m){ stop(ev); m.remove(); return false; } const b=$(BUDGET_TIP_ID); if(b?.classList.contains('open')) return closeBudgetTooltip(ev); } }, true);

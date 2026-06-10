@@ -13,9 +13,9 @@
 
   const STYLE_ID = 'ceV5020FinalStyle';
   const BUDGET_TIP_ID = 'ceBudgetLiteTooltipV307';
-  const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
-  const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
-  const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
+  const TABS = ['ingresos','donaciones','compras','mapa','documentos','planificacion','resumen','graficas'];
+  const PANEL_BY_TAB = {ingresos:'tabIngresos',donaciones:'tabDonaciones',compras:'tabCompras',mapa:'tabMapaProductos',documentos:'tabDocumentos',planificacion:'tabPlanificacionInicial',resumen:'tabResumen',graficas:'tabGraficas'};
+  const BUTTON_BY_TAB = {ingresos:'tabIngresosBtn',donaciones:'tabDonacionesBtn',compras:'tabComprasBtn',mapa:'tabMapaBtn',documentos:'tabDocumentosBtn',planificacion:'tabPlanificacionBtn',resumen:'tabResumenBtn',graficas:'tabGraficasBtn'};
 
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -36,7 +36,7 @@
   const roleAllowsTab = tab => {
     const t = String(tab || '');
     if(!auth()) return false;
-    if(isRO()) return ['resumen','mapa','graficas'].includes(t);
+    if(isRO()) return ['resumen','mapa','documentos','graficas'].includes(t);
     if(t === 'planificacion') return role() === 'GD';
     return TABS.includes(t);
   };
@@ -73,7 +73,8 @@
       body.ce-v5020-has-event #tabIngresos:not(.hidden),
       body.ce-v5020-has-event #tabDonaciones:not(.hidden),
       body.ce-v5020-has-event #tabCompras:not(.hidden),
-      body.ce-v5020-has-event #tabMapaProductos:not(.hidden){display:block!important;}
+      body.ce-v5020-has-event #tabMapaProductos:not(.hidden),
+      body.ce-v5020-has-event #tabDocumentos:not(.hidden){display:block!important;}
       .ce-v468-modal{position:fixed!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:650000!important;background:rgba(15,23,42,.74)!important;}
       .ce-v468-modal-card{position:relative!important;z-index:650001!important;}
       .ce-v468-modal-img{display:block!important;visibility:visible!important;opacity:1!important;}
@@ -165,17 +166,22 @@
   function renderActiveOnly(tab, reason){
     if(!hasValidEvent()) return;
     const active = showOnlyTab(tab || currentTab());
-    try{ window.ControlEventV447?.renderActive?.(active); }
-    catch(error){
-      console.warn('[v50.20] renderActive fallback', error);
+    if(active === 'documentos'){
       call('renderHeader'); call('renderMainSelectors');
-      if(active === 'ingresos'){ call('renderIngresosSummary'); call('renderColabs'); }
-      else if(active === 'donaciones') call('renderDonaciones');
-      else if(active === 'compras') call('renderCompras');
-      else if(active === 'resumen') call('renderBudget');
-      else if(active === 'graficas') call('renderGraficas', [{force:true, reason:reason || 'v50.20'}]);
-      else if(active === 'mapa') call('renderMapaProductos');
-      else if(active === 'planificacion') { try{ window.showPlanificacionInicial?.(); }catch(_){ } }
+      safe(() => window.ControlEventDocumentsV85?.open?.(), null);
+    }else{
+      try{ window.ControlEventV447?.renderActive?.(active); }
+      catch(error){
+        console.warn('[v50.20] renderActive fallback', error);
+        call('renderHeader'); call('renderMainSelectors');
+        if(active === 'ingresos'){ call('renderIngresosSummary'); call('renderColabs'); }
+        else if(active === 'donaciones') call('renderDonaciones');
+        else if(active === 'compras') call('renderCompras');
+        else if(active === 'resumen') call('renderBudget');
+        else if(active === 'graficas') call('renderGraficas', [{force:true, reason:reason || 'v50.20'}]);
+        else if(active === 'mapa') call('renderMapaProductos');
+        else if(active === 'planificacion') { try{ window.showPlanificacionInicial?.(); }catch(_){ } }
+      }
     }
     clearWelcome();
     [60,180,420,900,1600].forEach(ms => setTimeout(() => hydrateAfterRender(reason || 'render-active'), ms));

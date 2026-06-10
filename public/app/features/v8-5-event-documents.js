@@ -239,7 +239,7 @@
     safe(() => document.body.classList.toggle('ce-docs-active-v85', on), null);
     hideForeignMainChildren(on);
     hideForeignPhotoArtifacts(on);
-    if(on) enableDocumentViewControls();
+    if(on){ enableDocumentViewControls(); ensureMobileActionsV85(); }
     PANELS.forEach(id => {
       const el = $(id);
       if(!el) return;
@@ -306,6 +306,7 @@
       el.setAttribute('aria-hidden', visible ? 'false' : 'true');
     });
     if(active && hasEvent && canSee()) renderEventDocuments();
+    ensureMobileActionsV85();
   }
 
   function applyVersion(){
@@ -336,9 +337,9 @@
     wrap.innerHTML = `
       <div class="ce-docs-form entry-zone">
         <div class="field"><label>Fecha</label><input id="eventDocNewFecha" type="date" value="${esc(todayIso())}" /></div>
-        <div class="field ce-docs-form-desc"><label>Texto descriptivo</label><textarea id="eventDocNewDescripcion" rows="2" placeholder="Ej. Solicitud presentada al Ayuntamiento, permiso de ocupación, seguro, autorización..."></textarea></div>
+        <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="1" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
         <div class="field"><label>Foto/documento</label><input id="eventDocNewFile" type="file" accept="image/*" /></div>
-        <div class="field"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir DOC</button></div>
+        <div class="field"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
       </div>`;
   }
 
@@ -366,13 +367,13 @@
       const code = esc(doc.codigo || 'DOC');
       const id = esc(doc.id || `${doc.eventId}|${doc.codigo}`);
       const thumb = img
-        ? `<button type="button" class="ce-doc-thumb-btn" data-doc-open="${id}" title="Ampliar ${code}"><img class="ce-doc-thumb" src="${esc(img)}" alt="${code}" loading="lazy" /></button>`
+        ? `<span class="ce-doc-thumb-btn" role="button" tabindex="0" data-doc-open="${id}" title="Ampliar documento"><img class="ce-doc-thumb" src="${esc(img)}" alt="Documento" loading="lazy" /></span>`
         : '<div class="ce-doc-noimage">Sin foto</div>';
       const actions = editable && !doc.recovered ? `
           <button type="button" class="outline small" data-doc-replace="${id}">📎 Reemplazar foto</button>
           ${img ? `<button type="button" class="outline small" data-doc-remove-image="${id}">🗑️ Eliminar foto</button>` : ''}
           <button type="button" class="modify small" data-doc-save="${id}">Modificar</button>
-          <button type="button" class="danger small" data-doc-delete="${id}">Eliminar DOC</button>
+          <button type="button" class="danger small" data-doc-delete="${id}">Eliminar</button>
           <input class="ce-doc-file-input" type="file" accept="image/*" data-doc-upload-input="${id}" />`
         : (doc.recovered ? '<span class="readonly-note">Recuperado desde foto; añade metadatos creando de nuevo si necesitas editarlo.</span>' : '<span class="readonly-note">Solo lectura</span>');
       return `
@@ -380,10 +381,9 @@
           <div class="ce-doc-item-grid">
             <div class="ce-doc-media">${thumb}</div>
             <div class="ce-doc-data">
-              <div class="ce-doc-head"><span class="ce-doc-code">${code}</span><span class="ce-doc-date-label">${esc(formatDate(doc.fecha))}</span></div>
               <div class="ce-doc-fields">
                 <div class="field"><label>Fecha</label><input type="date" value="${esc(doc.fecha || '')}" data-doc-field="fecha" data-doc-id="${id}" ${disabled} /></div>
-                <div class="field ce-doc-desc-field"><label>Texto descriptivo</label><textarea rows="2" data-doc-field="descripcion" data-doc-id="${id}" ${readonlyText} ${disabled}>${esc(doc.descripcion || '')}</textarea></div>
+                <div class="field ce-doc-desc-field"><label>&nbsp;</label><textarea rows="1" data-doc-field="descripcion" data-doc-id="${id}" ${readonlyText} ${disabled}>${esc(doc.descripcion || '')}</textarea></div>
               </div>
               <div class="ce-doc-actions">${actions}</div>
             </div>
@@ -500,7 +500,7 @@
     if(!descripcion){ alert('Introduce un texto descriptivo.'); return; }
     if(!file){ alert('Adjunta una foto del documento.'); return; }
     const code = nextDocCode(eventId);
-    status('Preparando ' + code + '...', 'working');
+    status('Preparando documento...', 'working');
     let dataUrl = await fileToCompressedDataUrl(file);
     let imageUrl = dataUrl;
     try{
@@ -527,7 +527,7 @@
     });
     saveNow();
     renderEventDocuments();
-    status(code + ' añadido correctamente.', 'ok');
+    status('Documento añadido correctamente.', 'ok');
   }
 
   async function replaceImage(docId, file){
@@ -535,7 +535,7 @@
     if(!doc || !canMaintainDocs()) return;
     if(!file) return;
     const code = docCode(doc.codigo || doc.imageKey);
-    status('Actualizando foto de ' + code + '...', 'working');
+    status('Actualizando foto del documento...', 'working');
     let dataUrl = await fileToCompressedDataUrl(file);
     let imageUrl = dataUrl;
     try{
@@ -553,15 +553,15 @@
     doc.updatedAt = new Date().toISOString();
     saveNow();
     renderEventDocuments();
-    status('Foto de ' + code + ' actualizada.', 'ok');
+    status('Foto del documento actualizada.', 'ok');
   }
 
   async function removeImage(docId){
     const doc = findDoc(docId);
     if(!doc || !canMaintainDocs()) return;
     const code = docCode(doc.codigo || doc.imageKey);
-    if(!confirm('¿Eliminar solo la foto de ' + code + '? Se mantiene la ficha del documento.')) return;
-    status('Eliminando foto de ' + code + '...', 'working');
+    if(!confirm('¿Eliminar solo la foto? Se mantiene la ficha del documento.')) return;
+    status('Eliminando foto del documento...', 'working');
     await deleteDocumentImage(doc.eventId, code).catch(error => {
       console.warn('[ControlEvent v8.5_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
       throw error;
@@ -572,15 +572,15 @@
     doc.updatedAt = new Date().toISOString();
     saveNow();
     renderEventDocuments();
-    status('Foto de ' + code + ' eliminada.', 'ok');
+    status('Foto del documento eliminada.', 'ok');
   }
 
   async function deleteDoc(docId){
     const doc = findDoc(docId);
     if(!doc || !canMaintainDocs()) return;
     const code = docCode(doc.codigo || doc.imageKey);
-    if(!confirm('¿Eliminar definitivamente ' + code + ' y su foto?')) return;
-    status('Eliminando ' + code + '...', 'working');
+    if(!confirm('¿Eliminar definitivamente este documento y su foto?')) return;
+    status('Eliminando documento...', 'working');
     if(imageFor(doc)){
       await deleteDocumentImage(doc.eventId, code).catch(error => {
         console.warn('[ControlEvent v8.5_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
@@ -592,7 +592,7 @@
     s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== String(docId));
     saveNow();
     renderEventDocuments();
-    status(code + ' eliminado.', 'ok');
+    status('Documento eliminado.', 'ok');
   }
 
   function saveDoc(docId){
@@ -608,7 +608,7 @@
     doc.updatedAt = new Date().toISOString();
     saveNow();
     renderEventDocuments();
-    status((doc.codigo || 'DOC') + ' modificado.', 'ok');
+    status('Documento modificado.', 'ok');
   }
 
   function ensureModal(){
@@ -619,7 +619,7 @@
     modal.className = 'ce-doc-modal-v85';
     modal.innerHTML = `
       <div class="ce-doc-modal-box-v85">
-        <button type="button" class="ce-doc-modal-close-v85" aria-label="Cerrar">×</button>
+        <div class="ce-doc-modal-close-v85" role="button" tabindex="0" aria-label="Cerrar">×</div>
         <div class="ce-doc-modal-info-v85"></div>
         <div class="ce-doc-modal-imgwrap-v85"><img alt="Documento del evento" /></div>
       </div>`;
@@ -636,7 +636,7 @@
     if(!src) return;
     const modal = ensureModal();
     modal.querySelector('img').src = src;
-    modal.querySelector('.ce-doc-modal-info-v85').innerHTML = `<strong>${esc(doc.codigo || 'DOC')}</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p>`;
+    modal.querySelector('.ce-doc-modal-info-v85').innerHTML = `<strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p>`;
     modal.classList.add('visible');
     document.body.classList.add('ce-doc-modal-open-v85');
   }
@@ -707,6 +707,20 @@
     document.body?.classList.toggle('ce-docs-role-gd-v85', role() === 'GD');
   }
 
+  let lastDocOpenV85 = {id:'', at:0};
+  function openDocFromEvent(event){
+    const open = event?.target?.closest?.('[data-doc-open]');
+    if(!open) return false;
+    const id = String(open.dataset.docOpen || '');
+    if(!id) return false;
+    try{ event.preventDefault?.(); event.stopPropagation?.(); event.stopImmediatePropagation?.(); }catch(_){ }
+    const now = Date.now();
+    if(lastDocOpenV85.id === id && now - lastDocOpenV85.at < 480) return true;
+    lastDocOpenV85 = {id, at: now};
+    openModal(id);
+    return true;
+  }
+
   function handleClick(event){
     const target = event.target;
     if(!target?.closest) return;
@@ -720,8 +734,7 @@
       addDocument().catch(error => { console.error(error); alert('No se pudo añadir el documento: ' + (error?.message || error)); status('Error añadiendo documento.', 'bad'); });
       return false;
     }
-    const open = target.closest('[data-doc-open]');
-    if(open){ event.preventDefault(); openModal(open.dataset.docOpen); return false; }
+    if(openDocFromEvent(event)) return false;
     const repl = target.closest('[data-doc-replace]');
     if(repl){ event.preventDefault(); const input = document.querySelector(`input[data-doc-upload-input="${cssEscape(repl.dataset.docReplace)}"]`); input?.click(); return false; }
     const remImg = target.closest('[data-doc-remove-image]');
@@ -767,21 +780,21 @@
       body.ce-docs-active-v85 #tabIngresos,body.ce-docs-active-v85 #tabDonaciones,body.ce-docs-active-v85 #tabCompras,body.ce-docs-active-v85 #tabMapaProductos,body.ce-docs-active-v85 #tabPlanificacionInicial,body.ce-docs-active-v85 #tabResumen,body.ce-docs-active-v85 #tabGraficas,body.ce-docs-active-v85 #maintenanceWrapper,body.ce-docs-active-v85 #collabList,body.ce-docs-active-v85 #summaryTiendaTicket,body.ce-docs-active-v85 #ceBudgetLiteTooltipV307,body.ce-docs-active-v85 #ceTooltipV21,body.ce-docs-active-v85 #ceTooltipV181,body.ce-docs-active-v85 #ceTooltipV190{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       body.ce-docs-active-v85 .ce-v509-receipt-thumb,body.ce-docs-active-v85 .ce-v465-receipt-thumb,body.ce-docs-active-v85 .ce-v465-tip-thumb,body.ce-docs-active-v85 img.ticket-thumb{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;}
       body.ce-docs-active-v85 #tabDocumentos{display:block!important;visibility:visible!important;pointer-events:auto!important;}
-      body.ce-docs-active-v85 #tabDocumentos .ce-doc-thumb-btn,body.ce-docs-active-v85 #tabDocumentos [data-doc-open],body.ce-docs-active-v85 #ceDocModalV85 button{pointer-events:auto!important;opacity:1!important;filter:none!important;}
+      body.ce-docs-active-v85 #tabDocumentos .ce-doc-thumb-btn,body.ce-docs-active-v85 #tabDocumentos [data-doc-open],body.ce-docs-active-v85 #ceDocModalV85 .ce-doc-modal-close-v85{pointer-events:auto!important;opacity:1!important;filter:none!important;}
       .ce-docs-card{background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
-      .ce-docs-form{display:grid;grid-template-columns:minmax(140px,.6fr) minmax(240px,1.6fr) minmax(190px,1fr) auto;gap:10px;align-items:end}
-      .ce-docs-form-desc textarea{min-height:58px;resize:vertical}
+      .ce-docs-form{display:grid;grid-template-columns:minmax(120px,.45fr) minmax(380px,2.8fr) minmax(190px,.8fr) auto;gap:10px;align-items:end}
+      .ce-docs-form-desc textarea{min-height:42px;resize:vertical}
       .ce-docs-status{margin:0 0 12px 0;padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid var(--border);font-weight:800;font-size:13px;color:#334155;white-space:pre-wrap}
       .ce-docs-status.ok{background:#ecfdf5;border-color:#bbf7d0;color:#047857}.ce-docs-status.bad{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.ce-docs-status.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}.ce-docs-status.working{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
       .ce-docs-note{padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid var(--border);font-size:13px;font-weight:800;color:#334155}.ce-docs-note.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
-      .ce-docs-list{display:grid;gap:12px}.ce-doc-item{border:1px solid #dbe8f5;background:#fff}.ce-doc-item-grid{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start}
-      .ce-doc-media{display:flex;align-items:center;justify-content:center;min-height:112px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:18px;overflow:hidden}.ce-doc-thumb-btn{border:0;background:transparent;padding:0;cursor:zoom-in}.ce-doc-thumb{display:block;width:138px;height:104px;object-fit:cover;border-radius:14px;border:1px solid #dbe2ea;box-shadow:0 6px 20px rgba(15,23,42,.12)}.ce-doc-noimage{font-size:12px;color:#64748b;font-weight:900}
-      .ce-doc-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.ce-doc-code{display:inline-flex;align-items:center;justify-content:center;min-width:68px;border-radius:999px;background:#111827;color:#fff;padding:6px 10px;font-weight:950;letter-spacing:.04em}.ce-doc-date-label{font-size:12px;color:#64748b;font-weight:900;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:5px 9px}
-      .ce-doc-fields{display:grid;grid-template-columns:minmax(130px,.55fr) minmax(260px,1.8fr);gap:10px}.ce-doc-desc-field textarea{min-height:58px;resize:vertical}.ce-doc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}.ce-doc-file-input{display:none!important}
-      .ce-doc-modal-v85{position:fixed;inset:0;z-index:5600;background:rgba(15,23,42,.68);display:none;align-items:center;justify-content:center;padding:18px}.ce-doc-modal-v85.visible{display:flex}.ce-doc-modal-box-v85{position:relative;width:min(1180px,96vw);max-height:94vh;background:#fff;border-radius:22px;border:1px solid rgba(15,23,42,.18);box-shadow:0 24px 80px rgba(0,0,0,.36);padding:16px;display:grid;grid-template-columns:minmax(230px,.55fr) minmax(320px,1.45fr);gap:16px;align-items:start}.ce-doc-modal-close-v85{position:absolute;right:10px;top:8px;background:#111827!important;color:#fff!important;border-radius:999px!important;width:38px;height:38px;padding:0!important;font-size:24px;line-height:1}.ce-doc-modal-info-v85{background:#f8fafc;border:1px solid #dbe2ea;border-radius:16px;padding:12px;max-height:84vh;overflow:auto}.ce-doc-modal-info-v85 strong{display:block;font-size:20px;margin-bottom:4px}.ce-doc-modal-info-v85 span{display:inline-block;margin-bottom:10px;color:#64748b;font-weight:900}.ce-doc-modal-info-v85 p{white-space:pre-wrap;line-height:1.35;margin:0}.ce-doc-modal-imgwrap-v85{max-height:86vh;overflow:auto;display:flex;align-items:flex-start;justify-content:center}.ce-doc-modal-imgwrap-v85 img{max-width:100%;height:auto;border-radius:14px;border:1px solid #dbe2ea;box-shadow:0 10px 34px rgba(15,23,42,.18)}
+      .ce-docs-list{display:grid;gap:8px}.ce-doc-item{border:1px solid #dbe8f5;background:#fff}.ce-doc-item:nth-child(odd){background:#eef7ff}.ce-doc-item:nth-child(even){background:#fff}.ce-doc-item-grid{display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:start}
+      .ce-doc-media{display:flex;align-items:center;justify-content:center;min-height:52px;background:rgba(248,250,252,.72);border:1px dashed #cbd5e1;border-radius:12px;overflow:hidden}.ce-doc-thumb-btn{display:inline-flex;border:0;background:transparent;padding:0;cursor:zoom-in;touch-action:manipulation}.ce-doc-thumb{display:block;width:44px;height:44px;max-width:44px;max-height:44px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(15,23,42,.10)}.ce-doc-noimage{font-size:11px;color:#64748b;font-weight:900;text-align:center}
+      .ce-doc-head,.ce-doc-code,.ce-doc-date-label{display:none!important}
+      .ce-doc-fields{display:grid;grid-template-columns:minmax(130px,.30fr) minmax(420px,1.70fr);gap:10px}.ce-doc-desc-field textarea{min-height:40px;resize:vertical}.ce-doc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}.ce-doc-file-input{display:none!important}
+      .ce-doc-modal-v85{position:fixed;inset:0;z-index:5600;background:rgba(15,23,42,.68);display:none;align-items:center;justify-content:center;padding:18px}.ce-doc-modal-v85.visible{display:flex}.ce-doc-modal-box-v85{position:relative;width:min(1180px,96vw);max-height:94vh;background:#fff;border-radius:22px;border:1px solid rgba(15,23,42,.18);box-shadow:0 24px 80px rgba(0,0,0,.36);padding:16px;display:grid;grid-template-columns:minmax(230px,.55fr) minmax(320px,1.45fr);gap:16px;align-items:start}.ce-doc-modal-close-v85{position:absolute;right:10px;top:8px;background:#111827!important;color:#fff!important;border-radius:999px!important;width:38px;height:38px;padding:0!important;font-size:24px;line-height:38px;text-align:center;cursor:pointer;touch-action:manipulation;user-select:none}.ce-doc-modal-info-v85{background:#f8fafc;border:1px solid #dbe2ea;border-radius:16px;padding:12px;max-height:84vh;overflow:auto}.ce-doc-modal-info-v85 strong{display:block;font-size:20px;margin-bottom:4px}.ce-doc-modal-info-v85 span{display:inline-block;margin-bottom:10px;color:#64748b;font-weight:900}.ce-doc-modal-info-v85 p{white-space:pre-wrap;line-height:1.35;margin:0}.ce-doc-modal-imgwrap-v85{max-height:86vh;overflow:auto;display:flex;align-items:flex-start;justify-content:center}.ce-doc-modal-imgwrap-v85 img{max-width:100%;height:auto;border-radius:14px;border:1px solid #dbe2ea;box-shadow:0 10px 34px rgba(15,23,42,.18)}
       body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,48px)!important;justify-content:center!important;justify-items:center!important;gap:10px!important;}
       body.ce-docs-role-ro-v85 #tabResumenBtn,body.ce-role-ro-v505 #tabResumenBtn,body.ce-role-ro-v507 #tabResumenBtn,body.ce-role-ro-v508 #tabResumenBtn{order:1!important}body.ce-docs-role-ro-v85 #tabMapaBtn,body.ce-role-ro-v505 #tabMapaBtn,body.ce-role-ro-v507 #tabMapaBtn,body.ce-role-ro-v508 #tabMapaBtn{order:2!important}body.ce-docs-role-ro-v85 #tabDocumentosBtn,body.ce-role-ro-v505 #tabDocumentosBtn,body.ce-role-ro-v507 #tabDocumentosBtn,body.ce-role-ro-v508 #tabDocumentosBtn{order:3!important;display:inline-flex!important;visibility:visible!important;pointer-events:auto!important}body.ce-docs-role-ro-v85 #tabGraficasBtn,body.ce-role-ro-v505 #tabGraficasBtn,body.ce-role-ro-v507 #tabGraficasBtn,body.ce-role-ro-v508 #tabGraficasBtn{order:4!important}
-      @media(max-width:900px){.ce-docs-form,.ce-doc-fields,.ce-doc-item-grid{grid-template-columns:1fr!important}.ce-doc-media{justify-content:flex-start;padding:8px}.ce-doc-thumb{width:150px;height:112px}.ce-doc-modal-v85{padding:8px}.ce-doc-modal-box-v85{grid-template-columns:1fr;width:98vw;max-height:94vh;overflow:auto;padding:12px}.ce-doc-modal-info-v85,.ce-doc-modal-imgwrap-v85{max-height:none}.ce-doc-modal-imgwrap-v85 img{width:100%;}body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,42px)!important;gap:8px!important}}
+      @media(max-width:900px){body.ce-v5019-authenticated #ceMobileActionDockV518,body.ce-docs-active-v85 #ceMobileActionDockV518{display:flex!important;visibility:visible!important;opacity:.78!important;z-index:190500!important;pointer-events:none!important}body.ce-v5019-authenticated #ceMobileActionDockV518 button,body.ce-docs-active-v85 #ceMobileActionDockV518 button{pointer-events:auto!important;touch-action:manipulation!important;opacity:1!important}.ce-docs-form{grid-template-columns:1fr!important}.ce-doc-fields{grid-template-columns:minmax(108px,.34fr) minmax(210px,1.66fr)!important}.ce-doc-item-grid{grid-template-columns:58px 1fr!important}.ce-doc-media{justify-content:center;padding:4px}.ce-doc-thumb{width:44px!important;height:44px!important}.ce-doc-modal-v85{padding:8px}.ce-doc-modal-box-v85{grid-template-columns:1fr;width:98vw;max-height:94vh;overflow:auto;padding:12px}.ce-doc-modal-info-v85,.ce-doc-modal-imgwrap-v85{max-height:none}.ce-doc-modal-imgwrap-v85 img{width:100%;}body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,42px)!important;gap:8px!important}}
     `;
     document.head.appendChild(style);
   }
@@ -822,12 +835,38 @@
     });
   }
 
+  function isMobileLikeV85(){
+    return safe(() => window.matchMedia('(max-width: 900px)').matches, window.innerWidth <= 900) || /iPad|iPhone|Android/i.test(navigator.userAgent || '');
+  }
+
+  function ensureMobileActionsV85(){
+    if(!isMobileLikeV85() || !auth()) return;
+    safe(() => window.ControlEventV5019?.ensureMobileDock?.(), null);
+    const dock = $('ceMobileActionDockV518');
+    if(!dock) return;
+    try{
+      dock.style.setProperty('display','flex','important');
+      dock.style.setProperty('visibility','visible','important');
+      dock.style.setProperty('opacity','.78','important');
+      dock.style.setProperty('z-index','190500','important');
+      dock.style.setProperty('pointer-events','none','important');
+      dock.querySelectorAll('button').forEach(btn => {
+        btn.disabled = false;
+        btn.removeAttribute('disabled');
+        btn.style.setProperty('pointer-events','auto','important');
+        btn.style.setProperty('touch-action','manipulation','important');
+        btn.style.setProperty('opacity','1','important');
+      });
+    }catch(_){ }
+  }
+
   function install(){
     injectStyle();
     installExclusiveObserver();
     ensureDocumentPanelPlacement();
     ensureStateShape();
     ensureMobileButton();
+    ensureMobileActionsV85();
     patchRenderTabVisibility();
     patchRender();
     patchRoleStyles();
@@ -835,11 +874,13 @@
     renderVisibility();
   }
 
+  ['pointerup','touchend'].forEach(type => document.addEventListener(type, event => { if(currentTab() === TAB) openDocFromEvent(event); }, {capture:true, passive:false}));
   document.addEventListener('click', handleClick, true);
   document.addEventListener('change', handleChange, true);
   ['controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true}); else install();
   [160,700,1600].forEach(ms => setTimeout(install, ms));
+  [900,2200,5000].forEach(ms => setTimeout(ensureMobileActionsV85, ms));
 
   window.ControlEventDocumentsV85 = {
     version: VERSION,

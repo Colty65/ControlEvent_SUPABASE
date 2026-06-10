@@ -8,12 +8,13 @@
 
   const VERSION = 'ControlEvent v8.5_prod';
   const VERSION_FILE = 'ControlEvent_v8_5_prod';
-  const TABS = ['ingresos','donaciones','compras','mapa','planificacion','resumen','graficas'];
+  const TABS = ['ingresos','donaciones','compras','mapa','documentos','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',
     donaciones:'tabDonaciones',
     compras:'tabCompras',
     mapa:'tabMapaProductos',
+    documentos:'tabDocumentos',
     planificacion:'tabPlanificacionInicial',
     resumen:'tabResumen',
     graficas:'tabGraficas'
@@ -23,6 +24,7 @@
     donaciones:'tabDonacionesBtn',
     compras:'tabComprasBtn',
     mapa:'tabMapaBtn',
+    documentos:'tabDocumentosBtn',
     planificacion:'tabPlanificacionBtn',
     resumen:'tabResumenBtn',
     graficas:'tabGraficasBtn'
@@ -58,7 +60,7 @@
   function roleAllowsTab(tab){
     const name = String(tab || '');
     if(!auth()) return false;
-    if(isRO()) return ['resumen','mapa','graficas'].includes(name);
+    if(isRO()) return ['resumen','mapa','documentos','graficas'].includes(name);
     if(name === 'planificacion') return isGD();
     return TABS.includes(name);
   }
