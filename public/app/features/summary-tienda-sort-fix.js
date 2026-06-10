@@ -19,6 +19,41 @@
   function normalizeText(value){
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
   }
+
+  function injectPijamaStyle(){
+    if(document.getElementById('ceSummaryTiendaPijamaV85')) return;
+    const style = document.createElement('style');
+    style.id = 'ceSummaryTiendaPijamaV85';
+    style.textContent = `
+      #summaryTiendaTicket > .summary-item.ce-tt-pijama-odd{background:#eaf6ff!important;border-color:#c7dff4!important;}
+      #summaryTiendaTicket > .summary-item.ce-tt-pijama-even{background:#cfe6ff!important;border-color:#afd3f2!important;}
+      #summaryTiendaTicket > .summary-item.ce-tt-total-evento{background:#fff!important;border-color:#dbe2ea!important;font-weight:900!important;}
+      #summaryTiendaTicket > .summary-item.ce-tt-total-evento .pill{font-weight:950!important;}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function applyPijamaRows(){
+    injectPijamaStyle();
+    const root = $(ROOT_ID);
+    if(!root) return;
+    const items = Array.from(root.children || []).filter(el => el?.classList?.contains('summary-item'));
+    if(!items.length) return;
+    let rowIndex = 0;
+    items.forEach((item, idx) => {
+      item.classList.remove('ce-tt-pijama-odd','ce-tt-pijama-even','ce-tt-total-evento');
+      const labelEl = item.querySelector(':scope > span:first-child') || item.querySelector('span');
+      const label = normalizeText(labelEl?.textContent || '');
+      const isTotal = label === 'TOTAL' || label === 'TOTAL EVENTO' || idx === items.length - 1;
+      if(isTotal){
+        if(labelEl) labelEl.textContent = 'TOTAL EVENTO';
+        item.classList.add('ce-tt-total-evento');
+        return;
+      }
+      rowIndex += 1;
+      item.classList.add(rowIndex % 2 === 1 ? 'ce-tt-pijama-odd' : 'ce-tt-pijama-even');
+    });
+  }
   function modeFromTarget(target){
     const el = target?.closest?.('#' + ROOT_ID + ' a,#' + ROOT_ID + ' button,[data-ce-summary-sort]');
     if(!el) return '';
@@ -35,8 +70,8 @@
     st.summaryTiendaSort = mode;
     try{ window.state = st; }catch(_){ }
     renderBudgetSafe();
-    setTimeout(markLinks, 0);
-    setTimeout(markLinks, 80);
+    setTimeout(() => { markLinks(); applyPijamaRows(); }, 0);
+    setTimeout(() => { markLinks(); applyPijamaRows(); }, 80);
     return true;
   }
   function handleEvent(event){
@@ -64,7 +99,7 @@
     if(!old || old.__ceV307SummarySortWrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      if(String(arguments[0] || '') === ROOT_ID) setTimeout(markLinks, 0);
+      if(String(arguments[0] || '') === ROOT_ID) setTimeout(() => { markLinks(); applyPijamaRows(); }, 0);
       return ret;
     };
     wrapped.__ceV307SummarySortWrapped = true;
@@ -81,7 +116,19 @@
 
   patchRenderSummaryList();
   markLinks();
-  [80,250,700,1500,3000].forEach(ms => setTimeout(() => { patchRenderSummaryList(); markLinks(); }, ms));
-  window.addEventListener('controlevent:runtime-ready', () => { patchRenderSummaryList(); markLinks(); });
-  window.ControlEventSummaryTiendaSortFix = {version: VERSION, applySort, markLinks};
+  applyPijamaRows();
+  let pijamaPending = false;
+  try{
+    const obs = new MutationObserver(() => {
+      if(pijamaPending) return;
+      pijamaPending = true;
+      setTimeout(() => { pijamaPending = false; markLinks(); applyPijamaRows(); }, 40);
+    });
+    const rootNow = $(ROOT_ID);
+    if(rootNow) obs.observe(rootNow, {childList:true, subtree:false, characterData:true});
+    window.__ceSummaryTiendaPijamaObserverV85 = obs;
+  }catch(_){}
+  [80,250,700,1500,3000].forEach(ms => setTimeout(() => { patchRenderSummaryList(); markLinks(); applyPijamaRows(); }, ms));
+  window.addEventListener('controlevent:runtime-ready', () => { patchRenderSummaryList(); markLinks(); applyPijamaRows(); });
+  window.ControlEventSummaryTiendaSortFix = {version: VERSION, applySort, markLinks, applyPijamaRows};
 })();

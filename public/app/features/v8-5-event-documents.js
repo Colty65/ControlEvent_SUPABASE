@@ -362,7 +362,7 @@
         <div class="field ce-doc-date-new"><label>Fecha</label><input id="eventDocNewFecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(todayDisplay())}" /></div>
         <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="2" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
         <div class="field"><label>Foto/documento</label><input id="eventDocNewFile" type="file" accept="image/*" /></div>
-        <div class="field"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
+        <div class="field ce-doc-add-action"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
       </div>`;
   }
 
@@ -890,6 +890,19 @@
       @media(max-width:900px){.ce-doc-target-modal-v85{padding:8px!important;}.ce-doc-target-box-v85{grid-template-columns:1fr!important;width:98vw!important;max-height:94vh!important;border-radius:16px!important;padding:12px!important;}.ce-doc-target-info-v85,.ce-doc-target-imgwrap-v85{max-height:none!important;}.ce-doc-target-imgwrap-v85 img{width:100%!important;}.ce-doc-target-info-v85 strong{font-size:17px!important;}.ce-doc-target-info-v85 p{font-size:14px!important;}}
       #ceBtnRefresV518.ce-refreshing,#btnSoftRefresh.ce-refreshing{background:#dcfce7!important;border-color:#22c55e!important;color:#14532d!important;}
       #ceBtnRefresV518.ce-refresh-ok,#btnSoftRefresh.ce-refresh-ok{background:#22c55e!important;border-color:#16a34a!important;color:#fff!important;}
+
+      /* v8.5 FIX7: retoque estetico Documentos + formulario dentro de marco en iPad */
+      #tabDocumentos .ce-docs-form.entry-zone{background:#e2f0d9!important;border:1px solid #a9d18e!important;border-radius:16px!important;padding:12px!important;box-shadow:0 3px 12px rgba(22,101,52,.08)!important;box-sizing:border-box!important;max-width:100%!important;overflow:hidden!important;}
+      #tabDocumentos .ce-docs-form.entry-zone .field{min-width:0!important;}
+      #tabDocumentos .ce-docs-form.entry-zone input,#tabDocumentos .ce-docs-form.entry-zone textarea{max-width:100%!important;box-sizing:border-box!important;}
+      #tabDocumentos .ce-doc-add-action{justify-self:start!important;align-self:end!important;min-width:0!important;}
+      #btnAddEventDoc{font-size:12px!important;padding:9px 12px!important;border-radius:12px!important;line-height:1.08!important;white-space:normal!important;min-width:0!important;max-width:145px!important;box-shadow:none!important;}
+      #tabDocumentos .ce-docs-list > .ce-doc-item:nth-child(odd){background:#eaf6ff!important;border-color:#c7dff4!important;}
+      #tabDocumentos .ce-docs-list > .ce-doc-item:nth-child(even){background:#cfe6ff!important;border-color:#afd3f2!important;}
+      #tabDocumentos .ce-docs-list > .ce-doc-item .ce-doc-media{background:rgba(255,255,255,.66)!important;}
+      @media(min-width:901px){#tabDocumentos .ce-docs-form{grid-template-columns:110px minmax(720px,1fr) minmax(180px,.55fr) minmax(128px,auto)!important;}#tabDocumentos .ce-docs-form-desc textarea{min-height:86px!important;font-size:15px!important;}}
+      @media(min-width:901px) and (max-width:1180px){#tabDocumentos .ce-docs-form{grid-template-columns:105px minmax(360px,1fr) minmax(160px,.45fr) 122px!important;gap:8px!important;}#btnAddEventDoc{width:116px!important;max-width:116px!important;font-size:11.5px!important;padding:8px 9px!important;}#tabDocumentos .ce-docs-form-desc textarea{min-height:78px!important;}}
+      @media(max-width:900px){#tabDocumentos .ce-docs-form.entry-zone{padding:10px!important;}#btnAddEventDoc{max-width:160px!important;font-size:12px!important;padding:9px 12px!important;}#tabDocumentos .ce-doc-add-action{justify-self:start!important;}}
 
     `;
     document.head.appendChild(style);
