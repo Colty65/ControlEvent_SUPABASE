@@ -14,6 +14,8 @@
   let mapPinned = false;
   let selectedResponsables = null; // null = todos
   let productSearchText = '';
+  let productSearchFocused = false;
+  let productSearchCaret = 0;
   let lastRenderedEventId = null;
   const $ = id => document.getElementById(id);
 
@@ -367,8 +369,8 @@
 
   function renderProductSearch(){
     return `<div class="mapa-product-search" id="mapaProductoSearchBox">
-      <div class="field"><label>Buscar producto</label><input id="${SEARCH_ID}" value="${esc(productSearchText)}" placeholder="Teclea parte del producto..." autocomplete="off" /></div>
-      <button type="button" class="outline small" id="${SEARCH_ID}Btn">Buscar</button>
+      <div class="field"><label>Buscar producto</label><input id="${SEARCH_ID}" class="ce-mapa-readonly-allowed mobile-menu-action" value="${esc(productSearchText)}" placeholder="Teclea parte del producto..." autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
+      <button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}Btn">Buscar</button>
       <span class="mapa-search-help">Busca el primer registro que contenga el texto y se posiciona en la lista.</span>
     </div>`;
   }
@@ -387,24 +389,68 @@
     }
     return false;
   }
+  function rememberSearchInput(input){
+    if(!input) return;
+    try{ productSearchText = String(input.value || ''); }catch(_){ }
+    try{ productSearchCaret = Number(input.selectionStart || 0); }catch(_){ productSearchCaret = productSearchText.length; }
+  }
+  function markSearchControl(el){
+    if(!el) return;
+    try{ el.classList.add('ce-mapa-readonly-allowed','mobile-menu-action'); }catch(_){ }
+    try{ el.disabled = false; el.readOnly = false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled'); }catch(_){ }
+    try{ el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); }catch(_){ }
+  }
+  function restoreProductSearchFocus(){
+    if(!productSearchFocused) return;
+    const input = $(SEARCH_ID);
+    if(!input) return;
+    markSearchControl(input);
+    try{ if(input.value !== productSearchText) input.value = productSearchText; }catch(_){ }
+    try{ input.focus({preventScroll:true}); }catch(_){ try{ input.focus(); }catch(__){ } }
+    try{ const pos = Math.min(productSearchCaret || 0, String(input.value || '').length); input.setSelectionRange(pos, pos); }catch(_){ }
+  }
   function bindProductSearch(){
     const input = $(SEARCH_ID), btn = $(SEARCH_ID + 'Btn');
-    if(!input || input.__ceMapaSearchBound) return;
+    markSearchControl(input);
+    markSearchControl(btn);
+    if(!input || input.__ceMapaSearchBound){
+      if(input) restoreProductSearchFocus();
+      return;
+    }
     input.__ceMapaSearchBound = true;
     const clearSearch = () => {
       productSearchText = '';
+      productSearchCaret = 0;
+      productSearchFocused = false;
       try{ input.value = ''; }catch(_){ }
     };
     const run = () => {
-      const query = input.value || '';
+      rememberSearchInput(input);
+      const query = input.value || productSearchText || '';
       const ok = focusFirstProduct(query);
       // V31.4: búsqueda finalizada => limpiar lo tecleado para que la siguiente búsqueda no repita el registro anterior.
       clearSearch();
       return ok;
     };
-    // No buscar en cada pulsación; solo al pulsar Buscar o Enter.
-    input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); run(); } });
-    btn?.addEventListener('click', event => { try{ event.preventDefault(); }catch(_){ } run(); });
+    input.addEventListener('focus', () => { productSearchFocused = true; rememberSearchInput(input); });
+    input.addEventListener('blur', () => {
+      // Si un repintado/lock reemplaza temporalmente el input, lo restauramos enseguida.
+      setTimeout(() => {
+        const active = document.activeElement;
+        if(active && (active.id === SEARCH_ID || active.id === SEARCH_ID + 'Btn')) return;
+        if(productSearchFocused && $(SEARCH_ID)) restoreProductSearchFocus();
+      }, 30);
+    });
+    input.addEventListener('input', event => { try{ event.stopPropagation(); }catch(_){ } productSearchFocused = true; rememberSearchInput(input); }, true);
+    input.addEventListener('keydown', event => {
+      try{ event.stopPropagation(); }catch(_){ }
+      if(event.key === 'Enter'){ event.preventDefault(); run(); return; }
+      setTimeout(() => rememberSearchInput(input), 0);
+    }, true);
+    input.addEventListener('keyup', () => rememberSearchInput(input), true);
+    btn?.addEventListener('pointerdown', event => { try{ event.preventDefault(); }catch(_){ } }, true);
+    btn?.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } run(); }, true);
+    restoreProductSearchFocus();
   }
   function findScrollParent(el){
     let node = el?.parentElement || null;
@@ -539,6 +585,7 @@
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
+    restoreProductSearchFocus();
     const donationMetric = summary.querySelector('.mapa-metric.jump-donados');
     if(donationMetric){ donationMetric.setAttribute('data-mapa-jump-donados','1'); donationMetric.setAttribute('role','button'); donationMetric.setAttribute('tabindex','0'); donationMetric.setAttribute('title','Ir a productos donados'); }
     bindDonationSummaryJump();

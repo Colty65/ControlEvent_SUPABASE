@@ -4,7 +4,7 @@
    aunque el evento esté Finalizado o el usuario sea RO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.5_prod mapa-readonly-controls-1';
+  const VERSION = 'ControlEvent v8.5_prod mapa-readonly-controls-2';
   const PANEL_ID = 'tabMapaProductos';
   const STYLE_ID = 'ceV85MapaReadonlyControlsStyle';
   const CONTROL_SELECTOR = [
@@ -36,6 +36,7 @@
   }
   function enable(el){
     if(!el) return;
+    try{ el.classList?.add?.('ce-mapa-readonly-allowed','mobile-menu-action'); }catch(_){ }
     try{ if('disabled' in el) el.disabled = false; }catch(_){ }
     try{ if('readOnly' in el) el.readOnly = false; }catch(_){ }
     try{ el.removeAttribute('disabled'); }catch(_){ }
@@ -74,6 +75,17 @@
         -webkit-user-select:auto!important;
         user-select:auto!important;
       }
+      #tabMapaProductos .ce-mapa-readonly-allowed.mobile-menu-action{
+        display:initial!important;
+        visibility:visible!important;
+        transform:none!important;
+      }
+      #tabMapaProductos input.ce-mapa-readonly-allowed.mobile-menu-action{
+        width:100%!important;
+      }
+      #tabMapaProductos button.ce-mapa-readonly-allowed.mobile-menu-action{
+        display:inline-flex!important;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -110,6 +122,7 @@
     if(typeof old !== 'function' || old.__ceV85MapaReadonlyControls) return;
     const wrapped = function(){
       const result = old.apply(this, arguments);
+      if(mapaVisible()) unlockMapaControls(name + '-sync');
       burst(name);
       return result;
     };
@@ -125,6 +138,7 @@
       if(typeof old !== 'function' || old.__ceV85MapaReadonlyControls) return;
       api[name] = function(){
         const result = old.apply(this, arguments);
+        if(mapaVisible()) unlockMapaControls('mapa-api-' + name + '-sync');
         burst('mapa-api-' + name);
         return result;
       };
