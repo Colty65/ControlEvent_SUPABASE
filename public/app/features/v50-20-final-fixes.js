@@ -197,7 +197,7 @@
     const btns = Array.from(document.querySelectorAll('#btnSoftRefresh,#ceBtnRefresV518'));
     btns.forEach(b => { try{ b.disabled = true; b.classList.add('ce-refreshing'); }catch(_){ } });
     try{
-      const res = await fetch('/api/state', {cache:'no-store'});
+      const res = await fetch('/api/state?ts=' + Date.now(), {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
       if(res.ok){
         const fresh = await res.json().catch(() => ({}));
         mergeFreshState(fresh, keepEvent);

@@ -118,8 +118,30 @@
     const raw = String(value || '').trim();
     const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+    const dmy = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+    if(dmy){
+      const year = dmy[3].length === 2 ? '20' + dmy[3] : dmy[3];
+      return `${String(Number(dmy[1])).padStart(2,'0')}/${String(Number(dmy[2])).padStart(2,'0')}/${year}`;
+    }
     return raw || 'Sin fecha';
   }
+
+  function parseDateForStorage(value){
+    const raw = String(value || '').trim();
+    if(!raw) return '';
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(iso) return raw;
+    const dmy = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+    if(dmy){
+      const year = dmy[3].length === 2 ? '20' + dmy[3] : dmy[3];
+      const month = String(Number(dmy[2])).padStart(2,'0');
+      const day = String(Number(dmy[1])).padStart(2,'0');
+      if(Number(month) >= 1 && Number(month) <= 12 && Number(day) >= 1 && Number(day) <= 31) return `${year}-${month}-${day}`;
+    }
+    return raw;
+  }
+
+  function todayDisplay(){ return formatDate(todayIso()); }
 
   function status(message, kind = ''){
     const box = $('eventDocsStatus');
@@ -336,7 +358,7 @@
     }
     wrap.innerHTML = `
       <div class="ce-docs-form entry-zone">
-        <div class="field"><label>Fecha</label><input id="eventDocNewFecha" type="date" value="${esc(todayIso())}" /></div>
+        <div class="field ce-doc-date-new"><label>Fecha</label><input id="eventDocNewFecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(todayDisplay())}" /></div>
         <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="1" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
         <div class="field"><label>Foto/documento</label><input id="eventDocNewFile" type="file" accept="image/*" /></div>
         <div class="field"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
@@ -382,8 +404,8 @@
             <div class="ce-doc-media">${thumb}</div>
             <div class="ce-doc-data">
               <div class="ce-doc-fields">
-                <div class="field"><label>Fecha</label><input type="date" value="${esc(doc.fecha || '')}" data-doc-field="fecha" data-doc-id="${id}" ${disabled} /></div>
-                <div class="field ce-doc-desc-field"><label>&nbsp;</label><textarea rows="1" data-doc-field="descripcion" data-doc-id="${id}" ${readonlyText} ${disabled}>${esc(doc.descripcion || '')}</textarea></div>
+                <div class="field ce-doc-date-field"><label>Fecha</label><input type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(formatDate(doc.fecha || ''))}" data-doc-field="fecha" data-doc-id="${id}" ${disabled} /></div>
+                <div class="field ce-doc-desc-field"><label>&nbsp;</label><textarea rows="2" data-doc-field="descripcion" data-doc-id="${id}" ${readonlyText} ${disabled}>${esc(doc.descripcion || '')}</textarea></div>
               </div>
               <div class="ce-doc-actions">${actions}</div>
             </div>
@@ -494,7 +516,7 @@
       return;
     }
     const eventId = selectedEventId();
-    const fecha = $('eventDocNewFecha')?.value || todayIso();
+    const fecha = parseDateForStorage($('eventDocNewFecha')?.value || todayDisplay()) || todayIso();
     const descripcion = norm($('eventDocNewDescripcion')?.value || '');
     const file = $('eventDocNewFile')?.files?.[0] || null;
     if(!descripcion){ alert('Introduce un texto descriptivo.'); return; }
@@ -601,7 +623,7 @@
     const fields = document.querySelectorAll(`[data-doc-id="${cssEscape(docId)}"][data-doc-field]`);
     fields.forEach(el => {
       const field = el.dataset.docField;
-      if(field === 'fecha') doc.fecha = el.value || '';
+      if(field === 'fecha') doc.fecha = parseDateForStorage(el.value || '');
       if(field === 'descripcion') doc.descripcion = norm(el.value || '');
     });
     if(!doc.descripcion){ alert('El texto descriptivo no puede quedar vacío.'); return; }
@@ -611,22 +633,12 @@
     status('Documento modificado.', 'ok');
   }
 
-  function ensureModal(){
-    let modal = $('ceDocModalV85');
-    if(modal) return modal;
-    modal = document.createElement('div');
-    modal.id = 'ceDocModalV85';
-    modal.className = 'ce-doc-modal-v85';
-    modal.innerHTML = `
-      <div class="ce-doc-modal-box-v85">
-        <div class="ce-doc-modal-close-v85" role="button" tabindex="0" aria-label="Cerrar">×</div>
-        <div class="ce-doc-modal-info-v85"></div>
-        <div class="ce-doc-modal-imgwrap-v85"><img alt="Documento del evento" /></div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', event => { if(event.target === modal || event.target.closest('.ce-doc-modal-close-v85')) closeModal(); });
-    document.addEventListener('keydown', event => { if(event.key === 'Escape') closeModal(); });
-    return modal;
+  function removeAllDocModalsV85(){
+    document.querySelectorAll('#ceDocModalV85,.ce-doc-modal-v85').forEach(node => {
+      try{ node.remove(); }catch(_){ }
+    });
+    document.body?.classList.remove('ce-doc-modal-open-v85');
+    window.__ceDocModalOpenV85 = false;
   }
 
   function openModal(docId){
@@ -634,20 +646,48 @@
     if(!doc) return;
     const src = imageFor(doc);
     if(!src) return;
-    const modal = ensureModal();
-    modal.querySelector('img').src = src;
-    modal.querySelector('.ce-doc-modal-info-v85').innerHTML = `<strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p>`;
-    modal.classList.add('visible');
+    // v8.5 FIX5: visor propio, limpio en cada apertura. Evita que iOS/Android/Finalizado
+    // acumulen capas o listeners y bloqueen la quinta apertura.
+    removeAllDocModalsV85();
+    const modal = document.createElement('div');
+    modal.id = 'ceDocModalV85';
+    modal.className = 'ce-doc-modal-v85 visible';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.innerHTML = `
+      <div class="ce-doc-modal-box-v85" role="document">
+        <button type="button" class="ce-doc-modal-close-v85" aria-label="Cerrar documento">×</button>
+        <div class="ce-doc-modal-info-v85"><strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p></div>
+        <div class="ce-doc-modal-imgwrap-v85"><img alt="Documento del evento" /></div>
+      </div>`;
+    const img = modal.querySelector('img');
+    if(img) img.src = src;
+    const closeFromEvent = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } closeModal(); return false; };
+    const stopInside = ev => { try{ ev?.stopPropagation?.(); }catch(_){ } };
+    ['click','pointerup','touchend'].forEach(type => {
+      modal.addEventListener(type, ev => {
+        if(ev.target === modal || ev.target?.closest?.('.ce-doc-modal-close-v85')) return closeFromEvent(ev);
+      }, {capture:true, passive:false});
+      modal.querySelector('.ce-doc-modal-box-v85')?.addEventListener(type, stopInside, {capture:false, passive:false});
+    });
+    document.body.appendChild(modal);
     document.body.classList.add('ce-doc-modal-open-v85');
+    window.__ceDocModalOpenV85 = true;
+    setTimeout(() => { try{ modal.querySelector('.ce-doc-modal-close-v85')?.focus?.({preventScroll:true}); }catch(_){ } }, 40);
   }
 
   function closeModal(){
     const modal = $('ceDocModalV85');
-    if(!modal) return;
-    modal.classList.remove('visible');
-    const img = modal.querySelector('img');
-    if(img) img.removeAttribute('src');
-    document.body.classList.remove('ce-doc-modal-open-v85');
+    if(modal){
+      const img = modal.querySelector('img');
+      if(img) img.removeAttribute('src');
+      modal.classList.remove('visible');
+      try{ modal.remove(); }catch(_){ modal.style.setProperty('display','none','important'); }
+    }
+    document.body?.classList.remove('ce-doc-modal-open-v85');
+    window.__ceDocModalOpenV85 = false;
+    // Después de cerrar, reactivar la pestaña para que los botones vuelvan a aceptar toque.
+    setTimeout(() => { if(currentTab() === TAB){ setDocumentsExclusive(true); enableDocumentViewControls(); } }, 30);
   }
 
   function ensureMobileButton(){
@@ -715,7 +755,7 @@
     if(!id) return false;
     try{ event.preventDefault?.(); event.stopPropagation?.(); event.stopImmediatePropagation?.(); }catch(_){ }
     const now = Date.now();
-    if(lastDocOpenV85.id === id && now - lastDocOpenV85.at < 480) return true;
+    if(lastDocOpenV85.id === id && now - lastDocOpenV85.at < 120 && window.__ceDocModalOpenV85) return true;
     lastDocOpenV85 = {id, at: now};
     openModal(id);
     return true;
@@ -794,6 +834,19 @@
       .ce-doc-modal-v85{position:fixed;inset:0;z-index:5600;background:rgba(15,23,42,.68);display:none;align-items:center;justify-content:center;padding:18px}.ce-doc-modal-v85.visible{display:flex}.ce-doc-modal-box-v85{position:relative;width:min(1180px,96vw);max-height:94vh;background:#fff;border-radius:22px;border:1px solid rgba(15,23,42,.18);box-shadow:0 24px 80px rgba(0,0,0,.36);padding:16px;display:grid;grid-template-columns:minmax(230px,.55fr) minmax(320px,1.45fr);gap:16px;align-items:start}.ce-doc-modal-close-v85{position:absolute;right:10px;top:8px;background:#111827!important;color:#fff!important;border-radius:999px!important;width:38px;height:38px;padding:0!important;font-size:24px;line-height:38px;text-align:center;cursor:pointer;touch-action:manipulation;user-select:none}.ce-doc-modal-info-v85{background:#f8fafc;border:1px solid #dbe2ea;border-radius:16px;padding:12px;max-height:84vh;overflow:auto}.ce-doc-modal-info-v85 strong{display:block;font-size:20px;margin-bottom:4px}.ce-doc-modal-info-v85 span{display:inline-block;margin-bottom:10px;color:#64748b;font-weight:900}.ce-doc-modal-info-v85 p{white-space:pre-wrap;line-height:1.35;margin:0}.ce-doc-modal-imgwrap-v85{max-height:86vh;overflow:auto;display:flex;align-items:flex-start;justify-content:center}.ce-doc-modal-imgwrap-v85 img{max-width:100%;height:auto;border-radius:14px;border:1px solid #dbe2ea;box-shadow:0 10px 34px rgba(15,23,42,.18)}
       body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,48px)!important;justify-content:center!important;justify-items:center!important;gap:10px!important;}
       body.ce-docs-role-ro-v85 #tabResumenBtn,body.ce-role-ro-v505 #tabResumenBtn,body.ce-role-ro-v507 #tabResumenBtn,body.ce-role-ro-v508 #tabResumenBtn{order:1!important}body.ce-docs-role-ro-v85 #tabMapaBtn,body.ce-role-ro-v505 #tabMapaBtn,body.ce-role-ro-v507 #tabMapaBtn,body.ce-role-ro-v508 #tabMapaBtn{order:2!important}body.ce-docs-role-ro-v85 #tabDocumentosBtn,body.ce-role-ro-v505 #tabDocumentosBtn,body.ce-role-ro-v507 #tabDocumentosBtn,body.ce-role-ro-v508 #tabDocumentosBtn{order:3!important;display:inline-flex!important;visibility:visible!important;pointer-events:auto!important}body.ce-docs-role-ro-v85 #tabGraficasBtn,body.ce-role-ro-v505 #tabGraficasBtn,body.ce-role-ro-v507 #tabGraficasBtn,body.ce-role-ro-v508 #tabGraficasBtn{order:4!important}
+
+      /* v8.5 FIX5: ajustes responsive y visor limpio */
+      #tabDocumentos .ce-doc-item{overflow:hidden!important;}
+      #tabDocumentos .ce-doc-item textarea,#tabDocumentos .ce-doc-item input{font-weight:900!important;color:#0f172a!important;opacity:1!important;-webkit-text-fill-color:#0f172a!important;background:rgba(255,255,255,.72)!important;}
+      #tabDocumentos .ce-doc-desc-field textarea{font-weight:950!important;line-height:1.22!important;}
+      #tabDocumentos .ce-doc-date-field input{font-weight:950!important;text-align:center!important;letter-spacing:-.02em!important;}
+      #tabDocumentos .ce-doc-fields .field{min-width:0!important;}
+      #tabDocumentos .ce-doc-fields input,#tabDocumentos .ce-doc-fields textarea{width:100%!important;box-sizing:border-box!important;min-width:0!important;}
+      .ce-doc-modal-v85{position:fixed!important;inset:0!important;z-index:950000!important;background:rgba(15,23,42,.72)!important;display:none!important;align-items:center!important;justify-content:center!important;padding:18px!important;touch-action:manipulation!important;overscroll-behavior:contain!important;}
+      .ce-doc-modal-v85.visible{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+      .ce-doc-modal-close-v85{appearance:none!important;-webkit-appearance:none!important;border:0!important;position:absolute!important;right:10px!important;top:8px!important;background:#111827!important;color:#fff!important;border-radius:999px!important;width:42px!important;height:42px!important;padding:0!important;font-size:26px!important;line-height:42px!important;text-align:center!important;cursor:pointer!important;touch-action:manipulation!important;user-select:none!important;z-index:950002!important;}
+      @media(min-width:901px){#tabDocumentos .ce-doc-item-grid{grid-template-columns:62px minmax(0,1fr)!important;}#tabDocumentos .ce-doc-fields{grid-template-columns:116px minmax(0,1fr)!important;}#tabDocumentos .ce-doc-thumb{width:52px!important;height:52px!important;max-width:52px!important;max-height:52px!important;}#tabDocumentos .ce-doc-media{min-height:60px!important}.ce-doc-modal-info-v85 p{font-weight:850!important;}}
+      @media(max-width:900px){#tabDocumentos{overflow-x:hidden!important;}#tabDocumentos .card{padding-left:10px!important;padding-right:10px!important;}#tabDocumentos .ce-doc-item{padding:8px!important;}#tabDocumentos .ce-doc-item-grid{grid-template-columns:54px minmax(0,1fr)!important;gap:7px!important;}#tabDocumentos .ce-doc-fields{grid-template-columns:86px minmax(0,1fr)!important;gap:6px!important;}#tabDocumentos .ce-doc-date-field input{font-size:11px!important;padding-left:3px!important;padding-right:3px!important;}#tabDocumentos .ce-doc-desc-field textarea{font-size:12px!important;min-height:38px!important;}#tabDocumentos .ce-doc-actions{font-size:11px!important;gap:5px!important;}#tabDocumentos .ce-doc-actions button{font-size:11px!important;padding:7px 8px!important;}#tabDocumentos .ce-doc-thumb{width:44px!important;height:44px!important;max-width:44px!important;max-height:44px!important}.ce-doc-modal-v85{padding:6px!important}.ce-doc-modal-box-v85{width:98vw!important;max-height:94vh!important;overflow:auto!important;border-radius:16px!important;padding:10px!important}.ce-doc-modal-info-v85 strong{font-size:17px!important}.ce-doc-modal-info-v85 p{font-size:14px!important;font-weight:850!important}.ce-doc-modal-close-v85{width:44px!important;height:44px!important;line-height:44px!important;font-size:28px!important;}}
       @media(max-width:900px){body.ce-v5019-authenticated #ceMobileActionDockV518,body.ce-docs-active-v85 #ceMobileActionDockV518{display:flex!important;visibility:visible!important;opacity:.78!important;z-index:190500!important;pointer-events:none!important}body.ce-v5019-authenticated #ceMobileActionDockV518 button,body.ce-docs-active-v85 #ceMobileActionDockV518 button{pointer-events:auto!important;touch-action:manipulation!important;opacity:1!important}.ce-docs-form{grid-template-columns:1fr!important}.ce-doc-fields{grid-template-columns:minmax(108px,.34fr) minmax(210px,1.66fr)!important}.ce-doc-item-grid{grid-template-columns:58px 1fr!important}.ce-doc-media{justify-content:center;padding:4px}.ce-doc-thumb{width:44px!important;height:44px!important}.ce-doc-modal-v85{padding:8px}.ce-doc-modal-box-v85{grid-template-columns:1fr;width:98vw;max-height:94vh;overflow:auto;padding:12px}.ce-doc-modal-info-v85,.ce-doc-modal-imgwrap-v85{max-height:none}.ce-doc-modal-imgwrap-v85 img{width:100%;}body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,42px)!important;gap:8px!important}}
     `;
     document.head.appendChild(style);
@@ -860,6 +913,23 @@
     }catch(_){ }
   }
 
+  function patchRefreshButtonsForDocumentsV85(){
+    // La lógica de Refrescar vive en parches anteriores; aquí solo reforzamos que,
+    // si la ventana activa es DOCUMENTOS, tras refrescar se vuelve a pintar con datos actuales.
+    const after = () => {
+      if(currentTab() !== TAB) return;
+      try{ renderEventDocuments(); setDocumentsExclusive(true); ensureMobileActionsV85(); }catch(_){ }
+    };
+    ['btnSoftRefresh','ceBtnRefresV518'].forEach(id => {
+      const btn = $(id);
+      if(!btn || btn.__ceV85DocsRefreshAfter) return;
+      btn.__ceV85DocsRefreshAfter = true;
+      btn.addEventListener('click', () => [300,900,1800,3200].forEach(ms => setTimeout(after, ms)), false);
+      btn.addEventListener('touchend', () => [300,900,1800,3200].forEach(ms => setTimeout(after, ms)), false);
+      btn.addEventListener('pointerup', () => [300,900,1800,3200].forEach(ms => setTimeout(after, ms)), false);
+    });
+  }
+
   function install(){
     injectStyle();
     installExclusiveObserver();
@@ -867,6 +937,7 @@
     ensureStateShape();
     ensureMobileButton();
     ensureMobileActionsV85();
+    patchRefreshButtonsForDocumentsV85();
     patchRenderTabVisibility();
     patchRender();
     patchRoleStyles();
@@ -875,6 +946,11 @@
   }
 
   ['pointerup','touchend'].forEach(type => document.addEventListener(type, event => { if(currentTab() === TAB) openDocFromEvent(event); }, {capture:true, passive:false}));
+
+  if(!window.__ceDocModalEscV85){
+    window.__ceDocModalEscV85 = true;
+    document.addEventListener('keydown', event => { if(event.key === 'Escape' && $('ceDocModalV85')){ event.preventDefault(); closeModal(); } }, true);
+  }
   document.addEventListener('click', handleClick, true);
   document.addEventListener('change', handleChange, true);
   ['controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));

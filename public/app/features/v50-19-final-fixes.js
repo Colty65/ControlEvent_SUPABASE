@@ -351,7 +351,7 @@
     const tab = currentTab();
     if(!id || !hasValidEvent(id)){ showAwaitingEvent('refresh-no-event'); return false; }
     try{
-      const res = await fetch('/api/state', {cache:'no-store'});
+      const res = await fetch('/api/state?ts=' + Date.now(), {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
       if(res.ok){
         const fresh = await res.json();
         const target = st();

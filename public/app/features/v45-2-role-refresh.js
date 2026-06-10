@@ -246,7 +246,7 @@
     try{ document.body.classList.toggle('ce-role-ro-v452', isRO()); }catch(_){ }
   }
   async function loadFreshState(){
-    const res = await fetch('/api/state', {cache:'no-store'});
+    const res = await fetch('/api/state?ts=' + Date.now(), {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
     if(!res.ok) throw new Error('No se pudo cargar /api/state');
     const serverState = await res.json();
     let merged = serverState || {};
