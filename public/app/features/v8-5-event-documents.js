@@ -28,6 +28,7 @@
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
   const norm = value => String(value ?? '').normalize('NFC').replace(/\s+/g,' ').trim();
   const cssEscape = value => (window.CSS && typeof window.CSS.escape === 'function') ? window.CSS.escape(String(value)) : String(value).replace(/[^a-zA-Z0-9_-]/g, ch => '\\' + ch);
+  const safeDomId = value => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
   const role = () => String(auth()?.nivel || '').toUpperCase();
   const canSee = () => ['RO','RW','GD'].includes(role());
   const canWrite = () => ['RW','GD'].includes(role());
@@ -359,7 +360,7 @@
     wrap.innerHTML = `
       <div class="ce-docs-form entry-zone">
         <div class="field ce-doc-date-new"><label>Fecha</label><input id="eventDocNewFecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(todayDisplay())}" /></div>
-        <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="1" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
+        <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="2" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
         <div class="field"><label>Foto/documento</label><input id="eventDocNewFile" type="file" accept="image/*" /></div>
         <div class="field"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
       </div>`;
@@ -388,30 +389,41 @@
       const readonlyText = editable && !doc.recovered ? '' : 'readonly';
       const code = esc(doc.codigo || 'DOC');
       const id = esc(doc.id || `${doc.eventId}|${doc.codigo}`);
+      const targetId = 'ceDocViewV85_' + safeDomId(`${doc.eventId}_${doc.codigo || doc.imageKey || doc.id}`);
       const thumb = img
-        ? `<span class="ce-doc-thumb-btn" role="button" tabindex="0" data-doc-open="${id}" title="Ampliar documento"><img class="ce-doc-thumb" src="${esc(img)}" alt="Documento" loading="lazy" /></span>`
+        ? `<a class="ce-doc-thumb-btn ce-doc-thumb-link-v85" href="#${esc(targetId)}" title="Ampliar documento" aria-label="Ampliar documento"><img class="ce-doc-thumb" src="${esc(img)}" alt="Documento" loading="lazy" /></a>`
         : '<div class="ce-doc-noimage">Sin foto</div>';
+      const modal = img ? `
+        <div id="${esc(targetId)}" class="ce-doc-target-modal-v85" role="dialog" aria-modal="true">
+          <div class="ce-doc-target-box-v85" role="document">
+            <a class="ce-doc-target-close-v85" href="#tabDocumentos" aria-label="Cerrar documento">×</a>
+            <div class="ce-doc-target-info-v85"><strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p></div>
+            <div class="ce-doc-target-imgwrap-v85"><img src="${esc(img)}" alt="Documento del evento" loading="lazy" /></div>
+          </div>
+        </div>` : '';
       const actions = editable && !doc.recovered ? `
           <button type="button" class="outline small" data-doc-replace="${id}">📎 Reemplazar foto</button>
           ${img ? `<button type="button" class="outline small" data-doc-remove-image="${id}">🗑️ Eliminar foto</button>` : ''}
           <button type="button" class="modify small" data-doc-save="${id}">Modificar</button>
           <button type="button" class="danger small" data-doc-delete="${id}">Eliminar</button>
           <input class="ce-doc-file-input" type="file" accept="image/*" data-doc-upload-input="${id}" />`
-        : (doc.recovered ? '<span class="readonly-note">Recuperado desde foto; añade metadatos creando de nuevo si necesitas editarlo.</span>' : '<span class="readonly-note">Solo lectura</span>');
+        : (doc.recovered ? '<span class="readonly-note">Recuperado desde foto.</span>' : '');
+      const dateHtml = editable && !doc.recovered
+        ? `<input class="ce-doc-date-input" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(formatDate(doc.fecha || ''))}" data-doc-field="fecha" data-doc-id="${id}" />`
+        : `<div class="ce-doc-date-view">${esc(formatDate(doc.fecha || ''))}</div>`;
+      const descHtml = editable && !doc.recovered
+        ? `<textarea class="ce-doc-desc-input" rows="2" data-doc-field="descripcion" data-doc-id="${id}">${esc(doc.descripcion || '')}</textarea>`
+        : `<div class="ce-doc-desc-view">${esc(doc.descripcion || '')}</div>`;
       return `
         <div class="itemcard ce-doc-item" data-doc-id="${id}">
           <div class="ce-doc-item-grid">
             <div class="ce-doc-media">${thumb}</div>
-            <div class="ce-doc-data">
-              <div class="ce-doc-fields">
-                <div class="field ce-doc-date-field"><label>Fecha</label><input type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(formatDate(doc.fecha || ''))}" data-doc-field="fecha" data-doc-id="${id}" ${disabled} /></div>
-                <div class="field ce-doc-desc-field"><label>&nbsp;</label><textarea rows="2" data-doc-field="descripcion" data-doc-id="${id}" ${readonlyText} ${disabled}>${esc(doc.descripcion || '')}</textarea></div>
-              </div>
-              <div class="ce-doc-actions">${actions}</div>
-            </div>
+            <div class="ce-doc-date-slot">${dateHtml}</div>
+            <div class="ce-doc-desc-slot">${descHtml}</div>
+            ${actions ? `<div class="ce-doc-actions">${actions}</div>` : ''}
           </div>
-        </div>`;
-    }).join('');
+          ${modal}
+        </div>`;    }).join('');
     enableDocumentViewControls();
   }
 
@@ -848,6 +860,37 @@
       @media(min-width:901px){#tabDocumentos .ce-doc-item-grid{grid-template-columns:62px minmax(0,1fr)!important;}#tabDocumentos .ce-doc-fields{grid-template-columns:116px minmax(0,1fr)!important;}#tabDocumentos .ce-doc-thumb{width:52px!important;height:52px!important;max-width:52px!important;max-height:52px!important;}#tabDocumentos .ce-doc-media{min-height:60px!important}.ce-doc-modal-info-v85 p{font-weight:850!important;}}
       @media(max-width:900px){#tabDocumentos{overflow-x:hidden!important;}#tabDocumentos .card{padding-left:10px!important;padding-right:10px!important;}#tabDocumentos .ce-doc-item{padding:8px!important;}#tabDocumentos .ce-doc-item-grid{grid-template-columns:54px minmax(0,1fr)!important;gap:7px!important;}#tabDocumentos .ce-doc-fields{grid-template-columns:86px minmax(0,1fr)!important;gap:6px!important;}#tabDocumentos .ce-doc-date-field input{font-size:11px!important;padding-left:3px!important;padding-right:3px!important;}#tabDocumentos .ce-doc-desc-field textarea{font-size:12px!important;min-height:38px!important;}#tabDocumentos .ce-doc-actions{font-size:11px!important;gap:5px!important;}#tabDocumentos .ce-doc-actions button{font-size:11px!important;padding:7px 8px!important;}#tabDocumentos .ce-doc-thumb{width:44px!important;height:44px!important;max-width:44px!important;max-height:44px!important}.ce-doc-modal-v85{padding:6px!important}.ce-doc-modal-box-v85{width:98vw!important;max-height:94vh!important;overflow:auto!important;border-radius:16px!important;padding:10px!important}.ce-doc-modal-info-v85 strong{font-size:17px!important}.ce-doc-modal-info-v85 p{font-size:14px!important;font-weight:850!important}.ce-doc-modal-close-v85{width:44px!important;height:44px!important;line-height:44px!important;font-size:28px!important;}}
       @media(max-width:900px){body.ce-v5019-authenticated #ceMobileActionDockV518,body.ce-docs-active-v85 #ceMobileActionDockV518{display:flex!important;visibility:visible!important;opacity:.78!important;z-index:190500!important;pointer-events:none!important}body.ce-v5019-authenticated #ceMobileActionDockV518 button,body.ce-docs-active-v85 #ceMobileActionDockV518 button{pointer-events:auto!important;touch-action:manipulation!important;opacity:1!important}.ce-docs-form{grid-template-columns:1fr!important}.ce-doc-fields{grid-template-columns:minmax(108px,.34fr) minmax(210px,1.66fr)!important}.ce-doc-item-grid{grid-template-columns:58px 1fr!important}.ce-doc-media{justify-content:center;padding:4px}.ce-doc-thumb{width:44px!important;height:44px!important}.ce-doc-modal-v85{padding:8px}.ce-doc-modal-box-v85{grid-template-columns:1fr;width:98vw;max-height:94vh;overflow:auto;padding:12px}.ce-doc-modal-info-v85,.ce-doc-modal-imgwrap-v85{max-height:none}.ce-doc-modal-imgwrap-v85 img{width:100%;}body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,42px)!important;gap:8px!important}}
+
+
+      /* v8.5 FIX6: visor por CSS :target, sin listeners acumulados, y nueva disposición de registros */
+      #tabDocumentos .ce-doc-item:nth-child(odd){background:#fff!important;}
+      #tabDocumentos .ce-doc-item:nth-child(even){background:#dbeeff!important;}
+      #tabDocumentos .ce-doc-item-grid{display:grid!important;grid-template-columns:64px 118px minmax(0,1fr)!important;gap:10px!important;align-items:center!important;}
+      #tabDocumentos .ce-doc-media{min-height:48px!important;background:rgba(255,255,255,.60)!important;}
+      #tabDocumentos .ce-doc-thumb{width:58px!important;height:42px!important;max-width:58px!important;max-height:42px!important;object-fit:cover!important;border-radius:8px!important;}
+      #tabDocumentos .ce-doc-thumb-link-v85{display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:zoom-in!important;touch-action:manipulation!important;pointer-events:auto!important;-webkit-tap-highlight-color:rgba(37,99,235,.18)!important;}
+      #tabDocumentos .ce-doc-date-slot,#tabDocumentos .ce-doc-desc-slot{min-width:0!important;}
+      #tabDocumentos .ce-doc-date-input,#tabDocumentos .ce-doc-date-view{width:100%!important;box-sizing:border-box!important;text-align:center!important;font-weight:950!important;color:#0f172a!important;font-size:14px!important;line-height:1.15!important;background:rgba(255,255,255,.76)!important;border:1px solid #cbd5e1!important;border-radius:10px!important;padding:9px 6px!important;white-space:nowrap!important;}
+      #tabDocumentos .ce-doc-desc-input,#tabDocumentos .ce-doc-desc-view{width:100%!important;box-sizing:border-box!important;font-weight:950!important;color:#0f172a!important;font-size:14px!important;line-height:1.22!important;background:rgba(255,255,255,.76)!important;border:1px solid #cbd5e1!important;border-radius:12px!important;padding:9px 10px!important;min-height:42px!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;}
+      #tabDocumentos .ce-doc-actions{grid-column:2 / 4!important;display:flex!important;flex-wrap:nowrap!important;gap:8px!important;align-items:center!important;margin-top:0!important;overflow-x:auto!important;padding:2px 0 1px!important;}
+      #tabDocumentos .ce-doc-actions button{white-space:nowrap!important;flex:0 0 auto!important;}
+      #tabDocumentos .ce-docs-form-desc textarea{font-weight:850!important;}
+      @media(min-width:901px){#tabDocumentos .ce-docs-form{grid-template-columns:120px minmax(680px,4.2fr) minmax(190px,.75fr) auto!important;}#tabDocumentos .ce-docs-form-desc textarea{min-height:72px!important;font-size:15px!important;}#tabDocumentos .ce-doc-item-grid{grid-template-columns:66px 120px minmax(0,1fr)!important;}#tabDocumentos .ce-doc-desc-input,#tabDocumentos .ce-doc-desc-view{min-height:44px!important;}}
+      @media(max-width:900px){#tabDocumentos .ce-doc-item-grid{grid-template-columns:58px 78px minmax(0,1fr)!important;gap:6px!important;}#tabDocumentos .ce-doc-media{min-height:44px!important;padding:3px!important;}#tabDocumentos .ce-doc-thumb{width:52px!important;height:38px!important;max-width:52px!important;max-height:38px!important;}#tabDocumentos .ce-doc-date-input,#tabDocumentos .ce-doc-date-view{font-size:11px!important;padding:8px 3px!important;letter-spacing:-.03em!important;}#tabDocumentos .ce-doc-desc-input,#tabDocumentos .ce-doc-desc-view{font-size:12px!important;min-height:38px!important;padding:8px 7px!important;line-height:1.18!important;}#tabDocumentos .ce-doc-actions{grid-column:1 / 4!important;gap:5px!important;}#tabDocumentos .ce-doc-actions button{font-size:10.5px!important;padding:7px 7px!important;}#tabDocumentos .ce-docs-form-desc textarea{min-height:42px!important;}}
+      .ce-doc-target-modal-v85{position:fixed!important;inset:0!important;z-index:980000!important;background:rgba(15,23,42,.74)!important;display:none!important;align-items:center!important;justify-content:center!important;padding:18px!important;overscroll-behavior:contain!important;}
+      .ce-doc-target-modal-v85:target{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+      .ce-doc-target-box-v85{position:relative!important;width:min(1180px,96vw)!important;max-height:94vh!important;background:#fff!important;border-radius:22px!important;border:1px solid rgba(15,23,42,.18)!important;box-shadow:0 24px 80px rgba(0,0,0,.36)!important;padding:16px!important;display:grid!important;grid-template-columns:minmax(230px,.55fr) minmax(320px,1.45fr)!important;gap:16px!important;align-items:start!important;overflow:auto!important;}
+      .ce-doc-target-close-v85{position:absolute!important;right:10px!important;top:8px!important;z-index:980002!important;display:flex!important;align-items:center!important;justify-content:center!important;text-decoration:none!important;background:#111827!important;color:#fff!important;border-radius:999px!important;width:44px!important;height:44px!important;font-size:30px!important;line-height:1!important;font-weight:950!important;touch-action:manipulation!important;}
+      .ce-doc-target-info-v85{background:#f8fafc!important;border:1px solid #dbe2ea!important;border-radius:16px!important;padding:12px!important;max-height:84vh!important;overflow:auto!important;}
+      .ce-doc-target-info-v85 strong{display:block!important;font-size:20px!important;margin-bottom:4px!important;}
+      .ce-doc-target-info-v85 span{display:inline-block!important;margin-bottom:10px!important;color:#64748b!important;font-weight:950!important;}
+      .ce-doc-target-info-v85 p{white-space:pre-wrap!important;line-height:1.35!important;margin:0!important;font-weight:900!important;color:#0f172a!important;}
+      .ce-doc-target-imgwrap-v85{max-height:86vh!important;overflow:auto!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;}
+      .ce-doc-target-imgwrap-v85 img{max-width:100%!important;height:auto!important;border-radius:14px!important;border:1px solid #dbe2ea!important;box-shadow:0 10px 34px rgba(15,23,42,.18)!important;}
+      @media(max-width:900px){.ce-doc-target-modal-v85{padding:8px!important;}.ce-doc-target-box-v85{grid-template-columns:1fr!important;width:98vw!important;max-height:94vh!important;border-radius:16px!important;padding:12px!important;}.ce-doc-target-info-v85,.ce-doc-target-imgwrap-v85{max-height:none!important;}.ce-doc-target-imgwrap-v85 img{width:100%!important;}.ce-doc-target-info-v85 strong{font-size:17px!important;}.ce-doc-target-info-v85 p{font-size:14px!important;}}
+      #ceBtnRefresV518.ce-refreshing,#btnSoftRefresh.ce-refreshing{background:#dcfce7!important;border-color:#22c55e!important;color:#14532d!important;}
+      #ceBtnRefresV518.ce-refresh-ok,#btnSoftRefresh.ce-refresh-ok{background:#22c55e!important;border-color:#16a34a!important;color:#fff!important;}
+
     `;
     document.head.appendChild(style);
   }
@@ -949,8 +992,22 @@
 
   if(!window.__ceDocModalEscV85){
     window.__ceDocModalEscV85 = true;
-    document.addEventListener('keydown', event => { if(event.key === 'Escape' && $('ceDocModalV85')){ event.preventDefault(); closeModal(); } }, true);
+    document.addEventListener('keydown', event => {
+      if(event.key === 'Escape' && $('ceDocModalV85')){ event.preventDefault(); closeModal(); return; }
+      if(event.key === 'Escape' && String(location.hash || '').indexOf('#ceDocViewV85_') === 0){
+        event.preventDefault();
+        try{ location.hash = 'tabDocumentos'; }catch(_){ }
+      }
+    }, true);
   }
+  document.addEventListener('click', event => {
+    const modal = event.target?.closest?.('.ce-doc-target-modal-v85');
+    if(modal && event.target === modal){
+      event.preventDefault();
+      try{ location.hash = 'tabDocumentos'; }catch(_){ }
+      return false;
+    }
+  }, true);
   document.addEventListener('click', handleClick, true);
   document.addEventListener('change', handleChange, true);
   ['controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));

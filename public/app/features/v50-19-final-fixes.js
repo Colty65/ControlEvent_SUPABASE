@@ -346,6 +346,10 @@
   }
 
   async function refreshHere(ev){
+    // v8.5 FIX6: el dock movil Refres debe usar el refresco en sitio mas reciente.
+    if(window.ControlEventV5020 && typeof window.ControlEventV5020.refreshInPlace === 'function'){
+      return window.ControlEventV5020.refreshInPlace(ev);
+    }
     stop(ev);
     const id = currentEventId();
     const tab = currentTab();
