@@ -588,9 +588,17 @@
     const valoracionItems = [{label:'Valoración del evento', value:Math.abs(valoracion), displayValue:valoracion, color:WINDOWS_BLUE, layout:'metricv460', lines:valoracionLines(paidExpenseRows.concat(currentExpenseRows, pendingExpenseRows), compras.filter(r=>isDonation(r.ticketDonacion)), totalExp, totalDon, valoracion, totalPendingExp)}];
     return {incomeItems, donationItems, expenseItems, saldoActualItems, saldoOperativoItems, valoracionItems, totalIncome, totalDon, totalExp, saldoActual, saldoOperativo, valoracion};
   }
+  function detailSortText(value){ return upper(String(value || '')); }
   function incomeLines(rows){
-    if(!rows.length) return ['Nombre | Ingreso | Importe', 'Sin registros'];
-    return ['Nombre | Ingreso | Importe', ...rows.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
+      const sa = upper(a?.persona?.rango || personaBy(a?.personaId)?.rango) === 'SOCIO' ? 0 : 1;
+      const sb = upper(b?.persona?.rango || personaBy(b?.personaId)?.rango) === 'SOCIO' ? 0 : 1;
+      const na = a?.persona?.nombre || personName(a?.personaId) || 'Sin nombre';
+      const nb = b?.persona?.nombre || personName(b?.personaId) || 'Sin nombre';
+      return (sa - sb) || na.localeCompare(nb, 'es', {sensitivity:'base'});
+    });
+    if(!sorted.length) return ['Nombre | Ingreso | Importe', 'Sin registros'];
+    return ['Nombre | Ingreso | Importe', ...sorted.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
   }
   function donationLines(rows){
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
@@ -599,17 +607,46 @@
       return da.localeCompare(db, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
     });
     if(!sorted.length) return ['Donante | Producto | Cant. | Precio | Total', 'Sin registros'];
-    return ['Donante | Producto | Cant. | Precio | Total', ...sorted.map(r => `${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    const out = ['Donante | Producto | Cant. | Precio | Total'];
+    let i = 0;
+    while(i < sorted.length){
+      const donor = donorName(sorted[i]) || 'Sin donante';
+      const group = [];
+      while(i < sorted.length && (donorName(sorted[i]) || 'Sin donante') === donor){ group.push(sorted[i]); i += 1; }
+      group.forEach(r => out.push(`${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+      if(group.length > 1){
+        out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      }
+    }
+    return out;
   }
   function expenseLines(rows){
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
-      const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
       const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
+      const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
       const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      return ta.localeCompare(tb, 'es', {sensitivity:'base'}) || sa.localeCompare(sb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+      return sa.localeCompare(sb, 'es', {sensitivity:'base'}) || ta.localeCompare(tb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
     });
-    if(!sorted.length) return ['Ticket | Tienda | Producto | Cant. | Precio | Total', 'Sin registros'];
-    return ['Ticket | Tienda | Producto | Cant. | Precio | Total', ...sorted.map(r => `${r.ticketDonacion || 'Pte.Compra'} | ${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`)];
+    if(!sorted.length) return ['Tienda | Ticket | Producto | Cant. | Precio | Total', 'Sin registros'];
+    const out = ['Tienda | Ticket | Producto | Cant. | Precio | Total'];
+    let i = 0;
+    while(i < sorted.length){
+      const store = sorted[i]?.tienda?.nombre || storeName(sorted[i]?.tiendaId) || 'Sin tienda';
+      const ticket = sorted[i]?.ticketDonacion || 'Pte.Compra';
+      const group = [];
+      while(i < sorted.length){
+        const r = sorted[i];
+        const sName = r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
+        const tName = r?.ticketDonacion || 'Pte.Compra';
+        if(sName !== store || tName !== ticket) break;
+        group.push(r); i += 1;
+      }
+      group.forEach(r => out.push(`${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+      if(group.length > 1){
+        out.push(`Total ${store} / ${ticket} |  |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      }
+    }
+    return out;
   }
   function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
@@ -637,7 +674,7 @@
     });
   }
   function detailHeaderFor(label){
-    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Ticket | Tienda | Producto | Cant. | Precio | Total';
+    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Tienda | Ticket | Producto | Cant. | Precio | Total';
   }
   function pieCard(title, total, items){
     const nonzero = items.filter(it => Math.abs(Number(it.value || 0)) > 0);

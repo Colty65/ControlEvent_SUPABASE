@@ -138,6 +138,11 @@
     try{ if(typeof window.isDonationTicket === 'function') return window.isDonationTicket(value); }catch(_){ }
     return ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'].includes(up(value));
   }
+  function isCurrentExpenseTicket(value){
+    try{ if(typeof window.isCurrentExpenseTicket === 'function') return window.isCurrentExpenseTicket(value); }catch(_){ }
+    const t = up(value);
+    return t.includes('GASTOS CORRIENTES') || t.includes('GASTOS DE ORGANIZACION') || t.includes('GASTOS DE ORGANIZACIÓN');
+  }
   function eventPrice(){ return Number(selectedEventObj().precio || selectedEventObj().price || 0); }
   function incomePersona(row){ return row.persona || persona(row.personaId) || {}; }
   function incomeIsSocio(row){ return up(incomePersona(row).rango || row.rango || '') === 'SOCIO'; }
@@ -253,26 +258,32 @@
     const c = up(code);
     return compras().filter(row => up(row.ticketDonacion || row.ticket || '') === c).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
   }
+  function donationTableRows(rows){
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
+    const out = [];
+    let i = 0;
+    while(i < sorted.length){
+      const donor = donorName(sorted[i]);
+      const group = [];
+      while(i < sorted.length && donorName(sorted[i]) === donor){ group.push(sorted[i]); i += 1; }
+      group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+      if(group.length > 1){
+        out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      }
+    }
+    return out;
+  }
   function donationTipForCode(title, code){
     const rows = donationRows(code);
     const total = rows.reduce((sum, row) => sum + productValue(row), 0);
-    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], rows.map(row => [donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], donationTableRows(rows));
     return {title:`DONACION DE PRODUCTO / ${title}`, totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
   function donationTotalTip(){
-    const groups = [
-      ['TIENDAS','DONADO TIENDA'],
-      ['SOCIOS','DONADO SOCIO'],
-      ['NO SOCIOS','DONADO OTROS']
-    ];
-    const rows = [];
-    let total = 0;
-    groups.forEach(([title, code]) => {
-      const value = donationRows(code).reduce((sum, row) => sum + productValue(row), 0);
-      total += value;
-      rows.push([title, money(value)]);
-    });
-    return {title:'DONACION DE PRODUCTO / TOTAL', totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table: tableHtml(['Tipo','Valor estimado'], rows)};
+    const rows = compras().filter(row => isDonationTicket(row.ticketDonacion || row.ticket || '')).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
+    const total = rows.reduce((sum, row) => sum + productValue(row), 0);
+    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], donationTableRows(rows));
+    return {title:'DONACION DE PRODUCTO / TOTAL', totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
   function donationTipForRow(row){
     const text = up(row.textContent || '');
@@ -283,7 +294,50 @@
     return null;
   }
 
-
+  function expenseTicket(row){ return norm(row.ticketDonacion || row.ticket || '') || 'Pte.Compra'; }
+  function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
+  function allExpenseRows(){ return compras().filter(isExpenseRow); }
+  function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
+  function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
+  function expenseTableRows(rows){
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(expenseTicket(a), expenseTicket(b)) || cmp(storeName(a), storeName(b)) || cmp(productName(a), productName(b)));
+    const out = [];
+    let i = 0;
+    while(i < sorted.length){
+      const ticket = expenseTicket(sorted[i]);
+      const store = storeName(sorted[i]);
+      const group = [];
+      while(i < sorted.length && expenseTicket(sorted[i]) === ticket && storeName(sorted[i]) === store){ group.push(sorted[i]); i += 1; }
+      group.forEach(row => out.push([expenseTicket(row), storeName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+      if(group.length > 1){
+        out.push([`TOTAL ${ticket} / ${store}`, '', '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      }
+    }
+    return out;
+  }
+  function operativeTipForRow(row){
+    const text = up(row.textContent || '');
+    let rows = [];
+    let title = 'OPERATIVA / GASTOS';
+    if(text.includes('PTE')){
+      rows = pendingExpenseRows();
+      title = 'OPERATIVA / PTE. COMPRA U OTROS GASTOS';
+    }else if(text.includes('GASTO POR COMPRAS') || text.includes('GASTOS REALIZADOS')){
+      rows = realisedExpenseRows();
+      title = 'OPERATIVA / GASTOS REALIZADOS';
+    }else if(text === 'GASTOS' || text.includes('GASTOS PREVISTOS')){
+      rows = allExpenseRows();
+      title = 'OPERATIVA / GASTOS PREVISTOS Y REALIZADOS';
+    }else if(text.includes('GASTOS DE ORGANIZACION')){
+      rows = allExpenseRows().filter(item => isCurrentExpenseTicket(item.ticketDonacion || item.ticket || ''));
+      title = 'OPERATIVA / GASTOS DE ORGANIZACION';
+    }else{
+      return null;
+    }
+    const total = rows.reduce((sum, item) => sum + productValue(item), 0);
+    const table = tableHtml(['Ticket','Tienda','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    return {title, totalLabel:'TOTAL', totalValue: money(total), table};
+  }
   function installLegacyTipAttributeFirewall(){
     try{
       if(Element.prototype.setAttribute.__ceV306BudgetTipFirewall) return;
@@ -333,6 +387,19 @@
         removeLegacyAttributes(row);
       });
     });
+    budget.querySelectorAll('.budget-panel.operativo').forEach(panel => {
+      panel.classList.add('ce-v306-budget-lite-panel');
+      panel.querySelectorAll('.budget-row').forEach(row => {
+        const text = up(row.textContent || '');
+        const active = (text.includes('GASTOS') || text.includes('GASTO POR COMPRAS') || text.includes('PTE')) && !text.includes('SALDO') && !text.includes('INGRESOS');
+        if(!active) return;
+        row.classList.add('ce-v306-budget-lite-row');
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('aria-label', 'Ver detalle');
+        removeLegacyAttributes(row);
+      });
+    });
   }
 
   function isBudgetPanel(panel){
@@ -341,7 +408,8 @@
     return panel.classList.contains('socios')
       || panel.classList.contains('donantes')
       || panel.classList.contains('ce-v306-donantes-lite')
-      || /INGRESOS\s+EN\s+DINERO|DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO/.test(text);
+      || panel.classList.contains('operativo')
+      || /INGRESOS\s+EN\s+DINERO|DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO|OPERATIVA/.test(text);
   }
   function isDonationPanel(panel){
     if(!panel) return false;
@@ -354,6 +422,11 @@
     if(!panel) return false;
     const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
     return panel.classList.contains('socios') || /INGRESOS\s+EN\s+DINERO|SOCIOS|NO\s+SOCIOS/.test(text);
+  }
+  function isOperativePanel(panel){
+    if(!panel) return false;
+    const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
+    return panel.classList.contains('operativo') || /OPERATIVA/.test(text);
   }
   function findBudgetRow(target){
     if(!isBudgetLayoutActive()) return null;
@@ -371,6 +444,7 @@
     let tip = null;
     if(isIncomePanel(panel)) tip = incomeTipForRow(row);
     if(!tip && isDonationPanel(panel)) tip = donationTipForRow(row);
+    if(!tip && isOperativePanel(panel)) tip = operativeTipForRow(row);
     if(!tip) return false;
     row.classList.add('ce-v306-budget-lite-row');
     try{ row.setAttribute('role', 'button'); row.setAttribute('tabindex', '0'); }catch(_){ }
