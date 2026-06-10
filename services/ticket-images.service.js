@@ -2,7 +2,8 @@ import {
   deleteTicketImage as deleteTicketImageDb,
   deleteTicketImagesForEvent as deleteTicketImagesForEventDb,
   imagesForEvent,
-  uploadTicketImage as uploadTicketImageDb
+  uploadTicketImage as uploadTicketImageDb,
+  cleanupStaleIngresoImages as cleanupStaleIngresoImagesDb
 } from '../lib/supabase-normalized.js';
 
 export function listImages(eventId) {
@@ -31,4 +32,8 @@ export async function deleteEventImages({ eventId } = {}) {
   }
   const result = await deleteTicketImagesForEventDb(eventId);
   return { ok: true, ...result };
+}
+
+export async function cleanupStaleIngresoImages({ dryRun = false } = {}) {
+  return cleanupStaleIngresoImagesDb({ dryRun });
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v8-5-prod-fix13-img-guard';
+const CACHE_NAME = 'controlevent-shell-v8-5-prod-fix14-ingresos-clean';
 // V30.13: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',

@@ -1,8 +1,20 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { deleteEventImages, deleteImage, listImages, uploadImage } from '../services/ticket-images.service.js';
+import { cleanupStaleIngresoImages, deleteEventImages, deleteImage, listImages, uploadImage } from '../services/ticket-images.service.js';
 
 const router = express.Router();
+
+
+router.get('/ticket-images/cleanup-stale-ingresos', asyncHandler(async (req, res) => {
+  const dryRun = String(req.query.dryRun || '').toLowerCase();
+  res.json(await cleanupStaleIngresoImages({ dryRun: dryRun === '1' || dryRun === 'true' || dryRun === 'yes' }));
+}));
+
+router.post('/ticket-images/cleanup-stale-ingresos', asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const dryRun = String(req.query.dryRun || body.dryRun || '').toLowerCase();
+  res.json(await cleanupStaleIngresoImages({ dryRun: dryRun === '1' || dryRun === 'true' || dryRun === 'yes' }));
+}));
 
 router.get('/ticket-images', asyncHandler(async (req, res) => {
   res.json({ ok: true, images: await listImages(req.query.eventId || '') });
