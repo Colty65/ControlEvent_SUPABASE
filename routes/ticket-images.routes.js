@@ -1,8 +1,17 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { deleteEventImages, deleteImage, listImages, uploadImage } from '../services/ticket-images.service.js';
+import { cleanupOrphanImages, deleteEventImages, deleteImage, listImages, uploadImage } from '../services/ticket-images.service.js';
 
 const router = express.Router();
+
+
+router.post('/ticket-images/cleanup-orphans', asyncHandler(async (req, res) => {
+  res.json(await cleanupOrphanImages());
+}));
+
+router.get('/ticket-images/cleanup-orphans', asyncHandler(async (req, res) => {
+  res.json(await cleanupOrphanImages());
+}));
 
 router.get('/ticket-images', asyncHandler(async (req, res) => {
   res.json({ ok: true, images: await listImages(req.query.eventId || '') });

@@ -1,0 +1,23 @@
+ControlEvent v8.5_prod FIX11 - limpieza ce_ticket_images
+
+Motivo:
+- La consulta agrupada por event_id en ce_ticket_images podía devolver más eventos que los existentes en ce_eventos, por restos históricos de identificadores antiguos o eventos ya eliminados.
+
+Qué hace esta versión:
+- Añade el endpoint /api/ticket-images/cleanup-orphans.
+- Al arrancar la app, de forma diferida y una vez al día por navegador, ejecuta una limpieza no bloqueante.
+- Corrige event_id cuando la fila tiene una clave/URL que apunta claramente a un evento vivo.
+- Elimina filas huérfanas que no pertenecen a ningún evento vivo de ce_eventos y borra sus ficheros del bucket cuando hay storage_path.
+
+Consulta de comprobación posterior:
+select 
+  event_id,
+  count(*) as total_fotos,
+  count(*) filter (where label ilike 'INGRESO:%') as fotos_ingresos,
+  count(*) filter (where label ~* 'TK[0-9]+') as fotos_tkxx
+from ce_ticket_images
+group by event_id
+order by event_id;
+
+También se puede forzar manualmente desde el navegador abriendo:
+https://TU-APP/api/ticket-images/cleanup-orphans
