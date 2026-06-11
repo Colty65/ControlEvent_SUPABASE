@@ -1,10 +1,10 @@
-/* ControlEvent v8.5_prod FIX15 - preflight de fotos en eventos recien creados.
-   La FIX13 bloqueaba correctamente fotos de eventos inexistentes, pero un evento nuevo
-   puede estar aun pendiente del PUT /api/state cuando se adjunta el primer justificante.
-   Antes de POST /api/ticket-images, fuerza una sincronizacion completa del estado vivo. */
+/* ControlEvent v8.5_prod FIX16 - preflight ligero de fotos en eventos recien creados.
+   Mantiene la proteccion anti-huerfanos, pero al sincronizar antes de subir una foto
+   NO envia ticketImages/ticketImageRefs. Asi evita que aliases antiguos/canonicos de
+   imagen provoquen ON CONFLICT ... affect row a second time durante el PUT /api/state. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV85TicketImagesNewEventPreflightFix15';
+  const INSTALLED = '__ceV85TicketImagesNewEventPreflightFix16';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
@@ -37,9 +37,20 @@
     try{
       const copy = JSON.parse(JSON.stringify(s));
       copy.__imageUploadPreflight = true;
+      // FIX16: este preflight solo debe consolidar tablas de estado, no regrabar fotos.
+      // Enviar ticketImages/ticketImageRefs aqui puede contener aliases duplicados que,
+      // al canonizarse en servidor, acaban en dos filas con el mismo image_key dentro
+      // del mismo upsert y Supabase devuelve ON CONFLICT ... second time.
+      delete copy.ticketImages;
+      delete copy.ticketImageRefs;
       return copy;
     }catch(_){
-      try{ return Object.assign({}, s, {__imageUploadPreflight:true}); }catch(__){ return null; }
+      try{
+        const copy = Object.assign({}, s, {__imageUploadPreflight:true});
+        delete copy.ticketImages;
+        delete copy.ticketImageRefs;
+        return copy;
+      }catch(__){ return null; }
     }
   }
 
@@ -76,7 +87,7 @@
     await preflightChain;
   }
 
-  if(typeof window.fetch === 'function' && !window.fetch.__ceV85TicketImagesNewEventPreflightFix15){
+  if(typeof window.fetch === 'function' && !window.fetch.__ceV85TicketImagesNewEventPreflightFix16){
     const oldFetch = window.fetch.bind(window);
     const wrapped = async function(input, init){
       const url = String(typeof input === 'string' ? input : (input && input.url) || '');
@@ -86,15 +97,15 @@
         const eventId = norm(payload && payload.eventId);
         try{ await ensureStateSavedBeforeImageUpload(oldFetch, eventId); }
         catch(error){
-          try{ console.warn('[ControlEvent v8.5 FIX15] Preflight /api/state antes de subir imagen fallido:', error); }catch(_){ }
+          try{ console.warn('[ControlEvent v8.5 FIX16] Preflight /api/state antes de subir imagen fallido:', error); }catch(_){ }
           return new Response(JSON.stringify({ok:false, error:error?.message || String(error || 'No se pudo sincronizar el evento antes de subir la foto.')}), {status:409, headers:{'Content-Type':'application/json'}});
         }
       }
       return oldFetch(input, init);
     };
-    wrapped.__ceV85TicketImagesNewEventPreflightFix15 = true;
+    wrapped.__ceV85TicketImagesNewEventPreflightFix16 = true;
     window.fetch = wrapped;
   }
 
-  window.ControlEventV85TicketImagesNewEventPreflight = {version:'v8.5_prod FIX15'};
+  window.ControlEventV85TicketImagesNewEventPreflight = {version:'v8.5_prod FIX16'};
 })();
