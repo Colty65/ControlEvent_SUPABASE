@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX27 - CRUD raíz fila-a-fila
+/* ControlEvent v8.5_prod FIX28 - CRUD raíz fila-a-fila
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.
@@ -8,10 +8,10 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85CrudRootFix27';
+  const TAG='__ceV85CrudRootFix28';
   if(window[TAG]) return; window[TAG]=true;
 
-  const WRITE_SCOPE='row-crud-v8-5-fix27';
+  const WRITE_SCOPE='row-crud-v8-5-fix28';
   const COLLECTIONS=['eventos','personas','tiendas','productos','colaboradores','compras'];
   const MAINT_ACTIONS=new Set([
     'save-compra','delete-compra','save-donacion','delete-donacion',
@@ -23,7 +23,7 @@
   ]);
   const ADD_BUTTONS=new Set(['btnAddCompra','btnAddDonacion','btnAddColab','btnAddEvento','btnAddPersona','btnAddTienda','btnAddProducto']);
 
-  function log(){ try{ console.warn('[FIX27 CRUD RAIZ]', ...arguments); }catch(_){} }
+  function log(){ try{ console.warn('[FIX28 CRUD RAIZ]', ...arguments); }catch(_){} }
   function $(id){ return document.getElementById(id); }
   function css(s){ try{return window.CSS && CSS.escape ? CSS.escape(String(s)) : String(s).replace(/"/g,'\\"');}catch(_){return String(s||'');} }
   function getState(){ try{return Function('return (typeof state!=="undefined")?state:(window.state||{})')();}catch(_){return window.state||{};} }
@@ -50,6 +50,11 @@
   function requireWrite(){ if(!canWrite()){ alert('Usuario sin permiso de escritura.'); return false; } return true; }
   function requireGD(){ if(!isGD()){ alert('Solo usuario GD puede realizar esta operación.'); return false; } return true; }
   function blockIfFinalized(ev, text){ if(isFinalized(ev)){ alert('Evento Finalizado: no se permite '+(text||'modificar datos')+'. Cambia antes la situación a En curso si necesitas corregirlo.'); return true; } return false; }
+  function onlySituationChange(old,row){
+    if(!old || !row) return false;
+    return String(old.situacion||'').trim() !== String(row.situacion||'').trim()
+      && String(row.situacion||'').trim() !== '';
+  }
 
   async function apiJson(url, init){
     const res=await fetch(url, init||{});
@@ -111,7 +116,26 @@
   async function addCompra(donacion){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir compras/donaciones'))return; const pId=elVal(donacion?'donProducto':'buyProducto'); if(!pId)return; const p=productById(pId); const row={id:uid(),eventId:selectedEventId(),productoId:pId,unidades:Number(elVal(donacion?'donUnidades':'buyUnidades','0')||0),precio:money(elVal(donacion?'donPrecio':'buyPrecio',p.precio??p.defaultPrecio??0)),ticketDonacion:elVal(donacion?'donTicket':'buyTicket'),donorRef:donacion?elVal('donDonante'):'',responsableId:elVal(donacion?'donResponsable':'buyResponsable'),tiendaId:donacion?(p.tiendaId||p.defaultTiendaId||''):elVal('buyTienda',p.tiendaId||p.defaultTiendaId||'')}; await upsert('compras',row); replaceLocal('compras',row); if(donacion){ clear(['donProducto','donDonante','donResponsable']); setVal('donUnidades','1.00'); setVal('donPrecio','0,00 €'); } else { clear(['buyProducto','buyTienda','buyResponsable']); setVal('buyUnidades','1.00'); setVal('buyPrecio','0,00 €'); setVal('buyTicket',''); } await refreshFromDb(); }
 
   async function handleMaintenance(action,id){
-    if(action==='save-evento'){ if(!requireGD())return; const row=rowEventoFromForm(id); await upsert('eventos',row); replaceLocal('eventos',row); await refreshFromDb(); return; }
+    if(action==='save-evento'){
+      if(!requireGD())return;
+      const old=eventById(id);
+      const row=rowEventoFromForm(id);
+      // FIX28: si el evento YA está Finalizado, la única operación permitida es
+      // cambiar exclusivamente la situación. No mandamos el registro completo,
+      // porque cualquier diferencia de formato en fechas/descripción provocaba
+      // bloqueo y además no debe actualizar campos de un evento cerrado.
+      if(isFinalized(old)){
+        if(!onlySituationChange(old,row)){
+          alert('Evento Finalizado: solo se permite cambiar la SITUACIÓN. Para modificar datos, primero pásalo a En curso.');
+          return;
+        }
+        await updateEventSituation(id,row.situacion);
+        if(old) old.situacion=row.situacion;
+        await refreshFromDb();
+        return;
+      }
+      await upsert('eventos',row); replaceLocal('eventos',row); await refreshFromDb(); return;
+    }
     if(action==='delete-evento'){ if(!requireGD())return; const target=eventById(id); if(blockIfFinalized(target,'eliminar evento'))return; if(!confirm('¿Eliminar evento y sus datos asociados?')) return; await del('eventos',id); removeLocal('eventos',id); await refreshFromDb(); return; }
 
     if(!requireWrite()) return;
@@ -158,7 +182,7 @@
         if(bid==='btnAddCompra') return await addCompra(false);
         if(bid==='btnAddDonacion') return await addCompra(true);
         return await handleMaintenance(action,id);
-      }catch(err){ console.error('[FIX27 CRUD RAIZ]',err); alert(err.message||String(err)); }
+      }catch(err){ console.error('[FIX28 CRUD RAIZ]',err); alert(err.message||String(err)); }
     })();
     return false;
   }
@@ -201,6 +225,6 @@
     if(window.caches&&caches.keys) caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{});
   }catch(_){}
 
-  window.ControlEventCrudRootFix27={active:true, version:'v8.5_prod_fix27', scope:WRITE_SCOPE}; try{document.documentElement.setAttribute('data-ce-crud-root','fix27');}catch(_){}
-  log('Activo en WINDOW CAPTURE: CRUD raíz fila-a-fila. Sin guardado global.');
+  window.ControlEventCrudRootFix28={active:true, version:'v8.5_prod_fix28', scope:WRITE_SCOPE}; try{document.documentElement.setAttribute('data-ce-crud-root','fix28');}catch(_){}
+  log('Activo FIX28 en WINDOW CAPTURE: CRUD raíz fila-a-fila. Sin guardado global.');
 })();
