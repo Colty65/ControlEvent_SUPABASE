@@ -10,16 +10,13 @@ router.get('/state', asyncHandler(async (req, res) => {
 
 router.put('/state', asyncHandler(async (req, res) => {
   const body = req.body || {};
-  // FIX21: /api/state deja de ser una puerta de guardado automatico.
-  // Solo se acepta restauracion total o una escritura marcada explicitamente por accion de usuario.
-  if (String(req.query.imagePreflight || '') === '1') {
-    return res.json({ ok: true, ignored: true, reason: 'image-preflight-disabled' });
-  }
-  const explicit = body.__explicitWrite === true || String(req.get('X-ControlEvent-Explicit-Write') || '') === '1';
-  const restore = body.__forceReplaceAll === true || body.__allowEmptyReplace === true;
-  if (!explicit && !restore) {
-    console.warn('[FIX21] PUT /api/state ignorado: sin marca de escritura explicita.');
-    return res.json({ ok: true, ignored: true, reason: 'automatic-state-put-blocked' });
+  // FIX22: /api/state queda cerrado para guardados normales.
+  // Motivo: cualquier estado parcial del navegador podia terminar alterando tablas.
+  // Solo se admite restauracion total controlada con doble marca.
+  const restore = body.__forceReplaceAll === true && String(req.get('X-ControlEvent-Backup-Restore') || '') === '1';
+  if (!restore) {
+    console.warn('[FIX22] PUT /api/state BLOQUEADO. No se escribe nada en BBDD.');
+    return res.json({ ok: true, ignored: true, blocked: true, fix: 'FIX22', reason: 'state-put-disabled' });
   }
   delete body.__cleanupStaleIngresoImages;
   delete body.__cleanupOrphanTicketImages;

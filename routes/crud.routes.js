@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { applyDeltas, deleteRecord, upsertRecord } from '../services/crud.service.js';
+import { upsertRecord } from '../services/crud.service.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ function hasExplicitWrite(req){
 }
 function requireExplicitWrite(req){
   if(hasExplicitWrite(req)) return;
-  const err = new Error('FIX21: escritura CRUD sin accion explicita bloqueada.');
+  const err = new Error('FIX22: escritura CRUD sin accion explicita bloqueada.');
   err.status = 409;
   throw err;
 }
@@ -25,12 +25,15 @@ router.put('/crud/:collection/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/crud/:collection/:id', asyncHandler(async (req, res) => {
-  requireExplicitWrite(req);
-  res.json(await deleteRecord(req.params.collection, req.params.id));
+  // FIX22: por contencion, ninguna baja se acepta desde CRUD generico hasta reimplantar
+  // bajas boton-a-boton y verificadas. Esto impide perdidas por renders/caches/handlers viejos.
+  const err = new Error('FIX22: bajas CRUD bloqueadas temporalmente por seguridad.');
+  err.status = 409;
+  throw err;
 }));
 
 router.post('/crud-deltas', asyncHandler(async (req, res) => {
-  const err = new Error('FIX21: /api/crud-deltas bloqueado. No se admiten deltas automaticos.');
+  const err = new Error('FIX22: /api/crud-deltas bloqueado. No se admiten deltas automaticos.');
   err.status = 409;
   throw err;
 }));
