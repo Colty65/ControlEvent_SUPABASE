@@ -4,14 +4,14 @@ import { deleteRecord, updateEventSituation, upsertRecord } from '../services/cr
 
 const router = express.Router();
 
-const WRITE_SCOPES = new Set(['row-crud-v8-5-fix26', 'row-crud-v8-5-fix23']);
+const WRITE_SCOPES = new Set(['row-crud-v8-5-fix27', 'row-crud-v8-5-fix26', 'row-crud-v8-5-fix23']);
 const COLLECTIONS = new Set(['eventos','personas','tiendas','productos','colaboradores','compras']);
 
 function requireRowWrite(req){
   const scope = String(req.get('X-ControlEvent-Write-Scope') || '');
   const rowOnly = req.body?.__crudRowOnly === true || String(req.get('X-ControlEvent-Row-Only') || '') === '1';
   if(WRITE_SCOPES.has(scope) && rowOnly) return;
-  const err = new Error('FIX26: escritura bloqueada. Solo se admite CRUD explícito fila-a-fila.');
+  const err = new Error('FIX27: escritura bloqueada. Solo se admite CRUD explícito fila-a-fila.');
   err.status = 409;
   throw err;
 }
@@ -25,7 +25,7 @@ function cleanBody(body){
 function collection(req){
   const c = String(req.params.collection || '').trim();
   if(!COLLECTIONS.has(c)){
-    const err = new Error('FIX26: colección CRUD no permitida: ' + c);
+    const err = new Error('FIX27: colección CRUD no permitida: ' + c);
     err.status = 400;
     throw err;
   }
@@ -53,7 +53,7 @@ router.delete('/crud/:collection/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/crud-deltas', asyncHandler(async (_req, _res) => {
-  const err = new Error('FIX26: /api/crud-deltas eliminado. Prohibidas altas/bajas deducidas por navegador.');
+  const err = new Error('FIX27: /api/crud-deltas eliminado. Prohibidas altas/bajas deducidas por navegador.');
   err.status = 410;
   throw err;
 }));

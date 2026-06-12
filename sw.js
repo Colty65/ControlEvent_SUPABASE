@@ -1,4 +1,4 @@
-// ControlEvent v8.5_prod FIX26
+// ControlEvent v8.5_prod FIX27
 // Service Worker neutralizado: nada de caché. Siempre red para evitar JS viejo.
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {
