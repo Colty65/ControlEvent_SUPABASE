@@ -883,7 +883,7 @@ function render(){
   renderEnvironmentBanner();
   renderAuthUI();
   if(!authUser) return;
-  saveState();
+  // FIX21: renderizar nunca debe guardar estado en servidor.
   renderHeader();
   renderTabVisibility();
   renderMainSelectors();
@@ -14679,15 +14679,9 @@ window.addCellNote = addCellNote;
     if(!id) return;
     s.selectedEventId=id;
     try{ localStorage.setItem(typeof STORAGE_KEY!=='undefined'?STORAGE_KEY:'controlevent_v6_4', JSON.stringify(s)); }catch(_){ }
-    try{ if(typeof saveState==='function') saveState(); }catch(_){ }
+    // FIX21: cambiar evento es navegacion local, no escritura.
     try{ if(typeof render==='function') render(); }catch(_){ }
     const sel=$('selectedEvent'); if(sel) sel.value=id;
-    try{
-      if(window.authUser && ['RW','GD'].includes(String(window.authUser.nivel||'')) && typeof pushStateToServer==='function'){
-        clearTimeout(window.__ceV227EventSaveTimer);
-        window.__ceV227EventSaveTimer=setTimeout(()=>{try{pushStateToServer();}catch(_){}},120);
-      }
-    }catch(_){ }
   };
   document.addEventListener('change',function(ev){
     if(ev.target && ev.target.id==='selectedEvent'){
@@ -14997,7 +14991,7 @@ window.addCellNote = addCellNote;
     s.selectedEventId=id; rememberEvent(id); persistStateLocal();
     try{ if(typeof render==='function') render(); }catch(_){ }
     const sel=$('selectedEvent'); if(sel) sel.value=id;
-    try{ if((isGD()||isRW()) && typeof pushStateToServer==='function'){ clearTimeout(window.__ceV229SelectedPush); window.__ceV229SelectedPush=setTimeout(()=>{try{pushStateToServer();}catch(_e){}},250); } }catch(_){ }
+    // FIX21: seleccionar evento no guarda en servidor.
   };
   document.addEventListener('change',function(e){
     if(e.target&&e.target.id==='selectedEvent'){

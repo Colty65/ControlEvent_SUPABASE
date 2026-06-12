@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controlevent-shell-v8-5-prod-fix20-no-auto-delete';
+const CACHE_NAME = 'controlevent-shell-v8-5-prod-fix21-no-auto-writes';
 // V30.13: cache nuevo; mantiene bundles legacy estables v30.7 para recuperar login.
 const SHELL_ASSETS = [
   '/',
@@ -66,7 +66,7 @@ const SHELL_ASSETS = [
   '/app/features/v8-5-documentos-excel.js',
   '/app/features/v8-5-mapa-readonly-controls.js',
   '/app/features/v8-5-ticket-images-write-guard.js',
-  '/app/features/v8-5-crud-safe.js',
+  '/app/features/v8-5-no-automatic-writes.js',
           '/app/features/v46-4-final-fixes.js',
   '/app/features/v46-7-final-fixes.js',
   '/app/features/v46-9-final-fixes.js',

@@ -9,14 +9,21 @@ router.get('/state', asyncHandler(async (req, res) => {
 }));
 
 router.put('/state', asyncHandler(async (req, res) => {
-  // v8.5 FIX17: los preflight de imagen de FIX15/FIX16 no deben guardar estado completo.
-  // Si queda un cliente viejo en cache llamando a /api/state?imagePreflight=1, se ignora para
-  // evitar reemplazos destructivos de INGRESOS/COMPRAS en eventos finalizados.
+  const body = req.body || {};
+  // FIX21: /api/state deja de ser una puerta de guardado automatico.
+  // Solo se acepta restauracion total o una escritura marcada explicitamente por accion de usuario.
   if (String(req.query.imagePreflight || '') === '1') {
-    res.json({ ok: true, ignored: true, reason: 'imagePreflight-disabled-fix17' });
-    return;
+    return res.json({ ok: true, ignored: true, reason: 'image-preflight-disabled' });
   }
-  res.json(await saveState(req.body || {}));
+  const explicit = body.__explicitWrite === true || String(req.get('X-ControlEvent-Explicit-Write') || '') === '1';
+  const restore = body.__forceReplaceAll === true || body.__allowEmptyReplace === true;
+  if (!explicit && !restore) {
+    console.warn('[FIX21] PUT /api/state ignorado: sin marca de escritura explicita.');
+    return res.json({ ok: true, ignored: true, reason: 'automatic-state-put-blocked' });
+  }
+  delete body.__cleanupStaleIngresoImages;
+  delete body.__cleanupOrphanTicketImages;
+  res.json(await saveState(body));
 }));
 
 export default router;
