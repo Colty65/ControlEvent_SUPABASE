@@ -10,13 +10,13 @@ export function listImages(eventId) {
   return imagesForEvent(eventId || '');
 }
 
-export async function uploadImage({ eventId, key, dataUrl } = {}) {
+export async function uploadImage({ eventId, key, dataUrl, eventSnapshot } = {}) {
   if (!eventId || !key || !dataUrl) {
     const err = new Error('Faltan eventId, key o dataUrl.');
     err.status = 400;
     throw err;
   }
-  return uploadTicketImageDb({ eventId, key, dataUrl });
+  return uploadTicketImageDb({ eventId, key, dataUrl, eventSnapshot });
 }
 
 export async function deleteImage({ eventId, key } = {}) {
