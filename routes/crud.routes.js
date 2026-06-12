@@ -4,7 +4,7 @@ import { deleteRecord, updateEventSituation, upsertRecord } from '../services/cr
 
 const router = express.Router();
 
-const WRITE_SCOPES = new Set(['row-crud-v8-5-fix28', 'row-crud-v8-5-fix27', 'row-crud-v8-5-fix26', 'row-crud-v8-5-fix23']);
+const WRITE_SCOPES = new Set(['row-crud-v8-5-fix29', 'row-crud-v8-5-fix28', 'row-crud-v8-5-fix27', 'row-crud-v8-5-fix26', 'row-crud-v8-5-fix23']);
 const COLLECTIONS = new Set(['eventos','personas','tiendas','productos','colaboradores','compras']);
 
 function requireRowWrite(req){
@@ -49,7 +49,7 @@ router.put('/crud/:collection/:id', asyncHandler(async (req, res) => {
 
 router.delete('/crud/:collection/:id', asyncHandler(async (req, res) => {
   requireRowWrite(req);
-  res.json(await deleteRecord(collection(req), req.params.id));
+  res.json(await deleteRecord(collection(req), req.params.id, cleanBody(req.body || {})));
 }));
 
 router.post('/crud-deltas', asyncHandler(async (_req, _res) => {

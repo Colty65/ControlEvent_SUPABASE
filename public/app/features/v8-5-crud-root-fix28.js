@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX28 - CRUD raíz fila-a-fila
+/* ControlEvent v8.5_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.
@@ -8,10 +8,10 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85CrudRootFix28';
+  const TAG='__ceV85CrudRootFix29';
   if(window[TAG]) return; window[TAG]=true;
 
-  const WRITE_SCOPE='row-crud-v8-5-fix28';
+  const WRITE_SCOPE='row-crud-v8-5-fix29';
   const COLLECTIONS=['eventos','personas','tiendas','productos','colaboradores','compras'];
   const MAINT_ACTIONS=new Set([
     'save-compra','delete-compra','save-donacion','delete-donacion',
@@ -69,7 +69,15 @@
     return apiJson(url, init);
   }
   async function upsert(collection,row){ return crud(row?.id?'PUT':'POST', collection, row?.id||'', row); }
-  async function del(collection,id){ return crud('DELETE', collection, id, null); }
+  async function del(collection,id,row){
+    const url='/api/crud/'+encodeURIComponent(collection)+'/'+encodeURIComponent(id||'');
+    const body = row ? {...row,__crudRowOnly:true,__deleteSignature:true} : {__crudRowOnly:true};
+    return apiJson(url, {
+      method:'DELETE',
+      headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':WRITE_SCOPE,'X-ControlEvent-Row-Only':'1'},
+      body:JSON.stringify(body)
+    });
+  }
   async function updateEventSituation(id, situacion){
     return apiJson('/api/crud/eventos/'+encodeURIComponent(id)+'/situacion', {
       method:'PUT',
@@ -143,7 +151,17 @@
     if(blockIfFinalized(ev,'mantener datos')) return;
 
     if(action==='save-compra'||action==='save-donacion'){ const row=rowCompraFromForm(id, action==='save-donacion'); await upsert('compras',row); replaceLocal('compras',row); await refreshFromDb(); return; }
-    if(action==='delete-compra'||action==='delete-donacion'){ await del('compras',id); removeLocal('compras',id); await refreshFromDb(); if(arr('compras').some(x=>String(x.id||'')===String(id))){ throw new Error('La baja de compra NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); } return; }
+    if(action==='delete-compra'||action==='delete-donacion'){
+      const row=rowCompraFromForm(id, action==='delete-donacion');
+      const result = await del('compras', id, row);
+      removeLocal('compras', id);
+      await refreshFromDb();
+      const stillById = arr('compras').some(x=>String(x.id||'')===String(id));
+      const deletedActualId = result?.fallback?.deletedActualId;
+      const stillByActual = deletedActualId ? arr('compras').some(x=>String(x.id||'')===String(deletedActualId)) : false;
+      if(stillById || stillByActual){ throw new Error('La baja de compra NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); }
+      return;
+    }
     if(action==='save-collab'){ const row=rowCollabFromForm(id); await upsert('colaboradores',row); replaceLocal('colaboradores',row); await refreshFromDb(); return; }
     if(action==='delete-collab'){ await del('colaboradores',id); removeLocal('colaboradores',id); await refreshFromDb(); if(arr('colaboradores').some(x=>String(x.id||'')===String(id))){ throw new Error('La baja de ingreso NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); } return; }
     if(action==='save-persona'){ const row=rowPersonaFromForm(id); await upsert('personas',row); replaceLocal('personas',row); await refreshFromDb(); return; }
@@ -225,6 +243,6 @@
     if(window.caches&&caches.keys) caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{});
   }catch(_){}
 
-  window.ControlEventCrudRootFix28={active:true, version:'v8.5_prod_fix28', scope:WRITE_SCOPE}; try{document.documentElement.setAttribute('data-ce-crud-root','fix28');}catch(_){}
-  log('Activo FIX28 en WINDOW CAPTURE: CRUD raíz fila-a-fila. Sin guardado global.');
+  window.ControlEventCrudRootFix29={active:true, version:'v8.5_prod_fix29', scope:WRITE_SCOPE}; try{document.documentElement.setAttribute('data-ce-crud-root','fix29');}catch(_){}
+  log('Activo FIX29 en WINDOW CAPTURE: CRUD raíz fila-a-fila. Baja de compras con fallback por firma. Sin guardado global.');
 })();

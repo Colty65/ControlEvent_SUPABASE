@@ -4,8 +4,8 @@ export function upsertRecord(collection, payload) {
   return upsertCrudRecord(collection, payload || {});
 }
 
-export function deleteRecord(collection, id) {
-  return deleteCrudRecord(collection, id);
+export function deleteRecord(collection, id, payload = {}) {
+  return deleteCrudRecord(collection, id, payload || {});
 }
 
 export function applyDeltas(payload) {
