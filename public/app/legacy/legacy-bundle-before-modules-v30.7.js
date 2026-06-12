@@ -222,7 +222,8 @@ async function importInitialWorkbook(){
       colaboradores: [],
       compras: [],
       ticketImages: {},
-      selectedEventId: ''
+      selectedEventId: '',
+      __forceReplaceAll: true
     };
 
     eventosRows.forEach(row => {
@@ -511,10 +512,15 @@ async function pushStateToServer(){
   }
   __remoteSaveInFlight = true;
   try{
+    const rawPayload = {...state};
+    if(state && state.__forceReplaceAll === true){
+      rawPayload.__forceReplaceAll = true;
+      try{ delete state.__forceReplaceAll; }catch(_){ state.__forceReplaceAll = false; }
+    }
     const res = await fetch('/api/state', {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(state)
+      body: JSON.stringify(rawPayload)
     });
     if(!res.ok){
       const txt = await res.text();
@@ -15592,6 +15598,10 @@ window.addCellNote = addCellNote;
       else if(v && typeof v==='object') imgs[k]=v.pathname||v.url||'';
     });
     out.ticketImages=imgs;
+    if(src.__forceReplaceAll === true){
+      out.__forceReplaceAll = true;
+      try{ delete src.__forceReplaceAll; }catch(_){ src.__forceReplaceAll = false; }
+    }
     delete out.__photoCache; delete out.ticketImagesBackup; delete out.ticketImagesLocal;
     return out;
   }
