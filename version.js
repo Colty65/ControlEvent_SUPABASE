@@ -116,4 +116,4 @@ export function installScreenLazyRuntime({app, modules} = {}){
   return api;
 }
 
-window.CONTROLEVENT_FIX = 'FIX23_WRITE_LOCKDOWN';
+window.CONTROLEVENT_FIX = 'FIX24_EXPLICIT_CRUD';

@@ -506,35 +506,8 @@ let __remoteSaveInFlight = false;
 let __remoteSaveQueued = false;
 
 async function pushStateToServer(){
-  if(__remoteSaveInFlight){
-    __remoteSaveQueued = true;
-    return;
-  }
-  __remoteSaveInFlight = true;
-  try{
-    const rawPayload = {...state};
-    if(state && state.__forceReplaceAll === true){
-      rawPayload.__forceReplaceAll = true;
-      try{ delete state.__forceReplaceAll; }catch(_){ state.__forceReplaceAll = false; }
-    }
-    const res = await fetch('/api/state', {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(rawPayload)
-    });
-    if(!res.ok){
-      const txt = await res.text();
-      throw new Error('Error guardando en servidor: ' + txt);
-    }
-  }catch(err){
-    console.error(err);
-  }finally{
-    __remoteSaveInFlight = false;
-    if(__remoteSaveQueued){
-      __remoteSaveQueued = false;
-      setTimeout(pushStateToServer, 50);
-    }
-  }
+  // FIX24: eliminado guardado masivo. Los mantenimientos escriben por /api/crud fila-a-fila.
+  return {ok:true, localOnly:true, fix:'FIX24'};
 }
 
 function saveState(){
@@ -15600,14 +15573,10 @@ window.addCellNote = addCellNote;
     return out;
   }
   async function pushState(){
-    if(saveBusy){ saveQueued=true; return; }
-    saveBusy=true;
-    try{
-      const res=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(shallowCloneForServer())});
-      if(!res.ok) throw new Error(await res.text());
-    }catch(e){ console.error('[v23.6.4] Error guardando estado:',e); }
-    finally{ saveBusy=false; if(saveQueued){ saveQueued=false; setTimeout(pushState,300); } }
+    // FIX24: eliminado guardado masivo. CRUD explícito solamente.
+    return {ok:true, localOnly:true, fix:'FIX24'};
   }
+
   try{
     saveState=function(){
       if(!authUser || !(typeof canWriteRole==='function' && canWriteRole())) return;
