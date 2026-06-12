@@ -1,40 +1,55 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { upsertRecord } from '../services/crud.service.js';
+import { deleteRecord, upsertRecord } from '../services/crud.service.js';
 
 const router = express.Router();
 
-function hasExplicitWrite(req){
-  return String(req.get('X-ControlEvent-Explicit-Write') || '') === '1' || req.body?.__explicitWrite === true || req.query?.explicit === '1';
-}
-function requireExplicitWrite(req){
-  if(hasExplicitWrite(req)) return;
-  const err = new Error('FIX22: escritura CRUD sin accion explicita bloqueada.');
+const WRITE_SCOPE = 'row-crud-v8-5-fix23';
+const COLLECTIONS = new Set(['eventos','personas','tiendas','productos','colaboradores','compras']);
+
+function requireFix23RowWrite(req){
+  const scope = String(req.get('X-ControlEvent-Write-Scope') || '');
+  const rowOnly = req.body?.__crudRowOnly === true || String(req.get('X-ControlEvent-Row-Only') || '') === '1';
+  if(scope === WRITE_SCOPE && rowOnly) return;
+  const err = new Error('FIX23: escritura CRUD bloqueada. Solo se admite CRUD fila-a-fila con cabecera FIX23.');
   err.status = 409;
   throw err;
+}
+function cleanBody(body){
+  const out = {...(body || {})};
+  delete out.__crudRowOnly;
+  delete out.__explicitWrite;
+  delete out.__explicitWriteReason;
+  return out;
+}
+function collection(req){
+  const c = String(req.params.collection || '').trim();
+  if(!COLLECTIONS.has(c)){
+    const err = new Error('FIX23: colección CRUD no permitida: ' + c);
+    err.status = 400;
+    throw err;
+  }
+  return c;
 }
 
 router.post('/crud/:collection', asyncHandler(async (req, res) => {
-  requireExplicitWrite(req);
-  res.json(await upsertRecord(req.params.collection, req.body || {}));
+  requireFix23RowWrite(req);
+  res.json(await upsertRecord(collection(req), cleanBody(req.body)));
 }));
 
 router.put('/crud/:collection/:id', asyncHandler(async (req, res) => {
-  requireExplicitWrite(req);
-  res.json(await upsertRecord(req.params.collection, { ...(req.body || {}), id: req.params.id }));
+  requireFix23RowWrite(req);
+  res.json(await upsertRecord(collection(req), { ...cleanBody(req.body), id: req.params.id }));
 }));
 
 router.delete('/crud/:collection/:id', asyncHandler(async (req, res) => {
-  // FIX22: por contencion, ninguna baja se acepta desde CRUD generico hasta reimplantar
-  // bajas boton-a-boton y verificadas. Esto impide perdidas por renders/caches/handlers viejos.
-  const err = new Error('FIX22: bajas CRUD bloqueadas temporalmente por seguridad.');
-  err.status = 409;
-  throw err;
+  requireFix23RowWrite(req);
+  res.json(await deleteRecord(collection(req), req.params.id));
 }));
 
-router.post('/crud-deltas', asyncHandler(async (req, res) => {
-  const err = new Error('FIX22: /api/crud-deltas bloqueado. No se admiten deltas automaticos.');
-  err.status = 409;
+router.post('/crud-deltas', asyncHandler(async (_req, _res) => {
+  const err = new Error('FIX23: /api/crud-deltas eliminado. Prohibidas bajas/altas deducidas por diferencias de navegador.');
+  err.status = 410;
   throw err;
 }));
 

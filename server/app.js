@@ -38,6 +38,22 @@ export function createApp() {
   app.use('/uploads', express.static(path.join(ROOT, 'uploads'), { etag: false, maxAge: 0 }));
   app.use(express.static(PUBLIC_DIR, { etag: false, maxAge: 0 }));
 
+  // FIX23: cortafuegos de servidor antes de cualquier ruta de datos.
+  // La BBDD no se actualiza por navegación, render, refresco ni estado completo.
+  app.use((req, res, next) => {
+    const method = String(req.method || 'GET').toUpperCase();
+    const url = String(req.originalUrl || req.url || '');
+    if(method === 'PUT' && /^\/api\/state(?:$|\?)/i.test(url)){
+      const body = req.body || {};
+      const restore = body.__forceReplaceAll === true && String(req.get('X-ControlEvent-Backup-Restore') || '') === '1';
+      if(!restore) return res.status(409).json({ok:false, blocked:true, fix:'FIX23', error:'PUT /api/state bloqueado por cortafuegos de servidor'});
+    }
+    if(method === 'POST' && /^\/api\/crud-deltas(?:$|\?)/i.test(url)){
+      return res.status(410).json({ok:false, blocked:true, fix:'FIX23', error:'/api/crud-deltas eliminado'});
+    }
+    next();
+  });
+
   app.get('/api/bootstrap.js', (req, res) => {
     res.type('application/javascript; charset=utf-8');
     res.send(`window.__CONTROL_EVENT_STATE__ = {};\nwindow.__CONTROL_EVENT_USER__ = null;\nwindow.__CONTROL_EVENT_BACKEND__ = "${BACKEND_NAME}";\n`);

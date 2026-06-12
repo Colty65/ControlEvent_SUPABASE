@@ -1,24 +1,14 @@
-import { downloadInfoEvento, ensureExcelJS, registerExcelModule } from './_excel-runtime.js';
-import { captureResumenSnapshot } from './resumen-sheet.js';
-
-export const meta = {
-  name: 'infoevento',
-  version: 'v30.7',
-  mode: 'modular-public-facade-exceljs-lazy',
-  description: 'Controlador modular para INFOEVENTO. Desde v27.7 mantiene el libro final limpio: no añade hojas RESUMEN_MODULAR/GRAFICAS_MODULAR por defecto; las herramientas modulares quedan disponibles sólo en standalone.'
-};
-
-let lastResumenSnapshot = null;
-
-export async function run(options = {}){
-  lastResumenSnapshot = captureResumenSnapshot({source:'infoevento-before-legacy', excelOptions: options});
-  await ensureExcelJS();
-  return downloadInfoEvento(options);
-}
-
-export function getLastResumenSnapshot(){
-  return lastResumenSnapshot;
-}
-
-registerExcelModule('exportExcel', {meta, run, getLastResumenSnapshot});
-registerExcelModule('infoevento', {meta, run, getLastResumenSnapshot});
+// ControlEvent v8.5_prod FIX23
+// Service Worker neutralizado para evitar JS antiguo en caché durante la contención de escrituras.
+self.addEventListener('install', event => { self.skipWaiting(); });
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+self.addEventListener('fetch', event => {
+  // No cachear nada en FIX23. Todo va a red.
+  return;
+});

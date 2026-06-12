@@ -115,3 +115,5 @@ export function installScreenLazyRuntime({app, modules} = {}){
   window.ControlEventScreenLazy = api;
   return api;
 }
+
+window.CONTROLEVENT_FIX = 'FIX23_WRITE_LOCKDOWN';

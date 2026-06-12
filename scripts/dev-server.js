@@ -163,9 +163,13 @@ app.get('/api/state', async (req, res) => {
 
 app.put('/api/state', async (req, res) => {
   const incoming = req.body && typeof req.body === 'object' ? req.body : {};
+  const restore = incoming.__forceReplaceAll === true && String(req.get('X-ControlEvent-Backup-Restore') || '') === '1';
+  if(!restore){
+    return res.status(409).json({ ok:false, blocked:true, fix:'FIX23', error:'PUT /api/state bloqueado: no se permite guardar estado completo.' });
+  }
   const state = await sanitizeState(req, incoming, { persist: false });
   await writeJsonAtomic(STATE_FILE, state);
-  res.json({ ok: true, savedAt: new Date().toISOString() });
+  res.json({ ok: true, savedAt: new Date().toISOString(), restore:true });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -243,6 +247,9 @@ app.get('/api/ticket-images', async (req, res) => {
 
 app.post('/api/ticket-images', async (req, res) => {
   try {
+    if(String(req.get('X-ControlEvent-Write-Scope') || '') !== 'ticket-image-v8-5-fix23') {
+      return res.status(409).json({ ok:false, blocked:true, fix:'FIX23', error:'Escritura de imagen bloqueada: falta cabecera FIX23.' });
+    }
     const eventId = safeEventId(req.body?.eventId);
     const key = String(req.body?.key || '').trim();
     if (!key) return res.status(400).json({ ok: false, error: 'Falta key de foto.' });
@@ -255,6 +262,9 @@ app.post('/api/ticket-images', async (req, res) => {
 });
 
 app.delete('/api/ticket-images', async (req, res) => {
+  if(String(req.get('X-ControlEvent-Write-Scope') || '') !== 'ticket-image-v8-5-fix23') {
+    return res.status(409).json({ ok:false, blocked:true, fix:'FIX23', error:'Borrado de imagen bloqueado: falta cabecera FIX23.' });
+  }
   const eventId = safeEventId(req.query.eventId);
   const key = String(req.query.key || '').trim();
   if (!key) return res.status(400).json({ ok: false, error: 'Falta key de foto.' });

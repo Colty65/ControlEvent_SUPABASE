@@ -17,11 +17,9 @@ export function fetchState(){
   return requestJson('/api/state', {cache:'no-store'});
 }
 
-export function saveState(state){
-  return requestJson('/api/state', {
-    method:'PUT',
-    body: JSON.stringify(state || {})
-  });
+export function saveState(_state){
+  // FIX23: saveState completo eliminado. Las pantallas no deben guardar estado masivo.
+  return Promise.resolve({ok:false, blocked:true, fix:'FIX23', reason:'state-save-disabled'});
 }
 
 export function login({identificacion, clave}){
@@ -58,6 +56,7 @@ export function deleteAccessUser(identificacion){
 export function uploadTicketImage(payload){
   return requestJson('/api/ticket-images', {
     method:'POST',
+    headers:{'X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix23'},
     body: JSON.stringify(payload || {})
   });
 }
@@ -65,6 +64,7 @@ export function uploadTicketImage(payload){
 export function deleteTicketImage(payload){
   return requestJson('/api/ticket-images', {
     method:'DELETE',
+    headers:{'X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix23'},
     body: JSON.stringify(payload || {})
   });
 }
