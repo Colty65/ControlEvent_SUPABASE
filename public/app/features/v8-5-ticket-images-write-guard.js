@@ -55,9 +55,12 @@
         const payload = decodeBody(init || {});
         const check = shouldBlockUpload(payload);
         if(check.block){
-          try{ console.warn('[ControlEvent v8.5 FIX13] POST /api/ticket-images bloqueado:', check); }catch(_){ }
+          try{ console.warn('[ControlEvent v8.5 FIX13/FIX26] POST /api/ticket-images bloqueado:', check); }catch(_){ }
           return Promise.resolve(jsonResponse(409, {ok:false, blocked:true, error:'Subida de foto bloqueada: evento no valido o usuario no autenticado.', detail:check}));
         }
+        const headers = (()=>{ try{ return init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : {...(init?.headers||{})}; }catch(_){ return {}; } })();
+        headers['X-ControlEvent-Write-Scope'] = 'ticket-image-v8-5-fix26';
+        init = {...(init||{}), headers};
       }
       return oldFetch(input, init);
     };

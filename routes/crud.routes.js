@@ -1,17 +1,17 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { deleteRecord, upsertRecord } from '../services/crud.service.js';
+import { deleteRecord, updateEventSituation, upsertRecord } from '../services/crud.service.js';
 
 const router = express.Router();
 
-const WRITE_SCOPE = 'row-crud-v8-5-fix23';
+const WRITE_SCOPES = new Set(['row-crud-v8-5-fix26', 'row-crud-v8-5-fix23']);
 const COLLECTIONS = new Set(['eventos','personas','tiendas','productos','colaboradores','compras']);
 
-function requireFix23RowWrite(req){
+function requireRowWrite(req){
   const scope = String(req.get('X-ControlEvent-Write-Scope') || '');
   const rowOnly = req.body?.__crudRowOnly === true || String(req.get('X-ControlEvent-Row-Only') || '') === '1';
-  if(scope === WRITE_SCOPE && rowOnly) return;
-  const err = new Error('FIX23: escritura CRUD bloqueada. Solo se admite CRUD fila-a-fila con cabecera FIX23.');
+  if(WRITE_SCOPES.has(scope) && rowOnly) return;
+  const err = new Error('FIX26: escritura bloqueada. Solo se admite CRUD explícito fila-a-fila.');
   err.status = 409;
   throw err;
 }
@@ -25,30 +25,35 @@ function cleanBody(body){
 function collection(req){
   const c = String(req.params.collection || '').trim();
   if(!COLLECTIONS.has(c)){
-    const err = new Error('FIX23: colección CRUD no permitida: ' + c);
+    const err = new Error('FIX26: colección CRUD no permitida: ' + c);
     err.status = 400;
     throw err;
   }
   return c;
 }
 
+router.put('/crud/eventos/:id/situacion', asyncHandler(async (req, res) => {
+  requireRowWrite(req);
+  res.json(await updateEventSituation(req.params.id, req.body?.situacion));
+}));
+
 router.post('/crud/:collection', asyncHandler(async (req, res) => {
-  requireFix23RowWrite(req);
+  requireRowWrite(req);
   res.json(await upsertRecord(collection(req), cleanBody(req.body)));
 }));
 
 router.put('/crud/:collection/:id', asyncHandler(async (req, res) => {
-  requireFix23RowWrite(req);
+  requireRowWrite(req);
   res.json(await upsertRecord(collection(req), { ...cleanBody(req.body), id: req.params.id }));
 }));
 
 router.delete('/crud/:collection/:id', asyncHandler(async (req, res) => {
-  requireFix23RowWrite(req);
+  requireRowWrite(req);
   res.json(await deleteRecord(collection(req), req.params.id));
 }));
 
 router.post('/crud-deltas', asyncHandler(async (_req, _res) => {
-  const err = new Error('FIX23: /api/crud-deltas eliminado. Prohibidas bajas/altas deducidas por diferencias de navegador.');
+  const err = new Error('FIX26: /api/crud-deltas eliminado. Prohibidas altas/bajas deducidas por navegador.');
   err.status = 410;
   throw err;
 }));

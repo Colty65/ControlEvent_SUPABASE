@@ -3,10 +3,10 @@ import { asyncHandler } from './_async.js';
 import { cleanupStaleIngresoImages, deleteEventImages, deleteImage, listImages, uploadImage } from '../services/ticket-images.service.js';
 
 const router = express.Router();
-const IMAGE_SCOPE = 'ticket-image-v8-5-fix23';
+const IMAGE_SCOPES = new Set(['ticket-image-v8-5-fix23','ticket-image-v8-5-fix26']);
 
 function requireFix23ImageWrite(req){
-  if(String(req.get('X-ControlEvent-Write-Scope') || '') === IMAGE_SCOPE) return;
+  if(IMAGE_SCOPES.has(String(req.get('X-ControlEvent-Write-Scope') || ''))) return;
   const err = new Error('FIX23: escritura de imagen bloqueada. Solo se admite desde acción explícita de foto.');
   err.status = 409;
   throw err;
