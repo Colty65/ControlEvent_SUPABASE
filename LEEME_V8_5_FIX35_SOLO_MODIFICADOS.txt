@@ -1,0 +1,16 @@
+ControlEvent v8.5_prod FIX35 - SOLO ARCHIVOS MODIFICADOS
+
+Archivos incluidos:
+- public/app/features/v8-5-compras-rpc-head-fix35.js
+- public/index.html
+- index.html
+
+Qué corrige:
+- Mantiene COMPRAS con RPC directo ya probado en BBDD.
+- Tras eliminar una compra, la baja no llama a render global ni mantiene un MutationObserver continuo.
+- La ficha se elimina de la pantalla tras confirmación de BBDD y se fuerza desbloqueo fuerte de navegación/selector de evento.
+- Evita el bucle de repintado que podía dejar la interfaz aparentemente inactiva tras borrar.
+- El resaltado visual de alta/modificación dura más tiempo.
+
+No cambia SQL. No toca INGRESOS, DOCUMENTOS, MAPA, GLOBOS, BACKUP ni INFOEVENTO.
+Mantener global_write_lock = ON.
