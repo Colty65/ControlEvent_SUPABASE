@@ -7,3 +7,4 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => { return; });
 
 // fix33-compras-head
+// fix34-compras-ui

@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX33 - COMPRAS RPC desde HEAD
+/* ControlEvent v8.5_prod FIX34 - COMPRAS RPC desde HEAD
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -8,9 +8,9 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85ComprasRpcHeadFix33';
+  const TAG='__ceV85ComprasRpcHeadFix34';
   if(window[TAG]) return; window[TAG]=true;
-  const LOG='[CE FIX33 COMPRAS RPC HEAD]';
+  const LOG='[CE FIX34 COMPRAS RPC HEAD]';
   const WRITE_SCOPE='row-crud-v8-5-compras-directo';
   const deletedIds = new Set();
   let busy=false;
@@ -161,12 +161,33 @@
     setTimeout(()=>{
       const card=cardForId(id); if(!card) return;
       card.classList.add(cls||'ce-crud-flash');
-      setTimeout(()=>card.classList.remove(cls||'ce-crud-flash'), 1800);
+      setTimeout(()=>card.classList.remove(cls||'ce-crud-flash'), 5200);
     }, 50);
+  }
+  function unlockUi(){
+    try{ busy=false; }catch(_){}
+    try{ document.body.removeAttribute('inert'); document.body.removeAttribute('aria-busy'); document.body.style.removeProperty('pointer-events'); }catch(_){}
+    try{
+      if(authObj()){
+        document.body.classList.remove(
+          'auth-locked', 'ce-v447-switching', 'ce-v447-login-loading',
+          'ce-logged-out-v507','ce-logged-out-v508','ce-logged-out-v509',
+          'ce-v5011-logged-out','ce-v5013-logged-out','ce-v506-logged-out'
+        );
+      }
+    }catch(_){}
+    try{ document.querySelectorAll('.ce-crud-deleting').forEach(el=>el.classList.remove('ce-crud-deleting')); }catch(_){}
+  }
+  function refreshCompraViewsLight(){
+    // No llamamos al render global tras una baja: algunos parches legacy repintan con copias viejas.
+    try{ if(typeof renderBudgetSummary==='function') renderBudgetSummary(); }catch(_){}
+    try{ if(typeof renderResumen==='function') renderResumen(); }catch(_){}
+    try{ if(typeof renderDonaciones==='function') renderDonaciones(); }catch(_){}
+    setTimeout(()=>{ try{ if(typeof renderBudgetSummary==='function') renderBudgetSummary(); }catch(_){} }, 50);
   }
   async function syncStateNoRender(){
     try{
-      const fresh=await apiJson('/api/state?fix33=1&_='+Date.now(), {method:'GET', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
+      const fresh=await apiJson('/api/state?fix34=1&_='+Date.now(), {method:'GET', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
       const s=stateObj(); const keep=s.selectedEventId;
       ['eventos','personas','tiendas','productos','colaboradores','compras','ticketImages','ticketImageRefs','eventDocuments','eventCodeMap','entityCodeMaps'].forEach(k=>{
         if(Object.prototype.hasOwnProperty.call(fresh,k)) s[k]=fresh[k];
@@ -196,16 +217,28 @@
   async function deleteCompra(id, btn){
     const payload=rowPayload(id); validate(payload,'eliminar');
     if(!confirm('¿Eliminar esta línea de compra en BBDD?')) return;
-    if(btn){ btn.disabled=true; btn.textContent='Eliminando...'; }
+    const oldTxt = btn ? btn.textContent : '';
+    if(btn){ btn.disabled=true; btn.textContent='Eliminando...'; btn.setAttribute('data-ce-crud-busy','1'); }
     const card=btn?.closest?.('.itemcard') || cardForId(id);
     if(card) card.classList.add('ce-crud-deleting');
-    await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'DELETE', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
-    deletedIds.add(text(id));
-    removeCompraLocal(id);
-    if(card){ setTimeout(()=>{ try{ card.remove(); }catch(_){ } }, 120); }
-    scrubDeletedFromDom();
-    await syncStateNoRender();
-    renderAndScrub();
+    try{
+      await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'DELETE', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
+      deletedIds.add(text(id));
+      removeCompraLocal(id);
+      // La BBDD ya confirmó. Quitamos la tarjeta en la propia pantalla y NO lanzamos render global,
+      // porque los renders legacy pueden repintar desde copias viejas y dejar capas/bloqueos.
+      if(card){
+        card.classList.add('ce-crud-deleted');
+        setTimeout(()=>{ try{ card.remove(); }catch(_){ } scrubDeletedFromDom(); }, 260);
+      }
+      scrubDeletedFromDom();
+      // Sincronizamos en segundo plano, pero manteniendo el id eliminado fuera de la memoria.
+      syncStateNoRender().then(()=>{ removeCompraLocal(id); scrubDeletedFromDom(); refreshCompraViewsLight(); unlockUi(); }).catch(()=>unlockUi());
+      refreshCompraViewsLight();
+    }finally{
+      if(btn && document.body.contains(btn)){ btn.disabled=false; btn.textContent=oldTxt || 'Eliminar'; btn.removeAttribute('data-ce-crud-busy'); }
+      unlockUi();
+    }
   }
   function action(ev){
     const btn=ev.target?.closest?.('button'); if(!btn) return null;
@@ -229,7 +262,7 @@
       alert(err?.message || String(err));
       try{ if(info.btn){ info.btn.disabled=false; if(info.type==='delete') info.btn.textContent='Eliminar'; }}catch(_){ }
       document.querySelectorAll('.ce-crud-deleting').forEach(el=>el.classList.remove('ce-crud-deleting'));
-    }finally{ busy=false; }
+    }finally{ busy=false; unlockUi(); }
     return false;
   }
 
@@ -243,10 +276,12 @@
   });
   const style=document.createElement('style');
   style.textContent=`
-    .ce-crud-deleting{ opacity:.28; transform:scale(.995); transition:opacity .15s ease, transform .15s ease; pointer-events:none; }
-    .ce-crud-flash-add{ outline:3px solid #22c55e !important; box-shadow:0 0 0 4px rgba(34,197,94,.16) !important; }
-    .ce-crud-flash-update{ outline:3px solid #0ea5e9 !important; box-shadow:0 0 0 4px rgba(14,165,233,.16) !important; }
+    .ce-crud-deleting{ opacity:.42; transform:scale(.995); transition:opacity .22s ease, transform .22s ease; pointer-events:none; }
+    .ce-crud-deleted{ opacity:0!important; transform:scale(.985)!important; transition:opacity .26s ease, transform .26s ease!important; }
+    .ce-crud-flash-add{ outline:4px solid #22c55e !important; box-shadow:0 0 0 6px rgba(34,197,94,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
+    .ce-crud-flash-update{ outline:4px solid #0ea5e9 !important; box-shadow:0 0 0 6px rgba(14,165,233,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
+    .ce-crud-flash-add input,.ce-crud-flash-add select,.ce-crud-flash-update input,.ce-crud-flash-update select{font-weight:900!important;background:#fff7cc!important;}
   `;
   try{ document.head.appendChild(style); }catch(_){ }
-  console.info(LOG,'activo en HEAD: intercepta COMPRAS antes de parches antiguos');
+  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX34 sin render global tras baja');
 })();
