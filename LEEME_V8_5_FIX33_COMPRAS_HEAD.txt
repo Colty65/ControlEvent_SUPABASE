@@ -1,0 +1,10 @@
+ControlEvent v8.5_prod FIX33 - COMPRAS RPC HEAD
+
+Objetivo:
+- COMPRAS se intercepta antes que los parches antiguos.
+- Alta, modificacion y baja siguen usando las RPC SQL de FIX31 via /api/crud/compras.
+- Tras una baja confirmada por BBDD, la fila se elimina inmediatamente de memoria y DOM.
+- Se añade filtro/tombstone temporal para que un render legacy no vuelva a pintar la compra borrada en la misma sesion.
+- Mantener global_write_lock = ON.
+
+No toca INGRESOS, DOCUMENTOS, GLOBOS, MAPA, BACKUP ni INFOEVENTO.

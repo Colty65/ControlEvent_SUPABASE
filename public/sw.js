@@ -6,4 +6,4 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', event => { return; });
 
-// fix32-delete-refresh
+// fix33-compras-head
