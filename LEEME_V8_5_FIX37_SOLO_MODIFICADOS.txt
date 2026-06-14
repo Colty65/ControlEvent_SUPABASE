@@ -1,0 +1,23 @@
+ControlEvent v8.5_prod FIX37 - SOLO MODIFICADOS
+
+Partir de FIX36.
+
+Archivos incluidos:
+- public/app/features/v8-5-compras-rpc-head-fix37.js
+- public/index.html
+- index.html
+
+Cambios:
+1) COMPRAS / Baja:
+   - Tras DELETE confirmado por BBDD, se sincroniza /api/state.
+   - Se ejecuta render completo protegido para recomponer saldos, resumen, gráficas y compras.
+   - Durante ese render, cualquier PUT /api/state legacy se neutraliza como local-only, para no escribir BBDD.
+   - Se repite un segundo pase corto para evitar que un render viejo repinte la fila borrada.
+
+2) EVENTOS / Situación:
+   - El botón Modificar de EVENTOS, si cambia la situación, se intercepta antes del código legacy.
+   - Llama a PUT /api/crud/eventos/:id/situacion.
+   - Evita que el código antiguo intente INSERT/UPSERT en ce_eventos, que con global_write_lock=ON queda bloqueado.
+
+Mantener global_write_lock = ON.
+No toca SQL ni RPC.
