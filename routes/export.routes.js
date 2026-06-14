@@ -110,6 +110,35 @@ async function mergeTicketImagesFromDb(state, scope){
   return out;
 }
 
+
+async function rawTicketImageRowsForBackup(scope){
+  const scopeText = norm(scope || 'TODOS');
+  const scopeIsAll = !scopeText || scopeText === 'TODOS';
+  try{
+    let query = getSupabaseAdmin()
+      .from('ce_ticket_images')
+      .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
+      .order('event_id')
+      .order('image_key');
+    if(!scopeIsAll) query = query.eq('event_id', scopeText);
+    const { data, error } = await query;
+    if(error) throw error;
+    return (data || []).map(row => ({
+      image_key: norm(row?.image_key),
+      event_id: norm(row?.event_id || ticketEventIdFromKey(row?.image_key)),
+      label: norm(row?.label || ticketInnerKeyFromKey(row?.image_key)),
+      public_url: norm(row?.public_url),
+      pathname: norm(row?.pathname),
+      storage_path: norm(row?.storage_path),
+      content_type: norm(row?.content_type),
+      size_bytes: row?.size_bytes == null ? '' : row.size_bytes
+    })).filter(row => row.image_key || row.event_id || row.label || row.storage_path || row.public_url || row.pathname);
+  }catch(err){
+    console.warn('[backup v8.5 FIX41] No se pudo leer ce_ticket_images completo:', err?.message || err);
+    return [];
+  }
+}
+
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
 function stableCodeFor(item, prefix, stableMap = {}){
   const props = prefix === 'EV'
@@ -461,6 +490,8 @@ async function buildBackupWorkbook(fullState, scope){
   const {wb, addRows} = setupWorkbook();
   const scopedCounts = countsFor(scoped);
   const totalCounts = countsFor(fullState);
+  const rawTicketImageRows = await rawTicketImageRowsForBackup(scope);
+  const backupTicketCount = rawTicketImageRows.length;
   addRows('METADATOS', ['CAMPO','VALOR'], [
     ['VERSION', BACKUP_VERSION],
     ['VERSION_FICHERO', BACKUP_VERSION_FILE],
@@ -475,7 +506,8 @@ async function buildBackupWorkbook(fullState, scope){
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
     ['REGISTROS_COMPRAS', scopedCounts.compras],
     ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
-    ['REGISTROS_TICKETS', scopedCounts.ticketImages],
+    ['REGISTROS_TICKETS', backupTicketCount],
+    ['REGISTROS_TICKETS_CANONICOS_APP', scopedCounts.ticketImages],
     ['TOTAL_ORIGEN_EVENTOS', totalCounts.eventos],
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
     ['TOTAL_ORIGEN_PRODUCTOS', totalCounts.productos],
@@ -497,15 +529,34 @@ async function buildBackupWorkbook(fullState, scope){
     const imageText = typeof image === 'object' ? (image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || image.dataUrl || image.base64 || '') : String(image || '');
     return [eventCode[doc?.eventId] || doc?.eventId || '', code, doc?.id || key, doc?.fecha || '', doc?.descripcion || '', code, imageText || doc?.imageUrl || ''];
   }));
+  addRows('CE_TICKET_IMAGES_BBDD', ['EVENT_ID','IMAGE_KEY','LABEL','PUBLIC_URL','PATHNAME','STORAGE_PATH','CONTENT_TYPE','SIZE_BYTES'], rawTicketImageRows.map(img => [
+    img.event_id || ticketEventIdFromKey(img.image_key) || '',
+    img.image_key || '',
+    img.label || ticketInnerKeyFromKey(img.image_key) || '',
+    img.public_url || '',
+    img.pathname || '',
+    img.storage_path || '',
+    img.content_type || '',
+    img.size_bytes || ''
+  ]));
   const ticketRows = [], partRows = [];
-  Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
-    const ticketPartsInfo = ticketBackupParts(fullKey, image, eventCode);
-    const evCode = ticketPartsInfo.eventCode;
-    const key = ticketPartsInfo.innerKey;
-    const data = typeof image === 'object' ? JSON.stringify(image) : String(image || '');
+  const rawSource = rawTicketImageRows.length ? rawTicketImageRows : Object.entries(scoped.ticketImages || {}).map(([fullKey, image]) => ({
+    image_key: fullKey,
+    event_id: ticketEventIdFromKey(fullKey),
+    label: ticketInnerKeyFromKey(fullKey),
+    public_url: '',
+    pathname: '',
+    storage_path: typeof image === 'object' ? JSON.stringify(image) : String(image || ''),
+    content_type: '',
+    size_bytes: ''
+  }));
+  rawSource.forEach(img => {
+    const eventId = img.event_id || ticketEventIdFromKey(img.image_key) || '';
+    const innerKey = img.label || ticketInnerKeyFromKey(img.image_key) || img.image_key || '';
+    const data = img.public_url || img.pathname || img.storage_path || '';
     const parts = splitLongText(data, 8000);
-    ticketRows.push([evCode, key, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_V41_2' : 'SIN_IMAGEN']);
-    parts.forEach((part, idx) => partRows.push([evCode, key, idx + 1, parts.length, part]));
+    ticketRows.push([eventId, innerKey, '', '', data ? 'IMAGEN_DIVIDIDA_EN_TICKETS_PARTES_FIX41_RAW_BBDD' : 'SIN_IMAGEN_REFERENCIA_BBDD']);
+    parts.forEach((part, idx) => partRows.push([eventId, innerKey, idx + 1, parts.length, part]));
   });
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
