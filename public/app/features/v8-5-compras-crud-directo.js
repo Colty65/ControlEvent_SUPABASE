@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod - COMPRAS CRUD directo fila-a-fila
+/* ControlEvent v8.5_prod FIX32 - COMPRAS CRUD directo fila-a-fila
    Regla: las acciones de COMPRAS escriben en BBDD en ese mismo momento.
    - Añadir compra    -> POST   /api/crud/compras
    - Modificar compra -> PUT    /api/crud/compras/:id
@@ -8,7 +8,7 @@
   'use strict';
 
   const WRITE_SCOPE = 'row-crud-v8-5-compras-directo';
-  const LOG = '[CE v8.5 compras CRUD directo]';
+  const LOG = '[CE v8.5 compras CRUD directo FIX32]';
   let busy = false;
 
   function $(id){ return document.getElementById(id); }
@@ -123,14 +123,19 @@
     return data;
   }
   async function reloadStateFromDb(){
-    const fresh = await requestJson('/api/state?_=' + Date.now(), { method:'GET' });
+    const fresh = await requestJson('/api/state?_=' + Date.now(), {
+      method:'GET',
+      headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}
+    });
     const s = stateRef();
     Object.keys(s).forEach(k => delete s[k]);
-    Object.assign(s, fresh || {});
+    try{
+      if(typeof mergeLoadedState === 'function' && typeof defaultState === 'function') Object.assign(s, mergeLoadedState(fresh || {}, defaultState()));
+      else Object.assign(s, fresh || {});
+    }catch(_){ Object.assign(s, fresh || {}); }
     try{ window.state = s; }catch(_){ }
     try{ if(typeof persistStateLocal === 'function') persistStateLocal(); }catch(_){ }
-    try{ if(typeof render === 'function') render(); }catch(err){ console.warn(LOG, 'render falló tras recargar', err); }
-    try{ if(typeof renderCompras === 'function') renderCompras(); }catch(_){ }
+    forceRenderComprasArea();
     return s;
   }
   function resetAddInputs(){
@@ -145,6 +150,49 @@
     if(!payload.eventId) throw new Error('No hay evento seleccionado.');
     if(isFinalizado(ev)) throw new Error('Evento Finalizado: no se permite ' + action + ' compras. Cambia primero la situación a En curso.');
     if(!payload.productoId && action !== 'eliminar') throw new Error('Falta producto.');
+  }
+  function removeCompraFromMemory(id){
+    const s = stateRef();
+    const before = Array.isArray(s.compras) ? s.compras.length : 0;
+    if(Array.isArray(s.compras)) s.compras = s.compras.filter(c => txt(c.id) !== txt(id));
+    try{ window.state = s; }catch(_){ }
+    try{ if(typeof persistStateLocal === 'function') persistStateLocal(); }catch(_){ }
+    return before - (Array.isArray(s.compras) ? s.compras.length : 0);
+  }
+  function forceRenderComprasArea(){
+    try{ if(typeof renderBudgetSummary === 'function') renderBudgetSummary(); }catch(_){ }
+    try{ if(typeof renderResumen === 'function') renderResumen(); }catch(_){ }
+    try{ if(typeof renderCompras === 'function') renderCompras(); }catch(_){ }
+    try{ if(typeof renderDonaciones === 'function') renderDonaciones(); }catch(_){ }
+    try{ if(typeof render === 'function') render(); }catch(err){ console.warn(LOG, 'render falló', err); }
+    try{ if(typeof renderCompras === 'function') renderCompras(); }catch(_){ }
+  }
+  function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+  async function reloadStateUntilCompraGone(id){
+    let last = null;
+    for(let attempt = 0; attempt < 5; attempt++){
+      const fresh = await requestJson('/api/state?_=' + Date.now() + '&deletedCompra=' + encodeURIComponent(id) + '&attempt=' + attempt, {
+        method:'GET',
+        headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}
+      });
+      const still = Array.isArray(fresh?.compras) && fresh.compras.some(c => txt(c.id) === txt(id));
+      last = fresh;
+      if(!still) break;
+      await sleep(150 + attempt * 150);
+    }
+    const s = stateRef();
+    if(last && typeof last === 'object'){
+      Object.keys(s).forEach(k => delete s[k]);
+      try{
+        if(typeof mergeLoadedState === 'function' && typeof defaultState === 'function') Object.assign(s, mergeLoadedState(last, defaultState()));
+        else Object.assign(s, last || {});
+      }catch(_){ Object.assign(s, last || {}); }
+    }
+    // El DELETE ya fue aceptado por BBDD. Aunque algun GET llegara con cache vieja,
+    // la memoria/pantalla no debe mantener una fila que ya no existe.
+    removeCompraFromMemory(id);
+    forceRenderComprasArea();
+    return s;
   }
   async function addCompraDirecta(){
     const payload = compraPayloadFromAdd();
@@ -172,10 +220,15 @@
     const data = await requestJson('/api/crud/compras/' + encodeURIComponent(id), {
       method:'DELETE', headers:crudHeaders(), body: JSON.stringify({ ...payload, __crudRowOnly:true })
     });
-    const s = await reloadStateFromDb();
+    // Actualizacion optimista segura: el servidor/RPC ya ha confirmado la baja.
+    // Primero quitamos de memoria y pantalla para que no se pueda pulsar otra vez.
+    removeCompraFromMemory(id);
+    forceRenderComprasArea();
+    // Despues reconsultamos BBDD hasta que /api/state venga sin esa compra.
+    const s = await reloadStateUntilCompraGone(id);
     const still = (Array.isArray(s.compras) ? s.compras : []).some(c => txt(c.id) === txt(id));
     if(still){
-      throw new Error('La baja no ha quedado reflejada al releer BBDD. Revisa el registro antes de continuar.');
+      throw new Error('La compra se borró en BBDD, pero la recarga de pantalla sigue mostrando una copia vieja. Cambia de evento o refresca; no vuelvas a pulsar Eliminar sobre esa misma línea.');
     }
     return data;
   }
