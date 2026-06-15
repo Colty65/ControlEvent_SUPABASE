@@ -139,6 +139,53 @@ async function rawTicketImageRowsForBackup(scope){
   }
 }
 
+
+async function rawCompraRowsForBackup(scope){
+  const scopeText = norm(scope || 'TODOS');
+  const scopeIsAll = !scopeText || scopeText === 'TODOS';
+  try{
+    let query = getSupabaseAdmin()
+      .from('ce_compras')
+      .select('id,event_id,producto_id,unidades,precio,ticket_donacion,tienda_id,responsable_id,donor_ref,created_at,updated_at')
+      .order('event_id')
+      .order('id');
+    if(!scopeIsAll) query = query.eq('event_id', scopeText);
+    const { data, error } = await query;
+    if(error) throw error;
+    return (data || []).map(row => ({
+      id: norm(row?.id),
+      event_id: norm(row?.event_id),
+      producto_id: norm(row?.producto_id),
+      unidades: row?.unidades == null ? '' : row.unidades,
+      precio: row?.precio == null ? '' : row.precio,
+      ticket_donacion: norm(row?.ticket_donacion),
+      tienda_id: norm(row?.tienda_id),
+      responsable_id: norm(row?.responsable_id),
+      donor_ref: norm(row?.donor_ref),
+      created_at: norm(row?.created_at),
+      updated_at: norm(row?.updated_at)
+    })).filter(row => row.id || row.event_id || row.producto_id || row.ticket_donacion);
+  }catch(err){
+    console.warn('[backup v8.5 FIX42] No se pudo leer ce_compras completo:', err?.message || err);
+    return [];
+  }
+}
+function dbCompraToStateRow(row){
+  return {
+    id: row?.id || '',
+    eventId: row?.event_id || row?.eventId || '',
+    productoId: row?.producto_id || row?.productoId || '',
+    unidades: row?.unidades,
+    precio: row?.precio,
+    ticketDonacion: row?.ticket_donacion || row?.ticketDonacion || '',
+    tiendaId: row?.tienda_id || row?.tiendaId || '',
+    responsableId: row?.responsable_id || row?.responsableId || '',
+    donorRef: row?.donor_ref || row?.donorRef || '',
+    createdAt: row?.created_at || row?.createdAt || '',
+    updatedAt: row?.updated_at || row?.updatedAt || ''
+  };
+}
+
 function byIdMap(items){ return Object.fromEntries((items || []).map(item => [String(item.id), item])); }
 function stableCodeFor(item, prefix, stableMap = {}){
   const props = prefix === 'EV'
@@ -492,6 +539,9 @@ async function buildBackupWorkbook(fullState, scope){
   const totalCounts = countsFor(fullState);
   const rawTicketImageRows = await rawTicketImageRowsForBackup(scope);
   const backupTicketCount = rawTicketImageRows.length;
+  const rawCompraRows = await rawCompraRowsForBackup(scope);
+  const backupCompras = rawCompraRows.length ? rawCompraRows.map(dbCompraToStateRow) : scoped.compras;
+  const backupCompraCount = backupCompras.length;
   addRows('METADATOS', ['CAMPO','VALOR'], [
     ['VERSION', BACKUP_VERSION],
     ['VERSION_FICHERO', BACKUP_VERSION_FILE],
@@ -504,7 +554,8 @@ async function buildBackupWorkbook(fullState, scope){
     ['REGISTROS_TIENDAS', scopedCounts.tiendas],
     ['REGISTROS_PRODUCTOS', scopedCounts.productos],
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
-    ['REGISTROS_COMPRAS', scopedCounts.compras],
+    ['REGISTROS_COMPRAS', backupCompraCount],
+    ['REGISTROS_COMPRAS_CANONICAS_APP', scopedCounts.compras],
     ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
     ['REGISTROS_TICKETS', backupTicketCount],
     ['REGISTROS_TICKETS_CANONICOS_APP', scopedCounts.ticketImages],
@@ -520,8 +571,11 @@ async function buildBackupWorkbook(fullState, scope){
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
   addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
-  addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
-  addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
+  addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], rawCompraRows.map(c => [
+    c.id || '', c.event_id || '', c.producto_id || '', c.unidades == null ? '' : c.unidades, c.precio == null ? '' : c.precio, c.ticket_donacion || '', c.tienda_id || '', c.responsable_id || '', c.donor_ref || '', c.created_at || '', c.updated_at || ''
+  ]));
+  addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], backupCompras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || c.eventId || '', c.id || '', productCode[c.productoId] || c.productoId || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || c.tiendaId || '', personCode[c.responsableId] || c.responsableId || '']));
+  addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], backupCompras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || c.eventId || '', c.id || '', productCode[c.productoId] || c.productoId || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || id || '') : (kind === 'T' ? (storeCode[id] || id || '') : ''), personCode[c.responsableId] || c.responsableId || '']; }));
   addRows('DOCUMENTOS', ['EVENTO_CODIGO','DOC_CODIGO','DOC_ID','FECHA','DESCRIPCION','CLAVE_IMAGEN','FOTO_URL'], (scoped.eventDocuments || []).map(doc => {
     const code = documentToken(doc?.codigo || doc?.imageKey || doc?.id);
     const key = doc?.eventId && code ? `${doc.eventId}|${code}` : '';
@@ -562,7 +616,7 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
-  return {wb, filename: backupFileName(scope, selectedTitle), counts: scopedCounts};
+  return {wb, filename: backupFileName(scope, selectedTitle), counts: {...scopedCounts, compras: backupCompraCount, ticketImages: backupTicketCount}};
 }
 
 router.get('/export/backup', asyncHandler(async (req, res) => {
