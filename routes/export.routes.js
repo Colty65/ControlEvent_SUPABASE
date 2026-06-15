@@ -111,18 +111,38 @@ async function mergeTicketImagesFromDb(state, scope){
 }
 
 
+async function fetchAllSupabaseRows(makeQuery, pageSize = 1000){
+  const all = [];
+  let from = 0;
+  for(;;){
+    const to = from + pageSize - 1;
+    const { data, error } = await makeQuery().range(from, to);
+    if(error) throw error;
+    const rows = Array.isArray(data) ? data : [];
+    all.push(...rows);
+    if(rows.length < pageSize) break;
+    from += pageSize;
+    if(from > 200000){
+      throw new Error('Exportación detenida por seguridad: demasiadas filas al paginar Supabase.');
+    }
+  }
+  return all;
+}
+
+
 async function rawTicketImageRowsForBackup(scope){
   const scopeText = norm(scope || 'TODOS');
   const scopeIsAll = !scopeText || scopeText === 'TODOS';
   try{
-    let query = getSupabaseAdmin()
-      .from('ce_ticket_images')
-      .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
-      .order('event_id')
-      .order('image_key');
-    if(!scopeIsAll) query = query.eq('event_id', scopeText);
-    const { data, error } = await query;
-    if(error) throw error;
+    const data = await fetchAllSupabaseRows(() => {
+      let query = getSupabaseAdmin()
+        .from('ce_ticket_images')
+        .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
+        .order('event_id')
+        .order('image_key');
+      if(!scopeIsAll) query = query.eq('event_id', scopeText);
+      return query;
+    });
     return (data || []).map(row => ({
       image_key: norm(row?.image_key),
       event_id: norm(row?.event_id || ticketEventIdFromKey(row?.image_key)),
@@ -144,14 +164,15 @@ async function rawCompraRowsForBackup(scope){
   const scopeText = norm(scope || 'TODOS');
   const scopeIsAll = !scopeText || scopeText === 'TODOS';
   try{
-    let query = getSupabaseAdmin()
-      .from('ce_compras')
-      .select('id,event_id,producto_id,unidades,precio,ticket_donacion,tienda_id,responsable_id,donor_ref,created_at,updated_at')
-      .order('event_id')
-      .order('id');
-    if(!scopeIsAll) query = query.eq('event_id', scopeText);
-    const { data, error } = await query;
-    if(error) throw error;
+    const data = await fetchAllSupabaseRows(() => {
+      let query = getSupabaseAdmin()
+        .from('ce_compras')
+        .select('id,event_id,producto_id,unidades,precio,ticket_donacion,tienda_id,responsable_id,donor_ref,created_at,updated_at')
+        .order('event_id')
+        .order('id');
+      if(!scopeIsAll) query = query.eq('event_id', scopeText);
+      return query;
+    });
     return (data || []).map(row => ({
       id: norm(row?.id),
       event_id: norm(row?.event_id),
@@ -559,6 +580,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
     ['REGISTROS_TICKETS', backupTicketCount],
     ['REGISTROS_TICKETS_CANONICOS_APP', scopedCounts.ticketImages],
+    ['PAGINACION_SUPABASE_BACKUP', 'ACTIVA: lecturas por rangos para no quedar limitado a 1000 filas'],
     ['TOTAL_ORIGEN_EVENTOS', totalCounts.eventos],
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
     ['TOTAL_ORIGEN_PRODUCTOS', totalCounts.productos],
