@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX40 - COMPRAS RPC + FINALIZACION ACTIVA SEGURA
+/* ControlEvent v8.5_prod FIX45 - COMPRAS RPC SIN RELOGIN TRAS DELETE
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -8,9 +8,9 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85ComprasRpcHeadFix40';
+  const TAG='__ceV85ComprasRpcHeadFix45';
   if(window[TAG]) return; window[TAG]=true;
-  const LOG='[CE FIX40 COMPRAS/RPC FINALIZACION SEGURA]';
+  const LOG='[CE FIX45 COMPRAS/RPC SIN RELOGIN DELETE]';
   const WRITE_SCOPE='row-crud-v8-5-compras-directo';
   const deletedIds = new Set();
   let busy=false;
@@ -158,7 +158,7 @@
     const oldSave = window.saveState;
     const oldPush = window.pushStateToServer;
     const oldFetch = window.fetch;
-    const localOk = function(){ try{ if(typeof persistStateLocal==='function') persistStateLocal(); }catch(_){} return Promise.resolve({ok:true, localOnly:true, fix:'FIX40'}); };
+    const localOk = function(){ try{ if(typeof persistStateLocal==='function') persistStateLocal(); }catch(_){} return Promise.resolve({ok:true, localOnly:true, fix:'FIX45'}); };
     try{
       window.saveState = localOk;
       window.pushStateToServer = localOk;
@@ -167,7 +167,7 @@
           const url = String(typeof input==='string' ? input : (input && input.url) || '');
           const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
           if(method === 'PUT' && /\/api\/state(?:$|\?)/i.test(url)){
-            return Promise.resolve(new Response(JSON.stringify({ok:true, localOnly:true, blockedBy:'FIX40_RENDER'}), {status:200, headers:{'Content-Type':'application/json'}}));
+            return Promise.resolve(new Response(JSON.stringify({ok:true, localOnly:true, blockedBy:'FIX45_RENDER'}), {status:200, headers:{'Content-Type':'application/json'}}));
           }
           return oldFetch.apply(this, arguments);
         };
@@ -296,9 +296,9 @@
     return cur.toLowerCase()==='finalizado' ? 'En curso' : 'Finalizado';
   }
   function hardReloadAfterSituation(id, next){
-    try{ sessionStorage.setItem('ce_fix40_restore_event', String(id||'')); }catch(_){ }
-    try{ sessionStorage.setItem('ce_fix40_restore_tab', currentMainTabName() || 'compras'); }catch(_){ }
-    try{ sessionStorage.setItem('ce_fix40_event_situation', String(next||'')); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_restore_event', String(id||'')); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_restore_tab', currentMainTabName() || 'compras'); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_event_situation', String(next||'')); }catch(_){ }
     toast('Situación del evento actualizada en BBDD. Recargando datos reales...');
     setTimeout(()=>{
       try{ window.location.reload(); }
@@ -334,8 +334,8 @@
   }
   function toast(msg){
     try{
-      let box=document.getElementById('ceFix40Toast');
-      if(!box){ box=document.createElement('div'); box.id='ceFix40Toast'; box.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999999;background:#111827;color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;box-shadow:0 18px 45px rgba(15,23,42,.35);font-size:15px;'; document.body.appendChild(box); }
+      let box=document.getElementById('ceFix45Toast');
+      if(!box){ box=document.createElement('div'); box.id='ceFix45Toast'; box.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999999;background:#111827;color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;box-shadow:0 18px 45px rgba(15,23,42,.35);font-size:15px;'; document.body.appendChild(box); }
       box.textContent=msg;
     }catch(_){ }
   }
@@ -344,9 +344,9 @@
     // Tras confirmar DELETE en BBDD, se guarda en local la foto actual del estado
     // sin la compra y se recarga la app. Es el equivalente automático a lo que
     // el usuario hacía manualmente cambiando de evento para ver la realidad.
-    try{ sessionStorage.setItem('ce_fix40_restore_event', selectedEventId()); }catch(_){ }
-    try{ sessionStorage.setItem('ce_fix40_restore_tab', 'compras'); }catch(_){ }
-    try{ sessionStorage.setItem('ce_fix40_deleted_compra', String(id||'')); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_restore_event', selectedEventId()); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_restore_tab', 'compras'); }catch(_){ }
+    try{ sessionStorage.setItem('ce_fix45_deleted_compra', String(id||'')); }catch(_){ }
     persistLocalNow();
     toast('Compra eliminada en BBDD. Recargando datos reales...');
     setTimeout(()=>{
@@ -355,10 +355,10 @@
     }, 650);
   }
   function restoreAfterReload(){
-    const evId = (()=>{ try{return sessionStorage.getItem('ce_fix40_restore_event')||'';}catch(_){return '';} })();
-    const tab = (()=>{ try{return sessionStorage.getItem('ce_fix40_restore_tab')||'';}catch(_){return '';} })();
+    const evId = (()=>{ try{return sessionStorage.getItem('ce_fix45_restore_event')||'';}catch(_){return '';} })();
+    const tab = (()=>{ try{return sessionStorage.getItem('ce_fix45_restore_tab')||'';}catch(_){return '';} })();
     if(!evId && !tab) return;
-    try{ sessionStorage.removeItem('ce_fix40_restore_event'); sessionStorage.removeItem('ce_fix40_restore_tab'); }catch(_){ }
+    try{ sessionStorage.removeItem('ce_fix45_restore_event'); sessionStorage.removeItem('ce_fix45_restore_tab'); }catch(_){ }
     const apply=()=>{
       try{
         const s=stateObj();
@@ -423,8 +423,12 @@
       try{ await syncStateNoRender(); }catch(err){ console.warn(LOG,'sync posterior a baja falló',err); }
       removeCompraLocal(id);
       scrubDeletedFromDom();
+      // FIX45: NO recargar la página tras borrar. Con /api/state ya paginado (FIX44),
+      // basta sincronizar y repintar. La recarga dura introducida en FIX38/FIX40 podía
+      // devolver al login porque la sesión de la app no siempre sobrevive al reload.
+      toast('Compra eliminada en BBDD. Actualizando pantalla sin salir...');
+      renderCompraViewsFull();
       unlockUiRepeated();
-      reloadAfterDelete(id);
       return;
     }finally{
       if(btn && document.body.contains(btn)){
@@ -480,11 +484,11 @@
   style.textContent=`
     .ce-crud-deleting{ opacity:.42; transform:scale(.995); transition:opacity .22s ease, transform .22s ease; pointer-events:none; }
     .ce-crud-deleted{ opacity:0!important; transform:scale(.985)!important; transition:opacity .26s ease, transform .26s ease!important; }
-    .ce-crud-flash-add{ animation:ceCrudPulseFix40 1.1s ease-in-out 0s 7 alternate; outline:4px solid #22c55e !important; box-shadow:0 0 0 6px rgba(34,197,94,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
-    .ce-crud-flash-update{ animation:ceCrudPulseFix40 1.1s ease-in-out 0s 7 alternate; outline:4px solid #0ea5e9 !important; box-shadow:0 0 0 6px rgba(14,165,233,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
+    .ce-crud-flash-add{ animation:ceCrudPulseFix45 1.1s ease-in-out 0s 7 alternate; outline:4px solid #22c55e !important; box-shadow:0 0 0 6px rgba(34,197,94,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
+    .ce-crud-flash-update{ animation:ceCrudPulseFix45 1.1s ease-in-out 0s 7 alternate; outline:4px solid #0ea5e9 !important; box-shadow:0 0 0 6px rgba(14,165,233,.22) !important; font-weight:900!important; transition:outline .25s ease, box-shadow .25s ease; }
     .ce-crud-flash-add input,.ce-crud-flash-add select,.ce-crud-flash-update input,.ce-crud-flash-update select{font-weight:900!important;background:#fff7cc!important;}
 
-    @keyframes ceCrudPulseFix40{from{filter:saturate(1.0) brightness(1)}to{filter:saturate(1.18) brightness(1.06)}}
+    @keyframes ceCrudPulseFix45{from{filter:saturate(1.0) brightness(1)}to{filter:saturate(1.18) brightness(1.06)}}
   `;
   try{ document.head.appendChild(style); }catch(_){ }
   // La siguiente interacción de navegación limpia posibles restos de bloqueo legacy.
@@ -492,5 +496,5 @@
     const nav=ev.target?.closest?.('#mainTabs button,#selectedEvent,#btnSoftRefresh,#btnLogout,.tab');
     if(nav) unlockUiRepeated();
   }, true);
-  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX40; finalización/reapertura por RPC + recarga dura');
+  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX45; delete sin recarga, finalización mantiene recarga controlada');
 })();
