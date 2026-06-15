@@ -5,7 +5,8 @@ import { getState, saveState } from '../services/state.service.js';
 const router = express.Router();
 
 router.get('/state', asyncHandler(async (req, res) => {
-  res.json(await getState());
+  const eventId = String(req.query.eventId || req.query.event_id || '').trim();
+  res.json(await getState(eventId ? { eventId } : {}));
 }));
 
 router.put('/state', asyncHandler(async (req, res) => {

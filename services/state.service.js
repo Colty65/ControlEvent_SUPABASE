@@ -1,7 +1,7 @@
 import * as stateRepository from '../repositories/supabase-state.repository.js';
 
-export function getState() {
-  return stateRepository.readState();
+export function getState(options = {}) {
+  return stateRepository.readState(options || {});
 }
 
 export function saveState(payload) {

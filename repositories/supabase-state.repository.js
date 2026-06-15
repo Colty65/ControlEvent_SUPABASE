@@ -1,7 +1,7 @@
 import { health as dbHealth, saveStateToDb, stateFromDb } from '../lib/supabase-normalized.js';
 
-export async function readState() {
-  return stateFromDb();
+export async function readState(options = {}) {
+  return stateFromDb(options || {});
 }
 
 export async function writeState(state) {
