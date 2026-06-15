@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX46 - COMPRAS/EVENTOS SIN RELOGIN
+/* ControlEvent v8.5_prod FIX47 - COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -8,9 +8,9 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85ComprasRpcHeadFix46';
+  const TAG='__ceV85ComprasRpcHeadFix47';
   if(window[TAG]) return; window[TAG]=true;
-  const LOG='[CE FIX46 COMPRAS/EVENTOS SIN RELOGIN]';
+  const LOG='[CE FIX47 COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN]';
   const WRITE_SCOPE='row-crud-v8-5-compras-directo';
   const deletedIds = new Set();
   let busy=false;
@@ -102,6 +102,49 @@
       responsableId:text(elVal('buyResponsable',''))
     };
   }
+  function donationRowPayload(id){
+    const old=compraById(id)||{};
+    const productoId=text(val('edit-donacion-producto',id,old.productoId||''));
+    const p=productById(productoId);
+    const rawPrecio=val('edit-donacion-precio',id,'');
+    return {
+      id:text(id),
+      eventId:text(old.eventId||selectedEventId()),
+      productoId,
+      unidades:num(val('edit-donacion-unidades',id,old.unidades||0)),
+      precio: rawPrecio!=='' ? num(rawPrecio) : num(old.precio ?? old.precioCalc ?? p.precio ?? p.defaultPrecio ?? 0),
+      ticketDonacion:text(val('edit-donacion-ticket',id,old.ticketDonacion||'DONADO TIENDA')) || 'DONADO TIENDA',
+      donorRef:text(val('edit-donacion-donante',id,old.donorRef||'')),
+      tiendaId:'',
+      responsableId:text(val('edit-donacion-responsable',id,old.responsableId||''))
+    };
+  }
+  function addDonationPayload(){
+    const productoId=text(elVal('donProducto',''));
+    const p=productById(productoId);
+    const rawPrecio=elVal('donPrecio','');
+    return {
+      id:uid(),
+      eventId:selectedEventId(),
+      productoId,
+      unidades:num(elVal('donUnidades','0')),
+      precio: rawPrecio!=='' ? num(rawPrecio) : num(p.precio ?? p.defaultPrecio ?? 0),
+      ticketDonacion:text(elVal('donTicket','DONADO TIENDA')) || 'DONADO TIENDA',
+      donorRef:text(elVal('donDonante','')),
+      tiendaId:'',
+      responsableId:text(elVal('donResponsable',''))
+    };
+  }
+  function resetDonationInputs(){
+    ['donProducto','donDonante','donResponsable'].forEach(id=>setElVal(id,''));
+    setElVal('donUnidades','1.00');
+    setElVal('donPrecio','0,00 €');
+    setElVal('donImporte','');
+    try{
+      const el=$('donTicket');
+      if(el && (!el.value || !/^DONADO/i.test(String(el.value)))) el.value='DONADO TIENDA';
+    }catch(_){ }
+  }
   function normalizeItem(item, fallback){
     return {
       ...(fallback||{}),
@@ -133,7 +176,7 @@
     try{ if(typeof persistStateLocal==='function') persistStateLocal(); }catch(_){ }
   }
   function cardForId(id){
-    const el=document.querySelector(`[data-action="delete-compra"][data-id="${css(id)}"], [data-action="save-compra"][data-id="${css(id)}"]`);
+    const el=document.querySelector(`[data-action="delete-compra"][data-id="${css(id)}"], [data-action="save-compra"][data-id="${css(id)}"], [data-action="delete-donacion"][data-id="${css(id)}"], [data-action="save-donacion"][data-id="${css(id)}"]`);
     return el?.closest?.('.itemcard') || null;
   }
   function scrubDeletedFromDom(){
@@ -158,7 +201,7 @@
     const oldSave = window.saveState;
     const oldPush = window.pushStateToServer;
     const oldFetch = window.fetch;
-    const localOk = function(){ try{ if(typeof persistStateLocal==='function') persistStateLocal(); }catch(_){} return Promise.resolve({ok:true, localOnly:true, fix:'FIX46'}); };
+    const localOk = function(){ try{ if(typeof persistStateLocal==='function') persistStateLocal(); }catch(_){} return Promise.resolve({ok:true, localOnly:true, fix:'FIX47'}); };
     try{
       window.saveState = localOk;
       window.pushStateToServer = localOk;
@@ -167,7 +210,7 @@
           const url = String(typeof input==='string' ? input : (input && input.url) || '');
           const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
           if(method === 'PUT' && /\/api\/state(?:$|\?)/i.test(url)){
-            return Promise.resolve(new Response(JSON.stringify({ok:true, localOnly:true, blockedBy:'FIX46_RENDER'}), {status:200, headers:{'Content-Type':'application/json'}}));
+            return Promise.resolve(new Response(JSON.stringify({ok:true, localOnly:true, blockedBy:'FIX47_RENDER'}), {status:200, headers:{'Content-Type':'application/json'}}));
           }
           return oldFetch.apply(this, arguments);
         };
@@ -296,7 +339,7 @@
     return cur.toLowerCase()==='finalizado' ? 'En curso' : 'Finalizado';
   }
   async function refreshAfterSituationNoReload(id, next){
-    // FIX46: cambiar situación del evento no debe hacer reload ni mandar al login.
+    // FIX47: cambiar situación del evento no debe hacer reload ni mandar al login.
     // La BBDD ya confirmó el cambio; ahora sincronizamos /api/state paginado y repintamos.
     const previousSelected = selectedEventId();
     try{
@@ -347,7 +390,7 @@
     const data=await apiJson('/api/crud/eventos/'+encodeURIComponent(id)+'/situacion', {
       method:'PUT', headers:headers(), body:JSON.stringify({situacion:next,__crudRowOnly:true})
     });
-    // FIX46: cambiar situación, especialmente para abrir un Finalizado y limpiar duplicados,
+    // FIX47: cambiar situación, especialmente para abrir un Finalizado y limpiar duplicados,
     // NO debe hacer window.location.reload(): eso podía devolver al login. Sincroniza y repinta.
     if(old) old.situacion=next;
     try{ persistLocalNow(); }catch(_){ }
@@ -377,7 +420,7 @@
     try{ sessionStorage.setItem('ce_fix46_restore_tab', 'compras'); }catch(_){ }
     try{ sessionStorage.setItem('ce_fix46_deleted_compra', String(id||'')); }catch(_){ }
     persistLocalNow();
-    toast('Compra eliminada en BBDD. Recargando datos reales...');
+    toast('Línea eliminada en BBDD. Recargando datos reales...');
     setTimeout(()=>{
       try{ window.location.reload(); }
       catch(_){ window.location.href = window.location.href; }
@@ -424,12 +467,61 @@
     await syncStateNoRender();
     renderCompraViewsFull({flashId:item.id, flashClass:'ce-crud-flash-add'});
   }
+  async function addDonacion(){
+    const payload=addDonationPayload();
+    validate(payload,'añadir donaciones');
+    if(!/^DONADO/i.test(text(payload.ticketDonacion))) payload.ticketDonacion='DONADO TIENDA';
+    const data=await apiJson('/api/crud/compras', {method:'POST', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
+    const item=normalizeItem(data?.item,payload); replaceCompraLocal(item); resetDonationInputs();
+    try{ currentMainTab='donaciones'; }catch(_){ }
+    await syncStateNoRender();
+    renderCompraViewsFull({flashId:item.id, flashClass:'ce-crud-flash-add'});
+  }
+
   async function saveCompra(id){
     const payload=rowPayload(id); validate(payload,'modificar');
     const data=await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'PUT', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
     const item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
     await syncStateNoRender();
     renderCompraViewsFull({flashId:id, flashClass:'ce-crud-flash-update'});
+  }
+  async function saveDonacion(id){
+    const payload=donationRowPayload(id); validate(payload,'modificar donaciones');
+    if(!/^DONADO/i.test(text(payload.ticketDonacion))) payload.ticketDonacion='DONADO TIENDA';
+    const data=await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'PUT', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
+    const item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
+    await syncStateNoRender();
+    renderCompraViewsFull({flashId:id, flashClass:'ce-crud-flash-update'});
+  }
+  async function deleteDonacion(id, btn){
+    const payload=donationRowPayload(id); validate(payload,'eliminar donaciones');
+    if(!confirm('¿Eliminar esta línea de donación en BBDD?')){ unlockUiRepeated(); return; }
+    const oldTxt = btn ? btn.textContent : '';
+    const card=btn?.closest?.('.itemcard') || cardForId(id);
+    try{
+      if(btn){ btn.disabled=true; btn.textContent='Eliminando...'; btn.setAttribute('data-ce-crud-busy','1'); }
+      if(card) card.classList.add('ce-crud-deleting');
+      await apiJson('/api/crud/compras/'+encodeURIComponent(id), {
+        method:'DELETE', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})
+      });
+      deletedIds.add(text(id));
+      removeCompraLocal(id);
+      if(card) card.classList.add('ce-crud-deleted');
+      try{ await syncStateNoRender(); }catch(err){ console.warn(LOG,'sync posterior a baja donación falló',err); }
+      removeCompraLocal(id);
+      scrubDeletedFromDom();
+      toast('Donación eliminada en BBDD. Actualizando pantalla sin salir...');
+      renderCompraViewsFull();
+      unlockUiRepeated();
+      return;
+    }finally{
+      if(btn && document.body.contains(btn)){
+        btn.disabled=false;
+        btn.textContent=oldTxt || 'Eliminar';
+        btn.removeAttribute('data-ce-crud-busy');
+      }
+      unlockUiRepeated();
+    }
   }
   async function deleteCompra(id, btn){
     const payload=rowPayload(id); validate(payload,'eliminar');
@@ -452,10 +544,10 @@
       try{ await syncStateNoRender(); }catch(err){ console.warn(LOG,'sync posterior a baja falló',err); }
       removeCompraLocal(id);
       scrubDeletedFromDom();
-      // FIX46: NO recargar la página tras borrar. Con /api/state ya paginado (FIX44),
+      // FIX47: NO recargar la página tras borrar. Con /api/state ya paginado (FIX44),
       // basta sincronizar y repintar. La recarga dura introducida en FIX38/FIX40 podía
       // devolver al login porque la sesión de la app no siempre sobrevive al reload.
-      toast('Compra eliminada en BBDD. Actualizando pantalla sin salir...');
+      toast('Línea eliminada en BBDD. Actualizando pantalla sin salir...');
       renderCompraViewsFull();
       unlockUiRepeated();
       return;
@@ -472,8 +564,11 @@
     const btn=ev.target?.closest?.('button'); if(!btn) return null;
     const a=btn.dataset?.action||'';
     if(btn.id==='btnAddCompra') return {type:'add', btn};
+    if(btn.id==='btnAddDonacion') return {type:'add-donacion', btn};
     if(a==='save-compra') return {type:'save', id:btn.dataset.id||'', btn};
     if(a==='delete-compra') return {type:'delete', id:btn.dataset.id||'', btn};
+    if(a==='save-donacion') return {type:'save-donacion', id:btn.dataset.id||'', btn};
+    if(a==='delete-donacion') return {type:'delete-donacion', id:btn.dataset.id||'', btn};
     if(a==='save-evento') return {type:'event-situacion', id:btn.dataset.id||'', btn};
     if(btn.id==='btnTogglePower') return {type:'event-power', id:selectedEventId(), btn};
     return null;
@@ -481,7 +576,7 @@
   async function handleClick(ev){
     const info=action(ev); if(!info) return;
     ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
-    if(info.type==='delete' && deletedIds.has(text(info.id))){
+    if((info.type==='delete' || info.type==='delete-donacion') && deletedIds.has(text(info.id))){
       scrubDeletedFromDom();
       renderCompraViewsFull();
       return false;
@@ -490,8 +585,11 @@
     busy=true;
     try{
       if(info.type==='add') await addCompra();
+      else if(info.type==='add-donacion') await addDonacion();
       else if(info.type==='save') await saveCompra(info.id);
       else if(info.type==='delete') await deleteCompra(info.id, info.btn);
+      else if(info.type==='save-donacion') await saveDonacion(info.id);
+      else if(info.type==='delete-donacion') await deleteDonacion(info.id, info.btn);
       else if(info.type==='event-situacion') await updateEventoSituacion(info.id);
       else if(info.type==='event-power') await updateEventoSituacion(info.id, nextSituationForPowerButton());
     }catch(err){
@@ -525,5 +623,5 @@
     const nav=ev.target?.closest?.('#mainTabs button,#selectedEvent,#btnSoftRefresh,#btnLogout,.tab');
     if(nav) unlockUiRepeated();
   }, true);
-  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX46; delete sin recarga, finalización mantiene recarga controlada');
+  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX47; delete sin recarga, finalización mantiene recarga controlada');
 })();
