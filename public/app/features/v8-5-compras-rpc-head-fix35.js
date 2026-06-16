@@ -144,14 +144,10 @@
         if(card) card.remove();
       });
     });
-    // Importante: no reescribir comprasList en cada mutación. En FIX34 eso podía
-    // provocar bucles de MutationObserver y dejar la interfaz aparentemente inactiva.
     const wrap=$('comprasList');
-    if(wrap && !wrap.querySelector('.itemcard') && !wrap.querySelector('.empty')){
-      const empty=document.createElement('div');
-      empty.className='empty';
-      empty.textContent='Todavía no hay compras u otros gastos para este evento.';
-      wrap.appendChild(empty);
+    if(wrap && !wrap.querySelector('.itemcard')){
+      const hint=wrap.querySelector('.hint')?.outerHTML || '<div class="hint">Ordenar por: Producto · Ticket · Tienda · Responsable</div>';
+      wrap.innerHTML = hint + '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>';
     }
   }
   function renderAndScrub(){
@@ -239,42 +235,28 @@
   }
   async function deleteCompra(id, btn){
     const payload=rowPayload(id); validate(payload,'eliminar');
-    if(!confirm('¿Eliminar esta línea de compra en BBDD?')){ unlockUiRepeated(); return; }
+    if(!confirm('¿Eliminar esta línea de compra en BBDD?')) return;
     const oldTxt = btn ? btn.textContent : '';
+    if(btn){ btn.disabled=true; btn.textContent='Eliminando...'; btn.setAttribute('data-ce-crud-busy','1'); }
     const card=btn?.closest?.('.itemcard') || cardForId(id);
+    if(card) card.classList.add('ce-crud-deleting');
     try{
-      if(btn){ btn.disabled=true; btn.textContent='Eliminando...'; btn.setAttribute('data-ce-crud-busy','1'); }
-      if(card) card.classList.add('ce-crud-deleting');
-      await apiJson('/api/crud/compras/'+encodeURIComponent(id), {
-        method:'DELETE', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})
-      });
-
-      // Confirmado por BBDD: quitamos de memoria y DOM sin llamar a render global.
+      await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'DELETE', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
       deletedIds.add(text(id));
       removeCompraLocal(id);
+      // La BBDD ya confirmó. Quitamos la tarjeta en la propia pantalla y NO lanzamos render global,
+      // porque los renders legacy pueden repintar desde copias viejas y dejar capas/bloqueos.
       if(card){
         card.classList.add('ce-crud-deleted');
-        setTimeout(()=>{ try{ card.remove(); }catch(_){ } scrubDeletedFromDom(); unlockUiRepeated(); }, 180);
-      }else{
-        scrubDeletedFromDom();
+        setTimeout(()=>{ try{ card.remove(); }catch(_){ } scrubDeletedFromDom(); }, 260);
       }
-
-      // Desbloqueo inmediato: navegación y selector de evento deben quedar operativos YA.
+      scrubDeletedFromDom();
+      // Sincronizamos en segundo plano, pero manteniendo el id eliminado fuera de la memoria.
       unlockUiRepeated();
-
-      // Sincronización no bloqueante, sin render global, y sin reinsertar el eliminado.
-      setTimeout(()=>{
-        syncStateNoRender()
-          .then(()=>{ removeCompraLocal(id); scrubDeletedFromDom(); })
-          .catch(err=>console.warn(LOG,'sync posterior a baja falló',err))
-          .finally(()=>unlockUiRepeated());
-      }, 40);
+      syncStateNoRender().then(()=>{ removeCompraLocal(id); scrubDeletedFromDom(); refreshCompraViewsLight(); unlockUiRepeated(); }).catch(()=>unlockUiRepeated());
+      refreshCompraViewsLight();
     }finally{
-      if(btn && document.body.contains(btn)){
-        btn.disabled=false;
-        btn.textContent=oldTxt || 'Eliminar';
-        btn.removeAttribute('data-ce-crud-busy');
-      }
+      if(btn && document.body.contains(btn)){ btn.disabled=false; btn.textContent=oldTxt || 'Eliminar'; btn.removeAttribute('data-ce-crud-busy'); }
       unlockUiRepeated();
     }
   }
@@ -300,14 +282,17 @@
       alert(err?.message || String(err));
       try{ if(info.btn){ info.btn.disabled=false; if(info.type==='delete') info.btn.textContent='Eliminar'; }}catch(_){ }
       document.querySelectorAll('.ce-crud-deleting').forEach(el=>el.classList.remove('ce-crud-deleting'));
-    }finally{ busy=false; unlockUiRepeated(); }
+    }finally{ busy=false; unlockUi(); }
     return false;
   }
 
   window.addEventListener('click', handleClick, true);
   document.addEventListener('DOMContentLoaded', ()=>{
-    // Sin MutationObserver continuo: evitamos bucles de repintado tras baja.
-    setTimeout(scrubDeletedFromDom, 250);
+    const wrap=$('comprasList');
+    if(wrap && window.MutationObserver){
+      const mo=new MutationObserver(()=>scrubDeletedFromDom());
+      mo.observe(wrap,{childList:true,subtree:true});
+    }
   });
   const style=document.createElement('style');
   style.textContent=`
@@ -320,10 +305,5 @@
     @keyframes ceCrudPulseFix35{from{filter:saturate(1.0) brightness(1)}to{filter:saturate(1.18) brightness(1.06)}}
   `;
   try{ document.head.appendChild(style); }catch(_){ }
-  // La siguiente interacción de navegación limpia posibles restos de bloqueo legacy.
-  window.addEventListener('pointerdown', (ev)=>{
-    const nav=ev.target?.closest?.('#mainTabs button,#selectedEvent,#btnSoftRefresh,#btnLogout,.tab');
-    if(nav) unlockUiRepeated();
-  }, true);
-  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX35 con baja no bloqueante');
+  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX35 sin render global tras baja');
 })();

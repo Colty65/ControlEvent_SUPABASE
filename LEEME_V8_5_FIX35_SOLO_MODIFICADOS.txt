@@ -5,12 +5,10 @@ Archivos incluidos:
 - public/index.html
 - index.html
 
-Qué corrige:
-- Mantiene COMPRAS con RPC directo ya probado en BBDD.
-- Tras eliminar una compra, la baja no llama a render global ni mantiene un MutationObserver continuo.
-- La ficha se elimina de la pantalla tras confirmación de BBDD y se fuerza desbloqueo fuerte de navegación/selector de evento.
-- Evita el bucle de repintado que podía dejar la interfaz aparentemente inactiva tras borrar.
+Objetivo:
+- Mantener COMPRAS con RPC directo ya probado en BBDD.
+- Tras eliminar una compra, la ficha se quita de pantalla y se aplica desbloqueo fuerte para que no queden capas/estados legacy bloqueando menú o selector de evento.
 - El resaltado visual de alta/modificación dura más tiempo.
 
-No cambia SQL. No toca INGRESOS, DOCUMENTOS, MAPA, GLOBOS, BACKUP ni INFOEVENTO.
+No incluye cambios SQL ni toca INGRESOS, DOCUMENTOS, MAPA, GLOBOS, BACKUP ni INFOEVENTO.
 Mantener global_write_lock = ON.

@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { analyzeReceiptImage } from '../services/receipt-ai.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -272,6 +273,15 @@ app.delete('/api/ticket-images', async (req, res) => {
   const dir = path.join(UPLOAD_DIR, eventId);
   for (const ext of ['jpg', 'jpeg', 'png', 'webp']) await fs.unlink(path.join(dir, `${encoded}.${ext}`)).catch(() => {});
   res.json({ ok: true });
+});
+
+
+app.post('/api/receipt-ai/analyze', async (req, res) => {
+  try {
+    res.json(await analyzeReceiptImage(req.body || {}));
+  } catch (err) {
+    res.status(err?.status || 500).json({ ok: false, error: err?.message || String(err) });
+  }
 });
 
 app.get('/api/diagnostics', async (req, res) => {

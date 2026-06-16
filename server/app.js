@@ -9,6 +9,7 @@ import stateRoutes from '../routes/state.routes.js';
 import ticketImagesRoutes from '../routes/ticket-images.routes.js';
 import exportRoutes from '../routes/export.routes.js';
 import crudRoutes from '../routes/crud.routes.js';
+import receiptAiRoutes from '../routes/receipt-ai.routes.js';
 import { BACKEND_NAME, NODE_MODULES_DIR, PUBLIC_DIR, ROOT } from './paths.js';
 
 export function createApp() {
@@ -63,6 +64,7 @@ export function createApp() {
   app.use('/api', authRoutes);
   app.use('/api', accessRoutes);
   app.use('/api', ticketImagesRoutes);
+  app.use('/api', receiptAiRoutes);
   app.use('/api', crudRoutes);
   app.use('/api', exportRoutes);
   app.use('/api', healthRoutes);

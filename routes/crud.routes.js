@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { deleteRecord, updateEventSituation, upsertRecord } from '../services/crud.service.js';
+import { closeEventCorrection, deleteRecord, openComprasCorrection, updateEventSituation, upsertRecord } from '../services/crud.service.js';
 
 const router = express.Router();
 
@@ -35,6 +35,17 @@ function collection(req){
 router.put('/crud/eventos/:id/situacion', asyncHandler(async (req, res) => {
   requireRowWrite(req);
   res.json(await updateEventSituation(req.params.id, req.body?.situacion));
+}));
+
+
+router.post('/crud/eventos/:id/correccion-compras', asyncHandler(async (req, res) => {
+  requireRowWrite(req);
+  res.json(await openComprasCorrection(req.params.id, req.body?.minutes, req.body?.reason));
+}));
+
+router.delete('/crud/eventos/:id/correccion-compras', asyncHandler(async (req, res) => {
+  requireRowWrite(req);
+  res.json(await closeEventCorrection(req.params.id));
 }));
 
 router.post('/crud/:collection', asyncHandler(async (req, res) => {
