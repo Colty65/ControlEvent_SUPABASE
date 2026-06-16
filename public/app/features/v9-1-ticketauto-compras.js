@@ -84,7 +84,7 @@
       btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
       btn.setAttribute('data-ce-ai-ticket-open','1');
       btn.setAttribute('aria-label','Abrir TicketAuto');
-      btn.title='TicketAuto: alta asistida de COMPRAS desde foto de ticket'; btn.textContent='🧾 TicketAuto';
+      btn.title='TicketAuto: alta asistida de COMPRAS desde foto de ticket'; btn.textContent='🧾 TicketAuto'; btn.setAttribute('onclick','window.__ceOpenTicketAutoV91&&window.__ceOpenTicketAutoV91();return false;');
       var footer=document.querySelector('.footer-inner');
       var maint=$('btnToggleMaintenance');
       if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint);
@@ -182,17 +182,20 @@
   function friendlyAiError(message){
     var m=text(message||'');
     if(/quota|insufficient_quota|billing|plan/i.test(m)){
-      return 'La API de OpenAI no tiene cuota/saldo activo. ChatGPT Pro no da crédito API automático. Puedes añadir filas manualmente o activar billing/crédito en la plataforma API.';
+      return 'La API configurada no tiene cuota/saldo disponible. Puedes añadir filas manualmente o revisar límites/billing del proveedor IA.';
     }
-    if(/api key|401|invalid/i.test(m)){
-      return 'La clave OPENAI_API_KEY no es válida o no está activa en Vercel/OpenAI Platform.';
+    if(/api key|API key|401|403|invalid|permission|PERMISSION_DENIED/i.test(m)){
+      return 'La clave IA no es válida o no está habilitada. Para Gemini usa GEMINI_API_KEY; provisionalmente también sirve OPENAI_API_KEY si contiene la clave Gemini.';
     }
-    return m || 'Error desconocido al analizar con IA.';
+    if(/model|not found|404/i.test(m)){
+      return 'Modelo IA no disponible. Prueba CONTROLEVENT_TICKET_AI_MODEL=gemini-2.0-flash o revisa el modelo configurado.';
+    }
+    return m || 'Error desconocido al analizar con TicketAuto.';
   }
   function analyze(){
     var dataUrl=window.__ceAiTicketImage || '';
     if(!dataUrl){ var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f){ setStatus('Selecciona primero una foto de ticket.','warn'); return; } }
-    setStatus('Analizando ticket con IA...','info');
+    setStatus('Analizando ticket con TicketAuto...','info');
     Promise.resolve(dataUrl || readFileAsDataUrl($('ceAiFile').files[0])).then(function(src){
       window.__ceAiTicketImage=src;
       return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src})});
@@ -200,7 +203,7 @@
       var rows=Array.isArray(data.productos)?data.productos:[];
       window.__ceAiTicketLines=rows.map(function(r){ return Object.assign({ok:true},r); });
       renderRows();
-      var msg='IA terminada: '+rows.length+' líneas detectadas.';
+      var msg='TicketAuto terminado: '+rows.length+' líneas detectadas.';
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
@@ -301,6 +304,9 @@
   window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
+  window.addEventListener('pointerdown',delegatedOpen,true);
+  window.addEventListener('click',delegatedOpen,true);
+  document.addEventListener('pointerdown',delegatedOpen,true);
   document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);

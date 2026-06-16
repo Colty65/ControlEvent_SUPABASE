@@ -1,5 +1,6 @@
-/* ControlEvent v9.1_prod - IA para lectura asistida de tickets de compra.
-   No escribe datos. Solo analiza una imagen y devuelve filas candidatas para revisión GD. */
+/* ControlEvent v9.1_prod - TicketAuto para lectura asistida de tickets de compra.
+   No escribe datos. Solo analiza una imagen y devuelve filas candidatas para revisión GD.
+   FIX v9.1: admite Gemini API además de OpenAI. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -32,7 +33,7 @@ function normalizeLine(item = {}) {
     unidades: Number(unidades.toFixed(3)),
     precio: Number(precio.toFixed(4)),
     importe: Number(importe.toFixed(4)),
-    confianza: Math.max(0, Math.min(1, Number(item.confianza ?? item.confidence ?? 0) || 0)),
+    confianza: Math.max(0, Math.min(1, Number(item.confianza ?? item.confidence ?? 0.5) || 0)),
     notas: text(item.notas || item.notes || '').trim(),
     requiereRevision: !descripcion || !precio || !importe || String(item.requiereRevision || '').toLowerCase() === 'true'
   };
@@ -53,17 +54,55 @@ function normalizeAnalysis(raw = {}) {
     raw
   };
 }
-function imageMessage(dataUrl) {
-  return {
-    type: 'input_image',
-    image_url: dataUrl
-  };
-}
 function jsonInstruction() {
   return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.\n\nLee la imagen del ticket y devuelve SOLO JSON válido, sin markdown.\n\nFormato obligatorio:\n{\n  "proveedor": "nombre comercio si aparece",\n  "fecha": "YYYY-MM-DD si aparece o cadena vacía",\n  "total": numero,\n  "productos": [\n    {"descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "confianza":numero_0_a_1, "notas":""}\n  ],\n  "advertencias": []\n}\n\nReglas:\n- No inventes productos que no se vean.\n- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.\n- Si el ticket no tiene descripción clara del artículo, deja descripcion vacía o texto literal breve y pon confianza baja.\n- Si hay cantidad x precio, pon unidades, precio unitario e importe.\n- Usa punto decimal.\n- Si dudas, conserva la línea con confianza baja para que el usuario la revise.`;
 }
+function dataUrlParts(dataUrl) {
+  const match = /^data:([^;]+);base64,(.+)$/i.exec(text(dataUrl).trim());
+  if (!match) return null;
+  return { mimeType: match[1] || 'image/jpeg', base64: match[2] || '' };
+}
+function stripJsonText(value) {
+  let s = text(value).trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first >= 0 && last > first) s = s.slice(first, last + 1);
+  return s;
+}
+function parseJsonStrictish(outText, provider) {
+  let parsed;
+  try { parsed = JSON.parse(stripJsonText(outText)); }
+  catch (error) {
+    const err = new Error(`${provider} no devolvió JSON válido.`);
+    err.status = 502;
+    err.raw = text(outText).slice(0, 2000);
+    throw err;
+  }
+  return normalizeAnalysis(parsed);
+}
+function openAiKey() {
+  return process.env.OPENAI_API_KEY || process.env.CONTROLEVENT_OPENAI_API_KEY || '';
+}
+function geminiKey() {
+  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.CONTROLEVENT_GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+}
+function providerName() {
+  const explicit = text(process.env.CONTROLEVENT_TICKET_AI_PROVIDER || process.env.TICKET_AI_PROVIDER || '').trim().toLowerCase();
+  if (explicit === 'openai' || explicit === 'gemini') return explicit;
+  const g = text(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.CONTROLEVENT_GEMINI_API_KEY || '').trim();
+  if (g) return 'gemini';
+  const k = text(process.env.OPENAI_API_KEY || '').trim();
+  if (k && !/^sk-/i.test(k)) return 'gemini';
+  return 'openai';
+}
+function imageMessage(dataUrl) {
+  return { type: 'input_image', image_url: dataUrl };
+}
 async function callOpenAI({ dataUrl }) {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.CONTROLEVENT_OPENAI_API_KEY || '';
+  const apiKey = openAiKey();
   if (!apiKey) {
     const err = new Error('Falta OPENAI_API_KEY o CONTROLEVENT_OPENAI_API_KEY en variables de entorno.');
     err.status = 503;
@@ -118,10 +157,7 @@ async function callOpenAI({ dataUrl }) {
   };
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
@@ -133,19 +169,66 @@ async function callOpenAI({ dataUrl }) {
   }
   const outText = payload.output_text || payload.output?.flatMap(o => o.content || []).map(c => c.text || '').join('\n') || '';
   if (!outText.trim()) {
-    const err = new Error('La IA no devolvió texto analizable.');
+    const err = new Error('OpenAI no devolvió texto analizable.');
     err.status = 502;
     throw err;
   }
-  let parsed;
-  try { parsed = JSON.parse(outText); }
-  catch (error) {
-    const err = new Error('La IA no devolvió JSON válido.');
-    err.status = 502;
-    err.raw = outText.slice(0, 2000);
+  return { ...parseJsonStrictish(outText, 'OpenAI'), modelo: model, proveedorIa: 'openai' };
+}
+async function callGemini({ dataUrl }) {
+  const apiKey = geminiKey();
+  if (!apiKey) {
+    const err = new Error('Falta GEMINI_API_KEY. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY o, provisionalmente, OPENAI_API_KEY con una clave de Gemini.');
+    err.status = 503;
     throw err;
   }
-  return normalizeAnalysis(parsed);
+  const parts = dataUrlParts(dataUrl);
+  if (!parts || !parts.base64) {
+    const err = new Error('La imagen no está en formato data:image/...;base64,...');
+    err.status = 400;
+    throw err;
+  }
+  const model = process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { inline_data: { mime_type: parts.mimeType, data: parts.base64 } },
+        { text: jsonInstruction() }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json'
+    }
+  };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify(body)
+  });
+  const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+  if (!res.ok) {
+    const msg = payload?.error?.message || `Gemini HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = 502;
+    err.details = payload;
+    throw err;
+  }
+  const outText = (payload.candidates || [])
+    .flatMap(c => c?.content?.parts || [])
+    .map(p => p?.text || '')
+    .join('\n')
+    .trim();
+  if (!outText) {
+    const feedback = payload?.promptFeedback?.blockReason ? ` Bloqueo: ${payload.promptFeedback.blockReason}` : '';
+    const err = new Error('Gemini no devolvió texto analizable.' + feedback);
+    err.status = 502;
+    err.details = payload;
+    throw err;
+  }
+  return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini' };
 }
 
 export async function analyzeReceiptImage({ dataUrl } = {}) {
@@ -155,11 +238,12 @@ export async function analyzeReceiptImage({ dataUrl } = {}) {
     err.status = 400;
     throw err;
   }
-  if (src.length > 32 * 1024 * 1024) {
-    const err = new Error('Imagen demasiado grande para analizar.');
+  if (src.length > 20 * 1024 * 1024) {
+    const err = new Error('Imagen demasiado grande para analizar con TicketAuto. Reduce la foto o recórtala.');
     err.status = 413;
     throw err;
   }
-  const result = await callOpenAI({ dataUrl: src });
-  return { ...result, modelo: process.env.CONTROLEVENT_TICKET_AI_MODEL || 'gpt-4.1-mini' };
+  const provider = providerName();
+  const result = provider === 'openai' ? await callOpenAI({ dataUrl: src }) : await callGemini({ dataUrl: src });
+  return result;
 }
