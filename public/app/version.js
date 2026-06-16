@@ -3,4 +3,4 @@ export const VERSION_FILE = 'ControlEvent_v9_2_prod';
 
 window.ControlEventVersion = {version: VERSION, versionFile: VERSION_FILE};
 
-window.CONTROLEVENT_FIX = 'V9_2_PROD_TICKETAUTO_COMPRAS';
+window.CONTROLEVENT_FIX = 'V9_2_PROD_TICKETAUTO_REVISION_VISUAL';

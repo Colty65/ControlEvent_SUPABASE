@@ -1,6 +1,6 @@
 /* ControlEvent v9.2_prod - Alta asistida para lectura de tickets de compra.
    No escribe datos. Solo analiza una imagen y devuelve filas candidatas para revisión GD.
-   FIX v9.2: Gemini robusto, acepta GEMINI_API_KEY y OPENIA_API_KEY, con fallback desde OpenAI a Gemini si hay clave. */
+   FIX revisión visual: Gemini reforzado, modelos alternativos, errores técnicos visibles sin exponer claves. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -83,11 +83,12 @@ function parseJsonStrictish(outText, provider) {
   }
   return normalizeAnalysis(parsed);
 }
-function openAiKey() {
-  return process.env.OPENAI_API_KEY || process.env.CONTROLEVENT_OPENAI_API_KEY || '';
-}
 function looksLikeOpenAiKey(value) {
   return /^sk-/i.test(text(value).trim());
+}
+function openAiKey() {
+  const k = process.env.OPENAI_API_KEY || process.env.CONTROLEVENT_OPENAI_API_KEY || '';
+  return looksLikeOpenAiKey(k) ? k : '';
 }
 function geminiKey() {
   const explicitGemini = process.env.GEMINI_API_KEY
@@ -184,26 +185,33 @@ async function callOpenAI({ dataUrl }) {
   }
   return { ...parseJsonStrictish(outText, 'OpenAI'), modelo: model, proveedorIa: 'openai' };
 }
-async function callGemini({ dataUrl }) {
-  const apiKey = geminiKey();
-  if (!apiKey) {
-    const err = new Error('Falta GEMINI_API_KEY. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY (nombre escrito así) o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
-    err.status = 503;
-    throw err;
-  }
-  const parts = dataUrlParts(dataUrl);
-  if (!parts || !parts.base64) {
-    const err = new Error('La imagen no está en formato data:image/...;base64,...');
-    err.status = 400;
-    throw err;
-  }
-  const model = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || 'gemini-2.0-flash').replace(/^models\//, '');
+function configuredGeminiModels() {
+  const configured = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '').replace(/^models\//, '').trim();
+  const fallback = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+  const out = [];
+  [configured, ...fallback].forEach(model => {
+    const m = text(model).replace(/^models\//, '').trim();
+    if (m && !out.includes(m)) out.push(m);
+  });
+  return out;
+}
+function decorateGeminiError(err, model, payload) {
+  err.proveedorIa = 'gemini';
+  err.modelo = model;
+  err.details = payload || err.details;
+  return err;
+}
+function isRetryableGeminiError(err) {
+  const m = text(err?.message || '');
+  return /404|not found|not supported|model|429|quota|RESOURCE_EXHAUSTED|rate.?limit|l[ií]mite/i.test(m);
+}
+async function callGeminiModel({ dataUrl, model, apiKey, parts }) {
   const body = {
     contents: [{
       role: 'user',
       parts: [
-        { inline_data: { mime_type: parts.mimeType, data: parts.base64 } },
-        { text: jsonInstruction() }
+        { text: jsonInstruction() },
+        { inline_data: { mime_type: parts.mimeType, data: parts.base64 } }
       ]
     }],
     generationConfig: {
@@ -221,9 +229,8 @@ async function callGemini({ dataUrl }) {
   if (!res.ok) {
     const msg = payload?.error?.message || `Gemini HTTP ${res.status}`;
     const err = new Error(msg);
-    err.status = 502;
-    err.details = payload;
-    throw err;
+    err.status = res.status === 400 ? 400 : 502;
+    throw decorateGeminiError(err, model, payload);
   }
   const outText = (payload.candidates || [])
     .flatMap(c => c?.content?.parts || [])
@@ -234,10 +241,44 @@ async function callGemini({ dataUrl }) {
     const feedback = payload?.promptFeedback?.blockReason ? ` Bloqueo: ${payload.promptFeedback.blockReason}` : '';
     const err = new Error('Gemini no devolvió texto analizable.' + feedback);
     err.status = 502;
-    err.details = payload;
-    throw err;
+    throw decorateGeminiError(err, model, payload);
   }
   return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini' };
+}
+async function callGemini({ dataUrl }) {
+  const apiKey = geminiKey();
+  if (!apiKey) {
+    const err = new Error('Falta GEMINI_API_KEY. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY (nombre escrito así) o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
+    err.status = 503;
+    err.proveedorIa = 'gemini';
+    throw err;
+  }
+  const parts = dataUrlParts(dataUrl);
+  if (!parts || !parts.base64) {
+    const err = new Error('La imagen no está en formato data:image/...;base64,...');
+    err.status = 400;
+    err.proveedorIa = 'gemini';
+    throw err;
+  }
+  const models = configuredGeminiModels();
+  let lastError = null;
+  for (const model of models) {
+    try {
+      return await callGeminiModel({ dataUrl, model, apiKey, parts });
+    } catch (error) {
+      lastError = decorateGeminiError(error, model, error?.details);
+      if (!isRetryableGeminiError(error)) throw lastError;
+      try { console.warn(`[ControlEvent v9.2_prod Alta IA] Gemini falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+    }
+  }
+  if (lastError) {
+    lastError.message = `${lastError.message} (modelos probados: ${models.join(', ')})`;
+    throw lastError;
+  }
+  const err = new Error('No hay modelos Gemini configurados para probar.');
+  err.status = 503;
+  err.proveedorIa = 'gemini';
+  throw err;
 }
 
 export async function analyzeReceiptImage({ dataUrl } = {}) {

@@ -1,8 +1,8 @@
 /* ControlEvent v9.2_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
-   Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
+   FIX revisión visual: foto grande izquierda, importes automáticos, total factura y orden TKxx. */
 (function(){
   'use strict';
-  var TAG='__ceV92TicketAutoCompras';
+  var TAG='__ceV92TicketAutoComprasReviewFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -28,11 +28,14 @@
     else s=s.replace(/,/g,'');
     var n=Number(s); return isFinite(n) ? n : 0;
   }
+  function round2(v){ var n=money(v); return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function dec(v){ var n=round2(v); return n ? n.toFixed(2) : '0.00'; }
   function euro(v){ var n=money(v); return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+  function htmlEscape(v){ return text(v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function apiJson(url, init){
     return fetch(url, Object.assign({cache:'no-store'}, init||{})).then(function(res){
       return res.json().catch(function(){return {};}).then(function(data){
-        if(!res.ok || data.ok===false) throw new Error(data.error || data.message || ('HTTP '+res.status+' '+url));
+        if(!res.ok || data.ok===false){ var e=new Error(data.error || data.message || ('HTTP '+res.status+' '+url)); e.details=data; e.status=res.status; throw e; }
         return data;
       });
     });
@@ -51,21 +54,24 @@
     st.textContent='\n'+
       '.ce-ai-ticket-btn{font-weight:900;font-size:20px;min-width:48px;min-height:42px;padding:8px 11px;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
-      '.ce-ai-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:14px}\n'+
+      '.ce-ai-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:8px}\n'+
       '.ce-ai-overlay.open{display:flex}\n'+
-      '.ce-ai-modal{width:min(1180px,98vw);max-height:94vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);border:2px solid #fb923c;padding:14px}\n'+
-      '.ce-ai-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}\n'+
+      '.ce-ai-modal{width:min(1540px,99vw);max-height:96vh;overflow:hidden;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);border:2px solid #fb923c;padding:14px;display:flex;flex-direction:column}\n'+
+      '.ce-ai-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:8px;flex:0 0 auto}\n'+
       '.ce-ai-title{font-size:20px;font-weight:900;color:#7c2d12}.ce-ai-sub{font-size:13px;color:#475569;margin-top:3px}\n'+
-      '.ce-ai-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin:10px 0}.ce-ai-field label{font-weight:800;font-size:12px;color:#334155;display:block;margin-bottom:3px}.ce-ai-field input,.ce-ai-field select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:#fff}\n'+
+      '.ce-ai-status{padding:8px 10px;border-radius:10px;margin:6px 0 10px 0;font-weight:800;flex:0 0 auto}.ce-ai-status.ok{background:#dcfce7;color:#166534}.ce-ai-status.err{background:#fee2e2;color:#991b1b}.ce-ai-status.info{background:#dbeafe;color:#1e3a8a}.ce-ai-status.warn{background:#fef3c7;color:#92400e}\n'+
+      '.ce-ai-work{display:grid;grid-template-columns:minmax(315px,36%) minmax(610px,1fr);gap:12px;min-height:0;overflow:hidden}.ce-ai-left,.ce-ai-right{min-height:0}.ce-ai-left{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}.ce-ai-right{display:flex;flex-direction:column;min-width:0;overflow:auto;padding-right:2px}\n'+
+      '.ce-ai-photo-title{font-weight:900;color:#334155;font-size:13px}.ce-ai-photo-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ce-ai-photo-tools input{max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:7px;background:#fff}.ce-ai-preview{width:100%;height:calc(96vh - 250px);min-height:360px;max-height:760px;border-radius:12px;border:1px solid #cbd5e1;object-fit:contain;background:#fff;cursor:zoom-in}.ce-ai-preview.empty{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 12px,#eef2f7 12px,#eef2f7 24px)}\n'+
+      '.ce-ai-grid{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;margin:0 0 10px 0}.ce-ai-field label{font-weight:800;font-size:12px;color:#334155;display:block;margin-bottom:3px}.ce-ai-field input,.ce-ai-field select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:#fff}\n'+
       '.ce-ai-ticket-used{background:#dcfce7!important;color:#166534!important;font-weight:900!important;border-color:#86efac!important}\n'+
-      '.ce-ai-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.ce-ai-actions button{border-radius:10px;padding:8px 12px;font-weight:800}.ce-ai-primary{background:#f97316;color:#fff;border:1px solid #ea580c}.ce-ai-secondary{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}.ce-ai-danger{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}\n'+
-      '.ce-ai-preview{max-width:160px;max-height:120px;border-radius:10px;border:1px solid #e2e8f0;object-fit:contain;background:#f8fafc}\n'+
-      '.ce-ai-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px}.ce-ai-table{width:100%;border-collapse:collapse;font-size:13px}.ce-ai-table th{background:#ffedd5;color:#7c2d12;text-align:left;padding:7px;position:sticky;top:0}.ce-ai-table td{padding:6px;border-top:1px solid #e2e8f0;vertical-align:middle}.ce-ai-table input,.ce-ai-table select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:6px}.ce-ai-table .num{max-width:90px}.ce-ai-row-low{background:#fff7ed}.ce-ai-row-ok{background:#f8fafc}\n'+
-      '.ce-ai-status{padding:8px 10px;border-radius:10px;margin:8px 0;font-weight:800}.ce-ai-status.ok{background:#dcfce7;color:#166534}.ce-ai-status.err{background:#fee2e2;color:#991b1b}.ce-ai-status.info{background:#dbeafe;color:#1e3a8a}.ce-ai-status.warn{background:#fef3c7;color:#92400e}\n'+
-      '@media(max-width:760px){.ce-ai-grid{grid-template-columns:1fr}.ce-ai-modal{padding:10px}.ce-ai-title{font-size:17px}.ce-ai-table{font-size:12px}.ce-ai-preview{max-width:100%;max-height:150px}}\n';
+      '.ce-ai-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.ce-ai-actions button,.ce-ai-photo-tools button{border-radius:10px;padding:8px 12px;font-weight:800}.ce-ai-primary{background:#f97316;color:#fff;border:1px solid #ea580c}.ce-ai-secondary{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}.ce-ai-danger{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}\n'+
+      '.ce-ai-totalbar{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:8px;margin:8px 0}.ce-ai-totalbox{border:1px solid #e2e8f0;border-radius:12px;background:#fff7ed;padding:8px 10px}.ce-ai-totalbox strong{display:block;color:#7c2d12;font-size:12px}.ce-ai-totalbox span{font-size:18px;font-weight:900;color:#0f172a}.ce-ai-totalbox.diff-ok{background:#dcfce7}.ce-ai-totalbox.diff-warn{background:#fee2e2}\n'+
+      '.ce-ai-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;max-height:calc(96vh - 340px);min-height:130px}.ce-ai-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.ce-ai-table th{background:#ffedd5;color:#7c2d12;text-align:left;padding:7px;position:sticky;top:0;z-index:1}.ce-ai-table td{padding:6px;border-top:1px solid #e2e8f0;vertical-align:middle}.ce-ai-table input,.ce-ai-table select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:6px}.ce-ai-table .col-ok{width:46px}.ce-ai-table .col-prod{width:auto}.ce-ai-table .col-num{width:96px}.ce-ai-table .col-conf{width:72px}.ce-ai-table .col-del{width:88px}.ce-ai-table input[readonly]{background:#f1f5f9;color:#0f172a;font-weight:900}.ce-ai-row-low{background:#fff7ed}.ce-ai-row-ok{background:#f8fafc}\n'+
+      '.ce-ai-zoom{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:10020;padding:16px}.ce-ai-zoom.open{display:flex}.ce-ai-zoom img{max-width:96vw;max-height:92vh;object-fit:contain;background:#fff;border-radius:10px}.ce-ai-zoom button{position:absolute;right:18px;top:18px;border-radius:10px;padding:9px 13px;font-weight:900;border:1px solid #cbd5e1;background:#fff;color:#0f172a}\n'+
+      '@media(max-width:980px){.ce-ai-modal{overflow:auto}.ce-ai-work{grid-template-columns:1fr;overflow:visible}.ce-ai-right{overflow:visible}.ce-ai-grid{grid-template-columns:1fr}.ce-ai-preview{height:45vh;min-height:260px}.ce-ai-table-wrap{max-height:55vh}.ce-ai-totalbar{grid-template-columns:1fr}}\n'+
+      '@media(max-width:760px){.ce-ai-modal{padding:10px}.ce-ai-title{font-size:17px}.ce-ai-table{font-size:12px}.ce-ai-table .col-num{width:78px}.ce-ai-table .col-conf{width:55px}.ce-ai-table .col-del{width:76px}}\n';
     document.head.appendChild(st);
   }
-  function htmlEscape(v){ return text(v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function sortedByName(list){
     return (list || []).slice().sort(function(a,b){
       return trim(a && (a.nombre || a.name || a.id)).localeCompare(trim(b && (b.nombre || b.name || b.id)), 'es', {sensitivity:'base'});
@@ -93,12 +99,10 @@
     return used;
   }
   function ticketOptions(selected, used){
-    used = used || usedTicketMap();
-    selected = trim(selected).toUpperCase();
+    used = used || usedTicketMap(); selected = trim(selected).toUpperCase();
     var out='<option value=""></option>';
     for(var i=1;i<=50;i++){
-      var tk='TK'+String(i).padStart(2,'0');
-      var isUsed=!!used[tk];
+      var tk='TK'+String(i).padStart(2,'0'); var isUsed=!!used[tk];
       var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento"':'');
       out+='<option value="'+tk+'"'+attrs+'>'+tk+(isUsed?' ✓':'')+'</option>';
     }
@@ -106,10 +110,16 @@
   }
   function markTicketSelect(){
     var sel=$('ceAiTicket'); if(!sel) return;
-    var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase();
-    var isUsed=!!used[tk];
+    var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase(); var isUsed=!!used[tk];
     sel.classList.toggle('ce-ai-ticket-used', isUsed);
     sel.title=isUsed ? 'Este TKxx ya está usado en COMPRAS para este evento.' : 'Selecciona el TKxx del ticket.';
+  }
+  function sortLinesLikeTk(rows){
+    return (rows || []).map(function(row,idx){ return Object.assign({__idx:idx}, row); }).sort(function(a,b){
+      var an=trim(a.descripcion), bn=trim(b.descripcion);
+      if(!an && bn) return 1; if(an && !bn) return -1;
+      return an.localeCompare(bn,'es',{sensitivity:'base',numeric:true}) || (a.__idx-b.__idx);
+    }).map(function(row){ delete row.__idx; return row; });
   }
   function ensureUi(){
     css();
@@ -119,30 +129,37 @@
       btn.setAttribute('data-ce-ai-ticket-open','1');
       btn.setAttribute('aria-label','Abrir alta asistida de compras');
       btn.title='Alta asistida de COMPRAS desde foto de ticket'; btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>'; btn.setAttribute('onclick','window.__ceOpenTicketAutoV92&&window.__ceOpenTicketAutoV92();return false;');
-      var footer=document.querySelector('.footer-inner');
-      var maint=$('btnToggleMaintenance');
-      if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint);
-      else if(footer) footer.appendChild(btn);
+      var footer=document.querySelector('.footer-inner'); var maint=$('btnToggleMaintenance');
+      if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint); else if(footer) footer.appendChild(btn);
       btn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
     }
-    var oldHeaderBtn=$('btnReceiptAiComprasHeader');
-    if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
+    var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
         '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
         '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
-        '<div class="ce-ai-grid">'+
-          '<div class="ce-ai-field"><label>Foto del ticket</label><input id="ceAiFile" type="file" accept="image/*" capture="environment"></div>'+ 
-          '<div class="ce-ai-field"><label>TKxx</label><select id="ceAiTicket"></select></div>'+ 
-          '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
-          '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
+        '<div class="ce-ai-work">'+
+          '<aside class="ce-ai-left">'+
+            '<div class="ce-ai-photo-title">Foto del ticket</div>'+ 
+            '<div class="ce-ai-photo-tools"><input id="ceAiFile" type="file" accept="image/*" capture="environment"><button type="button" id="ceAiZoomBtn" class="ce-ai-secondary">Ampliar foto</button></div>'+ 
+            '<img id="ceAiPreview" class="ce-ai-preview" alt="Vista previa del ticket" style="display:none">'+
+          '</aside>'+ 
+          '<section class="ce-ai-right">'+
+            '<div class="ce-ai-grid">'+
+              '<div class="ce-ai-field"><label>TKxx</label><select id="ceAiTicket"></select></div>'+ 
+              '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
+              '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
+            '</div>'+ 
+            '<div class="ce-ai-actions"><button type="button" id="ceAiAnalyze" class="ce-ai-primary">Analizar foto con IA</button><button type="button" id="ceAiAddRow" class="ce-ai-secondary">Añadir fila manual</button><button type="button" id="ceAiClear" class="ce-ai-danger">Limpiar</button></div>'+ 
+            '<datalist id="ceAiProducts"></datalist>'+ 
+            '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
+            '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="7">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
+            '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary">Procesar y llevar a COMPRAS</button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary">Recargar evento</button></div>'+ 
+          '</section>'+ 
         '</div>'+ 
-        '<div class="ce-ai-actions"><img id="ceAiPreview" class="ce-ai-preview" alt="Vista previa" style="display:none"><button type="button" id="ceAiAnalyze" class="ce-ai-primary">Analizar foto con IA</button><button type="button" id="ceAiAddRow" class="ce-ai-secondary">Añadir fila manual</button><button type="button" id="ceAiClear" class="ce-ai-danger">Limpiar</button></div>'+ 
-        '<datalist id="ceAiProducts"></datalist>'+ 
-        '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th>OK</th><th>Producto</th><th>Unid.</th><th>Precio</th><th>Importe</th><th>Conf.</th><th></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="7">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
-        '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary">Procesar y llevar a COMPRAS</button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary">Recargar evento</button></div>'+ 
-      '</div>';
+      '</div>'+
+      '<div id="ceAiZoomPanel" class="ce-ai-zoom"><button type="button" id="ceAiZoomClose">Cerrar</button><img id="ceAiZoomImg" alt="Ticket ampliado"></div>';
       document.body.appendChild(div);
       $('ceAiClose').addEventListener('click',closePanel);
       $('ceAiFile').addEventListener('change',fileChanged);
@@ -151,88 +168,105 @@
       $('ceAiAddRow').addEventListener('click',function(){ addRow({descripcion:'',unidades:1,precio:0,importe:0,confianza:0,requiereRevision:true}); });
       $('ceAiClear').addEventListener('click',clearRows);
       $('ceAiProcess').addEventListener('click',processRows);
-      $('ceAiReloadEvent').addEventListener('click',reloadEvent);
+      $('ceAiReloadEvent').addEventListener('click',function(){ reloadEvent(false); });
+      $('ceAiZoomBtn').addEventListener('click',openZoom);
+      $('ceAiPreview').addEventListener('click',openZoom);
+      $('ceAiZoomClose').addEventListener('click',closeZoom);
+      $('ceAiZoomPanel').addEventListener('click',function(ev){ if(ev.target===$('ceAiZoomPanel')) closeZoom(); });
     }
-    refreshRole();
+    refreshRole(); updateTotals();
   }
   function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
   function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
-    if(tienda) tienda.innerHTML=options(arr('tiendas'), '', function(t){return t.nombre || t.id;});
-    if(resp) resp.innerHTML=options(arr('personas'), '', function(p){return p.nombre || p.id;});
-    var dl=$('ceAiProducts'); if(dl){
-      var ps=sortedByName(arr('productos'));
-      dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join('');
-    }
-    var used=usedTicketMap();
-    var sel=$('ceAiTicket');
-    if(sel){
-      var current=trim(sel.value).toUpperCase();
-      var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } }
-      var keep=current || next;
-      sel.innerHTML=ticketOptions(keep, used);
-      sel.value=keep;
-      markTicketSelect();
-    }
+    var oldT=tienda ? trim(tienda.value) : ''; var oldR=resp ? trim(resp.value) : '';
+    if(tienda) tienda.innerHTML=options(arr('tiendas'), oldT, function(t){return t.nombre || t.id;});
+    if(resp) resp.innerHTML=options(arr('personas'), oldR, function(p){return p.nombre || p.id;});
+    var dl=$('ceAiProducts'); if(dl){ var ps=sortedByName(arr('productos')); dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join(''); }
+    var used=usedTicketMap(); var sel=$('ceAiTicket');
+    if(sel){ var current=trim(sel.value).toUpperCase(); var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } } var keep=current || next; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
   }
   function openPanel(){
     if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
-    ensureUi(); fillSelects(); $('ceAiTicketPanel').classList.add('open');
+    ensureUi(); fillSelects(); $('ceAiTicketPanel').classList.add('open'); updateTotals();
   }
   function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); }
+  function openZoom(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); if(!src){ setStatus('Carga primero una foto para ampliarla.','warn'); return; } var img=$('ceAiZoomImg'), p=$('ceAiZoomPanel'); if(img) img.src=src; if(p) p.classList.add('open'); }
+  function closeZoom(){ var p=$('ceAiZoomPanel'); if(p) p.classList.remove('open'); }
   function fileChanged(){
-    var f=$('ceAiFile').files && $('ceAiFile').files[0];
-    if(!f) return;
-    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } setStatus('Foto cargada. Pulsa Analizar con IA o añade filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
+    var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f) return;
+    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada. Puedes ampliarla a la izquierda, analizar con IA o añadir filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
   }
-  function clearRows(){ window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; if($('ceAiFile')) $('ceAiFile').value=''; if($('ceAiPreview')){$('ceAiPreview').src=''; $('ceAiPreview').style.display='none';} renderRows(); setStatus('Panel limpio.','info'); }
+  function clearRows(){ window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; window.__ceAiDetectedTotal=0; if($('ceAiFile')) $('ceAiFile').value=''; if($('ceAiPreview')){$('ceAiPreview').src=''; $('ceAiPreview').style.display='none';} renderRows(); setStatus('Panel limpio.','info'); }
+  function updateRowImport(tr){
+    if(!tr) return 0;
+    var u=money((tr.querySelector('[data-ce-ai-field="unidades"]')||{}).value)||1;
+    var p=money((tr.querySelector('[data-ce-ai-field="precio"]')||{}).value);
+    var total=round2(u*p);
+    var imp=tr.querySelector('[data-ce-ai-field="importe"]'); if(imp) imp.value=dec(total);
+    return total;
+  }
+  function collectRows(updateInputs){
+    var out=[];
+    document.querySelectorAll('#ceAiRows tr[data-ce-ai-row]').forEach(function(tr){
+      if(updateInputs!==false) updateRowImport(tr);
+      var obj={};
+      tr.querySelectorAll('[data-ce-ai-field]').forEach(function(inp){ var k=inp.getAttribute('data-ce-ai-field'); obj[k]= inp.type==='checkbox' ? inp.checked : inp.value; });
+      obj.descripcion=trim(obj.descripcion); obj.unidades=money(obj.unidades)||1; obj.precio=money(obj.precio); obj.importe=round2(obj.unidades*obj.precio); obj.confianza=Number(tr.getAttribute('data-ce-ai-conf')||0) || 0; out.push(obj);
+    });
+    window.__ceAiTicketLines=out; return out;
+  }
+  function updateTotals(){
+    var rows=collectRows(false); var selected=0;
+    rows.forEach(function(r){ if(r.ok!==false) selected += round2((money(r.unidades)||1)*money(r.precio)); });
+    var tLines=$('ceAiTotalLines'); if(tLines) tLines.textContent=euro(selected);
+    var detected=money(window.__ceAiDetectedTotal||0);
+    var tPhoto=$('ceAiTotalPhoto'); if(tPhoto) tPhoto.textContent=detected ? euro(detected) : '—';
+    var diffEl=$('ceAiTotalDiff'), box=$('ceAiDiffBox');
+    if(diffEl){ diffEl.textContent=detected ? euro(selected-detected) : '—'; }
+    if(box){ box.classList.remove('diff-ok','diff-warn'); if(detected){ box.classList.add(Math.abs(selected-detected)<0.02 ? 'diff-ok' : 'diff-warn'); } }
+  }
   function renderRows(){
     var body=$('ceAiRows'); if(!body) return;
-    var rows=window.__ceAiTicketLines || [];
-    if(!rows.length){ body.innerHTML='<tr><td colspan="7">Sin líneas todavía.</td></tr>'; return; }
+    var rows=sortLinesLikeTk(window.__ceAiTicketLines || []); window.__ceAiTicketLines=rows;
+    if(!rows.length){ body.innerHTML='<tr><td colspan="7">Sin líneas todavía.</td></tr>'; updateTotals(); return; }
     body.innerHTML=rows.map(function(r,i){
       var cls=(Number(r.confianza||0)<0.65 || !trim(r.descripcion))?'ce-ai-row-low':'ce-ai-row-ok';
-      return '<tr class="'+cls+'" data-ce-ai-row="'+i+'">'+
+      var unidades=money(r.unidades)||1; var precio=money(r.precio); var importe=round2(unidades*precio);
+      return '<tr class="'+cls+'" data-ce-ai-row="'+i+'" data-ce-ai-conf="'+htmlEscape(r.confianza||0)+'">'+
         '<td><input type="checkbox" data-ce-ai-field="ok" '+(r.ok!==false?'checked':'')+'></td>'+ 
         '<td><input list="ceAiProducts" data-ce-ai-field="descripcion" value="'+htmlEscape(r.descripcion||'')+'" placeholder="Nombre producto"></td>'+ 
-        '<td><input class="num" data-ce-ai-field="unidades" value="'+htmlEscape(r.unidades||1)+'"></td>'+ 
-        '<td><input class="num" data-ce-ai-field="precio" value="'+htmlEscape(r.precio||0)+'"></td>'+ 
-        '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(r.importe||0)+'"></td>'+ 
+        '<td><input class="num" data-ce-ai-field="unidades" value="'+htmlEscape(unidades)+'"></td>'+ 
+        '<td><input class="num" data-ce-ai-field="precio" value="'+htmlEscape(precio)+'"></td>'+ 
+        '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(dec(importe))+'" readonly title="Calculado automáticamente: unidades x precio"></td>'+ 
         '<td>'+Math.round(Number(r.confianza||0)*100)+'%</td>'+ 
         '<td><button type="button" class="ce-ai-danger" data-ce-ai-del="'+i+'">Quitar</button></td>'+ 
       '</tr>';
     }).join('');
-    body.querySelectorAll('[data-ce-ai-field]').forEach(function(input){ input.addEventListener('change',collectRows); input.addEventListener('input',collectRows); });
+    body.querySelectorAll('[data-ce-ai-field="unidades"],[data-ce-ai-field="precio"]').forEach(function(input){ input.addEventListener('input',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); });
+    body.querySelectorAll('[data-ce-ai-field="descripcion"],[data-ce-ai-field="ok"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ collectRows(false); updateTotals(); }); });
     body.querySelectorAll('[data-ce-ai-del]').forEach(function(btn){ btn.addEventListener('click',function(){ collectRows(); var idx=Number(btn.getAttribute('data-ce-ai-del')); (window.__ceAiTicketLines||[]).splice(idx,1); renderRows(); }); });
-  }
-  function collectRows(){
-    var out=[];
-    document.querySelectorAll('#ceAiRows tr[data-ce-ai-row]').forEach(function(tr){
-      var obj={};
-      tr.querySelectorAll('[data-ce-ai-field]').forEach(function(inp){
-        var k=inp.getAttribute('data-ce-ai-field'); obj[k]= inp.type==='checkbox' ? inp.checked : inp.value;
-      });
-      obj.descripcion=trim(obj.descripcion); obj.unidades=money(obj.unidades)||1; obj.precio=money(obj.precio); obj.importe=money(obj.importe)||obj.unidades*obj.precio; obj.confianza=0; out.push(obj);
-    });
-    window.__ceAiTicketLines=out;
-    return out;
+    updateTotals();
   }
   function addRow(row){ if(!window.__ceAiTicketLines) window.__ceAiTicketLines=[]; window.__ceAiTicketLines.push(Object.assign({ok:true,unidades:1,precio:0,importe:0,confianza:0}, row||{})); renderRows(); }
-  function friendlyAiError(message){
+  function friendlyAiError(message, details){
     var m=text(message||'');
+    var provider=text(details && (details.proveedorIa || details.provider || details.proveedor) || '').trim();
+    var model=text(details && (details.modelo || details.model || details.modeloIntentado) || '').trim();
+    var prefix=(provider||model) ? ('['+(provider||'IA')+(model?' '+model:'')+'] ') : '';
     if(/quota|insufficient_quota|billing|plan|RESOURCE_EXHAUSTED|429|rate.?limit|l[ií]mite/i.test(m)){
-      return 'La API configurada no tiene cuota/saldo/límite disponible ahora. Puedes añadir filas manualmente o revisar cuota, límites y billing del proveedor IA.';
+      return prefix+'el proveedor IA devuelve límite/cuota/saldo no disponible ahora. Detalle técnico: '+m.slice(0,260);
     }
     if(/api key|API key|401|403|invalid|permission|PERMISSION_DENIED/i.test(m)){
-      return 'La clave IA no es válida o no está habilitada. Para Gemini usa GEMINI_API_KEY; también se acepta OPENIA_API_KEY si la variable ya está creada así.';
+      return prefix+'la clave IA no es válida, no está habilitada o no tiene permisos. Para Gemini usa GEMINI_API_KEY; también se acepta OPENIA_API_KEY.';
     }
     if(/model|not found|404/i.test(m)){
-      return 'Modelo IA no disponible. Prueba CONTROLEVENT_TICKET_AI_MODEL=gemini-2.0-flash o revisa el modelo configurado.';
+      return prefix+'modelo IA no disponible. El servidor probará modelos Gemini alternativos si están configurados.';
     }
-    return m || 'Error desconocido al analizar con la IA.';
+    return prefix+(m || 'Error desconocido al analizar con la IA.');
   }
   function analyze(){
     var dataUrl=window.__ceAiTicketImage || '';
@@ -240,17 +274,20 @@
     setStatus('Analizando ticket con IA...','info');
     Promise.resolve(dataUrl || readFileAsDataUrl($('ceAiFile').files[0])).then(function(src){
       window.__ceAiTicketImage=src;
+      var img=$('ceAiPreview'); if(img){ img.src=src; img.style.display=''; }
       return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src})});
     }).then(function(data){
       var rows=Array.isArray(data.productos)?data.productos:[];
-      window.__ceAiTicketLines=rows.map(function(r){ return Object.assign({ok:true},r); });
+      window.__ceAiDetectedTotal=money(data.total||0);
+      window.__ceAiTicketLines=sortLinesLikeTk(rows.map(function(r){ return Object.assign({ok:true},r); }));
       renderRows();
       var msg='Análisis terminado: '+rows.length+' líneas detectadas.';
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
+      if(data.proveedorIa || data.modelo) msg+=' IA: '+(data.proveedorIa||'')+(data.modelo?' '+data.modelo:'')+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
-      setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
+      setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err), err.details)+'. Puedes añadir filas manualmente.', 'err');
     });
   }
   function findProductByName(name){ var n=normalizeName(name); var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
@@ -260,98 +297,50 @@
     var existing=findProductByName(name);
     var payload=existing ? Object.assign({}, existing) : {id:uid(), nombre:name, segmento:'', destino:''};
     payload.defaultPrecio=money(price); if(tiendaId) payload.defaultTiendaId=tiendaId;
-    var url='/api/crud/productos'+(existing ? '/'+encodeURIComponent(existing.id) : '');
-    var method=existing ? 'PUT' : 'POST';
+    var url='/api/crud/productos'+(existing ? '/'+encodeURIComponent(existing.id) : ''); var method=existing ? 'PUT' : 'POST';
     return apiJson(url,{method:method,headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))})
-      .then(function(data){
-        var item=data.item || payload;
-        var s=stateObj(); if(!Array.isArray(s.productos)) s.productos=[];
-        var idx=s.productos.findIndex(function(p){ return trim(p.id)===trim(item.id); });
-        if(idx>=0) s.productos[idx]=Object.assign({},s.productos[idx],item); else s.productos.push(item);
-        return item;
-      })
-      .catch(function(err){
-        if(existing){ warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.'); return existing; }
-        throw err;
-      });
+      .then(function(data){ var item=data.item || payload; var s=stateObj(); if(!Array.isArray(s.productos)) s.productos=[]; var idx=s.productos.findIndex(function(p){ return trim(p.id)===trim(item.id); }); if(idx>=0) s.productos[idx]=Object.assign({},s.productos[idx],item); else s.productos.push(item); return item; })
+      .catch(function(err){ if(existing){ warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.'); return existing; } throw err; });
   }
   function postCompra(row, product, ticket, tiendaId, responsableId){
-    var payload={
-      id:uid(),
-      eventId:selectedEventId(),
-      productoId:product.id,
-      unidades:money(row.unidades)||1,
-      precio:money(row.precio) || (money(row.importe)/(money(row.unidades)||1)),
-      ticketDonacion:ticket,
-      donorRef:'',
-      tiendaId:tiendaId || product.defaultTiendaId || '',
-      responsableId:responsableId || ''
-    };
-    return apiJson('/api/crud/compras',{method:'POST',headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))}).then(function(data){
-      var item=data.item || payload;
-      var s=stateObj(); if(!Array.isArray(s.compras)) s.compras=[]; s.compras.push(item);
-      return item;
-    });
+    var payload={ id:uid(), eventId:selectedEventId(), productoId:product.id, unidades:money(row.unidades)||1, precio:money(row.precio) || (money(row.importe)/(money(row.unidades)||1)), ticketDonacion:ticket, donorRef:'', tiendaId:tiendaId || product.defaultTiendaId || '', responsableId:responsableId || '' };
+    return apiJson('/api/crud/compras',{method:'POST',headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))}).then(function(data){ var item=data.item || payload; var s=stateObj(); if(!Array.isArray(s.compras)) s.compras=[]; s.compras.push(item); return item; });
   }
   function uploadTicketImage(ticket){
     var img=window.__ceAiTicketImage||''; if(!img) return Promise.resolve(null);
-    return apiJson('/api/ticket-images',{method:'POST',headers:imageHeaders(),body:JSON.stringify({eventId:selectedEventId(),key:ticket,dataUrl:img,eventSnapshot:selectedEvent()||{}})}).then(function(data){
-      var image=data.image || {}; var s=stateObj(); if(!s.ticketImages) s.ticketImages={}; if(image.key) s.ticketImages[image.key]=image.url||image.pathname||''; return image;
-    });
+    return apiJson('/api/ticket-images',{method:'POST',headers:imageHeaders(),body:JSON.stringify({eventId:selectedEventId(),key:ticket,dataUrl:img,eventSnapshot:selectedEvent()||{}})}).then(function(data){ var image=data.image || {}; var s=stateObj(); if(!s.ticketImages) s.ticketImages={}; if(image.key) s.ticketImages[image.key]=image.url||image.pathname||''; return image; });
   }
   function processRows(){
     if(!isGD()){ alert('Solo GD.'); return; }
     if(isFinalizado()){ setStatus('Evento Finalizado: no se puede procesar ticket.','err'); return; }
-    var ticket=trim($('ceAiTicket').value).toUpperCase();
-    if(!ticket){ setStatus('Indica TKxx.','warn'); return; }
+    var ticket=trim($('ceAiTicket').value).toUpperCase(); if(!ticket){ setStatus('Indica TKxx.','warn'); return; }
     var tiendaId=trim($('ceAiTienda').value), responsableId=trim($('ceAiResponsable').value);
-    var rows=collectRows().filter(function(r){ return r.ok!==false; });
-    rows=rows.filter(function(r){ return trim(r.descripcion); });
+    var rows=sortLinesLikeTk(collectRows(true).filter(function(r){ return r.ok!==false; }).filter(function(r){ return trim(r.descripcion); }));
     if(!rows.length){ setStatus('No hay filas con producto para procesar.','warn'); return; }
     setStatus('Procesando '+rows.length+' líneas hacia PRODUCTOS y COMPRAS...','info');
     var warnings=[]; var created=0; var chain=Promise.resolve();
-    rows.forEach(function(row){
-      chain=chain.then(function(){ return upsertProductByName(row.descripcion, row.precio || row.importe, tiendaId, warnings); })
-        .then(function(product){ return postCompra(row, product, ticket, tiendaId, responsableId); })
-        .then(function(){ created++; });
-    });
+    rows.forEach(function(row){ chain=chain.then(function(){ return upsertProductByName(row.descripcion, row.precio || row.importe, tiendaId, warnings); }).then(function(product){ return postCompra(row, product, ticket, tiendaId, responsableId); }).then(function(){ created++; }); });
     chain.then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){
-        try{ fillSelects(); }catch(_){ }
-        var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si había imagen.';
-        if(warnings.length) msg+=' Avisos: '+warnings.length+'.';
-        setStatus(msg, warnings.length?'warn':'ok');
-        if(warnings.length) console.warn('[CE v9.2 Alta IA]', warnings);
-      })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); if(warnings.length) console.warn('[CE v9.2 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
     var ev=selectedEventId();
-    if(window.__ceLoadSelectedEventStateFix48 && ev){
-      return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); });
-    }
-    if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn');
-    return Promise.resolve();
+    if(window.__ceLoadSelectedEventStateFix48 && ev){ return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); }); }
+    if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn'); return Promise.resolve();
   }
   function delegatedOpen(ev){
-    var t=ev && ev.target;
-    var opener=t && t.closest && t.closest('#btnReceiptAiCompras,[data-ce-ai-ticket-open]');
-    if(!opener) return;
-    ev.preventDefault(); ev.stopPropagation();
-    if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
-    openPanel();
-    return false;
+    var t=ev && ev.target; var opener=t && t.closest && t.closest('#btnReceiptAiCompras,[data-ce-ai-ticket-open]'); if(!opener) return;
+    ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); }
   window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
-  window.addEventListener('pointerdown',delegatedOpen,true);
-  window.addEventListener('click',delegatedOpen,true);
-  document.addEventListener('pointerdown',delegatedOpen,true);
-  document.addEventListener('click',delegatedOpen,true);
+  window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
+  document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.2 Alta IA] instalada: botón de pie solo GD. Prueba: window.__ceOpenTicketAutoV92()');
+  console.info('[CE v9.2 Alta IA] revisión visual instalada: foto izquierda grande, importes automáticos, total factura y Gemini reforzado. Prueba: window.__ceOpenTicketAutoV92()');
 })();
