@@ -1,6 +1,6 @@
-export const VERSION = 'ControlEvent v9.0_prod';
-export const VERSION_FILE = 'ControlEvent_v9_0_prod';
+export const VERSION = 'ControlEvent v9.1_prod';
+export const VERSION_FILE = 'ControlEvent_v9_1_prod';
 
 window.ControlEventVersion = {version: VERSION, versionFile: VERSION_FILE};
 
-window.CONTROLEVENT_FIX = 'V9_0_PROD_TICKET_IA_COMPRAS';
+window.CONTROLEVENT_FIX = 'V9_1_PROD_TICKETAUTO_COMPRAS';

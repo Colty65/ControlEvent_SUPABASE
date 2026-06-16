@@ -1,9 +1,9 @@
-/* ControlEvent v8.5_prod - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
+/* ControlEvent v9.1_prod - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
    No toca el flujo de cambio de evento de v44.7.x. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v8.5_prod';
-  const VERSION_FILE = 'ControlEvent_v8_5_prod';
+  const VERSION = 'ControlEvent v9.1_prod';
+  const VERSION_FILE = 'ControlEvent_v9_1_prod';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const EVENT_GD_MSG = 'Solo GD puede eliminar eventos.';
   const OK_MSG = 'Se puede eliminar. No hay dependencias.';

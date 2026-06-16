@@ -2,7 +2,7 @@
    Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
 (function(){
   'use strict';
-  var TAG='__ceV90TicketIaCompras';
+  var TAG='__ceV91TicketAutoCompras';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -49,7 +49,7 @@
     if($('ceV90TicketAiStyle')) return;
     var st=document.createElement('style'); st.id='ceV90TicketAiStyle';
     st.textContent='\n'+
-      '.ce-ai-ticket-btn{font-weight:900;font-size:18px;min-width:54px;background:#fff7ed;border:2px solid #fb923c;color:#9a3412}\n'+
+      '.ce-ai-ticket-btn{font-weight:900;font-size:15px;min-width:120px;background:#fff7ed;border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:5px}\n'+
       '.ce-ai-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:14px}\n'+
       '.ce-ai-overlay.open{display:flex}\n'+
       '.ce-ai-modal{width:min(1180px,98vw);max-height:94vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);border:2px solid #fb923c;padding:14px}\n'+
@@ -83,26 +83,20 @@
       var btn=document.createElement('button');
       btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
       btn.setAttribute('data-ce-ai-ticket-open','1');
-      btn.setAttribute('aria-label','Abrir IA Ticket');
-      btn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; btn.textContent='🧾IA';
+      btn.setAttribute('aria-label','Abrir TicketAuto');
+      btn.title='TicketAuto: alta asistida de COMPRAS desde foto de ticket'; btn.textContent='🧾 TicketAuto';
       var footer=document.querySelector('.footer-inner');
-      if(footer) footer.appendChild(btn);
+      var maint=$('btnToggleMaintenance');
+      if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint);
+      else if(footer) footer.appendChild(btn);
       btn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
     }
-    if(!$('btnReceiptAiComprasHeader')){
-      var hbtn=document.createElement('button');
-      hbtn.type='button'; hbtn.id='btnReceiptAiComprasHeader'; hbtn.className='outline small ce-ai-ticket-header-btn';
-      hbtn.setAttribute('data-ce-ai-ticket-open','1');
-      hbtn.setAttribute('aria-label','Abrir IA Ticket');
-      hbtn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; hbtn.textContent='🧾 IA';
-      var actions=document.querySelector('.user-actions') || document.querySelector('.appname-stack') || document.querySelector('.header-inner');
-      if(actions) actions.insertBefore(hbtn, actions.firstChild || null);
-      hbtn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
-    }
+    var oldHeaderBtn=$('btnReceiptAiComprasHeader');
+    if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾 IA Ticket - Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾 TicketAuto - Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
         '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
         '<div class="ce-ai-grid">'+
           '<div class="ce-ai-field"><label>Foto del ticket</label><input id="ceAiFile" type="file" accept="image/*" capture="environment"></div>'+ 
@@ -126,7 +120,7 @@
     }
     refreshRole();
   }
-  function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn) hbtn.style.display=show; }
+  function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
   function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
@@ -185,6 +179,16 @@
     return out;
   }
   function addRow(row){ if(!window.__ceAiTicketLines) window.__ceAiTicketLines=[]; window.__ceAiTicketLines.push(Object.assign({ok:true,unidades:1,precio:0,importe:0,confianza:0}, row||{})); renderRows(); }
+  function friendlyAiError(message){
+    var m=text(message||'');
+    if(/quota|insufficient_quota|billing|plan/i.test(m)){
+      return 'La API de OpenAI no tiene cuota/saldo activo. ChatGPT Pro no da crédito API automático. Puedes añadir filas manualmente o activar billing/crédito en la plataforma API.';
+    }
+    if(/api key|401|invalid/i.test(m)){
+      return 'La clave OPENAI_API_KEY no es válida o no está activa en Vercel/OpenAI Platform.';
+    }
+    return m || 'Error desconocido al analizar con IA.';
+  }
   function analyze(){
     var dataUrl=window.__ceAiTicketImage || '';
     if(!dataUrl){ var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f){ setStatus('Selecciona primero una foto de ticket.','warn'); return; } }
@@ -201,7 +205,7 @@
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
-      setStatus('No se pudo analizar con IA: '+(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
+      setStatus('No se pudo analizar con TicketAuto: '+friendlyAiError(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
     });
   }
   function findProductByName(name){ var n=normalizeName(name); var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
@@ -272,7 +276,7 @@
         var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si había imagen.';
         if(warnings.length) msg+=' Avisos: '+warnings.length+'.';
         setStatus(msg, warnings.length?'warn':'ok');
-        if(warnings.length) console.warn('[CE v9.0 IA Ticket]', warnings);
+        if(warnings.length) console.warn('[CE v9.1 TicketAuto]', warnings);
       })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
@@ -286,7 +290,7 @@
   }
   function delegatedOpen(ev){
     var t=ev && ev.target;
-    var opener=t && t.closest && t.closest('#btnReceiptAiCompras,#btnReceiptAiComprasHeader,[data-ce-ai-ticket-open]');
+    var opener=t && t.closest && t.closest('#btnReceiptAiCompras,[data-ce-ai-ticket-open]');
     if(!opener) return;
     ev.preventDefault(); ev.stopPropagation();
     if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
@@ -294,11 +298,11 @@
     return false;
   }
   function tick(){ ensureUi(); refreshRole(); }
-  window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.0 Ticket IA] instalado: botón superior/inferior solo GD. Prueba: window.__ceOpenTicketIaComprasV90()');
+  console.info('[CE v9.1 TicketAuto] instalado: botón de pie solo GD. Prueba: window.__ceOpenTicketAutoV91()');
 })();

@@ -1,4 +1,4 @@
-/* ControlEvent v9.0_prod - IA para lectura asistida de tickets de compra.
+/* ControlEvent v9.1_prod - IA para lectura asistida de tickets de compra.
    No escribe datos. Solo analiza una imagen y devuelve filas candidatas para revisión GD. */
 
 function text(value) { return value == null ? '' : String(value); }
