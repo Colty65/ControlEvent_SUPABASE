@@ -1,7 +1,5 @@
 /* ControlEvent v9.2_prod - Alta asistida para lectura de tickets de compra.
-   FIX Gemini SDK oficial @google/genai + revisión visual de líneas. */
-
-import { GoogleGenAI, Type } from '@google/genai';
+   FIX despliegue Vercel: Gemini por REST nativo, sin @google/genai ni nuevas dependencias. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -103,14 +101,6 @@ function geminiKey() {
   const maybeOpenAiVar = process.env.OPENAI_API_KEY || '';
   return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
-function ensureGeminiSdkEnv() {
-  const key = geminiKey();
-  if (!key) return '';
-  // @google/genai con new GoogleGenAI() busca GOOGLE_API_KEY. ControlEvent admite también GEMINI_API_KEY/OPENIA_API_KEY.
-  if (!process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = key;
-  if (!process.env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = key;
-  return key;
-}
 function providerName() {
   const explicit = text(process.env.CONTROLEVENT_TICKET_AI_PROVIDER || process.env.TICKET_AI_PROVIDER || '').trim().toLowerCase();
   if (explicit === 'openai' || explicit === 'gemini') return explicit;
@@ -198,7 +188,7 @@ async function callOpenAI({ dataUrl }) {
 }
 function configuredGeminiModels() {
   const configured = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '').replace(/^models\//, '').trim();
-  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  const fallback = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
   const out = [];
   [configured, ...fallback].forEach(model => {
     const m = text(model).replace(/^models\//, '').trim();
@@ -206,31 +196,31 @@ function configuredGeminiModels() {
   });
   return out;
 }
-function ticketSchema() {
+function ticketSchemaRest() {
   return {
-    type: Type.OBJECT,
+    type: 'OBJECT',
     properties: {
-      proveedor: { type: Type.STRING, description: 'Nombre de la tienda o supermercado' },
-      fecha: { type: Type.STRING, description: 'Fecha de compra en formato YYYY-MM-DD, si aparece' },
-      total: { type: Type.NUMBER, description: 'Importe total del ticket' },
+      proveedor: { type: 'STRING', description: 'Nombre de la tienda o supermercado' },
+      fecha: { type: 'STRING', description: 'Fecha de compra en formato YYYY-MM-DD, si aparece' },
+      total: { type: 'NUMBER', description: 'Importe total del ticket' },
       productos: {
-        type: Type.ARRAY,
+        type: 'ARRAY',
         description: 'Lista de artículos individuales comprados, en el mismo orden vertical del ticket',
         items: {
-          type: Type.OBJECT,
+          type: 'OBJECT',
           properties: {
-            orden: { type: Type.NUMBER, description: 'Orden visual de la línea en el ticket empezando en 1' },
-            descripcion: { type: Type.STRING, description: 'Descripción del artículo' },
-            unidades: { type: Type.NUMBER, description: 'Cantidad o unidades' },
-            precio: { type: Type.NUMBER, description: 'Precio unitario' },
-            importe: { type: Type.NUMBER, description: 'Importe total de esta línea' },
-            confianza: { type: Type.NUMBER, description: 'Confianza entre 0 y 1' },
-            notas: { type: Type.STRING, description: 'Aviso breve si la línea es dudosa' }
+            orden: { type: 'NUMBER', description: 'Orden visual de la línea en el ticket empezando en 1' },
+            descripcion: { type: 'STRING', description: 'Descripción del artículo' },
+            unidades: { type: 'NUMBER', description: 'Cantidad o unidades' },
+            precio: { type: 'NUMBER', description: 'Precio unitario' },
+            importe: { type: 'NUMBER', description: 'Importe total de esta línea' },
+            confianza: { type: 'NUMBER', description: 'Confianza entre 0 y 1' },
+            notas: { type: 'STRING', description: 'Aviso breve si la línea es dudosa' }
           },
           required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'confianza', 'notas']
         }
       },
-      advertencias: { type: Type.ARRAY, items: { type: Type.STRING } }
+      advertencias: { type: 'ARRAY', items: { type: 'STRING' } }
     },
     required: ['proveedor', 'productos', 'total']
   };
@@ -242,49 +232,51 @@ function decorateGeminiError(err, model, payload) {
   return err;
 }
 function isRetryableGeminiError(err) {
-  const m = text(err?.message || '');
-  return /404|not found|not supported|model|429|quota|RESOURCE_EXHAUSTED|rate.?limit|l[ií]mite|unavailable|503/i.test(m);
+  const m = text(err?.message || err?.details?.error?.message || '');
+  return /400|404|not found|not supported|model|429|quota|RESOURCE_EXHAUSTED|rate.?limit|l[ií]mite|unavailable|503|INVALID_ARGUMENT/i.test(m);
 }
-async function callGeminiModel({ dataUrl, model, parts }) {
-  let ai;
-  try {
-    ensureGeminiSdkEnv();
-    ai = new GoogleGenAI();
-  } catch (error) {
-    const err = new Error('No se pudo inicializar @google/genai con new GoogleGenAI(): ' + (error?.message || error));
-    err.status = 503;
-    throw decorateGeminiError(err, model);
-  }
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        { inlineData: { data: parts.base64, mimeType: parts.mimeType } },
-        jsonInstruction()
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: ticketSchema(),
-        temperature: 0.1
+function geminiOutText(payload) {
+  return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || '';
+}
+async function callGeminiModel({ model, parts, apiKey }) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { inlineData: { data: parts.base64, mimeType: parts.mimeType } },
+          { text: jsonInstruction() }
+        ]
       }
-    });
-    const outText = text(response?.text || '').trim();
-    if (!outText) {
-      const err = new Error('Gemini no devolvió texto analizable.');
-      err.status = 502;
-      throw err;
+    ],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: ticketSchemaRest(),
+      temperature: 0.1
     }
-    return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-sdk' };
-  } catch (error) {
-    const err = new Error(error?.message || String(error));
-    const statusNum = Number(error?.status || error?.code || 0);
-    err.status = Number.isFinite(statusNum) && statusNum >= 400 && statusNum <= 599 ? statusNum : 502;
-    err.cause = error;
-    throw decorateGeminiError(err, model, error?.details || error?.response || undefined);
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify(body)
+  });
+  const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+  if (!res.ok) {
+    const err = new Error(payload?.error?.message || `Gemini HTTP ${res.status}`);
+    err.status = Number(res.status || 502);
+    throw decorateGeminiError(err, model, payload);
   }
+  const outText = text(geminiOutText(payload)).trim();
+  if (!outText) {
+    const err = new Error('Gemini no devolvió texto analizable.');
+    err.status = 502;
+    throw decorateGeminiError(err, model, payload);
+  }
+  return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest' };
 }
 async function callGemini({ dataUrl }) {
-  const apiKey = ensureGeminiSdkEnv();
+  const apiKey = geminiKey();
   if (!apiKey) {
     const err = new Error('Falta GEMINI_API_KEY en Vercel. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
     err.status = 503;
@@ -302,15 +294,15 @@ async function callGemini({ dataUrl }) {
   let lastError = null;
   for (const model of models) {
     try {
-      return await callGeminiModel({ dataUrl, model, parts });
+      return await callGeminiModel({ model, parts, apiKey });
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v9.2_prod Alta IA] @google/genai falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v9.2_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
-    lastError.message = `${lastError.message} (modelos probados con @google/genai: ${models.join(', ')})`;
+    lastError.message = `${lastError.message} (modelos probados con Gemini REST: ${models.join(', ')})`;
     throw lastError;
   }
   const err = new Error('No hay modelos Gemini configurados para probar.');
@@ -337,7 +329,7 @@ export async function analyzeReceiptImage({ dataUrl } = {}) {
       return await callOpenAI({ dataUrl: src });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v9.2_prod Alta IA] OpenAI falló; se reintenta con Gemini SDK.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v9.2_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src });
       }
       throw error;
