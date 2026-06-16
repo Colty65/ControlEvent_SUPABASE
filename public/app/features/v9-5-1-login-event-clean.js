@@ -2,8 +2,8 @@
    Evita que el desplegable muestre un evento aparente cuando todavía no se ha elegido ninguno. */
 (function(){
   'use strict';
-  if(window.__ceV95LoginEventClean) return;
-  window.__ceV95LoginEventClean = true;
+  if(window.__ceV951LoginEventClean) return;
+  window.__ceV951LoginEventClean = true;
 
   var PICKED_KEY = 'ControlEvent_v9_5_1_prod_event_user_picked';
   var LOGIN_CLEAN_UNTIL = 0;
@@ -66,8 +66,8 @@
       [80,220,480,900,1500,2600,4200,6500].forEach(function(ms){ setTimeout(function(){ tick('login-click'); }, ms); });
     }
   }, true);
-  if(typeof window.fetch === 'function' && !window.__ceV95LoginFetchClean){
-    window.__ceV95LoginFetchClean = true;
+  if(typeof window.fetch === 'function' && !window.__ceV951LoginFetchClean){
+    window.__ceV951LoginFetchClean = true;
     var oldFetch = window.fetch.bind(window);
     window.fetch = function(input, init){
       var url = text((input && input.url) || input || '');
@@ -85,7 +85,7 @@
       return p;
     };
   }
-  window.__ceV95CleanAwaitingEvent = function(){ clearPicked(); LOGIN_CLEAN_UNTIL=Date.now()+5000; tick('manual'); };
+  window.__ceV951CleanAwaitingEvent = function(){ clearPicked(); LOGIN_CLEAN_UNTIL=Date.now()+5000; tick('manual'); };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ tick('dom'); }, {once:true}); else tick('load');
   window.addEventListener('controlevent:runtime-ready', function(){ tick('runtime'); }, false);
   [300,900,1800,3200].forEach(function(ms){ setTimeout(function(){ tick('startup'); }, ms); });

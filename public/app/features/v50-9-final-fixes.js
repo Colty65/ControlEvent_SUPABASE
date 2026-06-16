@@ -1,4 +1,4 @@
-/* ControlEvent v9.5_prod - correccion puntual sobre v50.19.
+/* ControlEvent v9.5.1_prod - correccion puntual sobre v50.19.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -6,14 +6,14 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v9.5_prod';
-  const VERSION_FILE = 'ControlEvent_v9_5_prod';
+  const VERSION = 'ControlEvent v9.5.1_prod';
+  const VERSION_FILE = 'ControlEvent_v9_5_1_prod';
   const INSTALLED = '__ceV509FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEY = 'ControlEvent_v9_5_prod_session';
-  const LOGOUT_KEY_508 = 'ControlEvent_v9_5_prod_logout_at';
+  const SESSION_KEY = 'ControlEvent_v9_5_1_prod_session';
+  const LOGOUT_KEY_508 = 'ControlEvent_v9_5_1_prod_logout_at';
   const BACKUP_KEYS = ['ControlEvent_ingreso_receipts_v502','ControlEvent_ingreso_receipts_v468'];
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -207,7 +207,7 @@
       if(text && !data.error) data.error = text;
       if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       safe(() => sessionStorage.removeItem(LOGOUT_KEY_508), null);
-      safe(() => sessionStorage.removeItem('ControlEvent_v9_5_prod_logout_at'), null);
+      safe(() => sessionStorage.removeItem('ControlEvent_v9_5_1_prod_logout_at'), null);
       await loadFreshState();
       setLexical('authUser', data.user);
       window.authUser = data.user;

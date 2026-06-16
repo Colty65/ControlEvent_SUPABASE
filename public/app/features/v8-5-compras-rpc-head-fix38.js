@@ -312,11 +312,8 @@
     try{ localStorage.setItem(storageKey(), JSON.stringify(stateObj())); }catch(err){ console.warn(LOG,'No se pudo persistir localStorage antes de recargar',err); }
   }
   function toast(msg){
-    try{
-      let box=document.getElementById('ceFix38Toast');
-      if(!box){ box=document.createElement('div'); box.id='ceFix38Toast'; box.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999999;background:#111827;color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;box-shadow:0 18px 45px rgba(15,23,42,.35);font-size:15px;'; document.body.appendChild(box); }
-      box.textContent=msg;
-    }catch(_){ }
+    // v9.5.1: sin avisos flotantes negros; solo consola para depuración.
+    try{ console.info(LOG || '[ControlEvent v9.5.1_prod]', msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX38: dejamos de confiar en repintados parciales legacy.

@@ -2,7 +2,7 @@
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV95TicketAutoComprasCompactResponsibleFix';
+  var TAG='__ceV951TicketAutoComprasTotalCleanCompactFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -49,8 +49,8 @@
     });
   }
   function css(){
-    if($('ceV95TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV95TicketAiStyle';
+    if($('ceV951TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV951TicketAiStyle';
     st.textContent='\n'+
       '.ce-ai-ticket-btn{font-weight:900;font-size:22px;width:46px;min-width:46px;height:40px;min-height:40px;padding:4px 7px;margin-left:auto;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
@@ -90,6 +90,7 @@
       '.ce-ai-table button.ce-ai-danger{padding:4px 6px!important;font-size:0!important;border-radius:10px!important}.ce-ai-table button.ce-ai-danger::after{content:"✖";font-size:13px!important;}\n'+
       '.ce-ai-pending-box{margin-top:7px!important;padding:8px!important}.ce-ai-pending-title{font-size:15px!important}.ce-ai-pending-tools{display:flex;align-items:center;gap:6px;margin-left:auto}.ce-ai-pending-tools label{font-size:11px;color:#0369a1;font-weight:900}.ce-ai-pending-tools select{border:1px solid #bae6fd;border-radius:8px;padding:5px;background:#fff;font-weight:800}\n'+
       '.ce-ai-pending-list{max-height:230px!important;margin-top:5px!important}.ce-ai-pending-row{grid-template-columns:30px minmax(120px,1fr) minmax(96px,150px) 96px 90px!important;gap:6px!important;padding:4px 0!important;font-size:12px!important}\n';
+    st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n";
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -156,7 +157,7 @@
     btn.setAttribute('aria-label','Abrir Tickets IA');
     btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
     btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>';
-    btn.setAttribute('onclick','window.__ceOpenTicketAutoV95&&window.__ceOpenTicketAutoV95();return false;');
+    btn.setAttribute('onclick','window.__ceOpenTicketAutoV951&&window.__ceOpenTicketAutoV951();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     var header=document.querySelector('#tabCompras > .card > .toggle-row');
     var toggle=$('toggleComprasEvent');
@@ -169,8 +170,7 @@
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
-        '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
+        '<div class="ce-ai-head"><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div id="ceAiStatus" class="ce-ai-status info"></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+ 
         '<div class="ce-ai-work">'+
           '<aside class="ce-ai-left">'+
             '<div class="ce-ai-photo-title">Foto del ticket</div>'+ 
@@ -183,13 +183,13 @@
               '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
               '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
             '</div>'+ 
-            '<div class="ce-ai-hintbox"><label>Indicaciones adicionales para Gemini</label><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan Pérez; añade PROPINAS 1 ud 73,05 €; aplica IVA general a las líneas si procede."></textarea></div>'+
-            '<div class="ce-ai-actions"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" title="Analizar foto con IA" aria-label="Analizar foto con IA"><span aria-hidden="true">🤖</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" title="Añadir fila manual" aria-label="Añadir fila manual"><span aria-hidden="true">🤚➕</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" title="Limpiar" aria-label="Limpiar"><span aria-hidden="true">🧹</span></button></div>'+ 
+            '<div class="ce-ai-hintbox"><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan Pérez; añade PROPINAS 1 ud 73,05 €; aplica IVA general a las líneas si procede."></textarea></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-top"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" aria-label="Analizar foto con IA"><span aria-hidden="true">🤖</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Añadir fila manual"><span aria-hidden="true">🤚＋</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" aria-label="Limpiar"><span aria-hidden="true">🧹</span></button></div>'+ 
             '<datalist id="ceAiProducts"></datalist><datalist id="ceAiSegmentos"></datalist><datalist id="ceAiDestinos"></datalist>'+ 
             '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
             '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
-            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas pendientes del evento</span><div class="ce-ai-pending-tools"><label>Ordenar</label><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary">Actualizar</button></div></div><div class="ce-ai-pending-sub">Marca cualquier registro Pte.Compra del evento que ya queda sustituido por este ticket real.</div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
-            '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary ce-ai-icon-btn" title="Procesar y llevar a COMPRAS" aria-label="Procesar y llevar a COMPRAS"><span aria-hidden="true">⚙️⚙️</span></button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary ce-ai-icon-btn" title="Recargar evento" aria-label="Recargar evento"><span aria-hidden="true">🔋↻</span></button></div>'+ 
+            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas del evento. Marca para eliminar las ya compradas en este ticket</span><div class="ce-ai-pending-tools"><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Actualizar compras previstas">🔄</button></div></div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-bottom"><button type="button" id="ceAiProcess" class="ce-ai-primary ce-ai-icon-btn" aria-label="Procesar y llevar a COMPRAS"><span aria-hidden="true">⚙️⚙️</span></button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Recargar evento"><span aria-hidden="true">🔋↻</span></button></div>'+ 
           '</section>'+ 
         '</div>'+ 
       '</div>'+
@@ -206,7 +206,7 @@
       $('ceAiReloadEvent').addEventListener('click',function(){ reloadEvent(false); });
       $('ceAiZoomBtn').addEventListener('click',openZoom);
       $('ceAiDownloadPhoto').addEventListener('click',function(){ downloadCurrentTicketPhoto(); });
-      $('ceAiPendingRefresh').addEventListener('click',renderPendingPurchases);
+      $('ceAiPendingRefresh').addEventListener('click',function(){ renderPendingPurchases(); setStatus('Compras previstas actualizadas.','ok'); });
       if($('ceAiPendingSort')) $('ceAiPendingSort').addEventListener('change',renderPendingPurchases);
       $('ceAiPreview').addEventListener('click',openZoom);
       $('ceAiZoomClose').addEventListener('click',closeZoom);
@@ -215,7 +215,7 @@
     refreshRole(); updateTotals();
   }
   function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
-  function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg; } }
+  function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg||''; el.title=msg||''; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
     var oldT=tienda ? trim(tienda.value) : ''; var oldR=resp ? trim(resp.value) : '';
@@ -224,34 +224,38 @@
     var dl=$('ceAiProducts'); if(dl){ var ps=sortedByName(arr('productos')); dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join(''); }
     var seg=$('ceAiSegmentos'); if(seg){ seg.innerHTML=uniqueProductValues('segmento').map(function(v){return '<option value="'+htmlEscape(v)+'"></option>';}).join(''); }
     var des=$('ceAiDestinos'); if(des){ des.innerHTML=uniqueProductValues('destino').map(function(v){return '<option value="'+htmlEscape(v)+'"></option>';}).join(''); }
-    renderPendingPurchases();
     var used=usedTicketMap(); var sel=$('ceAiTicket');
-    if(sel){ var current=trim(sel.value).toUpperCase(); var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } } var keep=current || next; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
+    if(sel){ var current=trim(sel.value).toUpperCase(); var keep=current || ''; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
   }
   function openPanel(){
     if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
-    ensureUi(); fillSelects(); $('ceAiTicketPanel').classList.add('open'); updateTotals(); renderPendingPurchases(); installTicketImageDownloadButtons();
+    ensureUi(); fillSelects(); resetPanelState(true); $('ceAiTicketPanel').classList.add('open'); updateTotals(); installTicketImageDownloadButtons();
   }
   function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); }
   function openZoom(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); if(!src){ setStatus('Carga primero una foto para ampliarla.','warn'); return; } var img=$('ceAiZoomImg'), p=$('ceAiZoomPanel'); if(img) img.src=src; if(p) p.classList.add('open'); }
   function closeZoom(){ var p=$('ceAiZoomPanel'); if(p) p.classList.remove('open'); }
   function fileChanged(){
     var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f) return;
-    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada. Puedes ampliarla a la izquierda, analizar con IA o añadir filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
+    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada.','ok'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
   }
-  function clearRows(){
+  function resetPanelState(silent){
     window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; window.__ceAiDetectedTotal=0;
     if($('ceAiFile')) $('ceAiFile').value='';
     if($('ceAiPreview')){ $('ceAiPreview').src=''; $('ceAiPreview').style.display='none'; }
     if($('ceAiGeminiHint')) $('ceAiGeminiHint').value='';
-    try{ fillSelects(); }catch(_){}
+    if($('ceAiTicket')) $('ceAiTicket').value='';
     if($('ceAiTienda')) $('ceAiTienda').value='';
     if($('ceAiResponsable')) $('ceAiResponsable').value='';
-    renderRows(); updateTotals();
+    if($('ceAiPendingSort')) $('ceAiPendingSort').value='tienda';
     if($('ceAiPendingList')) $('ceAiPendingList').innerHTML='';
-    setStatus('Panel limpio.','info');
+    renderRows(); updateTotals(); markTicketSelect();
+    setStatus(silent ? '' : 'Limpio.','ok');
+  }
+  function clearRows(){
+    try{ fillSelects(); }catch(_){}
+    resetPanelState(false);
   }
   function updateRowImport(tr){
     if(!tr) return 0;
@@ -433,10 +437,8 @@
     var box=$('ceAiPendingList'); if(!box) return;
     var rows=pendingPurchasesForEvent();
     if(!rows.length){ box.innerHTML='<div class="ce-ai-muted">No hay compras previstas pendientes en este evento.</div>'; return; }
-    var total=rows.reduce(function(s,r){ return s+compraValue(r); },0);
-    var sortLabel=(trim(($('ceAiPendingSort')||{}).value)==='producto') ? 'producto' : 'tienda';
-    box.innerHTML='<div class="ce-ai-muted">'+rows.length+' registro(s) Pte.Compra del evento, total previsto '+htmlEscape(euro(total))+'. Orden actual: '+htmlEscape(sortLabel)+'.</div>'+rows.map(function(c){
-      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong title="Producto">'+htmlEscape(productNameById(c.productoId))+'</strong><span title="Tienda">'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span title="Unidades x precio">'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span title="Importe">'+htmlEscape(euro(compraValue(c)))+'</span></label>';
+    box.innerHTML=rows.map(function(c){
+      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong>'+htmlEscape(productNameById(c.productoId))+'</strong><span>'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span>'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span>'+htmlEscape(euro(compraValue(c)))+'</span></label>';
     }).join('');
   }
   function collectPendingDeleteIds(){
@@ -579,12 +581,12 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.5 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.5.1 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
     var ev=selectedEventId();
-    if(window.__ceLoadSelectedEventStateFix48 && ev){ return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); }); }
+    if(window.__ceLoadSelectedEventStateFix48 && ev){ return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); if(!silent) renderPendingPurchases(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); }); }
     if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn'); return Promise.resolve();
   }
   function delegatedOpen(ev){
@@ -592,12 +594,12 @@
     ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); installTicketImageDownloadButtons(); }
-  window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV951=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.5 Alta IA] Gemini REST + tienda/responsable sugeridos + ptes compra + alta productos compacta instalado. Prueba: window.__ceOpenTicketAutoV95()');
+  console.info('[CE v9.5.1 Alta IA] limpieza total + iconos compactos activos + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV951()');
 })();
