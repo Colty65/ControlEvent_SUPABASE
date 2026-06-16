@@ -1,4 +1,4 @@
-/* ControlEvent v9.3_prod FIX47 - COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN
+/* ControlEvent v9.4_prod FIX47 - COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -405,11 +405,8 @@
     try{ localStorage.setItem(storageKey(), JSON.stringify(stateObj())); }catch(err){ console.warn(LOG,'No se pudo persistir localStorage antes de recargar',err); }
   }
   function toast(msg){
-    try{
-      let box=document.getElementById('ceFix46Toast');
-      if(!box){ box=document.createElement('div'); box.id='ceFix46Toast'; box.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:999999;background:#111827;color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;box-shadow:0 18px 45px rgba(15,23,42,.35);font-size:15px;'; document.body.appendChild(box); }
-      box.textContent=msg;
-    }catch(_){ }
+    // v9.4: sin avisos flotantes negros; dejamos rastro solo en consola para depuración.
+    try{ console.info(LOG, msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX38: dejamos de confiar en repintados parciales legacy.

@@ -1,8 +1,8 @@
-/* ControlEvent v9.3_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v9.4_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV93TicketAutoComprasGeminiPracticalFix';
+  var TAG='__ceV94TicketAutoComprasGeminiPracticalFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -49,8 +49,8 @@
     });
   }
   function css(){
-    if($('ceV93TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV93TicketAiStyle';
+    if($('ceV94TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV94TicketAiStyle';
     st.textContent='\n'+
       '.ce-ai-ticket-btn{font-weight:900;font-size:20px;min-width:48px;min-height:42px;padding:8px 11px;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
@@ -72,6 +72,24 @@
       '.ce-ai-zoom{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:10020;padding:16px}.ce-ai-zoom.open{display:flex}.ce-ai-zoom img{max-width:96vw;max-height:92vh;object-fit:contain;background:#fff;border-radius:10px}.ce-ai-zoom button{position:absolute;right:18px;top:18px;border-radius:10px;padding:9px 13px;font-weight:900;border:1px solid #cbd5e1;background:#fff;color:#0f172a}\n'+
       '@media(max-width:980px){.ce-ai-modal{overflow:auto}.ce-ai-work{grid-template-columns:1fr;overflow:visible}.ce-ai-right{overflow:visible}.ce-ai-grid{grid-template-columns:1fr}.ce-ai-preview{height:45vh;min-height:260px}.ce-ai-table-wrap{max-height:55vh}.ce-ai-totalbar{grid-template-columns:1fr}}\n'+
       '@media(max-width:760px){.ce-ai-modal{padding:10px}.ce-ai-title{font-size:17px}.ce-ai-table{font-size:12px}.ce-ai-table .col-num{width:74px}.ce-ai-table .col-attr{width:102px}.ce-ai-table .col-conf{width:52px}.ce-ai-table .col-del{width:70px}}\n';
+    st.textContent += '\n'+
+      '#ceFix46Toast,#ceFix39Toast,#ceFix38Toast{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}\n'+
+      '.ce-ai-ticket-btn{margin-left:auto;min-width:132px;gap:7px;border-color:#fb923c!important;background:linear-gradient(135deg,#fff7ed,#fed7aa)!important;color:#9a3412!important}\n'+
+      '#tabCompras>.card>.toggle-row .ce-ai-ticket-btn{align-self:center;justify-self:flex-end}\n'+
+      '.ce-ai-modal{width:min(1680px,99.5vw);padding:10px!important}\n'+
+      '.ce-ai-head{margin-bottom:4px!important}.ce-ai-title{font-size:18px!important}.ce-ai-sub{font-size:12px!important}\n'+
+      '.ce-ai-status{padding:6px 9px!important;margin:4px 0 7px 0!important;font-size:12px!important}\n'+
+      '.ce-ai-work{grid-template-columns:minmax(270px,32%) minmax(720px,1fr)!important;gap:10px!important}\n'+
+      '.ce-ai-left{padding:8px!important;gap:6px!important}.ce-ai-preview{height:calc(96vh - 220px)!important;min-height:315px!important}\n'+
+      '.ce-ai-grid{gap:6px!important;margin-bottom:6px!important}.ce-ai-field input,.ce-ai-field select{padding:5px 7px!important;border-radius:8px!important}\n'+
+      '.ce-ai-hintbox{padding:6px 8px!important;margin-bottom:6px!important}.ce-ai-hintbox textarea{min-height:42px!important;padding:6px!important;font-size:12px!important}\n'+
+      '.ce-ai-actions{gap:6px!important;margin:6px 0!important}.ce-ai-actions button,.ce-ai-photo-tools button{padding:6px 9px!important;border-radius:9px!important}\n'+
+      '.ce-ai-totalbar{gap:6px!important;margin:6px 0!important}.ce-ai-totalbox{padding:6px 8px!important}.ce-ai-totalbox span{font-size:16px!important}.ce-ai-totalbox strong{font-size:11px!important}\n'+
+      '.ce-ai-table-wrap{max-height:230px!important;min-height:92px!important}.ce-ai-table{font-size:12px!important}.ce-ai-table th{padding:4px 5px!important}.ce-ai-table td{padding:3px 5px!important}.ce-ai-table input,.ce-ai-table select{padding:4px 5px!important;border-radius:7px!important}\n'+
+      '.ce-ai-table .col-ok{width:34px!important}.ce-ai-table .col-attr{width:105px!important}.ce-ai-table .col-num{width:70px!important}.ce-ai-table .col-conf{width:48px!important}.ce-ai-table .col-del{width:66px!important}\n'+
+      '.ce-ai-table button.ce-ai-danger{padding:5px 7px!important;font-size:12px!important;border-radius:10px!important}\n'+
+      '.ce-ai-pending-box{margin-top:7px!important;padding:8px!important}.ce-ai-pending-title{font-size:15px!important}.ce-ai-pending-tools{display:flex;align-items:center;gap:6px;margin-left:auto}.ce-ai-pending-tools label{font-size:11px;color:#0369a1;font-weight:900}.ce-ai-pending-tools select{border:1px solid #bae6fd;border-radius:8px;padding:5px;background:#fff;font-weight:800}\n'+
+      '.ce-ai-pending-list{max-height:230px!important;margin-top:5px!important}.ce-ai-pending-row{grid-template-columns:30px minmax(120px,1fr) minmax(96px,150px) 96px 90px!important;gap:6px!important;padding:4px 0!important;font-size:12px!important}\n';
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -127,17 +145,27 @@
   }
   function ensureUi(){
     css();
-    if(!$('btnReceiptAiCompras')){
-      var btn=document.createElement('button');
-      btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
-      btn.setAttribute('data-ce-ai-ticket-open','1');
-      btn.setAttribute('aria-label','Abrir alta asistida de compras');
-      btn.title='Alta asistida de COMPRAS desde foto de ticket'; btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>'; btn.setAttribute('onclick','window.__ceOpenTicketAutoV93&&window.__ceOpenTicketAutoV93();return false;');
-      var footer=document.querySelector('.footer-inner'); var maint=$('btnToggleMaintenance');
-      if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint); else if(footer) footer.appendChild(btn);
+    var btn=$('btnReceiptAiCompras');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.type='button'; btn.id='btnReceiptAiCompras';
       btn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
     }
+    btn.className='outline app-lockable ce-ai-ticket-btn';
+    btn.setAttribute('data-ce-ai-ticket-open','1');
+    btn.setAttribute('aria-label','Abrir Tickets IA');
+    btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
+    btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span><span>Tickets IA</span>';
+    btn.setAttribute('onclick','window.__ceOpenTicketAutoV94&&window.__ceOpenTicketAutoV94();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
+    var header=document.querySelector('#tabCompras > .card > .toggle-row');
+    var toggle=$('toggleComprasEvent');
+    if(header && btn.parentNode!==header){
+      if(toggle && toggle.parentNode===header) header.insertBefore(btn, toggle);
+      else header.appendChild(btn);
+    } else if(!header && !btn.parentNode){
+      var footer=document.querySelector('.footer-inner'); if(footer) footer.appendChild(btn);
+    }
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
@@ -160,7 +188,7 @@
             '<datalist id="ceAiProducts"></datalist><datalist id="ceAiSegmentos"></datalist><datalist id="ceAiDestinos"></datalist>'+ 
             '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
             '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
-            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas pendientes de esta tienda</span><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary">Actualizar</button></div><div class="ce-ai-pending-sub">Marca aquí los registros Pte.Compra que ya quedan sustituidos por el ticket real.</div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
+            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas pendientes del evento</span><div class="ce-ai-pending-tools"><label>Ordenar</label><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary">Actualizar</button></div></div><div class="ce-ai-pending-sub">Marca cualquier registro Pte.Compra del evento que ya queda sustituido por este ticket real.</div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
             '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary">Procesar y llevar a COMPRAS</button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary">Recargar evento</button></div>'+ 
           '</section>'+ 
         '</div>'+ 
@@ -179,6 +207,7 @@
       $('ceAiZoomBtn').addEventListener('click',openZoom);
       $('ceAiDownloadPhoto').addEventListener('click',function(){ downloadCurrentTicketPhoto(); });
       $('ceAiPendingRefresh').addEventListener('click',renderPendingPurchases);
+      if($('ceAiPendingSort')) $('ceAiPendingSort').addEventListener('change',renderPendingPurchases);
       $('ceAiPreview').addEventListener('click',openZoom);
       $('ceAiZoomClose').addEventListener('click',closeZoom);
       $('ceAiZoomPanel').addEventListener('click',function(ev){ if(ev.target===$('ceAiZoomPanel')) closeZoom(); });
@@ -212,7 +241,18 @@
     var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f) return;
     readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada. Puedes ampliarla a la izquierda, analizar con IA o añadir filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
   }
-  function clearRows(){ window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; window.__ceAiDetectedTotal=0; if($('ceAiFile')) $('ceAiFile').value=''; if($('ceAiPreview')){$('ceAiPreview').src=''; $('ceAiPreview').style.display='none';} renderRows(); setStatus('Panel limpio.','info'); }
+  function clearRows(){
+    window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; window.__ceAiDetectedTotal=0;
+    if($('ceAiFile')) $('ceAiFile').value='';
+    if($('ceAiPreview')){ $('ceAiPreview').src=''; $('ceAiPreview').style.display='none'; }
+    if($('ceAiGeminiHint')) $('ceAiGeminiHint').value='';
+    try{ fillSelects(); }catch(_){}
+    if($('ceAiTienda')) $('ceAiTienda').value='';
+    if($('ceAiResponsable')) $('ceAiResponsable').value='';
+    renderRows(); updateTotals();
+    if($('ceAiPendingList')) $('ceAiPendingList').innerHTML='<div class="ce-ai-muted">Panel limpio. Las compras pendientes se cargarán de nuevo al analizar, actualizar o reabrir Tickets IA.</div>';
+    setStatus('Panel limpio.','info');
+  }
   function updateRowImport(tr){
     if(!tr) return 0;
     var u=money((tr.querySelector('[data-ce-ai-field="unidades"]')||{}).value)||1;
@@ -323,25 +363,35 @@
   function productNameById(idv){ var id=trim(idv); var p=arr('productos').find(function(x){ return trim(x.id)===id; }); return p ? (p.nombre||p.id) : id; }
   function tiendaNameById(idv){ var id=trim(idv); var t=arr('tiendas').find(function(x){ return trim(x.id)===id; }); return t ? (t.nombre||t.id) : id; }
   function compraValue(c){ return round2((money(c && c.unidades)||0) * money(c && c.precio)); }
-  function pendingPurchasesForStore(){
-    var ev=selectedEventId(), tienda=trim(($('ceAiTienda')||{}).value);
-    if(!ev || !tienda) return [];
-    return arr('compras').filter(function(c){
+  function pendingPurchasesForEvent(){
+    var ev=selectedEventId();
+    if(!ev) return [];
+    var sort=trim(($('ceAiPendingSort')||{}).value) || 'tienda';
+    var rows=arr('compras').filter(function(c){
       if(trim(c.eventId)!==ev) return false;
-      if(trim(c.tiendaId)!==tienda) return false;
       if(trim(c.ticketDonacion)) return false;
       return true;
-    }).sort(function(a,b){ return productNameById(a.productoId).localeCompare(productNameById(b.productoId),'es',{sensitivity:'base'}); });
+    });
+    rows.sort(function(a,b){
+      var at=tiendaNameById(a.tiendaId), bt=tiendaNameById(b.tiendaId);
+      var ap=productNameById(a.productoId), bp=productNameById(b.productoId);
+      if(sort==='producto'){
+        var cp=ap.localeCompare(bp,'es',{sensitivity:'base'}); if(cp) return cp;
+        return at.localeCompare(bt,'es',{sensitivity:'base'});
+      }
+      var ct=at.localeCompare(bt,'es',{sensitivity:'base'}); if(ct) return ct;
+      return ap.localeCompare(bp,'es',{sensitivity:'base'});
+    });
+    return rows;
   }
   function renderPendingPurchases(){
     var box=$('ceAiPendingList'); if(!box) return;
-    var tienda=trim(($('ceAiTienda')||{}).value);
-    if(!tienda){ box.innerHTML='<div class="ce-ai-muted">Selecciona una tienda para ver sus compras Pte.Compra de este evento.</div>'; return; }
-    var rows=pendingPurchasesForStore();
-    if(!rows.length){ box.innerHTML='<div class="ce-ai-muted">No hay compras pendientes para '+htmlEscape(tiendaNameById(tienda))+' en este evento.</div>'; return; }
+    var rows=pendingPurchasesForEvent();
+    if(!rows.length){ box.innerHTML='<div class="ce-ai-muted">No hay compras previstas pendientes en este evento.</div>'; return; }
     var total=rows.reduce(function(s,r){ return s+compraValue(r); },0);
-    box.innerHTML='<div class="ce-ai-muted">'+rows.length+' registro(s), total previsto '+htmlEscape(euro(total))+'. Marca solo los que se sustituyen por este ticket.</div>'+rows.map(function(c){
-      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong>'+htmlEscape(productNameById(c.productoId))+'</strong><span>'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span>'+htmlEscape(euro(compraValue(c)))+'</span></label>';
+    var sortLabel=(trim(($('ceAiPendingSort')||{}).value)==='producto') ? 'producto' : 'tienda';
+    box.innerHTML='<div class="ce-ai-muted">'+rows.length+' registro(s) Pte.Compra del evento, total previsto '+htmlEscape(euro(total))+'. Orden actual: '+htmlEscape(sortLabel)+'.</div>'+rows.map(function(c){
+      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong title="Producto">'+htmlEscape(productNameById(c.productoId))+'</strong><span title="Tienda">'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span title="Unidades x precio">'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span title="Importe">'+htmlEscape(euro(compraValue(c)))+'</span></label>';
     }).join('');
   }
   function collectPendingDeleteIds(){
@@ -372,14 +422,14 @@
   }
   function downloadCurrentTicketPhoto(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); downloadSrc(src, ($('ceAiTicket')||{}).value || 'ticket_auto'); }
   function installTicketImageDownloadButtons(){
-    if(window.__ceV93TicketDownloadObserver) return;
-    window.__ceV93TicketDownloadObserver=true;
+    if(window.__ceV94TicketDownloadObserver) return;
+    window.__ceV94TicketDownloadObserver=true;
     function enhance(root){
       (root||document).querySelectorAll('img.ticket-thumb,img[src*="ticket-images"],img[src^="data:image/"]').forEach(function(img){
         if(!img || img.dataset.ceDownloadReady==='1') return;
         if(img.id==='ceAiPreview' || img.id==='ceAiZoomImg') return;
         img.dataset.ceDownloadReady='1';
-        var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-ticket-download-v93'; btn.title='Descargar foto al ordenador'; btn.textContent='⬇️';
+        var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-ticket-download-v94'; btn.title='Descargar foto al ordenador'; btn.textContent='⬇️';
         btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); downloadSrc(img.currentSrc || img.src, 'ControlEvent_'+(img.alt||'foto_ticket')); });
         if(img.parentNode) img.parentNode.insertBefore(btn, img.nextSibling);
       });
@@ -442,7 +492,8 @@
   function imageHeaders(){ return {'Content-Type':'application/json','X-ControlEvent-Write-Scope':IMAGE_SCOPE}; }
   function upsertProductByName(row, tiendaId, warnings){
     var name=trim(row && row.descripcion);
-    var price=money(row && (row.precio || row.importe));
+    var price=money(row && row.precio);
+    if(!(price>0) && money(row && row.importe)) price=money(row.importe)/(money(row && row.unidades)||1);
     var existing=findProductByName(name);
     var payload=existing ? Object.assign({}, existing) : {id:uid(), nombre:name, segmento:trim(row.segmento), destino:trim(row.destino)};
     if(!existing){ payload.segmento=trim(row.segmento); payload.destino=trim(row.destino); }
@@ -480,7 +531,7 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.3 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.4 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
@@ -493,12 +544,12 @@
     ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); installTicketImageDownloadButtons(); }
-  window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.3 Alta IA] Gemini REST + tienda sugerida + ptes compra + alta productos completa + descarga foto instalado. Prueba: window.__ceOpenTicketAutoV93()');
+  console.info('[CE v9.4 Alta IA] Gemini REST + tienda sugerida + ptes compra + alta productos completa + descarga foto instalado. Prueba: window.__ceOpenTicketAutoV94()');
 })();

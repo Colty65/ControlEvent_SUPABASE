@@ -1,5 +1,5 @@
-/* ControlEvent v9.3_prod - Alta asistida para lectura de tickets de compra.
-   FIX v9.3: Gemini por REST + indicaciones adicionales por ticket/factura. */
+/* ControlEvent v9.4_prod - Alta asistida para lectura de tickets de compra.
+   FIX v9.4: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -34,6 +34,8 @@ function normalizeLine(item = {}, idx = 0) {
     precio: Number(precio.toFixed(4)),
     importe: Number(importe.toFixed(4)),
     confianza: Math.max(0, Math.min(1, Number(item.confianza ?? item.confidence ?? 0.5) || 0)),
+    segmento: cleanName(item.segmento || item.segment || item.categoria || item.category || ''),
+    destino: cleanName(item.destino || item.destination || item.uso || item.use || ''),
     notas: text(item.notas || item.notes || '').trim(),
     requiereRevision: !descripcion || !precio || !importe || String(item.requiereRevision || '').toLowerCase() === 'true'
   };
@@ -55,8 +57,41 @@ function normalizeAnalysis(raw = {}) {
   };
 }
 function jsonInstruction(extraInstructions = '') {
-  const extra = text(extraInstructions).trim().slice(0, 1500);
-  return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.\n\nLee la imagen del ticket y devuelve SOLO JSON válido, sin markdown.\n\nFormato obligatorio:\n{\n  "proveedor": "nombre comercio si aparece",\n  "fecha": "YYYY-MM-DD si aparece o cadena vacía",\n  "total": numero,\n  "productos": [\n    {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "confianza":numero_0_a_1, "notas":""}\n  ],\n  "advertencias": []\n}\n\nReglas:\n- Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.\n- No inventes productos que no se vean.\n- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.\n- Si el ticket no tiene descripción clara del artículo, deja descripcion vacía o texto literal breve y pon confianza baja.\n- Si hay cantidad x precio, pon unidades, precio unitario e importe.\n- Usa punto decimal.\n- Si dudas, conserva la línea con confianza baja para que el usuario la revise.${extra ? `\n\nIndicaciones adicionales del usuario para ESTA factura/ticket:\n${extra}\nAplica estas indicaciones solo si no contradicen lo que se ve en la imagen.` : ''}`;
+  const extra = text(extraInstructions).trim().slice(0, 2500);
+  return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.
+
+Lee la imagen del ticket/factura y devuelve SOLO JSON válido, sin markdown.
+
+Formato obligatorio:
+{
+  "proveedor": "nombre comercio si aparece",
+  "fecha": "YYYY-MM-DD si aparece o cadena vacía",
+  "total": numero,
+  "productos": [
+    {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "segmento":"", "destino":"", "confianza":numero_0_a_1, "notas":""}
+  ],
+  "advertencias": []
+}
+
+Reglas principales:
+- Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.
+- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.
+- Si hay cantidad x precio, pon unidades, precio unitario e importe final de esa línea.
+- Usa punto decimal.
+- Si dudas, conserva la línea con confianza baja para que el usuario la revise.
+- Los campos segmento y destino se devuelven vacíos salvo que el usuario los indique expresamente o sean evidentes por la indicación adicional.
+
+IMPORTANTE SOBRE INDICACIONES DEL USUARIO:
+- Las indicaciones adicionales del usuario tienen prioridad como corrección manual de ESTA factura/ticket.
+- Si el usuario dice que falta una línea, o pide añadir/incluir una línea concreta, debes añadirla a productos aunque no la hayas detectado visualmente. Pon confianza 0.05 y en notas "Añadida por indicación del usuario".
+- Si el usuario indica SEGMENTO y/o DESTINO para una línea, copia esos valores exactamente en los campos segmento y destino de esa línea.
+- Si el usuario indica cómo aplicar IVA, recargo, descuento o cualquier regla de cálculo, recalcula precio e importe siguiendo esa indicación y añade advertencia breve explicando que se aplicó.
+- Si las líneas visibles no cuadran con el total y el usuario explica la diferencia, aplica su explicación.
+${extra ? `
+Indicaciones adicionales del usuario para ESTA factura/ticket:
+${extra}
+
+Relee las indicaciones anteriores y aplícalas de forma efectiva en el JSON final.` : ''}`;
 }
 function dataUrlParts(dataUrl) {
   const match = /^data:([^;]+);base64,(.+)$/i.exec(text(dataUrl).trim());
@@ -154,10 +189,12 @@ async function callOpenAI({ dataUrl, instrucciones = '' }) {
                   unidades: { type: 'number' },
                   precio: { type: 'number' },
                   importe: { type: 'number' },
+                  segmento: { type: 'string' },
+                  destino: { type: 'string' },
                   confianza: { type: 'number' },
                   notas: { type: 'string' }
                 },
-                required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'confianza', 'notas']
+                required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'segmento', 'destino', 'confianza', 'notas']
               }
             },
             advertencias: { type: 'array', items: { type: 'string' } }
@@ -215,10 +252,12 @@ function ticketSchemaRest() {
             unidades: { type: 'NUMBER', description: 'Cantidad o unidades' },
             precio: { type: 'NUMBER', description: 'Precio unitario' },
             importe: { type: 'NUMBER', description: 'Importe total de esta línea' },
+            segmento: { type: 'STRING', description: 'Segmento indicado por el usuario o vacío' },
+            destino: { type: 'STRING', description: 'Destino indicado por el usuario o vacío' },
             confianza: { type: 'NUMBER', description: 'Confianza entre 0 y 1' },
             notas: { type: 'STRING', description: 'Aviso breve si la línea es dudosa' }
           },
-          required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'confianza', 'notas']
+          required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'segmento', 'destino', 'confianza', 'notas']
         }
       },
       advertencias: { type: 'ARRAY', items: { type: 'STRING' } }
@@ -246,8 +285,9 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '' }) {
       {
         role: 'user',
         parts: [
+          { text: jsonInstruction(instrucciones) },
           { inlineData: { data: parts.base64, mimeType: parts.mimeType } },
-          { text: jsonInstruction(instrucciones) }
+          { text: 'Devuelve ahora el JSON final aplicando obligatoriamente las indicaciones adicionales del usuario si las hay.' }
         ]
       }
     ],
@@ -299,7 +339,7 @@ async function callGemini({ dataUrl, instrucciones = '' }) {
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v9.3_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v9.4_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -331,7 +371,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v9.3_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v9.4_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions });
       }
       throw error;
