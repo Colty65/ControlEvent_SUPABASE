@@ -1,8 +1,8 @@
 /* ControlEvent v9.2_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
-   FIX revisión visual: foto grande izquierda, importes automáticos, total factura y orden TKxx. */
+   FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV92TicketAutoComprasReviewFix';
+  var TAG='__ceV92TicketAutoComprasGeminiSdkSociosFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -85,16 +85,21 @@
     });
     return out;
   }
+  function normalizePlain(v){ return normalizeName(v).replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U'); }
   function isDonationTicket(v){
-    var n=normalizeName(v).replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U');
+    var n=normalizePlain(v);
     return /^DON/.test(n) || n.indexOf('DONACION')>=0 || n.indexOf('DONADO')>=0;
+  }
+  function isSocioPersona(p){
+    var r=normalizePlain((p && (p.rango || p.tipo || p.categoria || p.clase)) || '');
+    return r === 'SOCIO' || (r.indexOf('SOCIO') >= 0 && r.indexOf('NO SOCIO') < 0);
   }
   function usedTicketMap(){
     var used={}, ev=selectedEventId();
     arr('compras').forEach(function(c){
       if(ev && trim(c.eventId) && trim(c.eventId)!==ev) return;
       var tk=trim(c.ticketDonacion).toUpperCase();
-      if(/^TK\d+/.test(tk) && !isDonationTicket(tk)) used[tk]=true;
+      if(/^TK\d+/.test(tk) && !isDonationTicket(tk)) used[tk]=(used[tk]||0)+1;
     });
     return used;
   }
@@ -102,24 +107,21 @@
     used = used || usedTicketMap(); selected = trim(selected).toUpperCase();
     var out='<option value=""></option>';
     for(var i=1;i<=50;i++){
-      var tk='TK'+String(i).padStart(2,'0'); var isUsed=!!used[tk];
-      var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento"':'');
+      var tk='TK'+String(i).padStart(2,'0'); var usedCount=Number(used[tk]||0); var isUsed=usedCount>0;
+      var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento ('+usedCount+' líneas)"':'');
       out+='<option value="'+tk+'"'+attrs+'>'+tk+(isUsed?' ✓':'')+'</option>';
     }
     return out;
   }
   function markTicketSelect(){
     var sel=$('ceAiTicket'); if(!sel) return;
-    var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase(); var isUsed=!!used[tk];
+    var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase(); var usedCount=Number(used[tk]||0); var isUsed=usedCount>0;
     sel.classList.toggle('ce-ai-ticket-used', isUsed);
-    sel.title=isUsed ? 'Este TKxx ya está usado en COMPRAS para este evento.' : 'Selecciona el TKxx del ticket.';
+    sel.title=isUsed ? ('Este TKxx ya está usado en COMPRAS para este evento ('+usedCount+' líneas).') : 'Selecciona el TKxx del ticket.';
   }
   function sortLinesLikeTk(rows){
-    return (rows || []).map(function(row,idx){ return Object.assign({__idx:idx}, row); }).sort(function(a,b){
-      var an=trim(a.descripcion), bn=trim(b.descripcion);
-      if(!an && bn) return 1; if(an && !bn) return -1;
-      return an.localeCompare(bn,'es',{sensitivity:'base',numeric:true}) || (a.__idx-b.__idx);
-    }).map(function(row){ delete row.__idx; return row; });
+    // Mantener el orden visual del ticket/foto. La IA devuelve las líneas en ese orden y el usuario puede comprobarlas contra la imagen.
+    return (rows || []).slice();
   }
   function ensureUi(){
     css();
@@ -165,7 +167,7 @@
       $('ceAiFile').addEventListener('change',fileChanged);
       $('ceAiTicket').addEventListener('change',markTicketSelect);
       $('ceAiAnalyze').addEventListener('click',analyze);
-      $('ceAiAddRow').addEventListener('click',function(){ addRow({descripcion:'',unidades:1,precio:0,importe:0,confianza:0,requiereRevision:true}); });
+      $('ceAiAddRow').addEventListener('click',function(){ addRow({descripcion:'',unidades:1,precio:0,importe:0,confianza:0,requiereRevision:true,manual:true}); });
       $('ceAiClear').addEventListener('click',clearRows);
       $('ceAiProcess').addEventListener('click',processRows);
       $('ceAiReloadEvent').addEventListener('click',function(){ reloadEvent(false); });
@@ -182,7 +184,7 @@
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
     var oldT=tienda ? trim(tienda.value) : ''; var oldR=resp ? trim(resp.value) : '';
     if(tienda) tienda.innerHTML=options(arr('tiendas'), oldT, function(t){return t.nombre || t.id;});
-    if(resp) resp.innerHTML=options(arr('personas'), oldR, function(p){return p.nombre || p.id;});
+    if(resp) resp.innerHTML=options(arr('personas').filter(isSocioPersona), oldR, function(p){return p.nombre || p.id;});
     var dl=$('ceAiProducts'); if(dl){ var ps=sortedByName(arr('productos')); dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join(''); }
     var used=usedTicketMap(); var sel=$('ceAiTicket');
     if(sel){ var current=trim(sel.value).toUpperCase(); var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } } var keep=current || next; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
@@ -247,11 +249,21 @@
       '</tr>';
     }).join('');
     body.querySelectorAll('[data-ce-ai-field="unidades"],[data-ce-ai-field="precio"]').forEach(function(input){ input.addEventListener('input',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); });
-    body.querySelectorAll('[data-ce-ai-field="descripcion"],[data-ce-ai-field="ok"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ collectRows(false); updateTotals(); }); });
+    body.querySelectorAll('[data-ce-ai-field="descripcion"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ applyProductPriceFromName(input); collectRows(false); updateTotals(); }); });
+    body.querySelectorAll('[data-ce-ai-field="ok"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ collectRows(false); updateTotals(); }); });
     body.querySelectorAll('[data-ce-ai-del]').forEach(function(btn){ btn.addEventListener('click',function(){ collectRows(); var idx=Number(btn.getAttribute('data-ce-ai-del')); (window.__ceAiTicketLines||[]).splice(idx,1); renderRows(); }); });
     updateTotals();
   }
   function addRow(row){ if(!window.__ceAiTicketLines) window.__ceAiTicketLines=[]; window.__ceAiTicketLines.push(Object.assign({ok:true,unidades:1,precio:0,importe:0,confianza:0}, row||{})); renderRows(); }
+  function productPriceValue(p){ return money(p && (p.defaultPrecio ?? p.precio ?? p.precioReferencia ?? p.productoPrecioReferencia ?? 0)); }
+  function productByExactName(name){ var n=normalizeName(name); if(!n) return null; var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
+  function applyProductPriceFromName(input){
+    var p=productByExactName(input && input.value); if(!p) return;
+    var price=productPriceValue(p); if(!(price>0)) return;
+    var tr=input.closest('tr'); if(!tr) return;
+    var priceInput=tr.querySelector('[data-ce-ai-field="precio"]');
+    if(priceInput){ priceInput.value=dec(price); updateRowImport(tr); }
+  }
   function friendlyAiError(message, details){
     var m=text(message||'');
     var provider=text(details && (details.proveedorIa || details.provider || details.proveedor) || '').trim();
@@ -314,6 +326,11 @@
     if(!isGD()){ alert('Solo GD.'); return; }
     if(isFinalizado()){ setStatus('Evento Finalizado: no se puede procesar ticket.','err'); return; }
     var ticket=trim($('ceAiTicket').value).toUpperCase(); if(!ticket){ setStatus('Indica TKxx.','warn'); return; }
+    var usedCount=Number((usedTicketMap()||{})[ticket]||0);
+    if(usedCount>0){
+      var ok=window.confirm('ATENCIÓN: '+ticket+' ya tiene '+usedCount+' línea(s) de COMPRAS en este evento.\n\nTiene pinta de equivocación por no haber elegido el ticket correcto.\n\n¿Quieres continuar de todos modos y añadir más líneas a '+ticket+'?');
+      if(!ok){ setStatus('Operación cancelada: cambia el TKxx o revisa el ticket ya existente.','warn'); return; }
+    }
     var tiendaId=trim($('ceAiTienda').value), responsableId=trim($('ceAiResponsable').value);
     var rows=sortLinesLikeTk(collectRows(true).filter(function(r){ return r.ok!==false; }).filter(function(r){ return trim(r.descripcion); }));
     if(!rows.length){ setStatus('No hay filas con producto para procesar.','warn'); return; }
@@ -342,5 +359,5 @@
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.2 Alta IA] revisión visual instalada: foto izquierda grande, importes automáticos, total factura y Gemini reforzado. Prueba: window.__ceOpenTicketAutoV92()');
+  console.info('[CE v9.2 Alta IA] Gemini SDK + socios + aviso TK usado + precio automático producto instalado. Prueba: window.__ceOpenTicketAutoV92()');
 })();
