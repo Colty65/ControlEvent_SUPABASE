@@ -1,6 +1,6 @@
-/* ControlEvent v9.1_prod - TicketAuto para lectura asistida de tickets de compra.
+/* ControlEvent v9.2_prod - Alta asistida para lectura de tickets de compra.
    No escribe datos. Solo analiza una imagen y devuelve filas candidatas para revisión GD.
-   FIX v9.1: admite Gemini API además de OpenAI. */
+   FIX v9.2: Gemini robusto, acepta GEMINI_API_KEY y OPENIA_API_KEY, con fallback desde OpenAI a Gemini si hay clave. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -86,17 +86,26 @@ function parseJsonStrictish(outText, provider) {
 function openAiKey() {
   return process.env.OPENAI_API_KEY || process.env.CONTROLEVENT_OPENAI_API_KEY || '';
 }
+function looksLikeOpenAiKey(value) {
+  return /^sk-/i.test(text(value).trim());
+}
 function geminiKey() {
-  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.CONTROLEVENT_GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+  const explicitGemini = process.env.GEMINI_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || process.env.CONTROLEVENT_GEMINI_API_KEY
+    || process.env.OPENIA_API_KEY
+    || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    || '';
+  if (explicitGemini) return explicitGemini;
+  const maybeOpenAiVar = process.env.OPENAI_API_KEY || '';
+  return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
 function providerName() {
   const explicit = text(process.env.CONTROLEVENT_TICKET_AI_PROVIDER || process.env.TICKET_AI_PROVIDER || '').trim().toLowerCase();
   if (explicit === 'openai' || explicit === 'gemini') return explicit;
-  const g = text(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.CONTROLEVENT_GEMINI_API_KEY || '').trim();
-  if (g) return 'gemini';
-  const k = text(process.env.OPENAI_API_KEY || '').trim();
-  if (k && !/^sk-/i.test(k)) return 'gemini';
-  return 'openai';
+  if (geminiKey()) return 'gemini';
+  if (openAiKey()) return 'openai';
+  return 'gemini';
 }
 function imageMessage(dataUrl) {
   return { type: 'input_image', image_url: dataUrl };
@@ -178,7 +187,7 @@ async function callOpenAI({ dataUrl }) {
 async function callGemini({ dataUrl }) {
   const apiKey = geminiKey();
   if (!apiKey) {
-    const err = new Error('Falta GEMINI_API_KEY. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY o, provisionalmente, OPENAI_API_KEY con una clave de Gemini.');
+    const err = new Error('Falta GEMINI_API_KEY. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY (nombre escrito así) o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
     err.status = 503;
     throw err;
   }
@@ -188,7 +197,7 @@ async function callGemini({ dataUrl }) {
     err.status = 400;
     throw err;
   }
-  const model = process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || 'gemini-2.0-flash').replace(/^models\//, '');
   const body = {
     contents: [{
       role: 'user',
@@ -239,11 +248,21 @@ export async function analyzeReceiptImage({ dataUrl } = {}) {
     throw err;
   }
   if (src.length > 20 * 1024 * 1024) {
-    const err = new Error('Imagen demasiado grande para analizar con TicketAuto. Reduce la foto o recórtala.');
+    const err = new Error('Imagen demasiado grande para analizar con la IA. Reduce la foto o recórtala.');
     err.status = 413;
     throw err;
   }
   const provider = providerName();
-  const result = provider === 'openai' ? await callOpenAI({ dataUrl: src }) : await callGemini({ dataUrl: src });
-  return result;
+  if (provider === 'openai') {
+    try {
+      return await callOpenAI({ dataUrl: src });
+    } catch (error) {
+      if (geminiKey()) {
+        try { console.warn('[ControlEvent v9.2_prod Alta IA] OpenAI falló; se reintenta con Gemini.', error?.message || error); } catch (_) {}
+        return await callGemini({ dataUrl: src });
+      }
+      throw error;
+    }
+  }
+  return await callGemini({ dataUrl: src });
 }

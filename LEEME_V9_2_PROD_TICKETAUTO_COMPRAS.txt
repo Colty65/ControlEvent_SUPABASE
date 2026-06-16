@@ -1,14 +1,14 @@
-ControlEvent v9.1_prod - TicketAuto COMPRAS
+ControlEvent v9.2_prod - TicketAuto COMPRAS
 
 Base: v9.0_prod Ticket IA + FIX1 panel + FIX48 validado.
 
 Cambios:
-- Version visible unificada a ControlEvent v9.1_prod.
-- BACKUP/INFOEVENTO pasan a usar prefijo ControlEvent_v9_1_prod.
+- Version visible unificada a ControlEvent v9.2_prod.
+- BACKUP/INFOEVENTO pasan a usar prefijo ControlEvent_v9_2_prod.
 - Se elimina el botón IA de cabecera.
-- La opción de pie junto a Mantenimiento se llama “🧾 TicketAuto”.
-- Se carga el nuevo script public/app/features/v9-1-ticketauto-compras.js.
-- Se conserva alias de consola antiguo window.__ceOpenTicketIaComprasV90() y se añade window.__ceOpenTicketAutoV91().
+- La opción de pie junto a Mantenimiento queda como icono compacto “🧾✨”, sin texto visible.
+- Se carga el nuevo script public/app/features/v9-2-ticketauto-compras.js.
+- Se conserva alias de consola antiguo window.__ceOpenTicketIaComprasV90() y se añade window.__ceOpenTicketAutoV92().
 - Si OpenAI devuelve error de cuota/billing, el mensaje se presenta en castellano y permite seguir usando filas manuales.
 
 No se toca:

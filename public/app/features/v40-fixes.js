@@ -1,11 +1,11 @@
-/* ControlEvent v9.1_prod - Ajustes finales
+/* ControlEvent v9.2_prod - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
    - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v9.1_prod';
-  const VERSION_FILE = 'ControlEvent_v9_1_prod';
+  const VERSION = 'ControlEvent v9.2_prod';
+  const VERSION_FILE = 'ControlEvent_v9_2_prod';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const CURRENT_EXPENSE = 'GASTOS CORRIENTES';
   const $ = id => document.getElementById(id);

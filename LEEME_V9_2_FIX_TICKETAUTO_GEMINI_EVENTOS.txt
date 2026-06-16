@@ -1,6 +1,6 @@
-ControlEvent v9.1_prod - FIX TicketAuto/Gemini + alta real de EVENTOS
+ControlEvent v9.2_prod - FIX TicketAuto/Gemini + alta real de EVENTOS
 
-MISMA VERSION VISIBLE: v9.1_prod.
+MISMA VERSION VISIBLE: v9.2_prod.
 
 Cambios incluidos:
 
@@ -9,14 +9,14 @@ Cambios incluidos:
 - Eso podía dejar el alta de evento en memoria/localStorage, visible hasta salir, pero no persistida en Supabase.
 - Ahora public/index.html carga el cortafuegos/CRUD raíz igual que index.html.
 
-2) Botón TicketAuto
+2) Botón de alta asistida
 - Se refuerza la apertura del botón con onclick directo y listeners en window/document, click y pointerdown.
-- Se mantiene consola: window.__ceOpenTicketAutoV91()
+- Se mantiene consola: window.__ceOpenTicketAutoV92()
 
 3) Gemini API
 - TicketAuto ya puede llamar a Gemini vía REST.
-- Variables admitidas para Gemini: GEMINI_API_KEY, GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY.
-- Por compatibilidad con lo probado, también acepta OPENAI_API_KEY si ahí has puesto una clave Gemini.
+- Variables admitidas para Gemini: GEMINI_API_KEY, GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY y OPENIA_API_KEY.
+- Por compatibilidad con lo probado, también acepta OPENAI_API_KEY si ahí has puesto una clave Gemini, siempre que no empiece por sk-.
 - Si quieres forzar proveedor: CONTROLEVENT_TICKET_AI_PROVIDER=gemini
 - Modelo por defecto: gemini-2.0-flash
 - Se puede cambiar con CONTROLEVENT_TICKET_AI_MODEL o GEMINI_MODEL.
@@ -24,6 +24,6 @@ Cambios incluidos:
 Archivos modificados:
 - public/index.html
 - services/receipt-ai.service.js
-- public/app/features/v9-1-ticketauto-compras.js
+- public/app/features/v9-2-ticketauto-compras.js
 
 No toca SQL, BACKUP, CARGA ni FIX48.

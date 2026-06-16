@@ -1,8 +1,8 @@
-/* ControlEvent v9.1_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v9.2_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
 (function(){
   'use strict';
-  var TAG='__ceV91TicketAutoCompras';
+  var TAG='__ceV92TicketAutoCompras';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -46,16 +46,18 @@
     });
   }
   function css(){
-    if($('ceV90TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV90TicketAiStyle';
+    if($('ceV92TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV92TicketAiStyle';
     st.textContent='\n'+
-      '.ce-ai-ticket-btn{font-weight:900;font-size:15px;min-width:120px;background:#fff7ed;border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:5px}\n'+
+      '.ce-ai-ticket-btn{font-weight:900;font-size:20px;min-width:48px;min-height:42px;padding:8px 11px;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
+      '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
       '.ce-ai-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:14px}\n'+
       '.ce-ai-overlay.open{display:flex}\n'+
       '.ce-ai-modal{width:min(1180px,98vw);max-height:94vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);border:2px solid #fb923c;padding:14px}\n'+
       '.ce-ai-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}\n'+
       '.ce-ai-title{font-size:20px;font-weight:900;color:#7c2d12}.ce-ai-sub{font-size:13px;color:#475569;margin-top:3px}\n'+
       '.ce-ai-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin:10px 0}.ce-ai-field label{font-weight:800;font-size:12px;color:#334155;display:block;margin-bottom:3px}.ce-ai-field input,.ce-ai-field select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:#fff}\n'+
+      '.ce-ai-ticket-used{background:#dcfce7!important;color:#166534!important;font-weight:900!important;border-color:#86efac!important}\n'+
       '.ce-ai-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.ce-ai-actions button{border-radius:10px;padding:8px 12px;font-weight:800}.ce-ai-primary{background:#f97316;color:#fff;border:1px solid #ea580c}.ce-ai-secondary{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}.ce-ai-danger{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}\n'+
       '.ce-ai-preview{max-width:160px;max-height:120px;border-radius:10px;border:1px solid #e2e8f0;object-fit:contain;background:#f8fafc}\n'+
       '.ce-ai-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px}.ce-ai-table{width:100%;border-collapse:collapse;font-size:13px}.ce-ai-table th{background:#ffedd5;color:#7c2d12;text-align:left;padding:7px;position:sticky;top:0}.ce-ai-table td{padding:6px;border-top:1px solid #e2e8f0;vertical-align:middle}.ce-ai-table input,.ce-ai-table select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:6px}.ce-ai-table .num{max-width:90px}.ce-ai-row-low{background:#fff7ed}.ce-ai-row-ok{background:#f8fafc}\n'+
@@ -64,18 +66,50 @@
     document.head.appendChild(st);
   }
   function htmlEscape(v){ return text(v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function sortedByName(list){
+    return (list || []).slice().sort(function(a,b){
+      return trim(a && (a.nombre || a.name || a.id)).localeCompare(trim(b && (b.nombre || b.name || b.id)), 'es', {sensitivity:'base'});
+    });
+  }
   function options(list, selected, labelFn){
     var out='<option value=""></option>';
-    for(var i=0;i<list.length;i++){
-      var id=trim(list[i].id); var lab=labelFn ? labelFn(list[i]) : (list[i].nombre || id);
+    sortedByName(list).forEach(function(item){
+      var id=trim(item.id); var lab=labelFn ? labelFn(item) : (item.nombre || id);
       out+='<option value="'+htmlEscape(id)+'"'+(id===trim(selected)?' selected':'')+'>'+htmlEscape(lab)+'</option>';
+    });
+    return out;
+  }
+  function isDonationTicket(v){
+    var n=normalizeName(v).replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U');
+    return /^DON/.test(n) || n.indexOf('DONACION')>=0 || n.indexOf('DONADO')>=0;
+  }
+  function usedTicketMap(){
+    var used={}, ev=selectedEventId();
+    arr('compras').forEach(function(c){
+      if(ev && trim(c.eventId) && trim(c.eventId)!==ev) return;
+      var tk=trim(c.ticketDonacion).toUpperCase();
+      if(/^TK\d+/.test(tk) && !isDonationTicket(tk)) used[tk]=true;
+    });
+    return used;
+  }
+  function ticketOptions(selected, used){
+    used = used || usedTicketMap();
+    selected = trim(selected).toUpperCase();
+    var out='<option value=""></option>';
+    for(var i=1;i<=50;i++){
+      var tk='TK'+String(i).padStart(2,'0');
+      var isUsed=!!used[tk];
+      var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento"':'');
+      out+='<option value="'+tk+'"'+attrs+'>'+tk+(isUsed?' ✓':'')+'</option>';
     }
     return out;
   }
-  function ticketOptions(){
-    var out='';
-    for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); out+='<option value="'+tk+'">'+tk+'</option>'; }
-    return out;
+  function markTicketSelect(){
+    var sel=$('ceAiTicket'); if(!sel) return;
+    var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase();
+    var isUsed=!!used[tk];
+    sel.classList.toggle('ce-ai-ticket-used', isUsed);
+    sel.title=isUsed ? 'Este TKxx ya está usado en COMPRAS para este evento.' : 'Selecciona el TKxx del ticket.';
   }
   function ensureUi(){
     css();
@@ -83,8 +117,8 @@
       var btn=document.createElement('button');
       btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
       btn.setAttribute('data-ce-ai-ticket-open','1');
-      btn.setAttribute('aria-label','Abrir TicketAuto');
-      btn.title='TicketAuto: alta asistida de COMPRAS desde foto de ticket'; btn.textContent='🧾 TicketAuto'; btn.setAttribute('onclick','window.__ceOpenTicketAutoV91&&window.__ceOpenTicketAutoV91();return false;');
+      btn.setAttribute('aria-label','Abrir alta asistida de compras');
+      btn.title='Alta asistida de COMPRAS desde foto de ticket'; btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>'; btn.setAttribute('onclick','window.__ceOpenTicketAutoV92&&window.__ceOpenTicketAutoV92();return false;');
       var footer=document.querySelector('.footer-inner');
       var maint=$('btnToggleMaintenance');
       if(footer && maint && maint.parentNode===footer) footer.insertBefore(btn, maint);
@@ -96,11 +130,11 @@
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾 TicketAuto - Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
         '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
         '<div class="ce-ai-grid">'+
           '<div class="ce-ai-field"><label>Foto del ticket</label><input id="ceAiFile" type="file" accept="image/*" capture="environment"></div>'+ 
-          '<div class="ce-ai-field"><label>TKxx</label><input id="ceAiTicket" list="ceAiTkList" placeholder="TK01"><datalist id="ceAiTkList">'+ticketOptions()+'</datalist></div>'+ 
+          '<div class="ce-ai-field"><label>TKxx</label><select id="ceAiTicket"></select></div>'+ 
           '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
           '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
         '</div>'+ 
@@ -112,6 +146,7 @@
       document.body.appendChild(div);
       $('ceAiClose').addEventListener('click',closePanel);
       $('ceAiFile').addEventListener('change',fileChanged);
+      $('ceAiTicket').addEventListener('change',markTicketSelect);
       $('ceAiAnalyze').addEventListener('click',analyze);
       $('ceAiAddRow').addEventListener('click',function(){ addRow({descripcion:'',unidades:1,precio:0,importe:0,confianza:0,requiereRevision:true}); });
       $('ceAiClear').addEventListener('click',clearRows);
@@ -127,12 +162,19 @@
     if(tienda) tienda.innerHTML=options(arr('tiendas'), '', function(t){return t.nombre || t.id;});
     if(resp) resp.innerHTML=options(arr('personas'), '', function(p){return p.nombre || p.id;});
     var dl=$('ceAiProducts'); if(dl){
-      var ps=arr('productos').slice().sort(function(a,b){return trim(a.nombre).localeCompare(trim(b.nombre),'es');});
+      var ps=sortedByName(arr('productos'));
       dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join('');
     }
-    var used={}; arr('compras').forEach(function(c){ var tk=trim(c.ticketDonacion).toUpperCase(); if(/^TK\d+/.test(tk)) used[tk]=true; });
-    var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } }
-    if($('ceAiTicket') && !$('ceAiTicket').value) $('ceAiTicket').value=next;
+    var used=usedTicketMap();
+    var sel=$('ceAiTicket');
+    if(sel){
+      var current=trim(sel.value).toUpperCase();
+      var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } }
+      var keep=current || next;
+      sel.innerHTML=ticketOptions(keep, used);
+      sel.value=keep;
+      markTicketSelect();
+    }
   }
   function openPanel(){
     if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
@@ -181,21 +223,21 @@
   function addRow(row){ if(!window.__ceAiTicketLines) window.__ceAiTicketLines=[]; window.__ceAiTicketLines.push(Object.assign({ok:true,unidades:1,precio:0,importe:0,confianza:0}, row||{})); renderRows(); }
   function friendlyAiError(message){
     var m=text(message||'');
-    if(/quota|insufficient_quota|billing|plan/i.test(m)){
-      return 'La API configurada no tiene cuota/saldo disponible. Puedes añadir filas manualmente o revisar límites/billing del proveedor IA.';
+    if(/quota|insufficient_quota|billing|plan|RESOURCE_EXHAUSTED|429|rate.?limit|l[ií]mite/i.test(m)){
+      return 'La API configurada no tiene cuota/saldo/límite disponible ahora. Puedes añadir filas manualmente o revisar cuota, límites y billing del proveedor IA.';
     }
     if(/api key|API key|401|403|invalid|permission|PERMISSION_DENIED/i.test(m)){
-      return 'La clave IA no es válida o no está habilitada. Para Gemini usa GEMINI_API_KEY; provisionalmente también sirve OPENAI_API_KEY si contiene la clave Gemini.';
+      return 'La clave IA no es válida o no está habilitada. Para Gemini usa GEMINI_API_KEY; también se acepta OPENIA_API_KEY si la variable ya está creada así.';
     }
     if(/model|not found|404/i.test(m)){
       return 'Modelo IA no disponible. Prueba CONTROLEVENT_TICKET_AI_MODEL=gemini-2.0-flash o revisa el modelo configurado.';
     }
-    return m || 'Error desconocido al analizar con TicketAuto.';
+    return m || 'Error desconocido al analizar con la IA.';
   }
   function analyze(){
     var dataUrl=window.__ceAiTicketImage || '';
     if(!dataUrl){ var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f){ setStatus('Selecciona primero una foto de ticket.','warn'); return; } }
-    setStatus('Analizando ticket con TicketAuto...','info');
+    setStatus('Analizando ticket con IA...','info');
     Promise.resolve(dataUrl || readFileAsDataUrl($('ceAiFile').files[0])).then(function(src){
       window.__ceAiTicketImage=src;
       return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src})});
@@ -203,12 +245,12 @@
       var rows=Array.isArray(data.productos)?data.productos:[];
       window.__ceAiTicketLines=rows.map(function(r){ return Object.assign({ok:true},r); });
       renderRows();
-      var msg='TicketAuto terminado: '+rows.length+' líneas detectadas.';
+      var msg='Análisis terminado: '+rows.length+' líneas detectadas.';
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
-      setStatus('No se pudo analizar con TicketAuto: '+friendlyAiError(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
+      setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
     });
   }
   function findProductByName(name){ var n=normalizeName(name); var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
@@ -276,17 +318,18 @@
     chain.then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
       .then(function(){
+        try{ fillSelects(); }catch(_){ }
         var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si había imagen.';
         if(warnings.length) msg+=' Avisos: '+warnings.length+'.';
         setStatus(msg, warnings.length?'warn':'ok');
-        if(warnings.length) console.warn('[CE v9.1 TicketAuto]', warnings);
+        if(warnings.length) console.warn('[CE v9.2 Alta IA]', warnings);
       })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
     var ev=selectedEventId();
     if(window.__ceLoadSelectedEventStateFix48 && ev){
-      return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); });
+      return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); });
     }
     if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn');
     return Promise.resolve();
@@ -301,7 +344,7 @@
     return false;
   }
   function tick(){ ensureUi(); refreshRole(); }
-  window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true);
@@ -310,5 +353,5 @@
   document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.1 TicketAuto] instalado: botón de pie solo GD. Prueba: window.__ceOpenTicketAutoV91()');
+  console.info('[CE v9.2 Alta IA] instalada: botón de pie solo GD. Prueba: window.__ceOpenTicketAutoV92()');
 })();

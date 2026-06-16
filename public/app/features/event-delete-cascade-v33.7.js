@@ -1,4 +1,4 @@
-/* ControlEvent v9.1_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v9.2_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
@@ -20,8 +20,19 @@
     try{ if(typeof saveState === 'function') saveState(); }catch(_){ }
   }
   function redraw(){
-    try{ if(typeof window.render === 'function'){ window.render(); return; } }catch(_){ }
+    try{ if(typeof window.render === 'function'){ window.render(); } }catch(_){ }
     try{ if(typeof render === 'function') render(); }catch(_){ }
+    refreshMaintenanceEventos();
+  }
+  function refreshMaintenanceEventos(){
+    try{ if(typeof renderEventos === 'function') renderEventos(); }catch(_){ }
+    try{ if(typeof renderMaintenanceTabs === 'function') renderMaintenanceTabs(); }catch(_){ }
+    try{
+      const api=window.ControlEventMaintenance;
+      if(api && typeof api.refreshCurrent==='function'){
+        Promise.resolve(api.refreshCurrent({reason:'event-delete-cascade-refresh', force:true})).catch(()=>{});
+      }
+    }catch(_){ }
   }
   function eventById(id){ return (st().eventos || []).find(e => String(e.id || '') === String(id || '')) || null; }
   function countTicketImages(eventId){
@@ -56,7 +67,7 @@
     // Segunda pasada no bloqueante: cubre retardos de guardado remoto o cualquier handler legado que haya persistido tarde.
     window.setTimeout(() => {
       deleteTicketImagesServer(eventId).catch(error => {
-        console.warn('[ControlEvent v9.1_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
+        console.warn('[ControlEvent v9.2_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
       });
     }, 1400);
   }

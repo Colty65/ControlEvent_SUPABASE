@@ -1,4 +1,4 @@
-/* ControlEvent v9.1_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
+/* ControlEvent v9.2_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.
@@ -47,6 +47,21 @@
   function productById(id){ return arr('productos').find(p=>String(p.id||'')===String(id||''))||{}; }
   function localStore(){ try{ const key=Function('return (typeof STORAGE_KEY!=="undefined")?STORAGE_KEY:"controlevent_v6_4"')(); localStorage.setItem(key, JSON.stringify(getState())); }catch(_){} }
   function renderNow(){ localStore(); try{ if(typeof render==='function') render(); }catch(e){ log('render falló', e); } }
+  function refreshMaintenanceAfterSync(collection){
+    const col=String(collection||'').trim();
+    try{
+      if((!col || col==='eventos') && typeof renderEventos==='function') renderEventos();
+    }catch(e){ log('renderEventos tras sincronizar falló', e); }
+    try{ if(typeof renderMaintenanceTabs==='function') renderMaintenanceTabs(); }catch(_){ }
+    try{
+      const api=window.ControlEventMaintenance;
+      const current=api && typeof api.current==='function' ? String(api.current()||'') : '';
+      if(api && typeof api.refreshCurrent==='function' && (!current || current===col || col==='eventos' || (!col && current==='eventos'))){
+        Promise.resolve(api.refreshCurrent({reason:'crud-root-sync-'+(col||'state'), force:true})).catch(function(e){ log('ControlEventMaintenance.refreshCurrent falló', e); });
+      }
+    }catch(_){ }
+    try{ window.dispatchEvent(new CustomEvent('controlevent:crud-row-synced',{detail:{collection:col, at:Date.now()}})); }catch(_){ }
+  }
   function requireWrite(){ if(!canWrite()){ alert('Usuario sin permiso de escritura.'); return false; } return true; }
   function requireGD(){ if(!isGD()){ alert('Solo usuario GD puede realizar esta operación.'); return false; } return true; }
   function blockIfFinalized(ev, text){ if(isFinalized(ev)){ alert('Evento Finalizado: no se permite '+(text||'modificar datos')+'. Cambia antes la situación a En curso si necesitas corregirlo.'); return true; } return false; }
@@ -99,11 +114,12 @@
     else if(Array.isArray(s.eventos)) s.selectedEventId=s.eventos[0]?.id||'';
     localStore();
   }
-  async function refreshFromDb(){
+  async function refreshFromDb(collection){
     const keep=selectedEventId();
     const fresh=await readFreshState();
     replaceLocalState(fresh, keep);
     renderNow();
+    refreshMaintenanceAfterSync(collection);
     return fresh;
   }
   function replaceLocal(collection,row){ const a=arr(collection); const i=a.findIndex(x=>String(x.id||'')===String(row.id||'')); if(i>=0) a[i]={...a[i],...row}; else a.push(row); }
@@ -116,7 +132,7 @@
   function rowTiendaFromForm(id){ const old=arr('tiendas').find(x=>String(x.id)===String(id))||{}; return {...old,id:String(id),nombre:val('edit-tienda-nombre',id,old.nombre||'').trim()}; }
   function rowProductoFromForm(id){ const old=arr('productos').find(x=>String(x.id)===String(id))||{}; const precio=money(val('edit-producto-precio',id,old.defaultPrecio??old.precio??0)); const tienda=val('edit-producto-tienda',id,old.defaultTiendaId||old.tiendaId||''); return {...old,id:String(id),nombre:val('edit-producto-nombre',id,old.nombre||'').trim(),segmento:val('edit-producto-segmento',id,old.segmento||''),destino:val('edit-producto-destino',id,old.destino||''),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; }
 
-  async function addEvento(){ if(!requireGD()) return; const titulo=elVal('newEventoTitulo').trim(); if(!titulo) return; const row={id:uid(),titulo,precio:money(elVal('newEventoPrecio','0')),fechaIni:elVal('newEventoFechaIni').trim(),fechaFin:elVal('newEventoFechaFin').trim(),situacion:elVal('newEventoSituacion','En curso'),descripcion:elVal('newEventoDescripcion').trim()}; await upsert('eventos',row); replaceLocal('eventos',row); getState().selectedEventId=row.id; clear(['newEventoTitulo','newEventoFechaIni','newEventoFechaFin','newEventoDescripcion']); setVal('newEventoPrecio','0.00'); await refreshFromDb(); }
+  async function addEvento(){ if(!requireGD()) return; const titulo=elVal('newEventoTitulo').trim(); if(!titulo) return; const row={id:uid(),titulo,precio:money(elVal('newEventoPrecio','0')),fechaIni:elVal('newEventoFechaIni').trim(),fechaFin:elVal('newEventoFechaFin').trim(),situacion:elVal('newEventoSituacion','En curso'),descripcion:elVal('newEventoDescripcion').trim()}; await upsert('eventos',row); replaceLocal('eventos',row); getState().selectedEventId=row.id; clear(['newEventoTitulo','newEventoFechaIni','newEventoFechaFin','newEventoDescripcion']); setVal('newEventoPrecio','0.00'); await refreshFromDb('eventos'); }
   async function addPersona(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir personas'))return; const nombre=elVal('newPersonaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre,rango:elVal('newPersonaRango','SOCIO')}; await upsert('personas',row); replaceLocal('personas',row); setVal('newPersonaNombre',''); await refreshFromDb(); }
   async function addTienda(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir tiendas'))return; const nombre=elVal('newTiendaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre}; await upsert('tiendas',row); replaceLocal('tiendas',row); setVal('newTiendaNombre',''); await refreshFromDb(); }
   async function addProducto(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir productos'))return; const nombre=elVal('newProductoNombre').trim(); if(!nombre)return; const precio=money(elVal('newProductoPrecio','0')); const tienda=elVal('newProductoTienda',''); const row={id:uid(),nombre,segmento:elVal('newProductoSegmento'),destino:elVal('newProductoDestino'),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; await upsert('productos',row); replaceLocal('productos',row); setVal('newProductoNombre',''); setVal('newProductoPrecio','0,00 €'); await refreshFromDb(); }
@@ -139,12 +155,12 @@
         }
         await updateEventSituation(id,row.situacion);
         if(old) old.situacion=row.situacion;
-        await refreshFromDb();
+        await refreshFromDb('eventos');
         return;
       }
-      await upsert('eventos',row); replaceLocal('eventos',row); await refreshFromDb(); return;
+      await upsert('eventos',row); replaceLocal('eventos',row); await refreshFromDb('eventos'); return;
     }
-    if(action==='delete-evento'){ if(!requireGD())return; const target=eventById(id); if(blockIfFinalized(target,'eliminar evento'))return; if(!confirm('¿Eliminar evento y sus datos asociados?')) return; await del('eventos',id); removeLocal('eventos',id); await refreshFromDb(); return; }
+    if(action==='delete-evento'){ if(!requireGD())return; const target=eventById(id); if(blockIfFinalized(target,'eliminar evento'))return; if(!confirm('¿Eliminar evento y sus datos asociados?')) return; await del('eventos',id); removeLocal('eventos',id); await refreshFromDb('eventos'); return; }
 
     if(!requireWrite()) return;
     const ev=selectedEvent();
@@ -178,7 +194,7 @@
     const next=isFinalized(ev)?'En curso':'Finalizado';
     await updateEventSituation(ev.id,next);
     ev.situacion=next;
-    await refreshFromDb();
+    await refreshFromDb('eventos');
   }
 
   function handleCrudClick(e){

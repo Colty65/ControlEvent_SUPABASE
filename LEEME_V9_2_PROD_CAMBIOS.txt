@@ -1,0 +1,22 @@
+ControlEvent v9.2_prod - cambios aplicados
+
+1) TicketAuto / alta asistida de COMPRAS
+- Botón del pie cambiado a icono compacto 🧾✨, sin el texto visible "TicketAuto".
+- Título del panel cambiado a "Alta asistida de COMPRAS".
+- Desplegables de TIENDAS y RESPONSABLES ordenados alfabéticamente.
+- TKxx pasa a ser desplegable real y marca en verde los TKxx ya usados en el evento, igual que COMPRAS.
+- Al procesar líneas, el TK usado se actualiza en verde tras recargar el evento.
+
+2) Gemini / variables de entorno
+- Se acepta GEMINI_API_KEY como variable recomendada.
+- También se aceptan GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY y OPENIA_API_KEY.
+- Por compatibilidad, si OPENAI_API_KEY contiene una clave de Gemini que no empieza por sk-, también se usa como Gemini.
+- Si se intenta OpenAI y existe clave Gemini, se reintenta automáticamente con Gemini.
+
+3) Mantenimiento de EVENTOS
+- Tras alta, baja o cambio de situación de un evento, se fuerza refresco del mantenimiento de eventos sin tener que ir a otra opción y volver.
+
+4) Versión
+- App actualizada a ControlEvent v9.2_prod.
+- VERSION_FILE actualizado a ControlEvent_v9_2_prod.
+- BACKUP e INFOEVENTO toman esa versión en nombres de archivo y metadatos internos.
