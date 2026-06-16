@@ -82,10 +82,22 @@
     if(!$('btnReceiptAiCompras')){
       var btn=document.createElement('button');
       btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
-      btn.title='IA Ticket: alta asistida de COMPRAS por foto'; btn.textContent='🧾IA';
+      btn.setAttribute('data-ce-ai-ticket-open','1');
+      btn.setAttribute('aria-label','Abrir IA Ticket');
+      btn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; btn.textContent='🧾IA';
       var footer=document.querySelector('.footer-inner');
       if(footer) footer.appendChild(btn);
-      btn.addEventListener('click',function(){ openPanel(); });
+      btn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
+    }
+    if(!$('btnReceiptAiComprasHeader')){
+      var hbtn=document.createElement('button');
+      hbtn.type='button'; hbtn.id='btnReceiptAiComprasHeader'; hbtn.className='outline small ce-ai-ticket-header-btn';
+      hbtn.setAttribute('data-ce-ai-ticket-open','1');
+      hbtn.setAttribute('aria-label','Abrir IA Ticket');
+      hbtn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; hbtn.textContent='🧾 IA';
+      var actions=document.querySelector('.user-actions') || document.querySelector('.appname-stack') || document.querySelector('.header-inner');
+      if(actions) actions.insertBefore(hbtn, actions.firstChild || null);
+      hbtn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
     }
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
@@ -114,7 +126,7 @@
     }
     refreshRole();
   }
-  function refreshRole(){ var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=isGD()?'':'none'; }
+  function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn) hbtn.style.display=show; }
   function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
@@ -272,10 +284,21 @@
     if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn');
     return Promise.resolve();
   }
+  function delegatedOpen(ev){
+    var t=ev && ev.target;
+    var opener=t && t.closest && t.closest('#btnReceiptAiCompras,#btnReceiptAiComprasHeader,[data-ce-ai-ticket-open]');
+    if(!opener) return;
+    ev.preventDefault(); ev.stopPropagation();
+    if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    openPanel();
+    return false;
+  }
   function tick(){ ensureUi(); refreshRole(); }
+  window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
+  document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.0 Ticket IA] instalado: menú inferior solo GD.');
+  console.info('[CE v9.0 Ticket IA] instalado: botón superior/inferior solo GD. Prueba: window.__ceOpenTicketIaComprasV90()');
 })();
