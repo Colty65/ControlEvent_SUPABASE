@@ -1,4 +1,4 @@
-ControlEvent v9.2_prod - FIX despliegue Gemini REST
+ControlEvent v9.3_prod - FIX despliegue Gemini REST
 
 Motivo:
 - La versión anterior incorporaba @google/genai y package-lock con dependencias nuevas.
@@ -6,7 +6,7 @@ Motivo:
 
 Corrección aplicada:
 - Se elimina @google/genai de package.json y package-lock.json.
-- Se restaura el package-lock de la versión v9.2_prod que sí desplegaba.
+- Se restaura el package-lock de la versión v9.3_prod que sí desplegaba.
 - La llamada a Gemini se hace por REST nativo desde services/receipt-ai.service.js, sin dependencias nuevas.
 - Se mantiene GEMINI_API_KEY como variable recomendada.
 - También se admiten GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY y OPENAI_API_KEY si no empieza por sk-.

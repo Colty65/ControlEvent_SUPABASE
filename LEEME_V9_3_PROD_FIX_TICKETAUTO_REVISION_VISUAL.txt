@@ -1,4 +1,4 @@
-ControlEvent v9.2_prod - FIX TicketAuto revisión visual y Gemini
+ControlEvent v9.3_prod - FIX TicketAuto revisión visual y Gemini
 
 Cambios incluidos:
 

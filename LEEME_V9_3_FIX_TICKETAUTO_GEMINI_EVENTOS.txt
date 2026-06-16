@@ -1,6 +1,6 @@
-ControlEvent v9.2_prod - FIX TicketAuto/Gemini + alta real de EVENTOS
+ControlEvent v9.3_prod - FIX TicketAuto/Gemini + alta real de EVENTOS
 
-MISMA VERSION VISIBLE: v9.2_prod.
+MISMA VERSION VISIBLE: v9.3_prod.
 
 Cambios incluidos:
 
@@ -24,6 +24,6 @@ Cambios incluidos:
 Archivos modificados:
 - public/index.html
 - services/receipt-ai.service.js
-- public/app/features/v9-2-ticketauto-compras.js
+- public/app/features/v9-3-ticketauto-compras.js
 
 No toca SQL, BACKUP, CARGA ni FIX48.

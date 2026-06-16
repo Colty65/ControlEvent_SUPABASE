@@ -1,4 +1,4 @@
-ControlEvent v9.2_prod - cambios aplicados
+ControlEvent v9.3_prod - cambios aplicados
 
 1) TicketAuto / alta asistida de COMPRAS
 - Botón del pie cambiado a icono compacto 🧾✨, sin el texto visible "TicketAuto".
@@ -17,6 +17,6 @@ ControlEvent v9.2_prod - cambios aplicados
 - Tras alta, baja o cambio de situación de un evento, se fuerza refresco del mantenimiento de eventos sin tener que ir a otra opción y volver.
 
 4) Versión
-- App actualizada a ControlEvent v9.2_prod.
-- VERSION_FILE actualizado a ControlEvent_v9_2_prod.
+- App actualizada a ControlEvent v9.3_prod.
+- VERSION_FILE actualizado a ControlEvent_v9_3_prod.
 - BACKUP e INFOEVENTO toman esa versión en nombres de archivo y metadatos internos.

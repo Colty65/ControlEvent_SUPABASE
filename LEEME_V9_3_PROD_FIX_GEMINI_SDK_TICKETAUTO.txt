@@ -1,4 +1,4 @@
-ControlEvent v9.2_prod - FIX TicketAuto Gemini SDK + ajustes ventana IA
+ControlEvent v9.3_prod - FIX TicketAuto Gemini SDK + ajustes ventana IA
 
 Cambios incluidos:
 

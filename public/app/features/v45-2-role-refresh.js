@@ -1,4 +1,4 @@
-/* ControlEvent v9.2_prod - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v9.3_prod - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
    - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
@@ -6,8 +6,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v9.2_prod';
-  const VERSION_FILE = 'ControlEvent_v9_2_prod';
+  const VERSION = 'ControlEvent v9.3_prod';
+  const VERSION_FILE = 'ControlEvent_v9_3_prod';
   const TABS = ['ingresos','donaciones','compras','mapa','documentos','planificacion','resumen','graficas'];
   const PANEL_BY_TAB = {
     ingresos:'tabIngresos',

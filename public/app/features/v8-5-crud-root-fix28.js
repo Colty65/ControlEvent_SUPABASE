@@ -1,4 +1,4 @@
-/* ControlEvent v9.2_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
+/* ControlEvent v9.3_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.

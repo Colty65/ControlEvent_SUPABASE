@@ -1,0 +1,23 @@
+{
+  "version": "ControlEvent v9.3_prod",
+  "versionFile": "ControlEvent_v9_3_prod",
+  "mainChanges": [
+    "TicketAuto v9.3 con actualizacion permanente de precios en PRODUCTOS",
+    "Seleccion automatica de TIENDAS cuando la IA deduce proveedor",
+    "Gestion visual de COMPRAS pendientes de la misma tienda/evento para eliminarlas al sustituirlas por ticket real",
+    "SEGMENTO y DESTINO obligatorios para productos nuevos desde ticket IA/manual",
+    "Descarga local de fotos de ticket",
+    "Indicaciones adicionales para Gemini por ticket/factura"
+  ],
+  "changedFiles": [
+    "public/app/features/v9-3-ticketauto-compras.js",
+    "services/receipt-ai.service.js",
+    "lib/supabase-normalized.js",
+    "index.html",
+    "public/index.html",
+    "public/app/version.js",
+    "routes/export.routes.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

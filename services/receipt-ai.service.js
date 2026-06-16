@@ -1,5 +1,5 @@
-/* ControlEvent v9.2_prod - Alta asistida para lectura de tickets de compra.
-   FIX despliegue Vercel: Gemini por REST nativo, sin @google/genai ni nuevas dependencias. */
+/* ControlEvent v9.3_prod - Alta asistida para lectura de tickets de compra.
+   FIX v9.3: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -54,8 +54,9 @@ function normalizeAnalysis(raw = {}) {
     raw
   };
 }
-function jsonInstruction() {
-  return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.\n\nLee la imagen del ticket y devuelve SOLO JSON válido, sin markdown.\n\nFormato obligatorio:\n{\n  "proveedor": "nombre comercio si aparece",\n  "fecha": "YYYY-MM-DD si aparece o cadena vacía",\n  "total": numero,\n  "productos": [\n    {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "confianza":numero_0_a_1, "notas":""}\n  ],\n  "advertencias": []\n}\n\nReglas:\n- Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.\n- No inventes productos que no se vean.\n- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.\n- Si el ticket no tiene descripción clara del artículo, deja descripcion vacía o texto literal breve y pon confianza baja.\n- Si hay cantidad x precio, pon unidades, precio unitario e importe.\n- Usa punto decimal.\n- Si dudas, conserva la línea con confianza baja para que el usuario la revise.`;
+function jsonInstruction(extraInstructions = '') {
+  const extra = text(extraInstructions).trim().slice(0, 1500);
+  return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.\n\nLee la imagen del ticket y devuelve SOLO JSON válido, sin markdown.\n\nFormato obligatorio:\n{\n  "proveedor": "nombre comercio si aparece",\n  "fecha": "YYYY-MM-DD si aparece o cadena vacía",\n  "total": numero,\n  "productos": [\n    {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "confianza":numero_0_a_1, "notas":""}\n  ],\n  "advertencias": []\n}\n\nReglas:\n- Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.\n- No inventes productos que no se vean.\n- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.\n- Si el ticket no tiene descripción clara del artículo, deja descripcion vacía o texto literal breve y pon confianza baja.\n- Si hay cantidad x precio, pon unidades, precio unitario e importe.\n- Usa punto decimal.\n- Si dudas, conserva la línea con confianza baja para que el usuario la revise.${extra ? `\n\nIndicaciones adicionales del usuario para ESTA factura/ticket:\n${extra}\nAplica estas indicaciones solo si no contradicen lo que se ve en la imagen.` : ''}`;
 }
 function dataUrlParts(dataUrl) {
   const match = /^data:([^;]+);base64,(.+)$/i.exec(text(dataUrl).trim());
@@ -111,7 +112,7 @@ function providerName() {
 function imageMessage(dataUrl) {
   return { type: 'input_image', image_url: dataUrl };
 }
-async function callOpenAI({ dataUrl }) {
+async function callOpenAI({ dataUrl, instrucciones = '' }) {
   const apiKey = openAiKey();
   if (!apiKey) {
     const err = new Error('Falta OPENAI_API_KEY o CONTROLEVENT_OPENAI_API_KEY en variables de entorno.');
@@ -125,7 +126,7 @@ async function callOpenAI({ dataUrl }) {
       {
         role: 'user',
         content: [
-          { type: 'input_text', text: jsonInstruction() },
+          { type: 'input_text', text: jsonInstruction(instrucciones) },
           imageMessage(dataUrl)
         ]
       }
@@ -238,7 +239,7 @@ function isRetryableGeminiError(err) {
 function geminiOutText(payload) {
   return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || '';
 }
-async function callGeminiModel({ model, parts, apiKey }) {
+async function callGeminiModel({ model, parts, apiKey, instrucciones = '' }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const body = {
     contents: [
@@ -246,7 +247,7 @@ async function callGeminiModel({ model, parts, apiKey }) {
         role: 'user',
         parts: [
           { inlineData: { data: parts.base64, mimeType: parts.mimeType } },
-          { text: jsonInstruction() }
+          { text: jsonInstruction(instrucciones) }
         ]
       }
     ],
@@ -275,7 +276,7 @@ async function callGeminiModel({ model, parts, apiKey }) {
   }
   return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest' };
 }
-async function callGemini({ dataUrl }) {
+async function callGemini({ dataUrl, instrucciones = '' }) {
   const apiKey = geminiKey();
   if (!apiKey) {
     const err = new Error('Falta GEMINI_API_KEY en Vercel. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
@@ -294,11 +295,11 @@ async function callGemini({ dataUrl }) {
   let lastError = null;
   for (const model of models) {
     try {
-      return await callGeminiModel({ model, parts, apiKey });
+      return await callGeminiModel({ model, parts, apiKey, instrucciones });
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v9.2_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v9.3_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -311,8 +312,9 @@ async function callGemini({ dataUrl }) {
   throw err;
 }
 
-export async function analyzeReceiptImage({ dataUrl } = {}) {
+export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones, hint } = {}) {
   const src = text(dataUrl).trim();
+  const extraInstructions = text(instrucciones || indicaciones || hint || '').trim().slice(0, 1500);
   if (!/^data:image\//.test(src)) {
     const err = new Error('Falta imagen del ticket en formato data:image/...');
     err.status = 400;
@@ -326,14 +328,14 @@ export async function analyzeReceiptImage({ dataUrl } = {}) {
   const provider = providerName();
   if (provider === 'openai') {
     try {
-      return await callOpenAI({ dataUrl: src });
+      return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v9.2_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
-        return await callGemini({ dataUrl: src });
+        try { console.warn('[ControlEvent v9.3_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        return await callGemini({ dataUrl: src, instrucciones: extraInstructions });
       }
       throw error;
     }
   }
-  return await callGemini({ dataUrl: src });
+  return await callGemini({ dataUrl: src, instrucciones: extraInstructions });
 }
