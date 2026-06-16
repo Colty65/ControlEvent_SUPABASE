@@ -1,5 +1,5 @@
-/* ControlEvent v9.4_prod - Alta asistida para lectura de tickets de compra.
-   FIX v9.4: Gemini por REST + indicaciones adicionales por ticket/factura. */
+/* ControlEvent v9.5_prod - Alta asistida para lectura de tickets de compra.
+   FIX v9.5: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
@@ -49,6 +49,7 @@ function normalizeAnalysis(raw = {}) {
   return {
     ok: true,
     proveedor: raw.proveedor || raw.comercio || raw.tienda || raw.store || '',
+    responsable: raw.responsable || raw.responsableNombre || raw.encargado || raw.persona || raw.responsible || '',
     fecha: raw.fecha || raw.date || '',
     total: money(raw.total || raw.importe_total || raw.amount_total || 0),
     productos,
@@ -56,8 +57,11 @@ function normalizeAnalysis(raw = {}) {
     raw
   };
 }
-function jsonInstruction(extraInstructions = '') {
+function jsonInstruction(extraInstructions = '', context = {}) {
   const extra = text(extraInstructions).trim().slice(0, 2500);
+  const responsables = Array.isArray(context.responsables) ? context.responsables.map(x => text(x).trim()).filter(Boolean).slice(0, 120) : [];
+  const tiendas = Array.isArray(context.tiendas) ? context.tiendas.map(x => text(x).trim()).filter(Boolean).slice(0, 120) : [];
+  const knownContext = `${responsables.length ? `\nResponsables existentes en PERSONAS/SOCIO que puedes seleccionar si el usuario lo indica: ${responsables.join(', ')}.` : ''}${tiendas.length ? `\nTiendas existentes en TIENDAS que puedes seleccionar si reconoces o el usuario indica una: ${tiendas.join(', ')}.` : ''}`;
   return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.
 
 Lee la imagen del ticket/factura y devuelve SOLO JSON válido, sin markdown.
@@ -65,6 +69,7 @@ Lee la imagen del ticket/factura y devuelve SOLO JSON válido, sin markdown.
 Formato obligatorio:
 {
   "proveedor": "nombre comercio si aparece",
+  "responsable": "nombre responsable si el usuario lo indica o aparece, si no cadena vacía",
   "fecha": "YYYY-MM-DD si aparece o cadena vacía",
   "total": numero,
   "productos": [
@@ -80,13 +85,17 @@ Reglas principales:
 - Usa punto decimal.
 - Si dudas, conserva la línea con confianza baja para que el usuario la revise.
 - Los campos segmento y destino se devuelven vacíos salvo que el usuario los indique expresamente o sean evidentes por la indicación adicional.
+- El campo responsable se devuelve vacío salvo que el usuario indique de forma explícita un responsable o aparezca de forma clara en las indicaciones. Si coincide con un responsable existente, usa exactamente el nombre existente.
+- No uses MATERIAL como segmento. Para carbón, vasos, platos, hielo, bolsas, servilletas o similares, usa INFRAESTRUCTURA si procede o deja segmento vacío si no estás seguro.
 
 IMPORTANTE SOBRE INDICACIONES DEL USUARIO:
 - Las indicaciones adicionales del usuario tienen prioridad como corrección manual de ESTA factura/ticket.
 - Si el usuario dice que falta una línea, o pide añadir/incluir una línea concreta, debes añadirla a productos aunque no la hayas detectado visualmente. Pon confianza 0.05 y en notas "Añadida por indicación del usuario".
-- Si el usuario indica SEGMENTO y/o DESTINO para una línea, copia esos valores exactamente en los campos segmento y destino de esa línea.
+- Si el usuario indica SEGMENTO y/o DESTINO para una línea, copia esos valores exactamente en los campos segmento y destino de esa línea, salvo el segmento MATERIAL que ya no debe proponerse.
+- Si el usuario indica RESPONSABLE, encargado o persona concreta, devuelve ese nombre en el campo responsable y no lo ignores.
 - Si el usuario indica cómo aplicar IVA, recargo, descuento o cualquier regla de cálculo, recalcula precio e importe siguiendo esa indicación y añade advertencia breve explicando que se aplicó.
 - Si las líneas visibles no cuadran con el total y el usuario explica la diferencia, aplica su explicación.
+${knownContext}
 ${extra ? `
 Indicaciones adicionales del usuario para ESTA factura/ticket:
 ${extra}
@@ -147,7 +156,7 @@ function providerName() {
 function imageMessage(dataUrl) {
   return { type: 'input_image', image_url: dataUrl };
 }
-async function callOpenAI({ dataUrl, instrucciones = '' }) {
+async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tiendas = [] }) {
   const apiKey = openAiKey();
   if (!apiKey) {
     const err = new Error('Falta OPENAI_API_KEY o CONTROLEVENT_OPENAI_API_KEY en variables de entorno.');
@@ -161,7 +170,7 @@ async function callOpenAI({ dataUrl, instrucciones = '' }) {
       {
         role: 'user',
         content: [
-          { type: 'input_text', text: jsonInstruction(instrucciones) },
+          { type: 'input_text', text: jsonInstruction(instrucciones, {responsables, tiendas}) },
           imageMessage(dataUrl)
         ]
       }
@@ -176,6 +185,7 @@ async function callOpenAI({ dataUrl, instrucciones = '' }) {
           additionalProperties: false,
           properties: {
             proveedor: { type: 'string' },
+            responsable: { type: 'string' },
             fecha: { type: 'string' },
             total: { type: 'number' },
             productos: {
@@ -199,7 +209,7 @@ async function callOpenAI({ dataUrl, instrucciones = '' }) {
             },
             advertencias: { type: 'array', items: { type: 'string' } }
           },
-          required: ['proveedor', 'fecha', 'total', 'productos', 'advertencias']
+          required: ['proveedor', 'responsable', 'fecha', 'total', 'productos', 'advertencias']
         }
       }
     }
@@ -239,6 +249,7 @@ function ticketSchemaRest() {
     type: 'OBJECT',
     properties: {
       proveedor: { type: 'STRING', description: 'Nombre de la tienda o supermercado' },
+      responsable: { type: 'STRING', description: 'Nombre del responsable indicado por el usuario, si lo hay' },
       fecha: { type: 'STRING', description: 'Fecha de compra en formato YYYY-MM-DD, si aparece' },
       total: { type: 'NUMBER', description: 'Importe total del ticket' },
       productos: {
@@ -262,7 +273,7 @@ function ticketSchemaRest() {
       },
       advertencias: { type: 'ARRAY', items: { type: 'STRING' } }
     },
-    required: ['proveedor', 'productos', 'total']
+    required: ['proveedor', 'responsable', 'productos', 'total']
   };
 }
 function decorateGeminiError(err, model, payload) {
@@ -278,14 +289,14 @@ function isRetryableGeminiError(err) {
 function geminiOutText(payload) {
   return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || '';
 }
-async function callGeminiModel({ model, parts, apiKey, instrucciones = '' }) {
+async function callGeminiModel({ model, parts, apiKey, instrucciones = '', responsables = [], tiendas = [] }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const body = {
     contents: [
       {
         role: 'user',
         parts: [
-          { text: jsonInstruction(instrucciones) },
+          { text: jsonInstruction(instrucciones, {responsables, tiendas}) },
           { inlineData: { data: parts.base64, mimeType: parts.mimeType } },
           { text: 'Devuelve ahora el JSON final aplicando obligatoriamente las indicaciones adicionales del usuario si las hay.' }
         ]
@@ -316,7 +327,7 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '' }) {
   }
   return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest' };
 }
-async function callGemini({ dataUrl, instrucciones = '' }) {
+async function callGemini({ dataUrl, instrucciones = '', responsables = [], tiendas = [] }) {
   const apiKey = geminiKey();
   if (!apiKey) {
     const err = new Error('Falta GEMINI_API_KEY en Vercel. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
@@ -335,11 +346,11 @@ async function callGemini({ dataUrl, instrucciones = '' }) {
   let lastError = null;
   for (const model of models) {
     try {
-      return await callGeminiModel({ model, parts, apiKey, instrucciones });
+      return await callGeminiModel({ model, parts, apiKey, instrucciones, responsables, tiendas });
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v9.4_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v9.5_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -352,7 +363,7 @@ async function callGemini({ dataUrl, instrucciones = '' }) {
   throw err;
 }
 
-export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones, hint } = {}) {
+export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones, hint, responsables = [], tiendas = [] } = {}) {
   const src = text(dataUrl).trim();
   const extraInstructions = text(instrucciones || indicaciones || hint || '').trim().slice(0, 1500);
   if (!/^data:image\//.test(src)) {
@@ -368,14 +379,14 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
   const provider = providerName();
   if (provider === 'openai') {
     try {
-      return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions });
+      return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v9.4_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
-        return await callGemini({ dataUrl: src, instrucciones: extraInstructions });
+        try { console.warn('[ControlEvent v9.5_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;
     }
   }
-  return await callGemini({ dataUrl: src, instrucciones: extraInstructions });
+  return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
 }

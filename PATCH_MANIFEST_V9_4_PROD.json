@@ -1,9 +1,9 @@
 {
-  "version": "ControlEvent v9.4_prod",
+  "version": "ControlEvent v9.5_prod",
   "base": "versión anterior",
   "descripcion": "Tickets IA más práctico: botón en COMPRAS, sin toasts negros, limpieza completa, Pte.Compra de todo el evento ordenable, compactación de pantalla, actualización segura de precios existentes y Gemini obedeciendo indicaciones adicionales.",
   "modified": [
-    "public/app/features/v9-4-ticketauto-compras.js",
+    "public/app/features/v9-5-ticketauto-compras.js",
     "public/app/features/v8-5-compras-rpc-head-fix40.js",
     "services/receipt-ai.service.js",
     "lib/supabase-normalized.js",
@@ -14,7 +14,7 @@
     "package-lock.json"
   ],
   "checks": [
-    "node --check public/app/features/v9-4-ticketauto-compras.js",
+    "node --check public/app/features/v9-5-ticketauto-compras.js",
     "node --check services/receipt-ai.service.js",
     "node --check routes/crud.routes.js",
     "node --check lib/supabase-normalized.js",

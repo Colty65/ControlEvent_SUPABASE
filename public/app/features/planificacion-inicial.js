@@ -1,9 +1,9 @@
-/* ControlEvent v9.4_prod - Planificación inicial por réplica de evento FINALIZADO.
+/* ControlEvent v9.5_prod - Planificación inicial por réplica de evento FINALIZADO.
    La propuesta revisable ya puede crear el evento real con ingresos, compras y donaciones replicadas.
    Mantiene la lógica simple: un evento finalizado como modelo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v9.4_prod';
+  const VERSION = 'ControlEvent v9.5_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -635,7 +635,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v9.4_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v9.5_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {
