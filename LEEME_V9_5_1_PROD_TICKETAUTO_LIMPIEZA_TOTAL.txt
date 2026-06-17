@@ -1,4 +1,4 @@
-ControlEvent v9.5.2_prod
+ControlEvent v9.6_prod
 ==========================
 
 Cambios incluidos:

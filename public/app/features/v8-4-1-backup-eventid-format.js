@@ -1,11 +1,11 @@
-/* ControlEvent v9.5.2_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
+/* ControlEvent v9.6_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
    - EVENTOS ya no exporta EVENTO_CODIGO.
    - En hojas relacionales, EVENTO_CODIGO contiene el id real de ce_eventos.
    - La importación acepta el nuevo formato y conserva EVENTO_ID. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v9.5.2_prod';
-  const VERSION_FILE = 'ControlEvent_v9_5_2_prod';
+  const VERSION = 'ControlEvent v9.6_prod';
+  const VERSION_FILE = 'ControlEvent_v9_6_prod';
   const INSTALLED = '__ceV841BackupEventIdFormat';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

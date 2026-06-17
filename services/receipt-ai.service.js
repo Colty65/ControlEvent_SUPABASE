@@ -1,4 +1,4 @@
-/* ControlEvent v9.5.2_prod - Alta asistida para lectura de tickets de compra.
+/* ControlEvent v9.6_prod - Alta asistida para lectura de tickets de compra.
    FIX v9.5: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -51,6 +51,7 @@ function normalizeAnalysis(raw = {}) {
     proveedor: raw.proveedor || raw.comercio || raw.tienda || raw.store || '',
     responsable: raw.responsable || raw.responsableNombre || raw.encargado || raw.persona || raw.responsible || '',
     fecha: raw.fecha || raw.date || '',
+    ticket: raw.ticket || raw.tk || raw.ticketDonacion || raw.codigoTicket || raw.numeroTicket || '',
     total: money(raw.total || raw.importe_total || raw.amount_total || 0),
     productos,
     advertencias: Array.isArray(raw.advertencias) ? raw.advertencias : [],
@@ -71,6 +72,7 @@ Formato obligatorio:
   "proveedor": "nombre comercio si aparece",
   "responsable": "nombre responsable si el usuario lo indica o aparece, si no cadena vacía",
   "fecha": "YYYY-MM-DD si aparece o cadena vacía",
+  "ticket": "TKxx si aparece escrito en la foto o en indicaciones, si no cadena vacía",
   "total": numero,
   "productos": [
     {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "segmento":"", "destino":"", "confianza":numero_0_a_1, "notas":""}
@@ -79,6 +81,7 @@ Formato obligatorio:
 }
 
 Reglas principales:
+- Si aparece escrito en la foto o en las indicaciones un patrón TKxx (por ejemplo TK01, TK1, TK 01), devuélvelo en el campo ticket normalizado como TK01.
 - Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.
 - Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.
 - Si hay cantidad x precio, pon unidades, precio unitario e importe final de esa línea.
@@ -186,6 +189,7 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
           properties: {
             proveedor: { type: 'string' },
             responsable: { type: 'string' },
+            ticket: { type: 'string' },
             fecha: { type: 'string' },
             total: { type: 'number' },
             productos: {
@@ -209,7 +213,7 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
             },
             advertencias: { type: 'array', items: { type: 'string' } }
           },
-          required: ['proveedor', 'responsable', 'fecha', 'total', 'productos', 'advertencias']
+          required: ['proveedor', 'responsable', 'fecha', 'ticket', 'total', 'productos', 'advertencias']
         }
       }
     }
@@ -250,6 +254,7 @@ function ticketSchemaRest() {
     properties: {
       proveedor: { type: 'STRING', description: 'Nombre de la tienda o supermercado' },
       responsable: { type: 'STRING', description: 'Nombre del responsable indicado por el usuario, si lo hay' },
+      ticket: { type: 'STRING', description: 'TKxx detectado en la foto o indicado por el usuario, normalizado como TK01' },
       fecha: { type: 'STRING', description: 'Fecha de compra en formato YYYY-MM-DD, si aparece' },
       total: { type: 'NUMBER', description: 'Importe total del ticket' },
       productos: {
@@ -273,7 +278,7 @@ function ticketSchemaRest() {
       },
       advertencias: { type: 'ARRAY', items: { type: 'STRING' } }
     },
-    required: ['proveedor', 'responsable', 'productos', 'total']
+    required: ['proveedor', 'responsable', 'ticket', 'productos', 'total']
   };
 }
 function decorateGeminiError(err, model, payload) {
@@ -350,7 +355,7 @@ async function callGemini({ dataUrl, instrucciones = '', responsables = [], tien
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v9.5.2_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v9.6_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -382,7 +387,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v9.5.2_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v9.6_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;

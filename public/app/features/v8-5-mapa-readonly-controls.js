@@ -1,10 +1,10 @@
-/* ControlEvent v9.5.2_prod - Mapa de recursos: filtros/buscador activos en solo lectura.
+/* ControlEvent v9.6_prod - Mapa de recursos: filtros/buscador activos en solo lectura.
    Alcance: solo Mapa de Recursos. No toca datos, BACKUP, INFOEVENTO ni Documentos.
    Permite seleccionar responsables, buscar y usar los botones locales de Entregado/Comprado
    aunque el evento esté Finalizado o el usuario sea RO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v9.5.2_prod mapa-readonly-controls-2';
+  const VERSION = 'ControlEvent v9.6_prod mapa-readonly-controls-2';
   const PANEL_ID = 'tabMapaProductos';
   const STYLE_ID = 'ceV85MapaReadonlyControlsStyle';
   const CONTROL_SELECTOR = [

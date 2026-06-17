@@ -2,7 +2,7 @@
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV952TicketAutoComprasTotalCleanCompactFix';
+  var TAG='__ceV96TicketAutoComprasTotalCleanCompactFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -49,8 +49,8 @@
     });
   }
   function css(){
-    if($('ceV952TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV952TicketAiStyle';
+    if($('ceV96TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV96TicketAiStyle';
     st.textContent='\n'+
       '.ce-ai-ticket-btn{font-weight:900;font-size:22px;width:46px;min-width:46px;height:40px;min-height:40px;padding:4px 7px;margin-left:auto;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
@@ -93,6 +93,8 @@
     st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n";
 
     st.textContent += '\n.ce-ai-trash-btn{width:30px!important;min-width:30px!important;height:28px!important;min-height:28px!important;padding:0!important;border-radius:8px!important;font-size:16px!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}\n.ce-ai-trash-btn::after{content:""!important;font-size:0!important}\n.ce-ai-table button.ce-ai-trash-btn{font-size:16px!important;padding:0!important}\n';
+
+    st.textContent += '\n@media (max-width:767px){.ce-ai-overlay{align-items:flex-start!important;padding:4px!important}.ce-ai-modal{width:99vw!important;max-height:98vh!important;padding:8px!important;border-radius:12px!important;overflow:auto!important}.ce-ai-head{position:sticky!important;top:0!important;background:#fff!important;z-index:8!important;padding-bottom:4px!important}.ce-ai-title{font-size:15px!important}.ce-ai-work{display:flex!important;flex-direction:column!important;gap:6px!important;overflow:visible!important}.ce-ai-left,.ce-ai-right{width:100%!important;min-width:0!important;overflow:visible!important;padding:6px!important;box-sizing:border-box!important}.ce-ai-photo-title{display:none!important}.ce-ai-photo-tools{justify-content:center!important;gap:6px!important}.ce-ai-photo-tools input{max-width:100%!important;font-size:12px!important;padding:5px!important}.ce-ai-photo-tools #ceAiZoomBtn{font-size:12px!important;padding:5px 7px!important}.ce-ai-preview{height:160px!important;min-height:120px!important;max-height:210px!important}.ce-ai-grid{grid-template-columns:1fr!important;gap:5px!important;margin-bottom:4px!important}.ce-ai-field label{font-size:11px!important;margin-bottom:1px!important}.ce-ai-field select{padding:5px!important;font-size:12px!important}.ce-ai-hintbox textarea{height:32px!important;min-height:32px!important;font-size:11px!important}.ce-ai-totalbar{grid-template-columns:1fr 1fr 1fr!important;gap:4px!important}.ce-ai-totalbox{padding:4px!important}.ce-ai-totalbox strong{font-size:9px!important}.ce-ai-totalbox span{font-size:12px!important}.ce-ai-table-wrap{max-height:220px!important;min-height:190px!important;overflow:auto!important}.ce-ai-table{font-size:10px!important;min-width:720px!important}.ce-ai-pending-box{min-height:220px!important}.ce-ai-pending-title{font-size:12px!important;align-items:flex-start!important}.ce-ai-pending-row{grid-template-columns:25px 1fr 74px 72px 70px!important;font-size:10px!important}.ce-ai-actions-bottom{padding-bottom:4px!important}.ce-ai-download-btn{display:none!important}}\n#ceAiDownloadPhoto{display:none!important}\n';
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -142,6 +144,18 @@
     sel.classList.toggle('ce-ai-ticket-used', isUsed);
     sel.title=isUsed ? ('Este TKxx ya está usado en COMPRAS para este evento ('+usedCount+' líneas).') : 'Selecciona el TKxx del ticket.';
   }
+  function ticketFromText(v){
+    var m=/\bTK\s*0*(\d{1,2})\b/i.exec(text(v||''));
+    if(!m) return '';
+    var n=Number(m[1]);
+    return n>=1 && n<=50 ? ('TK'+String(n).padStart(2,'0')) : '';
+  }
+  function applyTicketFromAi(value, hint){
+    var tk=ticketFromText(value) || ticketFromText(hint);
+    var sel=$('ceAiTicket');
+    if(tk && sel){ sel.value=tk; markTicketSelect(); return 'TK detectado: '+tk+'.'; }
+    return '';
+  }
   function sortLinesLikeTk(rows){
     // Mantener el orden visual del ticket/foto. La IA devuelve las líneas en ese orden y el usuario puede comprobarlas contra la imagen.
     return (rows || []).slice();
@@ -159,7 +173,7 @@
     btn.setAttribute('aria-label','Abrir Tickets IA');
     btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
     btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>';
-    btn.setAttribute('onclick','window.__ceOpenTicketAutoV952&&window.__ceOpenTicketAutoV952();return false;');
+    btn.setAttribute('onclick','window.__ceOpenTicketAutoV96&&window.__ceOpenTicketAutoV96();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     var header=document.querySelector('#tabCompras > .card > .toggle-row');
     var toggle=$('toggleComprasEvent');
@@ -176,7 +190,7 @@
         '<div class="ce-ai-work">'+
           '<aside class="ce-ai-left">'+
             '<div class="ce-ai-photo-title">Foto del ticket</div>'+ 
-            '<div class="ce-ai-photo-tools"><input id="ceAiFile" type="file" accept="image/*" capture="environment"><button type="button" id="ceAiZoomBtn" class="ce-ai-secondary">Ampliar foto</button><button type="button" id="ceAiDownloadPhoto" class="ce-ai-secondary ce-ai-download-btn">Descargar foto</button></div>'+ 
+            '<div class="ce-ai-photo-tools"><input id="ceAiFile" type="file" accept="image/*" capture="environment"><button type="button" id="ceAiZoomBtn" class="ce-ai-secondary">Ampliar foto</button></div>'+ 
             '<img id="ceAiPreview" class="ce-ai-preview" alt="Vista previa del ticket" style="display:none">'+
           '</aside>'+ 
           '<section class="ce-ai-right">'+
@@ -207,7 +221,7 @@
       $('ceAiProcess').addEventListener('click',processRows);
       $('ceAiReloadEvent').addEventListener('click',function(){ reloadEvent(false); });
       $('ceAiZoomBtn').addEventListener('click',openZoom);
-      $('ceAiDownloadPhoto').addEventListener('click',function(){ downloadCurrentTicketPhoto(); });
+      if($('ceAiDownloadPhoto')) $('ceAiDownloadPhoto').addEventListener('click',function(){ downloadCurrentTicketPhoto(); });
       $('ceAiPendingRefresh').addEventListener('click',function(){ renderPendingPurchases(); setStatus('Compras previstas actualizadas.','ok'); });
       if($('ceAiPendingSort')) $('ceAiPendingSort').addEventListener('change',renderPendingPurchases);
       $('ceAiPreview').addEventListener('click',openZoom);
@@ -474,9 +488,10 @@
     if(window.__ceV95TicketDownloadObserver) return;
     window.__ceV95TicketDownloadObserver=true;
     function enhance(root){
-      (root||document).querySelectorAll('img.ticket-thumb,img[src*="ticket-images"],img[src^="data:image/"]').forEach(function(img){
+      (root||document).querySelectorAll('#tabIngresos img.ticket-thumb,#tabIngresos img[src*="ticket-images"],#tabIngresos img[src^="data:image/"],#tabResumen img.ticket-thumb,#tabResumen img[src*="ticket-images"],#tabResumen img[src^="data:image/"],#summaryTiendaTicket img.ticket-thumb,#summaryTiendaTicket img[src*="ticket-images"]').forEach(function(img){
         if(!img || img.dataset.ceDownloadReady==='1') return;
         if(img.id==='ceAiPreview' || img.id==='ceAiZoomImg') return;
+        if(img.closest && img.closest('#ceBudgetLiteTooltipV307,#tabGraficas,#tabCompras,#tabDonaciones,#tabMapa,#ceAiTicketPanel')) return;
         img.dataset.ceDownloadReady='1';
         var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-ticket-download-v95'; btn.title='Descargar foto al ordenador'; btn.textContent='⬇️';
         btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); downloadSrc(img.currentSrc || img.src, 'ControlEvent_'+(img.alt||'foto_ticket')); });
@@ -525,11 +540,13 @@
       window.__ceAiTicketLines=sortLinesLikeTk(rows.map(function(r){ return enrichRowDefaults(Object.assign({ok:true},r)); }));
       var hintText=trim(($('ceAiGeminiHint')||{}).value);
       var tiendaMsg=applyStoreFromAi(data.proveedor || data.tienda || data.comercio || '');
+      var tkMsg=applyTicketFromAi(data.ticket || data.tk || data.ticketDonacion || data.codigoTicket || '', hintText);
       var respMsg=applyResponsibleFromAi(data.responsable || data.responsableNombre || data.encargado || '', hintText);
       renderRows();
       renderPendingPurchases();
       var msg='Análisis terminado: '+rows.length+' líneas detectadas.';
       if(tiendaMsg) msg+=' '+tiendaMsg;
+      if(tkMsg) msg+=' '+tkMsg;
       if(respMsg) msg+=' '+respMsg;
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.proveedorIa || data.modelo) msg+=' IA: '+(data.proveedorIa||'')+(data.modelo?' '+data.modelo:'')+'.';
@@ -563,12 +580,26 @@
       return idx>=0 ? s.productos[idx] : s.productos[s.productos.length-1];
     }
     if(existing){
-      // v9.5.2: ruta dedicada. Solo refresca último precio conocido y tienda habitual en PRODUCTOS.
-      return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id)+'/precio',{method:'PUT',headers:crudHeaders(),body:JSON.stringify({__crudRowOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||''})})
-        .then(function(data){ return mergeLocal(data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''})); })
-        .catch(function(err){
-          warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.');
-          return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''}));
+      // v9.6: doble vía segura para refrescar PRODUCTOS cuando ya existe.
+      // Primero usa la ruta específica y después fuerza el mismo cambio por el CRUD normal
+      // con __priceRefreshOnly, para cubrir instalaciones donde la ruta dedicada no refrescaba la tabla visible.
+      var body={__crudRowOnly:true,__priceRefreshOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||''};
+      var full=Object.assign({}, existing, body, {nombre:existing.nombre||name, segmento:existing.segmento||'', destino:existing.destino||''});
+      function genericUpdate(){
+        return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id),{method:'PUT',headers:crudHeaders(),body:JSON.stringify(full)})
+          .then(function(data){ return mergeLocal(data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''})); });
+      }
+      return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id)+'/precio',{method:'PUT',headers:crudHeaders(),body:JSON.stringify(body)})
+        .then(function(data){
+          var item=data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''});
+          mergeLocal(item);
+          return genericUpdate().catch(function(){ return mergeLocal(item); });
+        })
+        .catch(function(err1){
+          return genericUpdate().catch(function(err2){
+            warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+((err2&&err2.message)||(err1&&err1.message)||err2||err1)+'. La compra se grabará con el precio del ticket.');
+            return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''}));
+          });
         });
     }
     return apiJson('/api/crud/productos',{method:'POST',headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))})
@@ -602,7 +633,7 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.5.2 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.6 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
@@ -615,12 +646,12 @@
     ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); installTicketImageDownloadButtons(); }
-  window.__ceOpenTicketAutoV952=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV96=openPanel; window.__ceOpenTicketAutoV952=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.5.2 Alta IA] limpieza total + iconos compactos activos + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV952()');
+  console.info('[CE v9.6 Alta IA] limpieza total + iconos compactos activos + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV96()');
 })();

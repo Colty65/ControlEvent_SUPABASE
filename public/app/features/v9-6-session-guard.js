@@ -2,8 +2,8 @@
    Evita que la cabecera quede en "Sin acceso" dentro de una sesión activa por refrescos/renderizados tardíos. */
 (function(){
   'use strict';
-  if(window.__ceV952SessionGuard) return;
-  window.__ceV952SessionGuard = true;
+  if(window.__ceV96SessionGuard) return;
+  window.__ceV96SessionGuard = true;
   var KEY='ControlEvent_v9_6_prod_auth_shadow';
   var LOGOUT_UNTIL=0;
   function text(v){ return v==null?'':String(v); }
@@ -14,17 +14,17 @@
   function validUser(u){ return !!u && !!text(u.nivel).trim() && (!!text(u.nombre).trim() || !!text(u.identificacion).trim()); }
   function putShadow(u){
     if(!validUser(u)) return;
-    window.__ceAuthShadowV952 = u;
+    window.__ceAuthShadowV96 = u;
     safe(function(){ sessionStorage.setItem(KEY, JSON.stringify(u)); });
   }
   function getShadow(){
-    if(validUser(window.__ceAuthShadowV952)) return window.__ceAuthShadowV952;
+    if(validUser(window.__ceAuthShadowV96)) return window.__ceAuthShadowV96;
     var raw=safe(function(){ return sessionStorage.getItem(KEY); }, '');
     if(!raw) return null;
     try{ var u=JSON.parse(raw); return validUser(u) ? u : null; }catch(_){ return null; }
   }
   function clearShadow(){
-    window.__ceAuthShadowV952=null;
+    window.__ceAuthShadowV96=null;
     safe(function(){ sessionStorage.removeItem(KEY); });
   }
   function setAuth(u){
@@ -58,12 +58,12 @@
     if(shadow && visibleData()){
       setAuth(shadow);
       updateHeader(shadow);
-      safe(function(){ window.dispatchEvent(new CustomEvent('controlevent:auth-restored-v952',{detail:{user:shadow}})); });
+      safe(function(){ window.dispatchEvent(new CustomEvent('controlevent:auth-restored-v96',{detail:{user:shadow}})); });
     }
   }
   document.addEventListener('click', function(ev){ if(ev.target && ev.target.closest && ev.target.closest('#btnLogout,[data-ce-logout],#ceBtnSalirV513')){ LOGOUT_UNTIL=Date.now()+20000; clearShadow(); } }, true);
-  if(typeof window.fetch==='function' && !window.__ceV952SessionGuardFetch){
-    window.__ceV952SessionGuardFetch=true;
+  if(typeof window.fetch==='function' && !window.__ceV96SessionGuardFetch){
+    window.__ceV96SessionGuardFetch=true;
     var oldFetch=window.fetch.bind(window);
     window.fetch=function(input, init){
       var url=text((input && input.url) || input || '');
@@ -78,9 +78,9 @@
     };
   }
   var oldLogout = window.doLogout;
-  if(typeof oldLogout === 'function' && !oldLogout.__ceV952Wrapped){
+  if(typeof oldLogout === 'function' && !oldLogout.__ceV96Wrapped){
     var wrapped=function(){ LOGOUT_UNTIL=Date.now()+20000; clearShadow(); return oldLogout.apply(this, arguments); };
-    wrapped.__ceV952Wrapped=true;
+    wrapped.__ceV96Wrapped=true;
     safe(function(){ doLogout=wrapped; });
     window.doLogout=wrapped;
   }
@@ -88,5 +88,5 @@
   window.addEventListener('controlevent:runtime-ready', tick, false);
   window.addEventListener('focus', tick, false);
   setInterval(tick, 900);
-  console.info('[CE v9.5.2] Guardia de sesión activa');
+  console.info('[CE v9.6] Guardia de sesión activa');
 })();
