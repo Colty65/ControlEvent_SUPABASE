@@ -1,4 +1,4 @@
-import { applyCrudDeltas, closeEventCorrectionCrud, deleteCrudRecord, openComprasCorrectionCrud, updateEventSituationCrud, upsertCrudRecord } from '../lib/supabase-normalized.js';
+import { applyCrudDeltas, closeEventCorrectionCrud, deleteCrudRecord, openComprasCorrectionCrud, updateEventSituationCrud, updateProductPriceCrud, upsertCrudRecord } from '../lib/supabase-normalized.js';
 
 export function upsertRecord(collection, payload) {
   return upsertCrudRecord(collection, payload || {});
@@ -23,4 +23,8 @@ export function openComprasCorrection(id, minutes, reason) {
 
 export function closeEventCorrection(id) {
   return closeEventCorrectionCrud(id);
+}
+
+export function updateProductPrice(id, payload) {
+  return updateProductPriceCrud(id, payload || {});
 }

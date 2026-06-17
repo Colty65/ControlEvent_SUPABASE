@@ -1,4 +1,4 @@
-ControlEvent v9.5.1_prod
+ControlEvent v9.5.2_prod
 ==========================
 
 Cambios incluidos:
@@ -35,7 +35,7 @@ Cambios incluidos:
 - Los avisos técnicos quedan como consola, no como cartel inferior molesto.
 
 Ficheros principales:
-- public/app/features/v9-5-1-ticketauto-compras.js
+- public/app/features/v9-5-2-ticketauto-compras.js
 - public/app/features/v9-5-1-login-event-clean.js
 - index.html
 - public/index.html

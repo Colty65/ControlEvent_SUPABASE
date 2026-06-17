@@ -1,22 +1,22 @@
-/* ControlEvent v9.5.1_prod - correccion minima sobre la base estable v50.20.
+/* ControlEvent v9.5.2_prod - correccion minima sobre la base estable v50.20.
    - No carga la capa v50.21 que bloqueaba la seleccion de evento.
    - Salir limpia el evento anterior antes de volver a Login.
    - Tras login queda CE + Selecciona evento; al elegir evento no se vuelve a bloquear.
    - La version visible y exportada queda unificada mediante constantes actualizadas en bundles. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v9.5.1_prod';
-  const VERSION_FILE = 'ControlEvent_v9_5_1_prod';
+  const VERSION = 'ControlEvent v9.5.2_prod';
+  const VERSION_FILE = 'ControlEvent_v9_5_2_prod';
   const INSTALLED = '__ceV5022FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
   const WELCOME_FLAG = 'controlevent_v5022_force_welcome_after_login';
   const USER_PICKED_FLAG = 'controlevent_v5022_user_picked_event';
-  const SESSION_KEYS = ['ControlEvent_v9_5_1_prod_session','ControlEvent_v9_5_1_prod_session'];
-  const SELECT_KEYS = ['controlevent_v229_selected_event_id','ControlEvent_v9_5_1_prod_selected_event','ControlEvent_v9_5_1_prod_selected_event'];
+  const SESSION_KEYS = ['ControlEvent_v9_5_2_prod_session','ControlEvent_v9_5_2_prod_session'];
+  const SELECT_KEYS = ['controlevent_v229_selected_event_id','ControlEvent_v9_5_2_prod_selected_event','ControlEvent_v9_5_2_prod_selected_event'];
   const CHOSEN_KEYS = [
-    'ce_v250_event_chosen','controlevent_v44_event_chosen_after_login','ControlEvent_v9_5_1_prod_event_chosen','ControlEvent_v9_5_1_prod_event_chosen','ControlEvent_v9_5_1_prod_event_chosen',
+    'ce_v250_event_chosen','controlevent_v44_event_chosen_after_login','ControlEvent_v9_5_2_prod_event_chosen','ControlEvent_v9_5_2_prod_event_chosen','ControlEvent_v9_5_2_prod_event_chosen',
     'ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event',
     USER_PICKED_FLAG
   ];

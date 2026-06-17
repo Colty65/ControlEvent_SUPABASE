@@ -1,4 +1,4 @@
-/* ControlEvent v9.5.1_prod - Baja segura de evento con eliminación en cascada controlada.
+/* ControlEvent v9.5.2_prod - Baja segura de evento con eliminación en cascada controlada.
    Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
@@ -67,7 +67,7 @@
     // Segunda pasada no bloqueante: cubre retardos de guardado remoto o cualquier handler legado que haya persistido tarde.
     window.setTimeout(() => {
       deleteTicketImagesServer(eventId).catch(error => {
-        console.warn('[ControlEvent v9.5.1_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
+        console.warn('[ControlEvent v9.5.2_prod] Limpieza diferida de CE_TICKET_IMAGES no bloqueante:', error?.message || error);
       });
     }, 1400);
   }

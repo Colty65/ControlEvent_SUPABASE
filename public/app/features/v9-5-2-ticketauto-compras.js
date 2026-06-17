@@ -2,7 +2,7 @@
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV94TicketAutoComprasGeminiPracticalFix';
+  var TAG='__ceV952TicketAutoComprasTotalCleanCompactFix';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -49,35 +49,35 @@
     });
   }
   function css(){
-    if($('ceV94TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV94TicketAiStyle';
+    if($('ceV952TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV952TicketAiStyle';
     st.textContent='\n'+
-      '.ce-ai-ticket-btn{font-weight:900;font-size:20px;min-width:48px;min-height:42px;padding:8px 11px;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
+      '.ce-ai-ticket-btn{font-weight:900;font-size:22px;width:46px;min-width:46px;height:40px;min-height:40px;padding:4px 7px;margin-left:auto;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
       '.ce-ai-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:8px}\n'+
       '.ce-ai-overlay.open{display:flex}\n'+
       '.ce-ai-modal{width:min(1540px,99vw);max-height:96vh;overflow:hidden;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);border:2px solid #fb923c;padding:14px;display:flex;flex-direction:column}\n'+
       '.ce-ai-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:8px;flex:0 0 auto}\n'+
-      '.ce-ai-title{font-size:20px;font-weight:900;color:#7c2d12}.ce-ai-sub{font-size:13px;color:#475569;margin-top:3px}\n'+
+      '.ce-ai-title{font-size:20px;font-weight:900;color:#7c2d12}.ce-ai-sub{display:none!important}\n'+
       '.ce-ai-status{padding:8px 10px;border-radius:10px;margin:6px 0 10px 0;font-weight:800;flex:0 0 auto}.ce-ai-status.ok{background:#dcfce7;color:#166534}.ce-ai-status.err{background:#fee2e2;color:#991b1b}.ce-ai-status.info{background:#dbeafe;color:#1e3a8a}.ce-ai-status.warn{background:#fef3c7;color:#92400e}\n'+
       '.ce-ai-work{display:grid;grid-template-columns:minmax(315px,36%) minmax(610px,1fr);gap:12px;min-height:0;overflow:hidden}.ce-ai-left,.ce-ai-right{min-height:0}.ce-ai-left{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}.ce-ai-right{display:flex;flex-direction:column;min-width:0;overflow:auto;padding-right:2px}\n'+
       '.ce-ai-photo-title{font-weight:900;color:#334155;font-size:13px}.ce-ai-photo-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ce-ai-photo-tools input{max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:7px;background:#fff}.ce-ai-preview{width:100%;height:calc(96vh - 250px);min-height:360px;max-height:760px;border-radius:12px;border:1px solid #cbd5e1;object-fit:contain;background:#fff;cursor:zoom-in}.ce-ai-preview.empty{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 12px,#eef2f7 12px,#eef2f7 24px)}\n'+
       '.ce-ai-grid{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;margin:0 0 10px 0}.ce-ai-field label{font-weight:800;font-size:12px;color:#334155;display:block;margin-bottom:3px}.ce-ai-field input,.ce-ai-field select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:#fff}\n'+
       '.ce-ai-ticket-used{background:#dcfce7!important;color:#166534!important;font-weight:900!important;border-color:#86efac!important}\n'+
-      '.ce-ai-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.ce-ai-actions button,.ce-ai-photo-tools button{border-radius:10px;padding:8px 12px;font-weight:800}.ce-ai-primary{background:#f97316;color:#fff;border:1px solid #ea580c}.ce-ai-secondary{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}.ce-ai-danger{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}\n'+
+      '.ce-ai-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}.ce-ai-actions button,.ce-ai-photo-tools button{border-radius:10px;padding:6px 9px;font-weight:800}.ce-ai-icon-btn{width:42px!important;min-width:42px!important;height:38px!important;min-height:38px!important;padding:4px!important;font-size:22px!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}.ce-ai-icon-btn span{display:inline-block;line-height:1!important}.ce-ai-primary{background:#f97316;color:#fff;border:1px solid #ea580c}.ce-ai-secondary{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}.ce-ai-danger{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}\n'+
       '.ce-ai-totalbar{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:8px;margin:8px 0}.ce-ai-totalbox{border:1px solid #e2e8f0;border-radius:12px;background:#fff7ed;padding:8px 10px}.ce-ai-totalbox strong{display:block;color:#7c2d12;font-size:12px}.ce-ai-totalbox span{font-size:18px;font-weight:900;color:#0f172a}.ce-ai-totalbox.diff-ok{background:#dcfce7}.ce-ai-totalbox.diff-warn{background:#fee2e2}\n'+
-      '.ce-ai-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;max-height:calc(96vh - 340px);min-height:130px}.ce-ai-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.ce-ai-table th{background:#ffedd5;color:#7c2d12;text-align:left;padding:7px;position:sticky;top:0;z-index:1}.ce-ai-table td{padding:6px;border-top:1px solid #e2e8f0;vertical-align:middle}.ce-ai-table input,.ce-ai-table select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:6px}.ce-ai-table .col-ok{width:46px}.ce-ai-table .col-prod{width:auto}.ce-ai-table .col-attr{width:126px}.ce-ai-table .col-num{width:88px}.ce-ai-table .col-conf{width:62px}.ce-ai-table .col-del{width:82px}.ce-ai-table input[readonly]{background:#f1f5f9;color:#0f172a;font-weight:900}.ce-ai-row-low{background:#fff7ed}.ce-ai-row-ok{background:#f8fafc}.ce-ai-new-product input[data-ce-ai-field=\"segmento\"],.ce-ai-new-product input[data-ce-ai-field=\"destino\"]{border-color:#fb923c;background:#fff7ed}.ce-ai-existing-product input[data-ce-ai-field=\"segmento\"],.ce-ai-existing-product input[data-ce-ai-field=\"destino\"]{background:#f1f5f9;color:#475569}\n'+
-      '.ce-ai-hintbox{border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;padding:8px 10px;margin:0 0 8px 0}.ce-ai-hintbox label{display:block;font-weight:900;color:#7c2d12;font-size:12px;margin-bottom:4px}.ce-ai-hintbox textarea{width:100%;box-sizing:border-box;min-height:58px;resize:vertical;border:1px solid #fdba74;border-radius:10px;padding:8px;font-family:inherit}.ce-ai-muted{font-size:12px;color:#64748b;font-weight:700;margin-top:3px}\n'+
+      '.ce-ai-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;max-height:calc(96vh - 340px);min-height:130px}.ce-ai-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.ce-ai-table th{background:#ffedd5;color:#7c2d12;text-align:left;padding:7px;position:sticky;top:0;z-index:1}.ce-ai-table td{padding:6px;border-top:1px solid #e2e8f0;vertical-align:middle}.ce-ai-table input,.ce-ai-table select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:6px}.ce-ai-table .col-ok{width:46px}.ce-ai-table .col-prod{width:auto}.ce-ai-table .col-attr{width:126px}.ce-ai-table .col-num{width:88px}.ce-ai-table .col-conf{width:62px}.ce-ai-table .col-del{width:46px}.ce-ai-table input[readonly]{background:#f1f5f9;color:#0f172a;font-weight:900}.ce-ai-row-low{background:#fff7ed}.ce-ai-row-ok{background:#f8fafc}.ce-ai-new-product [data-ce-ai-field=\"segmento\"],.ce-ai-new-product [data-ce-ai-field=\"destino\"]{border-color:#fb923c;background:#fff7ed}.ce-ai-existing-product [data-ce-ai-field=\"segmento\"],.ce-ai-existing-product [data-ce-ai-field=\"destino\"]{background:#f1f5f9;color:#475569}\n'+
+      '.ce-ai-hintbox{border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;padding:6px 9px;margin:0 0 6px 0}.ce-ai-hintbox label{display:block;font-weight:900;color:#7c2d12;font-size:12px;margin-bottom:3px}.ce-ai-hintbox textarea{width:100%;box-sizing:border-box;min-height:48px;resize:vertical;border:1px solid #fdba74;border-radius:10px;padding:7px;font-family:inherit}.ce-ai-muted{font-size:12px;color:#64748b;font-weight:700;margin-top:3px}\n'+
       '.ce-ai-pending-box{margin-top:10px;border:1px solid #bae6fd;background:#f0f9ff;border-radius:14px;padding:10px}.ce-ai-pending-title{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:900;color:#075985}.ce-ai-pending-sub{font-size:12px;color:#0369a1;margin-top:3px}.ce-ai-pending-list{margin-top:8px;max-height:170px;overflow:auto}.ce-ai-pending-row{display:grid;grid-template-columns:42px 1fr 92px 98px;gap:8px;align-items:center;border-top:1px solid #bae6fd;padding:6px 0;font-size:12px}.ce-ai-pending-row:first-child{border-top:none}.ce-ai-pending-row strong{color:#0f172a}.ce-ai-download-btn{white-space:nowrap}\n'+
       '.ce-ai-zoom{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:10020;padding:16px}.ce-ai-zoom.open{display:flex}.ce-ai-zoom img{max-width:96vw;max-height:92vh;object-fit:contain;background:#fff;border-radius:10px}.ce-ai-zoom button{position:absolute;right:18px;top:18px;border-radius:10px;padding:9px 13px;font-weight:900;border:1px solid #cbd5e1;background:#fff;color:#0f172a}\n'+
       '@media(max-width:980px){.ce-ai-modal{overflow:auto}.ce-ai-work{grid-template-columns:1fr;overflow:visible}.ce-ai-right{overflow:visible}.ce-ai-grid{grid-template-columns:1fr}.ce-ai-preview{height:45vh;min-height:260px}.ce-ai-table-wrap{max-height:55vh}.ce-ai-totalbar{grid-template-columns:1fr}}\n'+
       '@media(max-width:760px){.ce-ai-modal{padding:10px}.ce-ai-title{font-size:17px}.ce-ai-table{font-size:12px}.ce-ai-table .col-num{width:74px}.ce-ai-table .col-attr{width:102px}.ce-ai-table .col-conf{width:52px}.ce-ai-table .col-del{width:70px}}\n';
     st.textContent += '\n'+
       '#ceFix46Toast,#ceFix39Toast,#ceFix38Toast{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}\n'+
-      '.ce-ai-ticket-btn{margin-left:auto;min-width:132px;gap:7px;border-color:#fb923c!important;background:linear-gradient(135deg,#fff7ed,#fed7aa)!important;color:#9a3412!important}\n'+
+      '.ce-ai-ticket-btn{margin-left:auto!important;width:46px!important;min-width:46px!important;height:40px!important;gap:0!important;border-color:#fb923c!important;background:linear-gradient(135deg,#fff7ed,#fed7aa)!important;color:#9a3412!important}\n'+
       '#tabCompras>.card>.toggle-row .ce-ai-ticket-btn{align-self:center;justify-self:flex-end}\n'+
       '.ce-ai-modal{width:min(1680px,99.5vw);padding:10px!important}\n'+
-      '.ce-ai-head{margin-bottom:4px!important}.ce-ai-title{font-size:18px!important}.ce-ai-sub{font-size:12px!important}\n'+
+      '.ce-ai-head{margin-bottom:4px!important}.ce-ai-title{font-size:18px!important}.ce-ai-sub{display:none!important}\n'+
       '.ce-ai-status{padding:6px 9px!important;margin:4px 0 7px 0!important;font-size:12px!important}\n'+
       '.ce-ai-work{grid-template-columns:minmax(270px,32%) minmax(720px,1fr)!important;gap:10px!important}\n'+
       '.ce-ai-left{padding:8px!important;gap:6px!important}.ce-ai-preview{height:calc(96vh - 220px)!important;min-height:315px!important}\n'+
@@ -86,10 +86,13 @@
       '.ce-ai-actions{gap:6px!important;margin:6px 0!important}.ce-ai-actions button,.ce-ai-photo-tools button{padding:6px 9px!important;border-radius:9px!important}\n'+
       '.ce-ai-totalbar{gap:6px!important;margin:6px 0!important}.ce-ai-totalbox{padding:6px 8px!important}.ce-ai-totalbox span{font-size:16px!important}.ce-ai-totalbox strong{font-size:11px!important}\n'+
       '.ce-ai-table-wrap{max-height:230px!important;min-height:92px!important}.ce-ai-table{font-size:12px!important}.ce-ai-table th{padding:4px 5px!important}.ce-ai-table td{padding:3px 5px!important}.ce-ai-table input,.ce-ai-table select{padding:4px 5px!important;border-radius:7px!important}\n'+
-      '.ce-ai-table .col-ok{width:34px!important}.ce-ai-table .col-attr{width:105px!important}.ce-ai-table .col-num{width:70px!important}.ce-ai-table .col-conf{width:48px!important}.ce-ai-table .col-del{width:66px!important}\n'+
-      '.ce-ai-table button.ce-ai-danger{padding:5px 7px!important;font-size:12px!important;border-radius:10px!important}\n'+
+      '.ce-ai-table .col-ok{width:34px!important}.ce-ai-table .col-attr{width:112px!important}.ce-ai-table .col-num{width:68px!important}.ce-ai-table .col-conf{width:44px!important}.ce-ai-table .col-del{width:52px!important}\n'+
+      '.ce-ai-table button.ce-ai-danger{padding:4px 6px!important;font-size:0!important;border-radius:10px!important}.ce-ai-table button.ce-ai-danger::after{content:"✖";font-size:13px!important;}\n'+
       '.ce-ai-pending-box{margin-top:7px!important;padding:8px!important}.ce-ai-pending-title{font-size:15px!important}.ce-ai-pending-tools{display:flex;align-items:center;gap:6px;margin-left:auto}.ce-ai-pending-tools label{font-size:11px;color:#0369a1;font-weight:900}.ce-ai-pending-tools select{border:1px solid #bae6fd;border-radius:8px;padding:5px;background:#fff;font-weight:800}\n'+
       '.ce-ai-pending-list{max-height:230px!important;margin-top:5px!important}.ce-ai-pending-row{grid-template-columns:30px minmax(120px,1fr) minmax(96px,150px) 96px 90px!important;gap:6px!important;padding:4px 0!important;font-size:12px!important}\n';
+    st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n";
+
+    st.textContent += '\n.ce-ai-trash-btn{width:30px!important;min-width:30px!important;height:28px!important;min-height:28px!important;padding:0!important;border-radius:8px!important;font-size:16px!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}\n.ce-ai-trash-btn::after{content:""!important;font-size:0!important}\n.ce-ai-table button.ce-ai-trash-btn{font-size:16px!important;padding:0!important}\n';
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -155,8 +158,8 @@
     btn.setAttribute('data-ce-ai-ticket-open','1');
     btn.setAttribute('aria-label','Abrir Tickets IA');
     btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
-    btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span><span>Tickets IA</span>';
-    btn.setAttribute('onclick','window.__ceOpenTicketAutoV95&&window.__ceOpenTicketAutoV95();return false;');
+    btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>';
+    btn.setAttribute('onclick','window.__ceOpenTicketAutoV952&&window.__ceOpenTicketAutoV952();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     var header=document.querySelector('#tabCompras > .card > .toggle-row');
     var toggle=$('toggleComprasEvent');
@@ -169,8 +172,7 @@
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
-        '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
+        '<div class="ce-ai-head"><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div id="ceAiStatus" class="ce-ai-status info"></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+ 
         '<div class="ce-ai-work">'+
           '<aside class="ce-ai-left">'+
             '<div class="ce-ai-photo-title">Foto del ticket</div>'+ 
@@ -183,13 +185,13 @@
               '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
               '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
             '</div>'+ 
-            '<div class="ce-ai-hintbox"><label>Indicaciones adicionales para Gemini</label><textarea id="ceAiGeminiHint" placeholder="Ej.: en esta factura los importes de línea vienen sin IVA; deduce el precio final repartiendo el IVA general si procede."></textarea><div class="ce-ai-muted">Estas indicaciones se envían solo para el análisis de la foto actual.</div></div>'+
-            '<div class="ce-ai-actions"><button type="button" id="ceAiAnalyze" class="ce-ai-primary">Analizar foto con IA</button><button type="button" id="ceAiAddRow" class="ce-ai-secondary">Añadir fila manual</button><button type="button" id="ceAiClear" class="ce-ai-danger">Limpiar</button></div>'+ 
+            '<div class="ce-ai-hintbox"><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan Pérez; añade PROPINAS 1 ud 73,05 €; aplica IVA general a las líneas si procede."></textarea></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-top"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" aria-label="Analizar foto con IA"><span aria-hidden="true">🤖</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Añadir fila manual"><span aria-hidden="true">🤚＋</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" aria-label="Limpiar"><span aria-hidden="true">🧹</span></button></div>'+ 
             '<datalist id="ceAiProducts"></datalist><datalist id="ceAiSegmentos"></datalist><datalist id="ceAiDestinos"></datalist>'+ 
             '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
             '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
-            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas pendientes del evento</span><div class="ce-ai-pending-tools"><label>Ordenar</label><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary">Actualizar</button></div></div><div class="ce-ai-pending-sub">Marca cualquier registro Pte.Compra del evento que ya queda sustituido por este ticket real.</div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
-            '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary">Procesar y llevar a COMPRAS</button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary">Recargar evento</button></div>'+ 
+            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas del evento. Marca para eliminar las ya compradas en este ticket</span><div class="ce-ai-pending-tools"><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Actualizar compras previstas">🔄</button></div></div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-bottom"><button type="button" id="ceAiProcess" class="ce-ai-primary ce-ai-icon-btn" aria-label="Procesar y llevar a COMPRAS"><span aria-hidden="true">⚙️⚙️</span></button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Recargar evento"><span aria-hidden="true">🔋↻</span></button></div>'+ 
           '</section>'+ 
         '</div>'+ 
       '</div>'+
@@ -206,7 +208,7 @@
       $('ceAiReloadEvent').addEventListener('click',function(){ reloadEvent(false); });
       $('ceAiZoomBtn').addEventListener('click',openZoom);
       $('ceAiDownloadPhoto').addEventListener('click',function(){ downloadCurrentTicketPhoto(); });
-      $('ceAiPendingRefresh').addEventListener('click',renderPendingPurchases);
+      $('ceAiPendingRefresh').addEventListener('click',function(){ renderPendingPurchases(); setStatus('Compras previstas actualizadas.','ok'); });
       if($('ceAiPendingSort')) $('ceAiPendingSort').addEventListener('change',renderPendingPurchases);
       $('ceAiPreview').addEventListener('click',openZoom);
       $('ceAiZoomClose').addEventListener('click',closeZoom);
@@ -215,7 +217,7 @@
     refreshRole(); updateTotals();
   }
   function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
-  function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg; } }
+  function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg||''; el.title=msg||''; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
     var oldT=tienda ? trim(tienda.value) : ''; var oldR=resp ? trim(resp.value) : '';
@@ -224,34 +226,38 @@
     var dl=$('ceAiProducts'); if(dl){ var ps=sortedByName(arr('productos')); dl.innerHTML=ps.map(function(p){return '<option value="'+htmlEscape(p.nombre||'')+'"></option>';}).join(''); }
     var seg=$('ceAiSegmentos'); if(seg){ seg.innerHTML=uniqueProductValues('segmento').map(function(v){return '<option value="'+htmlEscape(v)+'"></option>';}).join(''); }
     var des=$('ceAiDestinos'); if(des){ des.innerHTML=uniqueProductValues('destino').map(function(v){return '<option value="'+htmlEscape(v)+'"></option>';}).join(''); }
-    renderPendingPurchases();
     var used=usedTicketMap(); var sel=$('ceAiTicket');
-    if(sel){ var current=trim(sel.value).toUpperCase(); var next='TK01'; for(var i=1;i<=50;i++){ var tk='TK'+String(i).padStart(2,'0'); if(!used[tk]){ next=tk; break; } } var keep=current || next; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
+    if(sel){ var current=trim(sel.value).toUpperCase(); var keep=current || ''; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
   }
   function openPanel(){
     if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
-    ensureUi(); fillSelects(); $('ceAiTicketPanel').classList.add('open'); updateTotals(); renderPendingPurchases(); installTicketImageDownloadButtons();
+    ensureUi(); fillSelects(); resetPanelState(true); $('ceAiTicketPanel').classList.add('open'); updateTotals(); installTicketImageDownloadButtons();
   }
   function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); }
   function openZoom(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); if(!src){ setStatus('Carga primero una foto para ampliarla.','warn'); return; } var img=$('ceAiZoomImg'), p=$('ceAiZoomPanel'); if(img) img.src=src; if(p) p.classList.add('open'); }
   function closeZoom(){ var p=$('ceAiZoomPanel'); if(p) p.classList.remove('open'); }
   function fileChanged(){
     var f=$('ceAiFile').files && $('ceAiFile').files[0]; if(!f) return;
-    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada. Puedes ampliarla a la izquierda, analizar con IA o añadir filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
+    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } window.__ceAiDetectedTotal=0; updateTotals(); setStatus('Foto cargada.','ok'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
   }
-  function clearRows(){
+  function resetPanelState(silent){
     window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; window.__ceAiDetectedTotal=0;
     if($('ceAiFile')) $('ceAiFile').value='';
     if($('ceAiPreview')){ $('ceAiPreview').src=''; $('ceAiPreview').style.display='none'; }
     if($('ceAiGeminiHint')) $('ceAiGeminiHint').value='';
-    try{ fillSelects(); }catch(_){}
+    if($('ceAiTicket')) $('ceAiTicket').value='';
     if($('ceAiTienda')) $('ceAiTienda').value='';
     if($('ceAiResponsable')) $('ceAiResponsable').value='';
-    renderRows(); updateTotals();
-    if($('ceAiPendingList')) $('ceAiPendingList').innerHTML='<div class="ce-ai-muted">Panel limpio. Las compras pendientes se cargarán de nuevo al analizar, actualizar o reabrir Tickets IA.</div>';
-    setStatus('Panel limpio.','info');
+    if($('ceAiPendingSort')) $('ceAiPendingSort').value='tienda';
+    if($('ceAiPendingList')) $('ceAiPendingList').innerHTML='';
+    renderRows(); updateTotals(); markTicketSelect();
+    setStatus(silent ? '' : 'Limpio.','ok');
+  }
+  function clearRows(){
+    try{ fillSelects(); }catch(_){}
+    resetPanelState(false);
   }
   function updateRowImport(tr){
     if(!tr) return 0;
@@ -296,13 +302,13 @@
       return '<tr class="'+cls+'" data-ce-ai-row="'+i+'" data-ce-ai-conf="'+htmlEscape(r.confianza||0)+'" data-ce-ai-existing="'+(existing?'1':'0')+'">'+
         '<td><input type="checkbox" data-ce-ai-field="ok" '+(r.ok!==false?'checked':'')+'></td>'+ 
         '<td><input list="ceAiProducts" data-ce-ai-field="descripcion" value="'+htmlEscape(r.descripcion||'')+'" placeholder="Nombre producto"></td>'+ 
-        '<td><input list="ceAiSegmentos" data-ce-ai-field="segmento" value="'+htmlEscape(seg)+'" placeholder="Segmento" '+(existing?'readonly':'')+' title="'+htmlEscape(attrTitle)+'"></td>'+ 
-        '<td><input list="ceAiDestinos" data-ce-ai-field="destino" value="'+htmlEscape(des)+'" placeholder="Destino" '+(existing?'readonly':'')+' title="'+htmlEscape(attrTitle)+'"></td>'+ 
+        '<td><select data-ce-ai-field="segmento" '+(existing?'disabled':'')+' title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('segmento'), seg, 'Segmento')+'</select></td>'+ 
+        '<td><select data-ce-ai-field="destino" '+(existing?'disabled':'')+' title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('destino'), des, 'Destino')+'</select></td>'+ 
         '<td><input class="num" data-ce-ai-field="unidades" value="'+htmlEscape(unidades)+'"></td>'+ 
         '<td><input class="num" data-ce-ai-field="precio" value="'+htmlEscape(precio)+'"></td>'+ 
         '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(dec(importe))+'" readonly title="Calculado automáticamente: unidades x precio"></td>'+ 
         '<td>'+Math.round(Number(r.confianza||0)*100)+'%</td>'+ 
-        '<td><button type="button" class="ce-ai-danger" data-ce-ai-del="'+i+'">Quitar</button></td>'+ 
+        '<td><button type="button" class="ce-ai-danger ce-ai-trash-btn" data-ce-ai-del="'+i+'" aria-label="Eliminar línea" title="Eliminar línea">🗑️</button></td>'+ 
       '</tr>';
     }).join('');
     body.querySelectorAll('[data-ce-ai-field="unidades"],[data-ce-ai-field="precio"]').forEach(function(input){ input.addEventListener('input',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); });
@@ -313,17 +319,32 @@
     updateTotals();
   }
   function addRow(row){ if(!window.__ceAiTicketLines) window.__ceAiTicketLines=[]; window.__ceAiTicketLines.push(enrichRowDefaults(Object.assign({ok:true,unidades:1,precio:0,importe:0,confianza:0}, row||{}))); renderRows(); }
+  function blockedSegment(value){ return normalizePlain(value)==='MATERIAL'; }
   function uniqueProductValues(field){
     var seen={}, out=[];
-    arr('productos').forEach(function(p){ var v=trim(p && p[field]); if(v && !seen[normalizePlain(v)]){ seen[normalizePlain(v)]=true; out.push(v); } });
+    arr('productos').forEach(function(p){
+      var v=trim(p && p[field]);
+      if(field==='segmento' && blockedSegment(v)) return;
+      if(v && !seen[normalizePlain(v)]){ seen[normalizePlain(v)]=true; out.push(v); }
+    });
     return out.sort(function(a,b){ return a.localeCompare(b,'es',{sensitivity:'base'}); });
+  }
+  function selectOptionsFromValues(values, selected, blankText){
+    var sel=trim(selected);
+    if(blockedSegment(sel)) sel='';
+    var normSel=normalizePlain(sel);
+    var seen={};
+    var out='<option value="">'+htmlEscape(blankText||'')+'</option>';
+    (values||[]).forEach(function(v){ var vv=trim(v); if(!vv) return; seen[normalizePlain(vv)]=true; out+='<option value="'+htmlEscape(vv)+'"'+(normalizePlain(vv)===normSel?' selected':'')+'>'+htmlEscape(vv)+'</option>'; });
+    if(sel && !seen[normSel]) out+='<option value="'+htmlEscape(sel)+'" selected>'+htmlEscape(sel)+'</option>';
+    return out;
   }
   function hasOptionValue(field, value){ var n=normalizePlain(value); if(!n) return false; return uniqueProductValues(field).some(function(v){ return normalizePlain(v)===n; }); }
   function guessSegment(name){
     var n=normalizePlain(name);
     if(/AGUA|REFRES|COCA|FANTA|AQUARIUS|NESTEA|CERVEZA|VINO|RON|GINEBRA|WHISKY|LICOR|ZUMO|BEBIDA|BATIDO/.test(n)) return hasOptionValue('segmento','BEBIDA') ? 'BEBIDA' : 'BEBIDA';
     if(/PAN|BARRA|PICOS|PATATA|ACEITUNA|QUESO|JAMON|CHORIZO|LOMO|SALCHICH|TORTILLA|APERITIVO|SNACK/.test(n)) return hasOptionValue('segmento','COMIDA') ? 'COMIDA' : 'COMIDA';
-    if(/VASO|PLATO|SERVILLETA|BOLSA|HIELO|CARBON|LIMPIEZA|PAPEL|MANTEL|CUBIERTO/.test(n)) return hasOptionValue('segmento','MATERIAL') ? 'MATERIAL' : 'MATERIAL';
+    if(/VASO|PLATO|SERVILLETA|BOLSA|HIELO|CARBON|LIMPIEZA|PAPEL|MANTEL|CUBIERTO/.test(n)) return hasOptionValue('segmento','INFRAESTRUCTURA') ? 'INFRAESTRUCTURA' : '';
     return '';
   }
   function guessDestino(name){
@@ -360,6 +381,36 @@
     if(tienda && sel){ sel.value=tienda.id; renderPendingPurchases(); return 'Tienda detectada: '+(tienda.nombre||tienda.id)+'.'; }
     return 'Tienda leída por IA: '+provider+'; no se encontró en TIENDAS, selecciónala manualmente.';
   }
+  function personScore(needle, personName){
+    var a=normalizePlain(needle), b=normalizePlain(personName); if(!a || !b) return 0;
+    if(a===b) return 100;
+    if(a.indexOf(b)>=0 || b.indexOf(a)>=0) return 88;
+    var toks=a.split(/[^A-Z0-9]+/).filter(function(x){ return x.length>2; });
+    var hit=0; toks.forEach(function(t){ if(b.indexOf(t)>=0) hit++; });
+    return toks.length ? Math.round((hit/toks.length)*78) : 0;
+  }
+  function findResponsibleByName(name){
+    var best=null, bestScore=0;
+    arr('personas').filter(isSocioPersona).forEach(function(p){ var sc=personScore(name, p && p.nombre); if(sc>bestScore){ best=p; bestScore=sc; } });
+    return bestScore>=58 ? best : null;
+  }
+  function responsibleFromHint(hint){
+    var h=trim(hint); if(!h) return '';
+    var m=/(?:responsable|encargad[oa]|persona)\s*(?:=|:|es|ser[aá])\s*["\']?([^"\'.,;\n]+)/i.exec(h);
+    if(m && trim(m[1])) return trim(m[1]);
+    var people=arr('personas').filter(isSocioPersona);
+    var best=null, bestScore=0;
+    people.forEach(function(p){ var sc=personScore(h, p && p.nombre); if(sc>bestScore){ best=p; bestScore=sc; } });
+    return bestScore>=88 && best ? (best.nombre||'') : '';
+  }
+  function applyResponsibleFromAi(name, hint){
+    var proposed=trim(name) || responsibleFromHint(hint);
+    if(!proposed) return '';
+    var person=findResponsibleByName(proposed);
+    var sel=$('ceAiResponsable');
+    if(person && sel){ sel.value=person.id; return 'Responsable detectado: '+(person.nombre||person.id)+'.'; }
+    return 'Responsable indicado: '+proposed+'; no se encontró como SOCIO en PERSONAS, selecciónalo manualmente.';
+  }
   function productNameById(idv){ var id=trim(idv); var p=arr('productos').find(function(x){ return trim(x.id)===id; }); return p ? (p.nombre||p.id) : id; }
   function tiendaNameById(idv){ var id=trim(idv); var t=arr('tiendas').find(function(x){ return trim(x.id)===id; }); return t ? (t.nombre||t.id) : id; }
   function compraValue(c){ return round2((money(c && c.unidades)||0) * money(c && c.precio)); }
@@ -388,10 +439,8 @@
     var box=$('ceAiPendingList'); if(!box) return;
     var rows=pendingPurchasesForEvent();
     if(!rows.length){ box.innerHTML='<div class="ce-ai-muted">No hay compras previstas pendientes en este evento.</div>'; return; }
-    var total=rows.reduce(function(s,r){ return s+compraValue(r); },0);
-    var sortLabel=(trim(($('ceAiPendingSort')||{}).value)==='producto') ? 'producto' : 'tienda';
-    box.innerHTML='<div class="ce-ai-muted">'+rows.length+' registro(s) Pte.Compra del evento, total previsto '+htmlEscape(euro(total))+'. Orden actual: '+htmlEscape(sortLabel)+'.</div>'+rows.map(function(c){
-      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong title="Producto">'+htmlEscape(productNameById(c.productoId))+'</strong><span title="Tienda">'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span title="Unidades x precio">'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span title="Importe">'+htmlEscape(euro(compraValue(c)))+'</span></label>';
+    box.innerHTML=rows.map(function(c){
+      return '<label class="ce-ai-pending-row"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong>'+htmlEscape(productNameById(c.productoId))+'</strong><span>'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span>'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span>'+htmlEscape(euro(compraValue(c)))+'</span></label>';
     }).join('');
   }
   function collectPendingDeleteIds(){
@@ -422,8 +471,8 @@
   }
   function downloadCurrentTicketPhoto(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); downloadSrc(src, ($('ceAiTicket')||{}).value || 'ticket_auto'); }
   function installTicketImageDownloadButtons(){
-    if(window.__ceV94TicketDownloadObserver) return;
-    window.__ceV94TicketDownloadObserver=true;
+    if(window.__ceV95TicketDownloadObserver) return;
+    window.__ceV95TicketDownloadObserver=true;
     function enhance(root){
       (root||document).querySelectorAll('img.ticket-thumb,img[src*="ticket-images"],img[src^="data:image/"]').forEach(function(img){
         if(!img || img.dataset.ceDownloadReady==='1') return;
@@ -469,16 +518,19 @@
     Promise.resolve(dataUrl || readFileAsDataUrl($('ceAiFile').files[0])).then(function(src){
       window.__ceAiTicketImage=src;
       var img=$('ceAiPreview'); if(img){ img.src=src; img.style.display=''; }
-      return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src, instrucciones:trim(($('ceAiGeminiHint')||{}).value)})});
+      return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src, instrucciones:trim(($('ceAiGeminiHint')||{}).value), responsables:arr('personas').filter(isSocioPersona).map(function(p){return p.nombre||'';}).filter(Boolean), tiendas:arr('tiendas').map(function(t){return t.nombre||'';}).filter(Boolean)})});
     }).then(function(data){
       var rows=Array.isArray(data.productos)?data.productos:[];
       window.__ceAiDetectedTotal=money(data.total||0);
       window.__ceAiTicketLines=sortLinesLikeTk(rows.map(function(r){ return enrichRowDefaults(Object.assign({ok:true},r)); }));
+      var hintText=trim(($('ceAiGeminiHint')||{}).value);
       var tiendaMsg=applyStoreFromAi(data.proveedor || data.tienda || data.comercio || '');
+      var respMsg=applyResponsibleFromAi(data.responsable || data.responsableNombre || data.encargado || '', hintText);
       renderRows();
       renderPendingPurchases();
       var msg='Análisis terminado: '+rows.length+' líneas detectadas.';
       if(tiendaMsg) msg+=' '+tiendaMsg;
+      if(respMsg) msg+=' '+respMsg;
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.proveedorIa || data.modelo) msg+=' IA: '+(data.proveedorIa||'')+(data.modelo?' '+data.modelo:'')+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
@@ -494,14 +546,33 @@
     var name=trim(row && row.descripcion);
     var price=money(row && row.precio);
     if(!(price>0) && money(row && row.importe)) price=money(row.importe)/(money(row && row.unidades)||1);
+    price=round2(price);
     var existing=findProductByName(name);
     var payload=existing ? Object.assign({}, existing) : {id:uid(), nombre:name, segmento:trim(row.segmento), destino:trim(row.destino)};
     if(!existing){ payload.segmento=trim(row.segmento); payload.destino=trim(row.destino); }
-    payload.defaultPrecio=money(price); if(tiendaId) payload.defaultTiendaId=tiendaId;
-    var url='/api/crud/productos'+(existing ? '/'+encodeURIComponent(existing.id) : ''); var method=existing ? 'PUT' : 'POST';
-    return apiJson(url,{method:method,headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true,__priceRefreshOnly:!!existing}))})
-      .then(function(data){ var item=data.item || payload; var s=stateObj(); if(!Array.isArray(s.productos)) s.productos=[]; var idx=s.productos.findIndex(function(p){ return trim(p.id)===trim(item.id); }); if(idx>=0) s.productos[idx]=Object.assign({},s.productos[idx],item); else s.productos.push(item); return item; })
-      .catch(function(err){ if(existing){ warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.'); return existing; } throw err; });
+    payload.defaultPrecio=price; payload.precio=price;
+    if(tiendaId){ payload.defaultTiendaId=tiendaId; payload.tiendaId=tiendaId; }
+    var s=stateObj();
+    function mergeLocal(item){
+      item=item || payload;
+      if(item && item.defaultPrecio !== undefined && item.precio === undefined) item.precio=item.defaultPrecio;
+      if(!Array.isArray(s.productos)) s.productos=[];
+      var idx=s.productos.findIndex(function(p){ return trim(p.id)===trim(item.id); });
+      if(idx>=0) s.productos[idx]=Object.assign({},s.productos[idx],item,{defaultPrecio:price,precio:price});
+      else s.productos.push(Object.assign({},item,{defaultPrecio:price,precio:price}));
+      return idx>=0 ? s.productos[idx] : s.productos[s.productos.length-1];
+    }
+    if(existing){
+      // v9.5.2: ruta dedicada. Solo refresca último precio conocido y tienda habitual en PRODUCTOS.
+      return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id)+'/precio',{method:'PUT',headers:crudHeaders(),body:JSON.stringify({__crudRowOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||''})})
+        .then(function(data){ return mergeLocal(data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''})); })
+        .catch(function(err){
+          warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.');
+          return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''}));
+        });
+    }
+    return apiJson('/api/crud/productos',{method:'POST',headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))})
+      .then(function(data){ return mergeLocal(data.item || payload); });
   }
   function postCompra(row, product, ticket, tiendaId, responsableId){
     var payload={ id:uid(), eventId:selectedEventId(), productoId:product.id, unidades:money(row.unidades)||1, precio:money(row.precio) || (money(row.importe)/(money(row.unidades)||1)), ticketDonacion:ticket, donorRef:'', tiendaId:tiendaId || product.defaultTiendaId || '', responsableId:responsableId || '' };
@@ -531,12 +602,12 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.4 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.5.2 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
     var ev=selectedEventId();
-    if(window.__ceLoadSelectedEventStateFix48 && ev){ return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); }); }
+    if(window.__ceLoadSelectedEventStateFix48 && ev){ return window.__ceLoadSelectedEventStateFix48(ev).then(function(){ try{ if(typeof render==='function') render(); }catch(_){} try{ fillSelects(); if(!silent) renderPendingPurchases(); }catch(_){} if(!silent) setStatus('Evento recargado.','ok'); }); }
     if(!silent) setStatus('Recarga parcial no disponible; cambia de evento y vuelve.','warn'); return Promise.resolve();
   }
   function delegatedOpen(ev){
@@ -544,12 +615,12 @@
     ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); installTicketImageDownloadButtons(); }
-  window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV952=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.4 Alta IA] Gemini REST + tienda sugerida + ptes compra + alta productos completa + descarga foto instalado. Prueba: window.__ceOpenTicketAutoV95()');
+  console.info('[CE v9.5.2 Alta IA] limpieza total + iconos compactos activos + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV952()');
 })();

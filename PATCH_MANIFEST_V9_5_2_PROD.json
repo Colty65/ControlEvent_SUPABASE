@@ -1,0 +1,32 @@
+{
+  "version": "ControlEvent v9.5.2_prod",
+  "base": "versión anterior v9.5.1",
+  "changes": [
+    "Ticket IA: sustituido Quitar por papelera pequeña por línea",
+    "PRODUCTOS: nueva ruta dedicada para actualizar último precio de productos existentes",
+    "PRODUCTOS: productFromDb devuelve precio y defaultPrecio",
+    "Ticket IA: al procesar producto existente llama a /api/crud/productos/:id/precio",
+    "GRAL: añadido guardia de sesión visible para evitar cabecera Sin acceso durante sesión activa"
+  ],
+  "files_added": [
+    "public/app/features/v9-5-2-ticketauto-compras.js",
+    "public/app/features/v9-5-2-session-guard.js"
+  ],
+  "files_modified": [
+    "index.html",
+    "public/index.html",
+    "routes/crud.routes.js",
+    "services/crud.service.js",
+    "lib/supabase-normalized.js",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json"
+  ],
+  "checks": [
+    "node --check public/app/features/v9-5-2-ticketauto-compras.js",
+    "node --check public/app/features/v9-5-2-session-guard.js",
+    "node --check routes/crud.routes.js",
+    "node --check services/crud.service.js",
+    "node --check lib/supabase-normalized.js"
+  ]
+}
