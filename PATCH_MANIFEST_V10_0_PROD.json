@@ -1,0 +1,28 @@
+{
+  "version": "v10.0_prod",
+  "base": "v9.6_prod",
+  "created_by": "ChatGPT",
+  "main_changes": [
+    "Actualización completa de versión visible a v10.0_prod",
+    "Ticket IA disponible para usuarios RW además de GD",
+    "Refuerzo de actualización de precio en PRODUCTOS para productos existentes",
+    "Mapa de recursos: TKxx abre detalle contable y foto de factura",
+    "Búsquedas en COMPRAS y DONACIONES permitidas en eventos Finalizados",
+    "Hidratación acelerada de acciones de fotos en Resumen presupuestario",
+    "Opción visible de compartir/proyectar pantalla"
+  ],
+  "added_files": [
+    "public/app/features/v10-0-ticketauto-compras.js",
+    "public/app/features/v10-0-app-fixes.js",
+    "LEEME_V10_0_PROD.txt"
+  ],
+  "validation": [
+    "node --check public/app/features/v10-0-app-fixes.js",
+    "node --check public/app/features/v10-0-ticketauto-compras.js",
+    "node --check routes/crud.routes.js",
+    "node --check lib/supabase-normalized.js",
+    "node --check services/receipt-ai.service.js",
+    "python3 -m json.tool package.json",
+    "python3 -m json.tool package-lock.json"
+  ]
+}

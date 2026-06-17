@@ -1,8 +1,8 @@
-/* ControlEvent v9.6_prod - ajustes generales: cabecera compacta, refresco gráficas, búsqueda finalizados, fotos y mapa. */
+/* ControlEvent v10.0_prod - ajustes generales: cabecera compacta, refresco gráficas, búsqueda finalizados, fotos y mapa. */
 (function(){
   'use strict';
   if(window.__ceV96AppFixes) return; window.__ceV96AppFixes=true;
-  var VERSION='v9.6_prod';
+  var VERSION='v10.0_prod';
   function text(v){ return v==null?'':String(v); }
   function $(id){ return document.getElementById(id); }
   function safe(fn){ try{return fn();}catch(_){return undefined;} }

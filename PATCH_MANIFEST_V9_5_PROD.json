@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v9.6_prod",
+  "version": "ControlEvent v10.0_prod",
   "base": "ControlEvent v9.4_prod",
   "changes": [
     "Eliminado MATERIAL como opción del desplegable Segmento",
@@ -11,13 +11,13 @@
     "Selección automática de Responsable desde Gemini o desde las indicaciones del usuario",
     "Refuerzo actualización precio PRODUCTOS existentes",
     "Parche de login para no mostrar evento aparente antes de elección real",
-    "Versión actualizada a v9.6_prod en referencias activas"
+    "Versión actualizada a v10.0_prod en referencias activas"
   ],
   "files_added": [
     "public/app/features/v9-5-ticketauto-compras.js",
     "public/app/features/v9-5-login-event-clean.js",
-    "LEEME_V9_6_PROD_TICKETAUTO_COMPACTO_RESPONSABLE.txt",
-    "PATCH_MANIFEST_V9_6_PROD.json"
+    "LEEME_V10_0_PROD_TICKETAUTO_COMPACTO_RESPONSABLE.txt",
+    "PATCH_MANIFEST_V10_0_PROD.json"
   ],
   "files_modified": [
     "services/receipt-ai.service.js",
