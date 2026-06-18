@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v10.4.1_prod",
+  "version": "ControlEvent v10.4.2_prod",
   "descripcion": "Ticket IA: limpieza total al abrir/limpiar, sin TKxx preseleccionado, iconos compactos repartidos y activos, mensajes en cabecera, compras previstas flexibles y sin líneas explicativas, actualización de avisos negros legacy.",
   "ficheros_principales": [
     "public/app/features/v9-5-2-ticketauto-compras.js",

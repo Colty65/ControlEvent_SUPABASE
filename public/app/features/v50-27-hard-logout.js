@@ -1,9 +1,9 @@
-/* ControlEvent v10.4.1_prod - Salir duro y logon limpio.
+/* ControlEvent v10.4.2_prod - Salir duro y logon limpio.
    Objetivo: reproducir el estado que funciona con Ctrl+F5 + nuevo login.
    No rehidrata globos, no usa MutationObserver, no usa setInterval. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4.1_prod';
+  const VERSION = 'ControlEvent v10.4.2_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   if(window.__ceV5027HardLogout) return;
   window.__ceV5027HardLogout = true;

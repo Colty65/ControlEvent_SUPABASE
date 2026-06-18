@@ -1,7 +1,7 @@
-ControlEvent v10.4.1_prod
+ControlEvent v10.4.2_prod
 
 Cambios principales:
-- Cabecera compacta: miniatura CE + v10.4.1_prod en lugar de texto largo ControlEvent.
+- Cabecera compacta: miniatura CE + v10.4.2_prod en lugar de texto largo ControlEvent.
 - Ticket IA detecta TKxx si aparece escrito en foto o indicaciones y lo selecciona en el desplegable.
 - Ticket IA en móvil se reorganiza en vertical: foto, controles y tablas debajo. En PC/iPad se mantiene distribución actual.
 - Reforzado refresco de GRÁFICAS tras cambio de evento para evitar donaciones sin pintar hasta refrescar.

@@ -1,11 +1,11 @@
-/* ControlEvent v10.4.1_prod - logon limpio y globos rehidratados sin bucles pesados.
+/* ControlEvent v10.4.2_prod - logon limpio y globos rehidratados sin bucles pesados.
    - Marca TODAS las claves de evento elegido, incluida la antigua ce_v250_event_chosen.
    - Tras cambio de usuario + eleccion de evento, rehidrata globos de Resumen y Graficas.
    - No usa MutationObserver global ni setInterval.
    - Mantiene Refres en sitio y version unificada. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4.1_prod';
+  const VERSION = 'ControlEvent v10.4.2_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const INSTALLED = '__ceV5026FinalFixes';
   if(window[INSTALLED]) return;

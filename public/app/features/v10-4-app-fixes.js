@@ -1,8 +1,8 @@
-/* ControlEvent v10.4.1_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
+/* ControlEvent v10.4.2_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
 (function(){
   'use strict';
   if(window.__ceV104AppFixes) return; window.__ceV104AppFixes=true;
-  var VERSION='v10.4.1_prod', VERSION_FULL='ControlEvent v10.4.1_prod';
+  var VERSION='v10.4.2_prod', VERSION_FULL='ControlEvent v10.4.2_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -41,7 +41,7 @@
 
   function applyVersion(){
     try{ document.title=VERSION_FULL; }catch(_){ }
-    try{ document.body.dataset.ceVersion=VERSION_FULL; window.__ceVersion=VERSION_FULL; window.VERSION=VERSION_FULL; window.ControlEventVersion={version:VERSION_FULL, versionFile:'ControlEvent_v10_4_prod'}; }catch(_){ }
+    try{ document.body.dataset.ceVersion=VERSION_FULL; window.__ceVersion=VERSION_FULL; window.VERSION=VERSION_FULL; window.ControlEventVersion={version:VERSION_FULL, versionFile:'ControlEvent_v10_4_2_prod'}; }catch(_){ }
     var stack=document.querySelector('.appname-stack'); if(stack){
       var first=stack.querySelector(':scope > span,.ce-v96-brand-mini,.ce-v100-brand-mini,.ce-v101-brand-mini,.ce-v104-brand-mini,.ce-v104-brand-mini');
       if(first){ first.className='ce-v104-brand-mini'; first.innerHTML='<img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>'+VERSION+'</span>'; }
@@ -102,7 +102,7 @@
   function hydrateDownloads(){ hydrateDocumentDownloads(); hydrateIngresoDownloads(); }
 
   function recoverHalfBoot(){
-    var hasUser=!!(safe(function(){return window.authUser || window.__CONTROL_EVENT_USER__ || JSON.parse(localStorage.getItem('ControlEvent_current_user')||'null') || JSON.parse(localStorage.getItem('ControlEvent_auth_user_v509')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v10_4_prod_session')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v3_0_prod_session')||'null');}, null));
+    var hasUser=!!(safe(function(){return window.authUser || window.__CONTROL_EVENT_USER__ || JSON.parse(localStorage.getItem('ControlEvent_current_user')||'null') || JSON.parse(localStorage.getItem('ControlEvent_auth_user_v509')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v10_4_2_prod_session')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v3_0_prod_session')||'null');}, null));
     var name=trim(($('brandCurrentUserName')||{}).textContent||($('currentUserName')||{}).textContent||'');
     if(!hasUser && !/sin acceso/i.test(name)) hasUser=true;
     if(!hasUser) return;
@@ -117,7 +117,7 @@
   function stabilizeEventLoad(){ var s=stateObj(); var ev=selectedEventId(); if(!ev) return; ['compras','colaboradores','productos','personas','tiendas'].forEach(function(k){ if(Array.isArray(s[k]) && s[k].length) s['__ceV104LastGood_'+k]=s[k].slice(); else if(Array.isArray(s['__ceV104LastGood_'+k]) && (k==='compras'||k==='colaboradores')) s[k]=s['__ceV104LastGood_'+k].slice(); }); }
   function cleanupComprasHeader(){ var card=document.querySelector('#tabCompras .card'); if(!card) return; Array.prototype.slice.call(card.querySelectorAll('p')).forEach(function(p){ if(trim(p.textContent)==='Compras normales y otros gastos, con responsable opcional.') p.remove(); }); }
 
-  function tick(){ injectStyle(); applyVersion(); ensureShareButton(); enableSearch(); markMapaTickets(); hydrateDownloads(); recoverHalfBoot(); stabilizeEventLoad(); cleanupComprasHeader(); }
+  function tick(){ injectStyle(); applyVersion(); ensureShareButton(); enableSearch(); markMapaTickets(); hydrateDownloads(); recoverHalfBoot(); cleanupComprasHeader(); }
   window.addEventListener('click',handleSearch,true);
   window.addEventListener('pointerdown',handleDownloadClick,true); window.addEventListener('mousedown',handleDownloadClick,true); window.addEventListener('touchstart',handleDownloadClick,{capture:true,passive:false}); window.addEventListener('touchend',handleDownloadClick,{capture:true,passive:false}); window.addEventListener('click',handleDownloadClick,true); window.addEventListener('keydown',handleSearch,true);
   window.addEventListener('pointerdown',handleTicketImage,true); window.addEventListener('touchstart',handleTicketImage,{capture:true,passive:false});
@@ -126,8 +126,6 @@
   document.addEventListener('click',function(ev){ if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-v104-close]')) return closeTicketDetail(ev); handleShare(ev); },true);
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape'){ var p=$('ceShareScreenPanel'); if(p){ p.remove(); stop(ev); return false; } if($('ceV104TicketDetail')) return closeTicketDetail(ev); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-loaded','controlevent:ticket-image-changed'].forEach(function(e){ window.addEventListener(e,function(){ setTimeout(tick,40); setTimeout(tick,240); }); });
-  try{ new MutationObserver(function(){ if(tick._t) clearTimeout(tick._t); tick._t=setTimeout(tick,80); }).observe(document.body,{childList:true,subtree:true}); }catch(_){ }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
-  setInterval(tick,1200);
   window.ControlEventV104={version:VERSION, openTicketDetail:openTicketDetail, runSearch:runSearch, openSharePanel:openSharePanel, hydrateDownloads:hydrateDownloads};
 })();
