@@ -1,4 +1,4 @@
-/* ControlEvent v10.4.2_prod - limpieza visual real del selector de evento tras login.
+/* ControlEvent v10.4.3_prod - limpieza visual real del selector de evento tras login.
    Evita que el desplegable muestre un evento aparente cuando todavía no se ha elegido ninguno. */
 (function(){
   'use strict';

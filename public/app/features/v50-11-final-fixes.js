@@ -1,4 +1,4 @@
-/* ControlEvent v10.4.2_prod - ajuste quirurgico sobre v50.19.
+/* ControlEvent v10.4.3_prod - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
@@ -7,7 +7,7 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.4.2_prod';
+  const VERSION = 'ControlEvent v10.4.3_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;

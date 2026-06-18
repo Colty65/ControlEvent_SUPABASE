@@ -1,4 +1,4 @@
-ControlEvent v10.4.2_prod
+ControlEvent v10.4.3_prod
 =======================
 
 Cambios aplicados sobre versión anterior:

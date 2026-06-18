@@ -1,4 +1,4 @@
-/* ControlEvent v10.4.2_prod - correccion puntual sobre v50.19.
+/* ControlEvent v10.4.3_prod - correccion puntual sobre v50.19.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -6,7 +6,7 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.4.2_prod';
+  const VERSION = 'ControlEvent v10.4.3_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const INSTALLED = '__ceV509FinalFixes';
   if(window[INSTALLED]) return;

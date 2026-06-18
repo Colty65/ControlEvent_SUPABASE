@@ -1,4 +1,4 @@
-/* ControlEvent v10.4.2_prod - guardia de sesión visible.
+/* ControlEvent v10.4.3_prod - guardia de sesión visible.
    Evita que la cabecera quede en "Sin acceso" dentro de una sesión activa por refrescos/renderizados tardíos. */
 (function(){
   'use strict';

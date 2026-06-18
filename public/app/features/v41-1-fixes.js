@@ -1,7 +1,7 @@
-/* ControlEvent v10.4.2_prod - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
+/* ControlEvent v10.4.3_prod - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4.2_prod';
+  const VERSION = 'ControlEvent v10.4.3_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const $ = id => document.getElementById(id);
   const now = () => Date.now();

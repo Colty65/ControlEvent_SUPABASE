@@ -1,7 +1,7 @@
-ControlEvent v10.4.2_prod
+ControlEvent v10.4.3_prod
 
 Cambios principales:
-- Versión actualizada a v10.4.2_prod en referencias activas.
+- Versión actualizada a v10.4.3_prod en referencias activas.
 - Se elimina la recarga automática continua introducida en ajustes anteriores para recuperar fluidez.
 - Se reduce el riesgo de que los buscadores de COMPRAS/DONACIONES pierdan el foco por refrescos repetidos.
 - Se evita restaurar datos globales antiguos al cambiar de evento.
