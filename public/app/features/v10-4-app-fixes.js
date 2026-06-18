@@ -1,8 +1,8 @@
-/* ControlEvent v10.4.3_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
+/* ControlEvent v10.4.4_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
 (function(){
   'use strict';
   if(window.__ceV104AppFixes) return; window.__ceV104AppFixes=true;
-  var VERSION='v10.4.3_prod', VERSION_FULL='ControlEvent v10.4.3_prod';
+  var VERSION='v10.4.4_prod', VERSION_FULL='ControlEvent v10.4.4_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -110,24 +110,10 @@
   function hydrateDocumentDownloads(){ var root=$('tabDocumentos'); if(!root) return; root.querySelectorAll('img.ce-doc-thumb,.ce-doc-target-imgwrap-v85 img,#tabDocumentos img[src^="data:image/"],#tabDocumentos img[src*="ticket-images"]').forEach(function(img,idx){ var holder=img.closest('.ce-doc-item,.ce-doc-target-imgwrap-v85,.ce-doc-media,.itemcard,.rowline,.card')||img.parentElement; if(!holder || holder.querySelector(':scope > .ce-v104-doc-download')) return; var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v104-download-btn ce-v104-doc-download'; btn.title='Descargar documento'; btn.setAttribute('aria-label','Descargar documento'); btn.textContent='⬇️'; wireDownloadBtn(btn,function(){return img.currentSrc||img.src||'';},'documento_evento_'+(idx+1)); var actions=holder.querySelector('.ce-doc-actions') || holder.querySelector('.ce-doc-media') || img.parentElement || holder; try{ actions.appendChild(btn); }catch(_){ holder.appendChild(btn); } }); }
   function hydrateIngresoDownloads(){ var root=$('tabIngresos')||$('collabList'); if(!root) return; root.querySelectorAll('.ce-v509-receipt-thumb img,.ce-v504-receipt-thumb img,.ce-v502-receipt-thumb img,.ce-v465-receipt-thumb img,#collabList img[src^="data:image/"],#collabList img[src*="ticket-images"]').forEach(function(img,idx){ var field=img.closest('.ce-v509-receipt-field,.ce-v504-receipt-strip,.ce-v502-receipt-strip,.ce-v465-receipt-strip,.itemcard,.rowline,.card')||img.parentElement; if(!field || field.querySelector(':scope > .ce-v104-ingreso-download')) return; var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v104-download-btn ce-v104-ingreso-download'; btn.title='Descargar justificante'; btn.setAttribute('aria-label','Descargar justificante'); btn.textContent='⬇️'; wireDownloadBtn(btn,function(){return img.currentSrc||img.src||'';},'justificante_ingreso_'+(idx+1)); var box=field.querySelector('.ce-v509-receipt-strip,.ce-v504-receipt-strip,.ce-v502-receipt-strip,.ce-v465-receipt-strip') || field; try{ box.appendChild(btn); }catch(_){ field.appendChild(btn); } }); }
   function handleDownloadClick(ev){ var btn=ev.target&&ev.target.closest&&ev.target.closest('.ce-v104-download-btn,.ce-v103-download-btn'); if(!btn) return; stop(ev); var img=(btn.parentElement&&btn.parentElement.querySelector('img')) || (btn.closest('.itemcard,.rowline,.card,.ce-doc-item')&&btn.closest('.itemcard,.rowline,.card,.ce-doc-item').querySelector('img')); if(img){ var now=Date.now(); if(!btn.__ceLastDownload || now-btn.__ceLastDownload>=900){ btn.__ceLastDownload=now; downloadSrc(img.currentSrc||img.src||'', btn.classList.contains('ce-v104-doc-download')?'documento_evento':'justificante_ingreso'); } } return false; }
-  function hydrateDownloads(){ hydrateDocumentDownloads(); hydrateIngresoDownloads(); }
+  function hydrateDownloads(){ /* v10.4.4: descargas las gestiona el módulo final para evitar duplicados */ }
 
   var __ceV104LastHalfBootRecover=0;
-  function recoverHalfBoot(){
-    var hasUser=!!(safe(function(){return window.authUser || window.__CONTROL_EVENT_USER__ || JSON.parse(localStorage.getItem('ControlEvent_current_user')||'null') || JSON.parse(localStorage.getItem('ControlEvent_auth_user_v509')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v10_4_3_prod_session')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v3_0_prod_session')||'null');}, null));
-    var name=trim(($('brandCurrentUserName')||{}).textContent||($('currentUserName')||{}).textContent||'');
-    if(!hasUser && !/sin acceso/i.test(name)) hasUser=true;
-    if(!hasUser) return;
-    var tabs=$('mainTabs');
-    var visible=tabs && Array.prototype.some.call(tabs.querySelectorAll('button.tab'),function(b){ return !b.classList.contains('hidden') && b.offsetParent!==null; });
-    if(visible) return;
-    if(Date.now()-__ceV104LastHalfBootRecover<5000) return;
-    __ceV104LastHalfBootRecover=Date.now();
-    if(tabs){ tabs.classList.remove('hidden'); tabs.style.removeProperty('display'); }
-    // Recuperación puntual, no refresco continuo: evita el parpadeo/temblor al cambiar menú o evento.
-    safe(function(){ if(typeof renderAuthUI==='function') renderAuthUI(); });
-    safe(function(){ if(typeof render==='function') render(); });
-  }
+  function recoverHalfBoot(){ /* v10.4.4: sin render de recuperación automático para evitar reentradas tras Ctrl+F5 */ }
   function stabilizeEventLoad(){ var s=stateObj(); var ev=selectedEventId(); if(!ev) return; ['compras','colaboradores','productos','personas','tiendas'].forEach(function(k){ if(Array.isArray(s[k]) && s[k].length) s['__ceV104LastGood_'+k]=s[k].slice(); else if(Array.isArray(s['__ceV104LastGood_'+k]) && (k==='compras'||k==='colaboradores')) s[k]=s['__ceV104LastGood_'+k].slice(); }); }
   function cleanupComprasHeader(){ var card=document.querySelector('#tabCompras .card'); if(!card) return; Array.prototype.slice.call(card.querySelectorAll('p')).forEach(function(p){ if(trim(p.textContent)==='Compras normales y otros gastos, con responsable opcional.') p.remove(); }); }
 

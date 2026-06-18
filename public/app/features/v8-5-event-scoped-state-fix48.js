@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const LOG='[CE FIX48 EVENT-SCOPED STATE v10.2]';
+  const LOG='[CE FIX48 EVENT-SCOPED STATE v10.4.4]';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const STORAGE_KEY_FALLBACK='controlevent_v6_4';
 
@@ -115,7 +115,7 @@
         if(!res.ok) throw new Error(data.error || ('No se pudo cargar datos del evento '+ev));
         lastData=data;
         const count=payloadCount(data);
-        // v10.2: si llega una respuesta vacía justo después de cambiar/recargar un evento que tenía datos en pantalla,
+        // v10.4.4: si llega una respuesta vacía justo después de cambiar/recargar un evento que tenía datos en pantalla,
         // no machacamos el estado a la primera. Reintentamos porque a veces el navegador/edge devuelve una carga parcial.
         if(count===0 && attempt<6){
           console.warn(LOG,'Respuesta de evento aparentemente vacía; reintento antes de aplicar estado vacío', {eventId:ev, attempt, hadLocal});
@@ -163,7 +163,6 @@
       const sel2=document.getElementById('selectedEvent');
       if(sel2) sel2.value=ev;
       try{ if(typeof render==='function') render(); }catch(_){}
-      setTimeout(()=>{ try{ if(typeof render==='function') render(); }catch(_){} },80);
       return false;
     }catch(err){
       console.error(LOG,'No se pudo cargar evento seleccionado',err);
@@ -187,25 +186,8 @@
     }
   },true);
 
-  // Tras login/reanudación, si hay evento recordado, recarga solo sus datos.
-  function afterAuthTryScopedLoad(){
-    const ev=selectedEventId();
-    if(!ev) return;
-    if(window.__ceFix48AutoLoading===ev) return;
-    window.__ceFix48AutoLoading=ev;
-    setTimeout(()=>{
-      fetchEventState(ev)
-        .then(()=>{ try{ if(typeof render==='function') render(); }catch(_){} })
-        .catch(err=>console.warn(LOG,'Carga inicial por evento no completada',err))
-        .finally(()=>{ window.__ceFix48AutoLoading=''; });
-    },350);
-  }
-  window.addEventListener('load', afterAuthTryScopedLoad, false);
-  document.addEventListener('DOMContentLoaded', afterAuthTryScopedLoad, false);
-  document.addEventListener('click',function(ev){
-    const t=ev.target;
-    if(t && (t.id==='btnLogin' || t.closest && t.closest('#btnLogin'))){ setTimeout(afterAuthTryScopedLoad,900); }
-  },true);
+  // v10.4.4: sin recarga automática tras login/CTRL+F5 para evitar reentradas y temblores.
+  function afterAuthTryScopedLoad(){ return; }
 
   console.info(LOG,'activo: /api/state con eventId y cambio de evento por carga parcial.');
 })();
