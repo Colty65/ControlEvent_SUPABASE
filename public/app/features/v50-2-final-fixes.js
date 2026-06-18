@@ -1,4 +1,4 @@
-/* ControlEvent v10.0_prod - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
+/* ControlEvent v10.1_prod - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
    - RW no ve Planificación inicial ni hay parpadeo de menú.
    - En móvil/iPhone/Android las opciones disponibles quedan siempre visibles; se oculta el botón Menú.
    - Botones inferiores visibles también en móvil para GD/RW, compactos y solo pulsables en el icono.
@@ -9,8 +9,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.0_prod';
-  const VERSION_FILE = 'ControlEvent_v10_0_prod';
+  const VERSION = 'ControlEvent v10.1_prod';
+  const VERSION_FILE = 'ControlEvent_v10_1_prod';
   const INSTALLED = '__ceV502FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

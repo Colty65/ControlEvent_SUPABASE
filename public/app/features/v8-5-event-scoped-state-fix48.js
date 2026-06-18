@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const LOG='[CE FIX48 EVENT-SCOPED STATE]';
+  const LOG='[CE FIX48 EVENT-SCOPED STATE v10.1]';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const STORAGE_KEY_FALLBACK='controlevent_v6_4';
 
@@ -67,14 +67,50 @@
     }catch(_){ return input; }
   }
 
+  function payloadCount(data){
+    if(!data || typeof data !== 'object') return 0;
+    let n=0;
+    ['compras','colaboradores','eventDocuments'].forEach(k=>{ if(Array.isArray(data[k])) n += data[k].length; });
+    if(data.ticketImages && typeof data.ticketImages === 'object') n += Object.keys(data.ticketImages).length;
+    if(data.ticketImageRefs && typeof data.ticketImageRefs === 'object') n += Object.keys(data.ticketImageRefs).length;
+    return n;
+  }
+  function localCountForSelected(){
+    const s=stateObj(); let n=0;
+    ['compras','colaboradores','eventDocuments'].forEach(k=>{ if(Array.isArray(s[k])) n += s[k].length; });
+    if(s.ticketImages && typeof s.ticketImages === 'object') n += Object.keys(s.ticketImages).length;
+    if(s.ticketImageRefs && typeof s.ticketImageRefs === 'object') n += Object.keys(s.ticketImageRefs).length;
+    return n;
+  }
   async function fetchEventState(eventId){
     const ev=text(eventId).trim();
     if(!ev) throw new Error('No hay evento seleccionado para cargar datos por evento.');
-    const url='/api/state?eventId='+encodeURIComponent(ev)+'&scope=event&fix48=1&_='+Date.now();
-    const res=await (window.__ceFix48NativeFetch || window.fetch)(url, {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
-    const data=await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error || ('No se pudo cargar datos del evento '+ev));
-    return applyState(data, ev);
+    const nativeFetch = window.__ceFix48NativeFetch || window.fetch;
+    const hadLocal = localCountForSelected();
+    let lastData=null, lastError=null;
+    for(let attempt=1; attempt<=3; attempt++){
+      try{
+        const url='/api/state?eventId='+encodeURIComponent(ev)+'&scope=event&fix48=1&v101=1&attempt='+attempt+'&_='+Date.now();
+        const res=await nativeFetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.error || ('No se pudo cargar datos del evento '+ev));
+        lastData=data;
+        const count=payloadCount(data);
+        // v10.1: si llega una respuesta vacía justo después de cambiar/recargar un evento que tenía datos en pantalla,
+        // no machacamos el estado a la primera. Reintentamos porque a veces el navegador/edge devuelve una carga parcial.
+        if(count===0 && attempt<3){
+          console.warn(LOG,'Respuesta de evento aparentemente vacía; reintento antes de aplicar estado vacío', {eventId:ev, attempt, hadLocal});
+          await new Promise(r=>setTimeout(r, attempt*320));
+          continue;
+        }
+        return applyState(data, ev);
+      }catch(err){
+        lastError=err;
+        if(attempt<3){ await new Promise(r=>setTimeout(r, attempt*280)); continue; }
+      }
+    }
+    if(lastData) return applyState(lastData, ev);
+    throw lastError || new Error('No se pudo cargar datos del evento '+ev);
   }
 
   // Interceptor conservador: todo GET /api/state posterior a tener selectedEventId se convierte
