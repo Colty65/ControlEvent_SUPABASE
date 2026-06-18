@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v10.3_prod",
+  "version": "ControlEvent v10.4_prod",
   "base": "versión anterior v9.5.1",
   "changes": [
     "Ticket IA: sustituido Quitar por papelera pequeña por línea",
