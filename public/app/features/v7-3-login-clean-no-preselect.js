@@ -1,8 +1,8 @@
-/* ControlEvent v10.4_prod - login limpio sin preselección y salida sin recarga pesada.
+/* ControlEvent v10.4.1_prod - login limpio sin preselección y salida sin recarga pesada.
    Alcance: tras Salir/Login, fuerza selector en "Selecciona evento..." hasta que el usuario elija evento. Sin bucles ni MutationObserver. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4_prod';
+  const VERSION = 'ControlEvent v10.4.1_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   if(window.__ceV73LoginCleanNoPreselect) return;
   window.__ceV73LoginCleanNoPreselect = true;

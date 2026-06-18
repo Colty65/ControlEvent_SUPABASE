@@ -1,8 +1,8 @@
-/* ControlEvent v10.4_prod - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v10.4.1_prod - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
-  const VERSION = 'ControlEvent v10.4_prod';
+  const VERSION = 'ControlEvent v10.4.1_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();

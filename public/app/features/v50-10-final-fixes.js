@@ -1,11 +1,11 @@
-/* ControlEvent v10.4_prod - ajuste minimo sobre v50.9.
+/* ControlEvent v10.4.1_prod - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.4_prod';
+  const VERSION = 'ControlEvent v10.4.1_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const INSTALLED = '__ceV5010FinalFixes';
   if(window[INSTALLED]) return;

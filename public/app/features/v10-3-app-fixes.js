@@ -1,8 +1,8 @@
-/* ControlEvent v10.4_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
+/* ControlEvent v10.4.1_prod - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
 (function(){
   'use strict';
   if(window.__ceV103AppFixes) return; window.__ceV103AppFixes=true;
-  var VERSION='v10.4_prod', VERSION_FULL='ControlEvent v10.4_prod';
+  var VERSION='v10.4.1_prod', VERSION_FULL='ControlEvent v10.4.1_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

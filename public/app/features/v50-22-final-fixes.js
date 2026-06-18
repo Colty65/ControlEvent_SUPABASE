@@ -1,11 +1,11 @@
-/* ControlEvent v10.4_prod - correccion minima sobre la base estable v50.20.
+/* ControlEvent v10.4.1_prod - correccion minima sobre la base estable v50.20.
    - No carga la capa v50.21 que bloqueaba la seleccion de evento.
    - Salir limpia el evento anterior antes de volver a Login.
    - Tras login queda CE + Selecciona evento; al elegir evento no se vuelve a bloquear.
    - La version visible y exportada queda unificada mediante constantes actualizadas en bundles. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4_prod';
+  const VERSION = 'ControlEvent v10.4.1_prod';
   const VERSION_FILE = 'ControlEvent_v10_4_prod';
   const INSTALLED = '__ceV5022FinalFixes';
   if(window[INSTALLED]) return;
