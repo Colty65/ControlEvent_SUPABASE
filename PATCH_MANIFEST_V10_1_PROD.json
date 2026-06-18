@@ -1,5 +1,5 @@
 {
-  "version": "v10.2_prod",
+  "version": "v10.3_prod",
   "base": "v10.0_prod",
   "files_created": [
     "public/app/features/v10-2-ticketauto-compras.js",

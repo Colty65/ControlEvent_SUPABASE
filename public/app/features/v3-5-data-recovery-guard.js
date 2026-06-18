@@ -1,9 +1,9 @@
-/* ControlEvent v10.2_prod - guarda de recuperacion de INGRESOS sin escrituras destructivas. */
+/* ControlEvent v10.3_prod - guarda de recuperacion de INGRESOS sin escrituras destructivas. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.2_prod';
-  const VERSION_FILE = 'ControlEvent_v10_2_prod';
+  const VERSION = 'ControlEvent v10.3_prod';
+  const VERSION_FILE = 'ControlEvent_v10_3_prod';
   const INSTALLED = '__ceV350DataRecoveryGuard';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -46,7 +46,7 @@
   function call(name, ...args){
     const fn = getFn(name);
     if(typeof fn !== 'function') return undefined;
-    try{ return fn(...args); }catch(error){ console.warn('[ControlEvent v10.2_prod]', name, error); return undefined; }
+    try{ return fn(...args); }catch(error){ console.warn('[ControlEvent v10.3_prod]', name, error); return undefined; }
   }
   function selectedId(source){
     try{
@@ -169,7 +169,7 @@
     });
 
     if(changed){
-      console.warn('[ControlEvent v10.2_prod] Recuperados datos desde /api/state:', reason);
+      console.warn('[ControlEvent v10.3_prod] Recuperados datos desde /api/state:', reason);
     }
     return changed;
   }
@@ -194,7 +194,7 @@
       }
       return changed;
     }catch(error){
-      console.warn('[ControlEvent v10.2_prod] No se pudo recuperar /api/state.', error);
+      console.warn('[ControlEvent v10.3_prod] No se pudo recuperar /api/state.', error);
       return false;
     }finally{
       recoverBusy = false;
@@ -230,7 +230,7 @@
             }
           });
           if(blocked){
-            console.warn('[ControlEvent v10.2_prod] Bloqueado guardado de colecciones vacias en /api/state.');
+            console.warn('[ControlEvent v10.3_prod] Bloqueado guardado de colecciones vacias en /api/state.');
             nextInit = Object.assign({}, init, {body:JSON.stringify(payload)});
             setTimeout(() => recover('blocked-empty-put'), 80);
           }
@@ -247,7 +247,7 @@
     if(typeof old !== 'function' || old.__ceV350Recovery) return;
     const wrapped = function(){
       let rows = [];
-      try{ rows = old.apply(this, arguments) || []; }catch(error){ console.warn('[ControlEvent v10.2_prod] collabsForEvent original fallo.', error); }
+      try{ rows = old.apply(this, arguments) || []; }catch(error){ console.warn('[ControlEvent v10.3_prod] collabsForEvent original fallo.', error); }
       if(Array.isArray(rows) && rows.length) return rows;
       const fallback = directRows(st());
       if(fallback.length) return fallback;

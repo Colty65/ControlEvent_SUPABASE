@@ -1,0 +1,20 @@
+ControlEvent v10.3_prod
+
+Cambios principales:
+- Versión cambiada a v10.3_prod en referencias activas.
+- Mapa de recursos: clic en TKxx abre visor común con información contable completa y búsqueda flexible de imagen por evento+TKxx, admitiendo claves ampliadas como TK01 - tienda.
+- Visor común de tickets: tabla contable con scroll para tickets con muchos registros, imagen a la derecha y mensaje grande si no hay imagen.
+- Compras y Donaciones: buscador reforzado en eventos En curso y Finalizados; si encuentra, rodea la ficha en rojo y negrita.
+- Documentos del evento e Ingresos: descarga de imagen/justificante habilitada tanto en Finalizado como En curso.
+- Arranque tras Ctrl+F5: refuerzo para evitar quedarse a medias con usuario reconocido pero sin menú.
+- Ticket Auto: en Compras previstas se marcan en rojo las posibles candidatas a eliminar por similitud con las líneas detectadas por IA; el usuario debe confirmar con el tic.
+- Compartir pantalla: panel simplificado para uso real con TV/proyector: pantalla completa + instrucciones de duplicación del sistema + copiar enlace.
+
+Ficheros clave nuevos/modificados:
+- public/app/features/v10-3-app-fixes.js
+- public/app/features/v10-3-ticketauto-compras.js
+- index.html
+- public/index.html
+- public/app/version.js
+- routes/export.routes.js
+- package.json / package-lock.json

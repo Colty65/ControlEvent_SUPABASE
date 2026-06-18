@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v10.2_prod",
+  "version": "ControlEvent v10.3_prod",
   "base": "ControlEvent v9.4_prod",
   "changes": [
     "Eliminado MATERIAL como opción del desplegable Segmento",
@@ -11,7 +11,7 @@
     "Selección automática de Responsable desde Gemini o desde las indicaciones del usuario",
     "Refuerzo actualización precio PRODUCTOS existentes",
     "Parche de login para no mostrar evento aparente antes de elección real",
-    "Versión actualizada a v10.2_prod en referencias activas"
+    "Versión actualizada a v10.3_prod en referencias activas"
   ],
   "files_added": [
     "public/app/features/v9-5-ticketauto-compras.js",

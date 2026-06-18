@@ -1,8 +1,8 @@
-/* ControlEvent v10.2_prod - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
+/* ControlEvent v10.3_prod - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
 (function(){
   'use strict';
   if(window.__ceV102AppFixes) return; window.__ceV102AppFixes=true;
-  var VERSION='v10.2_prod';
+  var VERSION='v10.3_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -24,7 +24,7 @@
     if($('ceV102Style')) return;
     var st=document.createElement('style'); st.id='ceV102Style';
     st.textContent='\n'+
-      '.appname-stack .ce-v102-brand-mini{display:inline-flex!important;align-items:center!important;gap:6px!important;font-weight:900!important;white-space:nowrap!important}.ce-v102-brand-mini img{height:28px!important;width:28px!important;object-fit:contain!important;border-radius:6px!important}.ce-v102-brand-mini span{font-size:13px!important;font-weight:900!important}@media(max-width:700px){.appname-stack .ce-v102-brand-mini img{height:22px!important;width:22px!important}.ce-v102-brand-mini span{font-size:10px!important}.brand-user strong{max-width:190px!important}}\n'+
+      '.appname-stack .ce-v103-brand-mini{display:inline-flex!important;align-items:center!important;gap:6px!important;font-weight:900!important;white-space:nowrap!important}.ce-v103-brand-mini img{height:28px!important;width:28px!important;object-fit:contain!important;border-radius:6px!important}.ce-v103-brand-mini span{font-size:13px!important;font-weight:900!important}@media(max-width:700px){.appname-stack .ce-v103-brand-mini img{height:22px!important;width:22px!important}.ce-v103-brand-mini span{font-size:10px!important}.brand-user strong{max-width:190px!important}}\n'+
       '#ceShareScreenBtn{font-size:16px!important;width:32px!important;height:30px!important;min-width:32px!important;min-height:30px!important;padding:2px!important;border-radius:9px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;touch-action:manipulation!important}\n'+
       '#ceShareScreenPanel{position:fixed!important;inset:0!important;z-index:10000040!important;background:rgba(15,23,42,.72)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important}#ceShareScreenPanel .box{background:#fff!important;border:2px solid #0ea5e9!important;border-radius:16px!important;max-width:760px!important;width:96vw!important;padding:16px!important;box-shadow:0 24px 80px rgba(0,0,0,.35)!important}#ceShareScreenPanel .head{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;margin-bottom:10px!important;font-weight:900!important;color:#075985!important}#ceShareScreenPanel .actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin-top:12px!important}#ceShareScreenPanel .actions button{min-height:42px!important;font-weight:900!important}#ceShareScreenPanel video{width:100%!important;max-height:260px!important;border-radius:12px!important;border:1px solid #cbd5e1!important;background:#0f172a!important;margin-top:10px!important}#ceShareStatus{margin-top:10px!important;border:1px solid #bae6fd!important;background:#f0f9ff!important;color:#075985!important;border-radius:10px!important;padding:8px!important;font-weight:800!important}@media(max-width:640px){#ceShareScreenPanel .actions{grid-template-columns:1fr!important}}\n'+
       'body.ce-finalizado-consulta #comprasSearchInput,body.ce-finalizado-consulta #donacionesSearchInput,body.ce-v235-finalizado #comprasSearchInput,body.ce-v235-finalizado #donacionesSearchInput,body.ce-v233-final-consulta #comprasSearchInput,body.ce-v233-final-consulta #donacionesSearchInput,#comprasSearchInput,#donacionesSearchInput,#comprasSearchInputBtn,#donacionesSearchInputBtn{pointer-events:auto!important;opacity:1!important;filter:none!important;background:#fff!important;user-select:text!important}\n'+
@@ -42,9 +42,9 @@
 
   function compactHeader(){
     var stack=document.querySelector('.appname-stack'); if(!stack) return;
-    var first=stack.querySelector(':scope > span,.ce-v96-brand-mini,.ce-v100-brand-mini,.ce-v101-brand-mini,.ce-v102-brand-mini'); if(!first) return;
-    if(first.className==='ce-v102-brand-mini' && first.textContent.indexOf(VERSION)>=0){ document.title='ControlEvent '+VERSION; return; }
-    first.className='ce-v102-brand-mini';
+    var first=stack.querySelector(':scope > span,.ce-v96-brand-mini,.ce-v100-brand-mini,.ce-v101-brand-mini,.ce-v103-brand-mini'); if(!first) return;
+    if(first.className==='ce-v103-brand-mini' && first.textContent.indexOf(VERSION)>=0){ document.title='ControlEvent '+VERSION; return; }
+    first.className='ce-v103-brand-mini';
     first.innerHTML='<img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>'+VERSION+'</span>';
     document.title='ControlEvent '+VERSION;
   }

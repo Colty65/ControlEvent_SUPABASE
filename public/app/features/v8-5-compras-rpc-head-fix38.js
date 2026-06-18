@@ -313,7 +313,7 @@
   }
   function toast(msg){
     // v9.5.1: sin avisos flotantes negros; solo consola para depuración.
-    try{ console.info(LOG || '[ControlEvent v10.2_prod]', msg); }catch(_){}
+    try{ console.info(LOG || '[ControlEvent v10.3_prod]', msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX38: dejamos de confiar en repintados parciales legacy.
