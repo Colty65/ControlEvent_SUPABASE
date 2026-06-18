@@ -93,7 +93,7 @@
       '.ce-ai-table button.ce-ai-danger{padding:4px 6px!important;font-size:0!important;border-radius:10px!important}.ce-ai-table button.ce-ai-danger::after{content:"✖";font-size:13px!important;}\n'+
       '.ce-ai-pending-box{margin-top:7px!important;padding:8px!important}.ce-ai-pending-title{font-size:15px!important}.ce-ai-pending-tools{display:flex;align-items:center;gap:6px;margin-left:auto}.ce-ai-pending-tools label{font-size:11px;color:#0369a1;font-weight:900}.ce-ai-pending-tools select{border:1px solid #bae6fd;border-radius:8px;padding:5px;background:#fff;font-weight:800}\n'+
       '.ce-ai-pending-list{max-height:230px!important;margin-top:5px!important}.ce-ai-pending-row{grid-template-columns:30px minmax(120px,1fr) minmax(96px,150px) 96px 90px!important;gap:6px!important;padding:4px 0!important;font-size:12px!important}\n';
-    st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n.ce-ai-pending-row.ce-ai-pending-candidate strong,.ce-ai-pending-row.ce-ai-pending-candidate span{color:#b91c1c!important;font-weight:950!important}\n";
+    st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n.ce-ai-pending-row.ce-ai-pending-candidate-same strong,.ce-ai-pending-row.ce-ai-pending-candidate-same span,.ce-ai-row-match-same td,.ce-ai-row-match-same input,.ce-ai-row-match-same select{color:#b91c1c!important;font-weight:950!important}\n.ce-ai-pending-row.ce-ai-pending-candidate-other strong,.ce-ai-pending-row.ce-ai-pending-candidate-other span,.ce-ai-row-match-other td,.ce-ai-row-match-other input,.ce-ai-row-match-other select{color:#c2410c!important;font-weight:950!important}\n";
 
     st.textContent += '\n.ce-ai-trash-btn{width:30px!important;min-width:30px!important;height:28px!important;min-height:28px!important;padding:0!important;border-radius:8px!important;font-size:16px!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}\n.ce-ai-trash-btn::after{content:""!important;font-size:0!important}\n.ce-ai-table button.ce-ai-trash-btn{font-size:16px!important;padding:0!important}\n';
 
@@ -313,6 +313,7 @@
       var existing=findBestProductByName(r.descripcion) || productByExactName(r.descripcion);
       var cls=(Number(r.confianza||0)<0.65 || !trim(r.descripcion))?'ce-ai-row-low':'ce-ai-row-ok';
       cls += existing ? ' ce-ai-existing-product' : ' ce-ai-new-product';
+      var pairKind=aiLineCandidateKind(r); if(pairKind==='same') cls+=' ce-ai-row-match-same'; else if(pairKind==='other') cls+=' ce-ai-row-match-other';
       var unidades=money(r.unidades)||1; var precio=money(r.precio); var importe=round2(unidades*precio);
       var seg=trim(r.segmento) || (existing ? (existing.segmento||'') : guessSegment(r.descripcion));
       var des=trim(r.destino) || (existing ? (existing.destino||'') : guessDestino(r.descripcion));
@@ -476,27 +477,65 @@
     });
     return rows;
   }
-  function pendingLooksCandidate(compra){
-    var pname=productNameById(compra && compra.productoId);
-    if(!trim(pname)) return false;
-    var ai=currentAiProductRows();
-    var pTok=pendingTokens(pname), pUnit=money(compra && compra.precio), pTotal=pendingRowTotal(compra);
-    for(var i=0;i<ai.length;i++){
-      var a=ai[i], sc=productSimilarityScore(pname, a.name);
-      if(sc>=72 || normalizeName(pname)===normalizeName(a.name)) return true;
-      var aTok=pendingTokens(a.name);
-      var common=pTok.some(function(x){ return aTok.some(function(y){ return x===y || x.indexOf(y)===0 || y.indexOf(x)===0; }); });
-      if(common && (closePrice(pUnit,a.price) || closePrice(pTotal,a.total) || closePrice(pTotal,a.price))) return true;
-    }
+  function currentTicketStoreId(){ return trim(($('ceAiTienda')||{}).value); }
+  function aiPendingSimilar(pname, a){
+    pname=trim(pname); if(!pname || !a || !trim(a.name)) return false;
+    var sc=productSimilarityScore(pname, a.name);
+    if(sc>=72 || normalizeName(pname)===normalizeName(a.name)) return true;
+    var pTok=pendingTokens(pname), aTok=pendingTokens(a.name);
+    var common=pTok.some(function(x){ return aTok.some(function(y){ return x===y || x.indexOf(y)===0 || y.indexOf(x)===0; }); });
+    if(common && (closePrice(a.pendingUnit||0,a.price) || closePrice(a.pendingTotal||0,a.total) || closePrice(a.pendingTotal||0,a.price))) return true;
     return false;
   }
-  function renderPendingPurchases(){
+  function pendingCandidateKind(compra){
+    var pname=productNameById(compra && compra.productoId);
+    if(!trim(pname)) return '';
+    var selectedStore=currentTicketStoreId();
+    var sameStore=selectedStore && trim(compra && compra.tiendaId)===selectedStore;
+    var ai=currentAiProductRows(), pUnit=money(compra && compra.precio), pTotal=pendingRowTotal(compra);
+    var foundOther=false;
+    for(var i=0;i<ai.length;i++){
+      var a=Object.assign({},ai[i],{pendingUnit:pUnit,pendingTotal:pTotal});
+      if(aiPendingSimilar(pname,a)){
+        if(sameStore) return 'same';
+        foundOther=true;
+      }
+    }
+    return foundOther ? 'other' : '';
+  }
+  function aiLineCandidateKind(line){
+    var d=trim(line && line.descripcion), od=trim(line && line.nombreDetectadoOriginal);
+    if(!d && !od) return '';
+    var u=money(line && line.unidades)||1, p=money(line && line.precio), im=money(line && line.importe)||(u*p);
+    var ai=[];
+    if(d) ai.push({name:d, units:u, price:p, total:im});
+    if(od && normalizeName(od)!==normalizeName(d)) ai.push({name:od, units:u, price:p, total:im});
+    var selectedStore=currentTicketStoreId();
+    var foundOther=false, rows=pendingPurchasesForEvent();
+    for(var r=0;r<rows.length;r++){
+      var c=rows[r], pname=productNameById(c && c.productoId);
+      if(!trim(pname)) continue;
+      var pUnit=money(c && c.precio), pTotal=pendingRowTotal(c);
+      for(var i=0;i<ai.length;i++){
+        var a=Object.assign({},ai[i],{pendingUnit:pUnit,pendingTotal:pTotal});
+        if(aiPendingSimilar(pname,a)){
+          if(selectedStore && trim(c && c.tiendaId)===selectedStore) return 'same';
+          foundOther=true;
+        }
+      }
+    }
+    return foundOther ? 'other' : '';
+  }
+  function pendingLooksCandidate(compra){ return !!pendingCandidateKind(compra); }
+    function renderPendingPurchases(){
     var box=$('ceAiPendingList'); if(!box) return;
     var rows=pendingPurchasesForEvent();
     if(!rows.length){ box.innerHTML='<div class="ce-ai-muted">No hay compras previstas pendientes en este evento.</div>'; return; }
     box.innerHTML=rows.map(function(c){
-      var cand=pendingLooksCandidate(c);
-      return '<label class="ce-ai-pending-row '+(cand?'ce-ai-pending-candidate':'')+'" title="'+(cand?'Posible compra ya realizada en este ticket. Márcala solo si quieres eliminarla.':'')+'"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong>'+htmlEscape(productNameById(c.productoId))+'</strong><span>'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span>'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span>'+htmlEscape(euro(compraValue(c)))+'</span></label>';
+      var kind=pendingCandidateKind(c), cand=!!kind;
+      var cls=cand ? ('ce-ai-pending-candidate ce-ai-pending-candidate-'+kind) : '';
+      var title=kind==='same' ? 'Posible compra ya realizada en este ticket y en la misma tienda. Márcala solo si quieres eliminarla.' : (kind==='other' ? 'Producto parecido al ticket, pero de otra tienda. Revisa antes de marcar.' : '');
+      return '<label class="ce-ai-pending-row '+cls+'" title="'+htmlEscape(title)+'"><input type="checkbox" data-ce-ai-pending-delete="'+htmlEscape(c.id)+'"><strong>'+htmlEscape(productNameById(c.productoId))+'</strong><span>'+htmlEscape(tiendaNameById(c.tiendaId)||'Sin tienda')+'</span><span>'+htmlEscape((money(c.unidades)||0)+' ud x '+dec(c.precio))+'</span><span>'+htmlEscape(euro(compraValue(c)))+'</span></label>';
     }).join('');
   }
   function collectPendingDeleteIds(){

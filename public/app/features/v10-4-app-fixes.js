@@ -73,7 +73,18 @@
     }
     return fold(parts.join(' '));
   }
-  function cardsIn(list){ return Array.prototype.slice.call((list||document).querySelectorAll(':scope > .itemcard, :scope .itemcard, :scope > .rowline, :scope .rowline')).filter(function(c){ return !c.closest('.maint-search,.ce-v434-search,.ce-v413-search') && c.offsetParent!==null; }); }
+  function cardsIn(list){
+    return Array.prototype.slice.call((list||document).querySelectorAll(':scope > .itemcard, :scope .itemcard, :scope > .rowline, :scope .rowline')).filter(function(c){
+      if(!c || c.offsetParent===null) return false;
+      if(c.closest('.maint-search,.ce-v434-search,.ce-v413-search')) return false;
+      // No considerar la propia caja de búsqueda como ficha: si no, el texto buscado está dentro del input
+      // y siempre "encuentra" el primer bloque visible.
+      if(c.querySelector('#comprasSearchInput,#donacionesSearchInput,#comprasSearchInputBtn,#donacionesSearchInputBtn,.maint-search,.ce-v434-search,.ce-v413-search')) return false;
+      var label=fold(c.textContent||'');
+      if(/^\s*BUSCAR\s+(COMPRA|DONACION)/.test(label)) return false;
+      return true;
+    });
+  }
   function runSearch(listId,inputId){ var list=$(listId), input=$(inputId); if(!list||!input) return false; var toks=fold(input.value||'').split(/\s+/).filter(Boolean); if(!toks.length) return false; var found=cardsIn(list).find(function(card){ var hay=rowSearchText(card); return toks.every(function(t){return hay.indexOf(t)>=0;}); }); document.querySelectorAll('.ce-search-found-v104').forEach(function(x){x.classList.remove('ce-search-found-v104');}); if(found){ found.classList.add('ce-search-found-v104'); try{ found.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ found.scrollIntoView(); } setTimeout(function(){ found.classList.remove('ce-search-found-v104'); },5000); return true; } alert('No se ha encontrado ningún registro con ese texto.'); return false; }
   function enableSearch(){ ['comprasSearchInput','donacionesSearchInput'].forEach(function(id){ var el=$(id); if(el){ el.disabled=false; el.readOnly=false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); }}); ['comprasSearchInputBtn','donacionesSearchInputBtn'].forEach(function(id){ var b=$(id); if(b){ b.disabled=false; b.removeAttribute('disabled'); b.style.setProperty('pointer-events','auto','important'); b.style.setProperty('opacity','1','important'); }}); }
   function handleSearch(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#comprasSearchInputBtn,#donacionesSearchInputBtn'); if(b){ stop(ev); return runSearch(b.id==='comprasSearchInputBtn'?'comprasList':'donacionesList', b.id==='comprasSearchInputBtn'?'comprasSearchInput':'donacionesSearchInput'); } if(ev.type==='keydown'){ var i=ev.target&&ev.target.closest&&ev.target.closest('#comprasSearchInput,#donacionesSearchInput'); if(i && ev.key==='Enter'){ stop(ev); return runSearch(i.id==='comprasSearchInput'?'comprasList':'donacionesList', i.id); } } }
@@ -101,6 +112,7 @@
   function handleDownloadClick(ev){ var btn=ev.target&&ev.target.closest&&ev.target.closest('.ce-v104-download-btn,.ce-v103-download-btn'); if(!btn) return; stop(ev); var img=(btn.parentElement&&btn.parentElement.querySelector('img')) || (btn.closest('.itemcard,.rowline,.card,.ce-doc-item')&&btn.closest('.itemcard,.rowline,.card,.ce-doc-item').querySelector('img')); if(img){ var now=Date.now(); if(!btn.__ceLastDownload || now-btn.__ceLastDownload>=900){ btn.__ceLastDownload=now; downloadSrc(img.currentSrc||img.src||'', btn.classList.contains('ce-v104-doc-download')?'documento_evento':'justificante_ingreso'); } } return false; }
   function hydrateDownloads(){ hydrateDocumentDownloads(); hydrateIngresoDownloads(); }
 
+  var __ceV104LastHalfBootRecover=0;
   function recoverHalfBoot(){
     var hasUser=!!(safe(function(){return window.authUser || window.__CONTROL_EVENT_USER__ || JSON.parse(localStorage.getItem('ControlEvent_current_user')||'null') || JSON.parse(localStorage.getItem('ControlEvent_auth_user_v509')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v10_4_2_prod_session')||'null') || JSON.parse(localStorage.getItem('ControlEvent_v3_0_prod_session')||'null');}, null));
     var name=trim(($('brandCurrentUserName')||{}).textContent||($('currentUserName')||{}).textContent||'');
@@ -109,15 +121,24 @@
     var tabs=$('mainTabs');
     var visible=tabs && Array.prototype.some.call(tabs.querySelectorAll('button.tab'),function(b){ return !b.classList.contains('hidden') && b.offsetParent!==null; });
     if(visible) return;
+    if(Date.now()-__ceV104LastHalfBootRecover<5000) return;
+    __ceV104LastHalfBootRecover=Date.now();
     if(tabs){ tabs.classList.remove('hidden'); tabs.style.removeProperty('display'); }
+    // Recuperación puntual, no refresco continuo: evita el parpadeo/temblor al cambiar menú o evento.
     safe(function(){ if(typeof renderAuthUI==='function') renderAuthUI(); });
     safe(function(){ if(typeof render==='function') render(); });
-    setTimeout(function(){ safe(function(){ if(typeof renderAuthUI==='function') renderAuthUI(); }); safe(function(){ if(typeof render==='function') render(); }); },250);
   }
   function stabilizeEventLoad(){ var s=stateObj(); var ev=selectedEventId(); if(!ev) return; ['compras','colaboradores','productos','personas','tiendas'].forEach(function(k){ if(Array.isArray(s[k]) && s[k].length) s['__ceV104LastGood_'+k]=s[k].slice(); else if(Array.isArray(s['__ceV104LastGood_'+k]) && (k==='compras'||k==='colaboradores')) s[k]=s['__ceV104LastGood_'+k].slice(); }); }
   function cleanupComprasHeader(){ var card=document.querySelector('#tabCompras .card'); if(!card) return; Array.prototype.slice.call(card.querySelectorAll('p')).forEach(function(p){ if(trim(p.textContent)==='Compras normales y otros gastos, con responsable opcional.') p.remove(); }); }
 
+  var __ceV104TickTimer=0, __ceV104TickLast=0;
   function tick(){ injectStyle(); applyVersion(); ensureShareButton(); enableSearch(); markMapaTickets(); hydrateDownloads(); recoverHalfBoot(); cleanupComprasHeader(); }
+  function scheduleTick(delay){
+    var now=Date.now();
+    if(__ceV104TickTimer) return;
+    var wait=Math.max(delay||0, (now-__ceV104TickLast<350)?350-(now-__ceV104TickLast):0);
+    __ceV104TickTimer=setTimeout(function(){ __ceV104TickTimer=0; __ceV104TickLast=Date.now(); tick(); }, wait);
+  }
   window.addEventListener('click',handleSearch,true);
   window.addEventListener('pointerdown',handleDownloadClick,true); window.addEventListener('mousedown',handleDownloadClick,true); window.addEventListener('touchstart',handleDownloadClick,{capture:true,passive:false}); window.addEventListener('touchend',handleDownloadClick,{capture:true,passive:false}); window.addEventListener('click',handleDownloadClick,true); window.addEventListener('keydown',handleSearch,true);
   window.addEventListener('pointerdown',handleTicketImage,true); window.addEventListener('touchstart',handleTicketImage,{capture:true,passive:false});
@@ -125,7 +146,7 @@
   document.addEventListener('pointerdown',function(ev){ if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-v104-close]')) return closeTicketDetail(ev); handleShare(ev); },true);
   document.addEventListener('click',function(ev){ if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-v104-close]')) return closeTicketDetail(ev); handleShare(ev); },true);
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape'){ var p=$('ceShareScreenPanel'); if(p){ p.remove(); stop(ev); return false; } if($('ceV104TicketDetail')) return closeTicketDetail(ev); } },true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-loaded','controlevent:ticket-image-changed'].forEach(function(e){ window.addEventListener(e,function(){ setTimeout(tick,40); setTimeout(tick,240); }); });
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-loaded','controlevent:ticket-image-changed'].forEach(function(e){ window.addEventListener(e,function(){ scheduleTick(90); }); });
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ scheduleTick(20); },{once:true}); else scheduleTick(20);
   window.ControlEventV104={version:VERSION, openTicketDetail:openTicketDetail, runSearch:runSearch, openSharePanel:openSharePanel, hydrateDownloads:hydrateDownloads};
 })();
