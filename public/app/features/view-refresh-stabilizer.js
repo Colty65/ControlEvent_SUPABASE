@@ -1,9 +1,11 @@
-/* ControlEvent v10.4.2_prod - Estabilizador de vistas
-   Refuerza el refresco de Colaboradores/Ingresos, Donaciones y Compras tras login,
-   cambio de evento y cambio de pestaña. No cambia datos: sólo repinta la vista activa. */
+/* ControlEvent v10.4.2_prod - Estabilizador de vistas (hotfix sin retemblores)
+   Esta versión evita repintados múltiples. Solo interviene si la vista activa queda vacía
+   aunque el estado del evento sí tenga datos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v10.4.2_prod';
+  if(window.__ceViewRefreshStabilizerNoTremble) return;
+  window.__ceViewRefreshStabilizerNoTremble = true;
+  const VERSION = 'ControlEvent v10.4.2_prod HOTFIX no-tremble';
   const stats = {version:VERSION, installed:true, schedules:0, hydrations:0, forced:0, errors:[], last:null};
   const $ = id => document.getElementById(id);
   const TAB_BY_BUTTON = {
@@ -67,7 +69,7 @@
       donaciones: compras.filter(r=>isDonationTicketValue(r.ticketDonacion))
     };
   }
-  function hasItemCards(id){ const el=$(id); return !!el && !!el.querySelector('.itemcard'); }
+  function hasItemCards(id){ const el=$(id); return !!el && !!el.querySelector('.itemcard,.ce-mapa-card,.ce-budget-card'); }
   function visibleButMissing(tab){
     if(!visiblePanel(tab)) return false;
     const rows=eventRows();
@@ -76,15 +78,18 @@
     if(tab==='compras') return rows.compras.length>0 && !hasItemCards('comprasList');
     return false;
   }
+  let hydrateTimer=0, lastHydrate=0;
   function hydrate(tab, reason){
     if(!hasAuth() || !hasEvent()) return;
     tab = tab || currentTab();
     if(role()==='RO' && ['ingresos','donaciones','compras'].includes(tab)) return;
+    if(!visibleButMissing(tab)) return; // clave del hotfix: no repintar si ya hay pantalla
+    const now=Date.now();
+    if(now-lastHydrate<1600) return;
+    lastHydrate=now;
     stats.hydrations += 1;
+    stats.forced += 1;
     stats.last = {at:new Date().toISOString(), tab, reason};
-    try{ call('renderHeader'); }catch(_){ }
-    try{ call('renderTabVisibility'); }catch(_){ }
-    try{ if(role()!=='RO') call('renderMainSelectors'); }catch(_){ }
     if(tab==='ingresos'){
       call('renderIngresosSummary');
       call('renderColabs');
@@ -92,30 +97,14 @@
       call('renderDonaciones');
     }else if(tab==='compras'){
       call('renderCompras');
-    }else if(tab==='mapa'){
-      call('renderMapaProductos');
-    }else if(tab==='resumen'){
-      call('renderBudget');
-    }else if(tab==='graficas'){
-      call('renderGraficas');
     }
-    try{ call('renderPermissions'); call('renderLockState'); }catch(_){ }
-    try{ window.ControlEventModules?.activate?.(tab, {reason:'view-refresh-stabilizer:'+reason}); }catch(_){ }
   }
-  let timer = 0;
   function schedule(reason, delay){
     stats.schedules += 1;
-    clearTimeout(timer);
-    timer = setTimeout(() => hydrate(currentTab(), reason || 'scheduled'), Number(delay ?? 80)), Number(delay ?? 80);
+    clearTimeout(hydrateTimer);
+    hydrateTimer=setTimeout(()=>hydrate(currentTab(), reason || 'missing-check'), Number(delay ?? 650));
   }
-  function scheduleSeries(reason){
-    schedule(reason+':quick', 60);
-    setTimeout(() => hydrate(currentTab(), reason+':late'), 260);
-    setTimeout(() => {
-      const tab=currentTab();
-      if(visibleButMissing(tab)){ stats.forced += 1; hydrate(tab, reason+':missing-visible-data'); }
-    }, 720);
-  }
+  function scheduleSeries(reason){ schedule(reason, 700); }
   function tabFromEvent(event){
     const btn = event.target?.closest?.('button[id],.mobile-menu-action[data-target]');
     if(!btn) return '';
@@ -126,38 +115,15 @@
     const tab=tabFromEvent(event);
     if(!tab) return;
     setCurrentTab(tab);
-    // Al salir de Mapa, se desactiva su pin lógico público.
     if(tab!=='mapa') { try{ window.__ceMapaProductosPinned=false; }catch(_){ } }
-    scheduleSeries('tab-click:'+tab);
+    schedule('tab-click:'+tab, 750);
   }, false);
   document.addEventListener('change', event => {
-    if(event.target && event.target.id==='selectedEvent'){
-      scheduleSeries('event-change');
-    }
+    if(event.target && event.target.id==='selectedEvent') schedule('event-change', 900);
   }, false);
-  window.addEventListener('controlevent:app-ready', () => scheduleSeries('app-ready'));
-  window.addEventListener('controlevent:runtime-ready', () => scheduleSeries('runtime-ready'));
-
-  function patchRender(){
-    const old = getFn('render');
-    if(typeof old !== 'function' || old.__ceV304Stabilized) return false;
-    const wrapped = function(){
-      const result = old.apply(this, arguments);
-      schedule('after-render', 90);
-      return result;
-    };
-    wrapped.__ceV304Stabilized = true;
-    try{ render = wrapped; }catch(_){ }
-    try{ window.render = wrapped; }catch(_){ }
-    try{ if(app()?.actions) app().actions.render = (...args)=>wrapped(...args); }catch(_){ }
-    return true;
-  }
-  patchRender();
-  setTimeout(patchRender, 400);
-  setTimeout(patchRender, 1400);
-  setInterval(() => {
-    const tab=currentTab();
-    if(visibleButMissing(tab)){ stats.forced += 1; hydrate(tab, 'watchdog-visible-empty'); }
-  }, window.ControlEventLowResource?.interval?.(2600) || 2600);
+  window.addEventListener('controlevent:app-ready', () => schedule('app-ready', 900));
+  window.addEventListener('controlevent:runtime-ready', () => schedule('runtime-ready', 900));
+  window.addEventListener('controlevent:event-loaded', () => schedule('event-loaded', 900));
+  setInterval(() => { schedule('watchdog-visible-empty', 100); }, window.ControlEventLowResource?.interval?.(5000) || 5000);
   window.ControlEventViewRefreshStabilizer = {version:VERSION, stats, hydrate, schedule:scheduleSeries, inspect:()=>({...stats, tab:currentTab(), role:role(), eventId:eventId(), rows:eventRows()})};
 })();

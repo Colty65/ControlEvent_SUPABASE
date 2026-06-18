@@ -9,7 +9,17 @@
   function safe(fn,fb){ try{ var v=fn(); return v===undefined?fb:v; }catch(_){ return fb; } }
   function stateObj(){ return safe(function(){return (typeof state!=='undefined'&&state)||window.state||{};}, window.state||{}); }
   function authObj(){ return safe(function(){ return (typeof authUser!=='undefined'&&authUser)||window.authUser||null; }, window.authUser||null); }
-  function isLogged(){ var u=authObj(); return !!(u && (u.identificacion || u.nombre || u.nivel)); }
+  function isLogged(){
+    var u=authObj();
+    if(u && (u.identificacion || u.nombre || u.nivel)) return true;
+    // Respaldo DOM por si authUser todavía no se ha expuesto como global.
+    var o=$('authOverlay');
+    if(o && o.classList.contains('hidden')){
+      var name=trim((($('brandCurrentUserName')||{}).textContent)||(($('currentUserName')||{}).textContent)||'');
+      if(name && !/^sin acceso$/i.test(name)) return true;
+    }
+    return false;
+  }
   function selectedEventId(){ var s=stateObj(); var id=trim(s.selectedEventId); if(id) return id; var sel=$('selectedEvent'); return sel?trim(sel.value):''; }
   function stop(ev){ if(ev){ ev.preventDefault&&ev.preventDefault(); ev.stopPropagation&&ev.stopPropagation(); ev.stopImmediatePropagation&&ev.stopImmediatePropagation(); } return false; }
   function injectStyle(){
@@ -22,6 +32,7 @@
       '#ceShareScreenBtn1042{font-size:16px!important;width:32px!important;height:30px!important;min-width:32px!important;min-height:30px!important;padding:2px!important;border-radius:9px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;touch-action:manipulation!important}\n'+
       '#ceShareScreenPanel1042{position:fixed!important;inset:0!important;z-index:10000090!important;background:rgba(15,23,42,.72)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important}#ceShareScreenPanel1042 .box{background:#fff!important;border:2px solid #0ea5e9!important;border-radius:16px!important;max-width:690px!important;width:96vw!important;padding:16px!important;box-shadow:0 24px 80px rgba(0,0,0,.35)!important}#ceShareScreenPanel1042 .head{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;margin-bottom:10px!important;font-weight:950!important;color:#075985!important}.ce-share1042-help{font-size:14px!important;line-height:1.45!important;color:#334155!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:12px!important;padding:12px!important}.ce-share1042-help b{color:#0f172a!important}.ce-share1042-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin:12px 0!important}.ce-share1042-actions button{min-height:44px!important;font-weight:950!important}.ce-share1042-status{margin-top:10px!important;border:1px solid #bae6fd!important;background:#f0f9ff!important;color:#075985!important;border-radius:10px!important;padding:8px!important;font-weight:850!important}@media(max-width:680px){.ce-share1042-actions{grid-template-columns:1fr!important}}\n'+
       '.ce-v1042-ingreso-download{width:32px!important;height:30px!important;min-width:32px!important;min-height:30px!important;padding:1px!important;border-radius:8px!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-left:4px!important}\n'+
+      '#tabDocumentos .ce-doc-thumb,#tabDocumentos img.ce-doc-thumb{display:block!important;visibility:visible!important;opacity:1!important;width:52px!important;height:52px!important;max-width:52px!important;max-height:52px!important;object-fit:cover!important}#tabDocumentos .ce-doc-media{min-width:58px!important;min-height:58px!important;overflow:visible!important}#tabDocumentos .ce-v1042-doc-download{width:32px!important;height:30px!important;min-width:32px!important;min-height:30px!important;padding:1px!important;border-radius:8px!important;font-size:16px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-left:4px!important}\n'+
       '.ce-ai-pending-row.ce-ai-pending-candidate{background:transparent!important;border:0!important;box-shadow:none!important;padding-left:0!important;padding-right:0!important}.ce-ai-pending-row.ce-ai-pending-candidate-same strong,.ce-ai-pending-row.ce-ai-pending-candidate-same span,.ce-ai-row-match-same td,.ce-ai-row-match-same input,.ce-ai-row-match-same select{color:#b91c1c!important;font-weight:950!important}.ce-ai-pending-row.ce-ai-pending-candidate-other strong,.ce-ai-pending-row.ce-ai-pending-candidate-other span,.ce-ai-row-match-other td,.ce-ai-row-match-other input,.ce-ai-row-match-other select{color:#c2410c!important;font-weight:950!important}.ce-ai-pending-row.ce-ai-pending-candidate::after{display:none!important;content:""!important}\n';
     document.head.appendChild(st);
   }
@@ -34,9 +45,13 @@
     });
   }
   function updatePrelogin(){
-    // HOTFIX LOGIN 2: no usar una clase global para ocultar la app.
-    // El bloqueo anterior podía quedarse activo si authUser tardaba en hidratarse tras /api/login.
+    // No mostrar nada de la app antes del login.
+    // La clase ce-prelogin-blank la trae el HTML: se quita solo cuando ya hay usuario real.
     try{ document.documentElement.classList.remove('ce-prelogin-clean'); }catch(_){}
+    try{
+      if(isLogged()){ document.documentElement.classList.remove('ce-prelogin-blank'); }
+      else { document.documentElement.classList.add('ce-prelogin-blank'); }
+    }catch(_){}
   }
   function ensureWelcome(){
     updatePrelogin();
@@ -69,6 +84,33 @@
       first.onclick=function(ev){ stop(ev); return downloadSrc(imgs[0].currentSrc||imgs[0].src,'justificante_ingreso_'+(idx+1)); };
     });
   }
+
+  function tidyDocumentDownloads(){
+    var root=$('tabDocumentos'); if(!root) return;
+    var docs=Array.prototype.slice.call(root.querySelectorAll('.ce-doc-item'));
+    docs.forEach(function(card,idx){
+      var img=card.querySelector('img.ce-doc-thumb') || card.querySelector('.ce-doc-media img') || card.querySelector('img[src^="data:image/"],img[src*="ticket-images"],img[src*="supabase"]');
+      if(!img) return;
+      img.style.display='block'; img.style.visibility='visible'; img.style.opacity='1';
+      var media=card.querySelector('.ce-doc-media');
+      if(media){ media.style.overflow='visible'; media.style.minWidth='58px'; media.style.minHeight='58px'; }
+      var buttons=Array.prototype.slice.call(card.querySelectorAll('.ce-v104-doc-download,.ce-v1041-doc-download,.ce-v1042-doc-download,.ce-v104-download-btn[title*="ocument"],button[aria-label*="ocument"]'));
+      var first=buttons[0]; buttons.slice(1).forEach(function(b){ b.remove(); });
+      if(!first){ first=document.createElement('button'); first.type='button'; first.className='outline small ce-v1042-doc-download'; first.title='Descargar documento'; first.setAttribute('aria-label','Descargar documento'); first.textContent='⬇️'; }
+      first.classList.add('ce-v1042-doc-download');
+      first.onclick=function(ev){ stop(ev); return downloadSrc(img.currentSrc||img.src,'documento_evento_'+(idx+1)); };
+      var actions=card.querySelector('.ce-doc-actions');
+      if(actions){
+        if(first.parentElement!==actions) actions.appendChild(first);
+      }else if(media && first.parentElement!==media){
+        // Si no existe zona de acciones, ponerlo después de la miniatura sin taparla.
+        media.insertAdjacentElement('afterend', first);
+      }
+    });
+    // Quitar botones sueltos que hayan quedado fuera de una ficha de documento.
+    root.querySelectorAll('.ce-v104-doc-download,.ce-v1041-doc-download,.ce-v1042-doc-download').forEach(function(btn){ if(!btn.closest('.ce-doc-item')) btn.remove(); });
+  }
+
   function ensureShareButton(){
     var actions=document.querySelector('.appname-stack .user-actions')||document.querySelector('.appname-stack'); if(!actions) return;
     var old=$('ceShareScreenBtn1041'); if(old) old.remove(); var old0=$('ceShareScreenBtn'); if(old0) old0.remove();
@@ -116,7 +158,7 @@
   },180);
   var queued=false, lastRun=0;
   function runSoon(delay){ if(queued) return; queued=true; var now=Date.now(); var wait=Math.max(delay||80, (now-lastRun<450)?450-(now-lastRun):0); setTimeout(function(){ queued=false; lastRun=Date.now(); run(); }, wait); }
-  function run(){ injectStyle(); applyVersion(); updatePrelogin(); ensureWelcome(); ensureShareButton(); tidyIngresoDownloads(); }
+  function run(){ injectStyle(); applyVersion(); updatePrelogin(); ensureWelcome(); ensureShareButton(); tidyIngresoDownloads(); tidyDocumentDownloads(); }
   document.addEventListener('click', function(ev){ handleShare(ev); var t=ev.target; if(t&&t.closest&&t.closest('#tabIngresosBtn,#btnLogin,#selectedEvent,.tab,.mobile-menu-action')) runSoon(250); }, true);
   document.addEventListener('change', function(ev){ var t=ev.target; if(t&&t.closest&&t.closest('#selectedEvent')) setTimeout(function(){ updatePrelogin(); }, 80); }, true);
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape'){ var p=$('ceShareScreenPanel1042'); if(p){ p.remove(); stop(ev); return false; } } },true);

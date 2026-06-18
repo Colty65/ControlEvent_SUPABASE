@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="ce-prelogin-blank">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="./assets/icons/icon-512.png" />
   <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-  <style id="ce-login-overlay-clean-head">#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
+  <style id="ce-login-overlay-clean-head">html.ce-prelogin-blank body > :not(#authOverlay){visibility:hidden!important}html.ce-prelogin-blank #authOverlay.hidden{display:none!important}html.ce-prelogin-blank body{background:#f6f8fb!important}#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
 
     <link rel="stylesheet" href="./app/styles/app.css" />
   <script src="./app/features/v8-5-compras-rpc-head-fix40.js?v=10.4.2_prod_fix47_donaciones_rpc_sin_relogin"></script>
@@ -524,7 +524,7 @@
 <script src="./app/features/mapa-productos.js"></script>
 <script src="./app/features/planificacion-inicial.js"></script>
 <script src="./app/features/ingresos-select-fix.js"></script>
-<script src="./app/features/view-refresh-stabilizer.js"></script>
+<script src="./app/features/view-refresh-stabilizer.js?v=10.4.2_hotfix_no_tremble"></script>
 <script src="./app/features/budget-tooltips-lite.js?v=10.4.2_prod_globos1"></script>
 <script src="./app/features/summary-tienda-sort-fix.js?v=10.4.2_prod_docfix7"></script>
 <script src="./app/features/maintenance-duplicates-v32.1.js"></script>
@@ -583,6 +583,6 @@
   <script src="./app/features/v10-4-2-ticketauto-compras.js?v=10.4.2_prod_ticketauto_v1042"></script>
   <script src="./app/features/v9-5-1-login-event-clean.js?v=10.4.2_prod_login_clean"></script>
   <script src="./app/features/v10-4-app-fixes.js?v=10.4.2_prod_appfixes_v104"></script>
-  <script src="./app/features/v10-4-2-app-fixes.js?v=10.4.2_prod_hotfix_login2"></script>
+  <script src="./app/features/v10-4-2-app-fixes.js?v=10.4.2_hotfix_blank_docs"></script>
 </body>
 </html>
