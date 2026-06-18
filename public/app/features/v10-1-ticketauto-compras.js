@@ -1,4 +1,4 @@
-/* ControlEvent v10.1_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v10.2_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
@@ -591,7 +591,7 @@
       return idx>=0 ? s.productos[idx] : s.productos[s.productos.length-1];
     }
     if(existing){
-      // v10.1: doble vía segura para refrescar PRODUCTOS cuando ya existe.
+      // v10.2: doble vía segura para refrescar PRODUCTOS cuando ya existe.
       // Primero usa la ruta específica y después fuerza el mismo cambio por el CRUD normal
       // con __priceRefreshOnly, para cubrir instalaciones donde la ruta dedicada no refrescaba la tabla visible.
       var body={__crudRowOnly:true,__priceRefreshOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||''};
@@ -646,7 +646,7 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.1 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.2 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
@@ -666,5 +666,5 @@
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v10.1 Alta IA] GD/RW + precio producto existente + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV101()');
+  console.info('[CE v10.2 Alta IA] GD/RW + precio producto existente + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV101()');
 })();

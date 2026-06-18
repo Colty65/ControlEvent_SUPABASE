@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const LOG='[CE FIX48 EVENT-SCOPED STATE v10.1]';
+  const LOG='[CE FIX48 EVENT-SCOPED STATE v10.2]';
   const SELECT_KEY='controlevent_v229_selected_event_id';
   const STORAGE_KEY_FALLBACK='controlevent_v6_4';
 
@@ -82,31 +82,54 @@
     if(s.ticketImageRefs && typeof s.ticketImageRefs === 'object') n += Object.keys(s.ticketImageRefs).length;
     return n;
   }
+
+  function scopedCount(data, ev){
+    if(!data || typeof data !== 'object') return 0;
+    let n=0;
+    ['compras','colaboradores','eventDocuments'].forEach(k=>{ if(Array.isArray(data[k])) n += data[k].filter(r=>text(r?.eventId || r?.event_id).trim()===ev).length; });
+    ['ticketImages','ticketImageRefs'].forEach(k=>{ const bag=data[k]||{}; if(bag && typeof bag==='object') n += Object.keys(bag).filter(key=>text(key).startsWith(ev+'|')).length; });
+    return n;
+  }
+  async function fullFallbackState(nativeFetch, ev){
+    try{
+      const res=await nativeFetch('/api/state?fullFallback=1&v102=1&_='+Date.now(), {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
+      const data=await res.json().catch(()=>({}));
+      if(res.ok && scopedCount(data, ev)>0){
+        console.warn(LOG,'Fallback completo recuperó datos del evento tras respuesta vacía scoped.', {eventId:ev, scopedCount:scopedCount(data, ev)});
+        return data;
+      }
+    }catch(err){ console.warn(LOG,'Fallback completo no disponible', err?.message || err); }
+    return null;
+  }
   async function fetchEventState(eventId){
     const ev=text(eventId).trim();
     if(!ev) throw new Error('No hay evento seleccionado para cargar datos por evento.');
     const nativeFetch = window.__ceFix48NativeFetch || window.fetch;
     const hadLocal = localCountForSelected();
     let lastData=null, lastError=null;
-    for(let attempt=1; attempt<=3; attempt++){
+    for(let attempt=1; attempt<=6; attempt++){
       try{
-        const url='/api/state?eventId='+encodeURIComponent(ev)+'&scope=event&fix48=1&v101=1&attempt='+attempt+'&_='+Date.now();
+        const url='/api/state?eventId='+encodeURIComponent(ev)+'&scope=event&fix48=1&v102=1&attempt='+attempt+'&_='+Date.now();
         const res=await nativeFetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
         const data=await res.json().catch(()=>({}));
         if(!res.ok) throw new Error(data.error || ('No se pudo cargar datos del evento '+ev));
         lastData=data;
         const count=payloadCount(data);
-        // v10.1: si llega una respuesta vacía justo después de cambiar/recargar un evento que tenía datos en pantalla,
+        // v10.2: si llega una respuesta vacía justo después de cambiar/recargar un evento que tenía datos en pantalla,
         // no machacamos el estado a la primera. Reintentamos porque a veces el navegador/edge devuelve una carga parcial.
-        if(count===0 && attempt<3){
+        if(count===0 && attempt<6){
           console.warn(LOG,'Respuesta de evento aparentemente vacía; reintento antes de aplicar estado vacío', {eventId:ev, attempt, hadLocal});
-          await new Promise(r=>setTimeout(r, attempt*320));
+          await new Promise(r=>setTimeout(r, 300 + attempt*450));
           continue;
+        }
+        if(count===0){
+          const fallback=await fullFallbackState(nativeFetch, ev);
+          if(fallback) return applyState(fallback, ev);
         }
         return applyState(data, ev);
       }catch(err){
         lastError=err;
-        if(attempt<3){ await new Promise(r=>setTimeout(r, attempt*280)); continue; }
+        if(attempt<6){ await new Promise(r=>setTimeout(r, 250 + attempt*420)); continue; }
       }
     }
     if(lastData) return applyState(lastData, ev);
@@ -131,15 +154,12 @@
     const ev=text(value).trim();
     if(!ev || !validEventId(ev)) return false;
     const s=stateObj();
-    s.selectedEventId=ev;
-    rememberEvent(ev);
-    persistLocal();
-    const sel=document.getElementById('selectedEvent');
-    if(sel) sel.value=ev;
-    try{ if(typeof render==='function') render(); }catch(_){}
+    const prev=text(s.selectedEventId).trim();
     try{
       document.body.classList.add('ce-event-loading-fix48');
       await fetchEventState(ev);
+      rememberEvent(ev);
+      persistLocal();
       const sel2=document.getElementById('selectedEvent');
       if(sel2) sel2.value=ev;
       try{ if(typeof render==='function') render(); }catch(_){}
@@ -147,6 +167,7 @@
       return false;
     }catch(err){
       console.error(LOG,'No se pudo cargar evento seleccionado',err);
+      if(prev){ s.selectedEventId=prev; const sel=document.getElementById('selectedEvent'); if(sel) sel.value=prev; try{ if(typeof render==='function') render(); }catch(_){} }
       alert(err && err.message ? err.message : String(err));
       return false;
     }finally{

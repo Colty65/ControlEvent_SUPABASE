@@ -1,9 +1,9 @@
-ControlEvent v10.1_prod
+ControlEvent v10.2_prod
 
 Cambios incluidos sobre v9.6_prod:
 
 1) Versión
-- Versión visible y referencias activas actualizadas a v10.1_prod.
+- Versión visible y referencias activas actualizadas a v10.2_prod.
 - package.json/package-lock.json actualizados a 10.0.0-prod.
 
 2) Ticket IA / COMPRAS

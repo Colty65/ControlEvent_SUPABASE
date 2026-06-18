@@ -1,4 +1,4 @@
-/* ControlEvent v10.1_prod FIX13 - guardia de escritura ce_ticket_images.
+/* ControlEvent v10.2_prod FIX13 - guardia de escritura ce_ticket_images.
    Evita que migraciones antiguas/locales suban fotos al abrir la pantalla de login
    con un selectedEventId obsoleto y creen event_id huérfanos. */
 (function(){

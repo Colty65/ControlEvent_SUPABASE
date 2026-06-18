@@ -2,7 +2,7 @@
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
-  var TAG='__ceV96TicketAutoComprasTotalCleanCompactFix';
+  var TAG='__ceV102TicketAutoComprasSmartProducts';
   if(window[TAG]) return; window[TAG]=true;
   var WRITE_SCOPE='row-crud-v8-5-compras-directo';
   var IMAGE_SCOPE='ticket-image-v8-5-fix26';
@@ -12,7 +12,10 @@
   function $(id){ return document.getElementById(id); }
   function stateObj(){ try{ return (typeof state !== 'undefined' && state) || window.state || {}; }catch(_){ return window.state || {}; } }
   function authObj(){ try{ return (typeof authUser !== 'undefined' && authUser) || window.authUser || null; }catch(_){ return window.authUser || null; } }
-  function isGD(){ var u=authObj(); return !!u && trim(u.nivel).toUpperCase()==='GD'; }
+  function userRole(){ var u=authObj(); return trim(u && u.nivel).toUpperCase(); }
+  function isGD(){ return userRole()==='GD'; }
+  function isRW(){ return userRole()==='RW'; }
+  function canWriteCompras(){ var r=userRole(); return r==='GD' || r==='RW'; }
   function arr(name){ var s=stateObj(); return Array.isArray(s[name]) ? s[name] : []; }
   function selectedEventId(){ var s=stateObj(); if(trim(s.selectedEventId)) return trim(s.selectedEventId); var el=$('selectedEvent'); return el ? trim(el.value) : ''; }
   function selectedEvent(){ var id=selectedEventId(); var evs=arr('eventos'); for(var i=0;i<evs.length;i++){ if(trim(evs[i].id)===id) return evs[i]; } return null; }
@@ -49,8 +52,8 @@
     });
   }
   function css(){
-    if($('ceV96TicketAiStyle')) return;
-    var st=document.createElement('style'); st.id='ceV96TicketAiStyle';
+    if($('ceV102TicketAiStyle')) return;
+    var st=document.createElement('style'); st.id='ceV102TicketAiStyle';
     st.textContent='\n'+
       '.ce-ai-ticket-btn{font-weight:900;font-size:22px;width:46px;min-width:46px;height:40px;min-height:40px;padding:4px 7px;margin-left:auto;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c;color:#9a3412;display:inline-flex;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(154,52,18,.18)}\n'+
       '.ce-ai-ticket-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}\n'+
@@ -94,7 +97,8 @@
 
     st.textContent += '\n.ce-ai-trash-btn{width:30px!important;min-width:30px!important;height:28px!important;min-height:28px!important;padding:0!important;border-radius:8px!important;font-size:16px!important;line-height:1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}\n.ce-ai-trash-btn::after{content:""!important;font-size:0!important}\n.ce-ai-table button.ce-ai-trash-btn{font-size:16px!important;padding:0!important}\n';
 
-    st.textContent += '\n@media (max-width:767px){.ce-ai-overlay{align-items:flex-start!important;padding:4px!important}.ce-ai-modal{width:99vw!important;max-height:98vh!important;padding:8px!important;border-radius:12px!important;overflow:auto!important}.ce-ai-head{position:sticky!important;top:0!important;background:#fff!important;z-index:8!important;padding-bottom:4px!important}.ce-ai-title{font-size:15px!important}.ce-ai-work{display:flex!important;flex-direction:column!important;gap:6px!important;overflow:visible!important}.ce-ai-left,.ce-ai-right{width:100%!important;min-width:0!important;overflow:visible!important;padding:6px!important;box-sizing:border-box!important}.ce-ai-photo-title{display:none!important}.ce-ai-photo-tools{justify-content:center!important;gap:6px!important}.ce-ai-photo-tools input{max-width:100%!important;font-size:12px!important;padding:5px!important}.ce-ai-photo-tools #ceAiZoomBtn{font-size:12px!important;padding:5px 7px!important}.ce-ai-preview{height:160px!important;min-height:120px!important;max-height:210px!important}.ce-ai-grid{grid-template-columns:1fr!important;gap:5px!important;margin-bottom:4px!important}.ce-ai-field label{font-size:11px!important;margin-bottom:1px!important}.ce-ai-field select{padding:5px!important;font-size:12px!important}.ce-ai-hintbox textarea{height:32px!important;min-height:32px!important;font-size:11px!important}.ce-ai-totalbar{grid-template-columns:1fr 1fr 1fr!important;gap:4px!important}.ce-ai-totalbox{padding:4px!important}.ce-ai-totalbox strong{font-size:9px!important}.ce-ai-totalbox span{font-size:12px!important}.ce-ai-table-wrap{max-height:220px!important;min-height:190px!important;overflow:auto!important}.ce-ai-table{font-size:10px!important;min-width:720px!important}.ce-ai-pending-box{min-height:220px!important}.ce-ai-pending-title{font-size:12px!important;align-items:flex-start!important}.ce-ai-pending-row{grid-template-columns:25px 1fr 74px 72px 70px!important;font-size:10px!important}.ce-ai-actions-bottom{padding-bottom:4px!important}.ce-ai-download-btn{display:none!important}}\n#ceAiDownloadPhoto{display:none!important}\n';
+    st.textContent += '\n@media (max-width:767px){.ce-ai-overlay{align-items:flex-start!important;padding:4px!important}.ce-ai-modal{width:99vw!important;max-height:98vh!important;padding:8px!important;border-radius:12px!important;overflow:auto!important}.ce-ai-head{position:sticky!important;top:0!important;background:#fff!important;z-index:8!important;padding-bottom:4px!important}.ce-ai-title{font-size:15px!important}.ce-ai-work{display:flex!important;flex-direction:column!important;gap:6px!important;overflow:visible!important}.ce-ai-left,.ce-ai-right{width:100%!important;min-width:0!important;overflow:visible!important;padding:6px!important;box-sizing:border-box!important}.ce-ai-photo-title{display:none!important}.ce-ai-photo-tools{justify-content:center!important;gap:6px!important}.ce-ai-photo-tools input{max-width:100%!important;font-size:12px!important;padding:5px!important}.ce-ai-photo-tools #ceAiZoomBtn{font-size:12px!important;padding:5px 7px!important}.ce-ai-preview{height:160px!important;min-height:120px!important;max-height:210px!important}.ce-ai-grid{grid-template-columns:1fr!important;gap:5px!important;margin-bottom:4px!important}.ce-ai-field label{font-size:11px!important;margin-bottom:1px!important}.ce-ai-field select{padding:5px!important;font-size:12px!important}.ce-ai-hintbox textarea{height:32px!important;min-height:32px!important;font-size:11px!important}.ce-ai-totalbar{grid-template-columns:1fr 1fr 1fr!important;gap:4px!important}.ce-ai-totalbox{padding:4px!important}.ce-ai-totalbox strong{font-size:9px!important}.ce-ai-totalbox span{font-size:12px!important}.ce-ai-table-wrap{max-height:220px!important;min-height:190px!important;overflow:auto!important}.ce-ai-table{font-size:10px!important;min-width:720px!important}.ce-ai-pending-box{min-height:220px!important}.ce-ai-pending-title{font-size:12px!important;align-items:flex-start!important}.ce-ai-pending-row{grid-template-columns:25px 1fr 74px 72px 70px!important;font-size:10px!important}.ce-ai-actions-bottom{padding-bottom:4px!important}.ce-ai-download-btn{display:none!important}}\n#ceAiDownloadPhoto{display:none!important}\nbody.ce-ai-panel-open #ceMapaFloatingHomeButton,body.ce-ai-panel-open .ce-global-floating-home-v412,body.ce-ai-panel-open .ce-maint-floating-top-v40,body.ce-ai-panel-open .mapa-floating-home{display:none!important;visibility:hidden!important;pointer-events:none!important}\n';
+    st.textContent += '\n.ce-ai-status.err{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;font-weight:950!important}.ce-ai-status.warn{background:#fef3c7!important;color:#92400e!important;border-color:#fde68a!important;font-weight:900!important}.ce-ai-status.ok{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;font-weight:900!important}';
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -173,7 +177,7 @@
     btn.setAttribute('aria-label','Abrir Tickets IA');
     btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
     btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>';
-    btn.setAttribute('onclick','window.__ceOpenTicketAutoV96&&window.__ceOpenTicketAutoV96();return false;');
+    btn.setAttribute('onclick','window.__ceOpenTicketAutoV101&&window.__ceOpenTicketAutoV101();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     var header=document.querySelector('#tabCompras > .card > .toggle-row');
     var toggle=$('toggleComprasEvent');
@@ -230,7 +234,7 @@
     }
     refreshRole(); updateTotals();
   }
-  function refreshRole(){ var show=isGD()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
+  function refreshRole(){ var show=canWriteCompras()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
   function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg||''; el.title=msg||''; } }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
@@ -244,12 +248,12 @@
     if(sel){ var current=trim(sel.value).toUpperCase(); var keep=current || ''; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
   }
   function openPanel(){
-    if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
+    if(!canWriteCompras()){ alert('Esta función está disponible para usuarios GD o RW.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
-    ensureUi(); fillSelects(); resetPanelState(true); $('ceAiTicketPanel').classList.add('open'); updateTotals(); installTicketImageDownloadButtons();
+    ensureUi(); fillSelects(); resetPanelState(true); document.body.classList.add('ce-ai-panel-open'); $('ceAiTicketPanel').classList.add('open'); updateTotals(); installTicketImageDownloadButtons();
   }
-  function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); }
+  function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); document.body.classList.remove('ce-ai-panel-open'); }
   function openZoom(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); if(!src){ setStatus('Carga primero una foto para ampliarla.','warn'); return; } var img=$('ceAiZoomImg'), p=$('ceAiZoomPanel'); if(img) img.src=src; if(p) p.classList.add('open'); }
   function closeZoom(){ var p=$('ceAiZoomPanel'); if(p) p.classList.remove('open'); }
   function fileChanged(){
@@ -306,18 +310,18 @@
     var rows=sortLinesLikeTk((window.__ceAiTicketLines || []).map(enrichRowDefaults)); window.__ceAiTicketLines=rows;
     if(!rows.length){ body.innerHTML='<tr><td colspan="9">Sin líneas todavía.</td></tr>'; updateTotals(); return; }
     body.innerHTML=rows.map(function(r,i){
-      var existing=productByExactName(r.descripcion);
+      var existing=findBestProductByName(r.descripcion) || productByExactName(r.descripcion);
       var cls=(Number(r.confianza||0)<0.65 || !trim(r.descripcion))?'ce-ai-row-low':'ce-ai-row-ok';
       cls += existing ? ' ce-ai-existing-product' : ' ce-ai-new-product';
       var unidades=money(r.unidades)||1; var precio=money(r.precio); var importe=round2(unidades*precio);
-      var seg=existing ? (existing.segmento||'') : (r.segmento||guessSegment(r.descripcion));
-      var des=existing ? (existing.destino||'') : (r.destino||guessDestino(r.descripcion));
-      var attrTitle=existing ? 'Producto existente: se actualiza precio en PRODUCTOS y se conservan segmento/destino actuales.' : 'Producto nuevo: informa segmento y destino antes de confirmar.';
+      var seg=trim(r.segmento) || (existing ? (existing.segmento||'') : guessSegment(r.descripcion));
+      var des=trim(r.destino) || (existing ? (existing.destino||'') : guessDestino(r.descripcion));
+      var attrTitle=existing ? 'Producto existente: puedes corregir SEGMENTO/DESTINO; al procesar se actualizarán PRODUCTOS junto con el precio.' : 'Producto nuevo: informa segmento y destino antes de confirmar.';
       return '<tr class="'+cls+'" data-ce-ai-row="'+i+'" data-ce-ai-conf="'+htmlEscape(r.confianza||0)+'" data-ce-ai-existing="'+(existing?'1':'0')+'">'+
         '<td><input type="checkbox" data-ce-ai-field="ok" '+(r.ok!==false?'checked':'')+'></td>'+ 
-        '<td><input list="ceAiProducts" data-ce-ai-field="descripcion" value="'+htmlEscape(r.descripcion||'')+'" placeholder="Nombre producto"></td>'+ 
-        '<td><select data-ce-ai-field="segmento" '+(existing?'disabled':'')+' title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('segmento'), seg, 'Segmento')+'</select></td>'+ 
-        '<td><select data-ce-ai-field="destino" '+(existing?'disabled':'')+' title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('destino'), des, 'Destino')+'</select></td>'+ 
+        '<td><input list="ceAiProducts" data-ce-ai-field="descripcion" value="'+htmlEscape((existing && existing.nombre) || r.descripcion || '')+'" placeholder="Nombre producto"></td>'+ 
+        '<td><select data-ce-ai-field="segmento" title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('segmento'), seg, 'Segmento')+'</select></td>'+ 
+        '<td><select data-ce-ai-field="destino" title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('destino'), des, 'Destino')+'</select></td>'+ 
         '<td><input class="num" data-ce-ai-field="unidades" value="'+htmlEscape(unidades)+'"></td>'+ 
         '<td><input class="num" data-ce-ai-field="precio" value="'+htmlEscape(precio)+'"></td>'+ 
         '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(dec(importe))+'" readonly title="Calculado automáticamente: unidades x precio"></td>'+ 
@@ -326,7 +330,7 @@
       '</tr>';
     }).join('');
     body.querySelectorAll('[data-ce-ai-field="unidades"],[data-ce-ai-field="precio"]').forEach(function(input){ input.addEventListener('input',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); });
-    body.querySelectorAll('[data-ce-ai-field="descripcion"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ applyProductPriceFromName(input); collectRows(false); renderRows(); updateTotals(); }); });
+    body.querySelectorAll('[data-ce-ai-field="descripcion"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ applyBestProductFromName(input); collectRows(false); renderRows(); updateTotals(); }); });
     body.querySelectorAll('[data-ce-ai-field="segmento"],[data-ce-ai-field="destino"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); }); input.addEventListener('change',function(){ collectRows(false); }); });
     body.querySelectorAll('[data-ce-ai-field="ok"]').forEach(function(input){ input.addEventListener('input',function(){ collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ collectRows(false); updateTotals(); }); });
     body.querySelectorAll('[data-ce-ai-del]').forEach(function(btn){ btn.addEventListener('click',function(){ collectRows(); var idx=Number(btn.getAttribute('data-ce-ai-del')); (window.__ceAiTicketLines||[]).splice(idx,1); renderRows(); }); });
@@ -370,9 +374,17 @@
   }
   function enrichRowDefaults(row){
     var r=Object.assign({}, row||{});
-    var p=productByExactName(r.descripcion);
-    if(p){ r.segmento=p.segmento||''; r.destino=p.destino||''; }
-    else { if(!trim(r.segmento)) r.segmento=guessSegment(r.descripcion); if(!trim(r.destino)) r.destino=guessDestino(r.descripcion); }
+    var p=findBestProductByName(r.descripcion) || productByExactName(r.descripcion);
+    if(p){
+      r.descripcion=p.nombre||r.descripcion;
+      if(!trim(r.segmento)) r.segmento=p.segmento||'';
+      if(!trim(r.destino)) r.destino=p.destino||'';
+      r.productoIdDetectado=p.id||'';
+      r.nombreDetectadoOriginal=row && row.descripcion && normalizeName(row.descripcion)!==normalizeName(p.nombre) ? row.descripcion : '';
+    } else {
+      if(!trim(r.segmento)) r.segmento=guessSegment(r.descripcion);
+      if(!trim(r.destino)) r.destino=guessDestino(r.descripcion);
+    }
     return r;
   }
   function storeScore(needle, storeName){
@@ -503,12 +515,38 @@
   }
   function productPriceValue(p){ return money(p && (p.defaultPrecio ?? p.precio ?? p.precioReferencia ?? p.productoPrecioReferencia ?? 0)); }
   function productByExactName(name){ var n=normalizeName(name); if(!n) return null; var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
-  function applyProductPriceFromName(input){
-    var p=productByExactName(input && input.value); if(!p) return;
-    var price=productPriceValue(p); if(!(price>0)) return;
+  function compactPlain(v){ return normalizePlain(v).replace(/[^A-Z0-9]+/g,''); }
+  function lev(a,b){ a=compactPlain(a); b=compactPlain(b); if(!a||!b) return 99; var m=a.length,n=b.length,dp=[]; for(var i=0;i<=m;i++){ dp[i]=[i]; } for(var j=1;j<=n;j++) dp[0][j]=j; for(i=1;i<=m;i++){ for(j=1;j<=n;j++){ var c=a.charAt(i-1)===b.charAt(j-1)?0:1; dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+c); } } return dp[m][n]; }
+  function productSimilarityScore(input, productName){
+    var a=normalizePlain(input), b=normalizePlain(productName); if(!a||!b) return 0;
+    if(a===b) return 100;
+    var ca=compactPlain(a), cb=compactPlain(b);
+    if(ca===cb) return 98;
+    if(ca.length>=4 && cb.indexOf(ca)>=0) return 92;
+    if(cb.length>=4 && ca.indexOf(cb)>=0) return 90;
+    var d=lev(a,b), max=Math.max(ca.length,cb.length)||1;
+    var score=Math.round((1-(d/max))*100);
+    var toks=a.split(/[^A-Z0-9]+/).filter(function(x){return x.length>2;});
+    var hits=0; toks.forEach(function(t){ if(b.indexOf(t)>=0 || cb.indexOf(t)>=0) hits++; });
+    if(toks.length) score=Math.max(score, Math.round((hits/toks.length)*88));
+    return score;
+  }
+  function findBestProductByName(name){
+    var exact=productByExactName(name); if(exact) return exact;
+    var input=trim(name); if(!input) return null;
+    var best=null,bestScore=0;
+    arr('productos').forEach(function(p){ var sc=productSimilarityScore(input,p&&p.nombre); if(sc>bestScore){best=p;bestScore=sc;} });
+    var min=(compactPlain(input).length<=5)?72:68;
+    return bestScore>=min ? best : null;
+  }
+  function applyBestProductFromName(input){
+    var p=findBestProductByName(input && input.value); if(!p) return;
+    input.value=p.nombre||input.value;
     var tr=input.closest('tr'); if(!tr) return;
-    var priceInput=tr.querySelector('[data-ce-ai-field="precio"]');
-    if(priceInput){ priceInput.value=dec(price); updateRowImport(tr); }
+    var seg=tr.querySelector('[data-ce-ai-field="segmento"]'), des=tr.querySelector('[data-ce-ai-field="destino"]');
+    if(seg && !trim(seg.value)) seg.value=p.segmento||'';
+    if(des && !trim(des.value)) des.value=p.destino||'';
+    var price=productPriceValue(p); if(price>0){ var priceInput=tr.querySelector('[data-ce-ai-field="precio"]'); if(priceInput && !(money(priceInput.value)>0)){ priceInput.value=dec(price); updateRowImport(tr); } }
   }
   function friendlyAiError(message, details){
     var m=text(message||'');
@@ -556,7 +594,15 @@
       setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err), err.details)+'. Puedes añadir filas manualmente.', 'err');
     });
   }
-  function findProductByName(name){ var n=normalizeName(name); var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
+  function productKey(v){ return normalizePlain(v).replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim(); }
+  function findProductByName(name){
+    var n=productKey(name); if(!n) return null;
+    var ps=arr('productos');
+    for(var i=0;i<ps.length;i++){ if(productKey(ps[i].nombre)===n) return ps[i]; }
+    var compact=n.replace(/\s+/g,'');
+    for(var j=0;j<ps.length;j++){ if(productKey(ps[j].nombre).replace(/\s+/g,'')===compact) return ps[j]; }
+    return null;
+  }
   function crudHeaders(){ return {'Content-Type':'application/json','X-ControlEvent-Write-Scope':WRITE_SCOPE,'X-ControlEvent-Row-Only':'1'}; }
   function imageHeaders(){ return {'Content-Type':'application/json','X-ControlEvent-Write-Scope':IMAGE_SCOPE}; }
   function upsertProductByName(row, tiendaId, warnings){
@@ -564,7 +610,7 @@
     var price=money(row && row.precio);
     if(!(price>0) && money(row && row.importe)) price=money(row.importe)/(money(row && row.unidades)||1);
     price=round2(price);
-    var existing=findProductByName(name);
+    var existing=findBestProductByName(name) || findProductByName(name);
     var payload=existing ? Object.assign({}, existing) : {id:uid(), nombre:name, segmento:trim(row.segmento), destino:trim(row.destino)};
     if(!existing){ payload.segmento=trim(row.segmento); payload.destino=trim(row.destino); }
     payload.defaultPrecio=price; payload.precio=price;
@@ -580,25 +626,27 @@
       return idx>=0 ? s.productos[idx] : s.productos[s.productos.length-1];
     }
     if(existing){
-      // v9.6: doble vía segura para refrescar PRODUCTOS cuando ya existe.
+      // v10.2: doble vía segura para refrescar PRODUCTOS cuando ya existe.
       // Primero usa la ruta específica y después fuerza el mismo cambio por el CRUD normal
       // con __priceRefreshOnly, para cubrir instalaciones donde la ruta dedicada no refrescaba la tabla visible.
-      var body={__crudRowOnly:true,__priceRefreshOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||''};
-      var full=Object.assign({}, existing, body, {nombre:existing.nombre||name, segmento:existing.segmento||'', destino:existing.destino||''});
+      var seg=trim(row.segmento) || existing.segmento || '';
+      var des=trim(row.destino) || existing.destino || '';
+      var body={__crudRowOnly:true,__priceRefreshOnly:true,defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',tiendaId:tiendaId||existing.tiendaId||'',segmento:seg,destino:des};
+      var full=Object.assign({}, existing, body, {nombre:existing.nombre||name, segmento:seg, destino:des});
       function genericUpdate(){
         return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id),{method:'PUT',headers:crudHeaders(),body:JSON.stringify(full)})
-          .then(function(data){ return mergeLocal(data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''})); });
+          .then(function(data){ return mergeLocal(data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',segmento:seg,destino:des})); });
       }
       return apiJson('/api/crud/productos/'+encodeURIComponent(existing.id)+'/precio',{method:'PUT',headers:crudHeaders(),body:JSON.stringify(body)})
         .then(function(data){
-          var item=data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''});
+          var item=data.item || Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',segmento:seg,destino:des});
           mergeLocal(item);
           return genericUpdate().catch(function(){ return mergeLocal(item); });
         })
         .catch(function(err1){
           return genericUpdate().catch(function(err2){
             warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+((err2&&err2.message)||(err1&&err1.message)||err2||err1)+'. La compra se grabará con el precio del ticket.');
-            return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||''}));
+            return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',segmento:seg,destino:des}));
           });
         });
     }
@@ -606,23 +654,25 @@
       .then(function(data){ return mergeLocal(data.item || payload); });
   }
   function postCompra(row, product, ticket, tiendaId, responsableId){
-    var payload={ id:uid(), eventId:selectedEventId(), productoId:product.id, unidades:money(row.unidades)||1, precio:money(row.precio) || (money(row.importe)/(money(row.unidades)||1)), ticketDonacion:ticket, donorRef:'', tiendaId:tiendaId || product.defaultTiendaId || '', responsableId:responsableId || '' };
+    var payload={ id:uid(), eventId:selectedEventId(), productoId:product.id, unidades:money(row.unidades)||1, precio:money(row.precio) || (money(row.importe)/(money(row.unidades)||1)), ticketDonacion:ticket, donorRef:'', tiendaId:tiendaId || '', responsableId:responsableId || '' };
     return apiJson('/api/crud/compras',{method:'POST',headers:crudHeaders(),body:JSON.stringify(Object.assign({},payload,{__crudRowOnly:true}))}).then(function(data){ var item=data.item || payload; var s=stateObj(); if(!Array.isArray(s.compras)) s.compras=[]; s.compras.push(item); return item; });
   }
   function uploadTicketImage(ticket){
     var img=window.__ceAiTicketImage||''; if(!img) return Promise.resolve(null);
-    return apiJson('/api/ticket-images',{method:'POST',headers:imageHeaders(),body:JSON.stringify({eventId:selectedEventId(),key:ticket,dataUrl:img,eventSnapshot:selectedEvent()||{}})}).then(function(data){ var image=data.image || {}; var s=stateObj(); if(!s.ticketImages) s.ticketImages={}; if(image.key) s.ticketImages[image.key]=image.url||image.pathname||''; return image; });
+    return apiJson('/api/ticket-images',{method:'POST',headers:imageHeaders(),body:JSON.stringify({eventId:selectedEventId(),key:ticket,dataUrl:img,eventSnapshot:selectedEvent()||{}})}).then(function(data){ var image=data.image || {}; var s=stateObj(); if(!s.ticketImages) s.ticketImages={}; if(image.key){ var src=image.url||image.pathname||''; s.ticketImages[image.key]=src; if(!s.ticketImageRefs) s.ticketImageRefs={}; s.ticketImageRefs[image.key]=Object.assign({}, image, {url:src, pathname:image.pathname||src}); } return image; });
   }
   function processRows(){
-    if(!isGD()){ alert('Solo GD.'); return; }
+    if(!canWriteCompras()){ alert('Solo usuarios GD o RW.'); return; }
     if(isFinalizado()){ setStatus('Evento Finalizado: no se puede procesar ticket.','err'); return; }
-    var ticket=trim($('ceAiTicket').value).toUpperCase(); if(!ticket){ setStatus('Indica TKxx.','warn'); return; }
+    var ticket=trim($('ceAiTicket').value).toUpperCase(); if(!ticket){ setStatus('Indica TKxx.','err'); return; }
     var usedCount=Number((usedTicketMap()||{})[ticket]||0);
     if(usedCount>0){
       var ok=window.confirm('ATENCIÓN: '+ticket+' ya tiene '+usedCount+' línea(s) de COMPRAS en este evento.\n\nTiene pinta de equivocación por no haber elegido el ticket correcto.\n\n¿Quieres continuar de todos modos y añadir más líneas a '+ticket+'?');
       if(!ok){ setStatus('Operación cancelada: cambia el TKxx o revisa el ticket ya existente.','warn'); return; }
     }
     var tiendaId=trim($('ceAiTienda').value), responsableId=trim($('ceAiResponsable').value);
+    if(!tiendaId){ setStatus('Indica TIENDA antes de procesar.','err'); return; }
+    if(!responsableId){ setStatus('Indica RESPONSABLE antes de procesar.','err'); return; }
     var rows=sortLinesLikeTk(collectRows(true).filter(function(r){ return r.ok!==false; }).filter(function(r){ return trim(r.descripcion); }));
     if(!rows.length){ setStatus('No hay filas con producto para procesar.','warn'); return; }
     try{ validateRowsBeforeProcess(rows); }catch(e){ setStatus(e.message||String(e),'warn'); return; }
@@ -633,7 +683,7 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v9.6 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.2 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
@@ -646,12 +696,12 @@
     ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); openPanel(); return false;
   }
   function tick(){ ensureUi(); refreshRole(); installTicketImageDownloadButtons(); }
-  window.__ceOpenTicketAutoV96=openPanel; window.__ceOpenTicketAutoV952=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
+  window.__ceOpenTicketAutoV102=openPanel; window.__ceOpenTicketAutoV101=openPanel; window.__ceOpenTicketAutoV96=openPanel; window.__ceOpenTicketAutoV952=openPanel; window.__ceOpenTicketAutoV95=openPanel; window.__ceOpenTicketAutoV94=openPanel; window.__ceOpenTicketAutoV93=openPanel; window.__ceOpenTicketAutoV92=openPanel; window.__ceOpenTicketAutoV91=openPanel; window.__ceOpenTicketIaComprasV90=openPanel;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   window.addEventListener('controlevent:runtime-ready',tick,false);
   window.addEventListener('pointerdown',delegatedOpen,true); window.addEventListener('click',delegatedOpen,true);
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.6 Alta IA] limpieza total + iconos compactos activos + ptes compra flex instalado. Prueba: window.__ceOpenTicketAutoV96()');
+  console.info('[CE v10.2 Alta IA] producto similar, segmento/destino editables y actualización PRODUCTOS instalada. Prueba: window.__ceOpenTicketAutoV102()');
 })();

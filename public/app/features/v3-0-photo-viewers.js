@@ -1,9 +1,9 @@
-/* ControlEvent v10.1_prod - visor de fotos sin doble apertura; base estable v3.2. */
+/* ControlEvent v10.2_prod - visor de fotos sin doble apertura; base estable v3.2. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.1_prod';
-  const VERSION_FILE = 'ControlEvent_v10_1_prod';
+  const VERSION = 'ControlEvent v10.2_prod';
+  const VERSION_FILE = 'ControlEvent_v10_2_prod';
   const STYLE_ID = 'ceV310PhotoViewerStyle';
   const MODAL_ID = 'ceV310PhotoViewer';
   const LEGACY_MODAL_IDS = ['ceV300PhotoViewer'];
@@ -106,7 +106,7 @@
         // v8.0: no crear variantes globales sin evento para TKxx. Esas variantes mezclaban fotos entre eventos.
       });
     }catch(error){
-      console.warn('[ControlEvent v10.1_prod] No se pudieron hidratar fotos desde BBDD.', error);
+      console.warn('[ControlEvent v10.2_prod] No se pudieron hidratar fotos desde BBDD.', error);
     }finally{
       hydrateBusy = false;
     }
