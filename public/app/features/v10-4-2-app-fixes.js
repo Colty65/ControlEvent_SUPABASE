@@ -1,6 +1,8 @@
 /* ControlEvent v10.4.2_prod - estabilización: menos refrescos, arranque limpio, bienvenida festiva y duplicar pantalla claro. */
 (function(){
   'use strict';
+  try{ document.documentElement.classList.remove('ce-prelogin-clean','ce-prelogin-blank'); }catch(_){}
+  try{ if(document.body){ document.body.style.visibility='visible'; document.body.style.opacity='1'; } }catch(_){}
   if(window.__ceV1042AppFixes) return; window.__ceV1042AppFixes=true;
   var VERSION='v10.4.2_prod';
   function text(v){ return v==null?'':String(v); }
@@ -45,13 +47,10 @@
     });
   }
   function updatePrelogin(){
-    // No mostrar nada de la app antes del login.
-    // La clase ce-prelogin-blank la trae el HTML: se quita solo cuando ya hay usuario real.
-    try{ document.documentElement.classList.remove('ce-prelogin-clean'); }catch(_){}
-    try{
-      if(isLogged()){ document.documentElement.classList.remove('ce-prelogin-blank'); }
-      else { document.documentElement.classList.add('ce-prelogin-blank'); }
-    }catch(_){}
+    // HOTFIX LOGIN 3: nunca ocultar la app con ce-prelogin-blank.
+    // La ocultacion previa al login dejaba la pantalla totalmente en blanco en algunos arranques.
+    try{ document.documentElement.classList.remove('ce-prelogin-clean','ce-prelogin-blank'); }catch(_){}
+    try{ if(document.body){ document.body.style.visibility='visible'; document.body.style.opacity='1'; } }catch(_){}
   }
   function ensureWelcome(){
     updatePrelogin();

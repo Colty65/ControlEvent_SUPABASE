@@ -1,0 +1,9 @@
+ControlEvent v10.4.2_prod - HOTFIX LOGIN UNBLANK 3
+
+Correccion quirurgica:
+- Se elimina el mecanismo ce-prelogin-blank que podia dejar la app invisible despues del login.
+- Se mantiene el resto de cambios de la v10.4.2 y hotfix anterior.
+- Se toca solo index.html, public/index.html y public/app/features/v10-4-2-app-fixes.js.
+
+Motivo:
+El ocultado previo al login dependia de detectar authUser; en algunos arranques la app ya habia ocultado el overlay, pero authUser no estaba todavia disponible globalmente, por lo que se mantenia toda la aplicacion invisible.
