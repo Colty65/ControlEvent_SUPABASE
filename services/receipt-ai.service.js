@@ -239,12 +239,17 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
   return { ...parseJsonStrictish(outText, 'OpenAI'), modelo: model, proveedorIa: 'openai' };
 }
 function configuredGeminiModels() {
-  const configured = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '').replace(/^models\//, '').trim();
-  const fallback = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  // v11.0 hotfix: no volver a llamar a Gemini 1.5 desde v1beta.
+  // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
+  const configuredRaw = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
+  const configured = configuredRaw.split(/[;,\s]+/).map(x => x.replace(/^models\//, '').trim()).filter(Boolean);
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
   const out = [];
-  [configured, ...fallback].forEach(model => {
+  [...configured, ...fallback].forEach(model => {
     const m = text(model).replace(/^models\//, '').trim();
-    if (m && !out.includes(m)) out.push(m);
+    if (!m) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m)) return;
+    if (!out.includes(m)) out.push(m);
   });
   return out;
 }

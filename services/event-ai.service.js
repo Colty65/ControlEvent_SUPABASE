@@ -57,12 +57,17 @@ function geminiKey() {
   return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
 function configuredGeminiModels() {
-  const configured = trim(process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '').replace(/^models\//, '');
-  const fallback = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+  // v11.0 hotfix: no volver a llamar a Gemini 1.5 desde v1beta.
+  // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
+  const configuredRaw = trim(process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
+  const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
   const out = [];
-  [configured, ...fallback].forEach(model => {
+  [...configured, ...fallback].forEach(model => {
     const m = trim(model).replace(/^models\//, '');
-    if (m && !out.includes(m)) out.push(m);
+    if (!m) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m)) return;
+    if (!out.includes(m)) out.push(m);
   });
   return out;
 }
