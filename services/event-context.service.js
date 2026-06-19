@@ -197,22 +197,13 @@ function eventScore(ev, prompt) {
   const code = norm(ev?.eventoCodigo || ev?.codigo || ''); if (code && p.includes(code)) score += 20;
   return score;
 }
-function chooseRelevantEventIds(events, selectedId, prompt, options = {}) {
-  // v11.1 hotfix: por defecto Gemini solo recibe el evento activo.
-  // No se añaden eventos por coincidencias de texto del prompt: las comparativas deben ser explícitas
-  // desde el selector de la ventana para evitar respuestas con contexto parcial o eventos no deseados.
+function chooseRelevantEventIds(events, selectedId, prompt) {
   const out = [];
-  const selected = trim(selectedId);
-  if (selected && arr(events).some(ev => trim(ev?.id) === selected)) out.push(selected);
-  const compareMode = options?.compareMode === true || options?.comparativa === true;
-  const explicit = arr(options?.compareEventIds || options?.eventIds || options?.comparisonEventIds)
-    .map(x => trim(x)).filter(Boolean);
-  if (compareMode) {
-    for (const id of explicit) {
-      if (!out.includes(id) && arr(events).some(ev => trim(ev?.id) === id)) out.push(id);
-      if (out.length >= 4) break;
-    }
-  }
+  if (selectedId) out.push(selectedId);
+  const scored = arr(events).map(ev => ({ id: trim(ev?.id), score: eventScore(ev, prompt) })).filter(x => x.id && x.score > 0).sort((a,b) => b.score - a.score);
+  const wantsCompare = /compar|frente|versus|\bvs\b|diferencia|evoluci/i.test(text(prompt));
+  const max = wantsCompare ? 8 : 4;
+  for (const row of scored) if (!out.includes(row.id) && out.length < max) out.push(row.id);
   return out;
 }
 
@@ -240,17 +231,16 @@ function buildEventDetail(ev, state, helpers, ticketImages) {
   };
 }
 
-export function buildEventAiContext(state, selectedEventId = '', userPrompt = '', options = {}) {
+export function buildEventAiContext(state, selectedEventId = '', userPrompt = '') {
   const safeState = state && typeof state === 'object' ? state : {};
   const events = arr(safeState.eventos);
   const helpers = makeHelpers(safeState);
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
   const selectedId = trim(selectedEventId || safeState.selectedEventId);
-  const relevantIds = chooseRelevantEventIds(events, selectedId, userPrompt, options);
+  const relevantIds = chooseRelevantEventIds(events, selectedId, userPrompt);
   const details = relevantIds.map(id => events.find(e => trim(e?.id) === id)).filter(Boolean).map(ev => buildEventDetail(ev, safeState, helpers, ticketImages));
   const globalIngresos = new Map(), globalCompras = new Map(), globalDonaciones = new Map(), globalValoracion = new Map();
-  const eventosParaResumen = events.filter(ev => relevantIds.includes(trim(ev?.id)));
-  const resumenEventos = eventosParaResumen.map(ev => {
+  const resumenEventos = events.map(ev => {
     const d = buildEventDetail(ev, safeState, helpers, ticketImages);
     add(globalIngresos, d.evento.titulo, d.resumenFinanciero.ingresosTotal);
     add(globalCompras, d.evento.titulo, d.resumenFinanciero.comprasReales);
@@ -275,12 +265,9 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     },
     selectedEventId: selectedId,
     selectedEvent: details.find(d => d.evento.id === selectedId)?.evento || null,
-    modoContexto: options?.compareMode === true || options?.comparativa === true ? 'comparativa explícita' : 'solo evento activo',
-    comparativaSolicitada: options?.compareMode === true || options?.comparativa === true,
-    eventosDisponiblesParaSelector: events.map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), situacion: trim(ev?.situacion || 'En curso'), fechaIni: trim(ev?.fechaIni), fechaFin: trim(ev?.fechaFin) })),
     eventosResumen: resumenEventos,
     detalleEventosRelevantes: details,
-    resumenGlobal: { totalEventosEnContexto: eventosParaResumen.length, rankingIngresos: topN(globalIngresos, 20), rankingCompras: topN(globalCompras, 20), rankingDonaciones: topN(globalDonaciones, 20), rankingValoracion: topN(globalValoracion, 20) },
+    resumenGlobal: { totalEventos: events.length, rankingIngresos: topN(globalIngresos, 20), rankingCompras: topN(globalCompras, 20), rankingDonaciones: topN(globalDonaciones, 20), rankingValoracion: topN(globalValoracion, 20) },
     catalogosRelacionados: {
       tiendas: arr(safeState.tiendas).map(t => ({ id: trim(t.id), nombre: trim(t.nombre) })).filter(t => t.nombre).slice(0, 500),
       responsables: arr(safeState.personas).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 800),

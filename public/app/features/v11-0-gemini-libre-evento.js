@@ -4,7 +4,6 @@
   'use strict';
   if(window.__ceV110GeminiLibre) return; window.__ceV110GeminiLibre=true;
   var VERSION='v11.1_prod';
-  var waitTimer=null, waitStep=0;
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -19,7 +18,7 @@
     var ev=currentEvent();
     if(!ev) return '<span class="ce-ai-event-warn">Selecciona un evento</span>';
     var cls=isFinalized(ev)?'ce-ai-event-final':'ce-ai-event-open';
-    return '<span class="'+cls+'">'+esc(trim(ev.titulo)||'Evento')+'</span><span class="ce-ai-event-state">'+esc(trim(ev.situacion||'En curso'))+'</span>';
+    return '<span class="'+cls+'">'+esc(trim(ev.titulo)||'Evento')+'</span><span class="ce-ai-event-state"> '+esc(trim(ev.situacion||'En curso'))+'</span>';
   }
   function fileSafe(v){ return trim(v||'resultado').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').slice(0,90)||'resultado'; }
   function downloadText(content, filename, mime){
@@ -27,44 +26,23 @@
     var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=fileSafe(filename||'resultado.txt'); a.style.display='none'; document.body.appendChild(a); a.click();
     setTimeout(function(){ try{a.remove(); URL.revokeObjectURL(url);}catch(_){ } },1500);
   }
-  function eventsForSelect(){
-    var cur=selectedEventId();
-    return arr('eventos').filter(function(e){ return trim(e.id) && trim(e.id)!==cur; });
-  }
-  function compareOptionsHtml(){
-    var opts=eventsForSelect();
-    if(!opts.length) return '<option value="">No hay otros eventos disponibles</option>';
-    return '<option value="">Selecciona evento para comparar...</option>'+opts.map(function(ev){
-      var label=(trim(ev.titulo)||trim(ev.nombre)||ev.id)+' ('+(trim(ev.situacion)||'En curso')+')';
-      return '<option value="'+esc(ev.id)+'">'+esc(label)+'</option>';
-    }).join('');
-  }
-  function isBroadPrompt(value){
-    var p=trim(value).toLowerCase();
-    if(p.length<10) return true;
-    var generic=/(dashboard|informe|analisis completo|análisis completo|analiza todo|todo el evento|resumen general|dame todo|vision general|visión general|cuadro de mando)/i.test(p);
-    var specific=/(ingreso|ingresos|compra|compras|donaci[oó]n|donaciones|ticket|tk\d+|producto|productos|tienda|responsable|segmento|destino|cantidad|coste|precio|valoraci[oó]n|persona|socios|no socios|documentos|compar|grafica|gr[aá]fica|barra|ranking)/i.test(p);
-    return generic && !specific;
-  }
   function injectStyle(){
     if($('ceV110GeminiLibreStyle')) return;
     var css=document.createElement('style'); css.id='ceV110GeminiLibreStyle';
     css.textContent='\n'+
       '.ce-ai-free-btn{margin-left:auto!important;border:1px solid #f59e0b!important;background:#fff7ed!important;color:#7c2d12!important;border-radius:18px!important;min-width:54px!important;height:48px!important;font-size:24px!important;box-shadow:0 8px 20px rgba(251,146,60,.22)!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important}\n'+
       '.ce-ai-free-btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(251,146,60,.30)!important}\n'+
+
       '#ceAiTicketPanel.ce-ai-overlay:not(.open){display:none!important;visibility:hidden!important;pointer-events:none!important}#ceAiTicketPanel.ce-ai-overlay.open{display:flex!important;visibility:visible!important;pointer-events:auto!important}\n'+
       '#ceGeminiLibreOverlay{position:fixed;inset:0;z-index:99995;background:rgba(15,23,42,.50);display:flex;align-items:center;justify-content:center;padding:16px}\n'+
       '#ceGeminiLibreOverlay .ce-ai-modal{width:min(1180px,96vw);height:min(860px,94vh);background:#fff;border:2px solid #f59e0b;border-radius:22px;box-shadow:0 24px 70px rgba(15,23,42,.34);display:flex;flex-direction:column;overflow:hidden}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #fed7aa;background:linear-gradient(90deg,#fff7ed,#fff)}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-head h2{margin:0;color:#7c2d12;font-size:24px;white-space:nowrap}#ceGeminiLibreOverlay #ceAiEventTitle{text-align:center;display:flex;justify-content:center;align-items:center;gap:14px}#ceGeminiLibreOverlay .ce-ai-close{border-radius:14px!important;background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;padding:10px 18px!important;font-weight:900!important}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-event-open{color:#15803d;font-weight:900;font-size:18px}#ceGeminiLibreOverlay .ce-ai-event-final{color:#dc2626;font-weight:900;font-size:18px}#ceGeminiLibreOverlay .ce-ai-event-warn{color:#b45309;font-weight:900}#ceGeminiLibreOverlay .ce-ai-event-state{font-size:13px;color:#475569;font-weight:900;background:#eef2ff;border-radius:999px;padding:5px 12px}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-prompt{padding:14px 18px;border-bottom:1px solid #e5e7eb;background:#fff}#ceGeminiLibreOverlay .ce-ai-prompt textarea{width:100%;min-height:112px;resize:vertical;border:1px solid #fb923c;border-radius:14px;padding:12px;font-size:16px;box-sizing:border-box}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-options{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 10px 0;padding:10px 12px;background:#f8fafc;border:1px solid #dbeafe;border-radius:14px}#ceGeminiLibreOverlay .ce-ai-check{display:inline-flex;align-items:center;gap:8px;font-weight:900;color:#075985}#ceGeminiLibreOverlay .ce-ai-check input{width:18px;height:18px}#ceGeminiLibreOverlay .ce-ai-compare-select{min-width:360px;max-width:min(620px,90vw);padding:9px 12px;border:1px solid #cbd5e1;border-radius:12px;font-weight:800;background:#fff;color:#0f172a}#ceGeminiLibreOverlay .ce-ai-compare-select[disabled]{opacity:.45}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-toolbar{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-run{background:#f97316!important;color:#fff!important;border:0!important;border-radius:14px!important;padding:12px 18px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-secondary{background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;border-radius:14px!important;padding:10px 14px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-status{font-weight:900;margin-left:auto}#ceGeminiLibreOverlay .ce-ai-status.ok{color:#15803d}#ceGeminiLibreOverlay .ce-ai-status.err{color:#b91c1c}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #fed7aa;background:linear-gradient(90deg,#fff7ed,#fff)}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-head h2{margin:0;color:#7c2d12;font-size:24px}#ceGeminiLibreOverlay .ce-ai-head .spacer{flex:1}#ceGeminiLibreOverlay .ce-ai-close{border-radius:14px!important;background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;padding:10px 18px!important;font-weight:900!important}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-event-open{color:#15803d;font-weight:900}#ceGeminiLibreOverlay .ce-ai-event-final{color:#dc2626;font-weight:900}#ceGeminiLibreOverlay .ce-ai-event-warn{color:#b45309;font-weight:900}#ceGeminiLibreOverlay .ce-ai-event-state{font-size:13px;color:#475569;font-weight:800}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-prompt{padding:14px 18px;border-bottom:1px solid #e5e7eb;background:#fff}#ceGeminiLibreOverlay .ce-ai-prompt textarea{width:100%;min-height:112px;resize:vertical;border:1px solid #fb923c;border-radius:14px;padding:12px;font-size:16px;box-sizing:border-box}#ceGeminiLibreOverlay .ce-ai-toolbar{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-run{background:#f97316!important;color:#fff!important;border:0!important;border-radius:14px!important;padding:12px 18px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-secondary{background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;border-radius:14px!important;padding:10px 14px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-status{font-weight:900;margin-left:auto}#ceGeminiLibreOverlay .ce-ai-status.ok{color:#15803d}#ceGeminiLibreOverlay .ce-ai-status.err{color:#b91c1c}\n'+
       '#ceGeminiLibreOverlay .ce-ai-result{flex:1;overflow:auto;background:#f8fafc;padding:16px 18px}#ceGeminiLibreOverlay .ce-ai-card{background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:14px;margin:0 0 14px 0;box-shadow:0 2px 10px rgba(15,23,42,.06)}#ceGeminiLibreOverlay .ce-ai-card h3{margin:0 0 10px;color:#075985}#ceGeminiLibreOverlay .ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:650;color:#0f172a}#ceGeminiLibreOverlay .ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}#ceGeminiLibreOverlay .ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-loading{display:flex;align-items:center;gap:14px;font-weight:900;color:#075985}.ce-ai-spinner{width:36px;height:36px;border-radius:50%;border:5px solid #bae6fd;border-top-color:#f97316;animation:ceAiSpin .8s linear infinite}.ce-ai-dots span{display:inline-block;animation:ceAiJump 1s infinite}.ce-ai-dots span:nth-child(2){animation-delay:.15s}.ce-ai-dots span:nth-child(3){animation-delay:.3s}@keyframes ceAiSpin{to{transform:rotate(360deg)}}@keyframes ceAiJump{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}}\n'+
       '#ceGeminiLibreOverlay .ce-ai-table-wrap{overflow:auto}#ceGeminiLibreOverlay .ce-ai-table{border-collapse:collapse;width:100%;font-size:14px}#ceGeminiLibreOverlay .ce-ai-table th,#ceGeminiLibreOverlay .ce-ai-table td{border:1px solid #dbeafe;padding:7px 8px;text-align:left}#ceGeminiLibreOverlay .ce-ai-table th{background:#eff6ff;color:#075985}#ceGeminiLibreOverlay .ce-ai-bars{display:grid;gap:8px}#ceGeminiLibreOverlay .ce-ai-bar-row{display:grid;grid-template-columns:minmax(120px,260px) 1fr auto;align-items:center;gap:10px}#ceGeminiLibreOverlay .ce-ai-bar-label{font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis}#ceGeminiLibreOverlay .ce-ai-bar-track{height:22px;background:#e2e8f0;border-radius:999px;overflow:hidden}#ceGeminiLibreOverlay .ce-ai-bar-fill{height:100%;background:#38bdf8;border-radius:999px}#ceGeminiLibreOverlay .ce-ai-bar-value{font-weight:900;color:#075985;min-width:78px;text-align:right}#ceGeminiLibreOverlay .ce-ai-files{display:flex;gap:8px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-file-btn{background:#e0f2fe!important;color:#075985!important;border:1px solid #7dd3fc!important;border-radius:12px!important;padding:8px 12px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-preview{margin-top:10px;background:#0f172a;color:#e2e8f0;border-radius:14px;padding:12px;max-height:240px;overflow:auto;white-space:pre-wrap}\n'+
-      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head{grid-template-columns:1fr auto;gap:8px}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}#ceGeminiLibreOverlay #ceAiEventTitle{grid-column:1 / -1;order:3}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}#ceGeminiLibreOverlay .ce-ai-compare-select{min-width:100%;width:100%}}\n';
+      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n';
     document.head.appendChild(css);
   }
   function injectButton(){
@@ -77,13 +55,12 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Gemini libre del evento</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Gemini libre del evento</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
-          '<div class="ce-ai-options"><label class="ce-ai-check"><input type="checkbox" id="ceAiCompareMode"> Comparativa</label><select id="ceAiCompareEvent" class="ce-ai-compare-select" disabled>'+compareOptionsHtml()+'</select><span style="font-weight:800;color:#64748b">Sin comparativa, Gemini solo recibe el evento activo.</span></div>'+
-          '<textarea id="ceAiPrompt" placeholder="Ejemplos: ¿Cuántas personas vinieron a este evento?\nSácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nActiva Comparativa y elige otro evento para comparar ingresos, compras, donaciones y valoración."></textarea>'+
+          '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🤖 Analizar con Gemini</button><button type="button" class="ce-ai-secondary" id="ceAiClear">Limpiar</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">Descargar resultado</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
-        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Consulta del evento activo</h3><div class="ce-ai-answer">Por defecto solo se analiza el evento seleccionado. Para comparar, marca Comparativa y elige el otro evento en el desplegable.</div></div></div>'+ 
+        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versión</h3><div class="ce-ai-answer">Pregunta libremente sobre el evento seleccionado o pide comparativas con otros eventos. Solo se responderán cuestiones relacionadas con la gestión de eventos: ingresos, compras, donaciones, tickets, productos, responsables, tiendas, segmentos, destinos, valoración y recursos.</div></div></div>'+ 
       '</div></div>';
   }
   function openModal(){
@@ -93,51 +70,27 @@
     $('ceAiClose').onclick=closeModal;
     $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
     $('ceAiRun').onclick=runAi;
-    $('ceAiClear').onclick=function(){ stopWait(); $('ceAiPrompt').value=''; $('ceAiResult').innerHTML=''; setStatus('', ''); };
+    $('ceAiClear').onclick=function(){ $('ceAiPrompt').value=''; $('ceAiResult').innerHTML=''; setStatus('', ''); };
     $('ceAiDownloadResult').onclick=function(){ downloadText(($('ceAiResult')||{}).innerText||'', 'ControlEvent_Gemini_evento_'+Date.now()+'.txt', 'text/plain;charset=utf-8'); };
-    var chk=$('ceAiCompareMode'), sel=$('ceAiCompareEvent');
-    if(chk && sel){ chk.onchange=function(){ sel.disabled=!chk.checked; if(!chk.checked) sel.value=''; }; }
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ stopWait(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
+  function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
-  function startWait(){
-    stopWait(); waitStep=0;
-    var messages=['Preparando contexto seguro del evento','Calculando ingresos, compras, donaciones y tickets','Consultando Gemini','Montando respuesta y gráficas'];
-    var resEl=$('ceAiResult');
-    function paint(){
-      if(!resEl) return;
-      var msg=messages[waitStep % messages.length]; waitStep++;
-      resEl.innerHTML='<div class="ce-ai-card"><div class="ce-ai-loading"><span class="ce-ai-spinner"></span><span>'+esc(msg)+' <span class="ce-ai-dots"><span>●</span><span>●</span><span>●</span></span></span></div><p style="margin:12px 0 0;color:#64748b;font-weight:800">Si la petición es muy amplia, conviene concretar: ingresos, compras, donaciones, tickets, productos, responsables, tiendas, segmentos o valoración.</p></div>';
-    }
-    paint(); waitTimer=setInterval(paint,1700);
-  }
-  function stopWait(){ if(waitTimer){ clearInterval(waitTimer); waitTimer=null; } }
   async function runAi(){
     var ev=currentEvent();
     if(!ev){ setStatus('Selecciona un evento antes de consultar.', 'err'); return; }
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    var compareMode=!!(($('ceAiCompareMode')||{}).checked);
-    var compareId=trim(($('ceAiCompareEvent')||{}).value||'');
-    if(compareMode && !compareId){ setStatus('Elige un evento para comparar.', 'err'); return; }
-    if(isBroadPrompt(prompt)){
-      $('ceAiResult').innerHTML='<div class="ce-ai-card ce-ai-warning"><h3>Concreta un poco más</h3><div class="ce-ai-answer">La petición es muy general y puede tardar demasiado o producir un resultado poco útil. Indica qué quieres analizar: ingresos, compras, donaciones, tickets, productos, tiendas, responsables, segmentos, destinos, valoración o documentos.</div></div>';
-      setStatus('Petición demasiado amplia', 'err');
-      return;
-    }
     setStatus('Consultando Gemini…', 'ok');
-    startWait();
+    var resEl=$('ceAiResult');
+    resEl.innerHTML='<div class="ce-ai-card"><div class="ce-ai-answer">⏳ Analizando datos del evento con Gemini...</div></div>';
     try{
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),compareMode:compareMode,compareEventIds:compareMode?[compareId]:[]})});
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
       var data=await res.json().catch(function(){ return {}; });
       if(!res.ok || data.ok===false) throw new Error(data.error || ('HTTP '+res.status));
-      stopWait();
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'Respuesta generada.', data.rejected?'err':'ok');
     }catch(err){
-      stopWait();
-      var resEl=$('ceAiResult');
       resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Gemini</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
     }
@@ -169,7 +122,7 @@
     var rows=(tb.rows||[]).map(function(r){ return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(tb.title||'Tabla')+'</h3><div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }
-  function tick(){ injectStyle(); injectButton(); var title=$('ceAiEventTitle'); if(title) title.innerHTML=eventTitleHtml(); var sel=$('ceAiCompareEvent'); if(sel && !$('ceAiCompareMode').checked) sel.innerHTML=compareOptionsHtml(); }
+  function tick(){ injectStyle(); injectButton(); var title=$('ceAiEventTitle'); if(title) title.innerHTML=eventTitleHtml(); }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-loaded'].forEach(function(evt){ window.addEventListener(evt,function(){ setTimeout(tick,80); }); });
   document.addEventListener('click',function(ev){ if(ev.target && ev.target.closest && ev.target.closest('#tabGraficasBtn')) setTimeout(tick,180); }, true);
   document.addEventListener('change',function(ev){ if(ev.target && ev.target.id==='selectedEvent') setTimeout(tick,250); }, true);
