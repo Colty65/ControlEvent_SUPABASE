@@ -1,6 +1,6 @@
-ControlEvent v10.4.6_prod
+ControlEvent v10_5_prod
 
-Versión de rescate afinada sobre v10.4.5_prod.
+Versión de rescate afinada sobre v10_5_prod.
 
 Cambios principales:
 - Ticket Auto: similitud de productos más estricta para evitar falsos positivos tipo SAL dentro de ROSAL.
@@ -9,4 +9,4 @@ Cambios principales:
 - COMPRAS: rehidratación puntual si al cambiar de evento queda la lista vacía, sin bucles de refresco.
 - INGRESOS y DOCUMENTOS: reconstrucción de una única flecha de descarga por foto/miniatura.
 - Mapa de recursos: filtro de responsables más pequeño en iPad.
-- INFOEVENTO/BACKUP: versión de exportación actualizada a ControlEvent_v10_4_6_prod.
+- INFOEVENTO/BACKUP: versión de exportación actualizada a ControlEvent_v10_5_prod.

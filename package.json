@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v10-4-7-prod",
-  "version": "10.4.7-prod",
+  "name": "controlevent-v10-5-prod",
+  "version": "10.5.0",
   "private": true,
   "type": "module",
   "scripts": {

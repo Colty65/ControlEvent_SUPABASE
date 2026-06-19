@@ -1,8 +1,8 @@
-/* ControlEvent v10.4.3_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
+/* ControlEvent v10_5_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
 (function(){
   'use strict';
   if(window.__ceV1041AppFixes) return; window.__ceV1041AppFixes=true;
-  var VERSION='v10.4.3_prod';
+  var VERSION='v10_5_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

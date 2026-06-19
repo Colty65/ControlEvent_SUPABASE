@@ -1,4 +1,4 @@
-ControlEvent v10.4.5_prod - rescate puntual sobre v10.4.4
+ControlEvent v10_5_prod - rescate puntual sobre v10.4.4
 
 Cambios realizados:
 - Documentos del evento: se restituye la miniatura visible y una única flecha de descarga por documento.

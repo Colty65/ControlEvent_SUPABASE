@@ -5,8 +5,8 @@ import { getState } from '../services/state.service.js';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v10.4.7_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v10_4_7_prod';
+const BACKUP_VERSION = 'ControlEvent v10_5_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v10_5_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 

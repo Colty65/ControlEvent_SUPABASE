@@ -1,5 +1,5 @@
 {
-  "version": "v10.4.3_prod",
+  "version": "v10_5_prod",
   "base": "v10.2_prod",
   "changed": [
     "public/app/features/v10-3-app-fixes.js",

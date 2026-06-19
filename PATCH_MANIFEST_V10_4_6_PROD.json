@@ -1,6 +1,6 @@
 {
-  "version": "v10.4.6_prod",
-  "base": "v10.4.5_prod",
+  "version": "v10_5_prod",
+  "base": "v10_5_prod",
   "touched_active_files": [
     "public/app/features/v10-4-app-fixes.js",
     "public/app/features/v10-4-6-app-fixes.js",
