@@ -1,4 +1,4 @@
-HOTFIX sobre ControlEvent v10_5_prod / HOTFIX_LOGIN2
+HOTFIX sobre ControlEvent v11.0_prod / HOTFIX_LOGIN2
 
 Objetivo: corrección quirúrgica sin tocar masivamente la app.
 

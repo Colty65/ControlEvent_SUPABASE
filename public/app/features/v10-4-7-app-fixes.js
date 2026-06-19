@@ -1,9 +1,9 @@
-/* ControlEvent v10_5_prod - Rescate afinado: descargas, búsquedas, carga COMPRAS y mapa iPad.
+/* ControlEvent v11.0_prod - Rescate afinado: descargas, búsquedas, carga COMPRAS y mapa iPad.
    No usa intervalos ni refrescos en bucle. Solo actúa por eventos o cambios reales del DOM. */
 (function(){
   'use strict';
   if(window.__ceV1047RescueFixes) return; window.__ceV1047RescueFixes=true;
-  var VERSION='v10_5_prod';
+  var VERSION='v11.0_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

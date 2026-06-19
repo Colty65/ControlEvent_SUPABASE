@@ -1,0 +1,28 @@
+{
+  "version": "v11.0_prod",
+  "base": "version anterior 10.5",
+  "changes": [
+    "Nueva ventana Gemini libre del evento desde GRAFICAS",
+    "Nueva ruta backend /api/event-ai/analyze",
+    "Nuevo servicio services/event-ai.service.js",
+    "Renderizado de respuestas con texto, tablas, graficas y archivos descargables",
+    "Disponible para GD, RW y RO, en eventos En curso y Finalizado",
+    "Version actualizada a v11.0_prod y ControlEvent_v11_0_prod en referencias activas"
+  ],
+  "files_added": [
+    "services/event-ai.service.js",
+    "routes/event-ai.routes.js",
+    "public/app/features/v11-0-gemini-libre-evento.js",
+    "LEEME_V11_0_PROD_GEMINI_LIBRE_EVENTO.txt"
+  ],
+  "files_modified": [
+    "server/app.js",
+    "scripts/dev-server.js",
+    "index.html",
+    "public/index.html",
+    "package.json",
+    "package-lock.json",
+    "routes/export.routes.js",
+    "public/app/version.js"
+  ]
+}

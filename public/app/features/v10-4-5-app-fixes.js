@@ -1,4 +1,4 @@
-/* ControlEvent v10_5_prod - Rescate Documentos/Ingresos/Mapa móvil
+/* ControlEvent v11.0_prod - Rescate Documentos/Ingresos/Mapa móvil
    - No hace render() ni recargas automáticas.
    - Restituye miniaturas y una única flecha de descarga en Documentos e Ingresos.
    - Reduce el filtro de responsables del Mapa en iPad/móvil.
@@ -7,7 +7,7 @@
   'use strict';
   if(window.__ceV1045RescueFixes) return;
   window.__ceV1045RescueFixes = true;
-  var VERSION='v10_5_prod';
+  var VERSION='v11.0_prod';
   function $(id){ return document.getElementById(id); }
   function trim(v){ return v == null ? '' : String(v).trim(); }
   function stop(ev){ if(ev){ ev.preventDefault&&ev.preventDefault(); ev.stopPropagation&&ev.stopPropagation(); ev.stopImmediatePropagation&&ev.stopImmediatePropagation(); } return false; }

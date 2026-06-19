@@ -4,6 +4,7 @@ import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeReceiptImage } from '../services/receipt-ai.service.js';
+import { analyzeEventPrompt } from '../services/event-ai.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -283,6 +284,15 @@ app.post('/api/receipt-ai/analyze', async (req, res) => {
     res.status(err?.status || 500).json({ ok: false, error: err?.message || String(err) });
   }
 });
+
+app.post('/api/event-ai/analyze', async (req, res) => {
+  try {
+    res.json(await analyzeEventPrompt({ ...(req.body || {}), stateOverride: await readJson(STATE_FILE, {}) }));
+  } catch (err) {
+    res.status(err?.status || 500).json({ ok: false, error: err?.message || String(err) });
+  }
+});
+
 
 app.get('/api/diagnostics', async (req, res) => {
   const raw = await fs.readFile(STATE_FILE, 'utf8').catch(() => '{}');
