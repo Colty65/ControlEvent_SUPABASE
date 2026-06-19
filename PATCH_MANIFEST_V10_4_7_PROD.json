@@ -1,0 +1,28 @@
+{
+  "version": "v10.4.7_prod",
+  "base": "CE_v10_4_6_PROD_RESCATE_AFINADO.zip",
+  "changed_files": [
+    "index.html",
+    "public/index.html",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json",
+    "routes/export.routes.js",
+    "public/app/features/v10-4-7-ticketauto-compras.js",
+    "public/app/features/v10-4-7-app-fixes.js",
+    "public/app/features/v10-4-app-fixes.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v7-3-prod-final-fix.js",
+    "public/app/features/v50-24-final-fixes.js",
+    "public/app/features/v50-26-final-fixes.js",
+    "public/app/features/v50-27-hard-logout.js",
+    "public/app/features/v8-4-1-backup-eventid-format.js",
+    "public/app/features/v8-5-documentos-excel.js"
+  ],
+  "checks": [
+    "node --check JS principales",
+    "routes/export.routes.js node --check",
+    "package.json/package-lock.json JSON parse",
+    "unzip -t"
+  ]
+}

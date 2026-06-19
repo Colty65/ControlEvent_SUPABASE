@@ -1,10 +1,10 @@
-/* ControlEvent v10.4.3_prod - cierre de versión y descarga/Excel sin carga periódica.
+/* ControlEvent v10.4.7_prod - cierre de versión y descarga/Excel sin carga periódica.
    Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v10.4.3_prod';
-  const VERSION_FILE = 'ControlEvent_v10_4_prod';
+  const VERSION = 'ControlEvent v10.4.7_prod';
+  const VERSION_FILE = 'ControlEvent_v10_4_7_prod';
   const INSTALLED = '__ceV73ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
