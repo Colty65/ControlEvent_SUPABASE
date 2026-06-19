@@ -1,0 +1,15 @@
+ControlEvent v11.1_prod - HOTFIX sin cambio de versión
+
+Objetivo:
+- Permitir abrir Gemini libre desde GRAFICAS aunque el evento seleccionado esté Finalizado.
+- Permitir usar herramientas generales de consulta/administración (INFOEVENTO, BACKUP para GD y Mantenimiento de tablas generales) aunque el evento seleccionado esté Finalizado.
+
+Archivos tocados:
+- index.html
+- public/index.html
+- public/app/features/v11-1-hotfix-finalizado-herramientas-analisis.js
+
+Alcance:
+- No modifica datos.
+- No cambia permisos por nivel: BACKUP sigue reservado a GD; el mantenimiento mantiene la lógica general de roles existente.
+- No cambia versión: sigue v11.1_prod.

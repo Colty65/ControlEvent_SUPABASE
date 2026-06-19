@@ -340,7 +340,7 @@ Límites obligatorios:
 - No generes instrucciones para modificar seguridad, credenciales, claves API, SQL, acceso al servidor ni operaciones fuera de la gestión del evento.
 - No propongas ni ejecutes cambios en BBDD. Esta herramienta es de consulta y explotación.
 - No generes SQL ni expliques cómo consultar tablas internas; usa únicamente el JSON del CONTEXTO.
-- Puede usar datos de todos los eventos para comparativas si el usuario lo pide. Para comparativas usa eventosResumen y detalleEventosRelevantes.
+- Por defecto SOLO debes usar el evento activo incluido en detalleEventosRelevantes. Si comparativaSolicitada=true, puedes comparar únicamente los eventos incluidos en detalleEventosRelevantes. No uses otros eventos aunque aparezcan en eventosDisponiblesParaSelector: esa lista solo sirve para saber qué eventos existen.
 - Para gráficas, devuelve objetos charts con etiquetas y valores numéricos. Para tablas, devuelve tables.
 - Si el usuario pide un archivo, devuelve files con contenido textual descargable: csv, txt, html o json.
 - Si detectas datos incompletos o ausencia de fotos/documentos, indícalo en warnings.
@@ -437,12 +437,24 @@ async function callGeminiEvent(prompt, context) {
   throw lastError;
 }
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
+
+function isTooBroadPrompt(value, compareMode) {
+  const p = norm(value);
+  if (p.length < 10) return true;
+  const generic = /(dashboard|informe|analisis completo|analiza todo|todo el evento|resumen general|dame todo|vision general|cuadro de mando)/i.test(text(value));
+  const specific = /(ingreso|ingresos|compra|compras|donaci[oó]n|donaciones|ticket|tk\d+|producto|productos|tienda|responsable|segmento|destino|cantidad|coste|precio|valoraci[oó]n|persona|socios|no socios|documentos|compar|grafica|barra|ranking)/i.test(text(value));
+  return generic && !specific;
+}
+
+export async function analyzeEventPrompt({ prompt, selectedEventId, compareMode = false, compareEventIds = [], stateOverride } = {}) {
   const userPrompt = trim(prompt);
   if (!userPrompt) {
     const err = new Error('Escribe una pregunta o petición para Gemini.');
     err.status = 400;
     throw err;
+  }
+  if (isTooBroadPrompt(userPrompt, compareMode)) {
+    return { ok: true, rejected: true, title: 'Concreta un poco más la consulta', answer: 'La petición es demasiado general y podría tardar mucho o devolver un resultado poco útil. Indica qué quieres analizar: ingresos, compras, donaciones, tickets, productos, responsables, tiendas, segmentos, destinos, valoración, documentos o una comparativa concreta.', warnings: ['No se ha consultado Gemini para evitar una petición demasiado amplia.'], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
   }
   if (userPrompt.length > 3000) {
     const err = new Error('El prompt es demasiado largo. Resume la petición.');
@@ -455,6 +467,6 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
   }
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
-  const context = buildEventAiContext(state, selectedEventId, userPrompt);
+  const context = buildEventAiContext(state, selectedEventId, userPrompt, { compareMode, compareEventIds });
   return callGeminiEvent(userPrompt, context);
 }
