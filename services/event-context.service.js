@@ -15,7 +15,7 @@ function norm(value) {
   return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().replace(/[^a-z0-9]+/gi, ' ').replace(/\s+/g, ' ').trim();
 }
 function words(value) {
-  const stop = new Set(['de','del','la','el','las','los','y','vs','contra','con','sin','para','por','un','una','iii','iv','jornada','solidaria']);
+  const stop = new Set(['de','del','la','el','las','los','y','vs','contra','con','sin','para','por','un','una','jornada','jornadas','solidaria','solidarias']);
   return norm(value).split(' ').filter(w => w.length >= 3 && !stop.has(w));
 }
 function byId(rows) {
@@ -165,7 +165,7 @@ function summarizeCompras(rows, ev, helpers, ticketImages) {
   });
   const tickets = [...byTicket.values()].sort((a,b) => a.ticket.localeCompare(b.ticket)).map(t => ({
     ticket: t.ticket, tienda: t.tienda, responsable: t.responsable, total: round(t.total, 2), numeroLineas: t.lineas, tieneFoto: !!t.tieneFoto,
-    segmentos: topN(t.segmentos, 12), destinos: topN(t.destinos, 12), lineas: t.productos.slice(0, 120)
+    segmentos: topN(t.segmentos, 12), destinos: topN(t.destinos, 12), lineas: t.productos
   }));
   return {
     totalComprasReales: round(totalReales, 2), totalComprasPendientes: round(totalPendientes, 2), totalDonacionesProducto: round(totalDonaciones, 2),
@@ -192,18 +192,34 @@ function summarizeDocs(rows, ev, ticketImages) {
 
 function eventScore(ev, prompt) {
   const p = norm(prompt); const title = norm(ev?.titulo); if (!p || !title) return 0;
-  let score = 0; if (p.includes(title)) score += 100;
-  for (const w of words(ev?.titulo)) if (p.includes(w)) score += w.length >= 5 ? 7 : 3;
-  const code = norm(ev?.eventoCodigo || ev?.codigo || ''); if (code && p.includes(code)) score += 20;
+  let score = 0;
+  if (p.includes(title)) score += 120;
+  const titleNoSuffix = title.replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
+  if (titleNoSuffix && p.includes(titleNoSuffix)) score += 90;
+  const romans = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+  const tWords = title.split(' ');
+  romans.forEach(r => { if (tWords.includes(r) && p.split(' ').includes(r)) score += 40; });
+  for (const w of words(ev?.titulo)) if (p.split(' ').includes(w) || p.includes(w)) score += w.length >= 5 ? 9 : 4;
+  const code = norm(ev?.eventoCodigo || ev?.codigo || ''); if (code && p.includes(code)) score += 30;
   return score;
 }
 function chooseRelevantEventIds(events, selectedId, prompt) {
+  // v11.1 HOTFIX Analítica libre: Gemini debe disponer del detalle de TODOS los eventos.
+  // No se da acceso a SQL ni a BBDD; simplemente se prepara un JSON de solo lectura con
+  // todos los eventos ya calculados por ControlEvent. El orden prioriza evento activo y
+  // eventos citados en el prompt, pero no elimina el resto.
+  const ids = arr(events).map(ev => trim(ev?.id)).filter(Boolean);
+  const selected = trim(selectedId);
+  const scored = arr(events)
+    .map(ev => ({ id: trim(ev?.id), score: eventScore(ev, prompt) }))
+    .filter(x => x.id && x.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .map(x => x.id);
   const out = [];
-  if (selectedId) out.push(selectedId);
-  const scored = arr(events).map(ev => ({ id: trim(ev?.id), score: eventScore(ev, prompt) })).filter(x => x.id && x.score > 0).sort((a,b) => b.score - a.score);
-  const wantsCompare = /compar|frente|versus|\bvs\b|diferencia|evoluci/i.test(text(prompt));
-  const max = wantsCompare ? 8 : 4;
-  for (const row of scored) if (!out.includes(row.id) && out.length < max) out.push(row.id);
+  function push(id){ if(id && !out.includes(id)) out.push(id); }
+  push(selected);
+  scored.forEach(push);
+  ids.forEach(push);
   return out;
 }
 
@@ -256,7 +272,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     };
   });
   return {
-    versionContexto: 'ControlEvent EventContext v11.1_prod',
+    versionContexto: 'ControlEvent EventContext v11.1_prod - analitica contexto completo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -266,7 +282,8 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     selectedEventId: selectedId,
     selectedEvent: details.find(d => d.evento.id === selectedId)?.evento || null,
     eventosResumen: resumenEventos,
-    detalleEventosRelevantes: details,
+    detalleEventosCompletos: details,
+    detalleEventosRelevantes: details, // Alias histórico: desde este hotfix contiene TODOS los eventos, no solo seleccionados.
     resumenGlobal: { totalEventos: events.length, rankingIngresos: topN(globalIngresos, 20), rankingCompras: topN(globalCompras, 20), rankingDonaciones: topN(globalDonaciones, 20), rankingValoracion: topN(globalValoracion, 20) },
     catalogosRelacionados: {
       tiendas: arr(safeState.tiendas).map(t => ({ id: trim(t.id), nombre: trim(t.nombre) })).filter(t => t.nombre).slice(0, 500),

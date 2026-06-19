@@ -1,4 +1,4 @@
-/* ControlEvent v11.1_prod - Gemini libre de explotación del evento.
+/* ControlEvent v11.1_prod - Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
@@ -45,17 +45,30 @@
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n';
     document.head.appendChild(css);
   }
+
+  var lastOpenTap=0;
+  function openFromButton(ev){
+    if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+    var now=Date.now(); if(now-lastOpenTap<650) return; lastOpenTap=now;
+    openModal();
+  }
+  function bindOpenButton(btn){
+    if(!btn || btn.__ceAnaliticaLibreBound) return; btn.__ceAnaliticaLibreBound=true;
+    ['click','touchend','pointerup'].forEach(function(evt){
+      btn.addEventListener(evt, openFromButton, { passive:false, capture:true });
+    });
+  }
   function injectButton(){
     var tab=$('tabGraficas'); if(!tab) return;
     var section=tab.querySelector('.section-title'); if(!section || $('ceGeminiLibreBtn')) return;
-    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Gemini libre del evento'; btn.setAttribute('aria-label','Gemini libre del evento'); btn.textContent='✨📊';
-    btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); openModal(); });
+    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Analítica libre'; btn.setAttribute('aria-label','Analítica libre'); btn.textContent='✨📊';
+    bindOpenButton(btn);
     section.appendChild(btn);
   }
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Gemini libre del evento</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Analítica libre</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🤖 Analizar con Gemini</button><button type="button" class="ce-ai-secondary" id="ceAiClear">Limpiar</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">Descargar resultado</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -73,7 +86,7 @@
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
     $('ceAiClear').onclick=function(){ $('ceAiPrompt').value=''; $('ceAiResult').innerHTML=''; setStatus('', ''); };
-    $('ceAiDownloadResult').onclick=function(){ downloadText(($('ceAiResult')||{}).innerText||'', 'ControlEvent_Gemini_evento_'+Date.now()+'.txt', 'text/plain;charset=utf-8'); };
+    $('ceAiDownloadResult').onclick=function(){ downloadText(($('ceAiResult')||{}).innerText||'', 'ControlEvent_Analitica_libre_'+Date.now()+'.txt', 'text/plain;charset=utf-8'); };
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
   function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
@@ -124,11 +137,13 @@
     var rows=(tb.rows||[]).map(function(r){ return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(tb.title||'Tabla')+'</h3><div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }
-  function tick(){ injectStyle(); injectButton(); var title=$('ceAiEventTitle'); if(title) title.innerHTML=eventTitleHtml(); }
+  function tick(){ injectStyle(); injectButton(); bindOpenButton($('ceGeminiLibreBtn')); var title=$('ceAiEventTitle'); if(title) title.innerHTML=eventTitleHtml(); }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-loaded'].forEach(function(evt){ window.addEventListener(evt,function(){ setTimeout(tick,80); }); });
   document.addEventListener('click',function(ev){ if(ev.target && ev.target.closest && ev.target.closest('#tabGraficasBtn')) setTimeout(tick,180); }, true);
   document.addEventListener('change',function(ev){ if(ev.target && ev.target.id==='selectedEvent') setTimeout(tick,250); }, true);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(); } }, true);
+  document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
+  document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
   window.ControlEventV111GeminiLibre={open:openModal, install:tick};
 })();
