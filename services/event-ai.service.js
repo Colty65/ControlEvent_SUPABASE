@@ -1,6 +1,7 @@
-/* ControlEvent v11.0_prod - Asistente libre Gemini sobre datos del evento.
+/* ControlEvent v11.1_prod - Asistente libre Gemini sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
+import { buildEventAiContext } from './event-context.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -57,7 +58,7 @@ function geminiKey() {
   return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
 function configuredGeminiModels() {
-  // v11.0 hotfix: no volver a llamar a Gemini 1.5 desde v1beta.
+  // v11.1: no volver a llamar a Gemini 1.5 desde v1beta.
   // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
   const configuredRaw = trim(process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
   const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
@@ -86,6 +87,66 @@ function compactState(state, selectedEventId = '') {
   function personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); }
   function productSegment(id) { return trim(products.get(trim(id))?.segmento || ''); }
   function productDestino(id) { return trim(products.get(trim(id))?.destino || ''); }
+  function firstNumber(row, keys, fallback = 0) {
+    for (const key of keys) {
+      if (row && row[key] !== undefined && row[key] !== null && trim(row[key]) !== '') return num(row[key]);
+    }
+    return fallback;
+  }
+  function incomeRango(row) {
+    const persona = people.get(trim(row?.personaId || row?.persona_id));
+    return norm(persona?.rango || row?.rango || row?.personaRango || row?.tipoPersona || '');
+  }
+  function isSocioIncome(row) { return incomeRango(row) === 'socio'; }
+  function incomePayment(row) { return trim(row?.situacion || row?.formaPago || row?.ingreso || 'Pendiente') || 'Pendiente'; }
+  function incomePersonName(row) {
+    const id = trim(row?.personaId || row?.persona_id);
+    return trim(people.get(id)?.nombre || row?.nombre || id || 'Sin colaborador');
+  }
+  function incomeParts(row, ev) {
+    const numero = num(row?.numero);
+    const precioEntrada = num(ev?.precio);
+    const socio = isSocioIncome(row);
+    const importeObligatorio = socio ? round(numero * precioEntrada, 2) : 0;
+    const importeVoluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
+    const importeTotal = round(importeObligatorio + importeVoluntario, 2);
+    return {
+      socio,
+      rango: socio ? 'SOCIO' : (trim(people.get(trim(row?.personaId || row?.persona_id))?.rango || row?.rango || row?.personaRango || '') || 'NO SOCIO / OTRO'),
+      numero: round(numero, 3),
+      formaPago: incomePayment(row),
+      importeObligatorio,
+      importeVoluntario: round(importeVoluntario, 2),
+      importeTotal,
+      importeCampoBBDD: round(row?.importe, 2)
+    };
+  }
+  function summarizeIngresos(rows, ev) {
+    const byForma = new Map();
+    const byRango = new Map();
+    let total = 0, totalSocios = 0, totalNoSocios = 0, obligatorioSocios = 0, voluntario = 0, entradas = 0;
+    arr(rows).forEach(row => {
+      const p = incomeParts(row, ev);
+      total += p.importeTotal;
+      entradas += p.numero;
+      voluntario += p.importeVoluntario;
+      obligatorioSocios += p.importeObligatorio;
+      if (p.socio) totalSocios += p.importeTotal; else totalNoSocios += p.importeTotal;
+      add(byForma, p.formaPago, p.importeTotal);
+      add(byRango, p.rango, p.importeTotal);
+    });
+    return {
+      ingresosTotal: round(total, 2),
+      ingresosSocios: round(totalSocios, 2),
+      ingresosNoSociosYOtros: round(totalNoSocios, 2),
+      importeObligatorioSocios: round(obligatorioSocios, 2),
+      importeVoluntario: round(voluntario, 2),
+      entradasTotal: round(entradas, 3),
+      porFormaPago: topN(byForma, 20),
+      porTipoPersona: topN(byRango, 20),
+      regla: 'IngresosTotal = importe obligatorio de socios (numero * precioEntrada) + importe voluntario / ingresos no socios. No usar solo el campo bruto importe si hay socios.'
+    };
+  }
 
   const eventSummaries = events.map(ev => {
     const evId = trim(ev.id);
@@ -96,12 +157,10 @@ function compactState(state, selectedEventId = '') {
     const byStore = new Map();
     const bySegment = new Map();
     const byDestino = new Map();
-    let comprasReales = 0, comprasPendientes = 0, donacionesValor = 0, ingresosTotal = 0, entradasTotal = 0;
-
-    evIngresos.forEach(row => {
-      ingresosTotal += num(row.importe);
-      entradasTotal += num(row.numero);
-    });
+    let comprasReales = 0, comprasPendientes = 0, donacionesValor = 0;
+    const ingresosResumen = summarizeIngresos(evIngresos, ev);
+    const ingresosTotal = ingresosResumen.ingresosTotal;
+    const entradasTotal = ingresosResumen.entradasTotal;
     evCompras.forEach(row => {
       const amount = valueOfLine(row);
       const ticket = ticketText(row);
@@ -131,6 +190,12 @@ function compactState(state, selectedEventId = '') {
       precioEntrada: round(ev.precio, 2),
       ingresosTotal: round(ingresosTotal, 2),
       entradasTotal: round(entradasTotal, 2),
+      ingresosSocios: ingresosResumen.ingresosSocios,
+      ingresosNoSociosYOtros: ingresosResumen.ingresosNoSociosYOtros,
+      importeObligatorioSocios: ingresosResumen.importeObligatorioSocios,
+      importeVoluntario: ingresosResumen.importeVoluntario,
+      ingresosPorFormaPago: ingresosResumen.porFormaPago,
+      ingresosPorTipoPersona: ingresosResumen.porTipoPersona,
       comprasReales: round(comprasReales, 2),
       comprasPendientes: round(comprasPendientes, 2),
       donacionesValor: round(donacionesValor, 2),
@@ -160,12 +225,27 @@ function compactState(state, selectedEventId = '') {
     return rows;
   }
   function ingresosForEvent(evId, maxRows = 400) {
-    return colaboradores.filter(c => trim(c.eventId || c.event_id) === evId).slice(0, maxRows).map(row => ({
-      colaborador: personName(row.personaId || row.persona_id),
-      numero: round(row.numero, 3),
-      situacion: trim(row.situacion || ''),
-      importe: round(row.importe, 2)
-    }));
+    const ev = events.find(e => trim(e.id) === trim(evId)) || selectedEvent || {};
+    return colaboradores.filter(c => trim(c.eventId || c.event_id) === evId).slice(0, maxRows).map(row => {
+      const p = incomeParts(row, ev);
+      return {
+        colaborador: incomePersonName(row),
+        tipoPersona: p.rango,
+        esSocio: p.socio,
+        numero: p.numero,
+        formaPago: p.formaPago,
+        importeObligatorioSocios: p.importeObligatorio,
+        importeVoluntarioONoSocio: p.importeVoluntario,
+        importeTotalCalculado: p.importeTotal,
+        importeCampoBBDD: p.importeCampoBBDD,
+        notaCalculo: p.socio ? 'Socio: obligatorio = numero * precioEntrada; total = obligatorio + voluntario.' : 'No socio/otro: total = importe voluntario o importe registrado.'
+      };
+    });
+  }
+  function ingresosResumenForEvent(evId) {
+    const ev = events.find(e => trim(e.id) === trim(evId)) || selectedEvent || {};
+    const rows = colaboradores.filter(c => trim(c.eventId || c.event_id) === evId);
+    return summarizeIngresos(rows, ev);
   }
   const selectedId = trim(selectedEvent?.id || selectedEventId);
   return {
@@ -181,6 +261,7 @@ function compactState(state, selectedEventId = '') {
     } : null,
     eventosResumen: eventSummaries,
     detalleEventoSeleccionado: selectedId ? {
+      resumenIngresosDetallado: ingresosResumenForEvent(selectedId),
       comprasDonacionesYPendientes: detailedRowsForEvent(selectedId),
       ingresos: ingresosForEvent(selectedId)
     } : null,
@@ -246,19 +327,23 @@ function eventAiSchema() {
 }
 
 function systemPrompt(userPrompt, context) {
-  const ctx = JSON.stringify(context).slice(0, 90000);
+  const ctx = JSON.stringify(context).slice(0, 140000);
   return `Eres Gemini integrado en ControlEvent, una aplicación de gestión de eventos solidarios.
 
-Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, necesidades y valoración del evento.
+Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO calculado por ControlEvent. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, documentos, necesidades y valoración del evento.
 
 Límites obligatorios:
 - Si la petición no tiene relación clara con gestión de eventos de ControlEvent, recházala con rejected=true y explica brevemente.
 - No inventes datos. Si falta un dato, dilo.
+- Para INGRESOS usa siempre ingresosTotal, ingresosSocios, ingresosNoSociosYOtros, importeObligatorioSocios, importeVoluntario y el detalle de ingresos. No confundas el campo bruto importe con el total real cuando hay socios: en socios el obligatorio se calcula como numero * precioEntrada.
+- Si el usuario pregunta por ingresos de socios y no socios, desglosa ambos y explica la regla de cálculo usada.
 - No generes instrucciones para modificar seguridad, credenciales, claves API, SQL, acceso al servidor ni operaciones fuera de la gestión del evento.
 - No propongas ni ejecutes cambios en BBDD. Esta herramienta es de consulta y explotación.
-- Puede usar datos de todos los eventos para comparativas si el usuario lo pide.
+- No generes SQL ni expliques cómo consultar tablas internas; usa únicamente el JSON del CONTEXTO.
+- Puede usar datos de todos los eventos para comparativas si el usuario lo pide. Para comparativas usa eventosResumen y detalleEventosRelevantes.
 - Para gráficas, devuelve objetos charts con etiquetas y valores numéricos. Para tablas, devuelve tables.
 - Si el usuario pide un archivo, devuelve files con contenido textual descargable: csv, txt, html o json.
+- Si detectas datos incompletos o ausencia de fotos/documentos, indícalo en warnings.
 - Responde siempre en español.
 
 Formato de salida: SOLO JSON válido con el esquema indicado.
@@ -370,6 +455,6 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
   }
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
-  const context = compactState(state, selectedEventId);
+  const context = buildEventAiContext(state, selectedEventId, userPrompt);
   return callGeminiEvent(userPrompt, context);
 }

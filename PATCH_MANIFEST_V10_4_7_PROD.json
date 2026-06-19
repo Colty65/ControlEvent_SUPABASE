@@ -1,6 +1,6 @@
 {
-  "version": "v11.0_prod",
-  "base": "CE_v11.0_prod_RESCATE_AFINADO.zip",
+  "version": "v11.1_prod",
+  "base": "CE_v11.1_prod_RESCATE_AFINADO.zip",
   "changed_files": [
     "index.html",
     "public/index.html",

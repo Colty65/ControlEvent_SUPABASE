@@ -1,10 +1,10 @@
 {
-  "version": "v11.0_prod",
-  "base": "v11.0_prod",
+  "version": "v11.1_prod",
+  "base": "v11.1_prod",
   "files_added": [
     "public/app/features/v10-4-2-ticketauto-compras.js",
     "public/app/features/v10-4-2-app-fixes.js",
-    "LEEME_v11.0_prod.txt"
+    "LEEME_v11.1_prod.txt"
   ],
   "files_modified": [
     "index.html",

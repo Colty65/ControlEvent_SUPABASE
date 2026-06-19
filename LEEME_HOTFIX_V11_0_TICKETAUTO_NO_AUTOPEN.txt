@@ -1,4 +1,4 @@
-ControlEvent v11.0_prod - HOTFIX Ticket Auto no autoabrir
+ControlEvent v11.1_prod - HOTFIX Ticket Auto no autoabrir
 
 No cambia versión.
 
@@ -9,6 +9,6 @@ Objetivo:
 Archivos tocados:
 - index.html
 - public/index.html
-- public/app/features/v11-0-hotfix-ticketauto-no-autopen.js
+- public/app/features/v11-1-hotfix-ticketauto-no-autopen.js
 
 No toca backend, Gemini libre, modelo de datos, ni resto de módulos.
