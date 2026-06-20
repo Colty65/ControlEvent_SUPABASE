@@ -62,12 +62,12 @@ function configuredGeminiModels() {
   // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
   const configuredRaw = trim(process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
   const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
-  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
   const out = [];
   [...configured, ...fallback].forEach(model => {
     const m = trim(model).replace(/^models\//, '');
     if (!m) return;
-    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m)) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
     if (!out.includes(m)) out.push(m);
   });
   return out;
@@ -328,7 +328,7 @@ function eventAiSchema() {
 
 function systemPrompt(userPrompt, context) {
   const rawCtx = JSON.stringify(context);
-  const ctx = rawCtx.length > 850000 ? rawCtx.slice(0, 850000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: pide una consulta más concreta si necesitas más detalle. */' : rawCtx;
+  const ctx = rawCtx.length > 180000 ? rawCtx.slice(0, 180000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: pide una consulta más concreta o usa una comparativa con eventos concretos si necesitas más detalle. */' : rawCtx;
   return `Eres la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
 
 Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO calculado por ControlEvent. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, documentos, necesidades y valoración del evento.
@@ -341,7 +341,7 @@ Límites obligatorios:
 - No generes instrucciones para modificar seguridad, credenciales, claves API, SQL, acceso al servidor ni operaciones fuera de la gestión del evento.
 - No propongas ni ejecutes cambios en BBDD. Esta herramienta es de consulta y explotación.
 - No generes SQL ni expliques cómo consultar tablas internas; usa únicamente el JSON del CONTEXTO.
-- Puede usar datos de todos los eventos para comparativas si el usuario lo pide. Para comparativas usa detalleEventosCompletos o detalleEventosRelevantes; ambos contienen todos los eventos calculados por ControlEvent.
+- Usa eventosResumen para visión global de todos los eventos. Usa detalleEventosSeleccionados/detalleEventosRelevantes para el evento activo y eventos citados. Usa lineasFiltradasPorPrompt para preguntas concretas de producto, tienda, ticket o responsable en todos los eventos, por ejemplo precios de cerveza en el evento más reciente.
 - Para gráficas, devuelve objetos charts con etiquetas y valores numéricos. Para tablas, devuelve tables.
 - Si el usuario pide un archivo, devuelve files con contenido textual descargable: csv, txt, html o json.
 - Si detectas datos incompletos o ausencia de fotos/documentos, indícalo en warnings.

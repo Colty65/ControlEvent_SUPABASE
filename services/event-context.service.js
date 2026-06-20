@@ -203,25 +203,110 @@ function eventScore(ev, prompt) {
   const code = norm(ev?.eventoCodigo || ev?.codigo || ''); if (code && p.includes(code)) score += 30;
   return score;
 }
+function parseEventDate(ev) {
+  const candidates = [ev?.fechaFin, ev?.fecha_fin, ev?.fechaIni, ev?.fecha_ini, ev?.createdAt, ev?.created_at].map(trim).filter(Boolean);
+  for (const raw of candidates) {
+    const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      const y = Number(m[3].length === 2 ? `20${m[3]}` : m[3]);
+      const d = new Date(y, Number(m[2]) - 1, Number(m[1])).getTime();
+      if (Number.isFinite(d)) return d;
+    }
+    const d = Date.parse(raw);
+    if (Number.isFinite(d)) return d;
+  }
+  return 0;
+}
+function mostRecentEventIds(events, n = 3) {
+  return arr(events).map(ev => ({ id: trim(ev?.id), date: parseEventDate(ev) })).filter(x => x.id)
+    .sort((a,b) => b.date - a.date).slice(0, n).map(x => x.id);
+}
 function chooseRelevantEventIds(events, selectedId, prompt) {
-  // v11.1 HOTFIX Analítica libre: Gemini debe disponer del detalle de TODOS los eventos.
-  // No se da acceso a SQL ni a BBDD; simplemente se prepara un JSON de solo lectura con
-  // todos los eventos ya calculados por ControlEvent. El orden prioriza evento activo y
-  // eventos citados en el prompt, pero no elimina el resto.
-  const ids = arr(events).map(ev => trim(ev?.id)).filter(Boolean);
+  // v11.1 HOTFIX cuota/contexto: no enviar SIEMPRE todos los eventos completos.
+  // Se envía siempre el resumen calculado de todos los eventos, pero el detalle pesado
+  // solo del evento activo, de eventos citados en el prompt y de los más recientes si se pide.
   const selected = trim(selectedId);
   const scored = arr(events)
     .map(ev => ({ id: trim(ev?.id), score: eventScore(ev, prompt) }))
-    .filter(x => x.id && x.score > 0)
+    .filter(x => x.id && x.score >= 25)
     .sort((a,b) => b.score - a.score)
     .map(x => x.id);
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
   push(selected);
   scored.forEach(push);
-  ids.forEach(push);
-  return out;
+  if (/\b(m[aá]s\s+reciente|[uú]ltim[oa]s?|reciente|actual)\b/i.test(text(prompt))) mostRecentEventIds(events, 4).forEach(push);
+  if (!out.length) mostRecentEventIds(events, 1).forEach(push);
+  const wantsComparison = /\b(compara|comparativa|frente| vs | versus |entre\s+los\s+eventos)\b/i.test(` ${text(prompt)} `);
+  return out.slice(0, wantsComparison ? 6 : 4);
 }
+const PROMPT_STOP = new Set(['dime','cual','cuanto','cuantos','cuantas','precio','comprado','compramos','hemos','evento','eventos','reciente','ultimo','ultima','actual','total','totales','dame','saca','sacame','grafica','graficas','analiza','analisis','comparar','compara','comparativa','entre','contra','gestion','detalle','detallado','producto','productos','articulo','articulos','unidades','coste','importe','valor','valoracion','ingresos','compras','donaciones','ticket','tickets','tienda','responsable']);
+function promptTerms(prompt) {
+  const out = [];
+  for (const w of words(prompt)) {
+    if (w.length < 4 || PROMPT_STOP.has(w)) continue;
+    if (!out.includes(w)) out.push(w);
+  }
+  return out.slice(0, 12);
+}
+function wordSet(value) { return new Set(words(value)); }
+function productMatchScore(texto, terms) {
+  const ws = wordSet(texto);
+  let score = 0;
+  for (const t of terms) {
+    if (ws.has(t)) score += 12;
+    else if (t.length >= 5 && [...ws].some(w => w.startsWith(t) || t.startsWith(w))) score += 5;
+  }
+  return score;
+}
+function buildLineasFiltradasPorPrompt(state, events, helpers, ticketImages, prompt) {
+  const terms = promptTerms(prompt);
+  if (!terms.length) return { criterios: [], totalCoincidencias: 0, lineas: [], nota: 'No se detectaron términos concretos de producto/persona/tienda en el prompt.' };
+  const evById = byId(events);
+  const matches = [];
+  for (const row of arr(state?.compras)) {
+    const evId = trim(row?.eventId || row?.event_id);
+    const ev = evById.get(evId);
+    const ticket = ticketText(row);
+    const tipo = moneyByTicketKind(ticket);
+    const productoId = trim(row?.productoId || row?.producto_id);
+    const tiendaId = trim(row?.tiendaId || row?.tienda_id);
+    const responsableId = trim(row?.responsableId || row?.responsable_id);
+    const producto = helpers.productName(productoId);
+    const texto = [producto, helpers.productSegment(productoId), helpers.productDestino(productoId), helpers.storeName(tiendaId), helpers.personName(responsableId), ticket].join(' ');
+    const score = productMatchScore(texto, terms);
+    if (score <= 0) continue;
+    matches.push({
+      score,
+      fechaEventoOrden: parseEventDate(ev || {}),
+      eventoId: evId,
+      evento: trim(ev?.titulo || evId || 'Sin evento'),
+      situacionEvento: trim(ev?.situacion || ''),
+      fechaIni: trim(ev?.fechaIni || ''),
+      fechaFin: trim(ev?.fechaFin || ''),
+      tipo,
+      ticket,
+      ticketToken: ticketToken(ticket),
+      producto,
+      segmento: helpers.productSegment(productoId),
+      destino: helpers.productDestino(productoId),
+      unidades: round(row?.unidades, 3),
+      precio: round(row?.precio, 4),
+      importe: valueOfLine(row),
+      tienda: helpers.storeName(tiendaId),
+      responsable: helpers.personName(responsableId),
+      tieneFotoTicket: tipo === 'COMPRA_REAL' ? hasImage(ticketImages, evId, ticket) : false
+    });
+  }
+  matches.sort((a,b) => b.fechaEventoOrden - a.fechaEventoOrden || b.score - a.score || b.importe - a.importe);
+  return {
+    criterios: terms,
+    totalCoincidencias: matches.length,
+    lineas: matches.slice(0, 500).map(({ score, fechaEventoOrden, ...x }) => x),
+    nota: 'Detalle filtrado por términos del prompt en compras reales, compras pendientes y donaciones de producto. Úsalo para preguntas concretas como precios de cerveza, rankings por artículo o productos citados.'
+  };
+}
+
 
 function buildEventDetail(ev, state, helpers, ticketImages) {
   const evId = trim(ev?.id);
@@ -255,6 +340,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   const selectedId = trim(selectedEventId || safeState.selectedEventId);
   const relevantIds = chooseRelevantEventIds(events, selectedId, userPrompt);
   const details = relevantIds.map(id => events.find(e => trim(e?.id) === id)).filter(Boolean).map(ev => buildEventDetail(ev, safeState, helpers, ticketImages));
+  const lineasFiltradasPorPrompt = buildLineasFiltradasPorPrompt(safeState, events, helpers, ticketImages, userPrompt);
   const globalIngresos = new Map(), globalCompras = new Map(), globalDonaciones = new Map(), globalValoracion = new Map();
   const resumenEventos = events.map(ev => {
     const d = buildEventDetail(ev, safeState, helpers, ticketImages);
@@ -272,7 +358,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     };
   });
   return {
-    versionContexto: 'ControlEvent EventContext v11.1_prod - analitica contexto completo',
+    versionContexto: 'ControlEvent EventContext v11.1_prod - analitica contexto selectivo anti-cuota',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -282,13 +368,17 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     selectedEventId: selectedId,
     selectedEvent: details.find(d => d.evento.id === selectedId)?.evento || null,
     eventosResumen: resumenEventos,
-    detalleEventosCompletos: details,
-    detalleEventosRelevantes: details, // Alias histórico: desde este hotfix contiene TODOS los eventos, no solo seleccionados.
+    detalleEventosSeleccionados: details,
+    detalleEventosRelevantes: details,
+    lineasFiltradasPorPrompt,
     resumenGlobal: { totalEventos: events.length, rankingIngresos: topN(globalIngresos, 20), rankingCompras: topN(globalCompras, 20), rankingDonaciones: topN(globalDonaciones, 20), rankingValoracion: topN(globalValoracion, 20) },
     catalogosRelacionados: {
-      tiendas: arr(safeState.tiendas).map(t => ({ id: trim(t.id), nombre: trim(t.nombre) })).filter(t => t.nombre).slice(0, 500),
-      responsables: arr(safeState.personas).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 800),
-      productos: arr(safeState.productos).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precioHabitual: round(p.defaultPrecio ?? p.precio, 4), tiendaHabitualId: trim(p.defaultTiendaId) })).filter(p => p.nombre).slice(0, 1600)
+      tiendas: arr(safeState.tiendas).map(t => ({ id: trim(t.id), nombre: trim(t.nombre) })).filter(t => t.nombre).slice(0, 300),
+      responsables: arr(safeState.personas).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 400),
+      productos: arr(safeState.productos)
+        .map(p => ({ id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precioHabitual: round(p.defaultPrecio ?? p.precio, 4), tiendaHabitualId: trim(p.defaultTiendaId) }))
+        .filter(p => p.nombre && (!lineasFiltradasPorPrompt.criterios.length || productMatchScore([p.nombre,p.segmento,p.destino].join(' '), lineasFiltradasPorPrompt.criterios) > 0))
+        .slice(0, 300)
     },
     instruccionesCalculo: {
       ingresos: 'Para socios, obligatorio = numero * precioEntrada. Total ingreso = obligatorio + voluntario/no socio. No usar solo importe bruto.',
