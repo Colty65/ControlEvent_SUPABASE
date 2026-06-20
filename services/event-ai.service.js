@@ -1,4 +1,4 @@
-/* ControlEvent v11_3_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v11_3_1_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -364,6 +364,76 @@ function stripJsonText(value) {
   if (first >= 0 && last > first) s = s.slice(first, last + 1);
   return s;
 }
+
+function csvEscape(value) {
+  const s = text(value);
+  return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvFromRows(columns, rows) {
+  const lines = [columns.map(csvEscape).join(';')];
+  arr(rows).forEach(row => lines.push(columns.map(c => csvEscape(row?.[c])).join(';')));
+  return lines.join('\n');
+}
+function orderedColumnsForModule(moduleName, rows) {
+  const preferred = {
+    COMPRAS: ['EVENTO','Producto','Segmento del producto','Destino del producto','Unidades','Precio','Importe','TKxx, GASTOS CORRIENTES o Pte. Compra','TKxx','Tienda','Responsable','Ticket SI/NO'],
+    DONACIONES: ['EVENTO','Producto','Segmento del producto','Destino del producto','Unidades','Precio','Importe','Valor estimado','Tipo de donación','Donante','Responsable'],
+    INGRESOS: ['EVENTO','Colaborador','Rango','Numero','Ingreso','Importe Obligatorio','Importe Voluntario','Importe Total Calculado','Just.ing'],
+    TICKETS: ['EVENTO','TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
+    DOCUMENTOS: ['DOCxxx','Evento','Fecha','Descripcion','Tiene imagen'],
+    EVENTOS: ['EVENTO','Titulo','Precio','Fecha ini','Fecha fin','Situacion','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
+    PRODUCTOS: ['Producto','Segmento','Destino','Precio Referencia'],
+    TIENDAS: ['Nombre tienda'],
+    PERSONAS: ['Nombre','Rango']
+  };
+  const seen = new Set();
+  const cols = [];
+  (preferred[moduleName] || []).forEach(c => { if (!seen.has(c)) { seen.add(c); cols.push(c); } });
+  arr(rows).forEach(row => Object.keys(row || {}).forEach(k => { if (!seen.has(k)) { seen.add(k); cols.push(k); } }));
+  return cols.filter(c => arr(rows).some(r => r && Object.prototype.hasOwnProperty.call(r, c)) || (preferred[moduleName]||[]).includes(c));
+}
+function isListExtractionPrompt(prompt) {
+  const p = norm(prompt);
+  if (/\b(compara|comparar|comparativa|analiza|analisis|dashboard|grafica|gráfica|estadistica|estadística|resume|resumen|porcentaje|evolucion|evolución)\b/.test(p)) return false;
+  return /\b(lista|listado|relacion|relación|detalle|detallame|detalla|dame|muestra|muéstrame|ensena|enseña|ver|cuales|cuáles|todos|todas)\b/.test(p);
+}
+function directModuleResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isListExtractionPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const p = norm(prompt);
+  const priority = [];
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) priority.push('COMPRAS');
+  if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) priority.push('DONACIONES');
+  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas\b/.test(p) && Array.isArray(mods.INGRESOS)) priority.push('INGRESOS');
+  if (/\bticket|tickets|tk\s*\d+|factura|facturas\b/.test(p) && Array.isArray(mods.TICKETS)) priority.push('TICKETS');
+  if (/\bdocumento|documentos|doc\s*\d+\b/.test(p) && Array.isArray(mods.DOCUMENTOS)) priority.push('DOCUMENTOS');
+  if (!priority.length) return null;
+  const moduleName = priority[0];
+  const rows = arr(mods[moduleName]);
+  const columns = orderedColumnsForModule(moduleName, rows);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.Titulo || e?.EVENTO)).filter(Boolean).join(', ');
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v11_3_1_prod.csv`);
+  const tableRows = rows.slice(0, 300).map(row => columns.map(c => {
+    const v = row?.[c];
+    if (c === 'Líneas contables' && Array.isArray(v)) return v.map(x => `${x.Producto || ''} ${x.Unidades || ''} x ${x.Precio || ''} = ${x.Importe || ''}`).join(' | ');
+    return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v);
+  }));
+  const extra = rows.length > tableRows.length ? ` Se muestran ${tableRows.length} en pantalla y el CSV incluye las ${rows.length}.` : '';
+  return {
+    ok: true,
+    rejected: false,
+    title: `${moduleName} extraído por ControlEvent`,
+    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. No se han recortado líneas antes de responder.${extra}`,
+    warnings: arr(context.advertencias).concat(rows.length ? [] : [`El módulo ${moduleName} no tiene registros con los filtros solicitados.`]),
+    charts: [],
+    tables: rows.length ? [{ title: `${moduleName} (${rows.length} registro(s))`, columns, rows: tableRows }] : [],
+    files: rows.length ? [{ filename, mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    provider: 'control-event-modules-direct',
+    model: 'sin-gemini-para-listados'
+  };
+}
+
 function normalizeResult(raw, model) {
   const out = raw && typeof raw === 'object' ? raw : {};
   const charts = arr(out.charts).map(ch => ({
@@ -481,7 +551,7 @@ Módulos disponibles:
 Reglas:
 - Elige solo los módulos necesarios.
 - Indica eventos concretos por id o por título exacto del catálogo. Si el usuario dice "eventos registrados" o "todos los eventos", todosLosEventos=true.
-- Si pide datos de una persona/producto/tienda/responsable/donante concreto, ponlo en filters.
+- Si pide datos de una persona/producto/tienda/responsable/donante concreto, ponlo en filters SOLO si aparece claramente escrito en el prompt o coincide con el catálogo. No inventes filtros: un filtro incorrecto recorta datos reales.
 - Si no se puede identificar evento o módulo y no basta el evento activo, needsClarification=true.
 - Si la petición es demasiado amplia sin filtros, pide concreción.
 - Devuelve SOLO JSON con el esquema.
@@ -547,6 +617,8 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
+  const directResult = directModuleResultIfApplicable(userPrompt, context);
+  if (directResult) return directResult;
   if (context?.needsClarification) {
     return {
       ok: true,

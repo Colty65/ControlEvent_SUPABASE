@@ -1,4 +1,4 @@
-/* ControlEvent v11_3_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v11_3_1_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Gemini NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -346,8 +346,14 @@ function eventScore(ev, prompt) {
   if (code && p.includes(code)) score += 60;
   return score;
 }
-function mostRecentEventIds(events, n = 1) {
-  return arr(events).map(ev => ({ id: trim(ev?.id), date: parseEventDate(ev) })).filter(x => x.id)
+function mostRecentEventIds(events, n = 1, opts = {}) {
+  const onlyCelebrated = opts && opts.celebrated === true;
+  let candidates = arr(events);
+  if (onlyCelebrated) {
+    const finalized = candidates.filter(ev => /finalizado/i.test(trim(ev?.situacion || '')));
+    if (finalized.length) candidates = finalized;
+  }
+  return candidates.map(ev => ({ id: trim(ev?.id), date: parseEventDate(ev) })).filter(x => x.id)
     .sort((a, b) => b.date - a.date).slice(0, n).map(x => x.id);
 }
 function detectPromptBlocks(prompt) {
@@ -380,6 +386,17 @@ function matchScoreFromTerms(value, terms) {
   return score;
 }
 function findReferencedEventIds(events, prompt, selectedId) {
+  const explicit = findExplicitReferencedEventIds(events, prompt);
+  if (explicit.length) return explicit;
+  const p = norm(prompt);
+  if (/\b(mas\s+reciente|ultimo|ultima|reciente|actual|celebrado|celebrada)\b/.test(p)) {
+    const celebrated = /\b(celebrado|celebrada)\b/.test(p);
+    const recent = mostRecentEventIds(events, 1, { celebrated });
+    if (recent.length) return recent;
+  }
+  return selectedId ? [selectedId] : [];
+}
+function findExplicitReferencedEventIds(events, prompt) {
   const scored = arr(events)
     .map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), score: eventScore(ev, prompt), date: parseEventDate(ev) }))
     .filter(x => x.id && x.score >= 35)
@@ -387,8 +404,6 @@ function findReferencedEventIds(events, prompt, selectedId) {
   const out = [];
   function push(id) { if (id && !out.includes(id)) out.push(id); }
   scored.forEach(x => push(x.id));
-  if (/\b(mas\s+reciente|ultimo|ultima|reciente|actual)\b/.test(norm(prompt))) mostRecentEventIds(events, 1).forEach(push);
-  if (!out.length && selectedId) push(selectedId);
   return out;
 }
 function buildPromptFilteredLines(state, events, helpers, ticketImages, prompt, maxLines = 500) {
@@ -598,7 +613,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v11_3_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v11_3_1_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -651,7 +666,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v11_3_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v11_3_1_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -723,23 +738,32 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
   }
   return { filterPeople, filterProducts, filterStores, filterTickets, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, lineMatchesCommon };
 }
-function zuzuFindEventIds(events, selectedId, prompt, plan) {
+function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim).filter(Boolean);
   const allRequested = plan?.todosLosEventos === true || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x)) || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados)\b/i.test(prompt);
-  if (allRequested) arr(events).forEach(e => push(trim(e?.id)));
+  if (allRequested) { arr(events).forEach(e => push(trim(e?.id))); return out; }
   requested.forEach(req => {
     if (/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(req)) return;
-    const direct = events.find(e => trim(e?.id) === req);
+    const direct = events.find(e => trim(e?.id) === req || norm(e?.titulo) === norm(req));
     if (direct) return push(trim(direct.id));
     const ranked = events.map(e => ({ id: trim(e?.id), score: Math.max(eventScore(e, req), eventScore(e, prompt) + (zuzuWordMatch(e?.titulo, req) ? 35 : 0)), date: parseEventDate(e) }))
       .filter(x => x.id && x.score >= 35).sort((a,b)=>b.score-a.score || b.date-a.date);
     if (ranked[0]) push(ranked[0].id);
   });
-  if (!out.length) findReferencedEventIds(events, prompt, selectedId).forEach(push);
-  if (!out.length && selectedId) push(selectedId);
+  // Prioridad a la detección local del texto real del prompt. Evita que el planificador IA meta otro evento por su cuenta.
+  if (!out.length) findExplicitReferencedEventIds(events, prompt).forEach(push);
+  if (!out.length && /\b(mas\s+reciente|ultimo|ultima|reciente|actual|celebrado|celebrada)\b/.test(norm(prompt))) {
+    const celebrated = /\b(celebrado|celebrada)\b/.test(norm(prompt));
+    mostRecentEventIds(events, 1, { celebrated }).forEach(push);
+  }
   return out;
+}
+function zuzuFindEventIds(events, selectedId, prompt, plan) {
+  const explicit = zuzuFindExplicitEventIds(events, selectedId, prompt, plan);
+  if (explicit.length) return explicit;
+  return selectedId ? [selectedId] : [];
 }
 function zuzuInferModulesLocal(prompt) {
   const p = norm(prompt);
@@ -775,7 +799,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
   const events = arr(state?.eventos).map(e => ({ id: trim(e?.id), titulo: trim(e?.titulo), situacion: trim(e?.situacion), fechaInicio: trim(e?.fechaIni), fechaFin: trim(e?.fechaFin), precioEntrada: round(e?.precio, 2) }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
   return {
-    version: 'ControlEvent Zuzu Planner v11_3_prod',
+    version: 'ControlEvent Zuzu Planner v11_3_1_prod',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     camposPorModulo: {
       INGRESOS: ['Colaborador','Rango','Numero','Ingreso','Importe Obligatorio','Importe Voluntario','Just.ing'],
@@ -960,7 +984,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (!eventIds.length && modules.some(m => ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'].includes(m))) {
     return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: no he podido identificar el evento o eventos objetivo.' };
   }
-  const filters = { ...(localPlan.filters || {}), ...(p.filters || {}) };
+  // v11_3_1: los filtros que reducen líneas deben salir de detección local verificable en catálogos reales.
+  // No se aplican filtros inventados por el planificador IA, porque podían recortar compras/donaciones reales.
+  const filters = localPlan.filters || {};
   const modulos = {};
   if (modules.includes('EVENTOS')) modulos.EVENTOS = zuzuModuleEventos(safeState, eventIds, ticketImages);
   if (modules.includes('INGRESOS')) modulos.INGRESOS = zuzuModuleIngresos(safeState, eventIds, filters, helpers, ticketImages);
@@ -974,7 +1000,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const eventRows = arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ Titulo: trim(e?.titulo), Precio: round(e?.precio, 2), 'Fecha ini': trim(e?.fechaIni), 'Fecha fin': trim(e?.fechaFin), Situacion: trim(e?.situacion || 'En curso') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v11_3_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v11_3_1_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Gemini no consulta Supabase, no ejecuta SQL y no modifica datos. ControlEvent entrega módulos completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),

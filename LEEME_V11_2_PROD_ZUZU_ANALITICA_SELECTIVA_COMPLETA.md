@@ -1,4 +1,4 @@
-# ControlEvent v11_3_prod - Zuzu / Analítica libre
+# ControlEvent v11.2_prod - Zuzu / Analítica libre
 
 Versión centrada en robustecer la explotación libre con IA sin exponer SQL ni acceso directo a Supabase.
 
