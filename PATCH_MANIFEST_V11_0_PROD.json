@@ -1,5 +1,5 @@
 {
-  "version": "v11.1_prod",
+  "version": "v11.2_prod",
   "base": "version anterior 10.5",
   "changes": [
     "Nueva ventana Gemini libre del evento desde GRAFICAS",
@@ -7,7 +7,7 @@
     "Nuevo servicio services/event-ai.service.js",
     "Renderizado de respuestas con texto, tablas, graficas y archivos descargables",
     "Disponible para GD, RW y RO, en eventos En curso y Finalizado",
-    "Version actualizada a v11.1_prod y ControlEvent_v11_1_prod en referencias activas"
+    "Version actualizada a v11.2_prod y ControlEvent_v11_2_prod en referencias activas"
   ],
   "files_added": [
     "services/event-ai.service.js",

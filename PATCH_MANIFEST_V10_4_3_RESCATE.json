@@ -1,5 +1,5 @@
 {
-  "version": "v11.1_prod",
+  "version": "v11.2_prod",
   "tipo": "rescate_estable",
   "objetivo": "recuperar fluidez y arranque estable tras hotfixes de v10.4.2",
   "cambios": [

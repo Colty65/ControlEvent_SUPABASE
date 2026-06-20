@@ -1,6 +1,6 @@
 {
-  "version": "v11.1_prod",
-  "base": "v11.1_prod",
+  "version": "v11.2_prod",
+  "base": "v11.2_prod",
   "files_added": [
     "public/app/features/v10-4-1-app-fixes.js"
   ],

@@ -1,9 +1,9 @@
 {
-  "version": "v11.1_prod",
+  "version": "v11.2_prod",
   "base": "v9.6_prod",
   "created_by": "ChatGPT",
   "main_changes": [
-    "Actualización completa de versión visible a v11.1_prod",
+    "Actualización completa de versión visible a v11.2_prod",
     "Ticket IA disponible para usuarios RW además de GD",
     "Refuerzo de actualización de precio en PRODUCTOS para productos existentes",
     "Mapa de recursos: TKxx abre detalle contable y foto de factura",

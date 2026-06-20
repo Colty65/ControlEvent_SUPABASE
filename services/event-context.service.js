@@ -1,5 +1,5 @@
-/* ControlEvent v11.1_prod - Motor seguro de contexto para Gemini libre.
-   SOLO LECTURA: prepara datos calculados y saneados. Gemini NO ejecuta SQL ni toca BBDD. */
+/* ControlEvent v11.2_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+   SOLO LECTURA: prepara datos completos, calculados y legibles. Gemini NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -12,11 +12,24 @@ function round(value, digits = 2) { return Number(num(value).toFixed(digits)); }
 function arr(value) { return Array.isArray(value) ? value : []; }
 function norm(value) {
   const s = text(value);
-  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().replace(/[^a-z0-9]+/gi, ' ').replace(/\s+/g, ' ').trim();
+  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
-function words(value) {
-  const stop = new Set(['de','del','la','el','las','los','y','vs','contra','con','sin','para','por','un','una','jornada','jornadas','solidaria','solidarias']);
-  return norm(value).split(' ').filter(w => w.length >= 3 && !stop.has(w));
+const COMMON_STOP = new Set([
+  'de','del','la','el','las','los','y','e','o','u','vs','vss','contra','con','sin','para','por','un','una','unos','unas',
+  'jornada','jornadas','solidaria','solidarias','evento','eventos','dime','dame','saca','sacame','haz','hacer','quiero',
+  'cuanto','cuantos','cuanta','cuantas','cual','cuales','total','totales','detalle','detalles','lista','listado','grafica','graficas',
+  'analiza','analisis','comparar','compara','comparativa','entre','mas','menos','ultimo','ultima','reciente','actual','gestion',
+  'producto','productos','articulo','articulos','ticket','tickets','tk','compra','compras','donacion','donaciones','ingreso','ingresos',
+  'responsable','responsables','tienda','tiendas','segmento','destino','precio','importe','coste','valor','valoracion','cantidad','unidades'
+]);
+function words(value, opts = {}) {
+  const min = opts.min || 3;
+  const keepStop = opts.keepStop === true;
+  return norm(value).split(' ').filter(w => w.length >= min && (keepStop || !COMMON_STOP.has(w)));
 }
 function byId(rows) {
   const out = new Map();
@@ -34,17 +47,26 @@ function addQtyCost(map, key, qty, cost) {
   old.importe += num(cost);
   map.set(k, old);
 }
-function topN(map, n = 20) {
+function topN(map, n = 50) {
   return [...map.entries()].sort((a, b) => num(b[1]) - num(a[1])).slice(0, n).map(([nombre, valor]) => ({ nombre, valor: round(valor, 2) }));
 }
-function topQtyCost(map, sortBy = 'importe', n = 20) {
-  return [...map.entries()].sort((a, b) => num(b[1]?.[sortBy]) - num(a[1]?.[sortBy])).slice(0, n).map(([nombre, v]) => ({ nombre, unidades: round(v.unidades, 3), importe: round(v.importe, 2) }));
+function topQtyCost(map, sortBy = 'importe', n = 50) {
+  return [...map.entries()]
+    .sort((a, b) => num(b[1]?.[sortBy]) - num(a[1]?.[sortBy]))
+    .slice(0, n)
+    .map(([nombre, v]) => ({ nombre, unidades: round(v.unidades, 3), importe: round(v.importe, 2) }));
 }
 function valueOfLine(row) { return round(num(row?.unidades) * num(row?.precio), 2); }
 function ticketText(row) { return trim(row?.ticketDonacion ?? row?.ticket_donacion ?? row?.ticket ?? row?.ticketOtrosGastos ?? ''); }
 function ticketToken(value) { const m = trim(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i); return m ? m[0].replace(/\s+/g, '').toUpperCase() : ''; }
 function isDonationTicket(value) { return /^DONADO\s+(TIENDA|SOCIO|OTROS)$/i.test(trim(value)); }
 function isPendingTicket(value) { return /PTE\.?\s*COMPRA|PENDIENTE/i.test(trim(value)); }
+function lineKind(value) {
+  const raw = trim(value);
+  if (isDonationTicket(raw)) return 'DONACION_PRODUCTO';
+  if (isPendingTicket(raw)) return 'PTE_COMPRA';
+  return 'COMPRA_REAL';
+}
 function docCode(value) { const m = text(value).toUpperCase().match(/DOC\s*(\d+)/); return m ? `DOC${String(Number(m[1])).padStart(2, '0')}` : ''; }
 function imageInnerKey(value) { return trim(value).split('|').slice(1).join('|') || trim(value); }
 function hasImage(ticketImages, eventId, inner) {
@@ -60,148 +82,9 @@ function hasImage(ticketImages, eventId, inner) {
     return false;
   });
 }
-function moneyByTicketKind(value) {
-  const raw = trim(value);
-  if (isDonationTicket(raw)) return 'DONACION_PRODUCTO';
-  if (isPendingTicket(raw)) return 'PTE_COMPRA';
-  return 'COMPRA_REAL';
-}
 function firstNumber(row, keys, fallback = 0) {
   for (const key of keys) if (row && row[key] !== undefined && row[key] !== null && trim(row[key]) !== '') return num(row[key]);
   return fallback;
-}
-
-function makeHelpers(state) {
-  const people = byId(state?.personas);
-  const stores = byId(state?.tiendas);
-  const products = byId(state?.productos);
-  return {
-    people, stores, products,
-    personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); },
-    personRange(id) { return trim(people.get(trim(id))?.rango || ''); },
-    storeName(id) { return trim(stores.get(trim(id))?.nombre || id || 'Sin tienda'); },
-    productName(id) { return trim(products.get(trim(id))?.nombre || id || 'Sin producto'); },
-    productSegment(id) { return trim(products.get(trim(id))?.segmento || ''); },
-    productDestino(id) { return trim(products.get(trim(id))?.destino || ''); },
-    productDefaultPrecio(id) { return round(products.get(trim(id))?.defaultPrecio ?? products.get(trim(id))?.precio ?? 0, 4); }
-  };
-}
-
-function incomeParts(row, ev, helpers) {
-  const personaId = trim(row?.personaId || row?.persona_id);
-  const rangoRaw = trim(helpers.personRange(personaId) || row?.rango || row?.personaRango || row?.tipoPersona || '');
-  const socio = norm(rangoRaw) === 'socio';
-  const numero = num(row?.numero);
-  const precioEntrada = num(ev?.precio);
-  const importeObligatorioSocios = socio ? round(numero * precioEntrada, 2) : 0;
-  const importeVoluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
-  const total = round(importeObligatorioSocios + importeVoluntario, 2);
-  return {
-    colaborador: helpers.personName(personaId),
-    personaId,
-    tipoPersona: socio ? 'SOCIO' : (rangoRaw || 'NO SOCIO / OTRO'),
-    esSocio: socio,
-    numero: round(numero, 3),
-    formaPago: trim(row?.situacion || row?.formaPago || row?.ingreso || 'Pendiente') || 'Pendiente',
-    importeObligatorioSocios,
-    importeVoluntarioONoSocio: round(importeVoluntario, 2),
-    importeTotalCalculado: total,
-    importeCampoBBDD: round(row?.importe, 2),
-    justificante: false
-  };
-}
-
-function summarizeIngresos(rows, ev, helpers, ticketImages) {
-  const byForma = new Map(), byTipo = new Map(), byColaborador = new Map();
-  let total = 0, socios = 0, noSocios = 0, obligatorio = 0, voluntario = 0, entradas = 0;
-  const detail = arr(rows).map(row => {
-    const p = incomeParts(row, ev, helpers);
-    p.justificante = hasImage(ticketImages, row?.eventId || ev?.id, `INGRESO:${row?.id}`);
-    total += p.importeTotalCalculado; entradas += p.numero; voluntario += p.importeVoluntarioONoSocio; obligatorio += p.importeObligatorioSocios;
-    if (p.esSocio) socios += p.importeTotalCalculado; else noSocios += p.importeTotalCalculado;
-    add(byForma, p.formaPago, p.importeTotalCalculado); add(byTipo, p.tipoPersona, p.importeTotalCalculado); add(byColaborador, p.colaborador, p.importeTotalCalculado);
-    return p;
-  });
-  return {
-    ingresosTotal: round(total, 2), ingresosSocios: round(socios, 2), ingresosNoSociosYOtros: round(noSocios, 2),
-    importeObligatorioSocios: round(obligatorio, 2), importeVoluntarioONoSocio: round(voluntario, 2), entradasTotal: round(entradas, 3),
-    numeroLineas: detail.length, conJustificante: detail.filter(x => x.justificante).length,
-    porFormaPago: topN(byForma, 30), porTipoPersona: topN(byTipo, 30), porColaborador: topN(byColaborador, 40),
-    reglaCalculo: 'IngresosTotal = socios(numero * precioEntrada + voluntario) + noSocios/otros(importe registrado). No usar solo importeCampoBBDD si hay socios.',
-    detalle: detail
-  };
-}
-
-function summarizeCompras(rows, ev, helpers, ticketImages) {
-  const reales = [], pendientes = [], donaciones = [];
-  const byProductoCantidad = new Map(), byProductoCoste = new Map(), byTienda = new Map(), byResponsable = new Map(), bySegmento = new Map(), byDestino = new Map(), byTicket = new Map();
-  let totalReales = 0, totalPendientes = 0, totalDonaciones = 0;
-  const lineas = arr(rows).map(row => {
-    const ticket = ticketText(row); const tipo = moneyByTicketKind(ticket); const importe = valueOfLine(row);
-    const productoId = trim(row?.productoId || row?.producto_id); const tiendaId = trim(row?.tiendaId || row?.tienda_id); const responsableId = trim(row?.responsableId || row?.responsable_id);
-    const out = {
-      id: trim(row?.id), tipo, ticket, ticketToken: ticketToken(ticket),
-      producto: helpers.productName(productoId), productoId,
-      segmento: helpers.productSegment(productoId), destino: helpers.productDestino(productoId),
-      unidades: round(row?.unidades, 3), precio: round(row?.precio, 4), importe,
-      tienda: helpers.storeName(tiendaId), tiendaId,
-      responsable: helpers.personName(responsableId), responsableId,
-      donante: trim(row?.donorRef || ''),
-      tieneFotoTicket: tipo === 'COMPRA_REAL' ? hasImage(ticketImages, ev?.id, ticket) : false
-    };
-    addQtyCost(byProductoCantidad, out.producto, out.unidades, out.importe); add(byProductoCoste, out.producto, out.importe);
-    add(byTienda, out.tienda, out.importe); add(byResponsable, out.responsable, out.importe); add(bySegmento, out.segmento || 'Sin segmento', out.importe); add(byDestino, out.destino || 'Sin destino', out.importe);
-    if (tipo === 'DONACION_PRODUCTO') { totalDonaciones += importe; donaciones.push(out); }
-    else if (tipo === 'PTE_COMPRA') { totalPendientes += importe; pendientes.push(out); }
-    else { totalReales += importe; reales.push(out); }
-    if (out.ticketToken && tipo === 'COMPRA_REAL') {
-      const key = out.ticketToken;
-      const old = byTicket.get(key) || { ticket: key, tienda: out.tienda, responsable: out.responsable, total: 0, lineas: 0, tieneFoto: out.tieneFotoTicket, segmentos: new Map(), destinos: new Map(), productos: [] };
-      old.total += importe; old.lineas += 1; old.tieneFoto = old.tieneFoto || out.tieneFotoTicket; add(old.segmentos, out.segmento || 'Sin segmento', importe); add(old.destinos, out.destino || 'Sin destino', importe);
-      old.productos.push({ producto: out.producto, unidades: out.unidades, precio: out.precio, importe: out.importe, segmento: out.segmento, destino: out.destino });
-      byTicket.set(key, old);
-    }
-    return out;
-  });
-  const tickets = [...byTicket.values()].sort((a,b) => a.ticket.localeCompare(b.ticket)).map(t => ({
-    ticket: t.ticket, tienda: t.tienda, responsable: t.responsable, total: round(t.total, 2), numeroLineas: t.lineas, tieneFoto: !!t.tieneFoto,
-    segmentos: topN(t.segmentos, 12), destinos: topN(t.destinos, 12), lineas: t.productos
-  }));
-  return {
-    totalComprasReales: round(totalReales, 2), totalComprasPendientes: round(totalPendientes, 2), totalDonacionesProducto: round(totalDonaciones, 2),
-    numeroLineasComprasReales: reales.length, numeroLineasPendientes: pendientes.length, numeroLineasDonaciones: donaciones.length,
-    numeroTickets: tickets.length, ticketsConFoto: tickets.filter(t => t.tieneFoto).length, ticketsSinFoto: tickets.filter(t => !t.tieneFoto).length,
-    rankings: {
-      productosPorCantidad: topQtyCost(byProductoCantidad, 'unidades', 30), productosPorCoste: topQtyCost(byProductoCantidad, 'importe', 30),
-      tiendasPorImporte: topN(byTienda, 30), responsablesPorImporte: topN(byResponsable, 30), segmentosPorImporte: topN(bySegmento, 30), destinosPorImporte: topN(byDestino, 30)
-    },
-    comprasReales: reales, comprasPendientes: pendientes, donacionesProducto: donaciones, tickets
-  };
-}
-
-function summarizeDocs(rows, ev, ticketImages) {
-  const docs = arr(rows).filter(d => trim(d?.eventId || d?.event_id) === trim(ev?.id)).map(doc => {
-    const code = docCode(doc?.codigo || doc?.imageKey || doc?.id) || trim(doc?.codigo || doc?.imageKey || 'DOC');
-    return {
-      id: trim(doc?.id), codigo: code, fecha: trim(doc?.fecha || ''), descripcion: trim(doc?.descripcion || doc?.texto || ''),
-      tieneImagen: hasImage(ticketImages, ev?.id, code) || !!trim(doc?.imageUrl || ''), recuperado: doc?.recovered === true
-    };
-  }).sort((a,b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.codigo || '').localeCompare(b.codigo || ''));
-  return { totalDocumentos: docs.length, conImagen: docs.filter(d => d.tieneImagen).length, sinImagen: docs.filter(d => !d.tieneImagen).length, documentos: docs };
-}
-
-function eventScore(ev, prompt) {
-  const p = norm(prompt); const title = norm(ev?.titulo); if (!p || !title) return 0;
-  let score = 0;
-  if (p.includes(title)) score += 120;
-  const titleNoSuffix = title.replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
-  if (titleNoSuffix && p.includes(titleNoSuffix)) score += 90;
-  const romans = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
-  const tWords = title.split(' ');
-  romans.forEach(r => { if (tWords.includes(r) && p.split(' ').includes(r)) score += 40; });
-  for (const w of words(ev?.titulo)) if (p.split(' ').includes(w) || p.includes(w)) score += w.length >= 5 ? 9 : 4;
-  const code = norm(ev?.eventoCodigo || ev?.codigo || ''); if (code && p.includes(code)) score += 30;
-  return score;
 }
 function parseEventDate(ev) {
   const candidates = [ev?.fechaFin, ev?.fecha_fin, ev?.fechaIni, ev?.fecha_ini, ev?.createdAt, ev?.created_at].map(trim).filter(Boolean);
@@ -217,96 +100,192 @@ function parseEventDate(ev) {
   }
   return 0;
 }
-function mostRecentEventIds(events, n = 3) {
-  return arr(events).map(ev => ({ id: trim(ev?.id), date: parseEventDate(ev) })).filter(x => x.id)
-    .sort((a,b) => b.date - a.date).slice(0, n).map(x => x.id);
-}
-function chooseRelevantEventIds(events, selectedId, prompt) {
-  // v11.1 HOTFIX cuota/contexto: no enviar SIEMPRE todos los eventos completos.
-  // Se envía siempre el resumen calculado de todos los eventos, pero el detalle pesado
-  // solo del evento activo, de eventos citados en el prompt y de los más recientes si se pide.
-  const selected = trim(selectedId);
-  const scored = arr(events)
-    .map(ev => ({ id: trim(ev?.id), score: eventScore(ev, prompt) }))
-    .filter(x => x.id && x.score >= 25)
-    .sort((a,b) => b.score - a.score)
-    .map(x => x.id);
-  const out = [];
-  function push(id){ if(id && !out.includes(id)) out.push(id); }
-  push(selected);
-  scored.forEach(push);
-  if (/\b(m[aá]s\s+reciente|[uú]ltim[oa]s?|reciente|actual)\b/i.test(text(prompt))) mostRecentEventIds(events, 4).forEach(push);
-  if (!out.length) mostRecentEventIds(events, 1).forEach(push);
-  const wantsComparison = /\b(compara|comparativa|frente| vs | versus |entre\s+los\s+eventos)\b/i.test(` ${text(prompt)} `);
-  return out.slice(0, wantsComparison ? 6 : 4);
-}
-const PROMPT_STOP = new Set(['dime','cual','cuanto','cuantos','cuantas','precio','comprado','compramos','hemos','evento','eventos','reciente','ultimo','ultima','actual','total','totales','dame','saca','sacame','grafica','graficas','analiza','analisis','comparar','compara','comparativa','entre','contra','gestion','detalle','detallado','producto','productos','articulo','articulos','unidades','coste','importe','valor','valoracion','ingresos','compras','donaciones','ticket','tickets','tienda','responsable']);
-function promptTerms(prompt) {
-  const out = [];
-  for (const w of words(prompt)) {
-    if (w.length < 4 || PROMPT_STOP.has(w)) continue;
-    if (!out.includes(w)) out.push(w);
+
+function makeHelpers(state) {
+  const people = byId(state?.personas);
+  const stores = byId(state?.tiendas);
+  const products = byId(state?.productos);
+  function personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); }
+  function personRange(id) { return trim(people.get(trim(id))?.rango || ''); }
+  function storeName(id) { return trim(stores.get(trim(id))?.nombre || id || 'Sin tienda'); }
+  function productName(id) { return trim(products.get(trim(id))?.nombre || id || 'Sin producto'); }
+  function productSegment(id) { return trim(products.get(trim(id))?.segmento || ''); }
+  function productDestino(id) { return trim(products.get(trim(id))?.destino || ''); }
+  function entityName(value) {
+    const v = trim(value);
+    if (!v) return '';
+    if (people.has(v)) return personName(v);
+    if (stores.has(v)) return storeName(v);
+    if (products.has(v)) return productName(v);
+    return v;
   }
-  return out.slice(0, 12);
+  return { people, stores, products, personName, personRange, storeName, productName, productSegment, productDestino, entityName };
 }
-function wordSet(value) { return new Set(words(value)); }
-function productMatchScore(texto, terms) {
-  const ws = wordSet(texto);
-  let score = 0;
-  for (const t of terms) {
-    if (ws.has(t)) score += 12;
-    else if (t.length >= 5 && [...ws].some(w => w.startsWith(t) || t.startsWith(w))) score += 5;
-  }
-  return score;
-}
-function buildLineasFiltradasPorPrompt(state, events, helpers, ticketImages, prompt) {
-  const terms = promptTerms(prompt);
-  if (!terms.length) return { criterios: [], totalCoincidencias: 0, lineas: [], nota: 'No se detectaron términos concretos de producto/persona/tienda en el prompt.' };
-  const evById = byId(events);
-  const matches = [];
-  for (const row of arr(state?.compras)) {
-    const evId = trim(row?.eventId || row?.event_id);
-    const ev = evById.get(evId);
-    const ticket = ticketText(row);
-    const tipo = moneyByTicketKind(ticket);
-    const productoId = trim(row?.productoId || row?.producto_id);
-    const tiendaId = trim(row?.tiendaId || row?.tienda_id);
-    const responsableId = trim(row?.responsableId || row?.responsable_id);
-    const producto = helpers.productName(productoId);
-    const texto = [producto, helpers.productSegment(productoId), helpers.productDestino(productoId), helpers.storeName(tiendaId), helpers.personName(responsableId), ticket].join(' ');
-    const score = productMatchScore(texto, terms);
-    if (score <= 0) continue;
-    matches.push({
-      score,
-      fechaEventoOrden: parseEventDate(ev || {}),
-      eventoId: evId,
-      evento: trim(ev?.titulo || evId || 'Sin evento'),
-      situacionEvento: trim(ev?.situacion || ''),
-      fechaIni: trim(ev?.fechaIni || ''),
-      fechaFin: trim(ev?.fechaFin || ''),
-      tipo,
-      ticket,
-      ticketToken: ticketToken(ticket),
-      producto,
-      segmento: helpers.productSegment(productoId),
-      destino: helpers.productDestino(productoId),
-      unidades: round(row?.unidades, 3),
-      precio: round(row?.precio, 4),
-      importe: valueOfLine(row),
-      tienda: helpers.storeName(tiendaId),
-      responsable: helpers.personName(responsableId),
-      tieneFotoTicket: tipo === 'COMPRA_REAL' ? hasImage(ticketImages, evId, ticket) : false
-    });
-  }
-  matches.sort((a,b) => b.fechaEventoOrden - a.fechaEventoOrden || b.score - a.score || b.importe - a.importe);
+
+function incomeParts(row, ev, helpers, ticketImages) {
+  const personaId = trim(row?.personaId || row?.persona_id);
+  const rangoRaw = trim(helpers.personRange(personaId) || row?.rango || row?.personaRango || row?.tipoPersona || '');
+  const socio = norm(rangoRaw) === 'socio';
+  const numero = num(row?.numero);
+  const precioEntrada = num(ev?.precio);
+  const importeObligatorioSocios = socio ? round(numero * precioEntrada, 2) : 0;
+  const importeVoluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
+  const total = round(importeObligatorioSocios + importeVoluntario, 2);
   return {
-    criterios: terms,
-    totalCoincidencias: matches.length,
-    lineas: matches.slice(0, 500).map(({ score, fechaEventoOrden, ...x }) => x),
-    nota: 'Detalle filtrado por términos del prompt en compras reales, compras pendientes y donaciones de producto. Úsalo para preguntas concretas como precios de cerveza, rankings por artículo o productos citados.'
+    colaborador: helpers.personName(personaId),
+    tipoPersona: socio ? 'SOCIO' : (rangoRaw || 'NO SOCIO / OTRO'),
+    esSocio: socio,
+    numero: round(numero, 3),
+    formaPago: trim(row?.situacion || row?.formaPago || row?.ingreso || 'Pendiente') || 'Pendiente',
+    importeObligatorioSocios,
+    importeVoluntarioONoSocio: round(importeVoluntario, 2),
+    importeTotalCalculado: total,
+    importeCampoBBDD: round(row?.importe, 2),
+    tieneJustificante: hasImage(ticketImages, row?.eventId || ev?.id, `INGRESO:${row?.id}`)
+  };
+}
+function summarizeIngresos(rows, ev, helpers, ticketImages) {
+  const byForma = new Map(), byTipo = new Map(), byColaborador = new Map();
+  let total = 0, socios = 0, noSocios = 0, obligatorio = 0, voluntario = 0, entradas = 0;
+  const detalle = arr(rows).map(row => {
+    const p = incomeParts(row, ev, helpers, ticketImages);
+    total += p.importeTotalCalculado;
+    entradas += p.numero;
+    voluntario += p.importeVoluntarioONoSocio;
+    obligatorio += p.importeObligatorioSocios;
+    if (p.esSocio) socios += p.importeTotalCalculado; else noSocios += p.importeTotalCalculado;
+    add(byForma, p.formaPago, p.importeTotalCalculado);
+    add(byTipo, p.tipoPersona, p.importeTotalCalculado);
+    add(byColaborador, p.colaborador, p.importeTotalCalculado);
+    return p;
+  });
+  return {
+    ingresosTotal: round(total, 2),
+    ingresosSocios: round(socios, 2),
+    ingresosNoSociosYOtros: round(noSocios, 2),
+    importeObligatorioSocios: round(obligatorio, 2),
+    importeVoluntarioONoSocio: round(voluntario, 2),
+    entradasTotal: round(entradas, 3),
+    numeroLineas: detalle.length,
+    conJustificante: detalle.filter(x => x.tieneJustificante).length,
+    porFormaPago: topN(byForma, 60),
+    porTipoPersona: topN(byTipo, 60),
+    porColaborador: topN(byColaborador, 120),
+    reglaCalculo: 'IngresosTotal = socios(numero * precioEntrada + voluntario) + noSocios/otros(importe registrado). No usar solo importeCampoBBDD si hay socios.',
+    detalle
   };
 }
 
+function purchaseReadable(row, ev, helpers, ticketImages) {
+  const ticket = ticketText(row);
+  const tipo = lineKind(ticket);
+  const productoId = trim(row?.productoId || row?.producto_id);
+  const tiendaId = trim(row?.tiendaId || row?.tienda_id);
+  const responsableId = trim(row?.responsableId || row?.responsable_id);
+  const producto = helpers.productName(productoId);
+  const tienda = helpers.storeName(tiendaId);
+  const responsable = helpers.personName(responsableId);
+  const donante = helpers.entityName(row?.donorRef || row?.donor_ref || '');
+  return {
+    tipo,
+    ticket: ticket || (tipo === 'PTE_COMPRA' ? 'Pte.Compra' : ''),
+    tk: ticketToken(ticket),
+    producto,
+    segmento: helpers.productSegment(productoId) || 'Sin segmento',
+    destino: helpers.productDestino(productoId) || 'Sin destino',
+    unidades: round(row?.unidades, 3),
+    precioUnitario: round(row?.precio, 4),
+    importe: valueOfLine(row),
+    tienda,
+    responsable,
+    donante: donante || (tipo === 'DONACION_PRODUCTO' ? 'Sin donante informado' : ''),
+    tieneFotoTicket: tipo === 'COMPRA_REAL' ? hasImage(ticketImages, ev?.id, ticket) : false
+  };
+}
+function summarizeCompras(rows, ev, helpers, ticketImages) {
+  const comprasReales = [], comprasPendientes = [], donacionesProducto = [];
+  const byProductoCantidad = new Map(), byProductoCoste = new Map(), byTienda = new Map(), byResponsable = new Map(), bySegmento = new Map(), byDestino = new Map(), byDonante = new Map(), byTicket = new Map();
+  let totalReales = 0, totalPendientes = 0, totalDonaciones = 0;
+  for (const row of arr(rows)) {
+    const out = purchaseReadable(row, ev, helpers, ticketImages);
+    if (out.tipo === 'DONACION_PRODUCTO') {
+      totalDonaciones += out.importe;
+      donacionesProducto.push(out);
+      add(byDonante, out.donante || 'Sin donante informado', out.importe);
+    } else if (out.tipo === 'PTE_COMPRA') {
+      totalPendientes += out.importe;
+      comprasPendientes.push(out);
+    } else {
+      totalReales += out.importe;
+      comprasReales.push(out);
+    }
+    addQtyCost(byProductoCantidad, out.producto, out.unidades, out.importe);
+    add(byProductoCoste, out.producto, out.importe);
+    add(byTienda, out.tienda, out.importe);
+    add(byResponsable, out.responsable, out.importe);
+    add(bySegmento, out.segmento || 'Sin segmento', out.importe);
+    add(byDestino, out.destino || 'Sin destino', out.importe);
+    if (out.tk && out.tipo === 'COMPRA_REAL') {
+      const old = byTicket.get(out.tk) || { ticket: out.tk, tienda: out.tienda, responsable: out.responsable, total: 0, numeroLineas: 0, tieneFoto: out.tieneFotoTicket, segmentos: new Map(), destinos: new Map(), lineas: [] };
+      old.total += out.importe;
+      old.numeroLineas += 1;
+      old.tieneFoto = old.tieneFoto || out.tieneFotoTicket;
+      add(old.segmentos, out.segmento, out.importe);
+      add(old.destinos, out.destino, out.importe);
+      old.lineas.push({ producto: out.producto, unidades: out.unidades, precioUnitario: out.precioUnitario, importe: out.importe, segmento: out.segmento, destino: out.destino });
+      byTicket.set(out.tk, old);
+    }
+  }
+  const tickets = [...byTicket.values()].sort((a, b) => a.ticket.localeCompare(b.ticket, 'es', { numeric: true })).map(t => ({
+    ticket: t.ticket,
+    tienda: t.tienda,
+    responsable: t.responsable,
+    total: round(t.total, 2),
+    numeroLineas: t.numeroLineas,
+    tieneFoto: !!t.tieneFoto,
+    segmentos: topN(t.segmentos, 30),
+    destinos: topN(t.destinos, 30),
+    lineas: t.lineas
+  }));
+  return {
+    totalComprasReales: round(totalReales, 2),
+    totalComprasPendientes: round(totalPendientes, 2),
+    totalDonacionesProducto: round(totalDonaciones, 2),
+    numeroLineasComprasReales: comprasReales.length,
+    numeroLineasPendientes: comprasPendientes.length,
+    numeroLineasDonaciones: donacionesProducto.length,
+    numeroTickets: tickets.length,
+    ticketsConFoto: tickets.filter(t => t.tieneFoto).length,
+    ticketsSinFoto: tickets.filter(t => !t.tieneFoto).length,
+    rankings: {
+      productosPorCantidad: topQtyCost(byProductoCantidad, 'unidades', 100),
+      productosPorCoste: topQtyCost(byProductoCantidad, 'importe', 100),
+      tiendasPorImporte: topN(byTienda, 100),
+      responsablesPorImporte: topN(byResponsable, 100),
+      segmentosPorImporte: topN(bySegmento, 100),
+      destinosPorImporte: topN(byDestino, 100),
+      donantesPorImporte: topN(byDonante, 100)
+    },
+    comprasReales,
+    comprasPendientes,
+    donacionesProducto,
+    tickets
+  };
+}
+
+function summarizeDocs(rows, ev, ticketImages) {
+  const docs = arr(rows).filter(d => trim(d?.eventId || d?.event_id) === trim(ev?.id)).map(doc => {
+    const code = docCode(doc?.codigo || doc?.imageKey || doc?.id) || trim(doc?.codigo || doc?.imageKey || 'DOC');
+    return {
+      codigo: code,
+      fecha: trim(doc?.fecha || ''),
+      descripcion: trim(doc?.descripcion || doc?.texto || ''),
+      tieneImagen: hasImage(ticketImages, ev?.id, code) || !!trim(doc?.imageUrl || ''),
+      recuperado: doc?.recovered === true
+    };
+  }).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.codigo || '').localeCompare(b.codigo || ''));
+  return { totalDocumentos: docs.length, conImagen: docs.filter(d => d.tieneImagen).length, sinImagen: docs.filter(d => !d.tieneImagen).length, documentos: docs };
+}
 
 function buildEventDetail(ev, state, helpers, ticketImages) {
   const evId = trim(ev?.id);
@@ -317,19 +296,144 @@ function buildEventDetail(ev, state, helpers, ticketImages) {
   const documentos = summarizeDocs(state?.eventDocuments, ev, ticketImages);
   const valoracion = round(ingresos.ingresosTotal + compras.totalDonacionesProducto - compras.totalComprasReales, 2);
   const avisos = [];
-  if (compras.totalComprasPendientes > 0) avisos.push(`Hay compras pendientes por ${round(compras.totalComprasPendientes,2)} €.`);
+  if (compras.totalComprasPendientes > 0) avisos.push(`Hay compras pendientes por ${round(compras.totalComprasPendientes, 2)} €.`);
   if (compras.ticketsSinFoto > 0) avisos.push(`Hay ${compras.ticketsSinFoto} ticket(s) sin foto asociada.`);
-  const sinSegmento = compras.comprasReales.concat(compras.comprasPendientes, compras.donacionesProducto).filter(x => !trim(x.segmento)).length;
-  const sinDestino = compras.comprasReales.concat(compras.comprasPendientes, compras.donacionesProducto).filter(x => !trim(x.destino)).length;
+  if (documentos.sinImagen > 0) avisos.push(`Hay ${documentos.sinImagen} documento(s) sin imagen asociada.`);
+  const sinSegmento = compras.comprasReales.concat(compras.comprasPendientes, compras.donacionesProducto).filter(x => !trim(x.segmento) || x.segmento === 'Sin segmento').length;
+  const sinDestino = compras.comprasReales.concat(compras.comprasPendientes, compras.donacionesProducto).filter(x => !trim(x.destino) || x.destino === 'Sin destino').length;
   if (sinSegmento) avisos.push(`${sinSegmento} línea(s) sin segmento.`);
   if (sinDestino) avisos.push(`${sinDestino} línea(s) sin destino.`);
   return {
-    evento: { id: evId, titulo: trim(ev?.titulo), situacion: trim(ev?.situacion || 'En curso'), fechaIni: trim(ev?.fechaIni), fechaFin: trim(ev?.fechaFin), precioEntrada: round(ev?.precio, 2), descripcion: trim(ev?.descripcion || '') },
-    resumenFinanciero: { ingresosTotal: ingresos.ingresosTotal, comprasReales: compras.totalComprasReales, donacionesProducto: compras.totalDonacionesProducto, comprasPendientes: compras.totalComprasPendientes, valoracionEvento: valoracion, formulaValoracion: 'valoracionEvento = ingresosTotal + donacionesProducto - comprasReales' },
-    ingresos, compras, donaciones: { totalValorado: compras.totalDonacionesProducto, lineas: compras.donacionesProducto, rankings: { porProducto: topQtyCost(new Map(compras.donacionesProducto.map(x => [x.producto, { unidades: x.unidades, importe: x.importe }])), 'importe', 20) } },
-    tickets: compras.tickets, documentos,
+    evento: {
+      titulo: trim(ev?.titulo),
+      situacion: trim(ev?.situacion || 'En curso'),
+      fechaInicio: trim(ev?.fechaIni),
+      fechaFin: trim(ev?.fechaFin),
+      precioEntrada: round(ev?.precio, 2),
+      descripcion: trim(ev?.descripcion || '')
+    },
+    resumenFinanciero: {
+      ingresosTotal: ingresos.ingresosTotal,
+      comprasReales: compras.totalComprasReales,
+      donacionesProducto: compras.totalDonacionesProducto,
+      comprasPendientes: compras.totalComprasPendientes,
+      valoracionEvento: valoracion,
+      formulaValoracion: 'valoracionEvento = ingresosTotal + donacionesProducto - comprasReales'
+    },
+    ingresos,
+    compras,
+    donaciones: { totalValorado: compras.totalDonacionesProducto, lineas: compras.donacionesProducto, rankings: { porProducto: compras.rankings.productosPorCoste, porDonante: compras.rankings.donantesPorImporte } },
+    tickets: compras.tickets,
+    documentos,
     avisosDatos: avisos
   };
+}
+
+function eventScore(ev, prompt) {
+  const p = norm(prompt);
+  const title = norm(ev?.titulo);
+  if (!p || !title) return 0;
+  let score = 0;
+  if (p.includes(title)) score += 160;
+  const titleNoSuffix = title.replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
+  if (titleNoSuffix && p.includes(titleNoSuffix)) score += 120;
+  const pWords = p.split(' ');
+  const tWords = title.split(' ');
+  const romans = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+  romans.forEach(r => { if (tWords.includes(r) && pWords.includes(r)) score += 55; });
+  for (const w of words(ev?.titulo)) if (pWords.includes(w)) score += w.length >= 5 ? 16 : 7;
+  const code = norm(ev?.eventoCodigo || ev?.codigoEvento || ev?.codigo || '');
+  if (code && p.includes(code)) score += 60;
+  return score;
+}
+function mostRecentEventIds(events, n = 1) {
+  return arr(events).map(ev => ({ id: trim(ev?.id), date: parseEventDate(ev) })).filter(x => x.id)
+    .sort((a, b) => b.date - a.date).slice(0, n).map(x => x.id);
+}
+function detectPromptBlocks(prompt) {
+  const p = norm(prompt);
+  const blocks = new Set();
+  if (/\bingres|socio|entrada|asistent|forma\s+de\s+pago|colaborador/.test(p)) blocks.add('ingresos');
+  if (/\bcompra|comprado|gasto|coste|precio|tienda|producto|articulo|segmento|destino|cerveza|agua|refresco|comida|material|ticket|tk\d+/.test(p)) { blocks.add('compras'); blocks.add('tickets'); }
+  if (/\bdonaci|donado|donante|producto\s+donado/.test(p)) { blocks.add('donaciones'); blocks.add('compras'); }
+  if (/\bdocumento|doc\d+|archivo|foto|justificante/.test(p)) blocks.add('documentos');
+  if (/\bvaloracion|resumen|dashboard|grafica|estadistica|compar/.test(p)) ['ingresos','compras','donaciones','tickets','documentos'].forEach(b => blocks.add(b));
+  if (!blocks.size) ['ingresos','compras','donaciones','tickets','documentos'].forEach(b => blocks.add(b));
+  return [...blocks];
+}
+function promptTerms(prompt) {
+  const out = [];
+  for (const w of words(prompt, { min: 3 })) {
+    if (COMMON_STOP.has(w)) continue;
+    if (!out.includes(w)) out.push(w);
+  }
+  return out.slice(0, 20);
+}
+function tokenSet(value) { return new Set(words(value, { min: 3, keepStop: true })); }
+function matchScoreFromTerms(value, terms) {
+  const ws = tokenSet(value);
+  let score = 0;
+  for (const t of terms) {
+    if (ws.has(t)) score += 14;
+    else if (t.length >= 5 && [...ws].some(w => w.length >= 5 && (w.startsWith(t) || t.startsWith(w)))) score += 5;
+  }
+  return score;
+}
+function findReferencedEventIds(events, prompt, selectedId) {
+  const scored = arr(events)
+    .map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), score: eventScore(ev, prompt), date: parseEventDate(ev) }))
+    .filter(x => x.id && x.score >= 35)
+    .sort((a, b) => b.score - a.score || b.date - a.date);
+  const out = [];
+  function push(id) { if (id && !out.includes(id)) out.push(id); }
+  scored.forEach(x => push(x.id));
+  if (/\b(mas\s+reciente|ultimo|ultima|reciente|actual)\b/.test(norm(prompt))) mostRecentEventIds(events, 1).forEach(push);
+  if (!out.length && selectedId) push(selectedId);
+  return out;
+}
+function buildPromptFilteredLines(state, events, helpers, ticketImages, prompt, maxLines = 500) {
+  const terms = promptTerms(prompt);
+  if (!terms.length) return { criterios: [], totalCoincidencias: 0, lineas: [], nota: 'No se detectaron términos concretos para filtrar líneas.' };
+  const evById = byId(events);
+  const out = [];
+  for (const row of arr(state?.compras)) {
+    const evId = trim(row?.eventId || row?.event_id);
+    const ev = evById.get(evId) || {};
+    const line = purchaseReadable(row, ev, helpers, ticketImages);
+    const haystack = [line.producto, line.segmento, line.destino, line.tienda, line.responsable, line.donante, line.ticket, trim(ev?.titulo)].join(' ');
+    const score = matchScoreFromTerms(haystack, terms);
+    if (score <= 0) continue;
+    out.push({ score, eventDate: parseEventDate(ev), evento: trim(ev?.titulo || 'Sin evento'), situacionEvento: trim(ev?.situacion || ''), fechaInicio: trim(ev?.fechaIni || ''), fechaFin: trim(ev?.fechaFin || ''), ...line });
+  }
+  out.sort((a, b) => b.eventDate - a.eventDate || b.score - a.score || b.importe - a.importe);
+  return { criterios: terms, totalCoincidencias: out.length, lineas: out.slice(0, maxLines).map(({ score, eventDate, ...x }) => x), nota: 'Líneas de compras reales, pendientes y donaciones filtradas por términos del prompt en todos los eventos. Los nombres son legibles; no se exponen claves internas.' };
+}
+function summarizeEventForGlobal(detail) {
+  return {
+    titulo: detail.evento.titulo,
+    situacion: detail.evento.situacion,
+    fechas: `${detail.evento.fechaInicio} a ${detail.evento.fechaFin}`,
+    precioEntrada: detail.evento.precioEntrada,
+    ingresosTotal: detail.resumenFinanciero.ingresosTotal,
+    ingresosSocios: detail.ingresos.ingresosSocios,
+    ingresosNoSociosYOtros: detail.ingresos.ingresosNoSociosYOtros,
+    comprasReales: detail.resumenFinanciero.comprasReales,
+    donacionesProducto: detail.resumenFinanciero.donacionesProducto,
+    comprasPendientes: detail.resumenFinanciero.comprasPendientes,
+    valoracionEvento: detail.resumenFinanciero.valoracionEvento,
+    numeroTickets: detail.tickets.length,
+    numeroDocumentos: detail.documentos.totalDocumentos,
+    lineasComprasReales: detail.compras.numeroLineasComprasReales,
+    lineasDonacionesProducto: detail.compras.numeroLineasDonaciones,
+    lineasComprasPendientes: detail.compras.numeroLineasPendientes,
+    productoMasConsumidoCantidad: detail.compras.rankings.productosPorCantidad[0] || null,
+    productoMayorCoste: detail.compras.rankings.productosPorCoste[0] || null
+  };
+}
+function estimateContextSize(obj) { return Buffer.byteLength(JSON.stringify(obj), 'utf8'); }
+function isVeryBroad(prompt) {
+  const p = norm(prompt);
+  return /\b(todo|todos|toda|todas|completo|completa|cualquier|general|global|dashboard\s+general)\b/.test(p) && !/\b(compara|comparativa|versus| vs |entre)\b/.test(` ${p} `);
 }
 
 export function buildEventAiContext(state, selectedEventId = '', userPrompt = '') {
@@ -338,53 +442,95 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   const helpers = makeHelpers(safeState);
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
   const selectedId = trim(selectedEventId || safeState.selectedEventId);
-  const relevantIds = chooseRelevantEventIds(events, selectedId, userPrompt);
-  const details = relevantIds.map(id => events.find(e => trim(e?.id) === id)).filter(Boolean).map(ev => buildEventDetail(ev, safeState, helpers, ticketImages));
-  const lineasFiltradasPorPrompt = buildLineasFiltradasPorPrompt(safeState, events, helpers, ticketImages, userPrompt);
-  const globalIngresos = new Map(), globalCompras = new Map(), globalDonaciones = new Map(), globalValoracion = new Map();
-  const resumenEventos = events.map(ev => {
+  const prompt = text(userPrompt);
+  const selectedEvent = events.find(e => trim(e?.id) === selectedId) || null;
+  const targetIds = findReferencedEventIds(events, prompt, selectedId);
+  const blocks = detectPromptBlocks(prompt);
+  const wantsComparison = /\b(compara|comparativa|frente|versus|entre\s+los\s+eventos| vs )\b/i.test(` ${prompt} `);
+  if (wantsComparison && selectedId && !targetIds.includes(selectedId)) targetIds.push(selectedId);
+  const warnings = [];
+
+  if (!events.length) {
+    return { needsClarification: true, clarification: 'No hay eventos disponibles para analizar. Debes cargar o seleccionar un evento antes de usar Zuzu.', warnings: [] };
+  }
+  if (!targetIds.length) {
+    return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: indica el evento, el producto, el responsable, el donante o el bloque que quieres analizar.', warnings: [] };
+  }
+  if (wantsComparison && targetIds.length < 2) {
+    return { needsClarification: true, clarification: 'Para una comparativa necesito que indiques con claridad al menos dos eventos, o que uses una petición más concreta indicando el evento activo y el evento a comparar.', warnings: [] };
+  }
+  if (targetIds.length > 3 && isVeryBroad(prompt)) {
+    return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: has pedido demasiados eventos o un análisis demasiado amplio. Indica 1 o 2 eventos y si quieres compras, donaciones, ingresos, tickets o documentos.', warnings: [] };
+  }
+
+  const detailById = new Map();
+  const fullDetails = [];
+  for (const id of targetIds.slice(0, wantsComparison ? 3 : 2)) {
+    const ev = events.find(e => trim(e?.id) === id);
+    if (!ev) continue;
     const d = buildEventDetail(ev, safeState, helpers, ticketImages);
-    add(globalIngresos, d.evento.titulo, d.resumenFinanciero.ingresosTotal);
-    add(globalCompras, d.evento.titulo, d.resumenFinanciero.comprasReales);
-    add(globalDonaciones, d.evento.titulo, d.resumenFinanciero.donacionesProducto);
-    add(globalValoracion, d.evento.titulo, d.resumenFinanciero.valoracionEvento);
-    return {
-      id: d.evento.id, titulo: d.evento.titulo, situacion: d.evento.situacion, fechas: `${d.evento.fechaIni} a ${d.evento.fechaFin}`, precioEntrada: d.evento.precioEntrada,
-      ingresosTotal: d.resumenFinanciero.ingresosTotal, ingresosSocios: d.ingresos.ingresosSocios, ingresosNoSociosYOtros: d.ingresos.ingresosNoSociosYOtros,
-      comprasReales: d.resumenFinanciero.comprasReales, donacionesProducto: d.resumenFinanciero.donacionesProducto, comprasPendientes: d.resumenFinanciero.comprasPendientes,
-      valoracionEvento: d.resumenFinanciero.valoracionEvento, numeroTickets: d.compras.numeroTickets, numeroDocumentos: d.documentos.totalDocumentos,
-      productoMasConsumidoCantidad: d.compras.rankings.productosPorCantidad[0] || null,
-      productoMayorCoste: d.compras.rankings.productosPorCoste[0] || null
-    };
-  });
-  return {
-    versionContexto: 'ControlEvent EventContext v11.1_prod - analitica contexto selectivo anti-cuota',
+    detailById.set(id, d);
+    fullDetails.push(d);
+  }
+  const allSummaries = events.map(ev => summarizeEventForGlobal(buildEventDetail(ev, safeState, helpers, ticketImages)));
+  const filteredLines = buildPromptFilteredLines(safeState, events, helpers, ticketImages, prompt, 800);
+
+  const globalIngresos = new Map(), globalCompras = new Map(), globalDonaciones = new Map(), globalValoracion = new Map();
+  allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
+
+  const context = {
+    versionContexto: 'ControlEvent EventContext v11.2_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
       prohibido: ['SQL directo', 'modificar BBDD', 'insertar', 'actualizar', 'borrar', 'leer credenciales', 'consultas ajenas al evento'],
       nota: 'Gemini solo recibe este JSON calculado por ControlEvent. No tiene conexión directa a Supabase ni permiso para ejecutar consultas.'
     },
-    selectedEventId: selectedId,
-    selectedEvent: details.find(d => d.evento.id === selectedId)?.evento || null,
-    eventosResumen: resumenEventos,
-    detalleEventosSeleccionados: details,
-    detalleEventosRelevantes: details,
-    lineasFiltradasPorPrompt,
-    resumenGlobal: { totalEventos: events.length, rankingIngresos: topN(globalIngresos, 20), rankingCompras: topN(globalCompras, 20), rankingDonaciones: topN(globalDonaciones, 20), rankingValoracion: topN(globalValoracion, 20) },
+    planExtraccionControlEvent: {
+      eventosObjetivo: fullDetails.map(d => d.evento.titulo),
+      eventoActivo: selectedEvent ? trim(selectedEvent.titulo) : '',
+      modoComparativa: wantsComparison,
+      bloquesSolicitados: blocks,
+      criterio: 'ControlEvent decide qué eventos y bloques extraer a partir del prompt. Si el prompt es ambiguo o excesivo, se pide concreción antes de llamar a Gemini.'
+    },
+    selectedEvent: selectedEvent ? { titulo: trim(selectedEvent.titulo), situacion: trim(selectedEvent.situacion), fechaInicio: trim(selectedEvent.fechaIni), fechaFin: trim(selectedEvent.fechaFin), precioEntrada: round(selectedEvent.precio, 2) } : null,
+    eventosResumen: allSummaries,
+    detalleEventosSeleccionados: fullDetails,
+    detalleEventosRelevantes: fullDetails,
+    lineasFiltradasPorPrompt: filteredLines,
+    resumenGlobal: {
+      totalEventos: events.length,
+      rankingIngresos: topN(globalIngresos, 50),
+      rankingCompras: topN(globalCompras, 50),
+      rankingDonaciones: topN(globalDonaciones, 50),
+      rankingValoracion: topN(globalValoracion, 50)
+    },
     catalogosRelacionados: {
-      tiendas: arr(safeState.tiendas).map(t => ({ id: trim(t.id), nombre: trim(t.nombre) })).filter(t => t.nombre).slice(0, 300),
-      responsables: arr(safeState.personas).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 400),
+      tiendas: arr(safeState.tiendas).map(t => ({ nombre: trim(t.nombre) })).filter(t => t.nombre),
+      responsables: arr(safeState.personas).map(p => ({ nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre),
       productos: arr(safeState.productos)
-        .map(p => ({ id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precioHabitual: round(p.defaultPrecio ?? p.precio, 4), tiendaHabitualId: trim(p.defaultTiendaId) }))
-        .filter(p => p.nombre && (!lineasFiltradasPorPrompt.criterios.length || productMatchScore([p.nombre,p.segmento,p.destino].join(' '), lineasFiltradasPorPrompt.criterios) > 0))
-        .slice(0, 300)
+        .map(p => ({ nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precioHabitual: round(p.defaultPrecio ?? p.precio, 4), tiendaHabitual: helpers.storeName(p.defaultTiendaId) }))
+        .filter(p => p.nombre && (!filteredLines.criterios.length || matchScoreFromTerms([p.nombre, p.segmento, p.destino, p.tiendaHabitual].join(' '), filteredLines.criterios) > 0))
+        .slice(0, 500)
     },
     instruccionesCalculo: {
       ingresos: 'Para socios, obligatorio = numero * precioEntrada. Total ingreso = obligatorio + voluntario/no socio. No usar solo importe bruto.',
       compras: 'COMPRA_REAL son tickets TKxx u otros gastos no pendientes ni donados. PTE_COMPRA son previsiones. DONADO TIENDA/SOCIO/OTROS son donaciones de producto valoradas.',
       valoracion: 'valoracionEvento = ingresosTotal + donacionesProducto - comprasReales.',
-      tickets: 'Los tickets agrupan líneas de compra por TKxx, tienda y responsable; tieneFoto solo indica disponibilidad de imagen, no se envía la imagen.'
-    }
+      tickets: 'Los tickets agrupan líneas de compra por TKxx, tienda y responsable; tieneFoto solo indica disponibilidad de imagen, no se envía la imagen.',
+      personas: 'Todos los datos están humanizados: se exponen nombres de producto, tienda, responsable y donante, no claves internas.'
+    },
+    warnings
   };
+
+  const bytes = estimateContextSize(context);
+  if (bytes > 350000) {
+    return {
+      needsClarification: true,
+      clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: el volumen de datos necesario es demasiado grande para una respuesta fiable. Indica evento(s), producto, responsable, donante o bloque concreto.',
+      warnings: [`Contexto estimado demasiado grande: ${bytes} bytes.`],
+      planExtraccionControlEvent: context.planExtraccionControlEvent
+    };
+  }
+  return context;
 }

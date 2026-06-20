@@ -9,4 +9,4 @@ Cambios:
 - Se mantiene la seguridad: Gemini no ejecuta SQL ni accede directamente a Supabase. Solo recibe JSON de solo lectura calculado por ControlEvent.
 - Se amplía el límite de contexto enviado a Gemini para evitar que se recorten detalles de compras/donaciones/ingresos de eventos citados.
 
-No cambia la versión visible: sigue v11.1_prod.
+No cambia la versión visible: sigue v11.2_prod.

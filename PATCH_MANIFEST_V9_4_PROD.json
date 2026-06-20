@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v11.1_prod",
+  "version": "ControlEvent v11.2_prod",
   "base": "versión anterior",
   "descripcion": "Tickets IA más práctico: botón en COMPRAS, sin toasts negros, limpieza completa, Pte.Compra de todo el evento ordenable, compactación de pantalla, actualización segura de precios existentes y Gemini obedeciendo indicaciones adicionales.",
   "modified": [

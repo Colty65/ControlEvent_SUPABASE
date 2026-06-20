@@ -1,4 +1,4 @@
-ControlEvent v11.1_prod
+ControlEvent v11.2_prod
 =======================
 
 Versión generada sobre v10.0_prod.
@@ -6,10 +6,10 @@ Versión generada sobre v10.0_prod.
 Cambios incluidos:
 
 1. Versión
-- Versión visible y técnica actualizada a v11.1_prod.
+- Versión visible y técnica actualizada a v11.2_prod.
 - package.json / package-lock.json actualizados a 10.3.0-prod.
-- BACKUP e INFOEVENTO actualizados a ControlEvent_v11_1_prod.
-- Cabecera inicial compacta con miniatura CE + v11.1_prod.
+- BACKUP e INFOEVENTO actualizados a ControlEvent_v11_2_prod.
+- Cabecera inicial compacta con miniatura CE + v11.2_prod.
 
 2. RESUMEN PRESUPUESTARIO / Cálculos por tienda y ticket
 - Botón Adjuntar sustituido visualmente por icono de clip 📎.

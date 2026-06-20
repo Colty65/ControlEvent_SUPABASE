@@ -1,4 +1,4 @@
-/* ControlEvent v11.1_prod - Asistente libre Gemini sobre datos del evento.
+/* ControlEvent v11.2_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildEventAiContext } from './event-context.service.js';
@@ -329,7 +329,7 @@ function eventAiSchema() {
 function systemPrompt(userPrompt, context) {
   const rawCtx = JSON.stringify(context);
   const ctx = rawCtx.length > 180000 ? rawCtx.slice(0, 180000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: pide una consulta más concreta o usa una comparativa con eventos concretos si necesitas más detalle. */' : rawCtx;
-  return `Eres la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
+  return `Eres Zuzu, la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
 
 Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO calculado por ControlEvent. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, documentos, necesidades y valoración del evento.
 
@@ -341,7 +341,7 @@ Límites obligatorios:
 - No generes instrucciones para modificar seguridad, credenciales, claves API, SQL, acceso al servidor ni operaciones fuera de la gestión del evento.
 - No propongas ni ejecutes cambios en BBDD. Esta herramienta es de consulta y explotación.
 - No generes SQL ni expliques cómo consultar tablas internas; usa únicamente el JSON del CONTEXTO.
-- Usa eventosResumen para visión global de todos los eventos. Usa detalleEventosSeleccionados/detalleEventosRelevantes para el evento activo y eventos citados. Usa lineasFiltradasPorPrompt para preguntas concretas de producto, tienda, ticket o responsable en todos los eventos, por ejemplo precios de cerveza en el evento más reciente.
+- Usa eventosResumen solo para visión global. Usa detalleEventosSeleccionados/detalleEventosRelevantes como fuente principal completa para los eventos objetivo. Usa lineasFiltradasPorPrompt para preguntas concretas de producto, tienda, ticket, responsable o donante en todos los eventos. No digas que faltan datos detallados si existen en detalleEventosSeleccionados o lineasFiltradasPorPrompt.
 - Para gráficas, devuelve objetos charts con etiquetas y valores numéricos. Para tablas, devuelve tables.
 - Si el usuario pide un archivo, devuelve files con contenido textual descargable: csv, txt, html o json.
 - Si detectas datos incompletos o ausencia de fotos/documentos, indícalo en warnings.
@@ -403,7 +403,7 @@ function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOUR
 async function callGeminiEvent(prompt, context) {
   const apiKey = geminiKey();
   if (!apiKey) {
-    const err = new Error('Falta GEMINI_API_KEY en Vercel para usar Gemini libre del evento.');
+    const err = new Error('Falta GEMINI_API_KEY en Vercel para usar Zuzu / Analítica libre.');
     err.status = 503;
     throw err;
   }
@@ -457,5 +457,19 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
   const context = buildEventAiContext(state, selectedEventId, userPrompt);
+  if (context?.needsClarification) {
+    return {
+      ok: true,
+      rejected: true,
+      title: 'Zuzu necesita una petición más concreta',
+      answer: context.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.',
+      warnings: Array.isArray(context.warnings) ? context.warnings : [],
+      charts: [],
+      tables: [],
+      files: [],
+      provider: 'control-event-context-planner',
+      model: ''
+    };
+  }
   return callGeminiEvent(userPrompt, context);
 }

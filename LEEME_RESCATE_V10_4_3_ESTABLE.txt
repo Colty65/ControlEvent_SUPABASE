@@ -1,11 +1,11 @@
-ControlEvent v11.1_prod - RESCATE ESTABLE
+ControlEvent v11.2_prod - RESCATE ESTABLE
 
 Motivo:
 La cadena de hotfix sobre v10.4.2 introdujo refrescos repetidos, temblores de pantalla, pérdida de foco en buscadores y problemas de arranque/login.
 Esta versión prioriza estabilidad y fluidez sobre la animación de bienvenida.
 
 Cambios principales:
-- Versión cambiada a v11.1_prod en referencias activas.
+- Versión cambiada a v11.2_prod en referencias activas.
 - Desactivado el estabilizador de vistas automático que repintaba varias veces al cambiar de menú o evento.
 - Eliminada la lógica experimental de prelogin/welcome/cohetes que podía dejar la app sin montar o dispararse en el momento incorrecto.
 - El login se muestra directamente desde el inicio, sin logo grande previo de la app.
