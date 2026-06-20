@@ -1,6 +1,6 @@
 {
-  "version": "v11.2_prod",
-  "base": "v11.2_prod",
+  "version": "v11_3_prod",
+  "base": "v11_3_prod",
   "scope": "rescate puntual: descargas Documentos/Ingresos, Mapa móvil, Ticket Auto",
   "files_changed": [
     "index.html",
@@ -11,7 +11,7 @@
     "public/app/features/v10-4-app-fixes.js",
     "public/app/features/v10-4-5-app-fixes.js",
     "public/app/features/v10-4-5-ticketauto-compras.js",
-    "LEEME_v11.2_prod_RESCATE_DESCARGAS_TICKETAUTO.txt",
-    "PATCH_MANIFEST_v11.2_prod.json"
+    "LEEME_v11_3_prod_RESCATE_DESCARGAS_TICKETAUTO.txt",
+    "PATCH_MANIFEST_v11_3_prod.json"
   ]
 }

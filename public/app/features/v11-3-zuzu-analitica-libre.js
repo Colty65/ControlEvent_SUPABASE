@@ -2,7 +2,7 @@
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
-  if(window.__ceV112ZuzuAnalitica) return; window.__ceV112ZuzuAnalitica=true;
+  if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
   var VERSION='v11_3_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
@@ -73,8 +73,15 @@
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">⬇️</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
-        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versión</h3><div class="ce-ai-answer">Soy Zuzu. Pregúntame sobre ingresos, compras, donaciones, tickets, responsables, tiendas, documentos, productos, valoración o comparativas entre eventos. Si la petición es demasiado amplia, te pediré que la concretes para no darte una respuesta sesgada.</div></div></div>'+ 
+        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versión</h3><div class="ce-ai-answer">Soy Zuzu. Puedo consultar módulos seguros de ControlEvent: INGRESOS, DONACIONES, COMPRAS, EVENTOS, PRODUCTOS, TIENDAS, PERSONAS, TICKETS y DOCUMENTOS. Si la petición es ambigua, te pediré que concretes antes de responder.</div></div></div>'+ 
       '</div></div>';
+  }
+  function clearZuzu(ev){
+    if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
+    var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
+    var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu lista</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
+    setStatus('', '');
+    try{ if(p) p.focus(); }catch(_){ }
   }
   function openModal(){
     injectStyle();
@@ -85,7 +92,7 @@
     $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
-    $('ceAiClear').onclick=function(){ $('ceAiPrompt').value=''; $('ceAiResult').innerHTML=''; setStatus('', ''); };
+    $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
     $('ceAiDownloadResult').onclick=function(){ downloadText(($('ceAiResult')||{}).innerText||'', 'ControlEvent_Analitica_libre_'+Date.now()+'.txt', 'text/plain;charset=utf-8'); };
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
@@ -145,5 +152,6 @@
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(); } }, true);
   document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
-  window.ControlEventV112ZuzuAnalitica={open:openModal, install:tick};
+  document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);
+  window.ControlEventV113ZuzuAnalitica={open:openModal, install:tick};
 })();

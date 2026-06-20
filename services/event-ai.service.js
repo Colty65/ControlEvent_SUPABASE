@@ -1,7 +1,7 @@
-/* ControlEvent v11.2_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v11_3_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
-import { buildEventAiContext } from './event-context.service.js';
+import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -328,23 +328,22 @@ function eventAiSchema() {
 
 function systemPrompt(userPrompt, context) {
   const rawCtx = JSON.stringify(context);
-  const ctx = rawCtx.length > 420000 ? rawCtx.slice(0, 420000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: la respuesta puede estar incompleta; concreta más por evento, producto, responsable, tienda, ticket o fecha. */' : rawCtx;
+  const ctx = rawCtx;
   return `Eres Zuzu, la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
 
-Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO calculado por ControlEvent. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, documentos, necesidades y valoración del evento.
+Tarea: responder al usuario SOLO con los datos incluidos en el CONTEXTO preparado por ControlEvent. El contexto contiene módulos ya extraídos y humanizados: EVENTOS, INGRESOS, DONACIONES, COMPRAS, TICKETS, DOCUMENTOS, PRODUCTOS, TIENDAS y PERSONAS. No tienes acceso directo a Supabase ni permiso para ejecutar SQL.
 
-Límites obligatorios:
-- Si la petición no tiene relación clara con gestión de eventos de ControlEvent, recházala con rejected=true y explica brevemente.
-- No inventes datos. Si falta un dato, dilo.
-- Para INGRESOS usa siempre ingresosTotal, ingresosSocios, ingresosNoSociosYOtros, importeObligatorioSocios, importeVoluntario y el detalle de ingresos. No confundas el campo bruto importe con el total real cuando hay socios: en socios el obligatorio se calcula como numero * precioEntrada.
-- Si el usuario pregunta por ingresos de socios y no socios, desglosa ambos y explica la regla de cálculo usada.
-- No generes instrucciones para modificar seguridad, credenciales, claves API, SQL, acceso al servidor ni operaciones fuera de la gestión del evento.
-- No propongas ni ejecutes cambios en BBDD. Esta herramienta es de consulta y explotación.
-- No generes SQL ni expliques cómo consultar tablas internas; usa únicamente el JSON del CONTEXTO.
-- Usa eventosResumen solo para visión global. Usa detalleEventosSeleccionados/detalleEventosRelevantes como fuente principal completa para los eventos objetivo. Usa lineasFiltradasPorPrompt para preguntas concretas de producto, tienda, ticket, responsable o donante en todos los eventos. No digas que faltan datos detallados si existen en detalleEventosSeleccionados o lineasFiltradasPorPrompt.
-- Para gráficas, devuelve objetos charts con etiquetas y valores numéricos. Para tablas, devuelve tables.
-- Si el usuario pide un archivo, devuelve files con contenido textual descargable: csv, txt, html o json.
-- Si detectas datos incompletos o ausencia de fotos/documentos, indícalo en warnings.
+Reglas obligatorias:
+- Usa exclusivamente modulosExtraidos y eventosObjetivo. No inventes datos ni completes huecos por intuición.
+- Si el dato no está en el módulo recibido, dilo claramente y no lo calcules con información ausente.
+- Si se pide una lista, tabla o CSV, usa todos los registros del módulo correspondiente que se te han entregado.
+- INGRESOS: usa Importe Obligatorio, Importe Voluntario e Importe Total Calculado. En socios, el obligatorio se calcula como Numero * Precio del evento.
+- DONACIONES: solo son DONADO SOCIO, DONADO TIENDA o DONADO OTROS. Usa Donante y Responsable legibles.
+- COMPRAS: incluye compra real, gasto corriente y Pte. Compra según el campo TKxx/GASTOS/Pte.Compra. No mezcles donaciones con compras salvo que el usuario lo pida.
+- TICKETS: usa el total de ticket y sus líneas contables si el usuario pregunta por TKxx/facturas.
+- No generes SQL. No expliques tablas internas ni claves. No propongas cambios en base de datos.
+- Si el usuario pide algo ajeno a la gestión de eventos, rejected=true.
+- Si detectas limitaciones o falta de datos, ponlo en warnings.
 - Responde siempre en español.
 
 Formato de salida: SOLO JSON válido con el esquema indicado.
@@ -353,7 +352,7 @@ CONTEXTO CONTROL EVENT:
 ${ctx}
 
 PETICIÓN DEL USUARIO:
-${trim(userPrompt).slice(0, 2500)}
+${trim(userPrompt).slice(0, 3000)}
 `;
 }
 
@@ -438,6 +437,96 @@ async function callGeminiEvent(prompt, context) {
   throw lastError;
 }
 
+function plannerSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      ok: { type: 'BOOLEAN' },
+      needsClarification: { type: 'BOOLEAN' },
+      clarification: { type: 'STRING' },
+      modules: { type: 'ARRAY', items: { type: 'STRING' } },
+      eventos: { type: 'ARRAY', items: { type: 'STRING' } },
+      todosLosEventos: { type: 'BOOLEAN' },
+      filters: {
+        type: 'OBJECT',
+        properties: {
+          personas: { type: 'ARRAY', items: { type: 'STRING' } },
+          productos: { type: 'ARRAY', items: { type: 'STRING' } },
+          tiendas: { type: 'ARRAY', items: { type: 'STRING' } },
+          responsables: { type: 'ARRAY', items: { type: 'STRING' } },
+          donantes: { type: 'ARRAY', items: { type: 'STRING' } },
+          tickets: { type: 'ARRAY', items: { type: 'STRING' } }
+        }
+      },
+      reasoning: { type: 'STRING' }
+    },
+    required: ['ok','needsClarification','clarification','modules','eventos','todosLosEventos','filters','reasoning']
+  };
+}
+function plannerPrompt(userPrompt, catalog) {
+  const ctx = JSON.stringify(catalog).slice(0, 95000);
+  return `Eres el planificador seguro de Zuzu para ControlEvent. Tu única tarea es decidir qué módulos de extracción debe usar ControlEvent para responder bien al usuario. NO respondas la pregunta final.
+
+Módulos disponibles:
+- INGRESOS: Colaborador; Rango; Numero; Ingreso; Importe Obligatorio; Importe Voluntario; Just.ing.
+- DONACIONES: Producto; Segmento; Destino; Unidades; Precio; Valor estimado; Tipo donación; Donante; Responsable.
+- COMPRAS: Producto; Segmento; Destino; Unidades; Precio; Importe; TKxx/GASTOS/Pte.Compra; Tienda; Responsable; Ticket SI/NO.
+- EVENTOS: EVENTO; Titulo; Precio; Fecha ini; Fecha fin; Situacion; DOCxxx.
+- TICKETS: TKxx y datos contables asociados.
+- DOCUMENTOS: DOCxxx, fecha y descripción.
+- PRODUCTOS: Producto; Segmento; Destino; Precio Referencia.
+- TIENDAS: Nombre tienda.
+- PERSONAS: Nombre; Rango.
+
+Reglas:
+- Elige solo los módulos necesarios.
+- Indica eventos concretos por id o por título exacto del catálogo. Si el usuario dice "eventos registrados" o "todos los eventos", todosLosEventos=true.
+- Si pide datos de una persona/producto/tienda/responsable/donante concreto, ponlo en filters.
+- Si no se puede identificar evento o módulo y no basta el evento activo, needsClarification=true.
+- Si la petición es demasiado amplia sin filtros, pide concreción.
+- Devuelve SOLO JSON con el esquema.
+
+CATÁLOGO CONTROL EVENT:
+${ctx}
+
+PROMPT DEL USUARIO:
+${trim(userPrompt).slice(0, 2500)}`;
+}
+async function callGeminiPlanner(userPrompt, catalog) {
+  const apiKey = geminiKey();
+  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para planificador.');
+  let lastError = null;
+  for (const model of configuredGeminiModels()) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: plannerPrompt(userPrompt, catalog) }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0.05 }
+    };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body) });
+      const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+      if (!res.ok) throw new Error(payload?.error?.message || `Gemini planner HTTP ${res.status}`);
+      const outText = trim(geminiOutText(payload));
+      if (!outText) throw new Error('Planificador no devolvió texto.');
+      return JSON.parse(stripJsonText(outText));
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error)) break;
+    }
+  }
+  throw lastError || new Error('Planificador Gemini no disponible.');
+}
+async function buildZuzuPlan(userPrompt, state, selectedEventId) {
+  const catalog = buildZuzuPlanningCatalog(state, selectedEventId);
+  try {
+    const plan = await callGeminiPlanner(userPrompt, catalog);
+    if (plan && typeof plan === 'object' && Array.isArray(plan.modules)) return plan;
+  } catch (err) {
+    console.warn('[Zuzu v11_3] Planificador Gemini no disponible; se usa plan local:', err?.message || err);
+  }
+  return buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+}
+
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
   const userPrompt = trim(prompt);
   if (!userPrompt) {
@@ -456,7 +545,8 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
   }
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
-  const context = buildEventAiContext(state, selectedEventId, userPrompt);
+  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
+  const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
   if (context?.needsClarification) {
     return {
       ok: true,

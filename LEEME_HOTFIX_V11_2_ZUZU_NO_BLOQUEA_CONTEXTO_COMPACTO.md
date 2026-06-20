@@ -1,4 +1,4 @@
-# Hotfix v11.2_prod - Zuzu contexto compacto sin bloqueo prematuro
+# Hotfix v11_3_prod - Zuzu contexto compacto sin bloqueo prematuro
 
 Objetivo: evitar que Zuzu rechace casi todas las consultas por tamaño de contexto cuando la petición ya es concreta.
 

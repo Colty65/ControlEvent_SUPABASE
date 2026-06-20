@@ -1,1 +1,1 @@
-{"version":"v11.2_prod","base":"v11.2_prod","changes":["fix undefined product similarity helper in Ticket Auto","download buttons for ingresos and documentos stop event propagation and download directly","ticket image lookup event-scoped by eventId + TKxx","version bump"]}
+{"version":"v11_3_prod","base":"v11_3_prod","changes":["fix undefined product similarity helper in Ticket Auto","download buttons for ingresos and documentos stop event propagation and download directly","ticket image lookup event-scoped by eventId + TKxx","version bump"]}
