@@ -1,6 +1,6 @@
-# HOTFIX v11.2_prod - Gemini libre: contexto ampliado de INGRESOS
+# HOTFIX v11.1_prod - Gemini libre: contexto ampliado de INGRESOS
 
-No cambia la versión visible de la app: sigue siendo v11.2_prod.
+No cambia la versión visible de la app: sigue siendo v11.1_prod.
 
 Problema detectado:
 - Gemini recibía el total bruto de ingresos (`row.importe`) pero no siempre el cálculo completo de ingresos de socios.

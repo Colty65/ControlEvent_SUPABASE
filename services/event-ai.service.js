@@ -328,7 +328,7 @@ function eventAiSchema() {
 
 function systemPrompt(userPrompt, context) {
   const rawCtx = JSON.stringify(context);
-  const ctx = rawCtx.length > 180000 ? rawCtx.slice(0, 180000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: pide una consulta más concreta o usa una comparativa con eventos concretos si necesitas más detalle. */' : rawCtx;
+  const ctx = rawCtx.length > 420000 ? rawCtx.slice(0, 420000) + '\n/* CONTEXTO RECORTADO POR TAMAÑO: la respuesta puede estar incompleta; concreta más por evento, producto, responsable, tienda, ticket o fecha. */' : rawCtx;
   return `Eres Zuzu, la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
 
 Tarea: responder al usuario SOLO con datos de gestión de eventos incluidos en el CONTEXTO calculado por ControlEvent. Puedes hacer estadísticas, tablas, comparativas entre eventos, análisis de compras, donaciones, ingresos, responsables, tiendas, segmentos, destinos, tickets, documentos, necesidades y valoración del evento.

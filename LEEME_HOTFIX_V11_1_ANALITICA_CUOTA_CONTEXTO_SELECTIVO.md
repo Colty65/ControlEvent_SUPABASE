@@ -1,6 +1,6 @@
-# Hotfix v11.2_prod - Analítica libre, cuota Gemini y contexto selectivo
+# Hotfix v11.1_prod - Analítica libre, cuota Gemini y contexto selectivo
 
-Este hotfix no cambia la versión visible: sigue siendo v11.2_prod.
+Este hotfix no cambia la versión visible: sigue siendo v11.1_prod.
 
 ## Motivo
 La versión anterior enviaba a Gemini el detalle completo de todos los eventos. Eso mejora disponibilidad de datos, pero en el plan gratuito de Gemini puede disparar cuota/tokens y provocar errores tipo `Quota exceeded`, especialmente con modelos como `gemini-2.0-flash-lite`.
