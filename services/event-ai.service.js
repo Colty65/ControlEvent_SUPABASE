@@ -460,24 +460,136 @@ function directModuleResultIfApplicable(prompt, context) {
 
 
 
-function groupRowsForChart(moduleName, rows, prompt) {
+function valueColumnForModule(moduleName) {
+  if (moduleName === 'DONACIONES') return 'Valor';
+  if (moduleName === 'COMPRAS') return 'Importe';
+  if (moduleName === 'INGRESOS') return 'Total ingreso';
+  return 'Importe';
+}
+function valueForModuleRow(moduleName, row) {
+  if (moduleName === 'INGRESOS') return num(row?.['Importe obligatorio']) + num(row?.['Importe voluntario']);
+  if (moduleName === 'DONACIONES') return num(row?.Valor);
+  if (moduleName === 'COMPRAS') return num(row?.Importe);
+  return 0;
+}
+function detectGroupField(moduleName, prompt) {
   const p = norm(prompt);
-  let groupField = 'Producto';
-  if (/\btienda|proveedor\b/.test(p)) groupField = moduleName === 'DONACIONES' ? 'Donante' : 'Tienda';
-  else if (/\bresponsable\b/.test(p)) groupField = 'Responsable';
-  else if (/\btk|ticket\b/.test(p)) groupField = moduleName === 'COMPRAS' ? 'Ticket u otros gastos' : 'TKxx';
-  else if (moduleName === 'INGRESOS') groupField = /\bforma|banco|bizum|efectivo|pendiente\b/.test(p) ? 'Ingreso' : 'Nombre';
+  if (moduleName === 'DONACIONES') {
+    if (/\btipo(?:\s+de)?\s+donaci|donado\s+socio|donado\s+no\s+socio|donado\s+otros|donado\s+tienda\b/.test(p)) return 'Tipo de donación';
+    if (/\bdonante|donantes\b/.test(p)) return 'Donante';
+    if (/\bresponsable|responsables\b/.test(p)) return 'Responsable';
+    if (/\bproducto|productos|articulo|articulos\b/.test(p)) return 'Producto';
+    return 'Tipo de donación';
+  }
+  if (moduleName === 'COMPRAS') {
+    if (/\btienda|tiendas|proveedor|proveedores\b/.test(p)) return 'Tienda';
+    if (/\bresponsable|responsables\b/.test(p)) return 'Responsable';
+    if (/\btk|ticket|factura|gastos\s+corrientes|pte\.?\s*compra\b/.test(p)) return 'Ticket u otros gastos';
+    if (/\bproducto|productos|articulo|articulos\b/.test(p)) return 'Producto';
+    return 'Producto';
+  }
+  if (moduleName === 'INGRESOS') {
+    if (/\bforma|ingreso|banco|bizum|efectivo|pendiente|pago\b/.test(p)) return 'Ingreso';
+    if (/\brango|socio|socios|no\s+socio|donante\b/.test(p)) return 'Rango';
+    if (/\bpersona|personas|nombre|colaborador|colaboradores|asistente|asistentes\b/.test(p)) return 'Nombre';
+    return 'Ingreso';
+  }
+  return 'Evento';
+}
+function detectAggregateModule(prompt, mods) {
+  const p = norm(prompt);
+  if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) return 'DONACIONES';
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) return 'COMPRAS';
+  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) return 'INGRESOS';
+  return '';
+}
+function groupRowsForChart(moduleName, rows, prompt) {
+  const groupField = detectGroupField(moduleName, prompt);
   const map = new Map();
   arr(rows).forEach(row => {
     const key = trim(row?.[groupField]) || 'Sin clasificar';
-    let value = 0;
-    if (moduleName === 'INGRESOS') value = num(row?.['Importe obligatorio']) + num(row?.['Importe voluntario']);
-    else if (moduleName === 'DONACIONES') value = num(row?.Valor);
-    else value = num(row?.Importe);
+    const value = valueForModuleRow(moduleName, row);
     map.set(key, num(map.get(key)) + value);
   });
   const ordered = [...map.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 30);
   return { groupField, labels: ordered.map(x=>x[0]), values: ordered.map(x=>round(x[1],2)) };
+}
+function aggregateRowsForModule(moduleName, rows, prompt) {
+  const groupField = detectGroupField(moduleName, prompt);
+  const valueColumn = valueColumnForModule(moduleName);
+  const groups = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[groupField]) || 'Sin clasificar';
+    const old = groups.get(key) || { key, registros: 0, unidades: 0, total: 0 };
+    old.registros += 1;
+    if (row?.Unidades !== undefined) old.unidades += num(row.Unidades);
+    old.total += valueForModuleRow(moduleName, row);
+    groups.set(key, old);
+  });
+  const ordered = [...groups.values()].sort((a,b)=>num(b.total)-num(a.total) || String(a.key).localeCompare(String(b.key), 'es'));
+  const totalGeneral = round(ordered.reduce((acc, g) => acc + num(g.total), 0), 2);
+  const totalRegistros = ordered.reduce((acc, g) => acc + num(g.registros), 0);
+  const totalUnidades = round(ordered.reduce((acc, g) => acc + num(g.unidades), 0), 3);
+  return { groupField, valueColumn, groups: ordered, totalGeneral, totalRegistros, totalUnidades };
+}
+function directAggregateResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(agrupa|agrupar|agrupado|agrupados|agrupacion|agrupación|totaliza|totalizar|totalizado|subtotal|subtotales|suma|sumar|sumatorio|desglose|desglosa|desglosar)\b/.test(p)) return null;
+  const mods = context.modulosExtraidos || {};
+  const moduleName = detectAggregateModule(prompt, mods);
+  if (!moduleName) return null;
+  const rows = arr(mods[moduleName]);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
+  if (!rows.length) {
+    return {
+      ok: true, rejected: false, title: `${moduleName} agrupado por ControlEvent`,
+      answer: `ControlEvent no puede agrupar porque el módulo ${moduleName} ha entregado 0 registros${eventos ? ` para ${eventos}` : ''}.`,
+      warnings: [audit ? `Auditoría ${moduleName}: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}.` : `El módulo ${moduleName} no tiene registros.`],
+      charts: [], tables: [], files: [], provider: 'control-event-query-modules-aggregate', model: 'sin-gemini-para-totales'
+    };
+  }
+  const ag = aggregateRowsForModule(moduleName, rows, prompt);
+  const groupedColumns = [ag.groupField, 'Registros'];
+  if (rows.some(r => r?.Unidades !== undefined)) groupedColumns.push('Unidades');
+  groupedColumns.push(`Total ${ag.valueColumn} (€)`);
+  groupedColumns.push('% sobre total');
+  const groupedRows = ag.groups.map(g => {
+    const base = [g.key, String(g.registros)];
+    if (groupedColumns.includes('Unidades')) base.push(String(round(g.unidades, 3)));
+    base.push(String(round(g.total, 2)));
+    base.push(ag.totalGeneral ? `${round((num(g.total) * 100) / ag.totalGeneral, 2)} %` : '0 %');
+    return base;
+  });
+  groupedRows.push(['TOTAL', String(ag.totalRegistros)].concat(groupedColumns.includes('Unidades') ? [String(ag.totalUnidades)] : []).concat([String(ag.totalGeneral), '100 %']));
+  const detailColumns = orderedColumnsForModule(moduleName, rows);
+  const detailRows = rows.slice(0, 300).map(row => detailColumns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  const groupedCsvRows = ag.groups.map(g => {
+    const row = { [ag.groupField]: g.key, Registros: g.registros, [`Total ${ag.valueColumn} (€)`]: round(g.total, 2), '% sobre total': ag.totalGeneral ? `${round((num(g.total) * 100) / ag.totalGeneral, 2)} %` : '0 %' };
+    if (groupedColumns.includes('Unidades')) row.Unidades = round(g.unidades, 3);
+    return row;
+  });
+  const groupedCsvColumns = groupedColumns;
+  const warningSynonyms = /donado\s+no\s+socio/.test(p) && moduleName === 'DONACIONES' ? ['En los datos reales el tipo equivalente a “DONADO NO SOCIO” suele venir como “DONADO OTROS”; se agrupa por el valor real del campo Tipo de donación.'] : [];
+  const auditText = audit ? ` Auditoría: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}${audit.filtrosAplicados ? ' con filtros verificados' : ' sin filtros'}.` : '';
+  return {
+    ok: true, rejected: false,
+    title: `${moduleName} agrupado por ${ag.groupField}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `ControlEvent ha agrupado y totalizado ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. Agrupación: ${ag.groupField}. Total general: ${ag.totalGeneral} €.${auditText}`,
+    warnings: arr(context.advertencias).concat(warningSynonyms),
+    charts: [{ title: `${moduleName} por ${ag.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
+    tables: [
+      { title: `${moduleName} agrupado por ${ag.groupField}`, columns: groupedColumns, rows: groupedRows },
+      { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
+    ],
+    files: [
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+    ],
+    provider: 'control-event-query-modules-aggregate',
+    model: 'sin-gemini-para-totales'
+  };
 }
 
 function directGraphResultIfApplicable(prompt, context) {
@@ -703,6 +815,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // En cuanto el prompt pide agrupar, totalizar, calcular, graficar, comparar, ordenar,
   // resumir o cualquier transformación, se extraen primero los módulos fiables y después
   // se pasan a Gemini junto con el prompt original para que haga exactamente esa operación.
+  const directAggregate = directAggregateResultIfApplicable(userPrompt, context);
+  if (directAggregate) return directAggregate;
+
+  const directGraph = directGraphResultIfApplicable(userPrompt, context);
+  if (directGraph) return directGraph;
+
   const directResult = directModuleResultIfApplicable(userPrompt, context);
   if (directResult) return directResult;
 
