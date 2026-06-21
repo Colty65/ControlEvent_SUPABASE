@@ -626,7 +626,7 @@ function directAggregateResultIfApplicable(prompt, context) {
 
 function isModuleDataPrompt(prompt) {
   const p = norm(prompt);
-  return /(donacion|donaciones|donado|donante|compra|compras|gasto|gastos|ingreso|ingresos|recaudacion|recaudación|asistente|asistentes|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|evento|eventos|producto|productos|tienda|tiendas|persona|personas|responsable|responsables)/.test(p);
+  return /\b(donacion|donaciones|donado|donante|compra|compras|gasto|gastos|ingreso|ingresos|recaudacion|recaudación|asistente|asistentes|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|evento|eventos|producto|productos|tienda|tiendas|persona|personas|responsable|responsables)\b/.test(p);
 }
 
 function isComparativeAllDataPrompt(prompt) {
@@ -641,7 +641,8 @@ function uniqueEventNamesFromContext(context) {
     .filter((v, i, a) => a.indexOf(v) === i);
 }
 function rowsForEvent(rows, eventName) {
-  return arr(rows).filter(row => trim(row?.Evento || row?.['Titulo del evento']) === trim(eventName));
+  const n = norm(eventName);
+  return arr(rows).filter(row => norm(row?.Evento || row?.['Titulo del evento']) === n);
 }
 function countYes(rows, field) {
   return arr(rows).filter(r => /^(si|sí|s)$/i.test(trim(r?.[field]))).length;
@@ -721,10 +722,146 @@ function directComparativeAllDataResultIfApplicable(prompt, context) {
   };
 }
 
+
+function firstIntInPrompt(prompt, fallback = 25) {
+  const m = text(prompt).match(/\b(\d{1,4})\b/);
+  const n = m ? Number(m[1]) : fallback;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 1000) : fallback;
+}
+function eventNamesFromContext(context) {
+  return arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.Evento || e?.EVENTO)).filter(Boolean);
+}
+function normEq(a, b) { return norm(a) === norm(b); }
+function nameMatches(value, needle) {
+  const v = norm(value), n = norm(needle);
+  return !!v && !!n && (v === n || v.includes(n) || n.includes(v));
+}
+function quotedNames(prompt) {
+  const out = [];
+  const re = /["“”']([^"“”']{2,120})["“”']/g; let m;
+  while ((m = re.exec(text(prompt)))) out.push(trim(m[1]));
+  return out;
+}
+function uniqueRowsBy(rows, keyFn) {
+  const seen = new Set(); const out = [];
+  arr(rows).forEach(r => { const k = keyFn(r); if (!seen.has(k)) { seen.add(k); out.push(r); } });
+  return out;
+}
+function directEventPriceExtremesIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(evento|eventos)\b/.test(p) || !/\b(precio|barato|costoso|caro|maximo|maxima|mínimo|minimo)\b/.test(p)) return null;
+  const rows = uniqueRowsBy(arr(context?.modulosExtraidos?.EVENTOS), r => trim(r?.['Titulo del evento'])).filter(r => trim(r?.['Titulo del evento']));
+  if (!rows.length) return null;
+  const positive = rows.filter(r => num(r?.Precio) > 0);
+  const base = positive.length ? positive : rows;
+  const sorted = base.slice().sort((a,b)=>num(a.Precio)-num(b.Precio));
+  const barato = sorted[0]; const caro = sorted[sorted.length-1];
+  const columns = ['Concepto','Titulo del evento','Precio','fecha ini','fecha fin','Estado'];
+  const tableRows = [
+    ['Más barato', barato?.['Titulo del evento'] || '', String(round(barato?.Precio,2)), text(barato?.['fecha ini']), text(barato?.['fecha fin']), text(barato?.Estado)],
+    ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
+  ];
+  const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v11_3_2_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+}
+function directPersonAppearanceIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(busca|buscar|aparece|aparecen|cuantos|cuántos|revisa)\b/.test(p) || !/\b(persona|colaborador|colaboradores|responsable|responsables|donante|donantes)\b/.test(p)) return null;
+  const q = quotedNames(prompt)[0];
+  const people = arr(context?.modulosExtraidos?.PERSONAS);
+  const needle = q || (people.length === 1 ? people[0]?.['Nombre persona'] : '');
+  if (!needle) return null;
+  const ingresos = arr(context?.modulosExtraidos?.INGRESOS).filter(r => nameMatches(r?.Nombre, needle));
+  const comprasResp = arr(context?.modulosExtraidos?.COMPRAS).filter(r => nameMatches(r?.Responsable, needle));
+  const donResp = arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Responsable, needle));
+  const donDonante = /\bdonante|donantes\b/.test(p) ? arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Donante, needle)) : [];
+  const events = new Map();
+  function touch(evento){ const e=trim(evento)||'Sin evento'; if(!events.has(e)) events.set(e,{Evento:e, Colaborador:0,'Responsable compras':0,'Responsable donaciones':0,'Donante donaciones':0}); return events.get(e); }
+  ingresos.forEach(r=>touch(r.Evento).Colaborador += 1);
+  comprasResp.forEach(r=>touch(r.Evento)['Responsable compras'] += 1);
+  donResp.forEach(r=>touch(r.Evento)['Responsable donaciones'] += 1);
+  donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
+  const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
+  const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en todos los módulos disponibles: colaboradores/ingresos, responsables de compras y responsables de donaciones${/\bdonante|donantes\b/.test(p)?', y donantes de donaciones':''}. Aparece en ${rows.length} evento(s).`, warnings:[], charts:[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}], tables:[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Apariciones_${needle}_v11_3_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+}
+function directBoughtDonatedUsageIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(comprado\s*\/\s*donado|comprado\s+y\s+donado|compras?\s+y\s+donaciones?|donaciones?\s+y\s+compras?|separa\s+comprado|mas\s+utilizado|más\s+utilizado)\b/.test(p)) return null;
+  if (!/\b(producto|productos|articulo|articulos|utilizado|usado|consumido)\b/.test(p)) return null;
+  const compras = arr(context?.modulosExtraidos?.COMPRAS);
+  const donaciones = arr(context?.modulosExtraidos?.DONACIONES);
+  if (!compras.length && !donaciones.length) return null;
+  const map = new Map();
+  function rec(prod){ const k=trim(prod)||'Sin producto'; if(!map.has(k)) map.set(k,{Producto:k,'Unidades compradas':0,'Unidades donadas':0,'Total unidades':0,'Importe comprado (€)':0,'Valor donado (€)':0}); return map.get(k); }
+  compras.forEach(r=>{ const o=rec(r.Producto); o['Unidades compradas']+=num(r.Unidades); o['Total unidades']+=num(r.Unidades); o['Importe comprado (€)']+=num(r.Importe); });
+  donaciones.forEach(r=>{ const o=rec(r.Producto); o['Unidades donadas']+=num(r.Unidades); o['Total unidades']+=num(r.Unidades); o['Valor donado (€)']+=num(r.Valor); });
+  const limit = firstIntInPrompt(prompt, 25);
+  const rows = [...map.values()].map(r=>({ ...r, 'Unidades compradas':round(r['Unidades compradas'],3), 'Unidades donadas':round(r['Unidades donadas'],3), 'Total unidades':round(r['Total unidades'],3), 'Importe comprado (€)':round(r['Importe comprado (€)'],2), 'Valor donado (€)':round(r['Valor donado (€)'],2)})).sort((a,b)=>num(b['Total unidades'])-num(a['Total unidades']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const eventos = eventNamesFromContext(context).join(', ');
+  const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
+  const shown = rows.slice(0, limit);
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v11_3_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+}
+function directProductCatalogIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  const rows0 = arr(context?.modulosExtraidos?.PRODUCTOS);
+  if (!rows0.length || !/\b(producto|productos|ce_productos|catalogo|catálogo|segmento|destino|precio\s+rfa|precio\s+referencia)\b/.test(p)) return null;
+  let rows = rows0.slice();
+  const top = /\b(mas\s+caros|más\s+caros|mayor\s+precio|top)\b/.test(p);
+  if (top) rows.sort((a,b)=>num(b['Precio rfa.'])-num(a['Precio rfa.']) || String(a['Nombre producto']).localeCompare(String(b['Nombre producto']),'es'));
+  else rows.sort((a,b)=>String(a.Segmento).localeCompare(String(b.Segmento),'es') || String(a.Destino).localeCompare(String(b.Destino),'es') || String(a['Nombre producto']).localeCompare(String(b['Nombre producto']),'es'));
+  const limit = top ? firstIntInPrompt(prompt,25) : rows.length;
+  const shown = rows.slice(0, limit);
+  const columns = ['Nombre producto','Segmento','Destino','Precio rfa.'];
+  const tables = [];
+  if (/\b(agrupa|agrupad|agrupados|agrupadas|por\s+segmento|por\s+destino)\b/.test(p)) {
+    const groups = new Map();
+    rows.forEach(r=>{ const key=`${trim(r.Segmento)||'Sin segmento'} / ${trim(r.Destino)||'Sin destino'}`; const g=groups.get(key)||{Grupo:key, Productos:0,'Precio mínimo':Infinity,'Precio máximo':0,'Precio medio':0, _sum:0}; g.Productos++; const price=num(r['Precio rfa.']); g['Precio mínimo']=Math.min(g['Precio mínimo'],price); g['Precio máximo']=Math.max(g['Precio máximo'],price); g._sum+=price; groups.set(key,g); });
+    const groupRows=[...groups.values()].map(g=>({Grupo:g.Grupo, Productos:g.Productos, 'Precio mínimo':g['Precio mínimo']===Infinity?0:round(g['Precio mínimo'],2), 'Precio máximo':round(g['Precio máximo'],2), 'Precio medio':round(g._sum/g.Productos,2)})).sort((a,b)=>String(a.Grupo).localeCompare(String(b.Grupo),'es'));
+    const gcols=['Grupo','Productos','Precio mínimo','Precio máximo','Precio medio'];
+    tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
+  }
+  tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v11_3_2_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+}
+function directPersonsCatalogIfApplicable(prompt, context) {
+  const p = norm(prompt); const rows=arr(context?.modulosExtraidos?.PERSONAS);
+  if (!rows.length || !/\b(persona|personas)\b/.test(p)) return null;
+  if (!/\b(agrupa|agrupad|rango|lista|completa|tabla)\b/.test(p)) return null;
+  const groups = new Map(); rows.forEach(r=>{ const k=trim(r.Rango)||'Sin rango'; groups.set(k,(groups.get(k)||0)+1); });
+  const gcols=['Rango','Personas']; const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>[k,String(v)]);
+  const cols=['Nombre persona','Rango'];
+  return {ok:true,rejected:false,title:'PERSONAS por rango',answer:`ControlEvent ha consultado la tabla PERSONAS completa y ha agrupado localmente por Rango. Registros: ${rows.length}.`,warnings:[],charts:[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}],tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe('PERSONAS_por_rango_v11_3_2_prod.csv'),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],provider:'control-event-local-personas',model:'sin-gemini-para-catalogos'};
+}
+function directComparativeModuleTotalsIfApplicable(prompt, context) {
+  const p = norm(prompt); const events=eventNamesFromContext(context); if (events.length < 2 || !/\b(compara|comparar|comparativa)\b/.test(p)) return null;
+  const mods=context?.modulosExtraidos||{}; let moduleName='', valueField='', title='';
+  if (/\bcompra|compras\b/.test(p) && Array.isArray(mods.COMPRAS)) { moduleName='COMPRAS'; valueField='Importe'; title='Compras total por evento'; }
+  else if (/\bdonacion|donaciones\b/.test(p) && Array.isArray(mods.DONACIONES)) { moduleName='DONACIONES'; valueField='Valor'; title='Donaciones total por evento'; }
+  else if (/\bingreso|ingresos|recaudacion\b/.test(p) && Array.isArray(mods.INGRESOS)) { moduleName='INGRESOS'; valueField='Total ingreso'; title='Ingresos total por evento'; }
+  if (!moduleName) return null;
+  const rows=arr(mods[moduleName]);
+  const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const total=moduleName==='INGRESOS'?round(rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2):sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
+  const cols=['Evento','Registros','Total'];
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v11_3_2_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+}
 function directDeterministicResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
   // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
+  const personSearch = directPersonAppearanceIfApplicable(prompt, context);
+  if (personSearch) return personSearch;
+  const productCatalog = directProductCatalogIfApplicable(prompt, context);
+  if (productCatalog) return productCatalog;
+  const personsCatalog = directPersonsCatalogIfApplicable(prompt, context);
+  if (personsCatalog) return personsCatalog;
+  const eventPrices = directEventPriceExtremesIfApplicable(prompt, context);
+  if (eventPrices) return eventPrices;
+  const boughtDonated = directBoughtDonatedUsageIfApplicable(prompt, context);
+  if (boughtDonated) return boughtDonated;
+  const cmpMod = directComparativeModuleTotalsIfApplicable(prompt, context);
+  if (cmpMod) return cmpMod;
   const cmp = directComparativeAllDataResultIfApplicable(prompt, context);
   if (cmp) return cmp;
   const ag = directAggregateResultIfApplicable(prompt, context);

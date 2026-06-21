@@ -801,7 +801,9 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
     tiendas: zuzuUnique(arr(filters?.tiendas)),
     responsables: zuzuUnique(arr(filters?.responsables)),
     donantes: zuzuUnique(arr(filters?.donantes)),
-    tickets: zuzuUnique(arr(filters?.tickets))
+    tickets: zuzuUnique(arr(filters?.tickets)),
+    segmentos: zuzuUnique(arr(filters?.segmentos)),
+    destinos: zuzuUnique(arr(filters?.destinos))
   };
   // Si el usuario pide todas las filas/datos de un evento, los filtros de personas/productos que se hayan inferido
   // por coincidencias de texto son peligrosos: pueden dejar el módulo a cero. Solo se conservan filtros muy explícitos.
@@ -820,6 +822,8 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
   const filterProducts = zuzuUnique([].concat(filters.productos || []));
   const filterStores = zuzuUnique([].concat(filters.tiendas || []));
   const filterTickets = zuzuUnique([].concat(filters.tickets || []));
+  const filterSegments = zuzuUnique([].concat(filters.segmentos || []));
+  const filterDestinos = zuzuUnique([].concat(filters.destinos || []));
   const promptProductHints = words(prompt).filter(w => !COMMON_STOP.has(w)).slice(0, 12);
   function anyMatch(value, list) { return !list.length || list.some(x => zuzuWordMatch(value, x) || zuzuNormIncludes(value, x)); }
   function productMatches(name) {
@@ -833,13 +837,21 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
     const tk = ticketToken(value) || trim(value);
     return filterTickets.some(x => norm(tk) === norm(x) || zuzuNormIncludes(tk, x));
   }
+  function segmentMatches(value) {
+    if (!filterSegments.length) return true;
+    return filterSegments.some(x => norm(value) === norm(x));
+  }
+  function destinoMatches(value) {
+    if (!filterDestinos.length) return true;
+    return filterDestinos.some(x => norm(value) === norm(x));
+  }
   function lineMatchesCommon(line) {
     return productMatches(line.producto)
       && peopleMatches([line.responsable, line.donante, line.colaborador].join(' '))
       && storeMatches(line.tienda)
       && ticketMatches(line.tk || line.ticket || line.ticketTipo || '');
   }
-  return { filterPeople, filterProducts, filterStores, filterTickets, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, lineMatchesCommon };
+  return { filterPeople, filterProducts, filterStores, filterTickets, filterSegments, filterDestinos, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, segmentMatches, destinoMatches, lineMatchesCommon };
 }
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
@@ -870,24 +882,46 @@ function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   });
   return out;
 }
-function zuzuFindEventIds(events, selectedId, prompt, plan) {
+function zuzuFindEventIds(events, selectedId, prompt, plan, options = {}) {
   const explicit = zuzuFindExplicitEventIds(events, selectedId, prompt, plan);
   if (explicit.length) return explicit;
+  if (options.noSelectedFallback) return [];
   return selectedId ? [selectedId] : [];
+}
+function zuzuAllEventsRequested(prompt, plan = {}) {
+  const p = norm(prompt);
+  const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim);
+  return plan?.todosLosEventos === true
+    || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))
+    || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos)\b/i.test(prompt);
+}
+function zuzuOnlyGlobalMasterModules(modules) {
+  const masters = new Set(['EVENTOS','PRODUCTOS','TIENDAS','PERSONAS']);
+  return arr(modules).length > 0 && arr(modules).every(m => masters.has(m));
 }
 function zuzuInferModulesLocal(prompt) {
   const p = norm(prompt);
   const mods = new Set();
-  if (/\b(ingreso|ingresos|recaudacion|recaudado|asistente|asistentes|entrada|entradas|socio|socios|banco|bizum|efectivo)\b/.test(p)) mods.add('INGRESOS');
+  const asksBoughtDonated = /\b(comprado\s*\/\s*donado|comprado\s+y\s+donado|compras?\s+y\s+donaciones?|donaciones?\s+y\s+compras?|separa\s+comprado\s*\/\s*donado)\b/.test(p);
+  const asksCatalogProduct = /\b(ce_productos|tabla\s+de\s+productos|tabla\s+ce\s*productos|catalogo|catálogo|precio\s+rfa|precio\s+referencia|productos?\s+mas\s+caros|productos?\s+m[aá]s\s+caros|segmento\s*[=:]|destino\s*[=:])\b/.test(p);
+
+  if (/\b(ingreso|ingresos|recaudacion|recaudado|asistente|asistentes|entrada|entradas|banco|bizum|efectivo)\b/.test(p)) mods.add('INGRESOS');
+  if (/\b(colaborador|colaboradores)\b/.test(p)) mods.add('INGRESOS');
   if (/\b(donacion|donaciones|donado|donados|donante|donantes)\b/.test(p)) mods.add('DONACIONES');
-  if (/\b(compra|compras|gasto|gastos|comprado|coste|costes|precio|precios|tienda|tiendas|producto|productos|articulo|articulos|pte|pendiente)\b/.test(p)) mods.add('COMPRAS');
+  if (/\b(compra|compras|gasto|gastos|comprado|coste|costes|pte|pendiente)\b/.test(p)) mods.add('COMPRAS');
+  if (asksBoughtDonated) { mods.add('COMPRAS'); mods.add('DONACIONES'); }
   if (/\b(ticket|tickets|tk\s*\d+|factura|facturas)\b/.test(p)) { mods.add('TICKETS'); mods.add('COMPRAS'); }
-  if (/\b(evento|eventos|fecha|fechas|situacion|finalizado|curso|precio\s+entrada|doc\s*\d+)\b/.test(p)) mods.add('EVENTOS');
-  if (/\b(documento|documentos|doc\s*\d+|descripcion|archivo)\b/.test(p)) { mods.add('DOCUMENTOS'); mods.add('EVENTOS'); }
-  if (/\b(catalogo|catálogo|productos|producto|segmento|destino|precio\s+referencia|precio\s+habitual)\b/.test(p)) mods.add('PRODUCTOS');
-  if (/\b(tienda|tiendas)\b/.test(p)) mods.add('TIENDAS');
-  if (/\b(persona|personas|responsable|responsables|donante|donantes|colaborador|colaboradores|socio|socios)\b/.test(p)) mods.add('PERSONAS');
-  if (/\b(valoracion|valoración|dashboard|grafica|gráfica|estadistica|estadística|comparativa|compara|comparar)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES'].forEach(m=>mods.add(m));
+  if (/\b(documento|documentos|doc\s*\d+|descripcion|archivo|adjunto|adjuntos)\b/.test(p)) { mods.add('DOCUMENTOS'); mods.add('EVENTOS'); }
+  if (/\b(evento|eventos|fecha|fechas|situacion|finalizado|curso|precio\s+entrada|precio\s+del\s+evento|evento\s+mas\s+barato|evento\s+mas\s+costoso|evento\s+m[aá]s\s+barato|evento\s+m[aá]s\s+costoso)\b/.test(p)) mods.add('EVENTOS');
+  if (asksCatalogProduct || (/\b(producto|productos|articulo|articulos)\b/.test(p) && !/\b(en\s+el\s+evento|del\s+evento|comprado|comprados|donado|donados|compras?|donaciones?)\b/.test(p))) mods.add('PRODUCTOS');
+  if (/\b(tienda|tiendas)\b/.test(p) && !/\b(compra|compras|en\s+la\s+tienda)\b/.test(p)) mods.add('TIENDAS');
+  if (/\b(persona|personas|socio|socios)\b/.test(p) && !/\b(asistente|asistentes|ingreso|ingresos)\b/.test(p)) mods.add('PERSONAS');
+  if (/\b(responsable|responsables)\b/.test(p)) { mods.add('COMPRAS'); mods.add('DONACIONES'); }
+  if (/\b(busca|buscar|aparecen|aparece)\b/.test(p) && /\b(colaborador|colaboradores|responsable|responsables|donante|donantes)\b/.test(p)) { mods.add('INGRESOS'); mods.add('COMPRAS'); mods.add('DONACIONES'); mods.add('PERSONAS'); }
+  if (/\b(valoracion|valoración|dashboard|grafica|gráfica|estadistica|estadística|comparativa|compara|comparar)\b/.test(p)) {
+    if (/\b(todo|todos|todas|global|general|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|tk|ticket|tickets|documento|documentos|donacion|donaciones)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
+    else if (!mods.size) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES'].forEach(m=>mods.add(m));
+  }
   if (!mods.size) ['EVENTOS'].forEach(m=>mods.add(m));
   return [...mods].filter(m => ZUZU_ALLOWED_MODULES.includes(m));
 }
@@ -897,22 +931,36 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
   const hasPersonCue = zuzuHasCue(prompt, ['persona','personas','colaborador','colaboradores','socio','socios','donante','donantes','responsable','responsables','ingreso','ingresos','recaudacion','recaudado']);
   const hasProductCue = zuzuHasCue(prompt, ['producto','productos','articulo','articulos','compra','compras','comprado','donacion','donaciones','donado','precio','coste','unidades']);
   const hasStoreCue = zuzuHasCue(prompt, ['tienda','tiendas','almacen','almacén','supermercado','bar','proveedor']);
+  function explicitValueAfter(label) {
+    const re = new RegExp('\\b' + label + '\\s*[=:]\\s*([^,;\\n]+?)(?=\\s+(?:y|e|,|;|segmento|destino|precio|evento|$)|$)', 'i');
+    const m = text(prompt).match(re);
+    return m ? trim(m[1]).replace(/^['\"]|['\"]$/g, '') : '';
+  }
+  const segmento = explicitValueAfter('segmento');
+  const destino = explicitValueAfter('destino');
   function namesFrom(rows, promptNorm, requireCue) {
     if (requireCue === true && !promptNorm) return [];
     return arr(rows).map(r => trim(r?.nombre)).filter(Boolean).filter(n => {
       const nn = norm(n);
       if (!nn || nn.length < 3) return false;
       if (promptNorm.includes(nn)) return true;
-      return words(n, { min: 4, keepStop: true }).some(w => new RegExp('\\b' + zuzuEscapeRegExp(w) + '\\b').test(promptNorm));
+      // Evita que palabras genéricas del prompt disparen filtros por coincidencias parciales con maestros.
+      const strongWords = words(n, { min: 5, keepStop: true }).filter(w => !COMMON_STOP.has(w));
+      if (!strongWords.length) return false;
+      return strongWords.length >= 2 && strongWords.some(w => new RegExp('\\b' + zuzuEscapeRegExp(w) + '\\b').test(promptNorm));
     });
   }
   const tickets = [];
   const tkRe = /\bTK\s*\d+[A-Z0-9_-]*\b/gi; let m; while ((m = tkRe.exec(prompt))) tickets.push(m[0].replace(/\s+/g,'').toUpperCase());
   return {
     personas: hasPersonCue ? namesFrom(state?.personas, pf, true) : [],
-    productos: hasProductCue ? namesFrom(state?.productos, pf, true) : [],
+    productos: hasProductCue && !/\b(lista|listado|tabla|catalogo|catálogo)\b.*\b(producto|productos)\b/.test(p) ? namesFrom(state?.productos, pf, true) : [],
     tiendas: hasStoreCue ? namesFrom(state?.tiendas, pf, true) : [],
-    tickets
+    responsables: [],
+    donantes: [],
+    tickets,
+    segmentos: segmento ? [segmento] : [],
+    destinos: destino ? [destino] : []
   };
 }
 export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
@@ -942,14 +990,21 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
   };
 }
 export function buildZuzuLocalPlan(state, selectedEventId = '', userPrompt = '') {
-  const eventos = zuzuFindEventIds(arr(state?.eventos), selectedEventId, userPrompt, {});
+  const modules = zuzuInferModulesLocal(userPrompt);
+  const allEvents = zuzuAllEventsRequested(userPrompt, {});
+  const explicitOnly = zuzuFindExplicitEventIds(arr(state?.eventos), selectedEventId, userPrompt, {});
+  const masterOnly = zuzuOnlyGlobalMasterModules(modules);
+  let eventos = explicitOnly;
+  if (!eventos.length && allEvents) eventos = arr(state?.eventos).map(e => trim(e?.id)).filter(Boolean);
+  if (!eventos.length && !masterOnly) eventos = zuzuFindEventIds(arr(state?.eventos), selectedEventId, userPrompt, {}, { noSelectedFallback: false });
+  if (!eventos.length && masterOnly && modules.includes('EVENTOS')) eventos = arr(state?.eventos).map(e => trim(e?.id)).filter(Boolean);
   const filters = zuzuDetectNamedFilters(userPrompt, state, eventos);
   return {
     ok: true,
     needsClarification: false,
-    modules: zuzuInferModulesLocal(userPrompt),
+    modules,
     eventos,
-    todosLosEventos: /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados)\b/i.test(userPrompt),
+    todosLosEventos: allEvents,
     filters,
     reasoning: 'Plan local de respaldo generado por ControlEvent. Prioriza evento y filtros detectados localmente para no recortar registros reales por una deducción incorrecta de Gemini.'
   };
@@ -1005,6 +1060,14 @@ function zuzuQueryFilterRows(rows, filters, matcher, moduleName) {
     if (filters.productos?.length) {
       const prod = row.Producto || row['Nombre producto'] || '';
       if (!matcher.productMatches(prod)) return false;
+    }
+    if (filters.segmentos?.length) {
+      const seg = row.Segmento || '';
+      if (!matcher.segmentMatches(seg)) return false;
+    }
+    if (filters.destinos?.length) {
+      const des = row.Destino || '';
+      if (!matcher.destinoMatches(des)) return false;
     }
     if (filters.tiendas?.length) {
       const tienda = row.Tienda || row['Nombre tienda'] || (moduleName === 'DONACIONES' ? row.Donante : '');
@@ -1181,7 +1244,7 @@ function zuzuModuleRawExpected(state, moduleName, eventIds) {
 }
 function zuzuFilterSummary(filters) {
   const out = {};
-  ['personas','productos','tiendas','responsables','donantes','tickets'].forEach(k => {
+  ['personas','productos','tiendas','responsables','donantes','tickets','segmentos','destinos'].forEach(k => {
     const v = zuzuUnique(arr(filters?.[k]).map(trim).filter(Boolean));
     if (v.length) out[k] = v;
   });
@@ -1217,8 +1280,10 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
   const localEventIds = arr(localPlan.eventos).map(trim).filter(Boolean);
   const planEventIds = zuzuFindEventIds(events, selectedId, userPrompt, p);
-  const eventIds = localEventIds.length ? localEventIds : planEventIds;
-  if (!eventIds.length && modules.some(m => ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'].includes(m))) {
+  let eventIds = localEventIds.length ? localEventIds : planEventIds;
+  const eventScopedModules = ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'];
+  if (!eventIds.length && modules.includes('EVENTOS')) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
+  if (!eventIds.length && modules.some(m => eventScopedModules.includes(m))) {
     return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: no he podido identificar el evento o eventos objetivo.' };
   }
   // v11_3_2: los filtros que reducen líneas deben salir de detección local verificable en catálogos reales.
