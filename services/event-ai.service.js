@@ -341,6 +341,10 @@ Reglas obligatorias:
 - Usa exclusivamente modulosExtraidos y eventosObjetivo. No inventes datos ni completes huecos por intuición.
 - Si el dato no está en el módulo recibido, dilo claramente y no lo calcules con información ausente.
 - Si se pide una lista, tabla o CSV, usa todos los registros del módulo correspondiente que se te han entregado.
+- Si el usuario pide agrupar, totalizar, calcular, comparar, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo, no sobre una muestra.
+- Si pide "agrupa y totaliza por X", devuelve una tabla agrupada por X con conteo de registros y suma del campo económico correcto.
+- Para DONACIONES, el campo económico a sumar es Valor. Para COMPRAS, el campo económico a sumar es Importe. Para INGRESOS, el importe por línea es Importe obligatorio + Importe voluntario.
+- Puedes devolver también una tabla de detalle si ayuda, pero la respuesta principal debe obedecer el cálculo/formato pedido por el usuario, no limitarse a repetir el listado bruto.
 - INGRESOS: usa los campos de la query probada: Evento, Nombre, Numero, Importe obligatorio, Importe voluntario e Ingreso. Si necesitas total por línea, suma Importe obligatorio + Importe voluntario.
 - DONACIONES: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Valor, Tipo de donación, Donante y Responsable. Donante y Responsable ya deben venir legibles.
 - COMPRAS: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Importe, Ticket u otros gastos, Tienda y Responsable. No mezcles donaciones con compras salvo que el usuario lo pida.
@@ -397,9 +401,17 @@ function orderedColumnsForModule(moduleName, rows) {
   return cols.filter(c => arr(rows).some(r => r && Object.prototype.hasOwnProperty.call(r, c)) || (preferred[moduleName]||[]).includes(c));
 }
 
+function isTransformAnalysisPrompt(prompt) {
+  const p = norm(prompt);
+  // Cuando el usuario pide operar sobre los datos, ControlEvent debe extraer los módulos
+  // y pasar esos datos ya fiables a Gemini junto con el prompt original.
+  // No se debe cortar con el listado directo, porque perdería agrupaciones, totalizaciones,
+  // cálculos, comparativas, gráficos o formatos pedidos por el usuario.
+  return /\b(agrupa|agrupar|agrupado|agrupados|agrupacion|agrupación|totaliza|totalizar|totalizado|subtotal|subtotales|suma|sumar|sumatorio|calcula|calcular|calculo|cálculo|media|promedio|porcentaje|porcentajes|ratio|ranking|ordena|ordenar|filtra|filtrar|resume|resumen|resumir|analiza|analisis|análisis|compara|comparar|comparativa|evolucion|evolución|tendencia|grafica|gráfica|grafico|gráfico|diagrama|tabla dinamica|tabla dinámica|desglose|desglosa|desglosar)\b/.test(p);
+}
 function isListExtractionPrompt(prompt) {
   const p = norm(prompt);
-  if (/\b(compara|comparar|comparativa|analiza|analisis|dashboard|grafica|gráfica|estadistica|estadística|resume|resumen|porcentaje|evolucion|evolución)\b/.test(p)) return false;
+  if (isTransformAnalysisPrompt(prompt)) return false;
   return /\b(lista|listado|relacion|relación|detalle|detallame|detalla|dame|muestra|muéstrame|ensena|enseña|ver|cuales|cuáles|todos|todas)\b/.test(p);
 }
 function directModuleResultIfApplicable(prompt, context) {
@@ -686,10 +698,14 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
+
+  // Solo los listados puros salen directos desde ControlEvent.
+  // En cuanto el prompt pide agrupar, totalizar, calcular, graficar, comparar, ordenar,
+  // resumir o cualquier transformación, se extraen primero los módulos fiables y después
+  // se pasan a Gemini junto con el prompt original para que haga exactamente esa operación.
   const directResult = directModuleResultIfApplicable(userPrompt, context);
   if (directResult) return directResult;
-  const directGraph = directGraphResultIfApplicable(userPrompt, context);
-  if (directGraph) return directGraph;
+
   if (context?.needsClarification) {
     return {
       ok: true,
@@ -704,5 +720,19 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       model: ''
     };
   }
-  return callGeminiEvent(userPrompt, context);
+
+  try {
+    return await callGeminiEvent(userPrompt, context);
+  } catch (error) {
+    // Si Gemini falla por cuota/modelo/red y el usuario pedía una gráfica básica, al menos
+    // ControlEvent devuelve una gráfica directa con los datos oficiales ya extraídos.
+    const fallbackGraph = directGraphResultIfApplicable(userPrompt, context);
+    if (fallbackGraph) {
+      fallbackGraph.warnings = arr(fallbackGraph.warnings).concat(`Gemini no pudo completar el análisis: ${trim(error?.message || error)}`);
+      fallbackGraph.provider = 'control-event-modules-direct-fallback';
+      fallbackGraph.model = 'sin-gemini-por-error';
+      return fallbackGraph;
+    }
+    throw error;
+  }
 }
