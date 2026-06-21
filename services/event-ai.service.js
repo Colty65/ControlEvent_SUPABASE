@@ -628,10 +628,105 @@ function isModuleDataPrompt(prompt) {
   const p = norm(prompt);
   return /(donacion|donaciones|donado|donante|compra|compras|gasto|gastos|ingreso|ingresos|recaudacion|recaudación|asistente|asistentes|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|evento|eventos|producto|productos|tienda|tiendas|persona|personas|responsable|responsables)/.test(p);
 }
+
+function isComparativeAllDataPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(compara|comparar|comparativa|comparativo|entre\s+los\s+eventos|entre\s+eventos)\b/.test(p)
+    && /\b(todo|todos|todas|global|general|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|tk|ticket|tickets|documento|documentos|donacion|donaciones)\b/.test(p);
+}
+function uniqueEventNamesFromContext(context) {
+  return arr(context?.eventosObjetivo)
+    .map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento))
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i);
+}
+function rowsForEvent(rows, eventName) {
+  return arr(rows).filter(row => trim(row?.Evento || row?.['Titulo del evento']) === trim(eventName));
+}
+function countYes(rows, field) {
+  return arr(rows).filter(r => /^(si|sí|s)$/i.test(trim(r?.[field]))).length;
+}
+function sumField(rows, field) {
+  return round(arr(rows).reduce((acc, r) => acc + num(r?.[field]), 0), 2);
+}
+function directComparativeAllDataResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isComparativeAllDataPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const events = uniqueEventNamesFromContext(context);
+  if (events.length < 2) return null;
+
+  const ingresos = arr(mods.INGRESOS);
+  const compras = arr(mods.COMPRAS);
+  const donaciones = arr(mods.DONACIONES);
+  const tickets = arr(mods.TICKETS);
+  const documentos = arr(mods.DOCUMENTOS);
+
+  const rows = events.map(eventName => {
+    const ing = rowsForEvent(ingresos, eventName);
+    const com = rowsForEvent(compras, eventName);
+    const don = rowsForEvent(donaciones, eventName);
+    const tk = rowsForEvent(tickets, eventName);
+    const doc = rowsForEvent(documentos, eventName);
+    const importeIngresos = round(ing.reduce((acc, r) => acc + num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario']), 0), 2);
+    const importeCompras = sumField(com, 'Importe');
+    const valorDonaciones = sumField(don, 'Valor');
+    const totalTk = round(tk.reduce((acc, r) => acc + num(r?.['Total ticket']), 0), 2);
+    return {
+      Evento: eventName,
+      Colaboradores: ing.length,
+      'Asistentes / Numero': round(ing.reduce((acc, r) => acc + num(r?.Numero), 0), 3),
+      'Just.ing SI': countYes(ing, 'Just.ing'),
+      'Ingresos total (€)': importeIngresos,
+      'Compras líneas': com.length,
+      'Compras total (€)': importeCompras,
+      'Donaciones líneas': don.length,
+      'Donaciones valor (€)': valorDonaciones,
+      TKxx: tk.length,
+      'TKxx total (€)': totalTk,
+      Documentos: doc.length,
+      'Resultado ingresos + donaciones - compras (€)': round(importeIngresos + valorDonaciones - importeCompras, 2)
+    };
+  });
+
+  const columns = ['Evento','Colaboradores','Asistentes / Numero','Just.ing SI','Ingresos total (€)','Compras líneas','Compras total (€)','Donaciones líneas','Donaciones valor (€)','TKxx','TKxx total (€)','Documentos','Resultado ingresos + donaciones - compras (€)'];
+  const tableRows = rows.map(r => columns.map(c => text(r[c])));
+  const auditRows = [
+    ['Modo', 'Comparativa estricta entre eventos citados'],
+    ['Eventos usados', events.join(' | ')],
+    ['Eventos no citados', 'Excluidos'],
+    ['Módulos usados', ['INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].filter(m => Array.isArray(mods[m])).join(', ')],
+    ['Motor de cálculo', 'ControlEvent local, sin Gemini para selección de eventos ni sumas']
+  ];
+  const charts = [
+    { title: 'Ingresos total por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Ingresos total (€)'], 2)), unit: '€' },
+    { title: 'Compras total por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Compras total (€)'], 2)), unit: '€' },
+    { title: 'Donaciones valor por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Donaciones valor (€)'], 2)), unit: '€' },
+    { title: 'Colaboradores por evento', type: 'bar', labels: events, values: rows.map(r => round(r.Colaboradores, 2)), unit: '' }
+  ];
+  return {
+    ok: true,
+    rejected: false,
+    title: `Comparativa estricta entre ${events.length} eventos`,
+    answer: `ControlEvent ha comparado únicamente los eventos citados: ${events.join(' y ')}. No se han mezclado datos de otros eventos. Las sumas y conteos salen del motor local sobre los módulos extraídos, no de Gemini.`,
+    warnings: arr(context.advertencias),
+    charts,
+    tables: [
+      { title: 'Auditoría de alcance', columns: ['Dato','Valor'], rows: auditRows },
+      { title: 'Comparativa general por evento', columns, rows: tableRows }
+    ],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    provider: 'control-event-local-comparativa-estricta',
+    model: 'sin-gemini-para-alcance-ni-calculos'
+  };
+}
+
 function directDeterministicResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
   // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
+  const cmp = directComparativeAllDataResultIfApplicable(prompt, context);
+  if (cmp) return cmp;
   const ag = directAggregateResultIfApplicable(prompt, context);
   if (ag) return ag;
   const gr = directGraphResultIfApplicable(prompt, context);

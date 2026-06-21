@@ -336,18 +336,48 @@ function buildEventDetail(ev, state, helpers, ticketImages) {
   };
 }
 
+function eventTitleWithoutDateSuffix(value) {
+  return norm(value).replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
+}
+function quotedFragments(value) {
+  const out = [];
+  const re = /["“”'‘’]([^"“”'‘’]{4,160})["“”'‘’]/g;
+  let m;
+  while ((m = re.exec(text(value)))) {
+    const q = trim(m[1]);
+    if (q && !out.includes(q)) out.push(q);
+  }
+  return out;
+}
+function eventPhraseScore(ev, phrase) {
+  const q = eventTitleWithoutDateSuffix(phrase);
+  const title = norm(ev?.titulo);
+  const titleNoSuffix = eventTitleWithoutDateSuffix(ev?.titulo);
+  if (!q || !titleNoSuffix) return 0;
+  if (q === title || q === titleNoSuffix) return 220;
+  if (q.includes(titleNoSuffix) || titleNoSuffix.includes(q)) return 190;
+  const qWords = q.split(' ').filter(w => w.length >= 2);
+  const tWords = new Set(titleNoSuffix.split(' ').filter(w => w.length >= 2));
+  const meaningful = qWords.filter(w => !COMMON_STOP.has(w));
+  const hits = meaningful.filter(w => tWords.has(w));
+  const romanHits = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'].filter(r => qWords.includes(r) && tWords.has(r)).length;
+  const score = hits.length * 35 + romanHits * 25;
+  return hits.length >= 2 || (hits.length >= 1 && romanHits) ? score : 0;
+}
 function eventScore(ev, prompt) {
   const p = norm(prompt);
   const title = norm(ev?.titulo);
   if (!p || !title) return 0;
   let score = 0;
   if (p.includes(title)) score += 160;
-  const titleNoSuffix = title.replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
+  const titleNoSuffix = eventTitleWithoutDateSuffix(ev?.titulo);
   if (titleNoSuffix && p.includes(titleNoSuffix)) score += 120;
   const pWords = p.split(' ');
   const tWords = title.split(' ');
   const romans = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
-  romans.forEach(r => { if (tWords.includes(r) && pWords.includes(r)) score += 55; });
+  // Un ordinal romano por sí solo NO identifica un evento. Antes esto metía eventos ajenos
+  // como "III Visita a Madrid" al pedir "III Jornada Solidaria VS ELA".
+  romans.forEach(r => { if (tWords.includes(r) && pWords.includes(r)) score += 8; });
   for (const w of words(ev?.titulo)) if (pWords.includes(w)) score += w.length >= 5 ? 16 : 7;
   const code = norm(ev?.eventoCodigo || ev?.codigoEvento || ev?.codigo || '');
   if (code && p.includes(code)) score += 60;
@@ -404,12 +434,25 @@ function findReferencedEventIds(events, prompt, selectedId) {
   return selectedId ? [selectedId] : [];
 }
 function findExplicitReferencedEventIds(events, prompt) {
-  const scored = arr(events)
-    .map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), score: eventScore(ev, prompt), date: parseEventDate(ev) }))
-    .filter(x => x.id && x.score >= 35)
-    .sort((a, b) => b.score - a.score || b.date - a.date);
   const out = [];
   function push(id) { if (id && !out.includes(id)) out.push(id); }
+  const quoted = quotedFragments(prompt);
+  if (quoted.length) {
+    // Si el usuario ha entrecomillado eventos, el alcance queda cerrado a esos textos.
+    // No añadimos eventos solo por parecido/ordinal para evitar mezclar datos de otros eventos.
+    quoted.forEach(q => {
+      const matches = arr(events)
+        .map(ev => ({ id: trim(ev?.id), score: eventPhraseScore(ev, q), date: parseEventDate(ev) }))
+        .filter(x => x.id && x.score >= 60)
+        .sort((a, b) => b.score - a.score || b.date - a.date);
+      if (matches[0]) push(matches[0].id);
+    });
+    return out;
+  }
+  const scored = arr(events)
+    .map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), score: eventScore(ev, prompt), date: parseEventDate(ev) }))
+    .filter(x => x.id && x.score >= 55)
+    .sort((a, b) => b.score - a.score || b.date - a.date);
   scored.forEach(x => push(x.id));
   return out;
 }
@@ -1206,6 +1249,12 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     modulosExtraidos: modulos,
     totalesRegistrosPorModulo: totals,
     auditoriaModulos,
+    instruccionesFuncionalesZuzu: [
+      { id: 'EXP-1-ALCANCE-EVENTOS', regla: 'Si el usuario cita eventos entre comillas, solo se usan esos eventos. No se añaden eventos parecidos por ordinal, fecha o palabras comunes.' },
+      { id: 'EXP-2-COMPARATIVA-EVENTOS', regla: 'Una comparativa entre eventos debe calcular una fila por evento y por módulo solicitado. Está prohibido mezclar datos de eventos no citados.' },
+      { id: 'EXP-3-CALCULO-DETERMINISTICO', regla: 'Sumas, conteos, agrupaciones, porcentajes y gráficas básicas se calculan en ControlEvent sobre los registros extraídos. Gemini solo puede redactar o interpretar, nunca sustituir la aritmética oficial.' },
+      { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' }
+    ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',
       ingresos: 'INGRESOS usa la salida probada: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Just.ing. En socios, Importe obligatorio = Numero * Precio del evento.',
