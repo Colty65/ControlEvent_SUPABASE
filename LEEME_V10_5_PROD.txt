@@ -1,10 +1,10 @@
-ControlEvent v11_3_1_prod
+ControlEvent v11_3_3_prod
 
 Cambios:
 - Resumen presupuestario / Cálculos por tienda y ticket: sin descarga de foto; Adjuntar pasa a 📎 y Eliminar foto a 🗑️.
 - INGRESOS: se restaura miniatura y descarga única del justificante cuando hay foto, en En curso y Finalizado.
 - DOCUMENTOS DEL EVENTO: se elimina la flecha pegada a la miniatura y queda una única descarga en la zona de acciones.
-- INFOEVENTO/BACKUP: versión normalizada a ControlEvent_v11_3_1_prod tanto en nombres como en metadatos internos.
+- INFOEVENTO/BACKUP: versión normalizada a ControlEvent_v11_3_3_prod tanto en nombres como en metadatos internos.
 - Ticket Auto: mantiene el literal leído del ticket y afina emparejamiento; evita colorear Fanta limón por un simple limón si ya no hay par real.
 
 Validación incluida: grep de versiones activas, node --check JS tocados, package JSON y zip -t.

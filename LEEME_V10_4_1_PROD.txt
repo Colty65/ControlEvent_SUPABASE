@@ -1,6 +1,6 @@
-ControlEvent v11_3_1_prod
+ControlEvent v11_3_3_prod
 
-Corrección sobre v11_3_1_prod:
+Corrección sobre v11_3_3_prod:
 - Ticket Auto: marca en rojo compras previstas candidatas aunque el texto no coincida literal, usando similitud de producto y coincidencia de precio/importe.
 - INGRESOS: elimina duplicados de botones de descarga y deja un único botón de descarga por justificante/foto.
 - Refresco/cambio de opción: caché por evento y recarga estabilizada para evitar pantallas sin datos por cargas transitorias.

@@ -1,4 +1,4 @@
-/* ControlEvent v11_3_2_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v11_3_3_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Gemini NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -56,7 +56,7 @@ function topQtyCost(map, sortBy = 'importe', n = 50) {
     .slice(0, n)
     .map(([nombre, v]) => ({ nombre, unidades: round(v.unidades, 3), importe: round(v.importe, 2) }));
 }
-function valueOfLine(row) { return round(num(row?.unidades) * num(row?.precio), 2); }
+function valueOfLine(row, productId = '', helpers = null) { return valueForPurchaseRow(row, productId, helpers); }
 function firstNonEmpty(...values) {
   for (const value of values) {
     const s = trim(value);
@@ -92,6 +92,22 @@ function hasImage(ticketImages, eventId, inner) {
 function firstNumber(row, keys, fallback = 0) {
   for (const key of keys) if (row && row[key] !== undefined && row[key] !== null && trim(row[key]) !== '') return num(row[key]);
   return fallback;
+}
+function rowHasNumber(row, keys) {
+  return keys.some(key => row && row[key] !== undefined && row[key] !== null && trim(row[key]) !== '');
+}
+function productPriceById(id, helpers) {
+  const p = helpers?.products?.get?.(trim(id)) || {};
+  return firstNumber(p, ['defaultPrecio','precio','precioRfa','precio_rfa','precioReferencia','precio_referencia'], 0);
+}
+function unitPriceForRow(row, productId, helpers) {
+  if (rowHasNumber(row, ['precio'])) return round(row?.precio, 4);
+  if (rowHasNumber(row, ['precioCalc','precio_calc'])) return round(row?.precioCalc ?? row?.precio_calc, 4);
+  return round(productPriceById(productId, helpers), 4);
+}
+function valueForPurchaseRow(row, productId, helpers) {
+  if (rowHasNumber(row, ['valor','importe','total'])) return round(firstNumber(row, ['valor','importe','total'], 0), 2);
+  return round(num(row?.unidades) * unitPriceForRow(row, productId, helpers), 2);
 }
 function parseEventDate(ev) {
   const candidates = [ev?.fechaFin, ev?.fecha_fin, ev?.fechaIni, ev?.fecha_ini, ev?.createdAt, ev?.created_at].map(trim).filter(Boolean);
@@ -201,8 +217,8 @@ function purchaseReadable(row, ev, helpers, ticketImages) {
     segmento: helpers.productSegment(productoId) || 'Sin segmento',
     destino: helpers.productDestino(productoId) || 'Sin destino',
     unidades: round(row?.unidades, 3),
-    precioUnitario: round(row?.precio, 4),
-    importe: valueOfLine(row),
+    precioUnitario: unitPriceForRow(row, productoId, helpers),
+    importe: valueOfLine(row, productoId, helpers),
     tienda,
     responsable,
     donante: donante || (tipo === 'DONACION_PRODUCTO' ? 'Sin donante informado' : ''),
@@ -663,7 +679,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v11_3_2_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v11_3_3_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -716,7 +732,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v11_3_2_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v11_3_3_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -770,7 +786,12 @@ function zuzuIncomeAmounts(row, ev, helpers) {
   const numero = num(row?.numero);
   const isSocio = rango === 'SOCIO';
   const obligatorio = isSocio ? round(numero * num(ev?.precio), 2) : 0;
-  const voluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
+  // Misma regla que RESUMEN PRESUPUESTARIO: si existe TOTAL calculado en la fila, es la fuente canónica.
+  // En socios, se descompone como obligatorio + voluntario. En no socios/donantes, todo va a voluntario/importe.
+  let total = 0;
+  if (rowHasNumber(row, ['total','importeTotal','importe_total'])) total = firstNumber(row, ['total','importeTotal','importe_total'], 0);
+  else total = obligatorio + firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
+  const voluntario = isSocio ? Math.max(0, round(total - obligatorio, 2)) : round(total, 2);
   return { rango, numero: round(numero, 3), obligatorio: round(obligatorio, 2), voluntario: round(voluntario, 2), total: round(obligatorio + voluntario, 2) };
 }
 
@@ -967,7 +988,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
   const events = arr(state?.eventos).map(e => ({ id: trim(e?.id), titulo: trim(e?.titulo), situacion: trim(e?.situacion), fechaInicio: trim(e?.fechaIni), fechaFin: trim(e?.fechaFin), precioEntrada: round(e?.precio, 2) }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
   return {
-    version: 'ControlEvent Zuzu Planner v11_3_2_prod',
+    version: 'ControlEvent Zuzu Planner v11_3_3_prod',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     camposPorModulo: {
       INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Just.ing'],
@@ -1123,8 +1144,8 @@ function zuzuModuleCompras(state, eventIds, filters, helpers, ticketImages, only
     const evento = trim(ev?.titulo) || 'Sin evento';
     const producto = zuzuHumanProduct(pId, helpers, 'Sin producto');
     const unidades = round(row?.unidades, 3);
-    const precio = round(row?.precio, 4);
-    const importe = valueOfLine(row);
+    const precio = unitPriceForRow(row, pId, helpers);
+    const importe = valueForPurchaseRow(row, pId, helpers);
     const responsable = zuzuHumanPerson(rId, helpers, 'Sin responsable');
     if (donation) {
       const tipo = trim(rawTicket).toUpperCase();
@@ -1139,9 +1160,10 @@ function zuzuModuleCompras(state, eventIds, filters, helpers, ticketImages, only
         Responsable: responsable
       });
     } else {
-      let etiqueta = 'GASTOS CORRIENTES';
-      if (isPendingTicket(rawTicket)) etiqueta = 'Pte. Compra';
-      else if (ticketToken(rawTicket)) etiqueta = ticketToken(rawTicket);
+      let etiqueta = 'Pte. Compra';
+      if (ticketToken(rawTicket)) etiqueta = ticketToken(rawTicket);
+      else if (isPendingTicket(rawTicket)) etiqueta = 'Pte. Compra';
+      else if (/GASTOS?\s+CORRIENTES?/i.test(trim(rawTicket))) etiqueta = 'GASTOS CORRIENTES';
       else if (trim(rawTicket)) etiqueta = trim(rawTicket);
       rows.push({
         Evento: evento,
@@ -1197,7 +1219,7 @@ function zuzuModuleTickets(state, eventIds, filters, helpers, ticketImages) {
     const key = `${evId}|${tk}`;
     if (!groups.has(key)) groups.set(key, { Evento: trim(evById.get(evId)?.titulo) || 'Sin evento', TKxx: tk, Tienda: zuzuHumanStore(tId, helpers, 'Sin tienda'), Responsable: zuzuHumanPerson(rId, helpers, 'Sin responsable'), 'Total ticket': 0, 'Nº líneas': 0, 'Ticket SI/NO': hasImage(ticketImages, evId, ticket) ? 'SI' : 'NO', 'Líneas contables': [] });
     const g = groups.get(key);
-    const line = { Producto: zuzuHumanProduct(pId, helpers, 'Sin producto'), Segmento: zuzuProductSegment(pId, helpers), Destino: zuzuProductDestino(pId, helpers), Unidades: round(row?.unidades,3), Precio: round(row?.precio,4), Importe: valueOfLine(row) };
+    const line = { Producto: zuzuHumanProduct(pId, helpers, 'Sin producto'), Segmento: zuzuProductSegment(pId, helpers), Destino: zuzuProductDestino(pId, helpers), Unidades: round(row?.unidades,3), Precio: unitPriceForRow(row, pId, helpers), Importe: valueForPurchaseRow(row, pId, helpers) };
     g['Total ticket'] = round(g['Total ticket'] + line.Importe, 2); g['Nº líneas'] += 1; g['Líneas contables'].push(line);
   });
   return zuzuQueryFilterRows([...groups.values()].filter(g => g['Nº líneas'] > 0), filters, matcher, 'TICKETS');
@@ -1250,6 +1272,55 @@ function zuzuFilterSummary(filters) {
   });
   return out;
 }
+function zuzuCanonicalMetricsFromModules(modulos) {
+  const mods = modulos || {};
+  const events = new Set();
+  ['INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m => arr(mods[m]).forEach(r => { const ev = trim(r.Evento); if (ev) events.add(ev); }));
+  function rows(moduleName, ev) { return arr(mods[moduleName]).filter(r => trim(r.Evento) === ev); }
+  function sum(rows, field) { return round(arr(rows).reduce((a,r)=>a+num(r?.[field]),0),2); }
+  const porEvento = [...events].map(ev => {
+    const ing = rows('INGRESOS', ev);
+    const com = rows('COMPRAS', ev);
+    const don = rows('DONACIONES', ev);
+    const tk = rows('TICKETS', ev);
+    const doc = rows('DOCUMENTOS', ev);
+    const comprasPendientes = com.filter(r => /pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])));
+    const comprasRealizadas = com.filter(r => !/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])));
+    const donPorTipo = {};
+    don.forEach(r => { const k = trim(r?.['Tipo de donación']) || 'Sin tipo'; donPorTipo[k] = round(num(donPorTipo[k]) + num(r?.Valor), 2); });
+    const ingresosTotal = round(ing.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const comprasTotal = sum(comprasRealizadas, 'Importe');
+    const comprasPte = sum(comprasPendientes, 'Importe');
+    const donacionesTotal = sum(don, 'Valor');
+    return {
+      Evento: ev,
+      'Colaboradores registros': ing.length,
+      'Asistentes / Numero': round(ing.reduce((a,r)=>a+num(r?.Numero),0),3),
+      'Justificantes ingreso SI': ing.filter(r=>/^(si|sí|s)$/i.test(trim(r?.['Just.ing']))).length,
+      'Ingresos total': ingresosTotal,
+      'Compras registros': com.length,
+      'Compras realizadas': comprasTotal,
+      'Compras pendientes': comprasPte,
+      'Donaciones registros': don.length,
+      'Donaciones valor': donacionesTotal,
+      'Donaciones por tipo': donPorTipo,
+      'Tickets numero': tk.length,
+      'Tickets total': sum(tk, 'Total ticket'),
+      'Documentos numero': doc.length,
+      'Saldo actual': round(ingresosTotal - comprasTotal, 2),
+      'Valoracion con donaciones': round(comprasTotal + donacionesTotal, 2)
+    };
+  });
+  return {
+    fuente: 'ControlEvent calculado sobre módulos extraídos con reglas de RESUMEN PRESUPUESTARIO',
+    reglaIngresos: 'Ingresos total = suma de Importe obligatorio + Importe voluntario de INGRESOS.',
+    reglaCompras: 'Compras realizadas = suma de Importe de COMPRAS excluyendo Pte. Compra. Incluye TKxx y GASTOS CORRIENTES.',
+    reglaDonaciones: 'Donaciones valor = suma de Valor de DONACIONES.',
+    reglaSaldoActual: 'Saldo actual = Ingresos total - Compras realizadas. No sumar donaciones al saldo financiero.',
+    porEvento
+  };
+}
+
 function zuzuBuildModuleAudit(state, eventIds, filters, modulos) {
   const filterSummary = zuzuFilterSummary(filters);
   const filtrosAplicados = Object.keys(filterSummary).length > 0;
@@ -1311,16 +1382,18 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const eventRows = arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
+  const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v11_3_2_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v11_3_3_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Gemini no consulta Supabase, no ejecuta SQL y no modifica datos. ControlEvent entrega módulos completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     planZuzu: { modules, eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO', planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
+    metricasCanonicas,
     totalesRegistrosPorModulo: totals,
     auditoriaModulos,
     instruccionesFuncionalesZuzu: [
@@ -1335,7 +1408,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       compras: 'COMPRAS usa la salida probada: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable. Excluye DONADO SOCIO/TIENDA/OTROS.',
       donaciones: 'DONACIONES usa la salida probada: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable. El donante se resuelve por P:/T:/id contra personas o tiendas y nunca debe mostrarse como código técnico.',
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
-      legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.'
+      legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
+      metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.'
     },
     advertencias: advertenciasAuditoria
   };

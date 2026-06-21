@@ -1,4 +1,4 @@
-ControlEvent v11_3_1_prod - Zuzu con módulos seguros selectivos
+ControlEvent v11_3_3_prod - Zuzu con módulos seguros selectivos
 
 Cambios principales:
 - La ventana mantiene el nombre "Soy Zuzu, pregúntame lo que quieras...".
@@ -29,4 +29,4 @@ Seguridad:
 - Todas las claves internas quedan humanizadas: producto, tienda, responsable, donante y persona aparecen como texto claro.
 
 Versión:
-- Cabecera, index, public/index, version.js, package, package-lock, BACKUP e INFOEVENTO quedan en v11_3_1_prod / ControlEvent_v11_3_1_prod.
+- Cabecera, index, public/index, version.js, package, package-lock, BACKUP e INFOEVENTO quedan en v11_3_3_prod / ControlEvent_v11_3_3_prod.

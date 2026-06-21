@@ -1,12 +1,12 @@
 {
-  "version": "v11_3_1_prod",
+  "version": "v11_3_3_prod",
   "base": "v11_3_prod",
   "changes": [
     "Zuzu: deteccion local prioritaria de eventos frente a planificador IA",
     "Zuzu: filtros de recorte solo por deteccion local validada contra catalogos",
     "Zuzu: listados directos por ControlEvent para COMPRAS/DONACIONES/INGRESOS/TICKETS/DOCUMENTOS",
     "Zuzu: CSV descargable con todos los registros extraidos",
-    "Cache buster actualizado para v11_3_1_prod"
+    "Cache buster actualizado para v11_3_3_prod"
   ],
   "touched": [
     "services/event-context.service.js",
