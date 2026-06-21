@@ -256,11 +256,12 @@
     var oldPanel=$('ceAiTicketPanel');
     if(oldPanel){ try{ oldPanel.remove(); }catch(_){} }
     try{ document.body.classList.remove('ce-ai-panel-open'); }catch(_){}
+    window.__ceTicketAutoUserOpen = true;
     ensureUi(); fillSelects(); resetPanelState(true); document.body.classList.add('ce-ai-panel-open'); $('ceAiTicketPanel').classList.add('open'); updateTotals();
     setTimeout(function(){ try{ var p=$('ceAiTicketPanel'); if(p){ p.style.pointerEvents='auto'; p.classList.add('open'); } var modal=document.querySelector('#ceAiTicketPanel .ce-ai-modal'); if(modal) modal.style.pointerEvents='auto'; var f=$('ceAiFile'); if(f){ f.disabled=false; f.removeAttribute('disabled'); f.style.pointerEvents='auto'; f.style.visibility='visible'; f.style.opacity='1'; f.style.position='relative'; f.style.zIndex='20'; } var c=$('ceAiClose'); if(c){ c.disabled=false; c.removeAttribute('disabled'); c.style.pointerEvents='auto'; c.style.zIndex='30'; } }catch(_){} }, 40);
     setTimeout(function(){ try{ var f=$('ceAiFile'), c=$('ceAiClose'); if(f){ f.disabled=false; f.removeAttribute('disabled'); f.style.pointerEvents='auto'; } if(c){ c.disabled=false; c.removeAttribute('disabled'); c.style.pointerEvents='auto'; } }catch(_){} }, 260);
   }
-  function closePanel(){ var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); document.body.classList.remove('ce-ai-panel-open'); }
+  function closePanel(){ window.__ceTicketAutoUserOpen = false; var p=$('ceAiTicketPanel'); if(p) p.classList.remove('open'); document.body.classList.remove('ce-ai-panel-open'); }
   function openZoom(){ var src=window.__ceAiTicketImage || (($('ceAiPreview')||{}).src || ''); if(!src){ setStatus('Carga primero una foto para ampliarla.','warn'); return; } var img=$('ceAiZoomImg'), p=$('ceAiZoomPanel'); if(img) img.src=src; if(p) p.classList.add('open'); }
   function closeZoom(){ var p=$('ceAiZoomPanel'); if(p) p.classList.remove('open'); }
   function fileChanged(){
@@ -863,7 +864,7 @@
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.4 Alta IA]', warnings); })
+      .then(function(){ try{ ensureUi(); fillSelects(); var p=$('ceAiTicketPanel'); if(p){ document.body.classList.add('ce-ai-panel-open'); p.classList.add('open'); p.style.pointerEvents='auto'; } window.__ceTicketAutoUserOpen = true; }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.4 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){

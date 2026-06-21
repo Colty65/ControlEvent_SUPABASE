@@ -25,6 +25,7 @@
     if($('ceV105HotfixSearchStyle')) return;
     var st=document.createElement('style'); st.id='ceV105HotfixSearchStyle';
     st.textContent='\n'+
+      '#tabCompras,#tabDonaciones,#comprasList,#donacionesList,#tabCompras .maint-search,#tabDonaciones .maint-search,#tabCompras .ce-v434-search,#tabDonaciones .ce-v434-search,#tabCompras .ce-v413-search,#tabDonaciones .ce-v413-search{pointer-events:auto!important}\n'+
       '#comprasSearchInput,#donacionesSearchInput,#comprasSearchInputBtn,#donacionesSearchInputBtn{pointer-events:auto!important;opacity:1!important;filter:none!important;background:#fff!important;color:#0f172a!important;visibility:visible!important}\n'+
       'body[class*="final"], body.ce-finalizado-consulta{ }\n'+
       '.ce-search-found-v105hf{outline:5px solid #dc2626!important;box-shadow:0 0 0 8px rgba(220,38,38,.20)!important;border-color:#dc2626!important;font-weight:950!important;scroll-margin:140px!important}.ce-search-found-v105hf *{font-weight:inherit!important}\n'+
@@ -151,6 +152,7 @@
     });
     ['comprasList','donacionesList','tabCompras','tabDonaciones'].forEach(function(id){
       var root=$(id); if(!root) return;
+      root.style.setProperty('pointer-events','auto','important');
       Array.prototype.slice.call(root.querySelectorAll('.maint-search,.ce-v434-search,.ce-v413-search')).forEach(function(box){
         box.style.setProperty('pointer-events','auto','important');
         box.style.setProperty('opacity','1','important');

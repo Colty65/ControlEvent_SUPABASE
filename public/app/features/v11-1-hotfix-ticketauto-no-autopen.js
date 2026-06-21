@@ -56,6 +56,7 @@
   function shouldTicketAutoBeClosed(){
     if(authVisible()) return 'login activo: cerrar Ticket Auto';
     if(!eventExists()) return 'sin evento seleccionado: cerrar Ticket Auto';
+    if(window.__ceTicketAutoUserOpen) return '';
     if(!tabComprasVisible()) return 'fuera de COMPRAS: cerrar Ticket Auto';
     return '';
   }

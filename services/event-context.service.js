@@ -130,7 +130,7 @@ function makeHelpers(state) {
 }
 
 function incomeParts(row, ev, helpers, ticketImages) {
-  const personaId = trim(row?.personaId || row?.persona_id);
+  const personaId = rowPersonaId(row);
   const rangoRaw = trim(helpers.personRange(personaId) || row?.rango || row?.personaRango || row?.tipoPersona || '');
   const socio = norm(rangoRaw) === 'socio';
   const numero = num(row?.numero);
@@ -729,7 +729,7 @@ function zuzuRangoPersona(id, row, helpers) {
   return r ? r.toUpperCase() : 'NO SOCIO';
 }
 function zuzuIncomeAmounts(row, ev, helpers) {
-  const personaId = trim(row?.personaId || row?.persona_id);
+  const personaId = rowPersonaId(row);
   const rango = zuzuRangoPersona(personaId, row, helpers);
   const numero = num(row?.numero);
   const isSocio = rango === 'SOCIO';
@@ -737,6 +737,47 @@ function zuzuIncomeAmounts(row, ev, helpers) {
   const voluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
   return { rango, numero: round(numero, 3), obligatorio: round(obligatorio, 2), voluntario: round(voluntario, 2), total: round(obligatorio + voluntario, 2) };
 }
+
+function rowEventId(row) { return trim(row?.eventId || row?.event_id || row?.eventoId || row?.evento_id || row?.idEvento || row?.evento || ''); }
+function rowPersonaId(row) { return trim(row?.personaId || row?.persona_id || row?.colaboradorId || row?.colaborador_id || row?.persona || ''); }
+function rowProductoId(row) { return trim(row?.productoId || row?.producto_id || row?.productId || row?.product_id || row?.producto || ''); }
+function rowTiendaId(row) { return trim(row?.tiendaId || row?.tienda_id || row?.storeId || row?.store_id || row?.tienda || ''); }
+function rowResponsableId(row) { return trim(row?.responsableId || row?.responsable_id || row?.responsibleId || row?.responsible_id || row?.responsable || ''); }
+function rowDonorRef(row) { return trim(row?.donorRef || row?.donor_ref || row?.donanteRef || row?.donante_ref || row?.donanteId || row?.donante_id || row?.donante || ''); }
+function zuzuHasAllRowsCue(prompt) {
+  const p = norm(prompt);
+  return /\b(todos|todas|todo|toda|completo|completa|completos|completas|todas\s+las\s+filas|todos\s+los\s+datos|sin\s+filtrar|del\s+evento|de\s+evento)\b/.test(p)
+    || /\b(lista|listado|relacion|detalle|detallame|muestra|dame)\b.*\b(colaboradores|compras|donaciones|ingresos|tickets|documentos)\b.*\b(evento)\b/.test(p)
+    || /\b(grafica|gráfica)\b.*\b(compras|donaciones|ingresos)\b.*\b(evento)\b/.test(p);
+}
+function zuzuPromptHasExplicitSpecificFilter(prompt, kind) {
+  const p = norm(prompt);
+  if (kind === 'tiendas') return /\b(en\s+la\s+tienda|tienda\s+|tiendas\s+|proveedor\s+)\b/.test(p);
+  if (kind === 'productos') return /\b(producto\s+|productos\s+|articulo\s+|articulos\s+|comprado\s+|de\s+producto\s+)\b/.test(p);
+  if (kind === 'personas') return /\b(de\s+la\s+persona|de\s+persona|persona\s+|personas\s+|colaborador\s+|colaboradora\s+|responsable\s+|donante\s+|de\s+[a-z0-9]{3,})\b/.test(p)
+    && !/\b(todos\s+los\s+colaboradores|todas\s+las\s+personas|lista\s+(?:los|de\s+los)?\s*colaboradores)\b/.test(p);
+  return false;
+}
+function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
+  const out = {
+    personas: zuzuUnique(arr(filters?.personas)),
+    productos: zuzuUnique(arr(filters?.productos)),
+    tiendas: zuzuUnique(arr(filters?.tiendas)),
+    responsables: zuzuUnique(arr(filters?.responsables)),
+    donantes: zuzuUnique(arr(filters?.donantes)),
+    tickets: zuzuUnique(arr(filters?.tickets))
+  };
+  // Si el usuario pide todas las filas/datos de un evento, los filtros de personas/productos que se hayan inferido
+  // por coincidencias de texto son peligrosos: pueden dejar el módulo a cero. Solo se conservan filtros muy explícitos.
+  if (zuzuHasAllRowsCue(prompt)) {
+    if (!zuzuPromptHasExplicitSpecificFilter(prompt, 'personas')) { out.personas = []; out.responsables = []; out.donantes = []; }
+    if (!zuzuPromptHasExplicitSpecificFilter(prompt, 'productos')) out.productos = [];
+    // La tienda sí se conserva si aparece como "tienda X"; si no, se limpia también.
+    if (!zuzuPromptHasExplicitSpecificFilter(prompt, 'tiendas')) out.tiendas = [];
+  }
+  return out;
+}
+
 function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
   const filters = plan?.filters && typeof plan.filters === 'object' ? plan.filters : {};
   const filterPeople = zuzuUnique([].concat(filters.personas || [], filters.responsables || [], filters.donantes || []));
@@ -882,9 +923,9 @@ function zuzuModuleIngresos(state, eventIds, filters, helpers, ticketImages) {
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
   const rows = [];
   arr(state?.colaboradores).forEach(row => {
-    const evId = trim(row?.eventId || row?.event_id); if (!eventIds.includes(evId)) return;
+    const evId = rowEventId(row); if (!eventIds.includes(evId)) return;
     const ev = evById.get(evId) || {};
-    const personaId = trim(row?.personaId || row?.persona_id);
+    const personaId = rowPersonaId(row);
     const amounts = zuzuIncomeAmounts(row, ev, helpers);
     const out = {
       EVENTO: trim(ev?.titulo),
@@ -907,15 +948,15 @@ function zuzuModuleCompras(state, eventIds, filters, helpers, ticketImages, only
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
   const rows = [];
   arr(state?.compras).forEach(row => {
-    const evId = trim(row?.eventId || row?.event_id); if (!eventIds.includes(evId)) return;
+    const evId = rowEventId(row); if (!eventIds.includes(evId)) return;
     const ev = evById.get(evId) || {};
     const rawTicket = ticketText(row);
     const donation = isDonationTicket(rawTicket);
     if (onlyDonations && !donation) return;
     if (!onlyDonations && donation) return;
-    const pId = trim(row?.productoId || row?.producto_id);
-    const tId = trim(row?.tiendaId || row?.tienda_id);
-    const rId = trim(row?.responsableId || row?.responsable_id);
+    const pId = rowProductoId(row);
+    const tId = rowTiendaId(row);
+    const rId = rowResponsableId(row);
     const tipoLinea = donation ? trim(rawTicket).toUpperCase() : isPendingTicket(rawTicket) ? 'Pte. Compra' : (ticketToken(rawTicket) || rawTicket || 'GASTOS CORRIENTES');
     const tk = ticketToken(rawTicket);
     const base = {
@@ -935,7 +976,7 @@ function zuzuModuleCompras(state, eventIds, filters, helpers, ticketImages, only
     if (donation) {
       base['Valor estimado'] = base.Importe;
       base['Tipo de donación'] = trim(rawTicket).toUpperCase();
-      base.Donante = zuzuResolveDonor(row?.donorRef || row?.donor_ref, helpers);
+      base.Donante = zuzuResolveDonor(rowDonorRef(row), helpers);
       delete base['TKxx, GASTOS CORRIENTES o Pte. Compra'];
       delete base.TKxx;
       delete base.Tienda;
@@ -953,7 +994,7 @@ function zuzuModuleCompras(state, eventIds, filters, helpers, ticketImages, only
 function zuzuModuleEventos(state, eventIds, ticketImages) {
   const docsByEvent = new Map();
   arr(state?.eventDocuments).forEach(d => {
-    const evId = trim(d?.eventId || d?.event_id); if (!evId) return;
+    const evId = rowEventId(d); if (!evId) return;
     if (!docsByEvent.has(evId)) docsByEvent.set(evId, []);
     docsByEvent.get(evId).push(d);
   });
@@ -977,12 +1018,12 @@ function zuzuModuleTickets(state, eventIds, filters, helpers, ticketImages) {
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
   const groups = new Map();
   arr(state?.compras).forEach(row => {
-    const evId = trim(row?.eventId || row?.event_id); if (!eventIds.includes(evId)) return;
+    const evId = rowEventId(row); if (!eventIds.includes(evId)) return;
     const ticket = ticketText(row); const tk = ticketToken(ticket); if (!tk || isDonationTicket(ticket) || isPendingTicket(ticket)) return;
     if (filters?.tickets?.length && !matcher.ticketMatches(tk)) return;
-    const pId = trim(row?.productoId || row?.producto_id);
-    const tId = trim(row?.tiendaId || row?.tienda_id);
-    const rId = trim(row?.responsableId || row?.responsable_id);
+    const pId = rowProductoId(row);
+    const tId = rowTiendaId(row);
+    const rId = rowResponsableId(row);
     const key = `${evId}|${tk}`;
     if (!groups.has(key)) groups.set(key, { EVENTO: trim(evById.get(evId)?.titulo), TKxx: tk, Tienda: helpers.storeName(tId), Responsable: helpers.personName(rId), 'Total ticket': 0, 'Nº líneas': 0, 'Ticket SI/NO': hasImage(ticketImages, evId, ticket) ? 'SI' : 'NO', 'Líneas contables': [] });
     const g = groups.get(key);
@@ -994,8 +1035,8 @@ function zuzuModuleTickets(state, eventIds, filters, helpers, ticketImages) {
 }
 function zuzuModuleDocumentos(state, eventIds, ticketImages) {
   const evById = byId(state?.eventos);
-  return arr(state?.eventDocuments).filter(d => eventIds.includes(trim(d?.eventId || d?.event_id))).map(d => {
-    const evId = trim(d?.eventId || d?.event_id); const code = docCode(d?.codigo || d?.imageKey || d?.id) || trim(d?.codigo || d?.imageKey || 'DOC');
+  return arr(state?.eventDocuments).filter(d => eventIds.includes(rowEventId(d))).map(d => {
+    const evId = rowEventId(d); const code = docCode(d?.codigo || d?.imageKey || d?.id) || trim(d?.codigo || d?.imageKey || 'DOC');
     return { DOCxxx: code, Evento: trim(evById.get(evId)?.titulo), Fecha: trim(d?.fecha || ''), Descripcion: trim(d?.descripcion || d?.texto || ''), 'Tiene imagen': (hasImage(ticketImages, evId, code) || !!trim(d?.imageUrl || '')) ? 'SI' : 'NO' };
   });
 }
@@ -1014,15 +1055,15 @@ function zuzuModulePersonas(state, filters, helpers) {
 }
 
 function zuzuModuleRawExpected(state, moduleName, eventIds) {
-  if (moduleName === 'INGRESOS') return arr(state?.colaboradores).filter(r => eventIds.includes(trim(r?.eventId || r?.event_id))).length;
-  if (moduleName === 'COMPRAS') return arr(state?.compras).filter(r => eventIds.includes(trim(r?.eventId || r?.event_id)) && !isDonationTicket(ticketText(r))).length;
-  if (moduleName === 'DONACIONES') return arr(state?.compras).filter(r => eventIds.includes(trim(r?.eventId || r?.event_id)) && isDonationTicket(ticketText(r))).length;
+  if (moduleName === 'INGRESOS') return arr(state?.colaboradores).filter(r => eventIds.includes(rowEventId(r))).length;
+  if (moduleName === 'COMPRAS') return arr(state?.compras).filter(r => eventIds.includes(rowEventId(r)) && !isDonationTicket(ticketText(r))).length;
+  if (moduleName === 'DONACIONES') return arr(state?.compras).filter(r => eventIds.includes(rowEventId(r)) && isDonationTicket(ticketText(r))).length;
   if (moduleName === 'TICKETS') {
     const tks = new Set();
-    arr(state?.compras).forEach(r => { const evId = trim(r?.eventId || r?.event_id); const tk = ticketToken(ticketText(r)); if (eventIds.includes(evId) && tk && !isDonationTicket(ticketText(r)) && !isPendingTicket(ticketText(r))) tks.add(`${evId}|${tk}`); });
+    arr(state?.compras).forEach(r => { const evId = rowEventId(r); const tk = ticketToken(ticketText(r)); if (eventIds.includes(evId) && tk && !isDonationTicket(ticketText(r)) && !isPendingTicket(ticketText(r))) tks.add(`${evId}|${tk}`); });
     return tks.size;
   }
-  if (moduleName === 'DOCUMENTOS') return arr(state?.eventDocuments).filter(r => eventIds.includes(trim(r?.eventId || r?.event_id))).length;
+  if (moduleName === 'DOCUMENTOS') return arr(state?.eventDocuments).filter(r => eventIds.includes(rowEventId(r))).length;
   if (moduleName === 'EVENTOS') return arr(state?.eventos).filter(e => eventIds.includes(trim(e?.id))).length;
   if (moduleName === 'PRODUCTOS') return arr(state?.productos).filter(p => trim(p?.nombre)).length;
   if (moduleName === 'TIENDAS') return arr(state?.tiendas).filter(t => trim(t?.nombre)).length;
@@ -1073,7 +1114,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   }
   // v11_3_1: los filtros que reducen líneas deben salir de detección local verificable en catálogos reales.
   // No se aplican filtros inventados por el planificador IA, porque podían recortar compras/donaciones reales.
-  const filters = localPlan.filters || {};
+  const filters = zuzuSanitizeFiltersForPrompt(userPrompt, modules, localPlan.filters || {});
   const modulos = {};
   if (modules.includes('EVENTOS')) modulos.EVENTOS = zuzuModuleEventos(safeState, eventIds, ticketImages);
   if (modules.includes('INGRESOS')) modulos.INGRESOS = zuzuModuleIngresos(safeState, eventIds, filters, helpers, ticketImages);

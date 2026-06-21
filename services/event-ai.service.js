@@ -409,7 +409,7 @@ function directModuleResultIfApplicable(prompt, context) {
   const priority = [];
   if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) priority.push('COMPRAS');
   if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) priority.push('DONACIONES');
-  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas\b/.test(p) && Array.isArray(mods.INGRESOS)) priority.push('INGRESOS');
+  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) priority.push('INGRESOS');
   if (/\bticket|tickets|tk\s*\d+|factura|facturas\b/.test(p) && Array.isArray(mods.TICKETS)) priority.push('TICKETS');
   if (/\bdocumento|documentos|doc\s*\d+\b/.test(p) && Array.isArray(mods.DOCUMENTOS)) priority.push('DOCUMENTOS');
   if (!priority.length) return null;
@@ -438,6 +438,65 @@ function directModuleResultIfApplicable(prompt, context) {
     files: rows.length ? [{ filename, mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-listados'
+  };
+}
+
+
+function groupRowsForChart(moduleName, rows, prompt) {
+  const p = norm(prompt);
+  let groupField = 'Producto';
+  if (/\btienda|proveedor\b/.test(p)) groupField = moduleName === 'DONACIONES' ? 'Donante' : 'Tienda';
+  else if (/\bresponsable\b/.test(p)) groupField = 'Responsable';
+  else if (/\bsegmento\b/.test(p)) groupField = 'Segmento del producto';
+  else if (/\bdestino\b/.test(p)) groupField = 'Destino del producto';
+  else if (/\btk|ticket\b/.test(p)) groupField = 'TKxx';
+  else if (moduleName === 'INGRESOS') groupField = /\bforma|banco|bizum|efectivo|pendiente\b/.test(p) ? 'Ingreso' : 'Colaborador';
+  const amountField = moduleName === 'INGRESOS' ? 'Importe Total Calculado' : (moduleName === 'DONACIONES' ? 'Valor estimado' : 'Importe');
+  const map = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[groupField]) || 'Sin clasificar';
+    map.set(key, num(map.get(key)) + num(row?.[amountField]));
+  });
+  const ordered = [...map.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 30);
+  return { groupField, amountField, labels: ordered.map(x=>x[0]), values: ordered.map(x=>round(x[1],2)) };
+}
+function directGraphResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(grafica|gráfica|grafico|gráfico|diagrama|barras|tarta)\b/.test(p)) return null;
+  const mods = context.modulosExtraidos || {};
+  let moduleName = '';
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) moduleName = 'COMPRAS';
+  else if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) moduleName = 'DONACIONES';
+  else if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) moduleName = 'INGRESOS';
+  if (!moduleName) return null;
+  const rows = arr(mods[moduleName]);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.Titulo || e?.EVENTO)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
+  if (!rows.length) {
+    return {
+      ok: true,
+      rejected: false,
+      title: `Gráfica de ${moduleName}`,
+      answer: `ControlEvent no ha podido generar la gráfica porque el módulo ${moduleName} ha entregado 0 registros${eventos ? ` para ${eventos}` : ''}.`,
+      warnings: [audit ? `Auditoría ${moduleName}: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}, filtros ${audit.filtrosAplicados ? JSON.stringify(audit.filtros) : 'NO'}.` : `El módulo ${moduleName} no tiene registros.`],
+      charts: [], tables: [], files: [], provider: 'control-event-modules-direct', model: 'sin-gemini-para-graficas'
+    };
+  }
+  const g = groupRowsForChart(moduleName, rows, prompt);
+  const columns = orderedColumnsForModule(moduleName, rows);
+  const tableRows = rows.slice(0, 300).map(row => columns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  return {
+    ok: true,
+    rejected: false,
+    title: `Gráfica de ${moduleName}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `ControlEvent ha generado la gráfica directamente con ${rows.length} registro(s) del módulo ${moduleName}. Agrupación: ${g.groupField}.`,
+    warnings: arr(context.advertencias),
+    charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
+    tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v11_3_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    provider: 'control-event-modules-direct',
+    model: 'sin-gemini-para-graficas'
   };
 }
 
@@ -594,13 +653,8 @@ async function callGeminiPlanner(userPrompt, catalog) {
   throw lastError || new Error('Planificador Gemini no disponible.');
 }
 async function buildZuzuPlan(userPrompt, state, selectedEventId) {
-  const catalog = buildZuzuPlanningCatalog(state, selectedEventId);
-  try {
-    const plan = await callGeminiPlanner(userPrompt, catalog);
-    if (plan && typeof plan === 'object' && Array.isArray(plan.modules)) return plan;
-  } catch (err) {
-    console.warn('[Zuzu v11_3] Planificador Gemini no disponible; se usa plan local:', err?.message || err);
-  }
+  // Hotfix módulos fiables: la elección de módulos/eventos/filtros NO depende de Gemini.
+  // Gemini podrá analizar después, pero ControlEvent decide localmente qué datos oficiales extrae.
   return buildZuzuLocalPlan(state, selectedEventId, userPrompt);
 }
 
@@ -626,6 +680,8 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
   const directResult = directModuleResultIfApplicable(userPrompt, context);
   if (directResult) return directResult;
+  const directGraph = directGraphResultIfApplicable(userPrompt, context);
+  if (directGraph) return directGraph;
   if (context?.needsClarification) {
     return {
       ok: true,
