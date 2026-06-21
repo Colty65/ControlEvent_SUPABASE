@@ -24,7 +24,11 @@ function byId(rows) {
   arr(rows).forEach(row => { const id = trim(row?.id); if (id) out.set(id, row); });
   return out;
 }
-function ticketText(row) { return trim(row?.ticketDonacion ?? row?.ticket_donacion ?? row?.ticket ?? row?.ticketOtrosGastos ?? ''); }
+function firstNonEmpty(...values) {
+  for (const value of values) { const s = trim(value); if (s) return s; }
+  return '';
+}
+function ticketText(row) { return firstNonEmpty(row?.ticketDonacion, row?.ticket_donacion, row?.ticket, row?.ticketOtrosGastos, row?.ticket_otros_gastos); }
 function isDonationTicket(value) { return /^DONADO\s+(TIENDA|SOCIO|OTROS)$/i.test(trim(value)); }
 function isPendingTicket(value) { return /PTE\.?\s*COMPRA|PENDIENTE/i.test(trim(value)); }
 function valueOfLine(row) { return round(num(row?.unidades) * num(row?.precio), 2); }
@@ -414,17 +418,20 @@ function directModuleResultIfApplicable(prompt, context) {
   const columns = orderedColumnsForModule(moduleName, rows);
   const eventos = arr(context.eventosObjetivo).map(e => trim(e?.Titulo || e?.EVENTO)).filter(Boolean).join(', ');
   const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v11_3_1_prod.csv`);
-  const tableRows = rows.slice(0, 300).map(row => columns.map(c => {
+  const tableLimit = 1000;
+  const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
     if (c === 'Líneas contables' && Array.isArray(v)) return v.map(x => `${x.Producto || ''} ${x.Unidades || ''} x ${x.Precio || ''} = ${x.Importe || ''}`).join(' | ');
     return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v);
   }));
   const extra = rows.length > tableRows.length ? ` Se muestran ${tableRows.length} en pantalla y el CSV incluye las ${rows.length}.` : '';
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
+  const auditText = audit ? ` Auditoría: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}${audit.filtrosAplicados ? ' con filtros verificados' : ' sin filtros'}.` : '';
   return {
     ok: true,
     rejected: false,
     title: `${moduleName} extraído por ControlEvent`,
-    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. No se han recortado líneas antes de responder.${extra}`,
+    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. No se han recortado líneas antes de responder.${extra}${auditText}`,
     warnings: arr(context.advertencias).concat(rows.length ? [] : [`El módulo ${moduleName} no tiene registros con los filtros solicitados.`]),
     charts: [],
     tables: rows.length ? [{ title: `${moduleName} (${rows.length} registro(s))`, columns, rows: tableRows }] : [],

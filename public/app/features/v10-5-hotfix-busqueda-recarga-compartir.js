@@ -149,6 +149,17 @@
       el.classList.add('ce-mapa-readonly-allowed','mobile-menu-action');
       el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); el.style.setProperty('visibility','visible','important');
     });
+    ['comprasList','donacionesList','tabCompras','tabDonaciones'].forEach(function(id){
+      var root=$(id); if(!root) return;
+      Array.prototype.slice.call(root.querySelectorAll('.maint-search,.ce-v434-search,.ce-v413-search')).forEach(function(box){
+        box.style.setProperty('pointer-events','auto','important');
+        box.style.setProperty('opacity','1','important');
+        Array.prototype.slice.call(box.querySelectorAll('input,button')).forEach(function(el){
+          el.disabled=false; el.readOnly=false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled');
+          el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); el.style.setProperty('visibility','visible','important');
+        });
+      });
+    });
   }
 
   var hydrateRunning={};
