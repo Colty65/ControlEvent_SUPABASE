@@ -1,4 +1,4 @@
-/* ControlEvent v11_3_1_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v11_3_2_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -341,9 +341,9 @@ Reglas obligatorias:
 - Usa exclusivamente modulosExtraidos y eventosObjetivo. No inventes datos ni completes huecos por intuición.
 - Si el dato no está en el módulo recibido, dilo claramente y no lo calcules con información ausente.
 - Si se pide una lista, tabla o CSV, usa todos los registros del módulo correspondiente que se te han entregado.
-- INGRESOS: usa Importe Obligatorio, Importe Voluntario e Importe Total Calculado. En socios, el obligatorio se calcula como Numero * Precio del evento.
-- DONACIONES: solo son DONADO SOCIO, DONADO TIENDA o DONADO OTROS. Usa Donante y Responsable legibles.
-- COMPRAS: incluye compra real, gasto corriente y Pte. Compra según el campo TKxx/GASTOS/Pte.Compra. No mezcles donaciones con compras salvo que el usuario lo pida.
+- INGRESOS: usa los campos de la query probada: Evento, Nombre, Numero, Importe obligatorio, Importe voluntario e Ingreso. Si necesitas total por línea, suma Importe obligatorio + Importe voluntario.
+- DONACIONES: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Valor, Tipo de donación, Donante y Responsable. Donante y Responsable ya deben venir legibles.
+- COMPRAS: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Importe, Ticket u otros gastos, Tienda y Responsable. No mezcles donaciones con compras salvo que el usuario lo pida.
 - TICKETS: usa el total de ticket y sus líneas contables si el usuario pregunta por TKxx/facturas.
 - No generes SQL. No expliques tablas internas ni claves. No propongas cambios en base de datos.
 - Si el usuario pide algo ajeno a la gestión de eventos, rejected=true.
@@ -380,15 +380,15 @@ function csvFromRows(columns, rows) {
 }
 function orderedColumnsForModule(moduleName, rows) {
   const preferred = {
-    COMPRAS: ['EVENTO','Producto','Segmento del producto','Destino del producto','Unidades','Precio','Importe','TKxx, GASTOS CORRIENTES o Pte. Compra','TKxx','Tienda','Responsable','Ticket SI/NO'],
-    DONACIONES: ['EVENTO','Producto','Segmento del producto','Destino del producto','Unidades','Precio','Importe','Valor estimado','Tipo de donación','Donante','Responsable'],
-    INGRESOS: ['EVENTO','Colaborador','Rango','Numero','Ingreso','Importe Obligatorio','Importe Voluntario','Importe Total Calculado','Just.ing'],
-    TICKETS: ['EVENTO','TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
+    COMPRAS: ['Evento','Producto','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable','Ticket SI/NO'],
+    DONACIONES: ['Evento','Producto','Unidades','Precio','Valor','Tipo de donación','Donante','Responsable'],
+    INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Rango','Just.ing'],
+    TICKETS: ['Evento','TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
     DOCUMENTOS: ['DOCxxx','Evento','Fecha','Descripcion','Tiene imagen'],
-    EVENTOS: ['EVENTO','Titulo','Precio','Fecha ini','Fecha fin','Situacion','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
-    PRODUCTOS: ['Producto','Segmento','Destino','Precio Referencia'],
+    EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
+    PRODUCTOS: ['Nombre producto','Segmento','Destino','Precio rfa.'],
     TIENDAS: ['Nombre tienda'],
-    PERSONAS: ['Nombre','Rango']
+    PERSONAS: ['Nombre persona','Rango']
   };
   const seen = new Set();
   const cols = [];
@@ -396,6 +396,7 @@ function orderedColumnsForModule(moduleName, rows) {
   arr(rows).forEach(row => Object.keys(row || {}).forEach(k => { if (!seen.has(k)) { seen.add(k); cols.push(k); } }));
   return cols.filter(c => arr(rows).some(r => r && Object.prototype.hasOwnProperty.call(r, c)) || (preferred[moduleName]||[]).includes(c));
 }
+
 function isListExtractionPrompt(prompt) {
   const p = norm(prompt);
   if (/\b(compara|comparar|comparativa|analiza|analisis|dashboard|grafica|gráfica|estadistica|estadística|resume|resumen|porcentaje|evolucion|evolución)\b/.test(p)) return false;
@@ -412,12 +413,16 @@ function directModuleResultIfApplicable(prompt, context) {
   if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) priority.push('INGRESOS');
   if (/\bticket|tickets|tk\s*\d+|factura|facturas\b/.test(p) && Array.isArray(mods.TICKETS)) priority.push('TICKETS');
   if (/\bdocumento|documentos|doc\s*\d+\b/.test(p) && Array.isArray(mods.DOCUMENTOS)) priority.push('DOCUMENTOS');
+  if (/\bevento|eventos|fecha|estado|situacion|situación\b/.test(p) && Array.isArray(mods.EVENTOS)) priority.push('EVENTOS');
+  if (/\bproducto|productos|catalogo|catálogo\b/.test(p) && Array.isArray(mods.PRODUCTOS)) priority.push('PRODUCTOS');
+  if (/\btienda|tiendas\b/.test(p) && Array.isArray(mods.TIENDAS) && !priority.includes('COMPRAS')) priority.push('TIENDAS');
+  if (/\bpersona|personas|responsable|responsables\b/.test(p) && Array.isArray(mods.PERSONAS) && !priority.includes('INGRESOS')) priority.push('PERSONAS');
   if (!priority.length) return null;
   const moduleName = priority[0];
   const rows = arr(mods[moduleName]);
   const columns = orderedColumnsForModule(moduleName, rows);
-  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.Titulo || e?.EVENTO)).filter(Boolean).join(', ');
-  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v11_3_1_prod.csv`);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v11_3_2_prod.csv`);
   const tableLimit = 1000;
   const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
@@ -431,15 +436,16 @@ function directModuleResultIfApplicable(prompt, context) {
     ok: true,
     rejected: false,
     title: `${moduleName} extraído por ControlEvent`,
-    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. No se han recortado líneas antes de responder.${extra}${auditText}`,
+    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. Los datos salen del módulo de consulta probado, en claro y sin códigos internos.${extra}${auditText}`,
     warnings: arr(context.advertencias).concat(rows.length ? [] : [`El módulo ${moduleName} no tiene registros con los filtros solicitados.`]),
     charts: [],
     tables: rows.length ? [{ title: `${moduleName} (${rows.length} registro(s))`, columns, rows: tableRows }] : [],
     files: rows.length ? [{ filename, mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
-    provider: 'control-event-modules-direct',
+    provider: 'control-event-query-modules-direct',
     model: 'sin-gemini-para-listados'
   };
 }
+
 
 
 function groupRowsForChart(moduleName, rows, prompt) {
@@ -447,19 +453,21 @@ function groupRowsForChart(moduleName, rows, prompt) {
   let groupField = 'Producto';
   if (/\btienda|proveedor\b/.test(p)) groupField = moduleName === 'DONACIONES' ? 'Donante' : 'Tienda';
   else if (/\bresponsable\b/.test(p)) groupField = 'Responsable';
-  else if (/\bsegmento\b/.test(p)) groupField = 'Segmento del producto';
-  else if (/\bdestino\b/.test(p)) groupField = 'Destino del producto';
-  else if (/\btk|ticket\b/.test(p)) groupField = 'TKxx';
-  else if (moduleName === 'INGRESOS') groupField = /\bforma|banco|bizum|efectivo|pendiente\b/.test(p) ? 'Ingreso' : 'Colaborador';
-  const amountField = moduleName === 'INGRESOS' ? 'Importe Total Calculado' : (moduleName === 'DONACIONES' ? 'Valor estimado' : 'Importe');
+  else if (/\btk|ticket\b/.test(p)) groupField = moduleName === 'COMPRAS' ? 'Ticket u otros gastos' : 'TKxx';
+  else if (moduleName === 'INGRESOS') groupField = /\bforma|banco|bizum|efectivo|pendiente\b/.test(p) ? 'Ingreso' : 'Nombre';
   const map = new Map();
   arr(rows).forEach(row => {
     const key = trim(row?.[groupField]) || 'Sin clasificar';
-    map.set(key, num(map.get(key)) + num(row?.[amountField]));
+    let value = 0;
+    if (moduleName === 'INGRESOS') value = num(row?.['Importe obligatorio']) + num(row?.['Importe voluntario']);
+    else if (moduleName === 'DONACIONES') value = num(row?.Valor);
+    else value = num(row?.Importe);
+    map.set(key, num(map.get(key)) + value);
   });
   const ordered = [...map.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 30);
-  return { groupField, amountField, labels: ordered.map(x=>x[0]), values: ordered.map(x=>round(x[1],2)) };
+  return { groupField, labels: ordered.map(x=>x[0]), values: ordered.map(x=>round(x[1],2)) };
 }
+
 function directGraphResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
@@ -471,7 +479,7 @@ function directGraphResultIfApplicable(prompt, context) {
   else if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) moduleName = 'INGRESOS';
   if (!moduleName) return null;
   const rows = arr(mods[moduleName]);
-  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.Titulo || e?.EVENTO)).filter(Boolean).join(', ');
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
   const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
   if (!rows.length) {
     return {
@@ -494,7 +502,7 @@ function directGraphResultIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
-    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v11_3_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-graficas'
   };
@@ -604,15 +612,15 @@ function plannerPrompt(userPrompt, catalog) {
   return `Eres el planificador seguro de Zuzu para ControlEvent. Tu única tarea es decidir qué módulos de extracción debe usar ControlEvent para responder bien al usuario. NO respondas la pregunta final.
 
 Módulos disponibles:
-- INGRESOS: Colaborador; Rango; Numero; Ingreso; Importe Obligatorio; Importe Voluntario; Just.ing.
-- DONACIONES: Producto; Segmento; Destino; Unidades; Precio; Valor estimado; Tipo donación; Donante; Responsable.
-- COMPRAS: Producto; Segmento; Destino; Unidades; Precio; Importe; TKxx/GASTOS/Pte.Compra; Tienda; Responsable; Ticket SI/NO.
-- EVENTOS: EVENTO; Titulo; Precio; Fecha ini; Fecha fin; Situacion; DOCxxx.
+- INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Just.ing.
+- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
+- COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable.
+- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; DOCxxx.
 - TICKETS: TKxx y datos contables asociados.
 - DOCUMENTOS: DOCxxx, fecha y descripción.
-- PRODUCTOS: Producto; Segmento; Destino; Precio Referencia.
+- PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
 - TIENDAS: Nombre tienda.
-- PERSONAS: Nombre; Rango.
+- PERSONAS: Nombre persona; Rango.
 
 Reglas:
 - Elige solo los módulos necesarios.

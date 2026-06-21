@@ -1,0 +1,24 @@
+{
+  "version": "v11_3_2_prod",
+  "base": "CE_v11_3_1_PROD_HOTFIX_ZUZU_MODULOS_REALES_SIN_CAMBIAR_VERSION.zip",
+  "changes": [
+    "Zuzu usa módulos de consulta alineados con las querys probadas",
+    "Salida humanizada y completa por evento en INGRESOS, COMPRAS, DONACIONES, EVENTOS, PRODUCTOS, TIENDAS y PERSONAS",
+    "DONACIONES limpia donor_ref P:/T:/id y resuelve donante contra personas/tiendas",
+    "Listados y gráficas directas salen de ControlEvent sin recorte por Gemini",
+    "Versión actualizada a v11_3_2_prod en referencias activas, BACKUP e INFOEVENTO"
+  ],
+  "touchedMainFiles": [
+    "services/event-context.service.js",
+    "services/event-ai.service.js",
+    "public/index.html",
+    "public/app/version.js",
+    "routes/export.routes.js",
+    "public/modules/excel/backup.js",
+    "package.json",
+    "package-lock.json",
+    "sw.js",
+    "public/sw.js",
+    "docs/ControlEvent_ZUZU_QUERIES_MODULOS_BASE_v3.sql"
+  ]
+}

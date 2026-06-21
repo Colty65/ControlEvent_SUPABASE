@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v11-3-1-prod",
-  "version": "11.3.1",
+  "name": "controlevent-v11-3-2-prod",
+  "version": "11.3.2",
   "private": true,
   "type": "module",
   "scripts": {
