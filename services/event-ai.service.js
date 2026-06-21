@@ -532,10 +532,39 @@ function aggregateRowsForModule(moduleName, rows, prompt) {
   const totalUnidades = round(ordered.reduce((acc, g) => acc + num(g.unidades), 0), 3);
   return { groupField, valueColumn, groups: ordered, totalGeneral, totalRegistros, totalUnidades };
 }
+
+function distinctValuesForField(rows, field) {
+  const seen = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[field]) || 'Sin clasificar';
+    seen.set(key, (seen.get(key) || 0) + 1);
+  });
+  return [...seen.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]), 'es')).map(([valor, registros]) => ({ valor, registros }));
+}
+function auditRowsForAggregate(moduleName, rows, ag, audit, context) {
+  const eventos = arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const values = distinctValuesForField(rows, ag.groupField);
+  const filtros = audit?.filtrosAplicados ? JSON.stringify(audit.filtros || {}) : 'NO';
+  return [
+    ['Módulo usado', moduleName],
+    ['Evento(s) detectado(s)', eventos || 'No indicado'],
+    ['Registros extraídos del módulo', String(rows.length)],
+    ['Registros fuente sin filtros', String(audit?.registrosFuenteSinFiltros ?? rows.length)],
+    ['Filtros aplicados', filtros],
+    ['Campo agrupado', ag.groupField],
+    ['Valores distintos encontrados', values.map(v => `${v.valor} (${v.registros})`).join(' | ') || 'Sin valores'],
+    ['Total general calculado por ControlEvent', String(ag.totalGeneral)],
+    ['Motor de cálculo', 'ControlEvent local, sin Gemini para sumas/agrupaciones']
+  ];
+}
+
 function directAggregateResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
-  if (!/\b(agrupa|agrupar|agrupado|agrupados|agrupacion|agrupación|totaliza|totalizar|totalizado|subtotal|subtotales|suma|sumar|sumatorio|desglose|desglosa|desglosar)\b/.test(p)) return null;
+  // Diagnóstico fiable: detección amplia, sin depender de que Gemini interprete el prompt.
+  // Captura formas con y sin acento: agrúpalas/agrupar/agrupado, totalízalas/totalizar,
+  // suma, subtotales, desglose, etc.
+  if (!/(agrup|totaliz|subtotal|subtot|sumator|sumar|suma|desglos|calcula|calculo|cálculo|conteo|contar|recuento)/.test(p)) return null;
   const mods = context.modulosExtraidos || {};
   const moduleName = detectAggregateModule(prompt, mods);
   if (!moduleName) return null;
@@ -573,13 +602,15 @@ function directAggregateResultIfApplicable(prompt, context) {
   const groupedCsvColumns = groupedColumns;
   const warningSynonyms = /donado\s+no\s+socio/.test(p) && moduleName === 'DONACIONES' ? ['En los datos reales el tipo equivalente a “DONADO NO SOCIO” suele venir como “DONADO OTROS”; se agrupa por el valor real del campo Tipo de donación.'] : [];
   const auditText = audit ? ` Auditoría: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}${audit.filtrosAplicados ? ' con filtros verificados' : ' sin filtros'}.` : '';
+  const auditTableRows = auditRowsForAggregate(moduleName, rows, ag, audit, context);
   return {
     ok: true, rejected: false,
     title: `${moduleName} agrupado por ${ag.groupField}${eventos ? ` - ${eventos}` : ''}`,
-    answer: `ControlEvent ha agrupado y totalizado ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. Agrupación: ${ag.groupField}. Total general: ${ag.totalGeneral} €.${auditText}`,
+    answer: `ControlEvent ha agrupado y totalizado localmente ${rows.length} registro(s) del módulo ${moduleName}${eventos ? ` para ${eventos}` : ''}. Agrupación: ${ag.groupField}. Total general: ${ag.totalGeneral} €. En esta respuesta Gemini no calcula ni agrupa; la aritmética sale del motor local de ControlEvent.${auditText}`,
     warnings: arr(context.advertencias).concat(warningSynonyms),
-    charts: [{ title: `${moduleName} por ${ag.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
+    charts: [{ title: `${moduleName} por ${ag.groupField} (cálculo local ControlEvent)`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
     tables: [
+      { title: `Auditoría de extracción y cálculo`, columns: ['Dato','Valor'], rows: auditTableRows },
       { title: `${moduleName} agrupado por ${ag.groupField}`, columns: groupedColumns, rows: groupedRows },
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
     ],
@@ -587,8 +618,57 @@ function directAggregateResultIfApplicable(prompt, context) {
       { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
       { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
     ],
-    provider: 'control-event-query-modules-aggregate',
-    model: 'sin-gemini-para-totales'
+    provider: 'control-event-local-deterministico',
+    model: 'sin-gemini-para-calculos'
+  };
+}
+
+
+function isModuleDataPrompt(prompt) {
+  const p = norm(prompt);
+  return /(donacion|donaciones|donado|donante|compra|compras|gasto|gastos|ingreso|ingresos|recaudacion|recaudación|asistente|asistentes|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|evento|eventos|producto|productos|tienda|tiendas|persona|personas|responsable|responsables)/.test(p);
+}
+function directDeterministicResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
+  // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
+  const ag = directAggregateResultIfApplicable(prompt, context);
+  if (ag) return ag;
+  const gr = directGraphResultIfApplicable(prompt, context);
+  if (gr) return gr;
+  const list = directModuleResultIfApplicable(prompt, context);
+  if (list) return list;
+  if (!isModuleDataPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const first = Object.keys(mods).find(k => Array.isArray(mods[k]));
+  if (!first) return null;
+  const rows = arr(mods[first]);
+  const columns = orderedColumnsForModule(first, rows);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === first);
+  const tableRows = rows.slice(0, 1000).map(row => columns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  const auditRows = [
+    ['Módulo usado', first],
+    ['Evento(s) detectado(s)', eventos || 'No indicado'],
+    ['Registros extraídos', String(rows.length)],
+    ['Registros fuente sin filtros', String(audit?.registrosFuenteSinFiltros ?? rows.length)],
+    ['Filtros aplicados', audit?.filtrosAplicados ? JSON.stringify(audit.filtros || {}) : 'NO'],
+    ['Motor', 'ControlEvent local, diagnóstico de módulos']
+  ];
+  return {
+    ok: true,
+    rejected: false,
+    title: `${first} extraído por ControlEvent`,
+    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${first}${eventos ? ` para ${eventos}` : ''}. En esta fase de diagnóstico no se usa Gemini para transformar los datos; se prioriza comprobar que el módulo devuelve los registros correctos y legibles.`,
+    warnings: arr(context.advertencias),
+    charts: [],
+    tables: [
+      { title: 'Auditoría de extracción', columns: ['Dato','Valor'], rows: auditRows },
+      ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
+    ],
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v11_3_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    provider: 'control-event-local-deterministico',
+    model: 'diagnostico-modulos-sin-gemini'
   };
 }
 
@@ -811,18 +891,11 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
 
-  // Solo los listados puros salen directos desde ControlEvent.
-  // En cuanto el prompt pide agrupar, totalizar, calcular, graficar, comparar, ordenar,
-  // resumir o cualquier transformación, se extraen primero los módulos fiables y después
-  // se pasan a Gemini junto con el prompt original para que haga exactamente esa operación.
-  const directAggregate = directAggregateResultIfApplicable(userPrompt, context);
-  if (directAggregate) return directAggregate;
-
-  const directGraph = directGraphResultIfApplicable(userPrompt, context);
-  if (directGraph) return directGraph;
-
-  const directResult = directModuleResultIfApplicable(userPrompt, context);
-  if (directResult) return directResult;
+  // Fase de diagnóstico/fiabilidad: las peticiones de datos de módulos, agrupaciones,
+  // totalizaciones, cálculos y gráficas básicas se resuelven en ControlEvent localmente.
+  // Gemini queda fuera de la aritmética crítica hasta verificar que cada módulo devuelve todo.
+  const deterministicResult = directDeterministicResultIfApplicable(userPrompt, context);
+  if (deterministicResult) return deterministicResult;
 
   if (context?.needsClarification) {
     return {

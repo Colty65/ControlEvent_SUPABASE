@@ -105,7 +105,7 @@
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
     setStatus('Zuzu está preparando los datos…', 'ok');
     var resEl=$('ceAiResult');
-    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>🧡 Zuzu está trabajando</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">⏳</span> Preparando contexto seguro, extrayendo datos completos y consultando Gemini...</div></div>';
+    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>🧡 Zuzu está trabajando</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">⏳</span> Preparando contexto seguro y extrayendo datos completos de ControlEvent...</div></div>';
     try{
       var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
       var data=await res.json().catch(function(){ return {}; });
@@ -113,7 +113,7 @@
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'Respuesta generada.', data.rejected?'err':'ok');
     }catch(err){
-      resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Gemini</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
+      resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
     }
   }
