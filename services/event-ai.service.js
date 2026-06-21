@@ -335,26 +335,37 @@ function systemPrompt(userPrompt, context) {
   const ctx = rawCtx;
   return `Eres Zuzu, la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
 
-Tarea: responder al usuario SOLO con los datos incluidos en el CONTEXTO preparado por ControlEvent. El contexto contiene módulos ya extraídos y humanizados: EVENTOS, INGRESOS, DONACIONES, COMPRAS, TICKETS, DOCUMENTOS, PRODUCTOS, TIENDAS y PERSONAS. No tienes acceso directo a Supabase ni permiso para ejecutar SQL.
+Arquitectura obligatoria ya ejecutada por ControlEvent:
+1) Gemini/planificador ha deducido los módulos necesarios.
+2) ControlEvent ha extraído esos módulos desde la app, en registros legibles y sin códigos internos.
+3) Ahora recibes TODOS los registros entregados por esos módulos y el prompt original del usuario. Tu trabajo es cocinar/formatear la respuesta final exactamente según lo pedido.
 
 Reglas obligatorias:
-- Usa exclusivamente modulosExtraidos y eventosObjetivo. No inventes datos ni completes huecos por intuición.
-- Si el dato no está en el módulo recibido, dilo claramente y no lo calcules con información ausente.
-- Si se pide una lista, tabla o CSV, usa todos los registros del módulo correspondiente que se te han entregado.
-- Si el usuario pide agrupar, totalizar, calcular, comparar, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo, no sobre una muestra.
-- Si pide "agrupa y totaliza por X", devuelve una tabla agrupada por X con conteo de registros y suma del campo económico correcto.
-- Para DONACIONES, el campo económico a sumar es Valor. Para COMPRAS, el campo económico a sumar es Importe. Para INGRESOS, el importe por línea es Importe obligatorio + Importe voluntario.
-- Puedes devolver también una tabla de detalle si ayuda, pero la respuesta principal debe obedecer el cálculo/formato pedido por el usuario, no limitarse a repetir el listado bruto.
-- INGRESOS: usa los campos de la query probada: Evento, Nombre, Numero, Importe obligatorio, Importe voluntario e Ingreso. Si necesitas total por línea, suma Importe obligatorio + Importe voluntario.
-- DONACIONES: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Valor, Tipo de donación, Donante y Responsable. Donante y Responsable ya deben venir legibles.
-- COMPRAS: usa los campos de la query probada: Evento, Producto, Unidades, Precio, Importe, Ticket u otros gastos, Tienda y Responsable. No mezcles donaciones con compras salvo que el usuario lo pida.
-- TICKETS: usa el total de ticket y sus líneas contables si el usuario pregunta por TKxx/facturas.
-- No generes SQL. No expliques tablas internas ni claves. No propongas cambios en base de datos.
-- Si el usuario pide algo ajeno a la gestión de eventos, rejected=true.
-- Si detectas limitaciones o falta de datos, ponlo en warnings.
+- Usa exclusivamente modulosExtraidos. No inventes datos ni completes huecos por intuición.
+- Si el usuario cita eventos concretos entre comillas o por título, filtra la respuesta a esos eventos exactos. No mezcles otros eventos aunque aparezcan en el contexto.
+- Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
+- Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
+- Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
+- Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
+- Para DONACIONES, suma el campo Valor. Para COMPRAS, suma Importe. Para INGRESOS, el total por línea es Importe obligatorio + Importe voluntario.
+- Para “producto/artículo más utilizado comprado/donado”, mide por Unidades, separando Comprado y Donado si el usuario lo pide.
+- Para listados, usa todos los registros relevantes. Puedes resumir en la respuesta principal, pero aporta una tabla o fichero si procede.
+- No generes SQL. No expliques claves internas. No propongas cambios en base de datos.
+- Si detectas que el contexto no contiene un módulo necesario para responder, dilo claramente en warnings.
 - Responde siempre en español.
 
-Formato de salida: SOLO JSON válido con el esquema indicado.
+Campos oficiales por módulo:
+- INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
+- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
+- COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
+- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; DOCxxx.
+- TICKETS: Evento; TKxx; Tienda; Responsable; Total ticket; Nº líneas; Ticket SI/NO; Líneas contables.
+- DOCUMENTOS: DOCxxx; Evento; Fecha; Descripcion; Tiene imagen.
+- PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
+- TIENDAS: Nombre tienda.
+- PERSONAS: Nombre persona; Rango.
+
+Formato de salida: SOLO JSON válido con el esquema indicado. Evita respuestas excesivamente largas: usa tablas y ficheros para detalle cuando sea necesario.
 
 CONTEXTO CONTROL EVENT:
 ${ctx}
@@ -363,7 +374,6 @@ PETICIÓN DEL USUARIO:
 ${trim(userPrompt).slice(0, 3000)}
 `;
 }
-
 function stripJsonText(value) {
   let s = trim(value);
   if (s.startsWith('```')) s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -1006,7 +1016,20 @@ async function callGeminiEvent(prompt, context) {
       if (!outText) throw new Error('Gemini no devolvió texto analizable.');
       let parsed;
       try { parsed = JSON.parse(stripJsonText(outText)); }
-      catch (e) { e.message = 'Gemini no devolvió JSON válido: ' + e.message; throw e; }
+      catch (e) {
+        return {
+          ok: true,
+          rejected: false,
+          title: 'Respuesta de Zuzu',
+          answer: outText.slice(0, 120000),
+          warnings: ['Gemini no devolvió JSON estructurado válido; se muestra la respuesta textual para no perder el análisis.'],
+          charts: [],
+          tables: [],
+          files: [],
+          provider: 'gemini-rest',
+          model
+        };
+      }
       return normalizeResult(parsed, model);
     } catch (error) {
       lastError = error;
@@ -1048,22 +1071,27 @@ function plannerPrompt(userPrompt, catalog) {
   return `Eres el planificador seguro de Zuzu para ControlEvent. Tu única tarea es decidir qué módulos de extracción debe usar ControlEvent para responder bien al usuario. NO respondas la pregunta final.
 
 Módulos disponibles:
-- INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Just.ing.
-- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
-- COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable.
-- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; DOCxxx.
-- TICKETS: TKxx y datos contables asociados.
-- DOCUMENTOS: DOCxxx, fecha y descripción.
-- PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
-- TIENDAS: Nombre tienda.
-- PERSONAS: Nombre persona; Rango.
+- INGRESOS: colaboradores, ingresos, recaudación, asistentes, socios/no socios, justificantes de ingreso.
+- DONACIONES: donaciones de producto, productos donados, donantes.
+- COMPRAS: compras, gastos, productos comprados, tiendas, responsables, Pte. Compra.
+- EVENTOS: eventos, título, precio, fechas, estado, documentos asociados.
+- TICKETS: TKxx, tickets, facturas, resumen por ticket.
+- DOCUMENTOS: DOCxxx, documentos adjuntos del evento.
+- PRODUCTOS: catálogo de productos, segmento, destino, precio de referencia.
+- TIENDAS: catálogo de tiendas.
+- PERSONAS: catálogo de personas, rango.
 
-Reglas:
-- Elige solo los módulos necesarios.
-- Indica eventos concretos por id o por título exacto del catálogo. Si el usuario dice "eventos registrados" o "todos los eventos", todosLosEventos=true.
-- Si pide datos de una persona/producto/tienda/responsable/donante concreto, ponlo en filters SOLO si aparece claramente escrito en el prompt o coincide con el catálogo. No inventes filtros: un filtro incorrecto recorta datos reales.
-- Si no se puede identificar evento o módulo y no basta el evento activo, needsClarification=true.
-- Si la petición es demasiado amplia sin filtros, pide concreción.
+Reglas de planificación:
+- Si el prompt menciona explícitamente un módulo o uno de sus sinónimos, inclúyelo.
+- Si el prompt pide una comparativa con varios conceptos, incluye TODOS esos módulos, no solo el primero.
+- Si pide "colaboradores", "asistentes", "justificantes de ingreso" o "recaudación", incluye INGRESOS.
+- Si pide "comprado/donado" o "separa comprado y donado", incluye COMPRAS y DONACIONES.
+- Si pide "tickets", incluye TICKETS y, si pide importes o líneas, también COMPRAS.
+- Si pide "documentos adjuntos", incluye DOCUMENTOS y EVENTOS.
+- Si cita eventos entre comillas, pon sus títulos en eventos exactamente como aparecen en el prompt o como mejor coincidan con el catálogo.
+- Si dice "todos los eventos", "eventos registrados" o "entre todos los eventos", todosLosEventos=true.
+- De momento NO propongas filtros de persona, producto, tienda, responsable, donante, segmento ni destino. ControlEvent traerá todos los registros de cada módulo y la respuesta final se filtrará en la segunda llamada a Gemini usando el prompt original.
+- needsClarification=true solo si no puedes identificar ningún módulo útil. No pidas concreción por volumen.
 - Devuelve SOLO JSON con el esquema.
 
 CATÁLOGO CONTROL EVENT:
@@ -1097,9 +1125,33 @@ async function callGeminiPlanner(userPrompt, catalog) {
   throw lastError || new Error('Planificador Gemini no disponible.');
 }
 async function buildZuzuPlan(userPrompt, state, selectedEventId) {
-  // Hotfix módulos fiables: la elección de módulos/eventos/filtros NO depende de Gemini.
-  // Gemini podrá analizar después, pero ControlEvent decide localmente qué datos oficiales extrae.
-  return buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+  const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+  try {
+    const catalog = buildZuzuPlanningCatalog(state, selectedEventId);
+    const ai = await callGeminiPlanner(userPrompt, catalog);
+    const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
+    return {
+      ...ai,
+      ok: ai?.ok !== false,
+      needsClarification: ai?.needsClarification === true && !modules.length,
+      modules: modules.length ? modules : local.modules,
+      eventos: arr(ai?.eventos).length ? arr(ai.eventos) : arr(local.eventos),
+      todosLosEventos: ai?.todosLosEventos === true || local.todosLosEventos === true,
+      filters: {},
+      reasoning: trim(ai?.reasoning || '') || 'Planificador Gemini: módulos deducidos desde el prompt. ControlEvent extrae todos los registros de esos módulos sin filtros de reducción.',
+      __zuzuPlannerProvider: 'gemini-planner',
+      __zuzuGeminiAllRows: true
+    };
+  } catch (error) {
+    return {
+      ...local,
+      filters: {},
+      reasoning: `${local.reasoning || 'Plan local de respaldo.'} Aviso: el planificador Gemini no respondió (${trim(error?.message || error)}).`,
+      __zuzuPlannerProvider: 'local-fallback',
+      __zuzuGeminiAllRows: true,
+      plannerWarning: trim(error?.message || error)
+    };
+  }
 }
 
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
@@ -1123,12 +1175,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
 
-  // Fase de diagnóstico/fiabilidad: las peticiones de datos de módulos, agrupaciones,
-  // totalizaciones, cálculos y gráficas básicas se resuelven en ControlEvent localmente.
-  // Gemini queda fuera de la aritmética crítica hasta verificar que cada módulo devuelve todo.
-  const deterministicResult = directDeterministicResultIfApplicable(userPrompt, context);
-  if (deterministicResult) return deterministicResult;
-
+  // v11_3_2 hotfix: Zuzu vuelve al flujo en 3 pasos pedido por el usuario:
+  // 1) planificación de módulos, 2) extracción oficial por ControlEvent, 3) respuesta final con Gemini.
+  // Las respuestas locales quedan solo como respaldo si Gemini falla.
   if (context?.needsClarification) {
     return {
       ok: true,
@@ -1147,14 +1196,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   try {
     return await callGeminiEvent(userPrompt, context);
   } catch (error) {
-    // Si Gemini falla por cuota/modelo/red y el usuario pedía una gráfica básica, al menos
-    // ControlEvent devuelve una gráfica directa con los datos oficiales ya extraídos.
-    const fallbackGraph = directGraphResultIfApplicable(userPrompt, context);
-    if (fallbackGraph) {
-      fallbackGraph.warnings = arr(fallbackGraph.warnings).concat(`Gemini no pudo completar el análisis: ${trim(error?.message || error)}`);
-      fallbackGraph.provider = 'control-event-modules-direct-fallback';
-      fallbackGraph.model = 'sin-gemini-por-error';
-      return fallbackGraph;
+    const fallback = directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
+    if (fallback) {
+      fallback.warnings = arr(fallback.warnings).concat(`Gemini no pudo completar la respuesta final: ${trim(error?.message || error)}. Se muestra respaldo local de ControlEvent.`);
+      fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
+      fallback.model = 'sin-gemini-por-error';
+      return fallback;
     }
     throw error;
   }
