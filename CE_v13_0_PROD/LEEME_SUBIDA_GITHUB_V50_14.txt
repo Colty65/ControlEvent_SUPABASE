@@ -1,0 +1,14 @@
+ControlEvent v5.1.0_prod
+
+Corrección conservadora posterior a v50.13.
+
+Cambios:
+- Se deja de cargar v50-13-final-fixes.js para retirar el forzado de selección de evento tras login que dejaba módulos sin datos en móvil/iPad.
+- Se recupera budget-tooltips-lite desde la versión estable anterior: los globos de Resumen Presupuestario muestran tabla de datos, y la columna Just. la añade el sistema v46.9.
+- En móvil/iPad, los justificantes de esos globos solo se abren si se toca la miniatura Just.; se evita que se abra automáticamente la primera foto del evento.
+- Dock móvil Refres/Salir, uno encima de otro, abajo a la derecha y pegado al margen.
+- Limpieza de negritas/parpadeos de PRODUCTOS sin observadores permanentes.
+- Versión y caché unificadas a ControlEvent v5.1.0_prod / controlevent-shell-v50-24.
+
+IMPORTANTE:
+No se ha tocado la gestión de justificantes dentro de INGRESOS ni tickets, que funcionaba correctamente en v50.13.

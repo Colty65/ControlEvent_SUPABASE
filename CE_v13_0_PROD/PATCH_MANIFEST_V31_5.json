@@ -1,0 +1,18 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "files_changed": [
+    "public/app/features/mapa-productos.js",
+    "public/app/styles/app.css",
+    "public/app/version.js",
+    "public/index.html",
+    "public/sw.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json"
+  ],
+  "notes": [
+    "Floating Volver arriba button",
+    "Filtered donation header values"
+  ]
+}

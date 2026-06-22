@@ -1,0 +1,26 @@
+ControlEvent v8.5_prod FIX24 - CRUD explícito + Finalizado inmutable
+
+Regla implantada:
+1) Un evento Finalizado NO puede recibir altas, bajas, modificaciones ni fotos.
+   Esto se controla en cliente y, sobre todo, en servidor.
+
+2) Se elimina el guardado masivo por /api/state como mantenimiento ordinario.
+   /api/state queda reservado a restauración total de BACKUP con marca interna.
+
+3) Se añade mantenimiento fila-a-fila mediante /api/crud:
+   - POST/PUT /api/crud/compras para alta/modificación de una compra/donación.
+   - DELETE /api/crud/compras/:id para baja de una compra/donación.
+   - Equivalente para colaboradores, eventos, personas, tiendas y productos.
+
+4) En cliente se añade v8-5-explicit-crud-fix24.js cargado en HEAD para interceptar
+   botones de alta/modificación/baja antes de los handlers legacy.
+
+5) Se neutraliza en el bundle legacy cargado la escritura masiva PUT /api/state.
+   Las lecturas GET /api/state siguen activas.
+
+6) Las fotos siguen por /api/ticket-images, pero el servidor rechaza subir/eliminar
+   fotos si el evento está Finalizado.
+
+Limitación honesta:
+Esta versión corta la vía peligrosa y convierte los mantenimientos principales a CRUD explícito.
+Aun así conviene probar de forma acotada con dos eventos EN CURSO antes de seguir con datos reales.

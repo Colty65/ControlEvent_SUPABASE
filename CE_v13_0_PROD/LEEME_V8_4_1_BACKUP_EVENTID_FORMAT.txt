@@ -1,0 +1,16 @@
+ControlEvent v8.5_prod - Corrección BACKUP con EVENTO_ID real
+
+Cambio quirúrgico solicitado:
+- Se elimina el uso de EVxxx como identificador de evento en el BACKUP nuevo.
+- Hoja EVENTOS: ya no incluye EVENTO_CODIGO; conserva EVENTO_ID como identificador real.
+- Hojas INGRESOS, COMPRAS, DONACIONES, TICKETS y TICKETS_PARTES: la columna EVENTO_CODIGO se mantiene por compatibilidad de formato, pero su valor es ahora el EVENTO_ID real de ce_eventos.
+- METADATOS: se usa EVENTO_ID en lugar de EVENTO_CODIGO.
+- La carga/importación se adapta para aceptar la hoja EVENTOS sin EVENTO_CODIGO y mapear por EVENTO_ID.
+- Se mantiene compatibilidad de lectura con backups antiguos que sí lleven EVENTO_CODIGO tipo EVxxx.
+- Se mantiene la versión visible y de fichero: v8.5_prod.
+- Se conservan los cambios anteriores de TK01..TK50 y tickets usados en verde.
+
+Archivos tocados:
+- routes/export.routes.js
+- public/index.html
+- public/app/features/v8-4-1-backup-eventid-format.js

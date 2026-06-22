@@ -1,0 +1,11 @@
+{
+  "version": "ControlEvent v8.5_prod",
+  "patch": "DOCUMENTOS_RETOQUE_FIX7",
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/features/v8-5-event-documents.js",
+    "public/app/features/summary-tienda-sort-fix.js"
+  ],
+  "notes": "Retoque visual Documentos y Resumen tienda/ticket; sin cambios en BACKUP ni INFOEVENTO."
+}

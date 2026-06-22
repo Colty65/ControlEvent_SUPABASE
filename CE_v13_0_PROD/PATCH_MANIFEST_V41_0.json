@@ -1,0 +1,29 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "changed_files": [
+    "public/app/features/v40-fixes.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/styles/app.css",
+    "public/app/version.js",
+    "public/index.html",
+    "public/sw.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/features/event-delete-cascade-v33.7.js",
+    "public/app/features/planificacion-inicial.js",
+    "README_V41_0.md",
+    "PATCH_MANIFEST_V41_0.json"
+  ],
+  "notes": [
+    "Compras producto muestra GASTADO/Pte.Compra.",
+    "GASTOS CORRIENTES cuenta como gastado.",
+    "Altas nuevas de compras/donaciones no se posicionan en el nuevo registro.",
+    "Duplicados siguen posicionando el registro existente.",
+    "Casitas flotantes reposicionadas y reforzadas.",
+    "Bundles legacy cargados por index.html actualizados internamente a v41.0 para INFOEVENTO, backup y cabecera."
+  ]
+}

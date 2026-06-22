@@ -1,0 +1,46 @@
+ControlEvent v5.1.0_prod - Corrección quirúrgica sobre v50.4
+
+Subida limpia desde la carpeta completa del repositorio.
+
+Cambios incluidos:
+1. RO / menú estable
+   - Se mantienen únicamente RESUMEN, MAPA DE RECURSOS y GRÁFICAS.
+   - Se bloquean de forma final las opciones no permitidas.
+   - En RO se estabiliza la barra de iconos en una rejilla fija de 3 posiciones para evitar el retiemble izquierda/derecha.
+
+2. Botón Salir en móvil
+   - El contenedor original de Salir estaba oculto en móvil; ahora se fuerza su visibilidad.
+   - Salir y Refrescar quedan fijos arriba a la derecha, con zona segura para iPhone/iPad/Android.
+
+3. Salir sin pantalla borrosa
+   - Antes de ejecutar el cierre se elimina el estado autenticado y se muestra el panel de acceso.
+   - Se cierran menús/capas/modales pendientes para evitar que quede la pantalla borrosa bloqueada.
+
+4. Por tienda y Ticket / cabeceras al final
+   - Se corrige la ordenación de cabeceras dentro de globos/tablas si aparecen al final.
+   - Afecta especialmente a DONADO SOCIOS, DONADO TIENDA y DONADO OTROS.
+
+5. Fotos en globos y iPad
+   - Se añade un visor propio ligero para fotos/justificantes dentro de globos y tickets.
+   - Captura la apertura antes que los manejadores antiguos, evitando bloqueos por modales antiguos.
+   - No se reescriben los motores de datos ni Excel.
+
+Fichero nuevo principal:
+- public/app/features/v50-5-final-fixes.js
+
+Carga añadida al final de public/index.html:
+- ./app/features/v50-5-final-fixes.js?v=50.24
+
+Service worker:
+- Cache actualizado a controlevent-shell-v50-24
+- Añadido v50-5-final-fixes.js a la precarga
+
+Verificaciones realizadas:
+- node --check public/app/features/v50-5-final-fixes.js
+- node --check public/app/features/v50-4-final-fixes.js
+- node --check public/app/features/v50-2-final-fixes.js
+- JSON válido en package.json, package-lock.json y build-metrics.json
+- node --check public/sw.js
+
+Nota:
+No se han tocado los motores principales de compras/donaciones/Excel. La corrección se ha hecho en una capa final v50.5 para minimizar riesgos sobre lo que ya funcionaba.

@@ -1,0 +1,11 @@
+{
+  "version": "30.12",
+  "base": "ControlEvent_v5_1_0_prod_RESCATE",
+  "changes": [
+    "Mapa de recursos con filtro multiple por responsables SOCIO",
+    "Ordenacion por Tienda, Pte. Comprar/TKxx y Producto",
+    "TKxx en verde Excel transparente",
+    "Fix anti-bloqueo de login: el mapa no actua mientras authOverlay esta visible",
+    "Fix anti-bucle: MutationObserver del mapa con debounce y sin reescritura continua del menu"
+  ]
+}

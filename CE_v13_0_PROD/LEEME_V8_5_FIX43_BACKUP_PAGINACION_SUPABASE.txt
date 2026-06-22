@@ -1,0 +1,21 @@
+ControlEvent v8.5_prod - FIX43 SOLO MODIFICADOS
+
+Motivo:
+Supabase devuelve por defecto un máximo de 1000 filas si no se pagina con .range().
+Por eso ce_compras tenía 1054 registros en BBDD, pero CE_COMPRAS_BBDD salía con 1000.
+
+Fichero modificado:
+- routes/export.routes.js
+
+Cambios:
+- Añadida paginación real por rangos en las lecturas directas de BBDD.
+- rawCompraRowsForBackup() ya lee ce_compras completa, no solo las primeras 1000 filas.
+- rawTicketImageRowsForBackup() también queda paginada para evitar el mismo problema cuando supere 1000 filas.
+- No toca COMPRAS operativa, EVENTOS, SQL ni global_write_lock.
+
+Comprobación esperada tras subirlo:
+- select count(*) from ce_compras; -> 1054
+- Hoja CE_COMPRAS_BBDD -> 1054 filas de datos
+- METADATOS / REGISTROS_COMPRAS -> 1054
+- COMPRAS + DONACIONES -> 1054
+- ce_ticket_images debe seguir cuadrando con 489.

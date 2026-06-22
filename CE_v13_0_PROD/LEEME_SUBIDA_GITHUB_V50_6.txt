@@ -1,0 +1,15 @@
+ControlEvent v5.1.0_prod
+
+Subir TODO el contenido del ZIP al repositorio, sustituyendo la versión anterior.
+
+Cambios aplicados sobre v50.5:
+- Salir real: limpia la sesión ligera ControlEvent_v5_1_0_prod_session y evita que la app vuelva a entrar sola.
+- Evita que en iPad aparezca fugazmente la pantalla inicial/login durante renders de INGRESOS.
+- Salir y Refrescar en móvil/iPad pasan a flotante inferior derecho, compactos y semitransparentes.
+- Fotos/justificantes de INGRESOS y fotos de globos se abren con visor ligero v50.6 y se neutralizan manejadores antiguos durante el toque para evitar bloqueos en iPad.
+
+Pruebas recomendadas:
+1) Entrar, pulsar SALIR y comprobar que queda en login sin reentrar solo.
+2) En móvil, comprobar que Salir/Refrescar no tapan cabecera ni datos.
+3) En iPad, modificar un registro de INGRESOS y comprobar que no aparece la pantalla CE/login por encima.
+4) En iPad, abrir justificante/foto de INGRESOS y cerrar el visor.

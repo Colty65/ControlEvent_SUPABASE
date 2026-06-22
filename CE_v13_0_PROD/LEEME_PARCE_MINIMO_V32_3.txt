@@ -1,0 +1,19 @@
+ControlEvent v5.1.0_prod - Parche mínimo
+
+Aplicar encima de la versión actual V32.x.
+
+Cambios:
+- Planificación inicial se simplifica: solo replica un evento FINALIZADO.
+- Ya no mezcla históricos ni calcula cantidades sugeridas.
+- Replica tal cual compras y donaciones de producto del evento elegido.
+- Genera una propuesta revisable, sin grabar todavía datos reales.
+- El selector de evento base solo muestra eventos con situación Finalizado.
+- Se mantiene el buscador de productos y el botón flotante de volver arriba.
+- Preparada la regla futura de ingresos: parejas número=2; si no existe pareja, socio número=1.
+
+Archivos modificados:
+- public/app/features/planificacion-inicial.js
+- public/index.html
+- public/app/styles/app.css
+- public/app/version.js
+- public/sw.js

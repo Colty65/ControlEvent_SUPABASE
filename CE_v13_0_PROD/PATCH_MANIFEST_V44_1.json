@@ -1,0 +1,24 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "version_file": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "type": "diagnostico-rendimiento",
+  "changed_files": [
+    "public/app/performance/perf-diagnostics-v44-1.js",
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "index.html",
+    "routes/export.routes.js",
+    "public/modules/excel/backup.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "package.json",
+    "LEEME_SUBIDA_GITHUB_V44_1.txt"
+  ],
+  "notes": [
+    "Se añade instrumentación de rendimiento sin cambiar la lógica de negocio.",
+    "El panel PERF aparece abajo a la izquierda y permite copiar informe.",
+    "Se actualiza caché/service worker a v44.1."
+  ]
+}

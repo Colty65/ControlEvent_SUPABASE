@@ -1,0 +1,24 @@
+FIX42 - BACKUP COMPRAS BBDD REAL
+
+SOLO MODIFICADOS:
+- routes/export.routes.js
+- LEEME_V8_5_FIX42_BACKUP_COMPRAS_BBDD_REAL.txt
+
+Objetivo:
+- El BACKUP ya no toma COMPRAS/DONACIONES desde el estado filtrado de la app.
+- Lee ce_compras directamente desde Supabase.
+- Añade hoja CE_COMPRAS_BBDD con la tabla real de ce_compras.
+- Genera hojas COMPRAS y DONACIONES desde ce_compras real.
+- METADATOS/REGISTROS_COMPRAS debe cuadrar con select count(*) from ce_compras.
+- METADATOS/REGISTROS_COMPRAS_CANONICAS_APP deja visible el contador antiguo filtrado.
+
+No toca COMPRAS en la app, no toca SQL, no toca eventos, no toca global_write_lock.
+
+Comprobación tras subir:
+1) Ejecutar en Supabase:
+   select count(*) from ce_compras;
+2) Descargar BACKUP TODOS.
+3) Comprobar:
+   - Hoja CE_COMPRAS_BBDD = ese número.
+   - Hoja COMPRAS + hoja DONACIONES = ese número.
+   - METADATOS REGISTROS_COMPRAS = ese número.

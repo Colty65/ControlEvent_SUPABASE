@@ -1,0 +1,18 @@
+{
+  "version": "44.7.3",
+  "base": "44.7.1",
+  "type": "stability-hotfix",
+  "summary": "Login rápido, captura temprana de selector/menú y watchdog para evitar bucles al cambiar de evento en móviles.",
+  "main_files": [
+    "public/app/features/v44-7-event-switcher.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/sw.js",
+    "package.json"
+  ],
+  "notes": [
+    "No se modifica la operativa de guardado de compras, donaciones, INFOEVENTO ni BACKUP.",
+    "La selección de evento sigue siendo preferencia local y no dispara pushStateToServer.",
+    "El service worker pasa a cache controlevent-shell-v50-24."
+  ]
+}

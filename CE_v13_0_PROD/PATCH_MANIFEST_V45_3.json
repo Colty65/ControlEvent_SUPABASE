@@ -1,0 +1,11 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod",
+  "from": "ControlEvent v5.1.0_prod",
+  "changes": [
+    "PERF persistente en PC para GD/RW",
+    "Refrescar reforzado junto a Salir",
+    "Limpieza de restos de permisos al cambiar de usuario",
+    "Versiones unificadas en UI, service worker, BACKUP e INFOEVENTO"
+  ]
+}

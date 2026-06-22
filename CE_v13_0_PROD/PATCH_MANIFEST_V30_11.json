@@ -1,0 +1,18 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "V30.10_RESCATE estable / legacy v30.7",
+  "changed": [
+    "public/index.html",
+    "public/app/version.js",
+    "public/sw.js",
+    "public/app/styles/app.css",
+    "public/app/features/mapa-recursos-v30.11.js",
+    "public/app/features/mapa-productos.js",
+    "public/modules/views/mapa-productos.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "package.json",
+    "package-lock.json"
+  ],
+  "cache": "controlevent-shell-v50-24"
+}

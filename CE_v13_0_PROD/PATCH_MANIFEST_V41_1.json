@@ -1,0 +1,34 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent_SUPABASE-main_V41_0.zip",
+  "type": "corrective_patch",
+  "date": "2026-05-24",
+  "changes": [
+    "Backup generado por servidor para evitar RangeError Maximum call stack size exceeded.",
+    "Eliminada casita negra duplicada de Planificación inicial en móvil.",
+    "Casitas flotantes reforzadas: PC/iPad centro derecha, iPhone/Android sobre Menú y sin doble relanzado.",
+    "Entrada desde login abre Gráficas tras seleccionar evento.",
+    "Cambio de evento conserva la ventana activa anterior.",
+    "Menú principal ajustado para una sola línea.",
+    "Eliminado botón maletín rosa de Compras y otros gastos.",
+    "Eliminada referencia V33.7 del mensaje de Planificación inicial.",
+    "Mapa de recursos permite marcar Entregado en productos solo donados desde iPhone/Android.",
+    "Actualización de versión a v41.1 en ficheros activos."
+  ],
+  "files": [
+    "public/index.html",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/styles/app.css",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "package.json",
+    "package-lock.json",
+    "public/app/diagnostics/build-metrics.json",
+    "README_V41_1.md",
+    "PATCH_MANIFEST_V41_1.json"
+  ]
+}

@@ -1,0 +1,10 @@
+ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
+
+Sube el contenido de este ZIP al repositorio.
+
+Objetivo de la versión:
+- Mantener la fluidez ya conseguida.
+- Corregir los globos de INGRESOS EN DINERO y DONACION DE PRODUCTO en iPad/iPhone/Android.
+- Evitar que queden restos del globo antiguo SOCIOS / INGRESADO SOCIOS tapando la pantalla.
+
+Recomendación: después de subirlo, cerrar completamente la pestaña en iPad/Android y volver a abrir la app para limpiar caché anterior.

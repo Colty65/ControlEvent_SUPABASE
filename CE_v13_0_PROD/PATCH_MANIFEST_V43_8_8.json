@@ -1,0 +1,31 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "version_file": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "changed_files": [
+    "index.html",
+    "public/index.html",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "public/app/version.js",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-4-fixes.js",
+    "public/app/features/v43-7-fixes.js",
+    "public/app/features/v43-8-1-fixes.js",
+    "public/app/features/v43-8-2-fixes.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js"
+  ],
+  "notes": [
+    "Base tomada de v43.8.2, última confirmada con login funcionando.",
+    "Corrección de entrada a Planificación inicial en iPhone/Android desde el menú móvil.",
+    "Corrección de versión de BACKUP en nombre de archivo y metadatos.",
+    "No se modifica la lógica de COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS."
+  ]
+}

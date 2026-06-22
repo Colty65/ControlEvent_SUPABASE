@@ -1,0 +1,16 @@
+ControlEvent v8.5_prod FIX29 - Baja de COMPRAS por firma funcional
+
+Problema observado:
+- La baja en pantalla se veía correcta, pero al salir y entrar reaparecía.
+- En algunos casos el botón llevaba un id local que no coincidía con el id real en ce_compras.
+- El DELETE por id devolvía: no se borró ningún registro en ce_compras con id=...
+
+Cambio aplicado:
+- La baja de COMPRAS sigue intentando primero DELETE por id.
+- Si ese id no existe en ce_compras, el cliente envía también la firma completa de la línea:
+  eventId, productoId, unidades, precio, ticketDonacion, tiendaId, responsableId, donorRef.
+- El servidor busca en ce_compras una línea con esa misma firma funcional y borra UNA sola coincidencia.
+- Si hay varias líneas idénticas, borra solo una, que es el caso típico de duplicado manual.
+- No borra en eventos Finalizados. Para corregir un evento finalizado hay que pasarlo antes a En curso.
+
+Esta solución no depende de saveState ni de guardados globales.

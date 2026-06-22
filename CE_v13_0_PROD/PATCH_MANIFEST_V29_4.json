@@ -1,0 +1,14 @@
+{
+  "version": "v29.4",
+  "base": "v29.3 limpia sobre v29.2 estable de rendimiento",
+  "objective": "corregir en iPad/Android el arranque post-login y la visibilidad inmediata de opciones GD sin perder el rendimiento LITE/turbo",
+  "changes": [
+    "Se mantiene el modo LITE/turbo oculto en producción y activo en iPad/Android.",
+    "El primer render autenticado tras login hace un bootstrap completo controlado para evitar pantallas vacías.",
+    "El cambio real de evento también fuerza un bootstrap controlado para que el evento elegido presente información desde el primer momento.",
+    "Las opciones por rol GD/RW/RO se sincronizan de forma inmediata; en GD deben verse desde el principio INGRESOS, DONACIONES, COMPRAS, RESUMEN PRESUPUESTARIO y GRAFICAS.",
+    "La pantalla activa se re-activa sin esperar a intervalos largos, evitando que Resumen/Graficas aparezcan mucho más tarde en iPad/Android.",
+    "No se toca la lógica funcional de INFOEVENTOS, BACKUP, Excel, ingresos, compras ni donaciones."
+  ],
+  "test": "En iPad/Android: login con usuario GD, comprobar que todas las opciones aparecen inmediatamente. Elegir otro evento y verificar que se pinta información sin esperar. En PC/iPhone debe seguir sin indicador LITE y con el mismo rendimiento."
+}

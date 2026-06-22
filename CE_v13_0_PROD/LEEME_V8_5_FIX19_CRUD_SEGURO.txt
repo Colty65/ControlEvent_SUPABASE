@@ -1,0 +1,31 @@
+ControlEvent v8.5_prod FIX19 - corte de arquitectura para guardado CRUD seguro
+
+Motivo:
+- Se detectó que el guardado histórico por PUT /api/state podía actuar como reemplazo completo de tablas.
+- Si el navegador enviaba un estado parcial/desfasado, registros válidos de INGRESOS/COMPRAS podían desaparecer.
+
+Cambio principal:
+- /api/state ya NO borra registros por ausencia en guardados normales.
+- Todas las colecciones principales se guardan por UPSERT no destructivo: eventos, personas, tiendas, productos, colaboradores e compras.
+- Las bajas pasan a endpoints explícitos CRUD:
+  POST   /api/crud/:collection
+  PUT    /api/crud/:collection/:id
+  DELETE /api/crud/:collection/:id
+  POST   /api/crud-deltas
+
+Regla aplicada:
+- Alta = INSERT/UPSERT del registro.
+- Modificación = UPDATE/UPSERT del registro.
+- Baja = DELETE explícito por id.
+- Importación/restauración total = única operación que puede reemplazar tablas completas, marcada con __forceReplaceAll y limpiada inmediatamente tras el envío.
+
+Protecciones:
+- Un refresco, render, login, cambio de ventana o subida de foto no puede borrar registros solo porque no vengan en el estado del navegador.
+- El módulo v8-5-crud-safe.js detecta diferencias reales de altas/modificaciones/bajas en el estado local y las envía como deltas explícitos.
+- Al borrar ingresos, se eliminan también sus justificantes INGRESO:<id>.
+- Al borrar evento, se eliminan ingresos/compras del evento, documentos meta y fotos del evento.
+
+Advertencia honesta:
+- Esta versión corta el riesgo de borrado por estado parcial.
+- Debe probarse en entorno real con una copia controlada antes de volver a introducir datos importantes.
+- Si algún botón de baja antiguo no es capturado por el módulo de deltas, la baja puede no persistir tras refrescar; eso es preferible a borrar datos por error.

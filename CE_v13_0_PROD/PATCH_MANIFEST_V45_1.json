@@ -1,0 +1,21 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "versionFile": "ControlEvent_v5_1_0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "changes": [
+    "RESUMEN PRESUPUESTARIO/OPERATIVA: PRESUPUESTO => INGRESO TOTAL",
+    "RESUMEN PRESUPUESTARIO/INGRESOS EN DINERO: INGRESOS EN DINERO / INGRESO DINERO => INGRESOS",
+    "Added final lightweight DOM label guard for #budgetLayout",
+    "Updated service worker/cache to v45.1"
+  ],
+  "newFiles": [
+    "public/app/features/v45-1-budget-labels.js"
+  ],
+  "untouchedFunctionalAreas": [
+    "COMPRAS save",
+    "DONACIONES save",
+    "INFOEVENTO",
+    "BACKUP",
+    "event switcher flow"
+  ]
+}

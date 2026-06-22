@@ -1,0 +1,12 @@
+ControlEvent v5.1.0_prod
+
+Base: v44.7.3 estable.
+
+Cambios:
+- Corrección de mantenimiento de PRODUCTOS para usuario GD/RW: Modificar y Eliminar vuelven a responder.
+- Eliminar PRODUCTO/PERSONA/TIENDA ya no borra dependencias: si está usado en ingresos, compras, donaciones o referencias, se bloquea.
+- Mensaje de botón al pasar el cursor: "No es posible, tiene dependencias."
+- Eliminación de EVENTO solo para usuario GD, con doble confirmación y baja en cascada de ingresos, compras/donaciones e imágenes de tickets del evento.
+- No se toca el flujo de cambio de evento conseguido en v44.7.2/v44.7.3.
+
+Recomendación: tras subir a GitHub/Vercel, recargar una vez en móvil/tablet para renovar service worker/cache.

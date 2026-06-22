@@ -1,0 +1,8 @@
+ControlEvent v5.1.0_prod
+
+Subir el contenido completo de este ZIP al repositorio, sustituyendo archivos existentes.
+
+Cambios principales:
+- Mapa de recursos: botón Volver arriba flotante a la derecha y centrado verticalmente.
+- Mapa de recursos: cabecera inferior de productos donados calculada solo con lo filtrado por responsables.
+- Caché nueva: controlevent-shell-v50-24.

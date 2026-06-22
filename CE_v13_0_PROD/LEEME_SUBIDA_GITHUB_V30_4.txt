@@ -1,0 +1,11 @@
+ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
+
+Sube el contenido de este ZIP sobre tu repositorio actual.
+
+Incluye la corrección de Mapa de productos y el nuevo estabilizador de vistas.
+
+Archivo nuevo importante:
+public/app/features/view-refresh-stabilizer.js
+
+Si GitHub pregunta si quieres sustituir archivos existentes, acepta.
+Después de publicar, en iPad/Android conviene cerrar la pestaña anterior y abrir de nuevo la app para que cargue el nuevo cache controlevent-shell-v50-24.

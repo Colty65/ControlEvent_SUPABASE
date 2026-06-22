@@ -1,0 +1,18 @@
+{
+  "version": "v8.5_prod",
+  "scope": "documentos-backup-infoevento",
+  "files": [
+    "public/app/features/v8-5-event-documents.js",
+    "public/app/features/v8-5-documentos-excel.js",
+    "public/app/features/v8-4-1-backup-eventid-format.js",
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "public/index.html"
+  ],
+  "notes": [
+    "Correccion de visibilidad de Documentos frente a refrescos tardios de RESUMEN/INGRESOS.",
+    "Backup exporta DOCUMENTOS y conserva DOCXX en TICKETS/TICKETS_PARTES.",
+    "Importacion de BACKUP restaura eventDocuments.",
+    "INFOEVENTO incluye hoja DOCUMENTOS con miniaturas cuando es posible."
+  ]
+}

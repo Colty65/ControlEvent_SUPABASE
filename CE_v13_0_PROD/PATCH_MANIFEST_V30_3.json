@@ -1,0 +1,20 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "changes": [
+    "Mapa de productos registrado como pestaña oficial",
+    "RO puede usar Mapa sin retorno automático a Resumen",
+    "Eliminado scrollIntoView al abrir Mapa",
+    "Precalentamiento de Colaboradores/Donaciones/Compras tras login y cambio de evento",
+    "Actualización de caché service worker a v30-3"
+  ],
+  "files": [
+    "public/index.html",
+    "public/app/features/mapa-productos.js",
+    "public/app/performance/low-resource-legacy-patch.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.3.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.3.js",
+    "public/app/version.js",
+    "public/sw.js"
+  ]
+}

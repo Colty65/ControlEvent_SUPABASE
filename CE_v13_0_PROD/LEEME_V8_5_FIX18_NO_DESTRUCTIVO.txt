@@ -1,0 +1,13 @@
+ControlEvent v8.5_prod FIX18 - guardado no destructivo urgente
+
+Objetivo:
+- Cortar la desaparicion de INGRESOS y COMPRAS causada por PUT /api/state con estado parcial/desfasado.
+
+Cambios:
+- ce_colaboradores y ce_compras ya no se reemplazan completamente en guardados normales.
+- En guardado normal, estas tablas hacen UPSERT: actualizan/anaden registros, pero no borran los ausentes del payload.
+- Se desactiva la limpieza automatica de fotos de INGRESOS durante saveState normal. La limpieza queda en el endpoint manual cleanup-stale-ingresos.
+- No se toca BACKUP, INFOEVENTO, Documentos, Mapa ni Globos.
+
+Limitacion temporal importante:
+- Hasta implementar borrados por endpoint explicito, eliminar un ingreso/compra desde la app puede no borrar fisicamente la fila antigua en BBDD. Es intencionado para priorizar que no desaparezcan datos.

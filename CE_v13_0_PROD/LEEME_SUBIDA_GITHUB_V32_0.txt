@@ -1,0 +1,13 @@
+ControlEvent v5.1.0_prod - SOLO SUBIR GITHUB
+
+Subir el contenido completo del ZIP sustituyendo los archivos del repositorio.
+
+Incluye nueva opción: Planificación inicial, solo para usuarios GD.
+Esta primera versión genera una propuesta desde histórico de COMPRAS y no graba todavía el evento real.
+
+Comprobar después de desplegar:
+1. Login normal.
+2. Usuario GD ve Planificación inicial.
+3. Usuarios RW/RO no la ven.
+4. Generar propuesta desde histórico.
+5. Ver que no se graba nada en EVENTOS/COMPRAS.

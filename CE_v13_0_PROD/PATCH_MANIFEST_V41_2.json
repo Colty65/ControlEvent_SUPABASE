@@ -1,0 +1,29 @@
+{
+  "version": "ControlEvent v5.1.0_prod",
+  "base": "ControlEvent v5.1.0_prod",
+  "created": "2026-05-24",
+  "changes": [
+    "Recupera casita global de subir arriba en ventanas donde había desaparecido, manteniendo las específicas de Mapa de recursos y mantenimiento.",
+    "Reposiciona las casitas en móvil para que no pisen el botón Menú y evita el doble relanzado/parpadeo.",
+    "Hace visible y pulsable en móvil vertical el botón Entregado de productos solo donados en Mapa de recursos.",
+    "Guarda a la primera pulsación los cambios de desplegables en Compras y Donaciones.",
+    "Refuerza el backup del servidor eliminando el clonado profundo recursivo y dividiendo tickets en fragmentos más pequeños."
+  ],
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "routes/export.routes.js",
+    "version.js",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json",
+    "README_V41_2.md"
+  ]
+}
