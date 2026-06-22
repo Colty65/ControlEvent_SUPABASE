@@ -293,9 +293,10 @@ function eventAiSchema() {
           type: 'OBJECT',
           properties: {
             title: { type: 'STRING' },
-            type: { type: 'STRING', description: 'bar, horizontalBar o pie' },
+            type: { type: 'STRING', description: 'bar, horizontalBar, pie, donut, line o stackedBar' },
             labels: { type: 'ARRAY', items: { type: 'STRING' } },
             values: { type: 'ARRAY', items: { type: 'NUMBER' } },
+            series: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, values: { type: 'ARRAY', items: { type: 'NUMBER' } } } } },
             unit: { type: 'STRING' }
           },
           required: ['title', 'type', 'labels', 'values', 'unit']
@@ -350,6 +351,9 @@ Reglas obligatorias:
 - Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
 - Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
+- Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
+- Tipos de gráfica disponibles: bar, horizontalBar, pie, donut, line y stackedBar. Para comparativas entre eventos usa bar/stackedBar. Para repartos por tipo usa pie/donut. Para rankings largos usa horizontalBar.
+- Para stackedBar rellena labels con las categorías y series con [{name, values}].
 - Para DONACIONES, suma el campo Valor. Para COMPRAS, suma Importe. Para INGRESOS, el total por línea es Importe obligatorio + Importe voluntario.
 - Para “producto/artículo más utilizado comprado/donado”, mide por Unidades, separando Comprado y Donado si el usuario lo pide.
 - Para listados, usa todos los registros relevantes. Puedes resumir en la respuesta principal, pero aporta una tabla o fichero si procede.
@@ -961,13 +965,14 @@ function directGraphResultIfApplicable(prompt, context) {
 
 function normalizeResult(raw, model) {
   const out = raw && typeof raw === 'object' ? raw : {};
-  const charts = arr(out.charts).map(ch => ({
-    title: trim(ch.title || 'Gráfica'),
-    type: ['bar','horizontalBar','pie'].includes(trim(ch.type)) ? trim(ch.type) : 'bar',
-    labels: arr(ch.labels).map(x => trim(x)).slice(0, 30),
-    values: arr(ch.values).map(x => round(x, 4)).slice(0, 30),
-    unit: trim(ch.unit || '')
-  })).filter(ch => ch.labels.length && ch.values.length);
+  const charts = arr(out.charts).map(ch => {
+    const rawType = trim(ch.type || 'bar');
+    const type = ['bar','horizontalBar','pie','donut','line','stackedBar'].includes(rawType) ? rawType : 'bar';
+    const labels = arr(ch.labels).map(x => trim(x)).slice(0, 40);
+    const values = arr(ch.values).map(x => round(x, 4)).slice(0, 40);
+    const series = arr(ch.series).map(s => ({ name: trim(s?.name || 'Serie'), values: arr(s?.values).map(x => round(x, 4)).slice(0, 40) })).filter(s => s.values.length);
+    return { title: trim(ch.title || 'Gráfica'), type, labels, values, series, unit: trim(ch.unit || '') };
+  }).filter(ch => ch.labels.length && (ch.values.length || ch.series.length));
   const tables = arr(out.tables).map(tb => ({
     title: trim(tb.title || 'Tabla'),
     columns: arr(tb.columns).map(x => trim(x)).slice(0, 12),

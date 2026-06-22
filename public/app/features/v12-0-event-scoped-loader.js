@@ -98,6 +98,6 @@
     try{ document.addEventListener(name, function(){ patchChangeSelected(); schedule(name, 260); }, true); }catch(_){}
   });
   patchChangeSelected();
-  [250,900,1800].forEach(ms => setTimeout(function(){ patchChangeSelected(); schedule('startup', 0); }, ms));
+  [300,1200].forEach(ms => setTimeout(function(){ patchChangeSelected(); schedule('startup', 0); }, ms));
   window.ControlEventV120EventScopedLoader = { load, schedule, renderActive };
 })();

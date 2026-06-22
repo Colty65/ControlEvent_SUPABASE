@@ -9,7 +9,7 @@
   const SAFE_ROOT_SEL = [
     '#ceGeminiLibreOverlay',
     '#maintenanceWrapper', '#maintenancePanel', '#mtPersonas', '#mtEventos', '#mtTiendas', '#mtProductos', '#mtAcceso', '#mtImportar',
-    '#backupPanel', '#excelPanel', '#importPanel', '#downloadPanel'
+    '#backupPanel', '#excelPanel', '#importPanel', '#downloadPanel', '.ce-backup-overlay-v181', '.ce-backup-modal-v181', '#ceV120BackupScopeFix', '#ceBackupScopeV40', '#ceBackupScopeV257', '#ceBackupScopeSelectV841Id'
   ].join(',');
   const SAFE_BUTTON_SEL = [
     '#ceGeminiLibreBtn', '.ce-zuzu-open', '#btnToggleMaintenance', '#btnExportSeed', '#btnExportExcel', '#btnOpenImport',
@@ -81,6 +81,11 @@
     document.head.appendChild(style);
   }
   let safeUntil = 0;
+  let applyTimer = 0;
+  function scheduleApply(delay){
+    clearTimeout(applyTimer);
+    applyTimer = setTimeout(apply, delay == null ? 40 : delay);
+  }
   function mark(ev){ if(isSafeElement(ev && ev.target)){ safeUntil = Date.now() + 2500; } }
   function safeContext(){ return Date.now() < safeUntil || isSafeElement(document.activeElement); }
   function patchLockFunctions(){
@@ -95,7 +100,7 @@
     try{
       const old = window.renderLockState || (typeof renderLockState === 'function' ? renderLockState : null);
       if(old && !old.__ceV120FinalTools){
-        const w=function(){ const r=old.apply(this, arguments); setTimeout(apply,0); setTimeout(apply,80); return r; };
+        const w=function(){ const r=old.apply(this, arguments); scheduleApply(40); return r; };
         w.__ceV120FinalTools=true; window.renderLockState=w; try{ renderLockState=w; }catch(_){}
       }
     }catch(_){}
@@ -140,12 +145,73 @@
   }
   function around(ev){
     if(!isFinalizado()) return;
+    // v12.0 hotfix: no recorrer DOM en cada tecla/click de toda la app; solo en zonas de consulta permitidas.
+    if(!isSafeElement(ev && ev.target)) return;
     mark(ev); installPatches();
     const root = ev?.target?.closest?.(SAFE_ROOT_SEL);
     if(root) unlockRoot(root);
     if(isSafeElement(ev?.target)) unlock(ev.target);
-    setTimeout(apply,0);
+    scheduleApply(30);
   }
+
+  function fileNameFromDisposition(value){
+    const s = text(value);
+    const m = /filename\*?=(?:UTF-8''|\")?([^";]+)/i.exec(s);
+    return m ? decodeURIComponent(m[1].replace(/"/g,'')) : '';
+  }
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename || ('ControlEvent_v12.0_prod_BACKUP_' + Date.now() + '.xlsx');
+    a.style.display='none'; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ try{ a.remove(); URL.revokeObjectURL(url); }catch(_){} }, 1500);
+  }
+  function backupEvents(){
+    const evs = Array.isArray(st().eventos) ? st().eventos.slice() : [];
+    const seen = new Set();
+    return evs.filter(e => { const id=text(e&&e.id).trim(); if(!id || seen.has(id)) return false; seen.add(id); return true; });
+  }
+  function escHtml(v){ return text(v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+  async function runBackupDownload(scope){
+    const params = new URLSearchParams();
+    if(scope === 'TODOS') params.set('scope','all');
+    else { params.set('scope','event'); params.set('eventId', scope); }
+    const res = await fetch('/api/export/backup?' + params.toString() + '&ts=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('Servidor no generó BACKUP (' + res.status + ')');
+    const blob = await res.blob();
+    if(!blob || !blob.size) throw new Error('El BACKUP descargado está vacío.');
+    downloadBlob(blob, fileNameFromDisposition(res.headers.get('content-disposition')) || 'ControlEvent_v12.0_prod_BACKUP.xlsx');
+  }
+  function openBackupDialogFinalizado(){
+    const existing = document.getElementById('ceV120BackupOverlayFix'); if(existing) existing.remove();
+    const evs = backupEvents();
+    const cur = eventId();
+    const opts = ['<option value="TODOS">TODOS los eventos</option>'].concat(evs.map(e => '<option value="'+escHtml(e.id)+'" '+(text(e.id)===cur?'selected':'')+'>'+escHtml(e.titulo || e.id)+'</option>')).join('');
+    const overlay=document.createElement('div'); overlay.id='ceV120BackupOverlayFix'; overlay.className='ce-backup-overlay-v181';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML='<div class="ce-backup-modal-v181" style="max-width:520px;width:100%;background:#fff;border-radius:20px;padding:18px;box-shadow:0 24px 70px rgba(15,23,42,.35);font-family:system-ui,-apple-system,Segoe UI,sans-serif;">'+
+      '<h3 style="margin:0 0 8px;color:#0f172a;">Descarga de datos</h3><p style="margin:0 0 14px;color:#475569;font-size:14px;">Elige si quieres descargar todos los datos o solo los vinculados a un evento concreto.</p>'+
+      '<div class="field" style="display:grid;gap:6px;margin-bottom:14px;"><label style="font-weight:900;color:#334155;">Evento a descargar</label><select id="ceV120BackupScopeFix" style="padding:10px;border:1px solid #cbd5e1;border-radius:12px;font-weight:800;">'+opts+'</select></div>'+
+      '<div style="display:flex;gap:10px;justify-content:flex-end;"><button type="button" id="ceV120BackupCancelFix" class="outline" style="padding:10px 14px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;font-weight:900;">Cancelar</button><button type="button" id="ceV120BackupOkFix" style="padding:10px 14px;border-radius:12px;border:0;background:#f97316;color:#fff;font-weight:900;">Descargar</button></div><div id="ceV120BackupMsgFix" style="margin-top:10px;font-weight:800;color:#475569;"></div></div>';
+    document.body.appendChild(overlay); unlockRoot(overlay);
+    overlay.addEventListener('click', ev => { if(ev.target===overlay) overlay.remove(); }, true);
+    overlay.querySelector('#ceV120BackupCancelFix').addEventListener('click', () => overlay.remove(), true);
+    overlay.querySelector('#ceV120BackupOkFix').addEventListener('click', async ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const msg=overlay.querySelector('#ceV120BackupMsgFix'); const btn=overlay.querySelector('#ceV120BackupOkFix');
+      try{ btn.disabled=true; if(msg) msg.textContent='Preparando BACKUP...'; await runBackupDownload(overlay.querySelector('#ceV120BackupScopeFix')?.value || 'TODOS'); overlay.remove(); }
+      catch(err){ if(msg) msg.textContent='No se pudo descargar: '+(err && err.message || err); btn.disabled=false; }
+    }, true);
+  }
+  function interceptBackupFinalizado(ev){
+    const b = ev && ev.target && ev.target.closest && ev.target.closest('#btnExportSeed,.mobile-menu-action[data-target="btnExportSeed"]');
+    if(!b || !isFinalizado()) return;
+    ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    installPatches(); openBackupDialogFinalizado();
+    return false;
+  }
+  document.addEventListener('click', interceptBackupFinalizado, true);
+  document.addEventListener('touchend', interceptBackupFinalizado, {capture:true, passive:false});
+
   ['focusin','pointerdown','mousedown','click','touchstart','touchend','pointerup','keydown','keypress','keyup','beforeinput','input','change'].forEach(name=>{
     try{ document.addEventListener(name, around, {capture:true, passive:false}); }catch(_){}
     try{ window.addEventListener(name, around, {capture:true, passive:false}); }catch(_){}
@@ -155,7 +221,6 @@
     try{ document.addEventListener(name, () => { installPatches(); setTimeout(apply,0); setTimeout(apply,120); }, true); }catch(_){}
   });
   installPatches();
-  [60,180,450,900,1600,2600,4200].forEach(ms=>setTimeout(apply,ms));
-  setInterval(function(){ if(isFinalizado()) apply(); }, 1200);
+  [80,500,1400].forEach(ms=>setTimeout(apply,ms));
   window.ControlEventV120FinalizadoTools = { apply, isFinalizado };
 })();
