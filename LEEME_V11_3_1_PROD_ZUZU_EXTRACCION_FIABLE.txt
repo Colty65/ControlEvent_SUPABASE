@@ -1,4 +1,4 @@
-﻿ControlEvent v13.0_prod - Correccion Zuzu extraccion fiable
+ControlEvent v13.0_prod - Correccion Zuzu extraccion fiable
 
 Objetivo:
 - Evitar que Zuzu entregue listados incompletos cuando el usuario pide datos concretos de un modulo.

@@ -1,7 +1,7 @@
-﻿/* ControlEvent v13.0_prod - Mapa de recursos: filtros/buscador activos en solo lectura.
+/* ControlEvent v13.0_prod - Mapa de recursos: filtros/buscador activos en solo lectura.
    Alcance: solo Mapa de Recursos. No toca datos, BACKUP, INFOEVENTO ni Documentos.
    Permite seleccionar responsables, buscar y usar los botones locales de Entregado/Comprado
-   aunque el evento estÃ© Finalizado o el usuario sea RO. */
+   aunque el evento esté Finalizado o el usuario sea RO. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod mapa-readonly-controls-2';
@@ -95,7 +95,7 @@
     if(!p) return false;
     try{ p.style.setProperty('pointer-events','auto','important'); p.style.setProperty('opacity','1','important'); p.style.removeProperty('filter'); p.removeAttribute('aria-disabled'); }catch(_){ }
     p.querySelectorAll(CONTROL_SELECTOR).forEach(enable);
-    // Por si el botÃ³n flotante estÃ¡ fuera del panel.
+    // Por si el botón flotante está fuera del panel.
     enable($('ceMapaFloatingHomeButton'));
     try{ window.__ceV85MapaReadonlyControlsLast = {version:VERSION, reason:reason || '', at:Date.now()}; }catch(_){ }
     return true;

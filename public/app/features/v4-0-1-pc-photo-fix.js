@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v13.0_prod - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -175,7 +175,7 @@
     return lines.length > 1 ? lines.join('\n') : fallback;
   }
   function money(value){
-    return safe(() => new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(Number(value || 0)), `${Number(value || 0).toFixed(2)} â‚¬`);
+    return safe(() => new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(Number(value || 0)), `${Number(value || 0).toFixed(2)} €`);
   }
   function renderInfoHtml(text){
     const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
@@ -221,7 +221,7 @@
       <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
       <div class="ce-v401-pc-modal-info">${renderInfoHtml(info)}</div>
       <img class="ce-v401-pc-modal-img" alt="${esc(title)}" src="${esc(src)}">
-      <button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">âœ• Cerrar</button>
+      <button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button>
     </div>`;
     document.body.appendChild(modal);
     safe(() => modal.querySelector('[data-close]')?.focus({preventScroll:true}), null);

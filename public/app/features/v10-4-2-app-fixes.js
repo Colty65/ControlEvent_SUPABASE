@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - estabilizaciÃ³n: menos refrescos, arranque limpio, bienvenida festiva y duplicar pantalla claro. */
+/* ControlEvent v13.0_prod - estabilización: menos refrescos, arranque limpio, bienvenida festiva y duplicar pantalla claro. */
 (function(){
   'use strict';
   if(window.__ceV1042AppFixes) return; window.__ceV1042AppFixes=true;
@@ -35,7 +35,7 @@
   }
   function updatePrelogin(){
     // HOTFIX LOGIN 2: no usar una clase global para ocultar la app.
-    // El bloqueo anterior podÃ­a quedarse activo si authUser tardaba en hidratarse tras /api/login.
+    // El bloqueo anterior podía quedarse activo si authUser tardaba en hidratarse tras /api/login.
     try{ document.documentElement.classList.remove('ce-prelogin-clean'); }catch(_){}
   }
   function ensureWelcome(){
@@ -44,7 +44,7 @@
     var msg=$('noEventMessage'); if(!msg) return;
     msg.classList.remove('hidden');
     if(!msg.querySelector('.ce-v1042-welcome')){
-      msg.innerHTML='<div class="ce-v1042-welcome"><div class="ce-v1042-party"><span>âœ¨</span><span>ðŸš€</span><span>â­</span><span>ðŸŽ‰</span><span>ðŸ’«</span><span>ðŸŽŠ</span><span>ðŸš€</span></div><div class="ce-v1042-welcome-inner"><img class="ce-v1042-welcome-logo" src="./assets/icons/controlevent-welcome-v44.png" alt="ControlEvent"><h2>Selecciona un evento para trabajar</h2><p>La fiesta empieza al elegir el evento.</p></div></div>';
+      msg.innerHTML='<div class="ce-v1042-welcome"><div class="ce-v1042-party"><span>✨</span><span>🚀</span><span>⭐</span><span>🎉</span><span>💫</span><span>🎊</span><span>🚀</span></div><div class="ce-v1042-welcome-inner"><img class="ce-v1042-welcome-logo" src="./assets/icons/controlevent-welcome-v44.png" alt="ControlEvent"><h2>Selecciona un evento para trabajar</h2><p>La fiesta empieza al elegir el evento.</p></div></div>';
     }
   }
   function safeDownloadName(base){ return trim(base||'foto').replace(/[\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').slice(0,90)||'foto'; }
@@ -64,7 +64,7 @@
       var imgs=Array.prototype.slice.call(card.querySelectorAll('img')).filter(isLikelyReceiptImg); if(!imgs.length) return;
       var buttons=Array.prototype.slice.call(card.querySelectorAll('.ce-v104-ingreso-download,.ce-v1041-ingreso-download,.ce-v1042-ingreso-download,.ce-ticket-download-v95'));
       var first=buttons[0]; buttons.slice(1).forEach(function(b){ b.remove(); });
-      if(!first){ first=document.createElement('button'); first.type='button'; first.className='outline small ce-v1042-ingreso-download'; first.title='Descargar justificante'; first.setAttribute('aria-label','Descargar justificante'); first.textContent='â¬‡ï¸'; imgs[0].insertAdjacentElement('afterend', first); }
+      if(!first){ first=document.createElement('button'); first.type='button'; first.className='outline small ce-v1042-ingreso-download'; first.title='Descargar justificante'; first.setAttribute('aria-label','Descargar justificante'); first.textContent='⬇️'; imgs[0].insertAdjacentElement('afterend', first); }
       first.classList.add('ce-v1042-ingreso-download');
       first.onclick=function(ev){ stop(ev); return downloadSrc(imgs[0].currentSrc||imgs[0].src,'justificante_ingreso_'+(idx+1)); };
     });
@@ -73,14 +73,14 @@
     var actions=document.querySelector('.appname-stack .user-actions')||document.querySelector('.appname-stack'); if(!actions) return;
     var old=$('ceShareScreenBtn1041'); if(old) old.remove(); var old0=$('ceShareScreenBtn'); if(old0) old0.remove();
     var btn=$('ceShareScreenBtn1042');
-    if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn1042'; btn.className='outline small'; btn.title='Duplicar pantalla en TV/proyector'; btn.setAttribute('aria-label','Duplicar pantalla en TV/proyector'); btn.textContent='ðŸ“º'; actions.insertBefore(btn, actions.firstChild||null); }
+    if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn1042'; btn.className='outline small'; btn.title='Duplicar pantalla en TV/proyector'; btn.setAttribute('aria-label','Duplicar pantalla en TV/proyector'); btn.textContent='📺'; actions.insertBefore(btn, actions.firstChild||null); }
   }
   function openSharePanel(){
     var old=$('ceShareScreenPanel1042'); if(old) old.remove();
-    var html='<div id="ceShareScreenPanel1042"><div class="box"><div class="head"><div>ðŸ“º Duplicar pantalla en TV / proyector</div><button type="button" class="outline small" data-ce-share1042-close>Cerrar</button></div>'+ 
-      '<div class="ce-share1042-help"><b>ControlEvent no puede elegir directamente una TV desde la web.</b> La app solo puede ponerse a pantalla completa; la conexiÃ³n con la TV la hace el sistema operativo.<br><br><b>Windows/PC:</b> pulsa primero <b>Pantalla completa</b> y despuÃ©s <b>Win + K</b>. En el panel de Windows elige la TV/proyector. Si no aparece, revisa que la TV acepte Miracast/ProyecciÃ³n inalÃ¡mbrica y estÃ© en la misma red.<br><b>iPad/iPhone:</b> abre el Centro de control â†’ <b>Duplicar pantalla</b> â†’ elige Apple TV/AirPlay.<br><b>Android:</b> ajustes rÃ¡pidos â†’ <b>Enviar pantalla / Smart View / Cast</b>.</div>'+ 
-      '<div class="ce-share1042-actions"><button type="button" class="modify small" data-ce-share1042-full>â›¶ Pantalla completa</button><button type="button" class="outline small" data-ce-share1042-url>ðŸ”— Copiar enlace de la app</button></div>'+ 
-      '<div id="ceShareStatus1042" class="ce-share1042-status">DespuÃ©s de Pantalla completa usa Win+K / AirPlay / Cast desde el dispositivo.</div></div></div>';
+    var html='<div id="ceShareScreenPanel1042"><div class="box"><div class="head"><div>📺 Duplicar pantalla en TV / proyector</div><button type="button" class="outline small" data-ce-share1042-close>Cerrar</button></div>'+ 
+      '<div class="ce-share1042-help"><b>ControlEvent no puede elegir directamente una TV desde la web.</b> La app solo puede ponerse a pantalla completa; la conexión con la TV la hace el sistema operativo.<br><br><b>Windows/PC:</b> pulsa primero <b>Pantalla completa</b> y después <b>Win + K</b>. En el panel de Windows elige la TV/proyector. Si no aparece, revisa que la TV acepte Miracast/Proyección inalámbrica y esté en la misma red.<br><b>iPad/iPhone:</b> abre el Centro de control → <b>Duplicar pantalla</b> → elige Apple TV/AirPlay.<br><b>Android:</b> ajustes rápidos → <b>Enviar pantalla / Smart View / Cast</b>.</div>'+ 
+      '<div class="ce-share1042-actions"><button type="button" class="modify small" data-ce-share1042-full>⛶ Pantalla completa</button><button type="button" class="outline small" data-ce-share1042-url>🔗 Copiar enlace de la app</button></div>'+ 
+      '<div id="ceShareStatus1042" class="ce-share1042-status">Después de Pantalla completa usa Win+K / AirPlay / Cast desde el dispositivo.</div></div></div>';
     document.body.insertAdjacentHTML('beforeend',html);
   }
   function shareStatus(msg){ var el=$('ceShareStatus1042'); if(el) el.textContent=msg||''; }
@@ -92,7 +92,7 @@
     if(t.closest('[data-ce-share1042-url]')){ stop(ev); var u=location.href; if(navigator.clipboard) navigator.clipboard.writeText(u).then(function(){shareStatus('Enlace copiado. Puedes abrir la misma app en otro dispositivo.');}).catch(function(){prompt('Copia esta URL:',u);}); else prompt('Copia esta URL:',u); return false; }
   }
 
-  // HOTFIX LOGIN 2: proteger los campos de login frente a repintados rÃ¡pidos de parches legacy.
+  // HOTFIX LOGIN 2: proteger los campos de login frente a repintados rápidos de parches legacy.
   var loginDraft={ident:'', clave:''};
   function loginOverlayVisible(){ var o=$('authOverlay'); return !!(o && !o.classList.contains('hidden')); }
   function captureLoginDraft(){

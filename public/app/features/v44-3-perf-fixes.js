@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - OptimizaciÃ³n controlada de render y grÃ¡ficas.
-   Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el grÃ¡fico antiguo de barras y corregir mediciÃ³n PERF. */
+/* ControlEvent v13.0_prod - Optimización controlada de render y gráficas.
+   Alcance: evitar renderizar todas las ventanas en cada cambio, evitar el gráfico antiguo de barras y corregir medición PERF. */
 (function(){
   'use strict';
 
@@ -57,7 +57,7 @@
   }
   function pruneInactive(active, reason){
     // v45.1: limpieza selectiva. No se barre todo en cada render.
-    // Solo se limpia una vez por combinaciÃ³n ventana/evento, o cuando se fuerza.
+    // Solo se limpia una vez por combinación ventana/evento, o cuando se fuerza.
     const key = String(active || '') + '|' + String(selectedEventId() || '');
     const force = reason === 'event-change' || reason === 'force';
     const t = Date.now();
@@ -184,13 +184,13 @@
       };
       const tab = map[target];
       if(!tab || tab === 'planificacion') return;
-      // Solo sincroniza el tab antes de que actÃºe el manejador existente; no renderiza aquÃ­ para evitar doble trabajo.
+      // Solo sincroniza el tab antes de que actúe el manejador existente; no renderiza aquí para evitar doble trabajo.
       setCurrentTab(tab);
     }, true);
   }
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }
-    // v45.1: actualizaciÃ³n ligera de versiÃ³n. Evita recorrer todo el DOM en cada instalaciÃ³n.
+    // v45.1: actualización ligera de versión. Evita recorrer todo el DOM en cada instalación.
     document.querySelectorAll('.appname span,.appname-stack span,[data-ce-version-label]').forEach(el => {
       const t = el.textContent || '';
       if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/.test(t)) el.textContent = t.replace(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/g, VERSION);

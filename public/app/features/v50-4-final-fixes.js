@@ -1,8 +1,8 @@
-﻿/* ControlEvent v13.0_prod - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
+/* ControlEvent v13.0_prod - estabilizacion final de menus por rol, justificantes de ingresos y refresco.
    - Un solo conjunto visible de controles de justificante en INGRESOS.
    - iPad: controles de justificante tratados como boton tactil propio, igual que tickets.
    - Salir/Refrescar visibles en movil vertical.
-   - RO/RW: menu estable sin enseÃ±ar opciones no permitidas durante repintados.
+   - RO/RW: menu estable sin enseñar opciones no permitidas durante repintados.
    - Rehidratacion de INGRESOS/DONACIONES/COMPRAS si alguna lista queda vacia tras elegir evento.
    - Cabeceras de globos: si una cabecera aparece al final, se recoloca al principio.
 */
@@ -166,13 +166,13 @@
     }catch(error){ console.warn('[v50.4] hydrate justificantes', error); }
   }
   function saveNow(){ try{ if(typeof saveState === 'function') return saveState(); }catch(_){ } try{ return window.saveState?.(); }catch(_){ } }
-  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v||0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; } }
-  function parseEuro(v){ if(typeof v==='number') return Number.isFinite(v)?v:0; let s=String(v??'').replace(/\s/g,'').replace(/â‚¬/g,''); if(s.includes(',')&&s.includes('.')) s=s.replace(/\./g,'').replace(',','.'); else if(s.includes(',')) s=s.replace(',','.'); const n=Number(s); return Number.isFinite(n)?n:0; }
+  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v||0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
+  function parseEuro(v){ if(typeof v==='number') return Number.isFinite(v)?v:0; let s=String(v??'').replace(/\s/g,'').replace(/€/g,''); if(s.includes(',')&&s.includes('.')) s=s.replace(/\./g,'').replace(',','.'); else if(s.includes(',')) s=s.replace(',','.'); const n=Number(s); return Number.isFinite(n)?n:0; }
   function receiptInfo(id){ const row=arr('colaboradores').find(r => same(r.id,id)) || {}; const p=arr('personas').find(x => same(x.id,row.personaId)) || {}; const ev=selectedEv() || {}; const socio=up(p.rango)==='SOCIO'; const precio=parseEuro(ev.precio); const obligatorio=socio ? precio * Number(row.numero || 0) : 0; const voluntario=parseEuro(row.importe); return {nombre:p.nombre||'-',rango:p.rango||'-',situacion:row.situacion||row.ingreso||'Pendiente',numero:Number(row.numero||0),obligatorio,voluntario,total:obligatorio+voluntario}; }
   function showReceipt(id,ev){
     const src=receiptSrc(id); if(!src){ alert('Este ingreso no tiene justificante adjunto.'); return stop(ev); }
     const info=receiptInfo(id); let ov=$('ceV504ReceiptModal'); if(ov) ov.remove(); ov=document.createElement('div'); ov.id='ceV504ReceiptModal'; ov.className='ce-v504-modal';
-    ov.innerHTML=`<div class="ce-v504-modal-card"><div class="ce-v504-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v504-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>SituaciÃ³n</td><td>${esc(info.situacion)}</td></tr><tr><td>NÂº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v504-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
+    ov.innerHTML=`<div class="ce-v504-modal-card"><div class="ce-v504-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v504-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>Situación</td><td>${esc(info.situacion)}</td></tr><tr><td>Nº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v504-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
     document.body.appendChild(ov);
     const close=e => { stop(e); try{ ov.remove(); }catch(_){ } setTimeout(() => { normalizeReceipts(); normalizeTooltips(); }, 30); return false; };
     ov.addEventListener('click', e => { if(e.target===ov || e.target?.closest?.('[data-close]')) return close(e); try{ e.stopPropagation(); }catch(_){ } }, true);
@@ -188,7 +188,7 @@
   async function removeReceipt(id,ev){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev); }
     if(isFinalizado()){ alert('Evento finalizado. No se puede eliminar el justificante.'); return stop(ev); }
-    if(!confirm('Â¿Eliminar el justificante de este ingreso?')) return stop(ev);
+    if(!confirm('¿Eliminar el justificante de este ingreso?')) return stop(ev);
     try{ deleteReceiptLocal(id); await fetch(`/api/ticket-images?eventId=${encodeURIComponent(selectedId())}&key=${encodeURIComponent(keyOnly(id))}`,{method:'DELETE'}); }catch(_){ }
     saveNow(); normalizeReceipts(); return stop(ev);
   }
@@ -199,7 +199,7 @@
     wrap.querySelectorAll('.itemcard,.rowline,.card').forEach(card => {
       const id=collabIdFromCard(card); if(!id) return;
       const src=receiptSrc(id); const writable=canWrite() && !isFinalizado();
-      const html=`${src ? `<button type="button" class="ce-v504-receipt-thumb" data-ce-v504-receipt="view" data-id="${esc(id)}" title="Ver justificante"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v504-receipt-empty" title="Sin justificante">ðŸ“·</span>`}${writable ? `<button type="button" class="ce-v504-receipt-btn" data-ce-v504-receipt="add" data-id="${esc(id)}" title="${src?'Cambiar justificante':'Adjuntar justificante'}">ðŸ“Ž</button>${src ? `<button type="button" class="ce-v504-receipt-btn danger" data-ce-v504-receipt="delete" data-id="${esc(id)}" title="Eliminar justificante">ðŸ—‘</button>` : ''}` : ''}`;
+      const html=`${src ? `<button type="button" class="ce-v504-receipt-thumb" data-ce-v504-receipt="view" data-id="${esc(id)}" title="Ver justificante"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v504-receipt-empty" title="Sin justificante">📷</span>`}${writable ? `<button type="button" class="ce-v504-receipt-btn" data-ce-v504-receipt="add" data-id="${esc(id)}" title="${src?'Cambiar justificante':'Adjuntar justificante'}">📎</button>${src ? `<button type="button" class="ce-v504-receipt-btn danger" data-ce-v504-receipt="delete" data-id="${esc(id)}" title="Eliminar justificante">🗑</button>` : ''}` : ''}`;
       let boxes=Array.from(card.querySelectorAll('.ce-v504-receipt-strip')); let box=boxes.shift(); boxes.forEach(x => { try{ x.remove(); }catch(_){ } });
       if(!box){ box=document.createElement('div'); box.className='ce-v504-receipt-strip'; const target=card.querySelector('button[data-action="save-collab"]')?.parentElement || card.querySelector('button[data-action="delete-collab"]')?.parentElement || card; try{ target.appendChild(box); }catch(_){ card.appendChild(box); } }
       if(box.dataset.sig !== html){ box.innerHTML=html; box.dataset.sig=html; }
@@ -224,7 +224,7 @@
       setCurrentTab(tabBefore); applyRoleMenu(); call('renderAuthUI'); call('renderHeader'); call('render');
       setTimeout(() => { applyRoleMenu(); ensureCriticalData('soft-refresh'); hydrateReceipts(true); normalizeReceipts(); }, 120);
       return true;
-    }catch(error){ console.warn('[v50.4] refrescar', error); alert('No se pudo refrescar. Prueba cambiar de evento o salir/entrar si continÃºa.'); return false; }
+    }catch(error){ console.warn('[v50.4] refrescar', error); alert('No se pudo refrescar. Prueba cambiar de evento o salir/entrar si continúa.'); return false; }
     finally{ softRefresh.busy=false; if(btn){ btn.textContent=prev; btn.disabled=false; } }
   }
   function handleRefresh(ev){ const btn=ev.target?.closest?.('#btnSoftRefresh'); if(!btn) return; stop(ev); const r=window.ControlEventV452?.refreshActive; if(typeof r==='function'){ try{ r('v50.4-direct'); }catch(_){ softRefresh('v50.4-fallback'); } } else softRefresh('v50.4-direct'); return false; }

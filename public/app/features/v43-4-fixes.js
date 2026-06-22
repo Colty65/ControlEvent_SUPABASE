@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - grÃ¡ficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v13.0_prod - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
@@ -14,7 +14,7 @@
   };
   const moneyF = v => {
     try{ return (typeof money === 'function') ? money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }
-    catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v||0).toFixed(2)} €`; }
   };
   const cssEsc = v => { try{ return window.CSS?.escape ? CSS.escape(String(v ?? '')) : String(v ?? '').replace(/[^a-zA-Z0-9_-]/g, '\\$&'); }catch(_){ return String(v ?? '').replace(/"/g,'\\"'); } };
   const st = () => { try{ if(typeof state !== 'undefined') return state || {}; }catch(_){ } return window.state || {}; };
@@ -165,7 +165,7 @@
       return tokens.every(t => hay.includes(t));
     });
     if(found) setFound(found);
-    else try{ alert('No se ha encontrado ningÃºn registro con ese texto.'); }catch(_){ }
+    else try{ alert('No se ha encontrado ningún registro con ese texto.'); }catch(_){ }
     return true;
   }
   function ensureSearch(listId, inputId, label){
@@ -177,7 +177,7 @@
   }
   function syncSearches(){
     ensureSearch('comprasList','comprasSearchInput','Buscar compra');
-    ensureSearch('donacionesList','donacionesSearchInput','Buscar donaciÃ³n');
+    ensureSearch('donacionesList','donacionesSearchInput','Buscar donación');
   }
   function installSearchInterceptors(){
     if(window.__ceV434SearchInterceptors) return;
@@ -296,9 +296,9 @@
         comprado:sum(comprados.map(value), null) + sum(corrientes.map(value), null),
         donado:sum(donados.map(value), null),
         pendiente:sum(pendientes.map(value), null),
-        listComprado:comprados.concat(corrientes).map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${c.ticketDonacion || ''} â€” ${moneyF(value(c))}`),
-        listDonado:donados.map(c=>`${donorName(c)||'Sin donante'} â€” ${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${moneyF(value(c))}`),
-        listPendiente:pendientes.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${moneyF(value(c))}`)
+        listComprado:comprados.concat(corrientes).map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${c.ticketDonacion || ''} — ${moneyF(value(c))}`),
+        listDonado:donados.map(c=>`${donorName(c)||'Sin donante'} — ${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${moneyF(value(c))}`),
+        listPendiente:pendientes.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${moneyF(value(c))}`)
       };
       row.total = row.comprado + row.donado + row.pendiente;
       return row;
@@ -335,7 +335,7 @@
     const own = wrap.firstElementChild?.classList?.contains('ce-v434-chart-layout-shell') && wrap.children.length === 1;
     if(own && lastChartSignature === signature && options.force !== true) return;
     chartRendering = true;
-    const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>DistribuciÃ³n general</span></div><div class="ce-v434-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div></div>`;
+    const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = signature;
     wrap.dataset.ceStableChart = 'v43.7';
@@ -370,7 +370,7 @@
       [/COMPRAS\s+PRODUCTO/g, 'COMPRAS'],
       [/Donado\s+producto/gi, 'DONACION DE PRODUCTO'],
       [/DONADO\s+PRODUCTO/g, 'DONACION DE PRODUCTO'],
-      [/DonaciÃ³n\s+de\s+producto/gi, 'DONACION DE PRODUCTO']
+      [/Donación\s+de\s+producto/gi, 'DONACION DE PRODUCTO']
     ];
     const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
     const nodes = [];

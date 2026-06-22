@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Rescate afinado: descargas, bÃºsquedas, carga COMPRAS y mapa iPad.
-   No usa intervalos ni refrescos en bucle. Solo actÃºa por eventos o cambios reales del DOM. */
+/* ControlEvent v13.0_prod - Rescate afinado: descargas, búsquedas, carga COMPRAS y mapa iPad.
+   No usa intervalos ni refrescos en bucle. Solo actúa por eventos o cambios reales del DOM. */
 (function(){
   'use strict';
   if(window.__ceV1047RescueFixes) return; window.__ceV1047RescueFixes=true;
@@ -50,7 +50,7 @@
   function isDownloadButton(btn){
     if(!btn || btn.tagName!=='BUTTON') return false;
     var t=fold((btn.textContent||'')+' '+(btn.title||'')+' '+(btn.getAttribute('aria-label')||'')+' '+(btn.className||''));
-    return /DESCARG|â¬‡|CE-V104|CE-V103|CE-TICKET-DOWNLOAD|DOWNLOAD/.test(t);
+    return /DESCARG|⬇|CE-V104|CE-V103|CE-TICKET-DOWNLOAD|DOWNLOAD/.test(t);
   }
   function cardOf(img, root){ return (img.closest && img.closest('.ce-doc-item,.ce-doc-media,.ce-v509-receipt-field,.ce-v504-receipt-strip,.ce-v502-receipt-strip,.ce-v465-receipt-strip,.itemcard,.rowline,.card')) || img.parentElement || root; }
   function photoImgs(root, mode){
@@ -62,7 +62,7 @@
     });
   }
   function makeDownloadButton(cls, img, name){
-    var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v1047-download '+cls; btn.textContent='â¬‡ï¸'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto'); btn.setAttribute('data-ce-download-bound','1');
+    var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v1047-download '+cls; btn.textContent='⬇️'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto'); btn.setAttribute('data-ce-download-bound','1');
     function go(ev){ stop(ev); var now=Date.now(); if(btn.__last && now-btn.__last<800) return false; btn.__last=now; return downloadSrc(srcOfImg(img), name); }
     ['pointerdown','touchstart','touchend','click'].forEach(function(evname){ btn.addEventListener(evname, go, {capture:true,passive:false}); });
     return btn;

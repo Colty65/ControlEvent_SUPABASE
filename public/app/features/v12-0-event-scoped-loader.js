@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - carga fiable por evento sin refrescos en bucle.
-   Al cambiar de evento hace una Ãºnica lectura /api/state?eventId=... y repinta la ventana activa. */
+/* ControlEvent v13.0_prod - carga fiable por evento sin refrescos en bucle.
+   Al cambiar de evento hace una única lectura /api/state?eventId=... y repinta la ventana activa. */
 (function(){
   'use strict';
   if (window.__ceV120EventScopedLoader) return;

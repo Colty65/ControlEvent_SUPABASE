@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - correccion puntual sobre v50.19.
+/* ControlEvent v13.0_prod - correccion puntual sobre v50.19.
    - Login: intercepta el boton antes de los manejadores antiguos para que el panel de acceso no quede delante.
    - INGRESOS movil: muestra un bloque unico y visible de justificante en cada ficha usando las mismas fotos que los globos.
    - No usa temporizadores permanentes de version.
@@ -198,14 +198,14 @@
     const clave = String($('loginClave')?.value || '');
     const error = $('authError');
     if(error) error.textContent = '';
-    if(!ident || !clave){ if(error) error.textContent = 'Introduce identificaciÃ³n y clave.'; return false; }
+    if(!ident || !clave){ if(error) error.textContent = 'Introduce identificación y clave.'; return false; }
     loginBusy = true;
     try{
       const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({identificacion:ident, clave})});
       const text = await res.text();
       const data = (() => { try{ return JSON.parse(text || '{}'); }catch(_){ return {}; } })();
       if(text && !data.error) data.error = text;
-      if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no vÃ¡lido');
+      if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       safe(() => sessionStorage.removeItem(LOGOUT_KEY_508), null);
       safe(() => sessionStorage.removeItem('ControlEvent_v13.0_prod_logout_at'), null);
       await loadFreshState();
@@ -301,13 +301,13 @@
 
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
     const n = Number(s); return Number.isFinite(n) ? n : 0;
   }
-  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; } }
+  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
   function receiptInfo(id){
     const raw = arr('colaboradores').find(r => same(r.id,id)) || {};
     const persona = arr('personas').find(p => same(p.id, raw.personaId)) || {};
@@ -343,7 +343,7 @@
       const writable = canWrite() && !isFinalizado();
       const field = ensureReceiptField(card);
       const strip = field.querySelector('.ce-v509-receipt-strip') || field;
-      const html = `${src ? `<button type="button" class="ce-v509-receipt-thumb" data-ce-v509-receipt="view" data-id="${esc(id)}" title="Ver justificante"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v509-receipt-empty" title="Sin justificante">ðŸ“·</span>`}${writable ? `<button type="button" class="ce-v509-receipt-btn" data-ce-v509-receipt="add" data-id="${esc(id)}" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}">ðŸ“Ž</button>${src ? `<button type="button" class="ce-v509-receipt-btn danger" data-ce-v509-receipt="delete" data-id="${esc(id)}" title="Eliminar justificante">ðŸ—‘</button>` : ''}` : ''}`;
+      const html = `${src ? `<button type="button" class="ce-v509-receipt-thumb" data-ce-v509-receipt="view" data-id="${esc(id)}" title="Ver justificante"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v509-receipt-empty" title="Sin justificante">📷</span>`}${writable ? `<button type="button" class="ce-v509-receipt-btn" data-ce-v509-receipt="add" data-id="${esc(id)}" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}">📎</button>${src ? `<button type="button" class="ce-v509-receipt-btn danger" data-ce-v509-receipt="delete" data-id="${esc(id)}" title="Eliminar justificante">🗑</button>` : ''}` : ''}`;
       const sig = JSON.stringify({html, src:!!src, writable, locked:isFinalizado(), role:role()});
       if(strip.dataset.sig !== sig){ strip.innerHTML = html; strip.dataset.sig = sig; }
       field.dataset.receiptHas = String(!!src);
@@ -356,7 +356,7 @@
     const info = receiptInfo(id);
     let ov = $('ceV509ReceiptModal'); if(ov) ov.remove();
     ov = document.createElement('div'); ov.id='ceV509ReceiptModal'; ov.className='ce-v509-modal';
-    ov.innerHTML = `<div class="ce-v509-modal-card" role="dialog" aria-modal="true"><div class="ce-v509-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v509-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>SituaciÃ³n</td><td>${esc(info.situacion)}</td></tr><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>NÂº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v509-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
+    ov.innerHTML = `<div class="ce-v509-modal-card" role="dialog" aria-modal="true"><div class="ce-v509-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v509-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>Situación</td><td>${esc(info.situacion)}</td></tr><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>Nº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v509-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
     document.body.appendChild(ov);
     const close = e => { stop(e || {}); try{ ov.remove(); }catch(_){ } setTimeout(normalizeReceiptFields, 40); return false; };
     ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) return close(e); try{ e.stopPropagation(); }catch(_){ } }, true);
@@ -393,7 +393,7 @@
     stop(ev || window.event || {});
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return false; }
     if(isFinalizado()){ alert('Evento finalizado. No se puede eliminar el justificante.'); return false; }
-    if(!confirm('Â¿Eliminar el justificante de este ingreso?')) return false;
+    if(!confirm('¿Eliminar el justificante de este ingreso?')) return false;
     try{ deleteReceiptLocal(id); await fetch(`/api/ticket-images?eventId=${encodeURIComponent(selectedId())}&key=${encodeURIComponent(keyOnly(id))}`, {method:'DELETE'}); }catch(_){ }
     normalizeReceiptFields();
     return false;

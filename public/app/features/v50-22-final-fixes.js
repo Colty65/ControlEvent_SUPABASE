@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - correccion minima sobre la base estable v50.20.
+/* ControlEvent v13.0_prod - correccion minima sobre la base estable v50.20.
    - No carga la capa v50.21 que bloqueaba la seleccion de evento.
    - Salir limpia el evento anterior antes de volver a Login.
    - Tras login queda CE + Selecciona evento; al elegir evento no se vuelve a bloquear.

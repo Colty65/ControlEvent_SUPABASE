@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
-   FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automÃ¡tico de producto y orden visual del ticket. */
+/* ControlEvent v13.0_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+   FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';
   var TAG='__ceV102TicketAutoComprasSmartProducts';
@@ -24,7 +24,7 @@
   function normalizeName(v){ return trim(v).replace(/\s+/g,' ').toUpperCase(); }
   function money(v){
     if(typeof v==='number') return isFinite(v) ? v : 0;
-    var s=text(v).replace(/â‚¬/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
+    var s=text(v).replace(/€/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
     var c=s.lastIndexOf(','), d=s.lastIndexOf('.');
     if(c!==-1 && d!==-1) s = c>d ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,'');
     else if(c!==-1) s = s.replace(/\./g,'').replace(',', '.');
@@ -33,7 +33,7 @@
   }
   function round2(v){ var n=money(v); return Math.round((n + Number.EPSILON) * 100) / 100; }
   function dec(v){ var n=round2(v); return n ? n.toFixed(2) : '0.00'; }
-  function euro(v){ var n=money(v); return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' â‚¬'; }
+  function euro(v){ var n=money(v); return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
   function htmlEscape(v){ return text(v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function apiJson(url, init){
     return fetch(url, Object.assign({cache:'no-store'}, init||{})).then(function(res){
@@ -90,7 +90,7 @@
       '.ce-ai-totalbar{gap:6px!important;margin:6px 0!important}.ce-ai-totalbox{padding:6px 8px!important}.ce-ai-totalbox span{font-size:16px!important}.ce-ai-totalbox strong{font-size:11px!important}\n'+
       '.ce-ai-table-wrap{max-height:230px!important;min-height:92px!important}.ce-ai-table{font-size:12px!important}.ce-ai-table th{padding:4px 5px!important}.ce-ai-table td{padding:3px 5px!important}.ce-ai-table input,.ce-ai-table select{padding:4px 5px!important;border-radius:7px!important}\n'+
       '.ce-ai-table .col-ok{width:34px!important}.ce-ai-table .col-attr{width:112px!important}.ce-ai-table .col-num{width:68px!important}.ce-ai-table .col-conf{width:44px!important}.ce-ai-table .col-del{width:52px!important}\n'+
-      '.ce-ai-table button.ce-ai-danger{padding:4px 6px!important;font-size:0!important;border-radius:10px!important}.ce-ai-table button.ce-ai-danger::after{content:"âœ–";font-size:13px!important;}\n'+
+      '.ce-ai-table button.ce-ai-danger{padding:4px 6px!important;font-size:0!important;border-radius:10px!important}.ce-ai-table button.ce-ai-danger::after{content:"✖";font-size:13px!important;}\n'+
       '.ce-ai-pending-box{margin-top:7px!important;padding:8px!important}.ce-ai-pending-title{font-size:15px!important}.ce-ai-pending-tools{display:flex;align-items:center;gap:6px;margin-left:auto}.ce-ai-pending-tools label{font-size:11px;color:#0369a1;font-weight:900}.ce-ai-pending-tools select{border:1px solid #bae6fd;border-radius:8px;padding:5px;background:#fff;font-weight:800}\n'+
       '.ce-ai-pending-list{max-height:230px!important;margin-top:5px!important}.ce-ai-pending-row{grid-template-columns:30px minmax(120px,1fr) minmax(96px,150px) 96px 90px!important;gap:6px!important;padding:4px 0!important;font-size:12px!important}\n';
     st.textContent += "\n.ce-ai-head{display:flex!important;align-items:center!important;gap:10px!important;margin-bottom:4px!important}\n.ce-ai-title{flex:0 0 auto!important;white-space:nowrap!important;font-size:18px!important}\n.ce-ai-status{flex:1 1 auto!important;min-width:120px!important;margin:0 8px!important;padding:5px 8px!important;border-radius:9px!important;font-size:12px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;border:1px solid #e2e8f0!important;background:#f8fafc!important;color:#475569!important}\n.ce-ai-status:empty{visibility:hidden!important}\n.ce-ai-hintbox{padding:0!important;border:0!important;background:transparent!important;margin:0 0 4px 0!important}\n.ce-ai-hintbox textarea{min-height:34px!important;height:38px!important;font-size:12px!important;padding:6px 8px!important}\n.ce-ai-actions-top{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;align-items:center!important;margin:4px 0!important}\n.ce-ai-actions-top button{justify-self:center!important}.ce-ai-actions-top #ceAiAnalyze{justify-self:start!important}.ce-ai-actions-top #ceAiClear{justify-self:end!important}\n.ce-ai-actions-bottom{display:flex!important;justify-content:space-between!important;align-items:center!important;margin:5px 0 0 0!important}\n.ce-ai-icon-btn{width:32px!important;min-width:32px!important;height:30px!important;min-height:30px!important;font-size:16px!important;padding:1px!important;border-radius:8px!important;line-height:1!important}\n.ce-ai-totalbar{margin:4px 0!important}.ce-ai-totalbox{padding:5px 7px!important}.ce-ai-totalbox span{font-size:15px!important}.ce-ai-totalbox strong{font-size:11px!important}\n.ce-ai-table-wrap{max-height:238px!important;min-height:238px!important;flex:0 0 auto!important}.ce-ai-table{font-size:11px!important}.ce-ai-table th{padding:3px 4px!important}.ce-ai-table td{padding:2px 4px!important;height:29px!important}.ce-ai-table input,.ce-ai-table select{padding:3px 4px!important;font-size:11px!important}\n.ce-ai-table .col-ok{width:30px!important}.ce-ai-table .col-attr{width:100px!important}.ce-ai-table .col-num{width:62px!important}.ce-ai-table .col-conf{width:38px!important}.ce-ai-table .col-del{width:44px!important}.ce-ai-table button.ce-ai-danger{padding:3px 4px!important;font-size:10px!important}\n.ce-ai-right{overflow:hidden!important}.ce-ai-pending-box{flex:1 1 auto!important;min-height:120px!important;margin-top:6px!important;padding:7px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}.ce-ai-pending-title{font-size:13px!important;line-height:1.15!important}.ce-ai-pending-tools{display:flex!important;gap:5px!important;align-items:center!important}.ce-ai-pending-tools label{display:none!important}.ce-ai-pending-tools select{height:30px!important;font-size:11px!important;padding:2px 5px!important;border-radius:8px!important}\n.ce-ai-pending-list{flex:1 1 auto!important;max-height:none!important;overflow:auto!important;margin-top:5px!important}.ce-ai-pending-sub{display:none!important}.ce-ai-pending-row{grid-template-columns:28px 1fr 92px 90px 82px!important;gap:5px!important;padding:4px 0!important;font-size:11px!important}.ce-ai-pending-row input{width:16px!important;height:16px!important}\n";
@@ -114,7 +114,7 @@
     });
     return out;
   }
-  function normalizePlain(v){ return normalizeName(v).replace(/[ÃÃ€Ã„Ã‚]/g,'A').replace(/[Ã‰ÃˆÃ‹ÃŠ]/g,'E').replace(/[ÃÃŒÃÃŽ]/g,'I').replace(/[Ã“Ã’Ã–Ã”]/g,'O').replace(/[ÃšÃ™ÃœÃ›]/g,'U'); }
+  function normalizePlain(v){ return normalizeName(v).replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U'); }
   function isDonationTicket(v){
     var n=normalizePlain(v);
     return /^DON/.test(n) || n.indexOf('DONACION')>=0 || n.indexOf('DONADO')>=0;
@@ -137,8 +137,8 @@
     var out='<option value=""></option>';
     for(var i=1;i<=50;i++){
       var tk='TK'+String(i).padStart(2,'0'); var usedCount=Number(used[tk]||0); var isUsed=usedCount>0;
-      var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento ('+usedCount+' lÃ­neas)"':'');
-      out+='<option value="'+tk+'"'+attrs+'>'+tk+(isUsed?' âœ“':'')+'</option>';
+      var attrs=(tk===selected?' selected':'') + (isUsed?' class="ce-ai-ticket-used" style="background:#dcfce7;color:#166534;font-weight:900" title="TKxx ya utilizado en este evento ('+usedCount+' líneas)"':'');
+      out+='<option value="'+tk+'"'+attrs+'>'+tk+(isUsed?' ✓':'')+'</option>';
     }
     return out;
   }
@@ -146,7 +146,7 @@
     var sel=$('ceAiTicket'); if(!sel) return;
     var used=usedTicketMap(); var tk=trim(sel.value).toUpperCase(); var usedCount=Number(used[tk]||0); var isUsed=usedCount>0;
     sel.classList.toggle('ce-ai-ticket-used', isUsed);
-    sel.title=isUsed ? ('Este TKxx ya estÃ¡ usado en COMPRAS para este evento ('+usedCount+' lÃ­neas).') : 'Selecciona el TKxx del ticket.';
+    sel.title=isUsed ? ('Este TKxx ya está usado en COMPRAS para este evento ('+usedCount+' líneas).') : 'Selecciona el TKxx del ticket.';
   }
   function ticketFromText(v){
     var m=/\bTK\s*0*(\d{1,2})\b/i.exec(text(v||''));
@@ -161,7 +161,7 @@
     return '';
   }
   function sortLinesLikeTk(rows){
-    // Mantener el orden visual del ticket/foto. La IA devuelve las lÃ­neas en ese orden y el usuario puede comprobarlas contra la imagen.
+    // Mantener el orden visual del ticket/foto. La IA devuelve las líneas en ese orden y el usuario puede comprobarlas contra la imagen.
     return (rows || []).slice();
   }
   function ensureUi(){
@@ -176,7 +176,7 @@
     btn.setAttribute('data-ce-ai-ticket-open','1');
     btn.setAttribute('aria-label','Abrir Tickets IA');
     btn.title='Tickets IA: alta asistida de COMPRAS desde foto de ticket';
-    btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">ðŸ§¾âœ¨</span>';
+    btn.innerHTML='<span class="ce-ai-ticket-icon" aria-hidden="true">🧾✨</span>';
     btn.setAttribute('onclick','window.__ceOpenTicketAutoV101&&window.__ceOpenTicketAutoV101();return false;');
     var oldHeaderBtn=$('btnReceiptAiComprasHeader'); if(oldHeaderBtn && oldHeaderBtn.parentNode) oldHeaderBtn.parentNode.removeChild(oldHeaderBtn);
     var header=document.querySelector('#tabCompras > .card > .toggle-row');
@@ -190,7 +190,7 @@
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div class="ce-ai-title">ðŸ§¾âœ¨ Alta asistida de COMPRAS</div><div id="ceAiStatus" class="ce-ai-status info"></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+ 
+        '<div class="ce-ai-head"><div class="ce-ai-title">🧾✨ Alta asistida de COMPRAS</div><div id="ceAiStatus" class="ce-ai-status info"></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+ 
         '<div class="ce-ai-work">'+
           '<aside class="ce-ai-left">'+
             '<div class="ce-ai-photo-title">Foto del ticket</div>'+ 
@@ -203,13 +203,13 @@
               '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
               '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
             '</div>'+ 
-            '<div class="ce-ai-hintbox"><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan PÃ©rez; aÃ±ade PROPINAS 1 ud 73,05 â‚¬; aplica IVA general a las lÃ­neas si procede."></textarea></div>'+
-            '<div class="ce-ai-actions ce-ai-actions-top"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" aria-label="Analizar foto con IA"><span aria-hidden="true">ðŸ¤–</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" aria-label="AÃ±adir fila manual"><span aria-hidden="true">ðŸ¤šï¼‹</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" aria-label="Limpiar"><span aria-hidden="true">ðŸ§¹</span></button></div>'+ 
+            '<div class="ce-ai-hintbox"><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan Pérez; añade PROPINAS 1 ud 73,05 €; aplica IVA general a las líneas si procede."></textarea></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-top"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" aria-label="Analizar foto con IA"><span aria-hidden="true">🤖</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Añadir fila manual"><span aria-hidden="true">🤚＋</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" aria-label="Limpiar"><span aria-hidden="true">🧹</span></button></div>'+ 
             '<datalist id="ceAiProducts"></datalist><datalist id="ceAiSegmentos"></datalist><datalist id="ceAiDestinos"></datalist>'+ 
-            '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura lÃ­neas OK</strong><span id="ceAiTotalLines">0,00 â‚¬</span></div><div class="ce-ai-totalbox"><strong>Total leÃ­do en foto por IA</strong><span id="ceAiTotalPhoto">â€”</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">â€”</span></div></div>'+ 
-            '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin lÃ­neas todavÃ­a.</td></tr></tbody></table></div>'+ 
-            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas del evento. Marca para eliminar las ya compradas en este ticket</span><div class="ce-ai-pending-tools"><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Actualizar compras previstas">ðŸ”„</button></div></div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
-            '<div class="ce-ai-actions ce-ai-actions-bottom"><button type="button" id="ceAiProcess" class="ce-ai-primary ce-ai-icon-btn" aria-label="Procesar y llevar a COMPRAS"><span aria-hidden="true">âš™ï¸âš™ï¸</span></button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Recargar evento"><span aria-hidden="true">ðŸ”‹â†»</span></button></div>'+ 
+            '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
+            '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
+            '<div id="ceAiPendingBox" class="ce-ai-pending-box"><div class="ce-ai-pending-title"><span>Compras previstas del evento. Marca para eliminar las ya compradas en este ticket</span><div class="ce-ai-pending-tools"><select id="ceAiPendingSort"><option value="tienda">por Tienda</option><option value="producto">por Producto</option></select><button type="button" id="ceAiPendingRefresh" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Actualizar compras previstas">🔄</button></div></div><div id="ceAiPendingList" class="ce-ai-pending-list"></div></div>'+
+            '<div class="ce-ai-actions ce-ai-actions-bottom"><button type="button" id="ceAiProcess" class="ce-ai-primary ce-ai-icon-btn" aria-label="Procesar y llevar a COMPRAS"><span aria-hidden="true">⚙️⚙️</span></button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Recargar evento"><span aria-hidden="true">🔋↻</span></button></div>'+ 
           '</section>'+ 
         '</div>'+ 
       '</div>'+
@@ -248,7 +248,7 @@
     if(sel){ var current=trim(sel.value).toUpperCase(); var keep=current || ''; sel.innerHTML=ticketOptions(keep, used); sel.value=keep; markTicketSelect(); }
   }
   function openPanel(){
-    if(!canWriteCompras()){ alert('Esta funciÃ³n estÃ¡ disponible para usuarios GD o RW.'); return; }
+    if(!canWriteCompras()){ alert('Esta función está disponible para usuarios GD o RW.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
     ensureUi(); fillSelects(); resetPanelState(true); document.body.classList.add('ce-ai-panel-open'); $('ceAiTicketPanel').classList.add('open'); updateTotals(); installTicketImageDownloadButtons();
@@ -300,15 +300,15 @@
     rows.forEach(function(r){ if(r.ok!==false) selected += round2((money(r.unidades)||1)*money(r.precio)); });
     var tLines=$('ceAiTotalLines'); if(tLines) tLines.textContent=euro(selected);
     var detected=money(window.__ceAiDetectedTotal||0);
-    var tPhoto=$('ceAiTotalPhoto'); if(tPhoto) tPhoto.textContent=detected ? euro(detected) : 'â€”';
+    var tPhoto=$('ceAiTotalPhoto'); if(tPhoto) tPhoto.textContent=detected ? euro(detected) : '—';
     var diffEl=$('ceAiTotalDiff'), box=$('ceAiDiffBox');
-    if(diffEl){ diffEl.textContent=detected ? euro(selected-detected) : 'â€”'; }
+    if(diffEl){ diffEl.textContent=detected ? euro(selected-detected) : '—'; }
     if(box){ box.classList.remove('diff-ok','diff-warn'); if(detected){ box.classList.add(Math.abs(selected-detected)<0.02 ? 'diff-ok' : 'diff-warn'); } }
   }
   function renderRows(){
     var body=$('ceAiRows'); if(!body) return;
     var rows=sortLinesLikeTk((window.__ceAiTicketLines || []).map(enrichRowDefaults)); window.__ceAiTicketLines=rows;
-    if(!rows.length){ body.innerHTML='<tr><td colspan="9">Sin lÃ­neas todavÃ­a.</td></tr>'; updateTotals(); return; }
+    if(!rows.length){ body.innerHTML='<tr><td colspan="9">Sin líneas todavía.</td></tr>'; updateTotals(); return; }
     body.innerHTML=rows.map(function(r,i){
       var existing=findBestProductByName(r.descripcion) || productByExactName(r.descripcion);
       var cls=(Number(r.confianza||0)<0.65 || !trim(r.descripcion))?'ce-ai-row-low':'ce-ai-row-ok';
@@ -316,7 +316,7 @@
       var unidades=money(r.unidades)||1; var precio=money(r.precio); var importe=round2(unidades*precio);
       var seg=trim(r.segmento) || (existing ? (existing.segmento||'') : guessSegment(r.descripcion));
       var des=trim(r.destino) || (existing ? (existing.destino||'') : guessDestino(r.descripcion));
-      var attrTitle=existing ? 'Producto existente: puedes corregir SEGMENTO/DESTINO; al procesar se actualizarÃ¡n PRODUCTOS junto con el precio.' : 'Producto nuevo: informa segmento y destino antes de confirmar.';
+      var attrTitle=existing ? 'Producto existente: puedes corregir SEGMENTO/DESTINO; al procesar se actualizarán PRODUCTOS junto con el precio.' : 'Producto nuevo: informa segmento y destino antes de confirmar.';
       return '<tr class="'+cls+'" data-ce-ai-row="'+i+'" data-ce-ai-conf="'+htmlEscape(r.confianza||0)+'" data-ce-ai-existing="'+(existing?'1':'0')+'">'+
         '<td><input type="checkbox" data-ce-ai-field="ok" '+(r.ok!==false?'checked':'')+'></td>'+ 
         '<td><input list="ceAiProducts" data-ce-ai-field="descripcion" value="'+htmlEscape((existing && existing.nombre) || r.descripcion || '')+'" placeholder="Nombre producto"></td>'+ 
@@ -324,9 +324,9 @@
         '<td><select data-ce-ai-field="destino" title="'+htmlEscape(attrTitle)+'">'+selectOptionsFromValues(uniqueProductValues('destino'), des, 'Destino')+'</select></td>'+ 
         '<td><input class="num" data-ce-ai-field="unidades" value="'+htmlEscape(unidades)+'"></td>'+ 
         '<td><input class="num" data-ce-ai-field="precio" value="'+htmlEscape(precio)+'"></td>'+ 
-        '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(dec(importe))+'" readonly title="Calculado automÃ¡ticamente: unidades x precio"></td>'+ 
+        '<td><input class="num" data-ce-ai-field="importe" value="'+htmlEscape(dec(importe))+'" readonly title="Calculado automáticamente: unidades x precio"></td>'+ 
         '<td>'+Math.round(Number(r.confianza||0)*100)+'%</td>'+ 
-        '<td><button type="button" class="ce-ai-danger ce-ai-trash-btn" data-ce-ai-del="'+i+'" aria-label="Eliminar lÃ­nea" title="Eliminar lÃ­nea">ðŸ—‘ï¸</button></td>'+ 
+        '<td><button type="button" class="ce-ai-danger ce-ai-trash-btn" data-ce-ai-del="'+i+'" aria-label="Eliminar línea" title="Eliminar línea">🗑️</button></td>'+ 
       '</tr>';
     }).join('');
     body.querySelectorAll('[data-ce-ai-field="unidades"],[data-ce-ai-field="precio"]').forEach(function(input){ input.addEventListener('input',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); input.addEventListener('change',function(){ updateRowImport(input.closest('tr')); collectRows(false); updateTotals(); }); });
@@ -405,7 +405,7 @@
     var tienda=findStoreByName(provider);
     var sel=$('ceAiTienda');
     if(tienda && sel){ sel.value=tienda.id; renderPendingPurchases(); return 'Tienda detectada: '+(tienda.nombre||tienda.id)+'.'; }
-    return 'Tienda leÃ­da por IA: '+provider+'; no se encontrÃ³ en TIENDAS, selecciÃ³nala manualmente.';
+    return 'Tienda leída por IA: '+provider+'; no se encontró en TIENDAS, selecciónala manualmente.';
   }
   function personScore(needle, personName){
     var a=normalizePlain(needle), b=normalizePlain(personName); if(!a || !b) return 0;
@@ -422,7 +422,7 @@
   }
   function responsibleFromHint(hint){
     var h=trim(hint); if(!h) return '';
-    var m=/(?:responsable|encargad[oa]|persona)\s*(?:=|:|es|ser[aÃ¡])\s*["\']?([^"\'.,;\n]+)/i.exec(h);
+    var m=/(?:responsable|encargad[oa]|persona)\s*(?:=|:|es|ser[aá])\s*["\']?([^"\'.,;\n]+)/i.exec(h);
     if(m && trim(m[1])) return trim(m[1]);
     var people=arr('personas').filter(isSocioPersona);
     var best=null, bestScore=0;
@@ -435,7 +435,7 @@
     var person=findResponsibleByName(proposed);
     var sel=$('ceAiResponsable');
     if(person && sel){ sel.value=person.id; return 'Responsable detectado: '+(person.nombre||person.id)+'.'; }
-    return 'Responsable indicado: '+proposed+'; no se encontrÃ³ como SOCIO en PERSONAS, selecciÃ³nalo manualmente.';
+    return 'Responsable indicado: '+proposed+'; no se encontró como SOCIO en PERSONAS, selecciónalo manualmente.';
   }
   function productNameById(idv){ var id=trim(idv); var p=arr('productos').find(function(x){ return trim(x.id)===id; }); return p ? (p.nombre||p.id) : id; }
   function tiendaNameById(idv){ var id=trim(idv); var t=arr('tiendas').find(function(x){ return trim(x.id)===id; }); return t ? (t.nombre||t.id) : id; }
@@ -474,7 +474,7 @@
   }
   function deletePendingPurchases(ids, warnings){
     var count=0, chain=Promise.resolve();
-    (ids||[]).forEach(function(id){ chain=chain.then(function(){ return apiJson('/api/crud/compras/'+encodeURIComponent(id),{method:'DELETE',headers:crudHeaders(),body:JSON.stringify({__crudRowOnly:true})}); }).then(function(){ count++; var s=stateObj(); if(Array.isArray(s.compras)) s.compras=s.compras.filter(function(c){ return trim(c.id)!==trim(id); }); }).catch(function(err){ warnings.push('No se eliminÃ³ Pte.Compra '+id+': '+(err.message||err)); }); });
+    (ids||[]).forEach(function(id){ chain=chain.then(function(){ return apiJson('/api/crud/compras/'+encodeURIComponent(id),{method:'DELETE',headers:crudHeaders(),body:JSON.stringify({__crudRowOnly:true})}); }).then(function(){ count++; var s=stateObj(); if(Array.isArray(s.compras)) s.compras=s.compras.filter(function(c){ return trim(c.id)!==trim(id); }); }).catch(function(err){ warnings.push('No se eliminó Pte.Compra '+id+': '+(err.message||err)); }); });
     return chain.then(function(){ return count; });
   }
   function validateRowsBeforeProcess(rows){
@@ -505,7 +505,7 @@
         if(img.id==='ceAiPreview' || img.id==='ceAiZoomImg') return;
         if(img.closest && img.closest('#ceBudgetLiteTooltipV307,#tabGraficas,#tabCompras,#tabDonaciones,#tabMapa,#ceAiTicketPanel')) return;
         img.dataset.ceDownloadReady='1';
-        var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-ticket-download-v95'; btn.title='Descargar foto al ordenador'; btn.textContent='â¬‡ï¸';
+        var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-ticket-download-v95'; btn.title='Descargar foto al ordenador'; btn.textContent='⬇️';
         btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); downloadSrc(img.currentSrc || img.src, 'ControlEvent_'+(img.alt||'foto_ticket')); });
         if(img.parentNode) img.parentNode.insertBefore(btn, img.nextSibling);
       });
@@ -553,14 +553,14 @@
     var provider=text(details && (details.proveedorIa || details.provider || details.proveedor) || '').trim();
     var model=text(details && (details.modelo || details.model || details.modeloIntentado) || '').trim();
     var prefix=(provider||model) ? ('['+(provider||'IA')+(model?' '+model:'')+'] ') : '';
-    if(/quota|insufficient_quota|billing|plan|RESOURCE_EXHAUSTED|429|rate.?limit|l[iÃ­]mite/i.test(m)){
-      return prefix+'el proveedor IA devuelve lÃ­mite/cuota/saldo no disponible ahora. Detalle tÃ©cnico: '+m.slice(0,260);
+    if(/quota|insufficient_quota|billing|plan|RESOURCE_EXHAUSTED|429|rate.?limit|l[ií]mite/i.test(m)){
+      return prefix+'el proveedor IA devuelve límite/cuota/saldo no disponible ahora. Detalle técnico: '+m.slice(0,260);
     }
     if(/api key|API key|401|403|invalid|permission|PERMISSION_DENIED/i.test(m)){
-      return prefix+'la clave IA no es vÃ¡lida, no estÃ¡ habilitada o no tiene permisos. Para Gemini usa GEMINI_API_KEY; tambiÃ©n se acepta OPENIA_API_KEY.';
+      return prefix+'la clave IA no es válida, no está habilitada o no tiene permisos. Para Gemini usa GEMINI_API_KEY; también se acepta OPENIA_API_KEY.';
     }
     if(/model|not found|404/i.test(m)){
-      return prefix+'modelo IA no disponible. El servidor probarÃ¡ modelos Gemini alternativos si estÃ¡n configurados.';
+      return prefix+'modelo IA no disponible. El servidor probará modelos Gemini alternativos si están configurados.';
     }
     return prefix+(m || 'Error desconocido al analizar con la IA.');
   }
@@ -582,16 +582,16 @@
       var respMsg=applyResponsibleFromAi(data.responsable || data.responsableNombre || data.encargado || '', hintText);
       renderRows();
       renderPendingPurchases();
-      var msg='AnÃ¡lisis terminado: '+rows.length+' lÃ­neas detectadas.';
+      var msg='Análisis terminado: '+rows.length+' líneas detectadas.';
       if(tiendaMsg) msg+=' '+tiendaMsg;
       if(tkMsg) msg+=' '+tkMsg;
       if(respMsg) msg+=' '+respMsg;
-      if(data.total) msg+=' Total leÃ­do: '+euro(data.total)+'.';
+      if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.proveedorIa || data.modelo) msg+=' IA: '+(data.proveedorIa||'')+(data.modelo?' '+data.modelo:'')+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
-      setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err), err.details)+'. Puedes aÃ±adir filas manualmente.', 'err');
+      setStatus('No se pudo analizar con la IA: '+friendlyAiError(err.message||String(err), err.details)+'. Puedes añadir filas manualmente.', 'err');
     });
   }
   function productKey(v){ return normalizePlain(v).replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim(); }
@@ -626,8 +626,8 @@
       return idx>=0 ? s.productos[idx] : s.productos[s.productos.length-1];
     }
     if(existing){
-      // v10.2: doble vÃ­a segura para refrescar PRODUCTOS cuando ya existe.
-      // Primero usa la ruta especÃ­fica y despuÃ©s fuerza el mismo cambio por el CRUD normal
+      // v10.2: doble vía segura para refrescar PRODUCTOS cuando ya existe.
+      // Primero usa la ruta específica y después fuerza el mismo cambio por el CRUD normal
       // con __priceRefreshOnly, para cubrir instalaciones donde la ruta dedicada no refrescaba la tabla visible.
       var seg=trim(row.segmento) || existing.segmento || '';
       var des=trim(row.destino) || existing.destino || '';
@@ -645,7 +645,7 @@
         })
         .catch(function(err1){
           return genericUpdate().catch(function(err2){
-            warnings.push('No se actualizÃ³ precio de PRODUCTOS para "'+name+'": '+((err2&&err2.message)||(err1&&err1.message)||err2||err1)+'. La compra se grabarÃ¡ con el precio del ticket.');
+            warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+((err2&&err2.message)||(err1&&err1.message)||err2||err1)+'. La compra se grabará con el precio del ticket.');
             return mergeLocal(Object.assign({},existing,{defaultPrecio:price,precio:price,defaultTiendaId:tiendaId||existing.defaultTiendaId||'',segmento:seg,destino:des}));
           });
         });
@@ -667,8 +667,8 @@
     var ticket=trim($('ceAiTicket').value).toUpperCase(); if(!ticket){ setStatus('Indica TKxx.','err'); return; }
     var usedCount=Number((usedTicketMap()||{})[ticket]||0);
     if(usedCount>0){
-      var ok=window.confirm('ATENCIÃ“N: '+ticket+' ya tiene '+usedCount+' lÃ­nea(s) de COMPRAS en este evento.\n\nTiene pinta de equivocaciÃ³n por no haber elegido el ticket correcto.\n\nÂ¿Quieres continuar de todos modos y aÃ±adir mÃ¡s lÃ­neas a '+ticket+'?');
-      if(!ok){ setStatus('OperaciÃ³n cancelada: cambia el TKxx o revisa el ticket ya existente.','warn'); return; }
+      var ok=window.confirm('ATENCIÓN: '+ticket+' ya tiene '+usedCount+' línea(s) de COMPRAS en este evento.\n\nTiene pinta de equivocación por no haber elegido el ticket correcto.\n\n¿Quieres continuar de todos modos y añadir más líneas a '+ticket+'?');
+      if(!ok){ setStatus('Operación cancelada: cambia el TKxx o revisa el ticket ya existente.','warn'); return; }
     }
     var tiendaId=trim($('ceAiTienda').value), responsableId=trim($('ceAiResponsable').value);
     if(!tiendaId){ setStatus('Indica TIENDA antes de procesar.','err'); return; }
@@ -677,13 +677,13 @@
     if(!rows.length){ setStatus('No hay filas con producto para procesar.','warn'); return; }
     try{ validateRowsBeforeProcess(rows); }catch(e){ setStatus(e.message||String(e),'warn'); return; }
     var pendingIds=collectPendingDeleteIds();
-    setStatus('Procesando '+rows.length+' lÃ­neas hacia PRODUCTOS y COMPRAS'+(pendingIds.length?' y eliminando '+pendingIds.length+' Pte.Compra marcados':'')+'...','info');
+    setStatus('Procesando '+rows.length+' líneas hacia PRODUCTOS y COMPRAS'+(pendingIds.length?' y eliminando '+pendingIds.length+' Pte.Compra marcados':'')+'...','info');
     var warnings=[]; var created=0; var deletedPending=0; var chain=Promise.resolve();
     rows.forEach(function(row){ chain=chain.then(function(){ return upsertProductByName(row, tiendaId, warnings); }).then(function(product){ return postCompra(row, product, ticket, tiendaId, responsableId); }).then(function(){ created++; }); });
     chain.then(function(){ return deletePendingPurchases(pendingIds, warnings).then(function(n){ deletedPending=n; }); })
       .then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
-      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si habÃ­a imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.2 Alta IA]', warnings); })
+      .then(function(){ try{ fillSelects(); }catch(_){} var msg='Procesado: '+created+' compras grabadas en '+ticket+'.'; if(deletedPending) msg+=' Eliminadas '+deletedPending+' Pte.Compra sustituidas.'; msg+=' Foto adjuntada al ticket si había imagen.'; if(warnings.length) msg+=' Avisos: '+warnings.length+'.'; setStatus(msg, warnings.length?'warn':'ok'); installTicketImageDownloadButtons(); if(warnings.length) console.warn('[CE v10.2 Alta IA]', warnings); })
       .catch(function(err){ setStatus('Error procesando ticket: '+(err.message||String(err)), 'err'); });
   }
   function reloadEvent(silent){
@@ -703,5 +703,5 @@
   document.addEventListener('pointerdown',delegatedOpen,true); document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v10.2 Alta IA] producto similar, segmento/destino editables y actualizaciÃ³n PRODUCTOS instalada. Prueba: window.__ceOpenTicketAutoV102()');
+  console.info('[CE v10.2 Alta IA] producto similar, segmento/destino editables y actualización PRODUCTOS instalada. Prueba: window.__ceOpenTicketAutoV102()');
 })();

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
+/* ControlEvent v13.0_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
 (function(){
   'use strict';
   if(window.__ceV105ProdFixes) return; window.__ceV105ProdFixes=true;
@@ -67,7 +67,7 @@
   function isDownloadButton(btn){
     if(!btn || btn.tagName!=='BUTTON') return false;
     var t=fold((btn.textContent||'')+' '+(btn.title||'')+' '+(btn.getAttribute('aria-label')||'')+' '+(btn.className||''));
-    return /DESCARG|DOWNLOAD|â¬‡/.test(t) || /CE-V10(4|5).*DOWNLOAD|CE-TICKET-DOWNLOAD/.test(t);
+    return /DESCARG|DOWNLOAD|⬇/.test(t) || /CE-V10(4|5).*DOWNLOAD|CE-TICKET-DOWNLOAD/.test(t);
   }
   function patchResumenActions(root){
     root=root || $('tabResumen') || document;
@@ -76,8 +76,8 @@
       Array.prototype.slice.call(r.querySelectorAll('button')).forEach(function(b){
         var t=fold((b.textContent||'')+' '+(b.title||'')+' '+(b.getAttribute('aria-label')||''));
         if(isDownloadButton(b)){ try{ b.remove(); }catch(_){ b.style.display='none'; } return; }
-        if(/ADJUNTAR|INSERTAR FOTO|SUBIR FOTO|CAMBIAR FOTO/.test(t) && !/JUSTIFICANTE/.test(t)){ b.textContent='ðŸ“Ž'; b.title='Adjuntar foto'; b.setAttribute('aria-label','Adjuntar foto'); }
-        if(/ELIMINAR FOTO/.test(t) || (/^\s*ELIMINAR\s*$/.test(fold(b.textContent||'')) && /FOTO|TICKET/.test(t))){ b.textContent='ðŸ—‘ï¸'; b.title='Eliminar foto'; b.setAttribute('aria-label','Eliminar foto'); }
+        if(/ADJUNTAR|INSERTAR FOTO|SUBIR FOTO|CAMBIAR FOTO/.test(t) && !/JUSTIFICANTE/.test(t)){ b.textContent='📎'; b.title='Adjuntar foto'; b.setAttribute('aria-label','Adjuntar foto'); }
+        if(/ELIMINAR FOTO/.test(t) || (/^\s*ELIMINAR\s*$/.test(fold(b.textContent||'')) && /FOTO|TICKET/.test(t))){ b.textContent='🗑️'; b.title='Eliminar foto'; b.setAttribute('aria-label','Eliminar foto'); }
       });
     });
   }
@@ -87,7 +87,7 @@
     if(isDownloadButton(b)){ stop(ev); try{ b.remove(); }catch(_){ b.style.display='none'; } return false; }
   }
   function makeDownloadButton(cls, srcFn, nameFn){
-    var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v105-download '+cls; btn.textContent='â¬‡ï¸'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto');
+    var btn=document.createElement('button'); btn.type='button'; btn.className='outline small ce-v105-download '+cls; btn.textContent='⬇️'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto');
     function go(ev){ stop(ev); var src=typeof srcFn==='function'?srcFn():srcFn; return downloadSrc(src, typeof nameFn==='function'?nameFn():nameFn); }
     ['pointerdown','touchstart','touchend','click'].forEach(function(n){ btn.addEventListener(n, go, {capture:true,passive:false}); });
     return btn;

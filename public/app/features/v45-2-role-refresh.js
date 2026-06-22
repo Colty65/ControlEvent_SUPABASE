@@ -1,8 +1,8 @@
-﻿/* ControlEvent v13.0_prod - cierre de permisos por rol y refresco limpio de ventana activa.
+/* ControlEvent v13.0_prod - cierre de permisos por rol y refresco limpio de ventana activa.
    Objetivos:
    - RO solo puede entrar en RESUMEN, Mapa de recursos y GRAFICAS.
-   - Al cambiar de usuario, limpiar restos de menÃº/vista del rol anterior sin Ctrl+F5.
-   - BotÃ³n Refrescar junto a Salir: recarga /api/state y repinta la ventana activa sin pedir login. */
+   - Al cambiar de usuario, limpiar restos de menú/vista del rol anterior sin Ctrl+F5.
+   - Botón Refrescar junto a Salir: recarga /api/state y repinta la ventana activa sin pedir login. */
 (function(){
   'use strict';
 
@@ -108,7 +108,7 @@
   }
   function clearRoleResiduesForWritable(){
     if(isRO()) return;
-    // v45.4: al pasar de RO a GD/RW, limpiar restos de display:none!important y clases de ocultaciÃ³n del rol anterior.
+    // v45.4: al pasar de RO a GD/RW, limpiar restos de display:none!important y clases de ocultación del rol anterior.
     Object.values(PANEL_BY_TAB).forEach(id => {
       const panel = $(id);
       if(!panel) return;
@@ -210,7 +210,7 @@
       refreshActive('button-direct');
       return false;
     };
-    // Click directo ademÃ¡s del capturador global: evita que otros listeners de menÃº lo traten como botÃ³n normal.
+    // Click directo además del capturador global: evita que otros listeners de menú lo traten como botón normal.
     btn.addEventListener('click', run, true);
     btn.onclick = run;
   }
@@ -263,7 +263,7 @@
     if(window.ControlEventV5020 && typeof window.ControlEventV5020.refreshInPlace === 'function'){
       return window.ControlEventV5020.refreshInPlace();
     }
-    if(refreshState.busy){ softNotice('Ya se estÃ¡ refrescando...'); return false; }
+    if(refreshState.busy){ softNotice('Ya se está refrescando...'); return false; }
     if(!auth()){ softNotice('No hay usuario identificado.'); return false; }
     const btn = $('btnSoftRefresh');
     const prevText = btn?.textContent || 'Refrescar';
@@ -300,7 +300,7 @@
       return true;
     }catch(error){
       console.warn('[v45.4] refresco limpio', error);
-      softNotice('No se pudo refrescar. Usa Salir/Entrar si continÃºa.');
+      softNotice('No se pudo refrescar. Usa Salir/Entrar si continúa.');
       return false;
     }finally{
       refreshState.busy = false;
@@ -326,7 +326,7 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      softNotice(isRO() ? 'Usuario RO: solo RESUMEN, Mapa de recursos y GRAFICAS.' : 'OpciÃ³n no disponible para este usuario.');
+      softNotice(isRO() ? 'Usuario RO: solo RESUMEN, Mapa de recursos y GRAFICAS.' : 'Opción no disponible para este usuario.');
       syncRoleMenu();
       return false;
     }
@@ -382,6 +382,6 @@
   else install();
   ['load','controlevent:app-ready','controlevent:runtime-ready','controlevent:modules-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 50)));
   [120, 700, 1500].forEach(ms => setTimeout(install, ms));
-  // v50.3: evitar refresco visual continuo de menÃºs por rol; solo se mantiene visible el botÃ³n Refrescar/Salir.
+  // v50.3: evitar refresco visual continuo de menús por rol; solo se mantiene visible el botón Refrescar/Salir.
   setInterval(() => { setRefreshVisible(); }, window.ControlEventLowResource?.interval?.(12000) || 12000);
 })();

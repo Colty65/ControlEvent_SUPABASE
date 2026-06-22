@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Fotos TKxx/INGRESOS con claves vivas y exportaciÃ³n limpia.
+/* ControlEvent v13.0_prod - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
    Sin intervalos: normaliza solo en carga, cambio de evento, refresco, foto cambiada o descarga. */
 (function(){
   'use strict';
@@ -124,10 +124,10 @@
       const store = s[name] || {};
       Object.entries({...store}).forEach(([key,value]) => {
         const lk = liveKeyFor(key, value, live);
-        // v8.3: normalizaciÃ³n NO destructiva.
-        // Si aÃºn no estÃ¡n cargadas compras/ingresos o la relaciÃ³n viva no casa en ese instante,
+        // v8.3: normalización NO destructiva.
+        // Si aún no están cargadas compras/ingresos o la relación viva no casa en ese instante,
         // no se borra la referencia de memoria: las fotos solo se eliminan al pulsar Eliminar.
-        // El BACKUP seguirÃ¡ filtrando lo vÃ¡lido, pero la pantalla no debe ocultar fotos guardadas
+        // El BACKUP seguirá filtrando lo válido, pero la pantalla no debe ocultar fotos guardadas
         // correctamente en ce_ticket_images.
         if(!lk) return;
         if(lk !== key){

@@ -1,10 +1,10 @@
-﻿/* ControlEvent v13.0_prod - estabilizaciÃ³n final de login, selecciÃ³n de evento y globos.
-   Objetivo: no sumar capas conflictivas. Se apoya en v44-7-event-switcher como Ãºnico flujo de evento.
-   - La app siempre arranca pidiendo login: se desactiva la reanudaciÃ³n automÃ¡tica por localStorage.
+/* ControlEvent v13.0_prod - estabilización final de login, selección de evento y globos.
+   Objetivo: no sumar capas conflictivas. Se apoya en v44-7-event-switcher como único flujo de evento.
+   - La app siempre arranca pidiendo login: se desactiva la reanudación automática por localStorage.
    - Tras login: pantalla CE grande + selector "Selecciona evento...", sin evento precargado.
-   - Al elegir/cambiar evento: rehidrata mÃ³dulos y globos sin tocar justificantes de INGRESOS.
+   - Al elegir/cambiar evento: rehidrata módulos y globos sin tocar justificantes de INGRESOS.
    - Globos de Resumen: miniatura Just. abre el visor estable v46.9; bloqueo de apertura accidental de la primera foto.
-   - Dock mÃ³vil: Refres / Salir abajo a la derecha.
+   - Dock móvil: Refres / Salir abajo a la derecha.
 */
 (function(){
   'use strict';
@@ -51,7 +51,7 @@
   let lastEventSelectedAt = 0;
 
   function removeSession(){ SESSION_KEYS.forEach(key => safe(() => localStorage.removeItem(key), null)); }
-  // Ejecutar inmediatamente, antes de los temporizadores de reanudaciÃ³n de sesiÃ³n del legacy.
+  // Ejecutar inmediatamente, antes de los temporizadores de reanudación de sesión del legacy.
   removeSession();
 
   function applyVersion(){
@@ -366,7 +366,7 @@
         target.selectedEventId = String(id);
         try{ if(window.ControlEventApp) window.ControlEventApp.state = target; }catch(_){ }
       }
-    }catch(error){ console.warn('[v50.19] Refres fallÃ³', error); }
+    }catch(error){ console.warn('[v50.19] Refres falló', error); }
     finalizeSelectedEvent(id, 'refresh');
     renderActiveTab(tab);
     afterEventSelected(id, 'refresh');
@@ -385,7 +385,7 @@
     if(!dock){
       dock = document.createElement('div');
       dock.id = DOCK_ID;
-      dock.setAttribute('aria-label','Acciones rÃ¡pidas');
+      dock.setAttribute('aria-label','Acciones rápidas');
       dock.innerHTML = '<button type="button" id="ceBtnRefresV518" aria-label="Refrescar">Refres</button><button type="button" id="ceBtnSalirV518" aria-label="Salir">Salir</button>';
       document.body.appendChild(dock);
     }
@@ -429,7 +429,7 @@
     installHandlers();
     observeBudgetOpen();
     ensureMobileDock();
-    // Si una sesiÃ³n fue reanudada por el legacy antes de que este parche cargara, se devuelve a login.
+    // Si una sesión fue reanudada por el legacy antes de que este parche cargara, se devuelve a login.
     if(auth() && !loginFlowActiveUntil && Date.now() < (window.__ceV5019BootAt || 0) + 6500){
       showLogin();
       return;

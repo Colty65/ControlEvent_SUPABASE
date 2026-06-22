@@ -1,8 +1,8 @@
-﻿/* ControlEvent v13.0_prod - Documentos del evento (fase 1: menÃº, gestiÃ³n y foto DOCXX).
-   - Nueva pantalla "Documentos" con fecha, descripciÃ³n y foto.
+/* ControlEvent v13.0_prod - Documentos del evento (fase 1: menú, gestión y foto DOCXX).
+   - Nueva pantalla "Documentos" con fecha, descripción y foto.
    - RW/GD pueden mantener en eventos En curso; RO visualiza y puede ampliar foto.
-   - Las imÃ¡genes se codifican como EVENTO_ID|DOCXX, empezando en DOC01 por evento.
-   - No toca todavÃ­a BACKUP ni INFOEVENTO. */
+   - Las imágenes se codifican como EVENTO_ID|DOCXX, empezando en DOC01 por evento.
+   - No toca todavía BACKUP ni INFOEVENTO. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -37,8 +37,8 @@
   const isFinalized = () => String(selectedEvent()?.situacion || 'En curso').toLowerCase() === 'finalizado';
   const canMaintainDocs = () => canWrite() && !!selectedEvent() && !isFinalized();
   const currentTab = () => {
-    // v8.5.3: DOCUMENTOS queda bloqueado como pestaÃ±a activa hasta que el usuario pulse otra pestaÃ±a.
-    // Varios parches legacy repintan INGRESOS/RESUMEN y pisan currentMainTab sin ser una acciÃ³n real del usuario.
+    // v8.5.3: DOCUMENTOS queda bloqueado como pestaña activa hasta que el usuario pulse otra pestaña.
+    // Varios parches legacy repintan INGRESOS/RESUMEN y pisan currentMainTab sin ser una acción real del usuario.
     if(window.__ceDocsForceActiveV85 === true) return TAB;
     const memorized = String(safe(() => window.__ceCurrentMainTab || '', '') || '');
     const appTab = String(safe(() => app()?.navigation?.currentMainTab || '', '') || '');
@@ -346,7 +346,7 @@
     const ev = selectedEvent();
     if(!ev){ wrap.innerHTML = ''; return; }
     if(role() === 'RO'){
-      wrap.innerHTML = '<div class="ce-docs-note">Modo consulta: puedes visualizar y ampliar los documentos, pero no aÃ±adir, modificar ni eliminar.</div>';
+      wrap.innerHTML = '<div class="ce-docs-note">Modo consulta: puedes visualizar y ampliar los documentos, pero no añadir, modificar ni eliminar.</div>';
       return;
     }
     if(!canWrite()){
@@ -354,15 +354,15 @@
       return;
     }
     if(isFinalized()){
-      wrap.innerHTML = '<div class="ce-docs-note warn">Evento Finalizado: los documentos quedan en modo consulta. Para modificar, cambia primero la situaciÃ³n del evento si procede.</div>';
+      wrap.innerHTML = '<div class="ce-docs-note warn">Evento Finalizado: los documentos quedan en modo consulta. Para modificar, cambia primero la situación del evento si procede.</div>';
       return;
     }
     wrap.innerHTML = `
       <div class="ce-docs-form entry-zone">
         <div class="field ce-doc-date-new"><label>Fecha</label><input id="eventDocNewFecha" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(todayDisplay())}" /></div>
-        <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="2" placeholder="DescripciÃ³n del documento: solicitud, permiso, seguro, autorizaciÃ³n..."></textarea></div>
+        <div class="field ce-docs-form-desc"><label>&nbsp;</label><textarea id="eventDocNewDescripcion" rows="2" placeholder="Descripción del documento: solicitud, permiso, seguro, autorización..."></textarea></div>
         <div class="field"><label>Foto/documento</label><input id="eventDocNewFile" type="file" accept="image/*" /></div>
-        <div class="field ce-doc-add-action"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">AÃ±adir documento</button></div>
+        <div class="field ce-doc-add-action"><label>&nbsp;</label><button type="button" id="btnAddEventDoc">Añadir documento</button></div>
       </div>`;
   }
 
@@ -379,7 +379,7 @@
     }
     const docs = docsForEvent(eventId);
     if(!docs.length){
-      list.innerHTML = '<div class="empty">TodavÃ­a no hay documentos para este evento.</div>';
+      list.innerHTML = '<div class="empty">Todavía no hay documentos para este evento.</div>';
       return;
     }
     const editable = canMaintainDocs();
@@ -396,14 +396,14 @@
       const modal = img ? `
         <div id="${esc(targetId)}" class="ce-doc-target-modal-v85" role="dialog" aria-modal="true">
           <div class="ce-doc-target-box-v85" role="document">
-            <a class="ce-doc-target-close-v85" href="#tabDocumentos" aria-label="Cerrar documento">Ã—</a>
+            <a class="ce-doc-target-close-v85" href="#tabDocumentos" aria-label="Cerrar documento">×</a>
             <div class="ce-doc-target-info-v85"><strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p></div>
             <div class="ce-doc-target-imgwrap-v85"><img src="${esc(img)}" alt="Documento del evento" loading="lazy" /></div>
           </div>
         </div>` : '';
       const actions = editable && !doc.recovered ? `
-          <button type="button" class="outline small" data-doc-replace="${id}">ðŸ“Ž Reemplazar foto</button>
-          ${img ? `<button type="button" class="outline small" data-doc-remove-image="${id}">ðŸ—‘ï¸ Eliminar foto</button>` : ''}
+          <button type="button" class="outline small" data-doc-replace="${id}">📎 Reemplazar foto</button>
+          ${img ? `<button type="button" class="outline small" data-doc-remove-image="${id}">🗑️ Eliminar foto</button>` : ''}
           <button type="button" class="modify small" data-doc-save="${id}">Modificar</button>
           <button type="button" class="danger small" data-doc-delete="${id}">Eliminar</button>
           <input class="ce-doc-file-input" type="file" accept="image/*" data-doc-upload-input="${id}" />`
@@ -447,8 +447,8 @@
     BUTTONS.forEach(id => $(id)?.classList.toggle('active', id === BUTTON_ID));
     document.querySelectorAll('.mobile-menu-action[data-target]').forEach(el => el.classList.toggle('primary', el.dataset.target === BUTTON_ID));
     renderEventDocuments();
-    // v8.5.2: varios parches legacy repintan la pestaÃ±a inicial unos segundos despues.
-    // Mientras Documentos siga siendo la pestaÃ±a activa, reaseguramos que no aparezca RESUMEN/INGRESOS encima.
+    // v8.5.2: varios parches legacy repintan la pestaña inicial unos segundos despues.
+    // Mientras Documentos siga siendo la pestaña activa, reaseguramos que no aparezca RESUMEN/INGRESOS encima.
     [0,80,240,700,1500,3000,6000,9000].forEach(ms => setTimeout(() => { if(currentTab() === TAB) renderVisibility(); }, ms));
     safe(() => document.body.classList.remove('mobile-drawer-open'), null);
   }
@@ -524,7 +524,7 @@
 
   async function addDocument(){
     if(!canMaintainDocs()){
-      alert(isFinalized() ? 'Evento Finalizado: los documentos estÃ¡n en modo consulta.' : 'No tienes permisos para aÃ±adir documentos.');
+      alert(isFinalized() ? 'Evento Finalizado: los documentos están en modo consulta.' : 'No tienes permisos para añadir documentos.');
       return;
     }
     const eventId = selectedEventId();
@@ -543,7 +543,7 @@
       dataUrl = imageUrl;
     }catch(error){
       console.warn('[ControlEvent v13.0_prod] No se pudo subir DOC ahora, queda en estado local/protegido:', error?.message || error);
-      status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentarÃ¡ sincronizar al guardar.', 'warn');
+      status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
     const id = `${eventId}|${code}`;
@@ -561,7 +561,7 @@
     });
     saveNow();
     renderEventDocuments();
-    status('Documento aÃ±adido correctamente.', 'ok');
+    status('Documento añadido correctamente.', 'ok');
   }
 
   async function replaceImage(docId, file){
@@ -578,7 +578,7 @@
       dataUrl = imageUrl;
     }catch(error){
       console.warn('[ControlEvent v13.0_prod] No se pudo subir DOC ahora, queda local:', error?.message || error);
-      status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentarÃ¡ sincronizar al guardar.', 'warn');
+      status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
     s.ticketImages[docKey(doc.eventId, code)] = dataUrl;
@@ -594,7 +594,7 @@
     const doc = findDoc(docId);
     if(!doc || !canMaintainDocs()) return;
     const code = docCode(doc.codigo || doc.imageKey);
-    if(!confirm('Â¿Eliminar solo la foto? Se mantiene la ficha del documento.')) return;
+    if(!confirm('¿Eliminar solo la foto? Se mantiene la ficha del documento.')) return;
     status('Eliminando foto del documento...', 'working');
     await deleteDocumentImage(doc.eventId, code).catch(error => {
       console.warn('[ControlEvent v13.0_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
@@ -613,7 +613,7 @@
     const doc = findDoc(docId);
     if(!doc || !canMaintainDocs()) return;
     const code = docCode(doc.codigo || doc.imageKey);
-    if(!confirm('Â¿Eliminar definitivamente este documento y su foto?')) return;
+    if(!confirm('¿Eliminar definitivamente este documento y su foto?')) return;
     status('Eliminando documento...', 'working');
     if(imageFor(doc)){
       await deleteDocumentImage(doc.eventId, code).catch(error => {
@@ -638,7 +638,7 @@
       if(field === 'fecha') doc.fecha = parseDateForStorage(el.value || '');
       if(field === 'descripcion') doc.descripcion = norm(el.value || '');
     });
-    if(!doc.descripcion){ alert('El texto descriptivo no puede quedar vacÃ­o.'); return; }
+    if(!doc.descripcion){ alert('El texto descriptivo no puede quedar vacío.'); return; }
     doc.updatedAt = new Date().toISOString();
     saveNow();
     renderEventDocuments();
@@ -668,7 +668,7 @@
     modal.setAttribute('aria-modal','true');
     modal.innerHTML = `
       <div class="ce-doc-modal-box-v85" role="document">
-        <button type="button" class="ce-doc-modal-close-v85" aria-label="Cerrar documento">Ã—</button>
+        <button type="button" class="ce-doc-modal-close-v85" aria-label="Cerrar documento">×</button>
         <div class="ce-doc-modal-info-v85"><strong>Documento del evento</strong><span>${esc(formatDate(doc.fecha))}</span><p>${esc(doc.descripcion || '')}</p></div>
         <div class="ce-doc-modal-imgwrap-v85"><img alt="Documento del evento" /></div>
       </div>`;
@@ -698,7 +698,7 @@
     }
     document.body?.classList.remove('ce-doc-modal-open-v85');
     window.__ceDocModalOpenV85 = false;
-    // DespuÃ©s de cerrar, reactivar la pestaÃ±a para que los botones vuelvan a aceptar toque.
+    // Después de cerrar, reactivar la pestaña para que los botones vuelvan a aceptar toque.
     setTimeout(() => { if(currentTab() === TAB){ setDocumentsExclusive(true); enableDocumentViewControls(); } }, 30);
   }
 
@@ -712,7 +712,7 @@
     btn.type = 'button';
     btn.className = 'mobile-menu-action';
     btn.dataset.target = BUTTON_ID;
-    btn.innerHTML = '<span class="mi">ðŸ“</span>Documentos';
+    btn.innerHTML = '<span class="mi">📁</span>Documentos';
     const resumen = grid.querySelector('.mobile-menu-action[data-target="tabResumenBtn"]');
     if(resumen) grid.insertBefore(btn, resumen); else grid.appendChild(btn);
   }
@@ -783,7 +783,7 @@
     }
     if(target.closest('#btnAddEventDoc')){
       event.preventDefault(); event.stopPropagation(); if(event.stopImmediatePropagation) event.stopImmediatePropagation();
-      addDocument().catch(error => { console.error(error); alert('No se pudo aÃ±adir el documento: ' + (error?.message || error)); status('Error aÃ±adiendo documento.', 'bad'); });
+      addDocument().catch(error => { console.error(error); alert('No se pudo añadir el documento: ' + (error?.message || error)); status('Error añadiendo documento.', 'bad'); });
       return false;
     }
     if(openDocFromEvent(event)) return false;
@@ -862,7 +862,7 @@
       @media(max-width:900px){body.ce-v5019-authenticated #ceMobileActionDockV518,body.ce-docs-active-v85 #ceMobileActionDockV518{display:flex!important;visibility:visible!important;opacity:.78!important;z-index:190500!important;pointer-events:none!important}body.ce-v5019-authenticated #ceMobileActionDockV518 button,body.ce-docs-active-v85 #ceMobileActionDockV518 button{pointer-events:auto!important;touch-action:manipulation!important;opacity:1!important}.ce-docs-form{grid-template-columns:1fr!important}.ce-doc-fields{grid-template-columns:minmax(108px,.34fr) minmax(210px,1.66fr)!important}.ce-doc-item-grid{grid-template-columns:58px 1fr!important}.ce-doc-media{justify-content:center;padding:4px}.ce-doc-thumb{width:44px!important;height:44px!important}.ce-doc-modal-v85{padding:8px}.ce-doc-modal-box-v85{grid-template-columns:1fr;width:98vw;max-height:94vh;overflow:auto;padding:12px}.ce-doc-modal-info-v85,.ce-doc-modal-imgwrap-v85{max-height:none}.ce-doc-modal-imgwrap-v85 img{width:100%;}body.ce-docs-role-ro-v85 #mainTabs.tabs,body.ce-role-ro-v505 #mainTabs.tabs,body.ce-role-ro-v507 #mainTabs.tabs,body.ce-role-ro-v508 #mainTabs.tabs{grid-template-columns:repeat(4,42px)!important;gap:8px!important}}
 
 
-      /* v8.5 FIX6: visor por CSS :target, sin listeners acumulados, y nueva disposiciÃ³n de registros */
+      /* v8.5 FIX6: visor por CSS :target, sin listeners acumulados, y nueva disposición de registros */
       #tabDocumentos .ce-doc-item:nth-child(odd){background:#fff!important;}
       #tabDocumentos .ce-doc-item:nth-child(even){background:#dbeeff!important;}
       #tabDocumentos .ce-doc-item-grid{display:grid!important;grid-template-columns:64px 118px minmax(0,1fr)!important;gap:10px!important;align-items:center!important;}
@@ -970,7 +970,7 @@
   }
 
   function patchRefreshButtonsForDocumentsV85(){
-    // La lÃ³gica de Refrescar vive en parches anteriores; aquÃ­ solo reforzamos que,
+    // La lógica de Refrescar vive en parches anteriores; aquí solo reforzamos que,
     // si la ventana activa es DOCUMENTOS, tras refrescar se vuelve a pintar con datos actuales.
     const after = () => {
       if(currentTab() !== TAB) return;

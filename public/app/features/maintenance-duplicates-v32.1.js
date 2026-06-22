@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Control de duplicados en mantenimientos generales
-   Evita duplicar PERSONAS, EVENTOS, TIENDAS y PRODUCTOS al aÃ±adir o modificar. */
+/* ControlEvent v13.0_prod - Control de duplicados en mantenimientos generales
+   Evita duplicar PERSONAS, EVENTOS, TIENDAS y PRODUCTOS al añadir o modificar. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';

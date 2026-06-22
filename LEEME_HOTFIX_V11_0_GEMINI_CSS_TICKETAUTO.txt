@@ -1,14 +1,14 @@
-﻿ControlEvent v13.0_prod - HOTFIX Ticket Auto auto-visible por CSS Gemini
+ControlEvent v13.0_prod - HOTFIX Ticket Auto auto-visible por CSS Gemini
 
 Causa real encontrada:
-- La nueva ventana Gemini libre introdujo reglas CSS genÃ©ricas para .ce-ai-overlay, .ce-ai-modal, .ce-ai-head, etc.
+- La nueva ventana Gemini libre introdujo reglas CSS genéricas para .ce-ai-overlay, .ce-ai-modal, .ce-ai-head, etc.
 - Ticket Auto usa esas mismas clases.
-- Como Gemini cargaba su CSS al arrancar, convertÃ­a .ce-ai-overlay en display:flex y hacÃ­a visible Alta asistida de COMPRAS sin que nadie la abriera.
+- Como Gemini cargaba su CSS al arrancar, convertía .ce-ai-overlay en display:flex y hacía visible Alta asistida de COMPRAS sin que nadie la abriera.
 
-CorrecciÃ³n:
+Corrección:
 - El CSS de Gemini queda acotado al id #ceGeminiLibreOverlay.
 - Ticket Auto recupera su comportamiento: oculto salvo cuando tenga clase .open.
-- No se cambia versiÃ³n: sigue v13.0_prod.
+- No se cambia versión: sigue v13.0_prod.
 - No se toca backend ni funcionalidad Gemini.
 
 Archivos tocados:

@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - HidrataciÃ³n puntual de fotos TKxx al volver a un evento.
-   Objetivo: si ce_ticket_images ya estÃ¡ limpia, que las miniaturas aparezcan al volver al evento
+/* ControlEvent v13.0_prod - Hidratación puntual de fotos TKxx al volver a un evento.
+   Objetivo: si ce_ticket_images ya está limpia, que las miniaturas aparezcan al volver al evento
    sin tener que pulsar Adjuntar ni Refrescar. Sin setInterval ni barridos continuos. */
 (function(){
   'use strict';
@@ -22,7 +22,7 @@
     return id;
   }
   function ticketToken(label){ const m = norm(label).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i); return m ? m[0].replace(/\s+/g,'').toUpperCase() : ''; }
-  function cleanLabel(label){ return norm(label).split('Â·')[0].replace(/\s*\|\s*/g,' | ').trim(); }
+  function cleanLabel(label){ return norm(label).split('·')[0].replace(/\s*\|\s*/g,' | ').trim(); }
   function imageCandidates(label, ev=currentEventId()){
     const base = norm(label), clean = cleanLabel(base), tk = ticketToken(base);
     const out = [];

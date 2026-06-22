@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Refuerzo del desplegable Ingreso en alta de colaboradores.
-   No intercepta login ni menÃºs: solo garantiza opciones en #collabSituacion. */
+/* ControlEvent v13.0_prod - Refuerzo del desplegable Ingreso en alta de colaboradores.
+   No intercepta login ni menús: solo garantiza opciones en #collabSituacion. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';

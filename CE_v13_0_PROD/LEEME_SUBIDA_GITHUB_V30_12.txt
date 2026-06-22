@@ -1,2 +1,0 @@
-Subir todo el contenido de este ZIP a GitHub sustituyendo la versión anterior.
-Base estable V30.10_RESCATE. No contiene scripts 30.9.x ni 30.11 separados.

@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
-   Corrige la instalaciÃ³n del visor, abre sin esperar a sanitizados tardÃ­os y
+/* ControlEvent v13.0_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
+   Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
 (function(){
   'use strict';
@@ -32,7 +32,7 @@
   function isBudgetLegacyText(text){
     const t = up(text);
     return /\b(SOCIOS|NO SOCIOS)\s*\/\s*(PERSONAS|IMPORTE|INGRESADO|PENDIENTE)/.test(t)
-      || /DONACI[OÃ“]N\s+DE\s+PRODUCTO\s*\//.test(t)
+      || /DONACI[OÓ]N\s+DE\s+PRODUCTO\s*\//.test(t)
       || /VALOR\s+PRODUCTO\s+DONADO/.test(t);
   }
   function isActuallyVisible(el){
@@ -141,7 +141,7 @@
   function isCurrentExpenseTicket(value){
     try{ if(typeof window.isCurrentExpenseTicket === 'function') return window.isCurrentExpenseTicket(value); }catch(_){ }
     const t = up(value);
-    return t.includes('GASTOS CORRIENTES') || t.includes('GASTOS DE ORGANIZACION') || t.includes('GASTOS DE ORGANIZACIÃ“N');
+    return t.includes('GASTOS CORRIENTES') || t.includes('GASTOS DE ORGANIZACION') || t.includes('GASTOS DE ORGANIZACIÓN');
   }
   function eventPrice(){ return Number(selectedEventObj().precio || selectedEventObj().price || 0); }
   function incomePersona(row){ return row.persona || persona(row.personaId) || {}; }
@@ -198,7 +198,7 @@
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
     hideLegacyBudgetTooltips();
-    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">Ã—</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
+    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
     box.dataset.ceBudgetOpenedAt = String(Date.now());
     box.dataset.ceBudgetLastTitle = String(title || '');
     box.classList.add('open');
@@ -247,7 +247,7 @@
       return true;
     }).sort((a,b) => cmp(incomeParts(a).nombre, incomeParts(b).nombre));
     const total = rows.reduce((sum, item) => sum + incomeParts(item).total, 0);
-    const table = tableHtml(['Nombre','NÂº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'], rows.map(item => {
+    const table = tableHtml(['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'], rows.map(item => {
       const p = incomeParts(item);
       return [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total)];
     }));
@@ -409,14 +409,14 @@
       || panel.classList.contains('donantes')
       || panel.classList.contains('ce-v306-donantes-lite')
       || panel.classList.contains('operativo')
-      || /INGRESOS\s+EN\s+DINERO|DONACION\s+DE\s+PRODUCTO|DONACI[OÃ“]N\s+DE\s+PRODUCTO|OPERATIVA/.test(text);
+      || /INGRESOS\s+EN\s+DINERO|DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO|OPERATIVA/.test(text);
   }
   function isDonationPanel(panel){
     if(!panel) return false;
     const text = up(panel.querySelector('h3')?.textContent || panel.textContent || '');
     return panel.classList.contains('donantes')
       || panel.classList.contains('ce-v306-donantes-lite')
-      || /DONACION\s+DE\s+PRODUCTO|DONACI[OÃ“]N\s+DE\s+PRODUCTO/.test(text);
+      || /DONACION\s+DE\s+PRODUCTO|DONACI[OÓ]N\s+DE\s+PRODUCTO/.test(text);
   }
   function isIncomePanel(panel){
     if(!panel) return false;

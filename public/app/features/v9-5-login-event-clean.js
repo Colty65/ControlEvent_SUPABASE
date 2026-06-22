@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - limpieza visual real del selector de evento tras login.
-   Evita que el desplegable muestre un evento aparente cuando todavÃ­a no se ha elegido ninguno. */
+/* ControlEvent v13.0_prod - limpieza visual real del selector de evento tras login.
+   Evita que el desplegable muestre un evento aparente cuando todavía no se ha elegido ninguno. */
 (function(){
   'use strict';
   if(window.__ceV95LoginEventClean) return;

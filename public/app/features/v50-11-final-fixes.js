@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajuste quirurgico sobre v50.19.
+/* ControlEvent v13.0_prod - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.

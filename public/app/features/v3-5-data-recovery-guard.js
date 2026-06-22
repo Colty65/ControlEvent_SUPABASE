@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - guarda de recuperacion de INGRESOS sin escrituras destructivas. */
+/* ControlEvent v13.0_prod - guarda de recuperacion de INGRESOS sin escrituras destructivas. */
 (function(){
   'use strict';
 
@@ -19,7 +19,7 @@
   const same = (a,b) => norm(a) === norm(b);
   const num = value => {
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = norm(value).replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = norm(value).replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');

@@ -1,15 +1,15 @@
-﻿{
+{
   "version": "v13.0_prod",
   "base": "v9.6_prod",
   "created_by": "ChatGPT",
   "main_changes": [
-    "ActualizaciÃ³n completa de versiÃ³n visible a v13.0_prod",
-    "Ticket IA disponible para usuarios RW ademÃ¡s de GD",
-    "Refuerzo de actualizaciÃ³n de precio en PRODUCTOS para productos existentes",
+    "Actualización completa de versión visible a v13.0_prod",
+    "Ticket IA disponible para usuarios RW además de GD",
+    "Refuerzo de actualización de precio en PRODUCTOS para productos existentes",
     "Mapa de recursos: TKxx abre detalle contable y foto de factura",
-    "BÃºsquedas en COMPRAS y DONACIONES permitidas en eventos Finalizados",
-    "HidrataciÃ³n acelerada de acciones de fotos en Resumen presupuestario",
-    "OpciÃ³n visible de compartir/proyectar pantalla"
+    "Búsquedas en COMPRAS y DONACIONES permitidas en eventos Finalizados",
+    "Hidratación acelerada de acciones de fotos en Resumen presupuestario",
+    "Opción visible de compartir/proyectar pantalla"
   ],
   "added_files": [
     "public/app/features/v10-0-ticketauto-compras.js",

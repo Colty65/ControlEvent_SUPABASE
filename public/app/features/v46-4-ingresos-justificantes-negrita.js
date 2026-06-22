@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - justificantes de INGRESOS y marca negrita post-modificaciÃ³n.
+/* ControlEvent v13.0_prod - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
@@ -145,7 +145,7 @@
       const has = !!receiptData(id);
       const box = document.createElement('div');
       box.className = 'ce-v464-receipt-tools';
-      box.innerHTML = `${has ? '<span class="ce-v464-receipt-ok">ðŸ“Ž Justificante adjunto</span>' : ''}<button type="button" class="outline small" data-action="ingreso-receipt-add-v464" data-id="${esc(id)}">${has ? 'Cambiar justificante' : 'Adjuntar justificante'}</button>${has ? `<button type="button" class="outline small" data-action="ingreso-receipt-view-v464" data-id="${esc(id)}">Ver justificante</button><button type="button" class="danger small" data-action="ingreso-receipt-delete-v464" data-id="${esc(id)}">Eliminar justificante</button>` : ''}`;
+      box.innerHTML = `${has ? '<span class="ce-v464-receipt-ok">📎 Justificante adjunto</span>' : ''}<button type="button" class="outline small" data-action="ingreso-receipt-add-v464" data-id="${esc(id)}">${has ? 'Cambiar justificante' : 'Adjuntar justificante'}</button>${has ? `<button type="button" class="outline small" data-action="ingreso-receipt-view-v464" data-id="${esc(id)}">Ver justificante</button><button type="button" class="danger small" data-action="ingreso-receipt-delete-v464" data-id="${esc(id)}">Eliminar justificante</button>` : ''}`;
       const actions = card.querySelector('button[data-action="save-collab"]')?.parentElement || card.querySelector('.rowline') || card;
       try{ actions.appendChild(box); }catch(_){ card.appendChild(box); }
     });
@@ -161,7 +161,7 @@
     if(action === 'ingreso-receipt-add-v464'){ stop(ev); attachReceipt(id); return false; }
     if(action === 'ingreso-receipt-delete-v464'){
       stop(ev);
-      if(confirm('Â¿Eliminar el justificante de este ingreso?')){
+      if(confirm('¿Eliminar el justificante de este ingreso?')){
         deleteReceipt(id); saveNow(); renderNow();
         [60,180,500].forEach(ms => setTimeout(injectReceiptTools, ms));
       }

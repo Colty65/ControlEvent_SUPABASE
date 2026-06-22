@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajustes generales: cabecera compacta, refresco grÃ¡ficas, bÃºsqueda finalizados, fotos y mapa. */
+/* ControlEvent v13.0_prod - ajustes generales: cabecera compacta, refresco gráficas, búsqueda finalizados, fotos y mapa. */
 (function(){
   'use strict';
   if(window.__ceV96AppFixes) return; window.__ceV96AppFixes=true;
@@ -54,8 +54,8 @@
   function ticketImageUrl(tk){ var s=stateObj(); var im=s.ticketImages||{}; return im[tk]||im[text(tk).toUpperCase()]||im[text(tk).toLowerCase()]||''; }
   function openTicketDetail(tk){
     var rows=eventRowsForTicket(tk); var img=ticketImageUrl(tk); var total=rows.reduce(function(a,c){ return a+(Number(c.unidades||0)*Number(c.precio||0)); },0);
-    var html='<div id="ceV96TicketDetail"><div class="box"><div class="head"><div>Factura '+tk+' Â· '+total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' â‚¬</div><button type="button" class="outline small" data-ce-v96-close> Cerrar </button></div><div class="grid"><div><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
-      (rows.length?rows.map(function(c){ var imp=Number(c.unidades||0)*Number(c.precio||0); return '<tr><td>'+esc(nameById('productos',c.productoId)||c.productoId)+'</td><td>'+esc(c.unidades||'')+'</td><td>'+Number(c.precio||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+imp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'; }).join(''):'<tr><td colspan="4">Sin lÃ­neas contables para este ticket.</td></tr>')+
+    var html='<div id="ceV96TicketDetail"><div class="box"><div class="head"><div>Factura '+tk+' · '+total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €</div><button type="button" class="outline small" data-ce-v96-close> Cerrar </button></div><div class="grid"><div><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
+      (rows.length?rows.map(function(c){ var imp=Number(c.unidades||0)*Number(c.precio||0); return '<tr><td>'+esc(nameById('productos',c.productoId)||c.productoId)+'</td><td>'+esc(c.unidades||'')+'</td><td>'+Number(c.precio||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+imp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'; }).join(''):'<tr><td colspan="4">Sin líneas contables para este ticket.</td></tr>')+
       '</tbody></table></div><div>'+(img?'<img src="'+esc(img)+'" alt="Foto '+esc(tk)+'">':'<div class="empty">No hay foto adjunta para '+esc(tk)+'</div>')+'</div></div></div></div>';
     var old=$('ceV96TicketDetail'); if(old) old.remove(); document.body.insertAdjacentHTML('beforeend',html);
   }

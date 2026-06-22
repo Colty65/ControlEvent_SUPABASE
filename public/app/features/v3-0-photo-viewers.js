@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - visor de fotos sin doble apertura; base estable v3.2. */
+/* ControlEvent v13.0_prod - visor de fotos sin doble apertura; base estable v3.2. */
 (function(){
   'use strict';
 

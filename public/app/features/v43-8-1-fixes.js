@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - correcciÃ³n mÃ³vil de PlanificaciÃ³n inicial y precio en COMPRAS.
+/* ControlEvent v13.0_prod - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
@@ -13,7 +13,7 @@
   function arr(name){ const v = st()[name]; return Array.isArray(v) ? v : []; }
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').replace(/â‚¬/g,'').replace(/\s/g,'').trim();
+    let s = String(value ?? '').replace(/€/g,'').replace(/\s/g,'').trim();
     if(!s) return 0;
     const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
     if(c !== -1 && d !== -1) s = c > d ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,'');
@@ -22,8 +22,8 @@
     return Number.isFinite(n) ? n : 0;
   }
   function euro(value){
-    try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value || 0)) + ' â‚¬'; }
-    catch(_){ return (Number(value || 0).toFixed(2).replace('.', ',')) + ' â‚¬'; }
+    try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value || 0)) + ' €'; }
+    catch(_){ return (Number(value || 0).toFixed(2).replace('.', ',')) + ' €'; }
   }
   function money(value){
     try{ if(typeof window.money === 'function') return window.money(value); }catch(_){ }
@@ -73,8 +73,8 @@
     try{
       document.body.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
       document.documentElement.classList.remove('mobile-drawer-open','mobile-menu-open','ce-mobile-menu-open','drawer-open','menu-open');
-      // No ponemos display:none ni hidden inline: el menÃº mÃ³vil legacy abre/cierra con body.mobile-drawer-open.
-      // Si aquÃ­ dejamos estilos inline, despuÃ©s el botÃ³n MenÃº parece no responder.
+      // No ponemos display:none ni hidden inline: el menú móvil legacy abre/cierra con body.mobile-drawer-open.
+      // Si aquí dejamos estilos inline, después el botón Menú parece no responder.
       ['ceMobileDrawerBackdrop','ceMobileOverlay'].forEach(id => {
         const el = $(id);
         if(el){ el.classList.remove('open','is-open','active'); el.style.removeProperty('display'); el.style.removeProperty('pointer-events'); }
@@ -115,7 +115,7 @@
     }
     if(!productId){
       precio = 0;
-      if(precioEl && forceReference){ precioEl.value = '0,00 â‚¬'; precioEl.dataset.lastProductIdV4381 = ''; precioEl.dataset.lastProductId = ''; }
+      if(precioEl && forceReference){ precioEl.value = '0,00 €'; precioEl.dataset.lastProductIdV4381 = ''; precioEl.dataset.lastProductId = ''; }
     }
     if(importeEl) importeEl.value = money(precio * unidades);
   }
@@ -169,6 +169,6 @@
 
   window.ControlEventV4381 = {version: VERSION, install, updateBuyPreview:updateBuyPreviewV4381, closeMobileDrawer};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
-  // InstalaciÃ³n puntual, sin refrescos permanentes de cabecera para evitar parpadeos.
+  // Instalación puntual, sin refrescos permanentes de cabecera para evitar parpadeos.
   [0,80,250,700,1500].forEach(ms => setTimeout(install, ms));
 })();

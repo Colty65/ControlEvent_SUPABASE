@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - HOTFIX mÃ­nimo: Ticket Auto no debe abrirse solo.
+/* ControlEvent v13.0_prod - HOTFIX mínimo: Ticket Auto no debe abrirse solo.
    Motivo: tras v11.1 algunos arranques dejaban visible Alta asistida de COMPRAS antes de elegir evento.
-   Este parche no cambia versiÃ³n ni funcionalidad; solo cierra el panel si no procede. */
+   Este parche no cambia versión ni funcionalidad; solo cierra el panel si no procede. */
 (function(){
   'use strict';
   if(window.__ceV110TicketAutoNoAutopenHotfix) return;
@@ -21,7 +21,7 @@
     if(!id) return false;
     var s = stateObj();
     var evs = Array.isArray(s.eventos) ? s.eventos : [];
-    if(!evs.length) return true; // si aÃºn no estÃ¡ hidratado el catÃ¡logo, no cerramos por este motivo.
+    if(!evs.length) return true; // si aún no está hidratado el catálogo, no cerramos por este motivo.
     return evs.some(function(e){ return trim(e && e.id) === id; });
   }
   function authVisible(){
@@ -39,7 +39,7 @@
     var cs = null;
     try{ cs = getComputedStyle(t); }catch(_){ }
     if(cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
-    // En esta app las pestaÃ±as ocultas pueden estar sin offset; si hay una clase activa en otra, lo tratamos como no visible.
+    // En esta app las pestañas ocultas pueden estar sin offset; si hay una clase activa en otra, lo tratamos como no visible.
     var active = document.querySelector('.tab-panel.active,.tab.active,[data-tab-panel].active,.view.active');
     if(active && active.id && active.id !== 'tabCompras') return false;
     return true;

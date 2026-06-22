@@ -1,10 +1,10 @@
-﻿/* ControlEvent v13.0_prod - estabilizaciÃ³n rol/menÃºs, estado de evento, justificantes de ingresos en iPad/mÃ³vil y negrita PRODUCTOS.
-   - RW no ve PlanificaciÃ³n inicial ni hay parpadeo de menÃº.
-   - En mÃ³vil/iPhone/Android las opciones disponibles quedan siempre visibles; se oculta el botÃ³n MenÃº.
-   - Botones inferiores visibles tambiÃ©n en mÃ³vil para GD/RW, compactos y solo pulsables en el icono.
+/* ControlEvent v13.0_prod - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
+   - RW no ve Planificación inicial ni hay parpadeo de menú.
+   - En móvil/iPhone/Android las opciones disponibles quedan siempre visibles; se oculta el botón Menú.
+   - Botones inferiores visibles también en móvil para GD/RW, compactos y solo pulsables en el icono.
    - Estado En curso/Finalizado siempre con color coherente y opciones finalizadas en rojo/negrita.
-   - INGRESOS/DONACIONES/COMPRAS se rehidratan si quedan vacÃ­os tras login/cambio de evento.
-   - Justificantes de ingresos usan mecÃ¡nica no destructiva similar a tickets.
+   - INGRESOS/DONACIONES/COMPRAS se rehidratan si quedan vacíos tras login/cambio de evento.
+   - Justificantes de ingresos usan mecánica no destructiva similar a tickets.
    - PRODUCTOS queda en negrita al modificar.
 */
 (function(){
@@ -131,11 +131,11 @@
       .ce-v502-receipt-btn.danger{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;}
       .ce-v502-receipt-empty{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:34px!important;height:34px!important;min-width:34px!important;border-radius:9px!important;background:#f8fafc!important;border:1px dashed #cbd5e1!important;color:#64748b!important;}
       .ce-v502-hidden-role{display:none!important;}
-      /* v50.3: menÃº estable por rol. PlanificaciÃ³n queda oculta por defecto y solo se muestra para GD. */
+      /* v50.3: menú estable por rol. Planificación queda oculta por defecto y solo se muestra para GD. */
       body.ce-v502-ready #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       body.ce-v502-ready.ce-role-gd-v502 #tabPlanificacionBtn{display:flex!important;visibility:visible!important;pointer-events:auto!important;}
       body.ce-v502-ready.ce-role-rw-v502 #tabPlanificacionBtn,body.ce-v502-ready.ce-role-ro-v502 #tabPlanificacionBtn{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      /* v50.3: salida cÃ³moda en mÃ³vil sin depender de giro horizontal. */
+      /* v50.3: salida cómoda en móvil sin depender de giro horizontal. */
       @media(max-width:760px){body.ce-v502-ready #btnLogout:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 6px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6200!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:54px!important;height:34px!important;padding:0 9px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.18)!important;font-size:12px!important;font-weight:900!important;pointer-events:auto!important;}body.ce-v502-ready #btnSoftRefresh:not(.hidden){position:fixed!important;right:calc(env(safe-area-inset-right,0px) + 66px)!important;top:calc(env(safe-area-inset-top,0px) + 6px)!important;z-index:6199!important;height:34px!important;min-width:72px!important;padding:0 8px!important;border-radius:12px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 8px 24px rgba(15,23,42,.14)!important;font-size:11px!important;font-weight:850!important;pointer-events:auto!important;}}
     `;
     document.head.appendChild(style);
@@ -274,11 +274,11 @@
   function collabIdFromCard(card){ return card?.querySelector?.('button[data-action="save-collab"][data-id],button[data-action="delete-collab"][data-id],select[data-action="edit-collab-persona"][data-id],input[data-action="edit-collab-numero"][data-id],[data-action="edit-collab-situacion"][data-id]')?.dataset?.id || ''; }
   function compactReceipts(){
     const wrap=$('collabList'); if(!wrap) return; injectStyle();
-    // Retirar herramientas antiguas sin tocar la ficha si ya estÃ¡ estable.
+    // Retirar herramientas antiguas sin tocar la ficha si ya está estable.
     wrap.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools,.ce-v465-receipt-strip:not(.ce-v502-receipt-strip),.ce-v501-receipt-strip').forEach(el => { try{ el.remove(); }catch(_){ } });
     wrap.querySelectorAll('.itemcard,.rowline,.card').forEach(card => {
       const id=collabIdFromCard(card); if(!id) return; const src=receiptSrc(id); const locked=isFinalizado(); const writable=canWrite() && !locked;
-      const html = `${src ? `<button type="button" class="ce-v502-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v502" data-id="${esc(id)}"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v502-receipt-empty" title="Sin justificante">ðŸ“·</span>`}${writable ? `<button type="button" class="ce-v502-receipt-btn" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v502" data-id="${esc(id)}">ðŸ“Ž</button>${src ? `<button type="button" class="ce-v502-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v502" data-id="${esc(id)}">ðŸ—‘</button>` : ''}` : ''}`;
+      const html = `${src ? `<button type="button" class="ce-v502-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v502" data-id="${esc(id)}"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v502-receipt-empty" title="Sin justificante">📷</span>`}${writable ? `<button type="button" class="ce-v502-receipt-btn" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v502" data-id="${esc(id)}">📎</button>${src ? `<button type="button" class="ce-v502-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v502" data-id="${esc(id)}">🗑</button>` : ''}` : ''}`;
       let boxes=Array.from(card.querySelectorAll('.ce-v502-receipt-strip'));
       let box=boxes.shift();
       boxes.forEach(x => { try{ x.remove(); }catch(_){ } });
@@ -291,24 +291,24 @@
   function receiptInfo(id){
     const row = arr('colaboradores').find(r => same(r.id,id)) || {}; const persona=arr('personas').find(p => same(p.id,row.personaId)) || {}; const ev=selectedEv() || {}; const socio=up(persona.rango)==='SOCIO'; const precio=Number(ev.precio || 0); const obligatorio=socio ? precio * Number(row.numero || 0) : 0; const voluntario=Number(String(row.importe || 0).replace(',','.')) || 0; return {nombre:persona.nombre || '-', rango:persona.rango || '-', situacion:row.situacion || 'Pendiente', numero:Number(row.numero || 0), obligatorio, voluntario, total:obligatorio+voluntario};
   }
-  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; } }
+  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
   function showReceipt(id, ev){
     const src=receiptSrc(id); if(!src){ alert('Este ingreso no tiene justificante adjunto.'); return stop(ev); }
     const info=receiptInfo(id); let ov=$('ceV502ReceiptModal'); if(ov) ov.remove(); ov=document.createElement('div'); ov.id='ceV502ReceiptModal'; ov.className='ce-v468-modal';
-    ov.innerHTML = `<div class="ce-v468-modal-card"><div class="ce-v468-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v468-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>SituaciÃ³n</td><td>${esc(info.situacion)}</td></tr><tr><td>NÂº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v468-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
+    ov.innerHTML = `<div class="ce-v468-modal-card"><div class="ce-v468-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div><div class="ce-v468-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody><tr><td>Rango</td><td>${esc(info.rango)}</td></tr><tr><td>Situación</td><td>${esc(info.situacion)}</td></tr><tr><td>Nº personas</td><td>${esc(info.numero)}</td></tr><tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr><tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr><tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr></tbody></table></div><img class="ce-v468-modal-img" alt="Justificante de ingreso" src="${esc(src)}"></div>`;
     document.body.appendChild(ov); ov.addEventListener('click', e => { if(e.target===ov || e.target?.closest?.('[data-close]')){ stop(e); ov.remove(); return false; } try{ e.stopPropagation(); }catch(_){ } }, true); return stop(ev);
   }
   async function attachReceipt(id, ev){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev); }
     if(isFinalizado()){ alert('Evento finalizado. Solo se puede ver el justificante.'); return stop(ev); }
     const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.position='fixed'; input.style.left='-9999px'; document.body.appendChild(input);
-    input.addEventListener('change', async () => { try{ const f=input.files && input.files[0]; if(!f) return; if(!/^image\//i.test(f.type || '')){ alert('Selecciona una imagen.'); return; } const src=await readImage(f); setReceiptLocal(id,src); compactReceipts(); try{ await uploadReceipt(id,src); }catch(error){ console.warn('[v50.3] Justificante no subido aÃºn, queda protegido localmente.', error); } saveNow(); compactReceipts(); hydrateReceipts(true); }catch(error){ alert('No se pudo adjuntar el justificante. '+(error?.message || error)); } finally{ try{ input.remove(); }catch(_){ } } }, {once:true});
+    input.addEventListener('change', async () => { try{ const f=input.files && input.files[0]; if(!f) return; if(!/^image\//i.test(f.type || '')){ alert('Selecciona una imagen.'); return; } const src=await readImage(f); setReceiptLocal(id,src); compactReceipts(); try{ await uploadReceipt(id,src); }catch(error){ console.warn('[v50.3] Justificante no subido aún, queda protegido localmente.', error); } saveNow(); compactReceipts(); hydrateReceipts(true); }catch(error){ alert('No se pudo adjuntar el justificante. '+(error?.message || error)); } finally{ try{ input.remove(); }catch(_){ } } }, {once:true});
     input.click(); return stop(ev);
   }
   async function removeReceipt(id, ev){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev); }
     if(isFinalizado()){ alert('Evento finalizado. No se puede eliminar el justificante.'); return stop(ev); }
-    if(!confirm('Â¿Eliminar el justificante de este ingreso?')) return stop(ev);
+    if(!confirm('¿Eliminar el justificante de este ingreso?')) return stop(ev);
     try{ deleteReceiptLocal(id); await fetch(`/api/ticket-images?eventId=${encodeURIComponent(selectedId())}&key=${encodeURIComponent(keyOnly(id))}`, {method:'DELETE'}); }catch(_){ }
     saveNow(); compactReceipts(); return stop(ev);
   }
@@ -332,7 +332,7 @@
   }
   function handleEventChange(){ applyEventStatus(); hydrateReceipts(true); scheduleRepair(currentTab(), 'event-change'); [120,500,1200,2500].forEach(ms => setTimeout(() => { applyRoleMenu(); applyEventStatus(); compactReceipts(); }, ms)); }
 
-  // v50.3: se elimina el observador global de todo el DOM porque reescribÃ­a controles de justificante y provocaba temblores en RW/RO.
+  // v50.3: se elimina el observador global de todo el DOM porque reescribía controles de justificante y provocaba temblores en RW/RO.
   let mo=null;
   function installObserver(){ return; }
   function wrapRender(){ const old=getFn('render'); if(!old || old.__ceV502Wrapped) return; const wrapped=function(){ const ret=old.apply(this, arguments); [40,180,650].forEach(ms => setTimeout(() => { applyRoleMenu(); applyEventStatus(); compactReceipts(); applyProductBold(); hydrateReceipts(false); }, ms)); setTimeout(() => scheduleRepair(currentTab(),'after-render'), 260); return ret; }; wrapped.__ceV502Wrapped=true; try{ render=wrapped; }catch(_){ } window.render=wrapped; }
@@ -352,7 +352,7 @@
   window.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') handleEventChange(); }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
   [0,80,240,700,1500,3000,6000].forEach(ms => setTimeout(install, ms));
-  // v50.3: sin watchdog visual cada 1,8s. Solo sincronizaciÃ³n ligera y espaciada para no provocar temblores ni duplicar controles.
+  // v50.3: sin watchdog visual cada 1,8s. Solo sincronización ligera y espaciada para no provocar temblores ni duplicar controles.
   setInterval(() => { hydrateReceipts(false); applyEventStatus(); }, window.ControlEventLowResource?.interval?.(15000) || 15000);
   window.ControlEventV502 = {version:VERSION, versionFile:VERSION_FILE, applyRoleMenu, applyEventStatus, repairVisibleData, hydrateReceipts, compactReceipts, applyProductBold};
   window.ControlEventV503 = window.ControlEventV502;

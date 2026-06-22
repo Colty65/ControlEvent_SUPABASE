@@ -1,35 +1,35 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Cambios incluidos sobre v9.6_prod:
 
-1) VersiÃ³n
-- VersiÃ³n visible y referencias activas actualizadas a v13.0_prod.
+1) Versión
+- Versión visible y referencias activas actualizadas a v13.0_prod.
 - package.json/package-lock.json actualizados a 10.0.0-prod.
 
 2) Ticket IA / COMPRAS
-- Usuarios RW tambiÃ©n pueden abrir y procesar Tickets IA.
-- Se mantiene bloqueo si el evento estÃ¡ Finalizado.
-- Refuerzo de actualizaciÃ³n de precio de PRODUCTOS cuando el producto ya existe, con comparaciÃ³n de producto sin acentos ni diferencias de espacios.
+- Usuarios RW también pueden abrir y procesar Tickets IA.
+- Se mantiene bloqueo si el evento está Finalizado.
+- Refuerzo de actualización de precio de PRODUCTOS cuando el producto ya existe, con comparación de producto sin acentos ni diferencias de espacios.
 
 3) Mapa de recursos
-- TKxx clicable corregido: el clic en TK01/TKxx abre una ventana con lÃ­neas contables a la izquierda y foto de factura a la derecha.
-- La bÃºsqueda de imagen comprueba claves con eventId|TKxx y variantes antiguas.
-- Cajitas de responsables reducidas en iPad y mÃ³viles.
+- TKxx clicable corregido: el clic en TK01/TKxx abre una ventana con líneas contables a la izquierda y foto de factura a la derecha.
+- La búsqueda de imagen comprueba claves con eventId|TKxx y variantes antiguas.
+- Cajitas de responsables reducidas en iPad y móviles.
 
 4) Eventos Finalizados
-- Se refuerza la bÃºsqueda en COMPRAS y DONACIONES aunque el evento estÃ© Finalizado.
-- Se intercepta la bÃºsqueda desde window en fase de captura para evitar bloqueos posteriores.
+- Se refuerza la búsqueda en COMPRAS y DONACIONES aunque el evento esté Finalizado.
+- Se intercepta la búsqueda desde window en fase de captura para evitar bloqueos posteriores.
 
-5) Resumen presupuestario / CÃ¡lculos por tienda y ticket
-- HidrataciÃ³n acelerada de botones/acciones de fotos al entrar en Resumen/Graficas y al refrescar mÃ³dulos.
+5) Resumen presupuestario / Cálculos por tienda y ticket
+- Hidratación acelerada de botones/acciones de fotos al entrar en Resumen/Graficas y al refrescar módulos.
 - Mantiene descarga solo en INGRESOS y RESUMEN PRESUPUESTARIO.
 
 6) Compartir/proyectar pantalla
-- Nuevo icono visible ðŸ“º en cabecera para cualquier usuario.
+- Nuevo icono visible 📺 en cabecera para cualquier usuario.
 - Permite activar pantalla completa, abrir el selector nativo de compartir pantalla si el navegador lo soporta, y copiar URL.
-- Para televisores/proyectores, depende de la funciÃ³n de proyecciÃ³n del dispositivo/navegador (AirPlay, Chromecast, Miracast, HDMI, duplicar pantalla, etc.).
+- Para televisores/proyectores, depende de la función de proyección del dispositivo/navegador (AirPlay, Chromecast, Miracast, HDMI, duplicar pantalla, etc.).
 
-Ficheros principales aÃ±adidos:
+Ficheros principales añadidos:
 - public/app/features/v10-0-ticketauto-compras.js
 - public/app/features/v10-0-app-fixes.js
 

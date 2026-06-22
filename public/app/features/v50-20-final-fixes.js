@@ -1,7 +1,7 @@
-﻿/* ControlEvent v13.0_prod - refresco en sitio y cierre visual del flujo evento.
+/* ControlEvent v13.0_prod - refresco en sitio y cierre visual del flujo evento.
    Cambios funcionales concentrados:
-   - Refres/Refrescar actualiza /api/state y repinta la ventana activa sin volver a CE ni cambiar a otra pestaÃ±a.
-   - Al elegir/cargar evento se oculta de forma real la pantalla CE en mÃ³vil/iPad.
+   - Refres/Refrescar actualiza /api/state y repinta la ventana activa sin volver a CE ni cambiar a otra pestaña.
+   - Al elegir/cargar evento se oculta de forma real la pantalla CE en móvil/iPad.
    - Visor de justificantes de globos visible por encima en iPad/iPhone, sin tocar justificantes dentro de INGRESOS. */
 (function(){
   'use strict';
@@ -158,7 +158,7 @@
     try{ window.ControlEventV469?.migrateLocalIngresoReceipts?.(); }catch(_){ }
     try{ window.ControlEventV469?.compactIngresoReceipts?.(); }catch(_){ }
     try{ window.ControlEventV469?.enrichOpenTooltips?.(); }catch(_){ }
-    // enrichOpenTooltips no estaba exportado en v46.9: lo fuerzo indirectamente provocando una micro-mutaciÃ³n inocua.
+    // enrichOpenTooltips no estaba exportado en v46.9: lo fuerzo indirectamente provocando una micro-mutación inocua.
     try{
       const b = $(BUDGET_TIP_ID) || $('ceTooltipV21');
       if(b){ b.dataset.ceV5020Hydrate = String(Date.now()); }
@@ -211,7 +211,7 @@
       renderActiveOnly(keepTab, 'refresh-in-place');
       return false;
     }catch(error){
-      console.warn('[v50.20] Refres en sitio fallÃ³', error);
+      console.warn('[v50.20] Refres en sitio falló', error);
       renderActiveOnly(keepTab, 'refresh-fallback');
       return false;
     }finally{

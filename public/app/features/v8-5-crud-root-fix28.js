@@ -1,10 +1,10 @@
-﻿/* ControlEvent v13.0_prod FIX29 - CRUD raÃ­z fila-a-fila con baja por firma
+/* ControlEvent v13.0_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.
    - Alta/Modificar/Baja de mantenimientos = endpoint CRUD concreto, una fila concreta.
-   - Cambiar situaciÃ³n del evento = endpoint explÃ­cito de situaciÃ³n.
-   - Evento Finalizado = datos bloqueados; solo se puede cambiar situaciÃ³n de forma explÃ­cita.
+   - Cambiar situación del evento = endpoint explícito de situación.
+   - Evento Finalizado = datos bloqueados; solo se puede cambiar situación de forma explícita.
 */
 (function(){
   'use strict';
@@ -46,25 +46,25 @@
   function money(v){ try{ if(typeof parseEuroInput==='function') return parseEuroInput(v); }catch(_){} return parseNum(v); }
   function productById(id){ return arr('productos').find(p=>String(p.id||'')===String(id||''))||{}; }
   function localStore(){ try{ const key=Function('return (typeof STORAGE_KEY!=="undefined")?STORAGE_KEY:"controlevent_v6_4"')(); localStorage.setItem(key, JSON.stringify(getState())); }catch(_){} }
-  function renderNow(){ localStore(); try{ if(typeof render==='function') render(); }catch(e){ log('render fallÃ³', e); } }
+  function renderNow(){ localStore(); try{ if(typeof render==='function') render(); }catch(e){ log('render falló', e); } }
   function refreshMaintenanceAfterSync(collection){
     const col=String(collection||'').trim();
     try{
       if((!col || col==='eventos') && typeof renderEventos==='function') renderEventos();
-    }catch(e){ log('renderEventos tras sincronizar fallÃ³', e); }
+    }catch(e){ log('renderEventos tras sincronizar falló', e); }
     try{ if(typeof renderMaintenanceTabs==='function') renderMaintenanceTabs(); }catch(_){ }
     try{
       const api=window.ControlEventMaintenance;
       const current=api && typeof api.current==='function' ? String(api.current()||'') : '';
       if(api && typeof api.refreshCurrent==='function' && (!current || current===col || col==='eventos' || (!col && current==='eventos'))){
-        Promise.resolve(api.refreshCurrent({reason:'crud-root-sync-'+(col||'state'), force:true})).catch(function(e){ log('ControlEventMaintenance.refreshCurrent fallÃ³', e); });
+        Promise.resolve(api.refreshCurrent({reason:'crud-root-sync-'+(col||'state'), force:true})).catch(function(e){ log('ControlEventMaintenance.refreshCurrent falló', e); });
       }
     }catch(_){ }
     try{ window.dispatchEvent(new CustomEvent('controlevent:crud-row-synced',{detail:{collection:col, at:Date.now()}})); }catch(_){ }
   }
   function requireWrite(){ if(!canWrite()){ alert('Usuario sin permiso de escritura.'); return false; } return true; }
-  function requireGD(){ if(!isGD()){ alert('Solo usuario GD puede realizar esta operaciÃ³n.'); return false; } return true; }
-  function blockIfFinalized(ev, text){ if(isFinalized(ev)){ alert('Evento Finalizado: no se permite '+(text||'modificar datos')+'. Cambia antes la situaciÃ³n a En curso si necesitas corregirlo.'); return true; } return false; }
+  function requireGD(){ if(!isGD()){ alert('Solo usuario GD puede realizar esta operación.'); return false; } return true; }
+  function blockIfFinalized(ev, text){ if(isFinalized(ev)){ alert('Evento Finalizado: no se permite '+(text||'modificar datos')+'. Cambia antes la situación a En curso si necesitas corregirlo.'); return true; } return false; }
   function onlySituationChange(old,row){
     if(!old || !row) return false;
     return String(old.situacion||'').trim() !== String(row.situacion||'').trim()
@@ -133,24 +133,24 @@
   function rowProductoFromForm(id){ const old=arr('productos').find(x=>String(x.id)===String(id))||{}; const precio=money(val('edit-producto-precio',id,old.defaultPrecio??old.precio??0)); const tienda=val('edit-producto-tienda',id,old.defaultTiendaId||old.tiendaId||''); return {...old,id:String(id),nombre:val('edit-producto-nombre',id,old.nombre||'').trim(),segmento:val('edit-producto-segmento',id,old.segmento||''),destino:val('edit-producto-destino',id,old.destino||''),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; }
 
   async function addEvento(){ if(!requireGD()) return; const titulo=elVal('newEventoTitulo').trim(); if(!titulo) return; const row={id:uid(),titulo,precio:money(elVal('newEventoPrecio','0')),fechaIni:elVal('newEventoFechaIni').trim(),fechaFin:elVal('newEventoFechaFin').trim(),situacion:elVal('newEventoSituacion','En curso'),descripcion:elVal('newEventoDescripcion').trim()}; await upsert('eventos',row); replaceLocal('eventos',row); getState().selectedEventId=row.id; clear(['newEventoTitulo','newEventoFechaIni','newEventoFechaFin','newEventoDescripcion']); setVal('newEventoPrecio','0.00'); await refreshFromDb('eventos'); }
-  async function addPersona(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'aÃ±adir personas'))return; const nombre=elVal('newPersonaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre,rango:elVal('newPersonaRango','SOCIO')}; await upsert('personas',row); replaceLocal('personas',row); setVal('newPersonaNombre',''); await refreshFromDb(); }
-  async function addTienda(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'aÃ±adir tiendas'))return; const nombre=elVal('newTiendaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre}; await upsert('tiendas',row); replaceLocal('tiendas',row); setVal('newTiendaNombre',''); await refreshFromDb(); }
-  async function addProducto(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'aÃ±adir productos'))return; const nombre=elVal('newProductoNombre').trim(); if(!nombre)return; const precio=money(elVal('newProductoPrecio','0')); const tienda=elVal('newProductoTienda',''); const row={id:uid(),nombre,segmento:elVal('newProductoSegmento'),destino:elVal('newProductoDestino'),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; await upsert('productos',row); replaceLocal('productos',row); setVal('newProductoNombre',''); setVal('newProductoPrecio','0,00 â‚¬'); await refreshFromDb(); }
-  async function addCollab(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'aÃ±adir ingresos'))return; const personaId=elVal('collabPersona'); if(!personaId)return; const row={id:uid(),eventId:selectedEventId(),personaId,numero:Number(elVal('collabNumero','0')||0),situacion:elVal('collabSituacion','Pendiente'),importe:money(elVal('collabImporte','0'))}; await upsert('colaboradores',row); replaceLocal('colaboradores',row); setVal('collabPersona',''); setVal('collabNumero','1'); setVal('collabSituacion','Pendiente'); setVal('collabImporte','0,00 â‚¬'); await refreshFromDb(); }
-  async function addCompra(donacion){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'aÃ±adir compras/donaciones'))return; const pId=elVal(donacion?'donProducto':'buyProducto'); if(!pId)return; const p=productById(pId); const row={id:uid(),eventId:selectedEventId(),productoId:pId,unidades:Number(elVal(donacion?'donUnidades':'buyUnidades','0')||0),precio:money(elVal(donacion?'donPrecio':'buyPrecio',p.precio??p.defaultPrecio??0)),ticketDonacion:elVal(donacion?'donTicket':'buyTicket'),donorRef:donacion?elVal('donDonante'):'',responsableId:elVal(donacion?'donResponsable':'buyResponsable'),tiendaId:donacion?(p.tiendaId||p.defaultTiendaId||''):elVal('buyTienda',p.tiendaId||p.defaultTiendaId||'')}; await upsert('compras',row); replaceLocal('compras',row); if(donacion){ clear(['donProducto','donDonante','donResponsable']); setVal('donUnidades','1.00'); setVal('donPrecio','0,00 â‚¬'); } else { clear(['buyProducto','buyTienda','buyResponsable']); setVal('buyUnidades','1.00'); setVal('buyPrecio','0,00 â‚¬'); setVal('buyTicket',''); } await refreshFromDb(); }
+  async function addPersona(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir personas'))return; const nombre=elVal('newPersonaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre,rango:elVal('newPersonaRango','SOCIO')}; await upsert('personas',row); replaceLocal('personas',row); setVal('newPersonaNombre',''); await refreshFromDb(); }
+  async function addTienda(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir tiendas'))return; const nombre=elVal('newTiendaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre}; await upsert('tiendas',row); replaceLocal('tiendas',row); setVal('newTiendaNombre',''); await refreshFromDb(); }
+  async function addProducto(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir productos'))return; const nombre=elVal('newProductoNombre').trim(); if(!nombre)return; const precio=money(elVal('newProductoPrecio','0')); const tienda=elVal('newProductoTienda',''); const row={id:uid(),nombre,segmento:elVal('newProductoSegmento'),destino:elVal('newProductoDestino'),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; await upsert('productos',row); replaceLocal('productos',row); setVal('newProductoNombre',''); setVal('newProductoPrecio','0,00 €'); await refreshFromDb(); }
+  async function addCollab(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir ingresos'))return; const personaId=elVal('collabPersona'); if(!personaId)return; const row={id:uid(),eventId:selectedEventId(),personaId,numero:Number(elVal('collabNumero','0')||0),situacion:elVal('collabSituacion','Pendiente'),importe:money(elVal('collabImporte','0'))}; await upsert('colaboradores',row); replaceLocal('colaboradores',row); setVal('collabPersona',''); setVal('collabNumero','1'); setVal('collabSituacion','Pendiente'); setVal('collabImporte','0,00 €'); await refreshFromDb(); }
+  async function addCompra(donacion){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir compras/donaciones'))return; const pId=elVal(donacion?'donProducto':'buyProducto'); if(!pId)return; const p=productById(pId); const row={id:uid(),eventId:selectedEventId(),productoId:pId,unidades:Number(elVal(donacion?'donUnidades':'buyUnidades','0')||0),precio:money(elVal(donacion?'donPrecio':'buyPrecio',p.precio??p.defaultPrecio??0)),ticketDonacion:elVal(donacion?'donTicket':'buyTicket'),donorRef:donacion?elVal('donDonante'):'',responsableId:elVal(donacion?'donResponsable':'buyResponsable'),tiendaId:donacion?(p.tiendaId||p.defaultTiendaId||''):elVal('buyTienda',p.tiendaId||p.defaultTiendaId||'')}; await upsert('compras',row); replaceLocal('compras',row); if(donacion){ clear(['donProducto','donDonante','donResponsable']); setVal('donUnidades','1.00'); setVal('donPrecio','0,00 €'); } else { clear(['buyProducto','buyTienda','buyResponsable']); setVal('buyUnidades','1.00'); setVal('buyPrecio','0,00 €'); setVal('buyTicket',''); } await refreshFromDb(); }
 
   async function handleMaintenance(action,id){
     if(action==='save-evento'){
       if(!requireGD())return;
       const old=eventById(id);
       const row=rowEventoFromForm(id);
-      // FIX28: si el evento YA estÃ¡ Finalizado, la Ãºnica operaciÃ³n permitida es
-      // cambiar exclusivamente la situaciÃ³n. No mandamos el registro completo,
-      // porque cualquier diferencia de formato en fechas/descripciÃ³n provocaba
-      // bloqueo y ademÃ¡s no debe actualizar campos de un evento cerrado.
+      // FIX28: si el evento YA está Finalizado, la única operación permitida es
+      // cambiar exclusivamente la situación. No mandamos el registro completo,
+      // porque cualquier diferencia de formato en fechas/descripción provocaba
+      // bloqueo y además no debe actualizar campos de un evento cerrado.
       if(isFinalized(old)){
         if(!onlySituationChange(old,row)){
-          alert('Evento Finalizado: solo se permite cambiar la SITUACIÃ“N. Para modificar datos, primero pÃ¡salo a En curso.');
+          alert('Evento Finalizado: solo se permite cambiar la SITUACIÓN. Para modificar datos, primero pásalo a En curso.');
           return;
         }
         await updateEventSituation(id,row.situacion);
@@ -160,7 +160,7 @@
       }
       await upsert('eventos',row); replaceLocal('eventos',row); await refreshFromDb('eventos'); return;
     }
-    if(action==='delete-evento'){ if(!requireGD())return; const target=eventById(id); if(blockIfFinalized(target,'eliminar evento'))return; if(!confirm('Â¿Eliminar evento y sus datos asociados?')) return; await del('eventos',id); removeLocal('eventos',id); await refreshFromDb('eventos'); return; }
+    if(action==='delete-evento'){ if(!requireGD())return; const target=eventById(id); if(blockIfFinalized(target,'eliminar evento'))return; if(!confirm('¿Eliminar evento y sus datos asociados?')) return; await del('eventos',id); removeLocal('eventos',id); await refreshFromDb('eventos'); return; }
 
     if(!requireWrite()) return;
     const ev=selectedEvent();
@@ -203,7 +203,7 @@
     const isHandled=MAINT_ACTIONS.has(action)||ADD_BUTTONS.has(bid)||bid==='btnTogglePower';
     if(!isHandled) return;
     // Va en WINDOW CAPTURE y se registra antes de los parches legacy.
-    // AsÃ­ ningÃºn listener antiguo puede borrar solo en memoria ni lanzar saveState global.
+    // Así ningún listener antiguo puede borrar solo en memoria ni lanzar saveState global.
     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
     (async()=>{
       try{
@@ -246,7 +246,7 @@
         let payload={}; try{ payload=JSON.parse(init?.body||'{}'); }catch(_){}
         const restore=payload.__forceReplaceAll===true && String((init?.headers||{})['X-ControlEvent-Backup-Restore']||'')==='1';
         if(!restore){
-          log('Bloqueado PUT /api/state de cÃ³digo legacy. Solo local.');
+          log('Bloqueado PUT /api/state de código legacy. Solo local.');
           return Promise.resolve(new Response(JSON.stringify({ok:false,blocked:true,error:'FIX27: PUT /api/state bloqueado; use CRUD fila-a-fila'}),{status:409,headers:{'Content-Type':'application/json'}}));
         }
       }
@@ -260,5 +260,5 @@
   }catch(_){}
 
   window.ControlEventCrudRootFix29={active:true, version:'v8.5_prod_fix29', scope:WRITE_SCOPE}; try{document.documentElement.setAttribute('data-ce-crud-root','fix29');}catch(_){}
-  log('Activo FIX29 en WINDOW CAPTURE: CRUD raÃ­z fila-a-fila. Baja de compras con fallback por firma. Sin guardado global.');
+  log('Activo FIX29 en WINDOW CAPTURE: CRUD raíz fila-a-fila. Baja de compras con fallback por firma. Sin guardado global.');
 })();

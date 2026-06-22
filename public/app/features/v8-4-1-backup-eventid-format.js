@@ -1,7 +1,7 @@
-﻿/* ControlEvent v13.0_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
+/* ControlEvent v13.0_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
    - EVENTOS ya no exporta EVENTO_CODIGO.
    - En hojas relacionales, EVENTO_CODIGO contiene el id real de ce_eventos.
-   - La importaciÃ³n acepta el nuevo formato y conserva EVENTO_ID. */
+   - La importación acepta el nuevo formato y conserva EVENTO_ID. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -127,10 +127,10 @@
     if(!response.ok){
       let detail = '';
       try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }catch(_){ detail = await response.text().catch(()=> ''); }
-      throw new Error(`Servidor no generÃ³ backup (${response.status}). ${detail || ''}`.trim());
+      throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
     }
     const blob = await response.blob();
-    if(!blob || blob.size === 0) throw new Error('El servidor devolviÃ³ un backup vacÃ­o.');
+    if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
     const ev = scope === 'TODOS' ? null : arr('eventos').find(e => String(e.id) === String(scope));
     downloadBlob(blob, filenameFromDisposition(response.headers.get('content-disposition')) || backupFileName(scope, ev?.titulo || scope));
     return {ok:true, source:'server-api-export-eventid'};
@@ -214,7 +214,7 @@
       s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar ExcelJS.'));
       document.head.appendChild(s);
     });
-    if(!window.ExcelJS) throw new Error('ExcelJS no quedÃ³ disponible.');
+    if(!window.ExcelJS) throw new Error('ExcelJS no quedó disponible.');
     return window.ExcelJS;
   }
   async function clientBackup(scope){
@@ -227,7 +227,7 @@
     const products = byId(scoped.productos);
     const selected = scope === 'TODOS' ? null : scoped.eventos.find(e => String(e.id) === String(scope));
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB '26`;
+    wb.creator = `${VERSION} - ©oltyLAB '26`;
     wb.created = new Date();
     const now = stamp();
     sheet(wb, 'METADATOS', ['CAMPO','VALOR'], [
@@ -291,7 +291,7 @@
       wrapped.__ceEventIdFormat = true;
       try{ readSheetRows = wrapped; }catch(_){ }
       window.readSheetRows = wrapped;
-    }catch(err){ console.warn('[ControlEvent/v8.5] No se pudo adaptar importaciÃ³n EVENTO_ID.', err); }
+    }catch(err){ console.warn('[ControlEvent/v8.5] No se pudo adaptar importación EVENTO_ID.', err); }
   }
   function install(){
     patchImportRows();

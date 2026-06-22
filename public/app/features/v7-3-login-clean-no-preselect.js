@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - login limpio sin preselecciÃ³n y salida sin recarga pesada.
+/* ControlEvent v13.0_prod - login limpio sin preselección y salida sin recarga pesada.
    Alcance: tras Salir/Login, fuerza selector en "Selecciona evento..." hasta que el usuario elija evento. Sin bucles ni MutationObserver. */
 (function(){
   'use strict';

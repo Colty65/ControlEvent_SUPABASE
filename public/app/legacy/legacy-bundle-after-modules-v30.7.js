@@ -1,6 +1,6 @@
-﻿window.__ceDisableLegacyBarGraficas = true;
-/* ControlEvent v13.0_prod - Bundle legacy generado desde scripts legacy-inline extraÃ­dos. */
-/* Mantiene el orden original de ejecuciÃ³n para compatibilidad. */
+window.__ceDisableLegacyBarGraficas = true;
+/* ControlEvent v13.0_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
@@ -501,7 +501,7 @@
       }
       r.getCell(1).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
       const v = r.getCell(valueCol);
-      v.numFmt = '#,##0.00 [$â‚¬-C0A]';
+      v.numFmt = '#,##0.00 [$€-C0A]';
       v.font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
     });
   }
@@ -691,7 +691,7 @@
     }
     document.querySelectorAll('#summaryTiendaTicket .summary-item > span:first-child').forEach(label => {
       const txt = label.textContent || '';
-      if(txt.includes('Â·')) label.textContent = txt.split('Â·')[0].trim();
+      if(txt.includes('·')) label.textContent = txt.split('·')[0].trim();
     });
   }
   function resizeGroupingBarsV252(){
@@ -773,7 +773,7 @@
       const row = ws.getRow(priceRow + 1 + i);
       for(let c = 1; c <= Math.max(valueCol, 3); c++) formatResumenCell(row.getCell(c), item[2]);
       row.getCell(1).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
-      row.getCell(valueCol).numFmt = '#,##0.00 [$â‚¬-C0A]';
+      row.getCell(valueCol).numFmt = '#,##0.00 [$€-C0A]';
       row.getCell(valueCol).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
     });
     for(let r = 1; r <= ws.rowCount; r++){
@@ -1122,7 +1122,7 @@
         const row = ws.getRow(priceRow + 1 + i);
         for(let c = 1; c <= Math.max(valueCol, 3); c++) formatResumenCell(row.getCell(c), item[2]);
         row.getCell(1).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
-        row.getCell(valueCol).numFmt = '#,##0.00 [$â‚¬-C0A]';
+        row.getCell(valueCol).numFmt = '#,##0.00 [$€-C0A]';
         row.getCell(valueCol).font = {bold:true, color:{argb:item[2] === 'pending' ? 'FFBE123C' : 'FF111827'}};
       });
     }
@@ -1394,7 +1394,7 @@
     ws.getCell(r,1).value = label;
     ws.getCell(r,1).font = {bold:true, color:{argb:color}};
     ws.getCell(r,2).value = opts.money ? Number(value || 0) : (value ?? '');
-    if(opts.money) ws.getCell(r,2).numFmt = '#,##0.00 [$â‚¬-C0A]';
+    if(opts.money) ws.getCell(r,2).numFmt = '#,##0.00 [$€-C0A]';
     ws.getCell(r,2).font = {bold:true, color:{argb:color}};
     ws.getCell(r,2).alignment = {vertical:'middle', horizontal:opts.money ? 'right' : 'left', wrapText:false};
   }
@@ -2051,10 +2051,10 @@
   function preparePhotoModalV255(){
     document.querySelectorAll('.ce-ticket-modal-v234-close,.ce-ticket-modal-v225-close,#ceTicketModalV234 button,#ceTicketImageModalV225 button').forEach(btn => {
       const txt = (btn.textContent || '').trim();
-      const isClose = btn.classList.contains('ce-ticket-modal-v234-close') || btn.classList.contains('ce-ticket-modal-v225-close') || txt === 'Ã—' || txt === 'x' || /cerrar/i.test(btn.getAttribute('title') || '');
+      const isClose = btn.classList.contains('ce-ticket-modal-v234-close') || btn.classList.contains('ce-ticket-modal-v225-close') || txt === '×' || txt === 'x' || /cerrar/i.test(btn.getAttribute('title') || '');
       if(!isClose) return;
       btn.type = 'button';
-      btn.textContent = 'Ã—';
+      btn.textContent = '×';
       btn.title = 'Cerrar foto';
       btn.setAttribute('data-ce-photo-close-v255','1');
       btn.setAttribute('aria-label','Cerrar foto');
@@ -2565,7 +2565,7 @@
     const imgs = st().ticketImages || {};
     const ev = currentEventId();
     const candidates = [];
-    const add = v => { v = norm(v).split('Â·')[0].trim(); if(v && !candidates.includes(v)) candidates.push(v); };
+    const add = v => { v = norm(v).split('·')[0].trim(); if(v && !candidates.includes(v)) candidates.push(v); };
     [row?.k,row?.label,row?.key,row?.rawTicket,row?.concepto].forEach(add);
     const src = norm(row?.k || row?.label || '');
     const parts = src.split('|').map(x => norm(x)).filter(Boolean);
@@ -2763,7 +2763,7 @@
     const max = Math.max(1, ...data.flatMap(r => [num(r.comprado), num(r.donado), num(r.pendiente)]));
     let y = 126;
     data.forEach(r => {
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} Â· ${money(r.total)}`, 35, y);
+      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} · ${money(r.total)}`, 35, y);
       const x = 360, w = 930, h = 16;
       [[r.comprado,'#dc2626','Comprado'],[r.donado,'#f59e0b','Donado'],[r.pendiente,'#fb7185','Pte. Compra u otros gastos']].forEach((v, i) => {
         const yy = y - 4 + i*24;
@@ -2792,7 +2792,7 @@
     return value.split(oldFile).join(VERSION_FILE).split(oldText).join(VERSION).split(oldTextAlt).join(VERSION);
   }
   function enforceWorkbookVersion(wb){
-    try{ wb.creator = `${VERSION} - Â©oltyLAB '26`; }catch(_){ }
+    try{ wb.creator = `${VERSION} - ©oltyLAB '26`; }catch(_){ }
     try{ wb.lastModifiedBy = VERSION; }catch(_){ }
     try{
       (wb.worksheets || []).forEach(ws => {
@@ -2816,11 +2816,11 @@
   }
   function setupWorkbook(ExcelJS){
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB '26`;
+    wb.creator = `${VERSION} - ©oltyLAB '26`;
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = {title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFE4EC', soft:'FFF8FAFC', white:'FFFFFFFF'};
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     function sheet(name, widths){ const ws = wb.addWorksheet(name); ws.properties.defaultRowHeight = 21; ws.columns = widths.map(width => ({width})); return ws; }
     function paint(cell, fill='white', bold=false, color='FF111827'){
       cell.border = border;
@@ -2971,7 +2971,7 @@
     make('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
     make('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
     const wsProductos = make('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
-    try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$â‚¬-C0A]'; }catch(_){ }
+    try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
     make('INGRESOS', ['EVENTO_CODIGO','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
     make('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
     make('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', productCode[c.productoId] || '', num(c.unidades), price(c), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
@@ -3044,7 +3044,7 @@
       x.title(ws,1,'DOCUMENTOS DEL EVENTO',5);
       const ev = currentEvent();
       x.text(ws,2,1,'Evento','soft',true); ws.mergeCells(2,2,2,5); x.text(ws,2,2,ev?.titulo || ev?.id || '','soft',true);
-      x.headers(ws,4,['CÃ³digo','Fecha','DescripciÃ³n','Foto/URL','Imagen']);
+      x.headers(ws,4,['Código','Fecha','Descripción','Foto/URL','Imagen']);
       let rr = 5;
       if(!docs.length){
         x.text(ws,rr,1,'Sin documentos','soft',true); ws.mergeCells(rr,2,rr,5); x.text(ws,rr,2,'No hay documentos DOCXX asociados a este evento.','soft');
@@ -3069,7 +3069,7 @@
       }
       try{ ws.autoFilter = {from:{row:4,column:1}, to:{row:4,column:5}}; }catch(_){ }
     }catch(error){
-      console.warn('[ControlEvent v13.0_prod] No se pudo aÃ±adir DOCUMENTOS DEL EVENTO al INFOEVENTO.', error);
+      console.warn('[ControlEvent v13.0_prod] No se pudo añadir DOCUMENTOS DEL EVENTO al INFOEVENTO.', error);
     }
   }
 
@@ -3154,9 +3154,9 @@
     addImage(wb, wsGraf, makeEventChart(), 3, 1, 1500, 775);
     for(let rr = 3; rr <= 40; rr++) wsGraf.getRow(rr).height = 20;
     await addDocumentosInfoEventoV85(wb, x);
-    // v27.7: las hojas RESUMEN_MODULAR y GRAFICAS_MODULAR fueron Ãºtiles para auditorÃ­a,
-    // pero ya no se aÃ±aden al INFOEVENTO por defecto porque ensuciaban el libro final.
-    // Se mantienen disponibles sÃ³lo como herramientas standalone desde consola.
+    // v27.7: las hojas RESUMEN_MODULAR y GRAFICAS_MODULAR fueron útiles para auditoría,
+    // pero ya no se añaden al INFOEVENTO por defecto porque ensuciaban el libro final.
+    // Se mantienen disponibles sólo como herramientas standalone desde consola.
     try{
       if(window.ControlEventExcel && typeof window.ControlEventExcel.protectWorkbook === 'function'){
         await window.ControlEventExcel.protectWorkbook(wb, {source:'infoevento-v27.7'});
@@ -3177,7 +3177,7 @@
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v13.0_prod] No se pudo aplicar protecciÃ³n final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v13.0_prod] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }

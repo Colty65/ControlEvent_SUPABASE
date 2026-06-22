@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
+/* ControlEvent v13.0_prod - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
    No toca el flujo de cambio de evento de v44.7.x. */
 (function(){
   'use strict';
@@ -40,7 +40,7 @@
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
     let s = String(value ?? '').trim();
     if(!s) return 0;
-    s = s.replace(/\s/g,'').replace(/â‚¬/g,'');
+    s = s.replace(/\s/g,'').replace(/€/g,'');
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
     const n = Number(s);
@@ -111,7 +111,7 @@
       const imgs = Object.keys(st().ticketImages || {}).filter(k => String(k).startsWith(`${sid}|`));
       if(ingresos.length) deps.push(`ingresos: ${ingresos.length}`);
       if(compras.length) deps.push(`compras/donaciones: ${compras.length}`);
-      if(imgs.length) deps.push(`imÃ¡genes: ${imgs.length}`);
+      if(imgs.length) deps.push(`imágenes: ${imgs.length}`);
     }
     return deps;
   }
@@ -154,7 +154,7 @@
     const action = btn.dataset.action || '';
     let msg = '';
     if(action === 'delete-evento'){
-      msg = isGD() ? 'Eliminar evento y sus datos dependientes. Se pedirÃ¡ confirmaciÃ³n.' : EVENT_GD_MSG;
+      msg = isGD() ? 'Eliminar evento y sus datos dependientes. Se pedirá confirmación.' : EVENT_GD_MSG;
     }else if(/^delete-(persona|producto|tienda)$/.test(action)){
       const deps = dependencies(action, btn.dataset.id);
       msg = deps.length ? BLOCK_MSG : OK_MSG;
@@ -192,7 +192,7 @@
       const action = btn.dataset.action || '';
       btn.classList.remove('ce-v450-delete-blocked','ce-v450-delete-ok');
       if(action === 'delete-evento'){
-        const msg = isGD() ? 'Eliminar evento y sus datos dependientes. Se pedirÃ¡ confirmaciÃ³n.' : EVENT_GD_MSG;
+        const msg = isGD() ? 'Eliminar evento y sus datos dependientes. Se pedirá confirmación.' : EVENT_GD_MSG;
         btn.title = msg;
         btn.setAttribute('aria-label', msg);
         btn.classList.toggle('ce-v450-delete-blocked', !isGD());
@@ -229,7 +229,7 @@
     const p = productById(id);
     if(!p) return blockEvent(ev, 'No se encuentra el producto.');
     const nombre = norm(value('edit-producto-nombre', id));
-    if(!nombre) return blockEvent(ev, 'El nombre del producto no puede estar vacÃ­o.');
+    if(!nombre) return blockEvent(ev, 'El nombre del producto no puede estar vacío.');
     p.nombre = nombre;
     const seg = value('edit-producto-segmento', id); if(seg !== '') p.segmento = seg;
     const dest = value('edit-producto-destino', id); if(dest !== '') p.destino = dest;
@@ -262,25 +262,25 @@
     const imgs = Object.keys(s.ticketImages || {}).filter(k => String(k).startsWith(`${eventId}|`));
     try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
     const msg = [
-      'ATENCIÃ“N: baja definitiva de EVENTO.',
+      'ATENCIÓN: baja definitiva de EVENTO.',
       '',
-      `Evento: ${event.titulo || 'sin tÃ­tulo'}`,
+      `Evento: ${event.titulo || 'sin título'}`,
       '',
-      'Se eliminarÃ¡:',
-      `â€¢ El propio evento.`,
-      `â€¢ Ingresos/colaboradores del evento: ${ingresos.length}`,
-      `â€¢ Compras/gastos del evento: ${comprasNoDon}`,
-      `â€¢ Donaciones de producto del evento: ${donaciones.length}`,
-      `â€¢ ImÃ¡genes de tickets del evento: ${imgs.length}`,
+      'Se eliminará:',
+      `• El propio evento.`,
+      `• Ingresos/colaboradores del evento: ${ingresos.length}`,
+      `• Compras/gastos del evento: ${comprasNoDon}`,
+      `• Donaciones de producto del evento: ${donaciones.length}`,
+      `• Imágenes de tickets del evento: ${imgs.length}`,
       '',
-      'No se eliminarÃ¡n PERSONAS, PRODUCTOS ni TIENDAS de las tablas generales.',
+      'No se eliminarán PERSONAS, PRODUCTOS ni TIENDAS de las tablas generales.',
       '',
-      'Esta operaciÃ³n no se puede deshacer salvo restaurando un BACKUP.',
+      'Esta operación no se puede deshacer salvo restaurando un BACKUP.',
       '',
-      'Â¿Quieres continuar?'
+      '¿Quieres continuar?'
     ].join('\n');
     if(!confirm(msg)) return false;
-    if(!confirm(`ConfirmaciÃ³n final: Â¿eliminar definitivamente el evento "${event.titulo || ''}" y sus datos dependientes?`)) return false;
+    if(!confirm(`Confirmación final: ¿eliminar definitivamente el evento "${event.titulo || ''}" y sus datos dependientes?`)) return false;
     s.eventos = arr('eventos').filter(e => !same(e.id, eventId));
     s.colaboradores = arr('colaboradores').filter(c => !same(c.eventId, eventId));
     s.compras = arr('compras').filter(c => !same(c.eventId, eventId));

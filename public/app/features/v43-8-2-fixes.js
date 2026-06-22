@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - menÃº mÃ³vil estable y versiÃ³n unificada.
+/* ControlEvent v13.0_prod - menú móvil estable y versión unificada.
    Parche defensivo: no toca INFOEVENTO, BACKUP, COMPRAS ni DONACIONES. */
 (function(){
   'use strict';

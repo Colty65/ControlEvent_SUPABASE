@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Salir duro y logon limpio.
+/* ControlEvent v13.0_prod - Salir duro y logon limpio.
    Objetivo: reproducir el estado que funciona con Ctrl+F5 + nuevo login.
    No rehidrata globos, no usa MutationObserver, no usa setInterval. */
 (function(){
@@ -210,7 +210,7 @@
     ensureLoginCleanAfterHardLogout();
   }
 
-  // Captura antes del click antiguo: en mÃ³vil/PC evita que los manejadores viejos de Salir ensucien el estado.
+  // Captura antes del click antiguo: en móvil/PC evita que los manejadores viejos de Salir ensucien el estado.
   ['pointerdown','mousedown','touchstart','click'].forEach(type => {
     window.addEventListener(type, logoutCapture, {capture:true, passive:false});
     document.addEventListener(type, logoutCapture, {capture:true, passive:false});

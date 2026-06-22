@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - DiagnÃ³stico de rendimiento robusto.
-   Solo instrumenta y muestra datos. No cambia la lÃ³gica funcional de la app. */
+/* ControlEvent v13.0_prod - Diagnóstico de rendimiento robusto.
+   Solo instrumenta y muestra datos. No cambia la lógica funcional de la app. */
 (function(){
   'use strict';
 
@@ -208,13 +208,13 @@
     return true;
   }
   function installRenderOptimizer(){
-    // v45.4: el diagnÃ³stico ya NO limpia automÃ¡ticamente el DOM.
-    // La limpieza global de v44.2/v45.4 era Ãºtil para medir, pero generaba demasiadas pasadas
-    // y podÃ­a convertirse en otro proceso pesado. AquÃ­ solo se mantienen mÃ©tricas y una acciÃ³n manual.
+    // v45.4: el diagnóstico ya NO limpia automáticamente el DOM.
+    // La limpieza global de v44.2/v45.4 era útil para medir, pero generaba demasiadas pasadas
+    // y podía convertirse en otro proceso pesado. Aquí solo se mantienen métricas y una acción manual.
     if(renderOptimizer.installed) return;
     renderOptimizer.installed = true;
     renderOptimizer.mode = 'diagnostic-only-no-auto-prune';
-    renderOptimizer.lastReason = 'v45.4: limpieza automÃ¡tica desactivada';
+    renderOptimizer.lastReason = 'v45.4: limpieza automática desactivada';
   }
 
   function sample(reason){
@@ -371,9 +371,9 @@
     const r = last.rows || {};
     const d = last.dom || {};
     const m = last.memory || {};
-    const events = state.events.slice(-8).map(ev => `${ev.at} Â· ${ev.type}${ev.ms ? ' Â· '+ev.ms+'ms' : ''}${ev.label ? ' Â· '+ev.label : ''}${ev.name ? ' Â· '+ev.name : ''}`).join('\n');
+    const events = state.events.slice(-8).map(ev => `${ev.at} · ${ev.type}${ev.ms ? ' · '+ev.ms+'ms' : ''}${ev.label ? ' · '+ev.label : ''}${ev.name ? ' · '+ev.name : ''}`).join('\n');
     panel.innerHTML = `
-      <h3>DiagnÃ³stico rendimiento Â· ${htmlEscape(VERSION)}</h3>
+      <h3>Diagnóstico rendimiento · ${htmlEscape(VERSION)}</h3>
       <div class="grid">
         ${cell('Pantalla', last.screen || '-')}
         ${cell('Evento', last.eventId || '-')}
@@ -381,15 +381,15 @@
         ${cell('DOM', `${d.nodes || 0} nodos`)}
         ${cell('Botones / inputs', `${d.buttons || 0} / ${d.inputs || 0}`)}
         ${cell('Tarjetas', d.cards || 0)}
-        ${cell('Renders', `${state.counters.renders} Â· max ${state.timings.maxRenderMs || 0} ms`)}
-        ${cell('Visibilidad tabs', `${state.counters.renderTabVisibility} Â· max ${state.timings.maxRenderMs || 0} ms`)}
-        ${cell('MÃ³dulos', `${state.counters.moduleActivations} Â· max ${state.timings.maxModuleMs || 0} ms`)}
-        ${cell('Long tasks', `${state.counters.longTasks} Â· max ${state.timings.maxLongTaskMs || 0} ms`)}
+        ${cell('Renders', `${state.counters.renders} · max ${state.timings.maxRenderMs || 0} ms`)}
+        ${cell('Visibilidad tabs', `${state.counters.renderTabVisibility} · max ${state.timings.maxRenderMs || 0} ms`)}
+        ${cell('Módulos', `${state.counters.moduleActivations} · max ${state.timings.maxModuleMs || 0} ms`)}
+        ${cell('Long tasks', `${state.counters.longTasks} · max ${state.timings.maxLongTaskMs || 0} ms`)}
         ${cell('Mutaciones DOM', state.counters.domMutations)}
         ${cell('Errores', state.counters.errors)}
       </div>
-      <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, grÃ¡ficas ${r.renderizado?.graficas||0}\nOptimizaciÃ³n DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
-OptimizaciÃ³n v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
+      <pre>BD total: eventos ${r.total?.eventos||0}, personas ${r.total?.personas||0}, productos ${r.total?.productos||0}, tiendas ${r.total?.tiendas||0}, ingresos ${r.total?.ingresos||0}, compras ${r.total?.compras||0}, donaciones ${r.total?.donaciones||0}\nEvento activo: ingresos ${r.evento?.ingresos||0}, compras ${r.evento?.compras||0}, donaciones ${r.evento?.donaciones||0}\nRenderizado: ingresos ${r.renderizado?.ingresos||0}, compras ${r.renderizado?.compras||0}, donaciones ${r.renderizado?.donaciones||0}, mapa ${r.renderizado?.mapa||0}, resumen ${r.renderizado?.resumen||0}, gráficas ${r.renderizado?.graficas||0}\nOptimización DOM: guardias ${renderOptimizer.guards}, limpiezas ${renderOptimizer.prunes}, nodos limpiados ${renderOptimizer.clearedNodes}
+Optimización v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${window.__ceV443Stats?.clearedNodes||0}\nActualizado: ${last.updatedAt}\nArranque: ${last.bootMs} ms</pre>
       <pre>${htmlEscape(events || 'Sin eventos recientes')}</pre>
       <div class="actions">
         <button type="button" id="cePerf442Copy">Copiar informe</button>
@@ -483,8 +483,8 @@ OptimizaciÃ³n v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
 
   function ensureUi(){
     injectCss();
-    // v45.4: no recrear el botÃ³n/panel en cada refresco de instalaciÃ³n.
-    // El intervalo de instalaciÃ³n anterior eliminaba el panel abierto y por eso PERF aparecÃ­a un instante y desaparecÃ­a.
+    // v45.4: no recrear el botón/panel en cada refresco de instalación.
+    // El intervalo de instalación anterior eliminaba el panel abierto y por eso PERF aparecía un instante y desaparecía.
     const old441Btn = byId('cePerf441Button');
     if(old441Btn) old441Btn.remove();
     const old441Panel = byId('cePerf441Panel');
@@ -503,7 +503,7 @@ OptimizaciÃ³n v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
       btn.id = 'cePerf442Button';
       btn.type = 'button';
       btn.textContent = 'PERF';
-      btn.setAttribute('aria-label', 'Abrir diagnÃ³stico de rendimiento');
+      btn.setAttribute('aria-label', 'Abrir diagnóstico de rendimiento');
       btn.removeAttribute('title');
       document.body.appendChild(btn);
     }
@@ -560,7 +560,7 @@ OptimizaciÃ³n v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${win
   else install();
   window.addEventListener('load', () => setTimeout(install, 80), {once:true});
   ['controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 80)));
-  // v45.4: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentaciÃ³n activa en mÃ³vil/tablet/RO.
+  // v45.4: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentación activa en móvil/tablet/RO.
   setInterval(() => {
     install();
     if(state.opened) updatePanel();

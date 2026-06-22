@@ -1,11 +1,11 @@
-﻿ControlEvent v13.0_prod - rescate final de estabilidad
+ControlEvent v13.0_prod - rescate final de estabilidad
 
 Cambios principales:
-- Eliminada la recarga automÃ¡tica tras login/CTRL+F5 que provocaba reentradas y temblores.
-- Cambio de evento: un Ãºnico render tras cargar datos, sin segundo render diferido.
-- INGRESOS y DOCUMENTOS: se ocultan/eliminan botones de descarga duplicados y se deja un solo botÃ³n visible por miniatura.
+- Eliminada la recarga automática tras login/CTRL+F5 que provocaba reentradas y temblores.
+- Cambio de evento: un único render tras cargar datos, sin segundo render diferido.
+- INGRESOS y DOCUMENTOS: se ocultan/eliminan botones de descarga duplicados y se deja un solo botón visible por miniatura.
 - Ticket Auto: candidatos de otra tienda pasan a color rosa; misma tienda rojo; sin similitud normal.
-- Ticket Auto: desactivada la inyecciÃ³n global de botones de descarga para evitar duplicados fuera de la ventana.
-- Ticket Auto: apertura mÃ¡s robusta si el panel anterior quedÃ³ a medias.
+- Ticket Auto: desactivada la inyección global de botones de descarga para evitar duplicados fuera de la ventana.
+- Ticket Auto: apertura más robusta si el panel anterior quedó a medias.
 
 Archivos tocados de forma directa: index.html, public/index.html, public/app/version.js, version.js, package.json, package-lock.json, public/app/features/v8-5-event-scoped-state-fix48.js, public/app/features/v10-4-app-fixes.js, public/app/features/v10-4-4-app-fixes.js, public/app/features/v10-4-4-ticketauto-compras.js.

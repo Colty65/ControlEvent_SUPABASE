@@ -1,5 +1,5 @@
-﻿// ControlEvent v13.0_prod FIX28
-// Service Worker neutralizado: nada de cachÃ©. Siempre red para evitar JS viejo.
+// ControlEvent v13.0_prod FIX28
+// Service Worker neutralizado: nada de caché. Siempre red para evitar JS viejo.
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).then(() => self.clients.claim()));

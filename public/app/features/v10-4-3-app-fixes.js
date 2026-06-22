@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - RESCATE ESTABLE
-   - Sin ocultaciÃ³n prelogin ni bienvenida experimental.
-   - Sin intervalos ni renders automÃ¡ticos.
+/* ControlEvent v13.0_prod - RESCATE ESTABLE
+   - Sin ocultación prelogin ni bienvenida experimental.
+   - Sin intervalos ni renders automáticos.
    - Limpia duplicados de descarga en Documentos/Ingresos sin tocar miniaturas.
    - Mantiene visible la app tras login y evita clases residuales de hotfix anteriores. */
 (function(){
@@ -54,7 +54,7 @@
       if(!imgs.length){ buttons.forEach(function(b){ b.remove(); }); return; }
       var keep=buttons[0];
       buttons.slice(1).forEach(function(b){ b.remove(); });
-      if(!keep){ keep=document.createElement('button'); keep.type='button'; keep.textContent='â¬‡ï¸'; keep.title='Descargar foto'; keep.setAttribute('aria-label','Descargar foto'); keep.className='outline small '+btnClass+' ce-v1043-download'; imgs[0].insertAdjacentElement('afterend', keep); }
+      if(!keep){ keep=document.createElement('button'); keep.type='button'; keep.textContent='⬇️'; keep.title='Descargar foto'; keep.setAttribute('aria-label','Descargar foto'); keep.className='outline small '+btnClass+' ce-v1043-download'; imgs[0].insertAdjacentElement('afterend', keep); }
       keep.classList.add(btnClass,'ce-v1043-download');
       keep.onclick=function(ev){ stop(ev); return downloadSrc(imgs[0].currentSrc||imgs[0].src, namePrefix+'_'+(idx+1)); };
     });
@@ -68,7 +68,7 @@
   function run(){ injectStyle(); removeBadClasses(); applyVersion(); tidyDownloads(); }
   document.addEventListener('click', function(ev){
     if(ev.target && ev.target.closest && ev.target.closest('.ce-v1043-download')){
-      // onclick del botÃ³n harÃ¡ la descarga; este listener solo blinda que no se abra el visor detrÃ¡s.
+      // onclick del botón hará la descarga; este listener solo blinda que no se abra el visor detrás.
       ev.stopPropagation();
     }
   }, true);

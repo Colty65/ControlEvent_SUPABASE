@@ -1,11 +1,11 @@
-﻿
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>ControlEvent v13.0_prod</title>
-  <!-- ControlEvent v13.0_prod PWA / instalaciÃ³n mÃ³vil -->
+  <!-- ControlEvent v13.0_prod PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -29,7 +29,7 @@
       <h2>Acceso a ControlEvent</h2>
             <div class="auth-grid">
         <div class="field">
-          <label>IdentificaciÃ³n</label>
+          <label>Identificación</label>
           <input id="loginIdentificacion" autocomplete="username" />
         </div>
         <div class="field">
@@ -66,7 +66,7 @@
       <div class="brand"><img class="brand-logo-large" alt="ColtyLAB" src="./assets/embedded/coltylab-logo.png" />  <div class="brand-user"><strong id="brandCurrentUserName">Sin acceso</strong><span id="brandCurrentUserMeta"></span></div></div>
       
       <div class="centerhead">
-        <button type="button" id="toggleEventDesc" class="outline info-mini" title="DescripciÃ³n del evento" onclick="toggleEventDescription(); return false;">â“˜</button>
+        <button type="button" id="toggleEventDesc" class="outline info-mini" title="Descripción del evento" onclick="toggleEventDescription(); return false;">ⓘ</button>
         <div class="event-label">EVENTO:</div>
         <div class="event-title-box"><select id="selectedEvent" onchange="changeSelectedEvent(this.value); return false;"></select></div>
         <div class="event-dates" id="eventDates">(del --/--/-- al --/--/--)</div>
@@ -90,14 +90,14 @@
     <div class="main">
       
 <div class="tabs app-lockable" id="mainTabs">
-        <button type="button" class="tab active" id="tabIngresosBtn" title="Colaboradores econÃ³micos"><span class="tabicon">ðŸ¤</span></button>
-        <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">ðŸŽ</span></button>
-        <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">ðŸ›’</span></button>
-        <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de recursos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">ðŸ§­</span></button>
-        <button type="button" class="tab" id="tabDocumentosBtn" title="Documentos importantes del evento"><span class="tabicon">ðŸ“</span></button>
-        <button type="button" class="tab hidden" id="tabPlanificacionBtn" aria-label="PlanificaciÃ³n inicial"><span class="tabicon">ðŸ§ </span></button>
-        <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cÃ¡lculos por agrupaciÃ³n"><span class="tabicon">ðŸ§¾</span></button>
-        <button type="button" class="tab" id="tabGraficasBtn" title="GrÃ¡ficas del evento"><span class="tabicon">ðŸ“Š</span></button>
+        <button type="button" class="tab active" id="tabIngresosBtn" title="Colaboradores económicos"><span class="tabicon">🤝</span></button>
+        <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
+        <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
+        <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de recursos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">🧭</span></button>
+        <button type="button" class="tab" id="tabDocumentosBtn" title="Documentos importantes del evento"><span class="tabicon">📁</span></button>
+        <button type="button" class="tab hidden" id="tabPlanificacionBtn" aria-label="Planificación inicial"><span class="tabicon">🧠</span></button>
+        <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
+        <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
       </div>
 
       <div id="noEventMessage" class="card hidden">
@@ -108,13 +108,13 @@
         <div class="card">
           <div class="toggle-row">
             <div class="section-title" style="margin:0">
-              <div class="icon-badge">ðŸ’¶</div>
+              <div class="icon-badge">💶</div>
               <div>
                 <h2>Resumen de Ingresos</h2>
                 <p>Desplegar o plegar el resumen por forma de ingreso.</p>
               </div>
             </div>
-            <button type="button" class="outline" id="toggleIngresosSummary">ðŸ’°</button>
+            <button type="button" class="outline" id="toggleIngresosSummary">💰</button>
           </div>
           <div id="ingresosSummaryBody" class="collapsed-body hidden">
             <div class="metrics" id="ingresosSummaryGrid"></div>
@@ -123,7 +123,7 @@
 
         <div class="card">
           <div class="section-title">
-            <div class="icon-badge">ðŸ¤</div>
+            <div class="icon-badge">🤝</div>
             <div>
               <h2>Ingresos de socios y Donantes (personas, empresas, asociaciones, etc)</h2>
               <p>Socios y donantes con su forma de ingreso e importe donado.</p>
@@ -135,7 +135,7 @@
               <select id="collabPersona"></select>
             </div>
             <div class="field">
-              <label>NÃºmero</label>
+              <label>Número</label>
               <input id="collabNumero" type="number" min="0" step="1" value="1" />
             </div>
             <div class="field">
@@ -144,11 +144,11 @@
             </div>
             <div class="field">
               <label>Importe voluntario</label>
-              <input id="collabImporte" class="money-text" type="text" value="0,00 â‚¬" />
+              <input id="collabImporte" class="money-text" type="text" value="0,00 €" />
             </div>
             <div class="field">
               <label>&nbsp;</label>
-              <button type="button" id="btnAddColab">AÃ±adir</button>
+              <button type="button" id="btnAddColab">Añadir</button>
             </div>
           </div>
           <div class="separator"></div>
@@ -160,13 +160,13 @@
         <div class="card">
           <div class="toggle-row">
             <div class="section-title" style="margin:0">
-              <div class="icon-badge">ðŸ›’</div>
+              <div class="icon-badge">🛒</div>
               <div>
                 <h2>Compras y otros gastos del evento</h2>
                 
               </div>
             </div>
-            <button type="button" class="outline hidden" id="toggleComprasEvent" aria-hidden="true" tabindex="-1">ðŸ§°</button>
+            <button type="button" class="outline hidden" id="toggleComprasEvent" aria-hidden="true" tabindex="-1">🧰</button>
           </div>
           <div id="comprasEventBody" class="collapsed-body">
             <div class="row-purchase-form entry-zone">
@@ -180,7 +180,7 @@
               </div>
               <div class="field">
                 <label>Precio</label>
-                <input id="buyPrecio" class="money-text" type="text" value="0,00 â‚¬" />
+                <input id="buyPrecio" class="money-text" type="text" value="0,00 €" />
               </div>
               <div class="field">
                 <label>Importe</label>
@@ -200,7 +200,7 @@
               </div>
               <div class="field">
                 <label>&nbsp;</label>
-                <button type="button" id="btnAddCompra">AÃ±adir</button>
+                <button type="button" id="btnAddCompra">Añadir</button>
               </div>
             </div>
             <div class="separator"></div>
@@ -212,10 +212,10 @@
       <div id="tabDonaciones" class="hidden app-lockable">
         <div class="card">
           <div class="section-title">
-            <div class="icon-badge">ðŸŽ</div>
+            <div class="icon-badge">🎁</div>
             <div>
               <h2>Donaciones de producto</h2>
-              <p>MantÃ©n las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.</p>
+              <p>Mantén las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.</p>
             </div>
           </div>
           <div class="row-purchase-form entry-zone">
@@ -229,14 +229,14 @@
             </div>
             <div class="field">
               <label>Precio</label>
-              <input id="donPrecio" class="money-text" type="text" value="0,00 â‚¬" />
+              <input id="donPrecio" class="money-text" type="text" value="0,00 €" />
             </div>
             <div class="field">
               <label>Valor</label>
               <input id="donImporte" class="soft-readonly" readonly />
             </div>
             <div class="field">
-              <label>Tipo de donaciÃ³n</label>
+              <label>Tipo de donación</label>
               <select id="donTicket"></select>
             </div>
             <div class="field">
@@ -249,7 +249,7 @@
             </div>
             <div class="field">
               <label>&nbsp;</label>
-              <button type="button" id="btnAddDonacion">AÃ±adir</button>
+              <button type="button" id="btnAddDonacion">Añadir</button>
             </div>
           </div>
           <div class="separator"></div>
@@ -260,7 +260,7 @@
       <div id="tabMapaProductos" class="hidden app-lockable">
         <div class="card mapa-productos-card">
           <div class="section-title">
-            <div class="icon-badge">ðŸ§­</div>
+            <div class="icon-badge">🧭</div>
             <div>
               <h2>Mapa de recursos</h2>
               <p>Vista conjunta de compras y donaciones para ver la necesidad real del evento por tienda y producto.</p>
@@ -275,10 +275,10 @@
       <div id="tabDocumentos" class="hidden">
         <div class="card ce-docs-card">
           <div class="section-title">
-            <div class="icon-badge">ðŸ“</div>
+            <div class="icon-badge">📁</div>
             <div>
               <h2>Documentos del evento</h2>
-              <p>Permisos, solicitudes y fotografÃ­as de documentaciÃ³n importante vinculada al evento.</p>
+              <p>Permisos, solicitudes y fotografías de documentación importante vinculada al evento.</p>
             </div>
           </div>
           <div id="eventDocsWritePanel" class="ce-docs-write-panel"></div>
@@ -291,36 +291,36 @@
       <div id="tabPlanificacionInicial" class="hidden">
         <div class="card planificacion-card">
           <div class="section-title">
-            <div class="icon-badge">ðŸ§ </div>
+            <div class="icon-badge">🧠</div>
             <div>
-              <h2>PlanificaciÃ³n inicial</h2>
-              <p>Genera una propuesta inicial con histÃ³rico y Zuzu, revisable antes de crear el evento real.</p>
+              <h2>Planificación inicial</h2>
+              <p>Planifica un evento nuevo con históricos y Zuzu. Prepara una propuesta revisable y permite generar el evento real cuando esté validada.</p>
             </div>
           </div>
 
 
           <div class="planificacion-grid">
-            <div class="field"><label>Nombre del evento</label><input id="planEventoTitulo" placeholder="Ej. CumpleaÃ±os / comida peÃ±a" /></div>
+            <div class="field"><label>Nombre del evento</label><input id="planEventoTitulo" placeholder="Ej. Cumpleaños / comida peña" /></div>
             <div class="field"><label>Fecha inicio</label><input id="planFechaIni" placeholder="DD/MM/AA" /></div>
             <div class="field"><label>Fecha fin</label><input id="planFechaFin" placeholder="DD/MM/AA" /></div>
-            <div class="field"><label>DÃ­as de duraciÃ³n</label><input id="planDias" type="number" min="1" step="1" value="1" /></div>
-            <div class="field"><label>NÂº estimado personas</label><input id="planPersonas" type="number" min="1" step="1" value="30" /></div>
+            <div class="field"><label>Días de duración</label><input id="planDias" type="number" min="1" step="1" value="1" /></div>
+            <div class="field"><label>Nº estimado personas</label><input id="planPersonas" type="number" min="1" step="1" value="30" /></div>
             <div class="field"><label>Responsable por defecto</label><select id="planResponsable"></select></div>
             <div class="field"><label>Tienda por defecto</label><select id="planTienda"></select></div>
-            <div class="field plan-span-2"><label>Breve descripciÃ³n</label><textarea id="planDescripcion" rows="2" placeholder="DescripciÃ³n inicial del evento"></textarea></div>
-            <div class="field plan-span-2"><label>InformaciÃ³n para la construcciÃ³n</label><textarea id="planInfo" rows="4" placeholder="Ej. comida y cena, cerveza, vino, cubatas, aperitivos, postre, hielo, vasos, mesas, etc."></textarea></div>
+            <div class="field plan-span-2"><label>Breve descripción</label><textarea id="planDescripcion" rows="2" placeholder="Descripción inicial del evento"></textarea></div>
+            <div class="field plan-span-2"><label>Información para la construcción</label><textarea id="planInfo" rows="4" placeholder="Ej. comida y cena, cerveza, vino, cubatas, aperitivos, postre, hielo, vasos, mesas, etc."></textarea></div>
           </div>
 
           <div class="planificacion-subcard">
             <div class="section-title small-title">
-              <div class="icon-badge">ðŸ“š</div>
+              <div class="icon-badge">📚</div>
               <div>
-                <h2>HistÃ³rico y Zuzu</h2>
-                <p>Elige si quieres replicar un modelo finalizado, encargar todo a Zuzu o mezclar modelo e inteligencia.</p>
+                <h2>Histórico a utilizar</h2>
+                <p>Elige cómo construir la propuesta: réplica exacta, encargo total a Zuzu o mezcla con evento modelo.</p>
               </div>
             </div>
             <div class="planificacion-grid compact">
-              <div class="field"><label>Modo de planificaciÃ³n</label><select id="planFuenteHistorica"></select></div>
+              <div class="field"><label>Modo de planificación</label><select id="planFuenteHistorica"></select></div>
               <div class="field"><label>Evento modelo</label><select id="planEventoBase"></select></div>
               <div class="field"><label>Contenido</label><select id="planNivelPropuesta"></select></div>
               <div class="field"><label>&nbsp;</label><button type="button" id="btnGenerarPlanificacion">Generar propuesta</button></div>
@@ -335,18 +335,18 @@
         <div class="card">
           <div class="toggle-row">
             <div class="section-title" style="margin:0">
-              <div class="icon-badge">ðŸ§¾</div>
+              <div class="icon-badge">🧾</div>
               <div>
-                <h2>Resumen presupuestario y cÃ¡lculos por agrupaciÃ³n</h2>
-                <p>Desplegar o plegar la informaciÃ³n econÃ³mica del evento.</p>
+                <h2>Resumen presupuestario y cálculos por agrupación</h2>
+                <p>Desplegar o plegar la información económica del evento.</p>
               </div>
             </div>
-            <button type="button" class="outline" id="toggleComprasSummary">ðŸ“ˆ</button>
+            <button type="button" class="outline" id="toggleComprasSummary">📈</button>
           </div>
           <div id="comprasSummaryBody" class="collapsed-body hidden">
             <div class="card" style="box-shadow:none;margin:12px 0 0 0">
               <div class="section-title">
-                <div class="icon-badge">ðŸ‘¥</div>
+                <div class="icon-badge">👥</div>
                 <div>
                   <h2>Resumen presupuestario</h2>
                   <p>Resumen por socios, donantes, compras y donaciones del evento.</p>
@@ -357,10 +357,10 @@
 
             <div class="card" style="box-shadow:none;margin:12px 0 0 0">
               <div class="section-title">
-                <div class="icon-badge">ðŸ§¾</div>
+                <div class="icon-badge">🧾</div>
                 <div>
-                  <h2>CÃ¡lculos por agrupaciÃ³n</h2>
-                  <p>Importes por segmento, destino y por tienda y ticket/donaciÃ³n/otros gastos.</p>
+                  <h2>Cálculos por agrupación</h2>
+                  <p>Importes por segmento, destino y por tienda y ticket/donación/otros gastos.</p>
                 </div>
               </div>
               <div class="summary-top-grid">
@@ -378,10 +378,10 @@
       <div id="tabGraficas" class="hidden app-lockable">
         <div class="card">
           <div class="section-title">
-            <div class="icon-badge">ðŸ“Š</div>
+            <div class="icon-badge">📊</div>
             <div>
-              <h2>GrÃ¡ficas del evento</h2>
-              <p>Panel visual completo del evento con barras y resÃºmenes rÃ¡pidos.</p>
+              <h2>Gráficas del evento</h2>
+              <p>Panel visual completo del evento con barras y resúmenes rápidos.</p>
             </div>
           </div>
           <div id="eventChartWrap"></div>
@@ -390,20 +390,20 @@
 
       <div id="maintenanceWrapper" class="hidden">
         <div class="maintenance-tabs">
-          <button type="button" class="tab active" id="mtPersonasBtn">ðŸ‘¤ personas</button>
-          <button type="button" class="tab" id="mtEventosBtn">ðŸŽ‰ eventos</button>
-          <button type="button" class="tab" id="mtTiendasBtn">ðŸª tiendas</button>
-          <button type="button" class="tab" id="mtProductosBtn">ðŸ“¦ productos</button>
-          <button type="button" class="tab hidden" id="mtAccesoBtn" onclick="openAccessMaintenance(); return false;">ðŸ” acceso</button>
+          <button type="button" class="tab active" id="mtPersonasBtn">👤 personas</button>
+          <button type="button" class="tab" id="mtEventosBtn">🎉 eventos</button>
+          <button type="button" class="tab" id="mtTiendasBtn">🏪 tiendas</button>
+          <button type="button" class="tab" id="mtProductosBtn">📦 productos</button>
+          <button type="button" class="tab hidden" id="mtAccesoBtn" onclick="openAccessMaintenance(); return false;">🔐 acceso</button>
           
         </div>
 
         <div id="mtPersonas" class="card app-lockable">
-          <div class="section-title"><div class="icon-badge">ðŸ‘¤</div><div><h2>PERSONAS</h2><p>Alta, modificaciÃ³n y borrado.</p></div></div>
+          <div class="section-title"><div class="icon-badge">👤</div><div><h2>PERSONAS</h2><p>Alta, modificación y borrado.</p></div></div>
           <div class="rowline persona entry-zone">
             <div class="field"><label>Nombre</label><input id="newPersonaNombre" /></div>
             <div class="field"><label>Rango</label><select id="newPersonaRango"></select></div>
-            <button type="button" id="btnAddPersona">AÃ±adir</button>
+            <button type="button" id="btnAddPersona">Añadir</button>
             <div></div>
           </div>
           <div class="separator"></div>
@@ -411,15 +411,15 @@
         </div>
 
         <div id="mtEventos" class="card hidden app-lockable">
-          <div class="section-title"><div class="icon-badge">ðŸŽ‰</div><div><h2>EVENTOS</h2><p>Alta, modificaciÃ³n y borrado.</p></div></div>
+          <div class="section-title"><div class="icon-badge">🎉</div><div><h2>EVENTOS</h2><p>Alta, modificación y borrado.</p></div></div>
           <div class="rowline evento entry-zone">
-            <div class="field"><label>TÃ­tulo</label><input id="newEventoTitulo" /></div>
+            <div class="field"><label>Título</label><input id="newEventoTitulo" /></div>
             <div class="field"><label>Precio</label><input id="newEventoPrecio" type="number" min="0" step="0.01" value="0.00" /></div>
             <div class="field"><label>Fecha ini</label><input id="newEventoFechaIni" placeholder="DD/MM/AA" /></div>
             <div class="field"><label>Fecha fin</label><input id="newEventoFechaFin" placeholder="DD/MM/AA" /></div>
-            <div class="field"><label>SituaciÃ³n</label><select id="newEventoSituacion"></select></div>
-            <div class="field"><label>DescripciÃ³n</label><textarea id="newEventoDescripcion"></textarea></div>
-            <button type="button" id="btnAddEvento">AÃ±adir</button>
+            <div class="field"><label>Situación</label><select id="newEventoSituacion"></select></div>
+            <div class="field"><label>Descripción</label><textarea id="newEventoDescripcion"></textarea></div>
+            <button type="button" id="btnAddEvento">Añadir</button>
             <div></div>
           </div>
           <div class="separator"></div>
@@ -427,10 +427,10 @@
         </div>
 
         <div id="mtTiendas" class="card hidden app-lockable">
-          <div class="section-title"><div class="icon-badge">ðŸª</div><div><h2>TIENDAS</h2><p>Alta, modificaciÃ³n y borrado.</p></div></div>
+          <div class="section-title"><div class="icon-badge">🏪</div><div><h2>TIENDAS</h2><p>Alta, modificación y borrado.</p></div></div>
           <div class="rowline tienda entry-zone">
             <div class="field"><label>Nombre</label><input id="newTiendaNombre" /></div>
-            <button type="button" id="btnAddTienda">AÃ±adir</button>
+            <button type="button" id="btnAddTienda">Añadir</button>
             <div></div>
           </div>
           <div class="separator"></div>
@@ -438,13 +438,13 @@
         </div>
 
         <div id="mtProductos" class="card hidden app-lockable">
-          <div class="section-title"><div class="icon-badge">ðŸ“¦</div><div><h2>PRODUCTOS</h2><p>Alta, modificaciÃ³n y borrado.</p></div></div>
+          <div class="section-title"><div class="icon-badge">📦</div><div><h2>PRODUCTOS</h2><p>Alta, modificación y borrado.</p></div></div>
           <div class="rowline producto entry-zone">
             <div class="field"><label>Nombre</label><input id="newProductoNombre" /></div>
             <div class="field"><label>Segmento</label><select id="newProductoSegmento"></select></div>
             <div class="field"><label>Destino</label><select id="newProductoDestino"></select></div>
-            <div class="field"><label>Precio referencia</label><input id="newProductoPrecio" class="money-text" type="text" value="0,00 â‚¬" /></div>
-            <button type="button" id="btnAddProducto">AÃ±adir</button>
+            <div class="field"><label>Precio referencia</label><input id="newProductoPrecio" class="money-text" type="text" value="0,00 €" /></div>
+            <button type="button" id="btnAddProducto">Añadir</button>
             <div></div>
           </div>
           <div class="separator"></div>
@@ -452,7 +452,7 @@
         </div>
 
         <div id="mtImportar" class="card hidden">
-          <div class="section-title"><div class="icon-badge">ðŸ“¥</div><div><h2>CARGA INICIAL DE DATOS</h2><p>Importa PERSONAS, EVENTOS, TIENDAS, PRODUCTOS, INGRESOS, COMPRAS, DONACIONES y TICKETS desde una plantilla Excel.</p></div></div>
+          <div class="section-title"><div class="icon-badge">📥</div><div><h2>CARGA INICIAL DE DATOS</h2><p>Importa PERSONAS, EVENTOS, TIENDAS, PRODUCTOS, INGRESOS, COMPRAS, DONACIONES y TICKETS desde una plantilla Excel.</p></div></div>
           <div class="import-panel">
             <div class="import-grid">
               <div class="field">
@@ -470,7 +470,7 @@
                 <label>Fotos de tickets (opcional, varias)</label>
                 <input id="importTicketFiles" type="file" accept="image/*" multiple />
               </div>
-              <div class="import-note">La importaciÃ³n puede REPLACE o RESUME. Para relacionar hojas se usan cÃ³digos: PERSONA_CODIGO, EVENTO_CODIGO, TIENDA_CODIGO y PRODUCTO_CODIGO. El formato de carga y el de descarga de datos es el mismo. La hoja TICKETS admite IMAGEN_BASE64 o cruce por nombre de archivo.</div>
+              <div class="import-note">La importación puede REPLACE o RESUME. Para relacionar hojas se usan códigos: PERSONA_CODIGO, EVENTO_CODIGO, TIENDA_CODIGO y PRODUCTO_CODIGO. El formato de carga y el de descarga de datos es el mismo. La hoja TICKETS admite IMAGEN_BASE64 o cruce por nombre de archivo.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="button" id="btnStartImport">Importar datos</button>
                 <button type="button" class="outline" id="btnClearImportStatus">Limpiar mensaje</button>
@@ -481,9 +481,9 @@
         </div>
 
         <div id="mtAcceso" class="card hidden">
-          <div class="section-title"><div class="icon-badge">ðŸ”</div><div><h2>ACCESO</h2></div></div>
+          <div class="section-title"><div class="icon-badge">🔐</div><div><h2>ACCESO</h2></div></div>
           <div class="rowline persona entry-zone">
-            <div class="field"><label>IdentificaciÃ³n</label><input id="newAccesoIdentificacion" /></div>
+            <div class="field"><label>Identificación</label><input id="newAccesoIdentificacion" /></div>
             <div class="field"><label>Nombre</label><input id="newAccesoNombre" /></div>
             <div class="field"><label>Clave</label><input id="newAccesoClave" type="password" /></div>
             <div class="field"><label>Nivel</label>
@@ -493,7 +493,7 @@
                 <option value="GD">GD</option>
               </select>
             </div>
-            <button type="button" id="btnAddAcceso" onclick="saveAccessUser(); return false;">AÃ±adir</button>
+            <button type="button" id="btnAddAcceso" onclick="saveAccessUser(); return false;">Añadir</button>
             <div></div>
           </div>
           <div class="separator"></div>

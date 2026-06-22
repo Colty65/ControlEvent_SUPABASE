@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Parche quirurgico COMPRAS: TK01..TK50 + tickets usados en verde.
+/* ControlEvent v13.0_prod - Parche quirurgico COMPRAS: TK01..TK50 + tickets usados en verde.
    No cambia version ni toca la logica de guardado/carga. */
 (function(){
   'use strict';
@@ -59,7 +59,7 @@
     return '<option value="' + esc(value) + '"'
       + (String(value) === String(selectedValue || '') ? ' selected' : '')
       + (isUsed ? ' class="ce-used-ticket-option" style="' + USED_STYLE + '" title="Ya utilizado en este evento"' : '')
-      + '>' + esc(label) + (isUsed ? ' âœ“' : '') + '</option>';
+      + '>' + esc(label) + (isUsed ? ' ✓' : '') + '</option>';
   }
   function valuesIncludingCurrent(current){
     const values = PURCHASE_VALUES.slice();

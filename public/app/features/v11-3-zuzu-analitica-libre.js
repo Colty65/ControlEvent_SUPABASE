@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Zuzu / AnalÃ­tica libre de explotaciÃ³n del evento.
+/* ControlEvent v13.0_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
@@ -64,17 +64,17 @@
   function injectButton(){
     var tab=$('tabGraficas'); if(!tab) return;
     var section=tab.querySelector('.section-title'); if(!section || $('ceGeminiLibreBtn')) return;
-    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Soy Zuzu, pregÃºntame lo que quieras'; btn.setAttribute('aria-label','Soy Zuzu, pregÃºntame lo que quieras'); btn.textContent='âœ¨ðŸ“Š';
+    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Soy Zuzu, pregúntame lo que quieras'; btn.setAttribute('aria-label','Soy Zuzu, pregúntame lo que quieras'); btn.textContent='✨📊';
     bindOpenButton(btn);
     section.appendChild(btn);
   }
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>âœ¨ Soy Zuzu, pregÃºntame lo que quieras...</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
-          '<textarea id="ceAiPrompt" placeholder="Ejemplos: SÃ¡came una grÃ¡fica de barras por artÃ­culos mÃ¡s utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoraciÃ³n.\nHazme un CSV con productos mÃ¡s consumidos por coste."></textarea>'+
-          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">ðŸ§¡ Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">ðŸ§¹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">â¬‡ï¸</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+          '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
+          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">⬇️</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
         '<div class="ce-ai-result" id="ceAiResult"></div>'+ 
       '</div></div>';
@@ -105,17 +105,17 @@
     var ev=currentEvent();
     if(!ev){ setStatus('Selecciona un evento antes de consultar.', 'err'); return; }
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
-    if(!prompt){ setStatus('Escribe primero la peticiÃ³n.', 'err'); return; }
-    setStatus('Zuzu estÃ¡ jubilao, hazte uno mientras........', 'ok');
+    if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
+    setStatus('Zuzu está jubilao, hazte uno mientras........', 'ok');
     var resEl=$('ceAiResult');
-    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>ðŸ§¡ Zuzu estÃ¡ jubilao, hazte uno mientras........</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">â³</span> Preparando datos y respuesta...</div></div>';
+    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>🧡 Zuzu está jubilao, hazte uno mientras........</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">⏳</span> Preparando datos y respuesta...</div></div>';
     try{
       var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
       var data=await res.json().catch(function(){ return {}; });
       if(!res.ok || data.ok===false) throw new Error(data.error || ('HTTP '+res.status));
       data.__prompt = prompt;
       renderResult(data);
-      setStatus(data.rejected?'PeticiÃ³n rechazada por Ã¡mbito.':'Respuesta generada.', data.rejected?'err':'ok');
+      setStatus(data.rejected?'Petición rechazada por ámbito.':'Respuesta generada.', data.rejected?'err':'ok');
     }catch(err){
       resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
@@ -132,14 +132,14 @@
     (data.tables||[]).forEach(function(tb){ html+=tableHtml(tb); });
     if(Array.isArray(data.files) && data.files.length){
       html+='<div class="ce-ai-card"><h3>Archivos generados</h3><div class="ce-ai-files">';
-      data.files.forEach(function(f,i){ html+='<button type="button" class="ce-ai-file-btn" data-file-index="'+i+'">â¬‡ï¸ '+esc(f.filename||('archivo_'+(i+1)))+'</button><button type="button" class="ce-ai-file-btn" data-file-preview="'+i+'">ðŸ‘ï¸ Ver</button>'; });
+      data.files.forEach(function(f,i){ html+='<button type="button" class="ce-ai-file-btn" data-file-index="'+i+'">⬇️ '+esc(f.filename||('archivo_'+(i+1)))+'</button><button type="button" class="ce-ai-file-btn" data-file-preview="'+i+'">👁️ Ver</button>'; });
       html+='</div><div id="ceAiFilePreview" class="ce-ai-preview" style="display:none"></div></div>';
     }
     var el=$('ceAiResult'); el.innerHTML=html;
     el.querySelectorAll('[data-file-index]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.fileIndex)]; downloadText(f.content||'', f.filename||'archivo.txt', f.mime||'text/plain;charset=utf-8'); }; });
     el.querySelectorAll('[data-file-preview]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.filePreview)]; var p=$('ceAiFilePreview'); if(!p) return; p.style.display='block'; p.textContent=f.content||''; }; });
   }
-  function wantsChart(p){ return /\b(graf|gr[aÃ¡]fic|chart|barras|tarta|pastel|donut|linea|lÃ­nea|comparativ)/i.test(String(p||'')); }
+  function wantsChart(p){ return /\b(graf|gr[aá]fic|chart|barras|tarta|pastel|donut|linea|línea|comparativ)/i.test(String(p||'')); }
   function autoChartsFromTables(tables){
     var out=[]; (tables||[]).some(function(tb){
       var cols=tb.columns||[], rows=tb.rows||[]; if(!cols.length || !rows.length) return false;
@@ -148,7 +148,7 @@
       if(numIdx<=0) return false;
       var labels=rows.slice(0,20).map(function(r){return String(r[labelIdx]||'');});
       var values=rows.slice(0,20).map(function(r){return Number(String(r[numIdx]||'0').replace(',','.').replace(/[^0-9.-]/g,''))||0;});
-      out.push({title:'GrÃ¡fica generada desde '+(tb.title||'tabla'),type:'horizontalBar',labels:labels,values:values,unit:/â‚¬|importe|valor|precio|total/i.test(cols[numIdx]||'')?'â‚¬':''});
+      out.push({title:'Gráfica generada desde '+(tb.title||'tabla'),type:'horizontalBar',labels:labels,values:values,unit:/€|importe|valor|precio|total/i.test(cols[numIdx]||'')?'€':''});
       return true;
     }); return out;
   }
@@ -160,22 +160,22 @@
     if(type==='stackedbar' || (Array.isArray(ch.series) && ch.series.length)) return stackedChartHtml(ch);
     if(type==='bar' || type==='verticalbar') return verticalChartHtml(ch, labels, values);
     var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var pct=Math.max(2, Math.min(100, (v/max)*100)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function chartColor(i){ return ['#38bdf8','#f97316','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
     var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartColor(i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
-    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartColor(i)+'"></span>'+esc(l)+' Â· '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
+    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartColor(i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
   function lineChartHtml(ch, labels, values){
     var w=900,h=300,pad=34,max=Math.max.apply(null, values.concat([1])), min=Math.min.apply(null, values.concat([0]));
     var pts=values.map(function(v,i){ var x=pad + (labels.length<=1?0:(i*(w-pad*2)/(labels.length-1))); var y=h-pad-((Number(v)-min)/(max-min||1))*(h-pad*2); return [x,y]; });
     var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
     var dots=pts.map(function(pt,i){return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="4" fill="'+chartColor(i)+'"><title>'+esc(labels[i]+' '+formatNumber(values[i])+' '+(ch.unit||''))+'</title></circle>';}).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+'</svg></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+'</svg></div>';
   }
   function stackedChartHtml(ch){
     var labels=(ch.labels||[]).map(String); var series=(ch.series||[]);
@@ -183,12 +183,12 @@
     var totals=labels.map(function(_,i){return series.reduce(function(a,s){return a+(Number((s.values||[])[i])||0);},0);}); var max=Math.max.apply(null, totals.concat([1]));
     var rows=labels.map(function(l,i){ var parts=series.map(function(s,si){ var v=Number((s.values||[])[i]||0); var pct=Math.max(v?3:0,(v/max)*100); return '<div class="ce-ai-stack-part" title="'+esc((s.name||'Serie')+': '+formatNumber(v)+' '+(ch.unit||''))+'" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(si)+'">'+(v?esc(formatNumber(v)):'')+'</div>'; }).join(''); return '<div class="ce-ai-stack-row"><div class="ce-ai-stack-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-stack-track">'+parts+'</div></div>'; }).join('');
     var leg=series.map(function(s,i){return '<span><i style="background:'+chartColor(i)+'"></i>'+esc(s.name||('Serie '+(i+1)))+'</span>';}).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><div class="ce-ai-stacked-wrap">'+rows+'</div><div class="ce-ai-stack-legend">'+leg+'</div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-stacked-wrap">'+rows+'</div><div class="ce-ai-stack-legend">'+leg+'</div></div>';
   }
   function verticalChartHtml(ch, labels, values){
     var max=Math.max.apply(null, values.concat([1]));
     var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(4, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
   }
   function tableHtml(tb){
     var head=(tb.columns||[]).map(function(c){return '<th>'+esc(c)+'</th>';}).join('');

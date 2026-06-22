@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "v13.0_prod",
   "base": "v13.0_prod",
   "files_added": [
@@ -7,7 +7,7 @@
   "main_changes": [
     "Marca inteligente de candidatos Pte.Compra en Ticket Auto",
     "Dedupe de botones de descarga en INGRESOS",
-    "Recarga estable por evento al cambiar de opciÃ³n",
+    "Recarga estable por evento al cambiar de opción",
     "Panel de duplicar pantalla simplificado y realista"
   ]
 }

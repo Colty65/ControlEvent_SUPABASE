@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - herramientas de consulta/maestros disponibles aunque el evento activo estÃ© Finalizado.
-   No desbloquea ediciÃ³n de datos del evento finalizado: solo Zuzu, BACKUP/Excel, ImportaciÃ³n/descarga y mantenimientos generales. */
+/* ControlEvent v13.0_prod - herramientas de consulta/maestros disponibles aunque el evento activo esté Finalizado.
+   No desbloquea edición de datos del evento finalizado: solo Zuzu, BACKUP/Excel, Importación/descarga y mantenimientos generales. */
 (function(){
   'use strict';
   if (window.__ceV1133FinalizadoHerramientasConsulta) return;

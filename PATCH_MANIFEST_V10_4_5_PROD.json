@@ -1,7 +1,7 @@
-﻿{
+{
   "version": "v13.0_prod",
   "base": "v13.0_prod",
-  "scope": "rescate puntual: descargas Documentos/Ingresos, Mapa mÃ³vil, Ticket Auto",
+  "scope": "rescate puntual: descargas Documentos/Ingresos, Mapa móvil, Ticket Auto",
   "files_changed": [
     "index.html",
     "public/index.html",

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - justificantes de ingresos corregidos y retorno al globo origen.
+/* ControlEvent v13.0_prod - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
@@ -42,14 +42,14 @@
   function isLockedSafe(){ try{ return typeof isLocked === 'function' ? !!isLocked() : up(selectedEv()?.situacion) === 'FINALIZADO'; }catch(_){ return false; } }
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
     const n = Number(s);
     return Number.isFinite(n) ? n : 0;
   }
-  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; } }
+  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
   function saveNow(){ try{ if(typeof saveState === 'function') return saveState(); }catch(_){ } try{ return window.saveState?.(); }catch(_){ } }
   function renderNow(){ try{ if(typeof render === 'function') return render(); }catch(_){ } try{ return window.render?.(); }catch(_){ } }
   function stop(ev){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ } return false; }
@@ -73,7 +73,7 @@
     return parseEuro(ev?.precio || 0) * Number(row?.numero || 0) + parseEuro(row?.importe || row?.importeVoluntario || 0);
   }
   function ingresoInfo(id){
-    // v46.8: priorizar la fila enriquecida por collabsForEvent(), porque ahÃ­ ya se aplica
+    // v46.8: priorizar la fila enriquecida por collabsForEvent(), porque ahí ya se aplica
     // correctamente la regla SOCIO / NO SOCIO. Antes, al leer primero el registro crudo,
     // los NO SOCIO mostraban como obligatorio el precio del evento y duplicaban el total.
     const enriched = collabRows().find(x => same(x.id, id)) || null;
@@ -161,9 +161,9 @@
     ov.innerHTML = `<div class="ce-v465-modal-card" role="dialog" aria-modal="true">
       <div class="ce-v465-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div>
       <div class="ce-v465-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody>
-        <tr><td>SituaciÃ³n</td><td>${esc(info.situacion)}</td></tr>
+        <tr><td>Situación</td><td>${esc(info.situacion)}</td></tr>
         <tr><td>Rango</td><td>${esc(info.rango || '-')}</td></tr>
-        <tr><td>NÂº personas</td><td>${esc(info.numero)}</td></tr>
+        <tr><td>Nº personas</td><td>${esc(info.numero)}</td></tr>
         <tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr>
         <tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr>
         <tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr>
@@ -207,7 +207,7 @@
   function removeReceipt(id){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return; }
     if(isLockedSafe()){ alert('Evento finalizado. No se puede modificar.'); return; }
-    if(!confirm('Â¿Eliminar el justificante de este ingreso?')) return;
+    if(!confirm('¿Eliminar el justificante de este ingreso?')) return;
     const scroll = captureScroll();
     deleteReceipt(id); saveNow(); renderNow(); restoreScroll(scroll);
     [80,220,520,1000].forEach(ms => setTimeout(() => { compactIngresoReceipts(); enrichOpenTooltips(); }, ms));
@@ -219,14 +219,14 @@
   function compactIngresoReceipts(){
     return;
     injectStyle();
-    // Oculta y retira los controles largos heredados para que no ocupen la lÃ­nea.
+    // Oculta y retira los controles largos heredados para que no ocupen la línea.
     document.querySelectorAll('.ce-ingreso-receipt-tools-v463,.ce-v464-receipt-tools').forEach(el => { try{ el.remove(); }catch(_){ } });
     const wrap = $('collabList'); if(!wrap) return;
     wrap.querySelectorAll('.itemcard,.rowline,.card').forEach(card => {
       const id = collabCardId(card); if(!id) return;
       let box = card.querySelector('.ce-v465-receipt-strip');
       const data = receiptData(id);
-      const html = `${data ? `<button type="button" class="ce-v465-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v465" data-id="${esc(id)}"><img alt="Justificante" src="${esc(data)}"></button>` : `<span class="ce-v465-receipt-empty" title="Sin justificante">ðŸ“·</span>`}<button type="button" class="ce-v465-receipt-btn" title="${data ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v465" data-id="${esc(id)}">ðŸ“Ž</button>${data ? `<button type="button" class="ce-v465-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v465" data-id="${esc(id)}">ðŸ—‘</button>` : ''}`;
+      const html = `${data ? `<button type="button" class="ce-v465-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v465" data-id="${esc(id)}"><img alt="Justificante" src="${esc(data)}"></button>` : `<span class="ce-v465-receipt-empty" title="Sin justificante">📷</span>`}<button type="button" class="ce-v465-receipt-btn" title="${data ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v465" data-id="${esc(id)}">📎</button>${data ? `<button type="button" class="ce-v465-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v465" data-id="${esc(id)}">🗑</button>` : ''}`;
       if(box){ if(box.dataset.receiptHas !== String(!!data)){ box.innerHTML = html; box.dataset.receiptHas = String(!!data); } return; }
       box = document.createElement('div');
       box.className = 'ce-v465-receipt-strip';

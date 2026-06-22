@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v13.0_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
 (function(){
   'use strict';
@@ -21,14 +21,14 @@
   function normalizeName(v){ return trim(v).replace(/\s+/g,' ').toUpperCase(); }
   function money(v){
     if(typeof v==='number') return isFinite(v) ? v : 0;
-    var s=text(v).replace(/â‚¬/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
+    var s=text(v).replace(/€/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
     var c=s.lastIndexOf(','), d=s.lastIndexOf('.');
     if(c!==-1 && d!==-1) s = c>d ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,'');
     else if(c!==-1) s = s.replace(/\./g,'').replace(',', '.');
     else s=s.replace(/,/g,'');
     var n=Number(s); return isFinite(n) ? n : 0;
   }
-  function euro(v){ var n=money(v); return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' â‚¬'; }
+  function euro(v){ var n=money(v); return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
   function apiJson(url, init){
     return fetch(url, Object.assign({cache:'no-store'}, init||{})).then(function(res){
       return res.json().catch(function(){return {};}).then(function(data){
@@ -84,7 +84,7 @@
       btn.type='button'; btn.id='btnReceiptAiCompras'; btn.className='iconbtn outline app-lockable ce-ai-ticket-btn';
       btn.setAttribute('data-ce-ai-ticket-open','1');
       btn.setAttribute('aria-label','Abrir IA Ticket');
-      btn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; btn.textContent='ðŸ§¾IA';
+      btn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; btn.textContent='🧾IA';
       var footer=document.querySelector('.footer-inner');
       if(footer) footer.appendChild(btn);
       btn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
@@ -94,7 +94,7 @@
       hbtn.type='button'; hbtn.id='btnReceiptAiComprasHeader'; hbtn.className='outline small ce-ai-ticket-header-btn';
       hbtn.setAttribute('data-ce-ai-ticket-open','1');
       hbtn.setAttribute('aria-label','Abrir IA Ticket');
-      hbtn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; hbtn.textContent='ðŸ§¾ IA';
+      hbtn.title='Abrir IA Ticket: alta asistida de COMPRAS por foto'; hbtn.textContent='🧾 IA';
       var actions=document.querySelector('.user-actions') || document.querySelector('.appname-stack') || document.querySelector('.header-inner');
       if(actions) actions.insertBefore(hbtn, actions.firstChild || null);
       hbtn.addEventListener('click',function(ev){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } openPanel(); });
@@ -102,7 +102,7 @@
     if(!$('ceAiTicketPanel')){
       var div=document.createElement('div'); div.id='ceAiTicketPanel'; div.className='ce-ai-overlay';
       div.innerHTML='<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><div><div class="ce-ai-title">ðŸ§¾ IA Ticket - Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone lÃ­neas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><div><div class="ce-ai-title">🧾 IA Ticket - Alta asistida de COMPRAS</div><div class="ce-ai-sub">Disponible solo para GD. La IA propone líneas; el usuario revisa, corrige y confirma antes de grabar.</div></div><button type="button" id="ceAiClose" class="ce-ai-secondary">Cerrar</button></div>'+
         '<div id="ceAiStatus" class="ce-ai-status info">Selecciona o captura una foto de ticket.</div>'+ 
         '<div class="ce-ai-grid">'+
           '<div class="ce-ai-field"><label>Foto del ticket</label><input id="ceAiFile" type="file" accept="image/*" capture="environment"></div>'+ 
@@ -110,9 +110,9 @@
           '<div class="ce-ai-field"><label>Tienda</label><select id="ceAiTienda"></select></div>'+ 
           '<div class="ce-ai-field"><label>Responsable</label><select id="ceAiResponsable"></select></div>'+ 
         '</div>'+ 
-        '<div class="ce-ai-actions"><img id="ceAiPreview" class="ce-ai-preview" alt="Vista previa" style="display:none"><button type="button" id="ceAiAnalyze" class="ce-ai-primary">Analizar foto con IA</button><button type="button" id="ceAiAddRow" class="ce-ai-secondary">AÃ±adir fila manual</button><button type="button" id="ceAiClear" class="ce-ai-danger">Limpiar</button></div>'+ 
+        '<div class="ce-ai-actions"><img id="ceAiPreview" class="ce-ai-preview" alt="Vista previa" style="display:none"><button type="button" id="ceAiAnalyze" class="ce-ai-primary">Analizar foto con IA</button><button type="button" id="ceAiAddRow" class="ce-ai-secondary">Añadir fila manual</button><button type="button" id="ceAiClear" class="ce-ai-danger">Limpiar</button></div>'+ 
         '<datalist id="ceAiProducts"></datalist>'+ 
-        '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th>OK</th><th>Producto</th><th>Unid.</th><th>Precio</th><th>Importe</th><th>Conf.</th><th></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="7">Sin lÃ­neas todavÃ­a.</td></tr></tbody></table></div>'+ 
+        '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th>OK</th><th>Producto</th><th>Unid.</th><th>Precio</th><th>Importe</th><th>Conf.</th><th></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="7">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
         '<div class="ce-ai-actions"><button type="button" id="ceAiProcess" class="ce-ai-primary">Procesar y llevar a COMPRAS</button><button type="button" id="ceAiReloadEvent" class="ce-ai-secondary">Recargar evento</button></div>'+ 
       '</div>';
       document.body.appendChild(div);
@@ -141,7 +141,7 @@
     if($('ceAiTicket') && !$('ceAiTicket').value) $('ceAiTicket').value=next;
   }
   function openPanel(){
-    if(!isGD()){ alert('Esta funciÃ³n solo estÃ¡ disponible para GD.'); return; }
+    if(!isGD()){ alert('Esta función solo está disponible para GD.'); return; }
     if(!selectedEventId()){ alert('Selecciona primero un evento.'); return; }
     if(isFinalizado()){ alert('Evento Finalizado: para procesar tickets debe estar En curso.'); return; }
     ensureUi(); fillSelects(); $('ceAiTicketPanel').classList.add('open');
@@ -150,13 +150,13 @@
   function fileChanged(){
     var f=$('ceAiFile').files && $('ceAiFile').files[0];
     if(!f) return;
-    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } setStatus('Foto cargada. Pulsa Analizar con IA o aÃ±ade filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
+    readFileAsDataUrl(f).then(function(dataUrl){ window.__ceAiTicketImage=dataUrl; var img=$('ceAiPreview'); if(img){ img.src=dataUrl; img.style.display=''; } setStatus('Foto cargada. Pulsa Analizar con IA o añade filas manuales.','info'); }).catch(function(e){ setStatus(e.message||String(e),'err'); });
   }
   function clearRows(){ window.__ceAiTicketLines=[]; window.__ceAiTicketImage=''; if($('ceAiFile')) $('ceAiFile').value=''; if($('ceAiPreview')){$('ceAiPreview').src=''; $('ceAiPreview').style.display='none';} renderRows(); setStatus('Panel limpio.','info'); }
   function renderRows(){
     var body=$('ceAiRows'); if(!body) return;
     var rows=window.__ceAiTicketLines || [];
-    if(!rows.length){ body.innerHTML='<tr><td colspan="7">Sin lÃ­neas todavÃ­a.</td></tr>'; return; }
+    if(!rows.length){ body.innerHTML='<tr><td colspan="7">Sin líneas todavía.</td></tr>'; return; }
     body.innerHTML=rows.map(function(r,i){
       var cls=(Number(r.confianza||0)<0.65 || !trim(r.descripcion))?'ce-ai-row-low':'ce-ai-row-ok';
       return '<tr class="'+cls+'" data-ce-ai-row="'+i+'">'+
@@ -196,12 +196,12 @@
       var rows=Array.isArray(data.productos)?data.productos:[];
       window.__ceAiTicketLines=rows.map(function(r){ return Object.assign({ok:true},r); });
       renderRows();
-      var msg='IA terminada: '+rows.length+' lÃ­neas detectadas.';
-      if(data.total) msg+=' Total leÃ­do: '+euro(data.total)+'.';
+      var msg='IA terminada: '+rows.length+' líneas detectadas.';
+      if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
-      setStatus('No se pudo analizar con IA: '+(err.message||String(err))+'. Puedes aÃ±adir filas manualmente.', 'err');
+      setStatus('No se pudo analizar con IA: '+(err.message||String(err))+'. Puedes añadir filas manualmente.', 'err');
     });
   }
   function findProductByName(name){ var n=normalizeName(name); var ps=arr('productos'); for(var i=0;i<ps.length;i++){ if(normalizeName(ps[i].nombre)===n) return ps[i]; } return null; }
@@ -222,7 +222,7 @@
         return item;
       })
       .catch(function(err){
-        if(existing){ warnings.push('No se actualizÃ³ precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabarÃ¡ con el precio del ticket.'); return existing; }
+        if(existing){ warnings.push('No se actualizó precio de PRODUCTOS para "'+name+'": '+(err.message||err)+'. La compra se grabará con el precio del ticket.'); return existing; }
         throw err;
       });
   }
@@ -259,7 +259,7 @@
     var rows=collectRows().filter(function(r){ return r.ok!==false; });
     rows=rows.filter(function(r){ return trim(r.descripcion); });
     if(!rows.length){ setStatus('No hay filas con producto para procesar.','warn'); return; }
-    setStatus('Procesando '+rows.length+' lÃ­neas hacia PRODUCTOS y COMPRAS...','info');
+    setStatus('Procesando '+rows.length+' líneas hacia PRODUCTOS y COMPRAS...','info');
     var warnings=[]; var created=0; var chain=Promise.resolve();
     rows.forEach(function(row){
       chain=chain.then(function(){ return upsertProductByName(row.descripcion, row.precio || row.importe, tiendaId, warnings); })
@@ -269,7 +269,7 @@
     chain.then(function(){ return uploadTicketImage(ticket); })
       .then(function(){ return reloadEvent(true); })
       .then(function(){
-        var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si habÃ­a imagen.';
+        var msg='Procesado: '+created+' compras grabadas en '+ticket+'. Foto adjuntada al ticket si había imagen.';
         if(warnings.length) msg+=' Avisos: '+warnings.length+'.';
         setStatus(msg, warnings.length?'warn':'ok');
         if(warnings.length) console.warn('[CE v9.0 IA Ticket]', warnings);
@@ -300,5 +300,5 @@
   document.addEventListener('click',delegatedOpen,true);
   document.addEventListener('click',function(ev){ var t=ev.target; if(t && (t.id==='btnLogin' || (t.closest&&t.closest('#btnLogin')))) setTimeout(tick,700); },true);
   setInterval(refreshRole,2000);
-  console.info('[CE v9.0 Ticket IA] instalado: botÃ³n superior/inferior solo GD. Prueba: window.__ceOpenTicketIaComprasV90()');
+  console.info('[CE v9.0 Ticket IA] instalado: botón superior/inferior solo GD. Prueba: window.__ceOpenTicketIaComprasV90()');
 })();

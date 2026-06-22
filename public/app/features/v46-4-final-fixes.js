@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - ajustes finales sobre v45.4 estable.
-   - EdiciÃ³n/borrado sin saltar al principio, con marca visual discreta y destrucciÃ³n animada.
-   - ExportaciÃ³n INFOEVENTO/BACKUP con guardia antirrecursiÃ³n.
+/* ControlEvent v13.0_prod - ajustes finales sobre v45.4 estable.
+   - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
+   - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
@@ -24,7 +24,7 @@
   };
   const moneyF = v => {
     try{ return (typeof money === 'function') ? money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }
-    catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v||0).toFixed(2)} €`; }
   };
   function st(){
     try{ if(typeof state !== 'undefined') return state || {}; }catch(_){ }
@@ -52,7 +52,7 @@
   function isLockedSafe(){ try{ return typeof isLocked === 'function' ? !!isLocked() : upper(selectedEv()?.situacion) === 'FINALIZADO'; }catch(_){ return false; } }
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
@@ -285,7 +285,7 @@
   function savePersona(btn, ev){
     if(!canWrite()) return block(ev, 'No autorizado para modificar.');
     const id = btn.dataset.id; const p = byId('personas', id); if(!p) return block(ev, 'No se encuentra la persona.');
-    const nombre = norm(getVal('edit-persona-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacÃ­o.');
+    const nombre = norm(getVal('edit-persona-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacío.');
     const scroll = captureScroll(); stop(ev);
     p.nombre = nombre; p.rango = getVal('edit-persona-rango', id) || p.rango;
     finishModify('save-persona', id, scroll);
@@ -294,13 +294,13 @@
   function saveTienda(btn, ev){
     if(!canWrite()) return block(ev, 'No autorizado para modificar.');
     const id = btn.dataset.id; const t = byId('tiendas', id); if(!t) return block(ev, 'No se encuentra la tienda.');
-    const nombre = norm(getVal('edit-tienda-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacÃ­o.');
+    const nombre = norm(getVal('edit-tienda-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacío.');
     const scroll = captureScroll(); stop(ev); t.nombre = nombre; finishModify('save-tienda', id, scroll); return false;
   }
   function saveProducto(btn, ev){
     if(!canWrite()) return block(ev, 'No autorizado para modificar.');
     const id = btn.dataset.id; const p = byId('productos', id); if(!p) return block(ev, 'No se encuentra el producto.');
-    const nombre = norm(getVal('edit-producto-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacÃ­o.');
+    const nombre = norm(getVal('edit-producto-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacío.');
     const scroll = captureScroll(); stop(ev);
     p.nombre = nombre;
     p.segmento = getVal('edit-producto-segmento', id) || p.segmento;
@@ -352,7 +352,7 @@
   function saveDonacion(btn, ev){
     if(!canWrite()) return block(ev, 'No autorizado para modificar.');
     if(isLockedSafe()) return block(ev, 'Evento finalizado. No se puede modificar.');
-    const id = btn.dataset.id; const c = arr('compras').find(x => same(x.id, id)); if(!c) return block(ev, 'No se encuentra la donaciÃ³n.');
+    const id = btn.dataset.id; const c = arr('compras').find(x => same(x.id, id)); if(!c) return block(ev, 'No se encuentra la donación.');
     const scroll = captureScroll(); stop(ev);
     c.productoId = getVal('edit-donacion-producto', id) || c.productoId;
     c.unidades = Number(getVal('edit-donacion-unidades', id) || 0);
@@ -375,9 +375,9 @@
     const compras = arr('compras').filter(c => same(c.eventId, eventId));
     const ingresos = arr('colaboradores').filter(c => same(c.eventId, eventId));
     const imgs = Object.keys(st().ticketImages || {}).filter(k => String(k).startsWith(`${eventId}|`));
-    const msg = ['ATENCIÃ“N: baja definitiva de EVENTO.','',`Evento: ${event.titulo || 'sin tÃ­tulo'}`,'','Se eliminarÃ¡:',`â€¢ El propio evento.`,`â€¢ Ingresos/colaboradores del evento: ${ingresos.length}`,`â€¢ Compras/donaciones del evento: ${compras.length}`,`â€¢ ImÃ¡genes de tickets del evento: ${imgs.length}`,'','No se eliminarÃ¡n PERSONAS, PRODUCTOS ni TIENDAS generales.','','Â¿Quieres continuar?'].join('\n');
+    const msg = ['ATENCIÓN: baja definitiva de EVENTO.','',`Evento: ${event.titulo || 'sin título'}`,'','Se eliminará:',`• El propio evento.`,`• Ingresos/colaboradores del evento: ${ingresos.length}`,`• Compras/donaciones del evento: ${compras.length}`,`• Imágenes de tickets del evento: ${imgs.length}`,'','No se eliminarán PERSONAS, PRODUCTOS ni TIENDAS generales.','','¿Quieres continuar?'].join('\n');
     if(!confirm(msg)) return false;
-    if(!confirm(`ConfirmaciÃ³n final: Â¿eliminar definitivamente el evento "${event.titulo || ''}" y sus datos dependientes?`)) return false;
+    if(!confirm(`Confirmación final: ¿eliminar definitivamente el evento "${event.titulo || ''}" y sus datos dependientes?`)) return false;
     return deleteAfterAnimation(btn, ev, () => {
       st().eventos = arr('eventos').filter(e => !same(e.id, eventId));
       st().colaboradores = arr('colaboradores').filter(c => !same(c.eventId, eventId));
@@ -436,7 +436,7 @@
       const has = !!ingresoReceiptData(id);
       const box = document.createElement('div');
       box.className = 'ce-ingreso-receipt-tools-v463';
-      box.innerHTML = `${has ? '<span class="ce-receipt-ok">ðŸ“Ž Justificante adjunto</span>' : ''}<button type="button" class="outline small" data-action="ingreso-receipt-add" data-id="${esc(id)}">${has ? 'Cambiar justificante' : 'Adjuntar justificante'}</button>${has ? `<button type="button" class="outline small" data-action="ingreso-receipt-view" data-id="${esc(id)}">Ver justificante</button><button type="button" class="danger small" data-action="ingreso-receipt-delete" data-id="${esc(id)}">Eliminar justificante</button>` : ''}`;
+      box.innerHTML = `${has ? '<span class="ce-receipt-ok">📎 Justificante adjunto</span>' : ''}<button type="button" class="outline small" data-action="ingreso-receipt-add" data-id="${esc(id)}">${has ? 'Cambiar justificante' : 'Adjuntar justificante'}</button>${has ? `<button type="button" class="outline small" data-action="ingreso-receipt-view" data-id="${esc(id)}">Ver justificante</button><button type="button" class="danger small" data-action="ingreso-receipt-delete" data-id="${esc(id)}">Eliminar justificante</button>` : ''}`;
       const actions = card.querySelector('button[data-action="save-collab"]')?.parentElement || card;
       try{ actions.appendChild(box); }catch(_){ card.appendChild(box); }
     });
@@ -471,7 +471,7 @@
     if(btn.dataset.action === 'ingreso-receipt-add'){ stop(ev); addIngresoReceipt(id); return false; }
     if(btn.dataset.action === 'ingreso-receipt-delete'){
       stop(ev);
-      if(confirm('Â¿Eliminar el justificante de este ingreso?')){ deleteIngresoReceipt(id); saveNow(); renderNow(); applyVersion(); setTimeout(addIngresoReceiptTools, 80); }
+      if(confirm('¿Eliminar el justificante de este ingreso?')){ deleteIngresoReceipt(id); saveNow(); renderNow(); applyVersion(); setTimeout(addIngresoReceiptTools, 80); }
       return false;
     }
   }
@@ -488,7 +488,7 @@
     const nombre = norm(getVal('edit-acceso-nombre', oldId));
     const nivel = upper(getVal('edit-acceso-nivel', oldId) || 'RO') || 'RO';
     const clave = String(getVal('edit-acceso-clave', oldId) || '');
-    if(!identificacion || !nombre){ return block(ev, 'IdentificaciÃ³n y nombre son obligatorios.'); }
+    if(!identificacion || !nombre){ return block(ev, 'Identificación y nombre son obligatorios.'); }
     const scroll = captureScroll(); stop(ev);
     try{
       const payload = {identificacion, nombre, nivel, existingId: oldId};
@@ -505,9 +505,9 @@
     if(!isGD()) return block(ev, 'Solo GD puede mantener ACCESO.');
     const id = norm(btn.dataset.id || '');
     if(!id) return block(ev, 'No se encuentra el usuario de acceso.');
-    try{ if((window.authUser?.identificacion || '') === id) return block(ev, 'No puedes eliminar el acceso con el que estÃ¡s logado.'); }catch(_){ }
+    try{ if((window.authUser?.identificacion || '') === id) return block(ev, 'No puedes eliminar el acceso con el que estás logado.'); }catch(_){ }
     stop(ev);
-    if(!confirm('Â¿Eliminar este usuario de acceso?')) return false;
+    if(!confirm('¿Eliminar este usuario de acceso?')) return false;
     const scroll = captureScroll();
     const card = btn.closest?.('.itemcard,.rowline,.card,tr,li,[data-id]');
     if(card){ card.querySelectorAll('button,input,select,textarea').forEach(el => { try{ el.disabled = true; }catch(_){ } }); card.classList.add('ce-v46-deleting'); }
@@ -585,7 +585,7 @@
     const saldoOperativoColor = saldoOperativo >= 0 ? '#155e75' : '#7f1d1d';
     const saldoActualItems = [{label:'Saldo actual', value:Math.abs(saldoActual), displayValue:saldoActual, color:saldoActualColor, layout:'metricv460', lines:saldoActualLines(incomePaidRows, paidExpenseRows.concat(currentExpenseRows), totalIncomePaid, totalExpPaid, saldoActual)}];
     const saldoOperativoItems = [{label:'Saldo operativo', value:Math.abs(saldoOperativo), displayValue:saldoOperativo, color:saldoOperativoColor, layout:'metricv460', lines:saldoOperativoLines(rows, paidExpenseRows.concat(currentExpenseRows, pendingExpenseRows), totalIncome, totalExp, saldoOperativo)}];
-    const valoracionItems = [{label:'ValoraciÃ³n del evento', value:Math.abs(valoracion), displayValue:valoracion, color:WINDOWS_BLUE, layout:'metricv460', lines:valoracionLines(paidExpenseRows.concat(currentExpenseRows, pendingExpenseRows), compras.filter(r=>isDonation(r.ticketDonacion)), totalExp, totalDon, valoracion, totalPendingExp)}];
+    const valoracionItems = [{label:'Valoración del evento', value:Math.abs(valoracion), displayValue:valoracion, color:WINDOWS_BLUE, layout:'metricv460', lines:valoracionLines(paidExpenseRows.concat(currentExpenseRows, pendingExpenseRows), compras.filter(r=>isDonation(r.ticketDonacion)), totalExp, totalDon, valoracion, totalPendingExp)}];
     return {incomeItems, donationItems, expenseItems, saldoActualItems, saldoOperativoItems, valoracionItems, totalIncome, totalDon, totalExp, saldoActual, saldoOperativo, valoracion};
   }
   function detailSortText(value){ return upper(String(value || '')); }
@@ -648,7 +648,7 @@
     }
     return out;
   }
-  function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros mÃ¡s`]) : list; }
+  function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
     return ['SALDO ACTUAL', 'TOTAL | Importe', `Ingresos realizados | ${moneyF(income)}`, `Gastos realizados | ${moneyF(expense)}`, `SALDO ACTUAL | ${moneyF(saldo)}`, '', 'INGRESOS REALIZADOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS REALIZADOS', ...limited(expenseLines(expenseRows))];
   }
@@ -656,7 +656,7 @@
     return ['SALDO OPERATIVO', 'TOTAL | Importe', `Ingreso total previsto | ${moneyF(income)}`, `Gasto total previsto | ${moneyF(expense)}`, `SALDO OPERATIVO | ${moneyF(saldo)}`, '', 'INGRESOS INCLUIDOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS INCLUIDOS', ...limited(expenseLines(expenseRows))];
   }
   function valoracionLines(expenseRows, donationRows, expenses, donations, valoracion, pending){
-    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Gastos previstos | ${moneyF(expenses)}`, `DonaciÃ³n de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows)), '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows))];
+    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Gastos previstos | ${moneyF(expenses)}`, `Donación de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows)), '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows))];
   }
   function polar(cx, cy, r, angle){ const rad = (angle - 90) * Math.PI / 180; return {x:cx + r * Math.cos(rad), y:cy + r * Math.sin(rad)}; }
   function arcPath(cx, cy, r, start, end){ const s = polar(cx,cy,r,end), e = polar(cx,cy,r,start); const large = end - start <= 180 ? 0 : 1; return `M ${cx} ${cy} L ${s.x.toFixed(3)} ${s.y.toFixed(3)} A ${r} ${r} 0 ${large} 0 ${e.x.toFixed(3)} ${e.y.toFixed(3)} Z`; }
@@ -690,7 +690,7 @@
   }
   function hasDestinoValues(row){ return Math.abs(Number(row?.comprado || 0)) > 0 || Math.abs(Number(row?.donado || 0)) > 0 || Math.abs(Number(row?.pendiente || 0)) > 0; }
   function destinoRows(){
-    // v46.8: se calcula aquÃ­ para garantizar cabeceras y ordenaciÃ³n homogÃ©nea en los globos.
+    // v46.8: se calcula aquí para garantizar cabeceras y ordenación homogénea en los globos.
     const compras = comprasRows();
     const destinos = Array.from(new Set(compras.map(c => c.producto?.destino || productoBy(c.productoId)?.destino || 'Sin destino'))).filter(Boolean);
     return destinos.map(k => {
@@ -730,7 +730,7 @@
     const g = chartData(); const sig = chartSignature(g);
     const own = wrap.firstElementChild?.classList?.contains('ce-v434-chart-layout-shell') && wrap.children.length === 1;
     if(own && lastChartSignature === sig && options.force !== true) return;
-    const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>DistribuciÃ³n general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
+    const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = sig;
     wrap.dataset.ceStableChart = 'v46.8';
@@ -763,7 +763,7 @@
         table.push(raw.split('|').map(s => s.trim())); return;
       }
       flush();
-      const html = esc(raw).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*â‚¬|\d+(?:,\d{2})?\s*â‚¬)/g,'<strong>$1</strong>');
+      const html = esc(raw).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*€|\d+(?:,\d{2})?\s*€)/g,'<strong>$1</strong>');
       if(/^(TOTAL|INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE|GAST|SALDO|VALORACION|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS)/i.test(raw.trim())) parts.push('<div class="ce-v21-title">' + html + '</div>');
       else parts.push('<div class="ce-v21-text">' + html + '</div>');
     });

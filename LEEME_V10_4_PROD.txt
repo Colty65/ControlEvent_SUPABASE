@@ -1,8 +1,8 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Cambios principales:
-- CorrecciÃ³n de Ticket Auto: error productScore is not defined.
+- Corrección de Ticket Auto: error productScore is not defined.
 - Descarga real de justificantes en INGRESOS.
 - Descarga en DOCUMENTOS sin abrir el visor ni bloquear la app.
-- Visor TKxx mÃ¡s robusto: imÃ¡genes localizadas por evento+TKxx, tambiÃ©n desde Mapa de recursos.
-- VersiÃ³n actualizada a v13.0_prod en referencias activas.
+- Visor TKxx más robusto: imágenes localizadas por evento+TKxx, también desde Mapa de recursos.
+- Versión actualizada a v13.0_prod en referencias activas.

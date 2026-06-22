@@ -1,21 +1,21 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Cambios principales:
-- VersiÃ³n subida a v13.0_prod en referencias activas, cabecera, package y exportaciones BACKUP/INFOEVENTO.
-- Visor comÃºn de fotos de ticket para RESUMEN PRESUPUESTARIO/CÃ¡lculos por tienda y ticket y MAPA DE RECURSOS:
-  arriba muestra tÃ­tulo del evento en verde/rojo segÃºn En curso/Finalizado;
+- Versión subida a v13.0_prod en referencias activas, cabecera, package y exportaciones BACKUP/INFOEVENTO.
+- Visor común de fotos de ticket para RESUMEN PRESUPUESTARIO/Cálculos por tienda y ticket y MAPA DE RECURSOS:
+  arriba muestra título del evento en verde/rojo según En curso/Finalizado;
   debajo muestra TKxx, TIENDA y Responsable;
   debajo muestra Total ticket;
-  despuÃ©s muestra las lÃ­neas contables del ticket.
-- En Mapa de recursos, el cierre del visor se refuerza tambiÃ©n en eventos Finalizados y el botÃ³n Cerrar queda abajo a la derecha.
-- En Mapa de recursos, la imagen del TKxx se recarga estrictamente por eventId+TKxx para evitar fotos cruzadas; si no hay imagen muestra â€œNo hay imagen del ticket.â€.
-- Refuerzo de carga por evento: mÃ¡s reintentos y fallback de lectura completa si una respuesta scoped llega vacÃ­a de forma transitoria.
+  después muestra las líneas contables del ticket.
+- En Mapa de recursos, el cierre del visor se refuerza también en eventos Finalizados y el botón Cerrar queda abajo a la derecha.
+- En Mapa de recursos, la imagen del TKxx se recarga estrictamente por eventId+TKxx para evitar fotos cruzadas; si no hay imagen muestra “No hay imagen del ticket.”.
+- Refuerzo de carga por evento: más reintentos y fallback de lectura completa si una respuesta scoped llega vacía de forma transitoria.
 - Ticket Auto: mensajes de error en la cabecera en rojo y negrita.
-- Ticket Auto: bÃºsqueda inteligente de productos similares en PRODUCTOS antes de presentar la lÃ­nea. Ejemplo: si la IA lee UTANO y existe BUTANO, propone BUTANO.
-- Ticket Auto: SEGMENTO y DESTINO quedan editables tambiÃ©n para productos existentes.
+- Ticket Auto: búsqueda inteligente de productos similares en PRODUCTOS antes de presentar la línea. Ejemplo: si la IA lee UTANO y existe BUTANO, propone BUTANO.
+- Ticket Auto: SEGMENTO y DESTINO quedan editables también para productos existentes.
 - Ticket Auto: al procesar, PRODUCTOS actualiza precio, tienda habitual, SEGMENTO y DESTINO si el usuario los ha corregido.
-- Backend: la ruta de actualizaciÃ³n de precio de productos admite tambiÃ©n SEGMENTO y DESTINO desde Ticket Auto.
-- BotÃ³n de compartir/proyectar pantalla reforzado con acciÃ³n directa y panel real: pantalla completa, compartir del sistema, Presentation API si existe, captura de pantalla y copiar URL.
+- Backend: la ruta de actualización de precio de productos admite también SEGMENTO y DESTINO desde Ticket Auto.
+- Botón de compartir/proyectar pantalla reforzado con acción directa y panel real: pantalla completa, compartir del sistema, Presentation API si existe, captura de pantalla y copiar URL.
 
 Validaciones realizadas:
 - node --check en v10-2-ticketauto-compras.js
@@ -24,4 +24,4 @@ Validaciones realizadas:
 - node --check en lib/supabase-normalized.js
 - node --check en services/receipt-ai.service.js
 - node --check en routes/crud.routes.js
-- JSON vÃ¡lido en package.json y package-lock.json
+- JSON válido en package.json y package-lock.json

@@ -1,10 +1,10 @@
-﻿/* ControlEvent v13.0_prod - Alta asistida para lectura de tickets de compra.
+/* ControlEvent v13.0_prod - Alta asistida para lectura de tickets de compra.
    FIX v9.5: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
 function money(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  let s = text(value).replace(/â‚¬/g, '').replace(/\s/g, '').trim();
+  let s = text(value).replace(/€/g, '').replace(/\s/g, '').trim();
   if (!s) return 0;
   const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
   if (c !== -1 && d !== -1) s = c > d ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
@@ -16,7 +16,7 @@ function money(value) {
 function cleanName(value) {
   return text(value)
     .replace(/\s+/g, ' ')
-    .replace(/^[*\-â€¢#\s]+/, '')
+    .replace(/^[*\-•#\s]+/, '')
     .replace(/[\s:;,.]+$/, '')
     .trim();
 }
@@ -63,47 +63,47 @@ function jsonInstruction(extraInstructions = '', context = {}) {
   const responsables = Array.isArray(context.responsables) ? context.responsables.map(x => text(x).trim()).filter(Boolean).slice(0, 120) : [];
   const tiendas = Array.isArray(context.tiendas) ? context.tiendas.map(x => text(x).trim()).filter(Boolean).slice(0, 120) : [];
   const knownContext = `${responsables.length ? `\nResponsables existentes en PERSONAS/SOCIO que puedes seleccionar si el usuario lo indica: ${responsables.join(', ')}.` : ''}${tiendas.length ? `\nTiendas existentes en TIENDAS que puedes seleccionar si reconoces o el usuario indica una: ${tiendas.join(', ')}.` : ''}`;
-  return `Eres un asistente de extracciÃ³n de tickets de compra para una app de gestiÃ³n de eventos.
+  return `Eres un asistente de extracción de tickets de compra para una app de gestión de eventos.
 
-Lee la imagen del ticket/factura y devuelve SOLO JSON vÃ¡lido, sin markdown.
+Lee la imagen del ticket/factura y devuelve SOLO JSON válido, sin markdown.
 
 Formato obligatorio:
 {
   "proveedor": "nombre comercio si aparece",
-  "responsable": "nombre responsable si el usuario lo indica o aparece, si no cadena vacÃ­a",
-  "fecha": "YYYY-MM-DD si aparece o cadena vacÃ­a",
-  "ticket": "TKxx si aparece escrito en la foto o en indicaciones, si no cadena vacÃ­a",
+  "responsable": "nombre responsable si el usuario lo indica o aparece, si no cadena vacía",
+  "fecha": "YYYY-MM-DD si aparece o cadena vacía",
+  "ticket": "TKxx si aparece escrito en la foto o en indicaciones, si no cadena vacía",
   "total": numero,
   "productos": [
-    {"orden":1, "descripcion":"texto artÃ­culo", "unidades":numero, "precio":numero, "importe":numero, "segmento":"", "destino":"", "confianza":numero_0_a_1, "notas":""}
+    {"orden":1, "descripcion":"texto artículo", "unidades":numero, "precio":numero, "importe":numero, "segmento":"", "destino":"", "confianza":numero_0_a_1, "notas":""}
   ],
   "advertencias": []
 }
 
 Reglas principales:
-- Si aparece escrito en la foto o en las indicaciones un patrÃ³n TKxx (por ejemplo TK01, TK1, TK 01), devuÃ©lvelo en el campo ticket normalizado como TK01.
+- Si aparece escrito en la foto o en las indicaciones un patrón TKxx (por ejemplo TK01, TK1, TK 01), devuélvelo en el campo ticket normalizado como TK01.
 - Devuelve los productos en el mismo orden vertical en que aparecen en el ticket/foto.
-- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una lÃ­nea de artÃ­culo clara.
-- Si hay cantidad x precio, pon unidades, precio unitario e importe final de esa lÃ­nea.
+- Excluye subtotal, total, IVA, pago con tarjeta, cambio, efectivo, cabeceras y descuentos globales salvo que el descuento sea una línea de artículo clara.
+- Si hay cantidad x precio, pon unidades, precio unitario e importe final de esa línea.
 - Usa punto decimal.
-- Si dudas, conserva la lÃ­nea con confianza baja para que el usuario la revise.
-- Los campos segmento y destino se devuelven vacÃ­os salvo que el usuario los indique expresamente o sean evidentes por la indicaciÃ³n adicional.
-- El campo responsable se devuelve vacÃ­o salvo que el usuario indique de forma explÃ­cita un responsable o aparezca de forma clara en las indicaciones. Si coincide con un responsable existente, usa exactamente el nombre existente.
-- No uses MATERIAL como segmento. Para carbÃ³n, vasos, platos, hielo, bolsas, servilletas o similares, usa INFRAESTRUCTURA si procede o deja segmento vacÃ­o si no estÃ¡s seguro.
+- Si dudas, conserva la línea con confianza baja para que el usuario la revise.
+- Los campos segmento y destino se devuelven vacíos salvo que el usuario los indique expresamente o sean evidentes por la indicación adicional.
+- El campo responsable se devuelve vacío salvo que el usuario indique de forma explícita un responsable o aparezca de forma clara en las indicaciones. Si coincide con un responsable existente, usa exactamente el nombre existente.
+- No uses MATERIAL como segmento. Para carbón, vasos, platos, hielo, bolsas, servilletas o similares, usa INFRAESTRUCTURA si procede o deja segmento vacío si no estás seguro.
 
 IMPORTANTE SOBRE INDICACIONES DEL USUARIO:
-- Las indicaciones adicionales del usuario tienen prioridad como correcciÃ³n manual de ESTA factura/ticket.
-- Si el usuario dice que falta una lÃ­nea, o pide aÃ±adir/incluir una lÃ­nea concreta, debes aÃ±adirla a productos aunque no la hayas detectado visualmente. Pon confianza 0.05 y en notas "AÃ±adida por indicaciÃ³n del usuario".
-- Si el usuario indica SEGMENTO y/o DESTINO para una lÃ­nea, copia esos valores exactamente en los campos segmento y destino de esa lÃ­nea, salvo el segmento MATERIAL que ya no debe proponerse.
+- Las indicaciones adicionales del usuario tienen prioridad como corrección manual de ESTA factura/ticket.
+- Si el usuario dice que falta una línea, o pide añadir/incluir una línea concreta, debes añadirla a productos aunque no la hayas detectado visualmente. Pon confianza 0.05 y en notas "Añadida por indicación del usuario".
+- Si el usuario indica SEGMENTO y/o DESTINO para una línea, copia esos valores exactamente en los campos segmento y destino de esa línea, salvo el segmento MATERIAL que ya no debe proponerse.
 - Si el usuario indica RESPONSABLE, encargado o persona concreta, devuelve ese nombre en el campo responsable y no lo ignores.
-- Si el usuario indica cÃ³mo aplicar IVA, recargo, descuento o cualquier regla de cÃ¡lculo, recalcula precio e importe siguiendo esa indicaciÃ³n y aÃ±ade advertencia breve explicando que se aplicÃ³.
-- Si las lÃ­neas visibles no cuadran con el total y el usuario explica la diferencia, aplica su explicaciÃ³n.
+- Si el usuario indica cómo aplicar IVA, recargo, descuento o cualquier regla de cálculo, recalcula precio e importe siguiendo esa indicación y añade advertencia breve explicando que se aplicó.
+- Si las líneas visibles no cuadran con el total y el usuario explica la diferencia, aplica su explicación.
 ${knownContext}
 ${extra ? `
 Indicaciones adicionales del usuario para ESTA factura/ticket:
 ${extra}
 
-Relee las indicaciones anteriores y aplÃ­calas de forma efectiva en el JSON final.` : ''}`;
+Relee las indicaciones anteriores y aplícalas de forma efectiva en el JSON final.` : ''}`;
 }
 function dataUrlParts(dataUrl) {
   const match = /^data:([^;]+);base64,(.+)$/i.exec(text(dataUrl).trim());
@@ -124,7 +124,7 @@ function parseJsonStrictish(outText, provider) {
   let parsed;
   try { parsed = JSON.parse(stripJsonText(outText)); }
   catch (error) {
-    const err = new Error(`${provider} no devolviÃ³ JSON vÃ¡lido.`);
+    const err = new Error(`${provider} no devolvió JSON válido.`);
     err.status = 502;
     err.raw = text(outText).slice(0, 2000);
     throw err;
@@ -232,7 +232,7 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
   }
   const outText = payload.output_text || payload.output?.flatMap(o => o.content || []).map(c => c.text || '').join('\n') || '';
   if (!outText.trim()) {
-    const err = new Error('OpenAI no devolviÃ³ texto analizable.');
+    const err = new Error('OpenAI no devolvió texto analizable.');
     err.status = 502;
     throw err;
   }
@@ -264,19 +264,19 @@ function ticketSchemaRest() {
       total: { type: 'NUMBER', description: 'Importe total del ticket' },
       productos: {
         type: 'ARRAY',
-        description: 'Lista de artÃ­culos individuales comprados, en el mismo orden vertical del ticket',
+        description: 'Lista de artículos individuales comprados, en el mismo orden vertical del ticket',
         items: {
           type: 'OBJECT',
           properties: {
-            orden: { type: 'NUMBER', description: 'Orden visual de la lÃ­nea en el ticket empezando en 1' },
-            descripcion: { type: 'STRING', description: 'DescripciÃ³n del artÃ­culo' },
+            orden: { type: 'NUMBER', description: 'Orden visual de la línea en el ticket empezando en 1' },
+            descripcion: { type: 'STRING', description: 'Descripción del artículo' },
             unidades: { type: 'NUMBER', description: 'Cantidad o unidades' },
             precio: { type: 'NUMBER', description: 'Precio unitario' },
-            importe: { type: 'NUMBER', description: 'Importe total de esta lÃ­nea' },
-            segmento: { type: 'STRING', description: 'Segmento indicado por el usuario o vacÃ­o' },
-            destino: { type: 'STRING', description: 'Destino indicado por el usuario o vacÃ­o' },
+            importe: { type: 'NUMBER', description: 'Importe total de esta línea' },
+            segmento: { type: 'STRING', description: 'Segmento indicado por el usuario o vacío' },
+            destino: { type: 'STRING', description: 'Destino indicado por el usuario o vacío' },
             confianza: { type: 'NUMBER', description: 'Confianza entre 0 y 1' },
-            notas: { type: 'STRING', description: 'Aviso breve si la lÃ­nea es dudosa' }
+            notas: { type: 'STRING', description: 'Aviso breve si la línea es dudosa' }
           },
           required: ['orden', 'descripcion', 'unidades', 'precio', 'importe', 'segmento', 'destino', 'confianza', 'notas']
         }
@@ -294,7 +294,7 @@ function decorateGeminiError(err, model, payload) {
 }
 function isRetryableGeminiError(err) {
   const m = text(err?.message || err?.details?.error?.message || '');
-  return /400|404|not found|not supported|model|429|quota|RESOURCE_EXHAUSTED|rate.?limit|l[iÃ­]mite|unavailable|503|INVALID_ARGUMENT/i.test(m);
+  return /400|404|not found|not supported|model|429|quota|RESOURCE_EXHAUSTED|rate.?limit|l[ií]mite|unavailable|503|INVALID_ARGUMENT/i.test(m);
 }
 function geminiOutText(payload) {
   return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || '';
@@ -331,7 +331,7 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '', respo
   }
   const outText = text(geminiOutText(payload)).trim();
   if (!outText) {
-    const err = new Error('Gemini no devolviÃ³ texto analizable.');
+    const err = new Error('Gemini no devolvió texto analizable.');
     err.status = 502;
     throw decorateGeminiError(err, model, payload);
   }
@@ -340,14 +340,14 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '', respo
 async function callGemini({ dataUrl, instrucciones = '', responsables = [], tiendas = [] }) {
   const apiKey = geminiKey();
   if (!apiKey) {
-    const err = new Error('Falta GEMINI_API_KEY en Vercel. TambiÃ©n se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
+    const err = new Error('Falta GEMINI_API_KEY en Vercel. También se admite GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o, provisionalmente, OPENAI_API_KEY si contiene una clave de Gemini.');
     err.status = 503;
     err.proveedorIa = 'gemini';
     throw err;
   }
   const parts = dataUrlParts(dataUrl);
   if (!parts || !parts.base64) {
-    const err = new Error('La imagen no estÃ¡ en formato data:image/...;base64,...');
+    const err = new Error('La imagen no está en formato data:image/...;base64,...');
     err.status = 400;
     err.proveedorIa = 'gemini';
     throw err;
@@ -360,7 +360,7 @@ async function callGemini({ dataUrl, instrucciones = '', responsables = [], tien
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v13.0_prod Alta IA] Gemini REST fallÃ³ con ${model}; se probarÃ¡ otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v13.0_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -382,7 +382,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
     throw err;
   }
   if (src.length > 20 * 1024 * 1024) {
-    const err = new Error('Imagen demasiado grande para analizar con la IA. Reduce la foto o recÃ³rtala.');
+    const err = new Error('Imagen demasiado grande para analizar con la IA. Reduce la foto o recórtala.');
     err.status = 413;
     throw err;
   }
@@ -392,7 +392,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v13.0_prod Alta IA] OpenAI fallÃ³; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v13.0_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;

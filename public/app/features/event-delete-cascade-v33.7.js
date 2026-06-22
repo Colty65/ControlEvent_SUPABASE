@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Baja segura de evento con eliminaciÃ³n en cascada controlada.
-   Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imÃ¡genes de tickets.
+/* ControlEvent v13.0_prod - Baja segura de evento con eliminación en cascada controlada.
+   Elimina EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
    No elimina PERSONAS, TIENDAS ni PRODUCTOS generales. */
 (function(){
   'use strict';
@@ -91,30 +91,30 @@
     const docs = (state.eventDocuments || []).filter(x => String(x.eventId || '') === String(eventId));
 
     const msg = [
-      'ATENCIÃ“N: baja definitiva de evento.',
+      'ATENCIÓN: baja definitiva de evento.',
       '',
-      'Evento: ' + esc(ev.titulo || 'sin tÃ­tulo'),
+      'Evento: ' + esc(ev.titulo || 'sin título'),
       '',
-      'Se eliminarÃ¡:',
-      'â€¢ El propio evento.',
-      'â€¢ Ingresos/colaboradores del evento: ' + ingresos.length,
-      'â€¢ Compras/gastos del evento: ' + comprasNoDon,
-      'â€¢ Donaciones de producto del evento: ' + donaciones.length,
-      'â€¢ ImÃ¡genes de tickets/documentos del evento: ' + ticketImgs,
-      'â€¢ Fichas de documentos del evento: ' + docs.length,
+      'Se eliminará:',
+      '• El propio evento.',
+      '• Ingresos/colaboradores del evento: ' + ingresos.length,
+      '• Compras/gastos del evento: ' + comprasNoDon,
+      '• Donaciones de producto del evento: ' + donaciones.length,
+      '• Imágenes de tickets/documentos del evento: ' + ticketImgs,
+      '• Fichas de documentos del evento: ' + docs.length,
       '',
-      'NO se eliminarÃ¡n PERSONAS, TIENDAS ni PRODUCTOS de las tablas generales, aunque solo hayan intervenido en este evento.',
+      'NO se eliminarán PERSONAS, TIENDAS ni PRODUCTOS de las tablas generales, aunque solo hayan intervenido en este evento.',
       '',
-      'Esta operaciÃ³n no se puede deshacer salvo restaurando un BACKUP.',
+      'Esta operación no se puede deshacer salvo restaurando un BACKUP.',
       '',
-      'Â¿Quieres continuar?'
+      '¿Quieres continuar?'
     ].join('\n');
     let ok = false;
     try{ ok = confirm(msg); }catch(_){ ok = false; }
     if(!ok) return;
 
     let ok2 = false;
-    try{ ok2 = confirm('ConfirmaciÃ³n final: Â¿eliminar definitivamente el evento "' + esc(ev.titulo || '') + '" y todos sus ingresos/compras/donaciones?'); }catch(_){ ok2 = false; }
+    try{ ok2 = confirm('Confirmación final: ¿eliminar definitivamente el evento "' + esc(ev.titulo || '') + '" y todos sus ingresos/compras/donaciones?'); }catch(_){ ok2 = false; }
     if(!ok2) return;
 
     const prevDisabled = !!button.disabled;
@@ -123,7 +123,7 @@
       await deleteTicketImagesServer(eventId);
     }catch(err){
       button.disabled = prevDisabled;
-      try{ alert('No se han podido eliminar las fotos del evento en servidor. No se da de baja el evento para evitar referencias huÃ©rfanas.\n\n' + (err?.message || err)); }catch(_){ }
+      try{ alert('No se han podido eliminar las fotos del evento en servidor. No se da de baja el evento para evitar referencias huérfanas.\n\n' + (err?.message || err)); }catch(_){ }
       return;
     }
 

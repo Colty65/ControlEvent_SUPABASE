@@ -1,4 +1,4 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 ==========================
 
 Cambios incluidos:
@@ -6,33 +6,33 @@ Cambios incluidos:
 1) Ventana Ticket IA / COMPRAS
 - Al abrir la ventana queda limpia totalmente.
 - Ya no quedan compras previstas de usos anteriores.
-- Ya no se preselecciona automÃ¡ticamente el primer TKxx libre.
-- El botÃ³n Limpiar hace la misma limpieza total.
+- Ya no se preselecciona automáticamente el primer TKxx libre.
+- El botón Limpiar hace la misma limpieza total.
 
 2) Aprovechamiento de pantalla
-- Eliminadas las lÃ­neas explicativas que ocupaban altura.
-- Eliminado el rÃ³tulo "Indicaciones adicionales para Gemini".
-- Eliminada la lÃ­nea de foto cargada como fila independiente.
-- Eliminada la explicaciÃ³n de compras previstas.
-- Eliminada la lÃ­nea de conteo/resumen de compras Pte.Compra.
-- Los mensajes pasan a la cabecera, a la derecha del tÃ­tulo "Alta asistida de COMPRAS".
+- Eliminadas las líneas explicativas que ocupaban altura.
+- Eliminado el rótulo "Indicaciones adicionales para Gemini".
+- Eliminada la línea de foto cargada como fila independiente.
+- Eliminada la explicación de compras previstas.
+- Eliminada la línea de conteo/resumen de compras Pte.Compra.
+- Los mensajes pasan a la cabecera, a la derecha del título "Alta asistida de COMPRAS".
 
 3) Botones compactos y activos
-- Analizar IA, AÃ±adir manual y Limpiar son iconos mÃ¡s pequeÃ±os.
+- Analizar IA, Añadir manual y Limpiar son iconos más pequeños.
 - Quedan repartidos en la fila: izquierda, centro y derecha.
 - Procesar queda abajo a la izquierda.
 - Recargar evento queda abajo a la derecha.
-- Actualizar compras previstas pasa a icono pequeÃ±o y refresca la lista.
+- Actualizar compras previstas pasa a icono pequeño y refresca la lista.
 - Se eliminan los textos tipo tooltip/title de estos iconos para no mostrar globos molestos.
 
 4) Compras previstas
 - El bloque pasa a llamarse: "Compras previstas del evento. Marca para eliminar las ya compradas en este ticket".
-- La lista ocupa el resto de ventana disponible debajo de las lÃ­neas IA/manuales.
-- La tabla IA/manual se compacta para mostrar hasta 6 lÃ­neas aproximadamente.
+- La lista ocupa el resto de ventana disponible debajo de las líneas IA/manuales.
+- La tabla IA/manual se compacta para mostrar hasta 6 líneas aproximadamente.
 
 5) Avisos negros inferiores
-- Reforzada la eliminaciÃ³n de avisos flotantes negros antiguos en COMPRAS.
-- Los avisos tÃ©cnicos quedan como consola, no como cartel inferior molesto.
+- Reforzada la eliminación de avisos flotantes negros antiguos en COMPRAS.
+- Los avisos técnicos quedan como consola, no como cartel inferior molesto.
 
 Ficheros principales:
 - public/app/features/v9-5-2-ticketauto-compras.js

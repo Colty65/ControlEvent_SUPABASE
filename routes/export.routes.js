@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import ExcelJS from 'exceljs';
 import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
@@ -123,7 +123,7 @@ async function fetchAllSupabaseRows(makeQuery, pageSize = 1000){
     if(rows.length < pageSize) break;
     from += pageSize;
     if(from > 200000){
-      throw new Error('ExportaciÃ³n detenida por seguridad: demasiadas filas al paginar Supabase.');
+      throw new Error('Exportación detenida por seguridad: demasiadas filas al paginar Supabase.');
     }
   }
   return all;
@@ -401,7 +401,7 @@ function liveCanonicalInfo(key, value, liveIndex, scopedEventIds){
         if(exact) return exact;
         const tk = ticketToken(tkInner);
         const candidates = liveIndex.byEventToken.get(`${ev}|${tk}`);
-        // Solo se permite resolver una clave reducida TKxx si en ese evento hay una Ãºnica compra viva con ese TKxx.
+        // Solo se permite resolver una clave reducida TKxx si en ese evento hay una única compra viva con ese TKxx.
         if(candidates && candidates.size === 1) return liveIndex.index.get([...candidates][0]);
       }
     }
@@ -469,7 +469,7 @@ function countsFor(state){
 }
 function setupWorkbook(){
   const wb = new ExcelJS.Workbook();
-  wb.creator = `${BACKUP_VERSION} - Â©oltyLAB '26`;
+  wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`;
   wb.created = new Date();
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
   function sheet(name, headers){
@@ -525,7 +525,7 @@ function backupVersionText(value){
   return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
 }
 function enforceBackupVersion(wb){
-  try{ wb.creator = `${BACKUP_VERSION} - Â©oltyLAB '26`; }catch(_){ }
+  try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }
   try{ wb.lastModifiedBy = BACKUP_VERSION; }catch(_){ }
   try{
     (wb.worksheets || []).forEach(ws => {
@@ -585,13 +585,13 @@ async function buildBackupWorkbook(fullState, scope){
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
     ['TOTAL_ORIGEN_PRODUCTOS', totalCounts.productos],
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
-    ['NOTA', 'ExportaciÃ³n generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
+    ['NOTA', 'Exportación generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
   ]);
   addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
-  try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$â‚¬-C0A]'; }catch(_){ }
+  try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
   addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
   addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], rawCompraRows.map(c => [
     c.id || '', c.event_id || '', c.producto_id || '', c.unidades == null ? '' : c.unidades, c.precio == null ? '' : c.precio, c.ticket_donacion || '', c.tienda_id || '', c.responsable_id || '', c.donor_ref || '', c.created_at || '', c.updated_at || ''

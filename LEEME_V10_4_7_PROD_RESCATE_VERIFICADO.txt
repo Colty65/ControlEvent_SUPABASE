@@ -1,4 +1,4 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Base: CE_v13.0_prod_RESCATE_AFINADO.zip
 
@@ -11,7 +11,7 @@ Cambios aplicados:
 - routes/export.routes.js actualizado a:
   * ControlEvent v13.0_prod
   * ControlEvent_v13.0_prod
-- Parcheados los mÃ³dulos activos que podÃ­an normalizar nombres de INFOEVENTO/BACKUP con ControlEvent_v13.0_prod:
+- Parcheados los módulos activos que podían normalizar nombres de INFOEVENTO/BACKUP con ControlEvent_v13.0_prod:
   * v40-fixes.js
   * v7-3-prod-final-fix.js
   * v50-24-final-fixes.js
@@ -22,32 +22,32 @@ Cambios aplicados:
 
 2) Ticket Auto
 - Nuevo script activo: public/app/features/v10-4-7-ticketauto-compras.js.
-- Ya no se sustituye automÃ¡ticamente el producto leÃ­do en el ticket por el nombre parecido encontrado en PRODUCTOS.
-- El literal leÃ­do por la IA se mantiene en la lÃ­nea.
+- Ya no se sustituye automáticamente el producto leído en el ticket por el nombre parecido encontrado en PRODUCTOS.
+- El literal leído por la IA se mantiene en la línea.
 - El usuario puede elegir manualmente un producto existente desde el desplegable/lista de productos.
-- La grabaciÃ³n en PRODUCTOS solo actualiza un producto existente cuando el nombre elegido coincide de forma exacta/normalizada, no por parecido automÃ¡tico.
-- El emparejamiento con Compras previstas usa parejas Ãºnicas: una lÃ­nea IA no colorea varios pendientes por una palabra genÃ©rica.
+- La grabación en PRODUCTOS solo actualiza un producto existente cuando el nombre elegido coincide de forma exacta/normalizada, no por parecido automático.
+- El emparejamiento con Compras previstas usa parejas únicas: una línea IA no colorea varios pendientes por una palabra genérica.
 - Misma tienda: rojo.
 - Tienda distinta: naranja vivo.
-- No se empareja SAL con ROSAL ni se colorea Fanta limÃ³n solo por compartir LIMÃ“N con TÃ© al limÃ³n.
-- TE al limÃ³n/FUZE Tea limÃ³n y Acuarius/Acuarios se mantienen como similitudes vÃ¡lidas.
+- No se empareja SAL con ROSAL ni se colorea Fanta limón solo por compartir LIMÓN con Té al limón.
+- TE al limón/FUZE Tea limón y Acuarius/Acuarios se mantienen como similitudes válidas.
 
-3) BÃºsquedas COMPRAS/DONACIONES
+3) Búsquedas COMPRAS/DONACIONES
 - Reforzado el buscador para buscar sobre texto real, valores escritos y opciones seleccionadas de cada ficha.
 - Si encuentra, rodea la ficha en rojo.
 - Si no encuentra, no se posiciona en el primer registro por defecto.
 
 4) Descargas INGRESOS/DOCUMENTOS
 - En Documentos se mantiene la descarga que ya funcionaba.
-- En Ingresos se aÃ±ade un refuerzo especÃ­fico por colaborador/justificante usando las claves INGRESO del estado cuando exista foto.
-- El objetivo es dejar una Ãºnica flecha de descarga por justificante.
+- En Ingresos se añade un refuerzo específico por colaborador/justificante usando las claves INGRESO del estado cuando exista foto.
+- El objetivo es dejar una única flecha de descarga por justificante.
 
 5) Mapa de recursos iPad
-- Reducido tamaÃ±o de texto y checkboxes del filtro de responsables tambiÃ©n para iPad.
+- Reducido tamaño de texto y checkboxes del filtro de responsables también para iPad.
 
 Validaciones realizadas:
 - node --check en los JS modificados principales.
 - node --check en routes/export.routes.js.
-- JSON vÃ¡lido en package.json y package-lock.json.
-- RevisiÃ³n con grep de los ficheros activos de versiÃ³n para evitar v10.4.6/v13.0_prod en los mÃ³dulos tocados.
+- JSON válido en package.json y package-lock.json.
+- Revisión con grep de los ficheros activos de versión para evitar v10.4.6/v13.0_prod en los módulos tocados.
 - ZIP comprobado con unzip -t.

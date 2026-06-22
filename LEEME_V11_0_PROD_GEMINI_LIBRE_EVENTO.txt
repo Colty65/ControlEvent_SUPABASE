@@ -1,15 +1,15 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Base: version anterior 10.5 con hotfixes previos.
 
 Nueva funcionalidad:
-- Gemini libre del evento, accesible desde GRAFICAS mediante icono âœ¨ðŸ“Š situado a la derecha del encabezado "GrÃ¡ficas del evento".
+- Gemini libre del evento, accesible desde GRAFICAS mediante icono ✨📊 situado a la derecha del encabezado "Gráficas del evento".
 - Disponible para cualquier usuario: GD, RW y RO.
 - Disponible tanto en eventos En curso como Finalizado.
 - Ventana con:
-  1) tÃ­tulo del evento seleccionado en verde si estÃ¡ En curso y rojo si estÃ¡ Finalizado,
+  1) título del evento seleccionado en verde si está En curso y rojo si está Finalizado,
   2) prompt libre en la parte superior,
-  3) zona de resultado de media pantalla hacia abajo con texto, tablas, grÃ¡ficas y archivos generados.
+  3) zona de resultado de media pantalla hacia abajo con texto, tablas, gráficas y archivos generados.
 
 Backend:
 - Nueva ruta POST /api/event-ai/analyze.
@@ -18,13 +18,13 @@ Backend:
   GEMINI_API_KEY, GOOGLE_API_KEY, CONTROLEVENT_GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, OPENIA_API_KEY o OPENAI_API_KEY si contiene clave Gemini.
 - No escribe en BBDD. Solo lee el estado mediante getState().
 - La IA recibe un contexto compacto con eventos, ingresos, compras, donaciones, pendientes, productos, tiendas, responsables, segmentos, destinos y agregados.
-- Incluye guardia de Ã¡mbito: si la peticiÃ³n no tiene que ver con gestiÃ³n del evento, debe rechazarse.
+- Incluye guardia de ámbito: si la petición no tiene que ver con gestión del evento, debe rechazarse.
 
 Formato de respuesta esperado:
 - Texto explicativo.
-- GrÃ¡ficas estructuradas tipo barras/horizontal/pie representadas en la app.
+- Gráficas estructuradas tipo barras/horizontal/pie representadas en la app.
 - Tablas estructuradas.
 - Archivos textuales descargables si Gemini los genera (CSV, TXT, HTML, JSON).
 
-VersiÃ³n:
+Versión:
 - Cabecera, index, public/index, version.js, package.json, package-lock, BACKUP e INFOEVENTO actualizados a v13.0_prod / ControlEvent_v13.0_prod.

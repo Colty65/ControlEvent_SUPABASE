@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajustes generales: cabecera, bÃºsquedas en finalizados, resumen rÃ¡pido, mapa TK y compartir pantalla. */
+/* ControlEvent v13.0_prod - ajustes generales: cabecera, búsquedas en finalizados, resumen rápido, mapa TK y compartir pantalla. */
 (function(){
   'use strict';
   if(window.__ceV100AppFixes) return; window.__ceV100AppFixes=true;
@@ -28,15 +28,15 @@
   function ensureShareButton(){
     var stack=document.querySelector('.appname-stack'); if(!stack || $('ceShareScreenBtn')) return;
     var actions=stack.querySelector('.user-actions') || stack;
-    var btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn'; btn.className='outline small'; btn.title='Compartir/proyectar pantalla'; btn.setAttribute('aria-label','Compartir/proyectar pantalla'); btn.textContent='ðŸ“º';
+    var btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn'; btn.className='outline small'; btn.title='Compartir/proyectar pantalla'; btn.setAttribute('aria-label','Compartir/proyectar pantalla'); btn.textContent='📺';
     btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); openSharePanel(); });
     actions.insertBefore(btn, actions.firstChild || null);
   }
   function openSharePanel(){
     var old=$('ceShareScreenPanel'); if(old) old.remove();
-    var html='<div id="ceShareScreenPanel"><div class="box"><div class="head"><div>ðŸ“º Compartir / proyectar pantalla</div><button type="button" class="outline small" data-ce-share-close>Cerrar</button></div>'+ 
-      '<div>Para llevar esta misma app a un televisor o proyector de tu red, usa la funciÃ³n de proyecciÃ³n del dispositivo/navegador. Desde aquÃ­ puedes activar pantalla completa y, si el navegador lo permite, abrir el selector nativo de compartir pantalla.</div>'+ 
-      '<div class="actions"><button type="button" class="modify small" data-ce-share-full>â›¶ Pantalla completa</button><button type="button" class="outline small" data-ce-share-capture>ðŸ–¥ï¸ Abrir selector de compartir</button><button type="button" class="outline small" data-ce-share-url>ðŸ”— Copiar URL de esta pantalla</button></div>'+ 
+    var html='<div id="ceShareScreenPanel"><div class="box"><div class="head"><div>📺 Compartir / proyectar pantalla</div><button type="button" class="outline small" data-ce-share-close>Cerrar</button></div>'+ 
+      '<div>Para llevar esta misma app a un televisor o proyector de tu red, usa la función de proyección del dispositivo/navegador. Desde aquí puedes activar pantalla completa y, si el navegador lo permite, abrir el selector nativo de compartir pantalla.</div>'+ 
+      '<div class="actions"><button type="button" class="modify small" data-ce-share-full>⛶ Pantalla completa</button><button type="button" class="outline small" data-ce-share-capture>🖥️ Abrir selector de compartir</button><button type="button" class="outline small" data-ce-share-url>🔗 Copiar URL de esta pantalla</button></div>'+ 
       '<video id="ceSharePreview" autoplay muted playsinline style="display:none"></video></div></div>';
     document.body.insertAdjacentHTML('beforeend',html);
   }
@@ -53,7 +53,7 @@
     var cards=Array.prototype.slice.call(list.querySelectorAll(':scope > .itemcard, :scope .itemcard')).filter(function(c){ return !c.closest('.ce-v434-search,.ce-v413-search,.maint-search'); });
     var found=cards.find(function(c){ var h=rowText(c); return q.every(function(t){return h.indexOf(t)>=0;}); });
     if(found){ try{ found.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ found.scrollIntoView(); } found.classList.add('ce-search-found','mapa-search-found'); setTimeout(function(){ found.classList.remove('ce-search-found','mapa-search-found'); },1800); return true; }
-    try{ alert('No se ha encontrado ningÃºn registro con ese texto.'); }catch(_){}
+    try{ alert('No se ha encontrado ningún registro con ese texto.'); }catch(_){}
     return false;
   }
   function enableFinalizedSearch(){
@@ -86,7 +86,7 @@
   function openTicketDetail(tk){
     tk=trim(tk).toUpperCase().replace(/\s+/g,''); if(!/^TK\d+/.test(tk)) return;
     var rows=eventRowsForTicket(tk), img=ticketImageUrl(tk); var total=rows.reduce(function(a,c){ return a+(Number(c.unidades||0)*Number(c.precio||0)); },0);
-    var html='<div id="ceV100TicketDetail"><div class="box"><div class="head"><div>Factura '+esc(tk)+' Â· '+total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' â‚¬</div><button type="button" class="outline small" data-ce-v100-close>Cerrar</button></div><div class="grid"><div><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+ (rows.length?rows.map(function(c){ var imp=Number(c.unidades||0)*Number(c.precio||0); return '<tr><td>'+esc(nameById('productos',c.productoId||c.producto_id)||c.productoId||c.producto_id)+'</td><td>'+esc(c.unidades||'')+'</td><td>'+Number(c.precio||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+imp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'; }).join(''):'<tr><td colspan="4">Sin lÃ­neas contables para este ticket.</td></tr>')+'</tbody></table></div><div>'+(img?'<img src="'+esc(img)+'" alt="Foto '+esc(tk)+'">':'<div class="empty">No hay foto adjunta para '+esc(tk)+'</div>')+'</div></div></div></div>';
+    var html='<div id="ceV100TicketDetail"><div class="box"><div class="head"><div>Factura '+esc(tk)+' · '+total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €</div><button type="button" class="outline small" data-ce-v100-close>Cerrar</button></div><div class="grid"><div><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+ (rows.length?rows.map(function(c){ var imp=Number(c.unidades||0)*Number(c.precio||0); return '<tr><td>'+esc(nameById('productos',c.productoId||c.producto_id)||c.productoId||c.producto_id)+'</td><td>'+esc(c.unidades||'')+'</td><td>'+Number(c.precio||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+imp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'; }).join(''):'<tr><td colspan="4">Sin líneas contables para este ticket.</td></tr>')+'</tbody></table></div><div>'+(img?'<img src="'+esc(img)+'" alt="Foto '+esc(tk)+'">':'<div class="empty">No hay foto adjunta para '+esc(tk)+'</div>')+'</div></div></div></div>';
     var old=$('ceV100TicketDetail')||$('ceV96TicketDetail'); if(old) old.remove(); document.body.insertAdjacentHTML('beforeend',html);
   }
   function markMapaTickets(){
@@ -111,8 +111,8 @@
   function handleShareClick(ev){
     var close=ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-close]'); if(close){ ev.preventDefault(); var p=$('ceShareScreenPanel'); if(p)p.remove(); return; }
     if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-full]')){ ev.preventDefault(); var de=document.documentElement; if(de.requestFullscreen) de.requestFullscreen().catch(function(){}); return; }
-    if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-url]')){ ev.preventDefault(); var url=location.href; if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ alert('URL copiada. Ãbrela en el dispositivo/proyector o compÃ¡rtela por tu sistema.'); }).catch(function(){ prompt('Copia esta URL:',url); }); else prompt('Copia esta URL:',url); return; }
-    if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-capture]')){ ev.preventDefault(); if(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia){ navigator.mediaDevices.getDisplayMedia({video:true,audio:false}).then(function(stream){ var v=$('ceSharePreview'); if(v){ v.srcObject=stream; v.style.display='block'; } }).catch(function(){}); } else alert('Este navegador no permite abrir el selector de compartir pantalla desde la web. Usa la opciÃ³n de proyectar/duplicar pantalla del dispositivo.'); return; }
+    if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-url]')){ ev.preventDefault(); var url=location.href; if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ alert('URL copiada. Ábrela en el dispositivo/proyector o compártela por tu sistema.'); }).catch(function(){ prompt('Copia esta URL:',url); }); else prompt('Copia esta URL:',url); return; }
+    if(ev.target&&ev.target.closest&&ev.target.closest('[data-ce-share-capture]')){ ev.preventDefault(); if(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia){ navigator.mediaDevices.getDisplayMedia({video:true,audio:false}).then(function(stream){ var v=$('ceSharePreview'); if(v){ v.srcObject=stream; v.style.display='block'; } }).catch(function(){}); } else alert('Este navegador no permite abrir el selector de compartir pantalla desde la web. Usa la opción de proyectar/duplicar pantalla del dispositivo.'); return; }
   }
   function tick(){ injectStyle(); compactHeader(); ensureShareButton(); enableFinalizedSearch(); markMapaTickets(); if($('summaryTiendaTicket') && !tick._hydrated){ tick._hydrated=true; hydrateBurst(); setTimeout(function(){tick._hydrated=false;},1200); } }
   window.addEventListener('click', handleSearchEvents, true);

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - casitas globales, mÃ³vil en donaciones y guardado inmediato de compras/donaciones. */
+/* ControlEvent v13.0_prod - casitas globales, móvil en donaciones y guardado inmediato de compras/donaciones. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -125,7 +125,7 @@
       btn.id = HOME_ID;
       btn.type = 'button';
       btn.className = 'ce-global-floating-home-v412';
-      btn.textContent = 'âŒ‚';
+      btn.textContent = '⌂';
       btn.title = 'Volver al inicio';
       btn.setAttribute('aria-label','Volver al inicio');
       document.body.appendChild(btn);
@@ -141,9 +141,9 @@
     global.classList.toggle('is-visible', showGlobal);
     global.style.pointerEvents = showGlobal ? 'auto' : 'none';
     const map = $('ceMapaFloatingHomeButton');
-    if(map){ const showMap = !!hasEvent() && tab === 'mapa' && !isHidden($('tabMapaProductos')); map.hidden = !showMap; map.classList.toggle('is-visible', showMap); map.textContent = 'âŒ‚'; map.style.pointerEvents = showMap ? 'auto' : 'none'; }
+    if(map){ const showMap = !!hasEvent() && tab === 'mapa' && !isHidden($('tabMapaProductos')); map.hidden = !showMap; map.classList.toggle('is-visible', showMap); map.textContent = '⌂'; map.style.pointerEvents = showMap ? 'auto' : 'none'; }
     const maint = $('ceMaintFloatingTopV40');
-    if(maint){ maint.hidden = !maintOpen; maint.classList.toggle('is-visible', maintOpen); maint.textContent = 'âŒ‚'; maint.style.pointerEvents = maintOpen ? 'auto' : 'none'; }
+    if(maint){ maint.hidden = !maintOpen; maint.classList.toggle('is-visible', maintOpen); maint.textContent = '⌂'; maint.style.pointerEvents = maintOpen ? 'auto' : 'none'; }
     const plan = $('cePlanTopFloat');
     if(plan){ plan.hidden = true; plan.classList.add('hidden'); plan.style.display='none'; plan.style.pointerEvents='none'; }
   }
@@ -160,7 +160,7 @@
     return true;
   }
 
-  function isDelivered(row){ return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÃ')); }
+  function isDelivered(row){ return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ')); }
   function handleDonationDelivered(event){
     const btn = event.target?.closest?.('#tabMapaProductos [data-mapa-donation-toggle="1"]');
     if(!btn) return false;
@@ -238,7 +238,7 @@
     const donorRef = fieldValue(['edit-compra-donante','edit-donacion-donante'], id, scope, c.donorRef || '');
     const donation = isDonationTicket(ticket) || isDonationTicket(c.ticketDonacion || '') || !!scope?.closest?.('#donacionesList');
     if(donation){
-      // v43.7: en modificaciÃ³n no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
       const found = null; // duplicateDonacion(productoId, donorRef, id);
       c.productoId = productoId;
       c.unidades = Number.isFinite(unidades) ? unidades : 0;
@@ -248,7 +248,7 @@
       c.responsableId = responsableId;
     }else{
       const tiendaId = fieldValue('edit-compra-tienda', id, scope, c.tiendaId || '');
-      // v43.7: en modificaciÃ³n no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+      // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
       const found = null; // duplicateCompra(productoId, tiendaId, ticket, id);
       c.productoId = productoId;
       c.unidades = Number.isFinite(unidades) ? unidades : 0;
@@ -274,7 +274,7 @@
     const ticket = fieldValue(['edit-donacion-ticket','edit-compra-ticket'], id, scope, c.ticketDonacion || '');
     const donorRef = fieldValue(['edit-donacion-donante','edit-compra-donante'], id, scope, c.donorRef || '');
     const responsableId = fieldValue(['edit-donacion-responsable','edit-compra-responsable'], id, scope, c.responsableId || '');
-    // v43.7: en modificaciÃ³n no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
+    // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
     const found = null; // duplicateDonacion(productoId, donorRef, id);
     c.productoId = productoId;
     c.unidades = Number.isFinite(unidades) ? unidades : 0;

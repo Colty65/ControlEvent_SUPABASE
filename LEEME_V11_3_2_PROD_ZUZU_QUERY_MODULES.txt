@@ -1,14 +1,14 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Objetivo:
-- Zuzu usa ahora mÃ³dulos de consulta alineados con las querys probadas de ControlEvent.
-- Los mÃ³dulos devuelven registros completos y legibles, sin claves internas p_id/pr_id/t_id.
-- Primero se decide evento(s) y mÃ³dulo(s); despuÃ©s ControlEvent extrae los datos; despuÃ©s Gemini solo analiza/formatea esos datos.
+- Zuzu usa ahora módulos de consulta alineados con las querys probadas de ControlEvent.
+- Los módulos devuelven registros completos y legibles, sin claves internas p_id/pr_id/t_id.
+- Primero se decide evento(s) y módulo(s); después ControlEvent extrae los datos; después Gemini solo analiza/formatea esos datos.
 
-MÃ³dulos principales:
+Módulos principales:
 - INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
 - COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
-- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donaciÃ³n; Donante; Responsable.
+- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
 - EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; DOCxxx.
 - PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
 - TIENDAS: Nombre tienda.
@@ -16,6 +16,6 @@ MÃ³dulos principales:
 
 Notas:
 - DONACIONES resuelve donor_ref P:/T:/id contra PERSONAS y TIENDAS.
-- Si un donor_ref tÃ©cnico no existe en maestro, se muestra "Donante no encontrado en maestro", nunca el id.
-- Los listados y grÃ¡ficas bÃ¡sicas se generan directamente desde ControlEvent, sin que Gemini pueda omitir lÃ­neas.
-- Para anÃ¡lisis mÃ¡s complejos, Gemini recibe estos mÃ³dulos ya extraÃ­dos y legibles.
+- Si un donor_ref técnico no existe en maestro, se muestra "Donante no encontrado en maestro", nunca el id.
+- Los listados y gráficas básicas se generan directamente desde ControlEvent, sin que Gemini pueda omitir líneas.
+- Para análisis más complejos, Gemini recibe estos módulos ya extraídos y legibles.

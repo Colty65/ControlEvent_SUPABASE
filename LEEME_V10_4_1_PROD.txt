@@ -1,9 +1,9 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
-CorrecciÃ³n sobre v13.0_prod:
+Corrección sobre v13.0_prod:
 - Ticket Auto: marca en rojo compras previstas candidatas aunque el texto no coincida literal, usando similitud de producto y coincidencia de precio/importe.
-- INGRESOS: elimina duplicados de botones de descarga y deja un Ãºnico botÃ³n de descarga por justificante/foto.
-- Refresco/cambio de opciÃ³n: cachÃ© por evento y recarga estabilizada para evitar pantallas sin datos por cargas transitorias.
-- Compartir pantalla: panel simplificado para duplicar la pantalla desde Windows/iPad/iPhone/Android; se elimina la opciÃ³n confusa de presentar dispositivo desde Chrome.
+- INGRESOS: elimina duplicados de botones de descarga y deja un único botón de descarga por justificante/foto.
+- Refresco/cambio de opción: caché por evento y recarga estabilizada para evitar pantallas sin datos por cargas transitorias.
+- Compartir pantalla: panel simplificado para duplicar la pantalla desde Windows/iPad/iPhone/Android; se elimina la opción confusa de presentar dispositivo desde Chrome.
 
-Nota tÃ©cnica: una web/PWA no puede seleccionar directamente una TV cercana por seguridad del navegador/sistema operativo. La duplicaciÃ³n real se hace con Win+K en Windows, AirPlay en iPad/iPhone o Cast en Android.
+Nota técnica: una web/PWA no puede seleccionar directamente una TV cercana por seguridad del navegador/sistema operativo. La duplicación real se hace con Win+K en Windows, AirPlay en iPad/iPhone o Cast en Android.

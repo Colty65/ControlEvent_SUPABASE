@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - LowResourceBoot
+/* ControlEvent v13.0_prod - LowResourceBoot
    Modo tactil/turbo para iPad/Android modestos.
    En produccion trabaja sin indicador visible; el panel aparece solo con ?ceDiag=1. */
 (function(){
@@ -14,9 +14,9 @@
   const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   const memory = Number(navigator.deviceMemory || 0);
   const cores = Number(navigator.hardwareConcurrency || 0);
-  const forcedOn = /^(1|true|on|si|sÃ­)$/i.test(params.get('ceLite') || '');
+  const forcedOn = /^(1|true|on|si|sí)$/i.test(params.get('ceLite') || '');
   const forcedOff = /^(0|false|off|no)$/i.test(params.get('ceLite') || '');
-  const diagForced = /^(1|true|on|si|sÃ­)$/i.test(params.get('ceDiag') || '');
+  const diagForced = /^(1|true|on|si|sí)$/i.test(params.get('ceDiag') || '');
   const likelyLowResource = (memory && memory <= 4) || (cores && cores <= 4);
   const detected = isAndroid || isIPad || (coarse && likelyLowResource && !isIPhone);
   const enabled = forcedOn || (!forcedOff && detected);
@@ -133,7 +133,7 @@
   }
   function short(value, max=80){
     const text = String(value ?? '');
-    return text.length > max ? text.slice(0, max - 1) + 'â€¦' : text;
+    return text.length > max ? text.slice(0, max - 1) + '…' : text;
   }
   function getLite(){ try{return window.ControlEventMobileLite?.inspect?.() || null;}catch(_){return null;} }
   function getHotpath(){ try{return window.ControlEventHotpath?.inspect?.() || null;}catch(_){return null;} }
@@ -191,36 +191,36 @@
     const skipped = totals(lite?.skipped);
     const executed = totals(lite?.executed);
     const legacySkips = legacy?.skipped || {};
-    const suppressed = Object.entries(stats.suppressedListeners || {}).map(([k,v]) => `${esc(k)}: ${esc(v)}`).join(' Â· ') || '0';
+    const suppressed = Object.entries(stats.suppressedListeners || {}).map(([k,v]) => `${esc(k)}: ${esc(v)}`).join(' · ') || '0';
     const hotRows = Array.isArray(hot?.rows) ? hot.rows.slice(0, 6) : [];
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
-        <strong>DiagnÃ³stico mÃ³vil ${esc(VERSION)}</strong>
+        <strong>Diagnóstico móvil ${esc(VERSION)}</strong>
         <button type="button" data-ce-lite-close style="border:0;border-radius:10px;padding:6px 9px;background:#111827;color:white">Cerrar</button>
       </div>
       <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:8px;margin-bottom:10px;font-size:13px">
-        <b>Lectura rÃ¡pida:</b> el modo LITE queda oculto en producciÃ³n. Este panel solo aparece con <b>?ceDiag=1</b>; los contadores sirven para diagnÃ³stico interno.
+        <b>Lectura rápida:</b> el modo LITE queda oculto en producción. Este panel solo aparece con <b>?ceDiag=1</b>; los contadores sirven para diagnóstico interno.
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
         <div><b>LowResource</b><br>${enabled ? 'ACTIVO' : 'NO activo'}<br><small>${esc(reason)}</small></div>
         <div><b>MobileLite</b><br>${lite?.installed ? 'INSTALADO' : 'No instalado'} / ${lite?.enabled ? 'ON' : 'OFF'}<br><small>envueltas: ${wrapped}</small></div>
         <div><b>Render visible-only</b><br>ejecutados: ${executed}<br>ocultos evitados: ${skipped}</div>
         <div><b>Legacy Turbo v30.7</b><br>${legacy?.installed ? 'ACTIVO' : 'no instalado'}<br><small>render ligero: ${esc(legacy?.liteRenderCalls || 0)}</small></div>
-        <div><b>Saltos legacy</b><br>budget: ${esc(legacySkips.budget || 0)} Â· grÃ¡ficas: ${esc(legacySkips.graficas || 0)} Â· mant.: ${esc(legacySkips.maintenance || 0)}</div>
-        <div><b>Tab actual</b><br>${esc(lite?.currentTab || legacy?.currentTab || lazy?.current || 'sin dato')}<br><small>pantallas cargadas: ${esc((lazy?.loadedScreens || []).join(', ') || 'â€”')}</small></div>
+        <div><b>Saltos legacy</b><br>budget: ${esc(legacySkips.budget || 0)} · gráficas: ${esc(legacySkips.graficas || 0)} · mant.: ${esc(legacySkips.maintenance || 0)}</div>
+        <div><b>Tab actual</b><br>${esc(lite?.currentTab || legacy?.currentTab || lazy?.current || 'sin dato')}<br><small>pantallas cargadas: ${esc((lazy?.loadedScreens || []).join(', ') || '—')}</small></div>
         <div><b>Intervalos rebajados</b><br>${esc(stats.intervalsAdjusted)}<br><small>los barridos cortos pasan a ~45 s</small></div>
         <div><b>Eventos hover anulados</b><br>${suppressed}</div>
         <div><b>Timeout/RAF suavizados</b><br>${esc(stats.timeoutsAdjusted)} / ${esc(stats.rafAdjusted)}</div>
         <div><b>Scroll suave evitado</b><br>${esc(stats.scrollIntoViewAdjusted)}</div>
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,23,42,.18)">
-        <b>Ãšltima acciÃ³n MobileLite</b><br><small>${esc(short(JSON.stringify(lite?.last || null), 240))}</small>
+        <b>Última acción MobileLite</b><br><small>${esc(short(JSON.stringify(lite?.last || null), 240))}</small>
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,23,42,.18)">
-        <b>Cache Hotpath</b><br><small>${hot ? `cache: ${esc(hot.cacheSize)} Â· funciones: ${esc((hot.cachedFunctions||[]).length)} Â· invalidaciones: ${esc((hot.invalidations||[]).length)}` : 'sin dato'}</small>
-        ${hotRows.length ? `<table style="width:100%;font-size:12px;margin-top:6px;border-collapse:collapse"><tr><th style="text-align:left">FunciÃ³n</th><th>Hits</th><th>Ms</th></tr>${hotRows.map(row => `<tr><td style="border-top:1px solid #e5e7eb">${esc(row.name)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.hits)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.totalMs)}</td></tr>`).join('')}</table>` : ''}
+        <b>Cache Hotpath</b><br><small>${hot ? `cache: ${esc(hot.cacheSize)} · funciones: ${esc((hot.cachedFunctions||[]).length)} · invalidaciones: ${esc((hot.invalidations||[]).length)}` : 'sin dato'}</small>
+        ${hotRows.length ? `<table style="width:100%;font-size:12px;margin-top:6px;border-collapse:collapse"><tr><th style="text-align:left">Función</th><th>Hits</th><th>Ms</th></tr>${hotRows.map(row => `<tr><td style="border-top:1px solid #e5e7eb">${esc(row.name)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.hits)}</td><td style="text-align:center;border-top:1px solid #e5e7eb">${esc(row.totalMs)}</td></tr>`).join('')}</table>` : ''}
       </div>
-      <div style="margin-top:10px;font-size:12px;color:#4b5563">Pruebas: <b>?ceLite=1</b> fuerza el modo ligero. <b>?ceLite=0</b> lo desactiva. <b>?ceDiag=1</b> muestra este diagnÃ³stico.</div>
+      <div style="margin-top:10px;font-size:12px;color:#4b5563">Pruebas: <b>?ceLite=1</b> fuerza el modo ligero. <b>?ceLite=0</b> lo desactiva. <b>?ceDiag=1</b> muestra este diagnóstico.</div>
     `;
   }
 
@@ -231,8 +231,8 @@
     const badge = document.createElement('button');
     badge.type = 'button';
     badge.id = 'ceLowResourceBadge';
-    badge.textContent = enabled ? 'âš¡ LITE DIAG ON' : 'âš¡ LITE DIAG OFF';
-    badge.title = 'Ver diagnÃ³stico de rendimiento mÃ³vil';
+    badge.textContent = enabled ? '⚡ LITE DIAG ON' : '⚡ LITE DIAG OFF';
+    badge.title = 'Ver diagnóstico de rendimiento móvil';
     badge.style.cssText = 'position:fixed;right:10px;bottom:72px;z-index:3000;border:0;border-radius:999px;padding:8px 11px;font:700 12px system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 8px 22px rgba(15,23,42,.25);background:' + (enabled ? '#16a34a' : '#6b7280') + ';color:white;opacity:.92';
     badge.addEventListener('click', () => openPanel(), true);
     document.body.appendChild(badge);
@@ -258,7 +258,7 @@
       const lite = getLite();
       const skipped = totals(lite?.skipped);
       const legacy = getLegacyPatch();
-      badge.textContent = enabled ? `âš¡ LITE DIAG Â· ocultos ${skipped || 0}${legacy?.installed ? ' Â· turbo' : ''}` : 'âš¡ LITE DIAG OFF';
+      badge.textContent = enabled ? `⚡ LITE DIAG · ocultos ${skipped || 0}${legacy?.installed ? ' · turbo' : ''}` : '⚡ LITE DIAG OFF';
     }
     const panel = document.getElementById('ceLowResourcePanel');
     if(panel && panel.style.display !== 'none') panel.innerHTML = panelHtml();

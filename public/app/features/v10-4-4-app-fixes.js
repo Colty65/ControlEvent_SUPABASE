@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - RESCATE ESTABLE
-   - Sin ocultaciÃ³n prelogin ni bienvenida experimental.
-   - Sin intervalos ni renders automÃ¡ticos.
+/* ControlEvent v13.0_prod - RESCATE ESTABLE
+   - Sin ocultación prelogin ni bienvenida experimental.
+   - Sin intervalos ni renders automáticos.
    - Limpia duplicados de descarga en Documentos/Ingresos sin tocar miniaturas.
    - Mantiene visible la app tras login y evita clases residuales de hotfix anteriores. */
 (function(){
@@ -71,7 +71,7 @@
       if(seen.indexOf(card)>=0) return;
       seen.push(card);
       var btn=document.createElement('button');
-      btn.type='button'; btn.textContent='â¬‡ï¸'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto');
+      btn.type='button'; btn.textContent='⬇️'; btn.title='Descargar foto'; btn.setAttribute('aria-label','Descargar foto');
       btn.className='outline small '+btnClass+' ce-v1044-download';
       btn.onclick=function(ev){ stop(ev); return downloadSrc(img.currentSrc||img.src, namePrefix+'_'+(idx+1)); };
       try{ img.insertAdjacentElement('afterend', btn); }catch(_){ try{ card.appendChild(btn); }catch(__){} }
@@ -86,7 +86,7 @@
   function run(){ injectStyle(); removeBadClasses(); applyVersion(); tidyDownloads(); }
   document.addEventListener('click', function(ev){
     if(ev.target && ev.target.closest && ev.target.closest('.ce-v1044-download')){
-      // onclick del botÃ³n harÃ¡ la descarga; este listener solo blinda que no se abra el visor detrÃ¡s.
+      // onclick del botón hará la descarga; este listener solo blinda que no se abra el visor detrás.
       ev.stopPropagation();
     }
   }, true);

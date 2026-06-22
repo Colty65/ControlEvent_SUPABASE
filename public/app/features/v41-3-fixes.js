@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - guardado inmediato, buscadores en compras/donaciones y nuevas grÃ¡ficas. */
+/* ControlEvent v13.0_prod - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -13,7 +13,7 @@
   const cssEsc = v => { try{ return window.CSS?.escape ? CSS.escape(String(v ?? '')) : String(v ?? '').replace(/[^a-zA-Z0-9_-]/g, '\\$&'); }catch(_){ return String(v ?? '').replace(/"/g,'\\"'); } };
   const moneyF = v => {
     try{ return (typeof money === 'function') ? money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }
-    catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v||0).toFixed(2)} €`; }
   };
   const parseEuro = v => {
     try{ if(typeof parseEuroInput === 'function') return parseEuroInput(v); }catch(_){ }
@@ -103,7 +103,7 @@
     const scope = scopeForButton(btn, id);
     const donationContext = !!btn.closest?.('#donacionesList') || isDonation(row.ticketDonacion || '');
     if(donationContext){
-      // En DONACIONES los campos reales son edit-donacion-*. AsÃ­ el refresco visual sale bien a la primera.
+      // En DONACIONES los campos reales son edit-donacion-*. Así el refresco visual sale bien a la primera.
       const ticket = valueForAny(['edit-donacion-ticket','edit-compra-ticket'], id, scope, row.ticketDonacion || '');
       const productoId = valueForAny(['edit-donacion-producto','edit-compra-producto'], id, scope, row.productoId || '');
       const unidades = Number(valueForAny(['edit-donacion-unidades','edit-compra-unidades'], id, scope, row.unidades || 0) || 0);
@@ -223,7 +223,7 @@
     }
     const rd = (typeof renderDonaciones === 'function') ? renderDonaciones : window.renderDonaciones;
     if(rd && !rd.__ceV413Search){
-      const wrapped = function(){ const ret = rd.apply(this, arguments); setTimeout(() => injectSearch('donacionesList','donacionesSearchInput','Buscar donaciÃ³n'), 0); return ret; };
+      const wrapped = function(){ const ret = rd.apply(this, arguments); setTimeout(() => injectSearch('donacionesList','donacionesSearchInput','Buscar donación'), 0); return ret; };
       wrapped.__ceV413Search = true;
       try{ renderDonaciones = wrapped; }catch(_){ }
       window.renderDonaciones = wrapped;
@@ -238,16 +238,16 @@
       if(des) des.style.display = 'none';
       const grid = document.querySelector('#tabResumen .summary-top-grid');
       if(grid) grid.style.display = 'none';
-      const title = Array.from(document.querySelectorAll('#tabResumen h2')).find(h => norm(h.textContent) === 'CÃ¡lculos por agrupaciÃ³n');
+      const title = Array.from(document.querySelectorAll('#tabResumen h2')).find(h => norm(h.textContent) === 'Cálculos por agrupación');
       if(title){
         const card = title.closest('.card');
         const hasOnlyTop = card?.querySelector('#summaryTiendaTicket') ? false : true;
         if(hasOnlyTop) card.style.display = 'none';
         const p = title.parentElement?.querySelector('p');
-        title.textContent = 'CÃ¡lculos por tienda y ticket';
-        if(p) p.textContent = 'Importes por tienda y ticket/donaciÃ³n/otros gastos.';
+        title.textContent = 'Cálculos por tienda y ticket';
+        if(p) p.textContent = 'Importes por tienda y ticket/donación/otros gastos.';
       }
-      const mainTitle = Array.from(document.querySelectorAll('#tabResumen h2')).find(h => /Resumen presupuestario y cÃ¡lculos/i.test(h.textContent||''));
+      const mainTitle = Array.from(document.querySelectorAll('#tabResumen h2')).find(h => /Resumen presupuestario y cálculos/i.test(h.textContent||''));
       if(mainTitle) mainTitle.textContent = 'Resumen presupuestario';
     }catch(_){ }
   }
@@ -259,9 +259,9 @@
     try{ return (typeof comprasForEvent === 'function' ? comprasForEvent() : []).slice(); }catch(_){ return comprasRaw().filter(r => norm(r.eventId) === norm(st().selectedEventId)); }
   }
   function sum(list, field='value'){ return list.reduce((a,b)=>a+Number(field ? (b?.[field] || 0) : (b || 0)),0); }
-  function incomeLines(fn){ return rowsForEvent().filter(fn).map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} â€” ${moneyF(r.total || (Number(r.importe||0) + 0))}`); }
-  function donationLines(ticket){ return buysForEvent().filter(r => norm(r.ticketDonacion) === ticket).map(r => `${donorName(r) || 'Sin donante'} â€” ${r.producto?.nombre || productName(r.productoId) || 'Producto'} â€” ${moneyF(r.valor || Number(r.precio||0)*Number(r.unidades||0))}`); }
-  function expenseLines(fn){ return buysForEvent().filter(fn).map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} â€” ${r.ticketDonacion || 'Pte.Compra'} â€” ${r.producto?.nombre || productName(r.productoId) || 'Producto'} â€” ${moneyF(r.valor || Number(r.precio||0)*Number(r.unidades||0))}`); }
+  function incomeLines(fn){ return rowsForEvent().filter(fn).map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} — ${moneyF(r.total || (Number(r.importe||0) + 0))}`); }
+  function donationLines(ticket){ return buysForEvent().filter(r => norm(r.ticketDonacion) === ticket).map(r => `${donorName(r) || 'Sin donante'} — ${r.producto?.nombre || productName(r.productoId) || 'Producto'} — ${moneyF(r.valor || Number(r.precio||0)*Number(r.unidades||0))}`); }
+  function expenseLines(fn){ return buysForEvent().filter(fn).map(r => `${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} — ${r.ticketDonacion || 'Pte.Compra'} — ${r.producto?.nombre || productName(r.productoId) || 'Producto'} — ${moneyF(r.valor || Number(r.precio||0)*Number(r.unidades||0))}`); }
   function chartParts(){
     const rows = rowsForEvent();
     const compras = buysForEvent();
@@ -329,9 +329,9 @@
         comprado:sum(comprados.map(v), null),
         donado:sum(donados.map(v), null),
         pendiente:sum(pendientes.map(v), null),
-        listComprado:comprados.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${c.ticketDonacion || ''} â€” ${moneyF(v(c))}`),
-        listDonado:donados.map(c=>`${donorName(c)||'Sin donante'} â€” ${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${moneyF(v(c))}`),
-        listPendiente:pendientes.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} â€” ${moneyF(v(c))}`)
+        listComprado:comprados.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${c.ticketDonacion || ''} — ${moneyF(v(c))}`),
+        listDonado:donados.map(c=>`${donorName(c)||'Sin donante'} — ${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${moneyF(v(c))}`),
+        listPendiente:pendientes.map(c=>`${c.producto?.nombre || productName(c.productoId) || 'Producto'} — ${moneyF(v(c))}`)
       };
       row.total = row.comprado + row.donado + row.pendiente;
       return row;
@@ -358,7 +358,7 @@
     }
     const wrap = $('eventChartWrap'); if(!wrap) return;
     const g = chartParts();
-    wrap.innerHTML = `<div class="chart-shell ce-v413-chart-layout"><div class="ce-v413-chart-panel"><div class="ce-v413-panel-title"><span>DistribuciÃ³n general</span></div><div class="ce-v413-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div>`;
+    wrap.innerHTML = `<div class="chart-shell ce-v413-chart-layout"><div class="ce-v413-chart-panel"><div class="ce-v413-panel-title"><span>Distribución general</span></div><div class="ce-v413-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div>`;
   }
   function patchGraficas(){
     if(graficasV413Superseded()) return;
@@ -372,7 +372,7 @@
     if(!old || old.__ceV413Wrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donaciÃ³n'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 30);
+      setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 30);
       return ret;
     };
     wrapped.__ceV413Wrapped = true;
@@ -406,7 +406,7 @@
   }
   function install(){
     injectStyle(); applyVersion(); patchSearchRenderers(); patchGraficas(); patchRenderForPostProcessing(); eventInterceptors();
-    setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donaciÃ³n'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 40);
+    setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 40);
   }
   window.ControlEventV413 = {version:VERSION, install, renderGraficas:renderGraficasV413, saveCompraOrDonation};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 25)));

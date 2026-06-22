@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Gemini libre de explotaciÃ³n del evento.
+/* ControlEvent v13.0_prod - Gemini libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
@@ -48,19 +48,19 @@
   function injectButton(){
     var tab=$('tabGraficas'); if(!tab) return;
     var section=tab.querySelector('.section-title'); if(!section || $('ceGeminiLibreBtn')) return;
-    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Gemini libre del evento'; btn.setAttribute('aria-label','Gemini libre del evento'); btn.textContent='âœ¨ðŸ“Š';
+    var btn=document.createElement('button'); btn.type='button'; btn.id='ceGeminiLibreBtn'; btn.className='ce-ai-free-btn'; btn.title='Gemini libre del evento'; btn.setAttribute('aria-label','Gemini libre del evento'); btn.textContent='✨📊';
     btn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); openModal(); });
     section.appendChild(btn);
   }
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>âœ¨ Gemini libre del evento</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Gemini libre del evento</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
-          '<textarea id="ceAiPrompt" placeholder="Ejemplos: SÃ¡came una grÃ¡fica de barras por artÃ­culos mÃ¡s utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoraciÃ³n.\nHazme un CSV con productos mÃ¡s consumidos por coste."></textarea>'+
-          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">ðŸ¤– Analizar con Gemini</button><button type="button" class="ce-ai-secondary" id="ceAiClear">Limpiar</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">Descargar resultado</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+          '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
+          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🤖 Analizar con Gemini</button><button type="button" class="ce-ai-secondary" id="ceAiClear">Limpiar</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">Descargar resultado</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
-        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versiÃ³n</h3><div class="ce-ai-answer">Pregunta libremente sobre el evento seleccionado o pide comparativas con otros eventos. Solo se responderÃ¡n cuestiones relacionadas con la gestiÃ³n de eventos: ingresos, compras, donaciones, tickets, productos, responsables, tiendas, segmentos, destinos, valoraciÃ³n y recursos.</div></div></div>'+ 
+        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versión</h3><div class="ce-ai-answer">Pregunta libremente sobre el evento seleccionado o pide comparativas con otros eventos. Solo se responderán cuestiones relacionadas con la gestión de eventos: ingresos, compras, donaciones, tickets, productos, responsables, tiendas, segmentos, destinos, valoración y recursos.</div></div></div>'+ 
       '</div></div>';
   }
   function openModal(){
@@ -80,16 +80,16 @@
     var ev=currentEvent();
     if(!ev){ setStatus('Selecciona un evento antes de consultar.', 'err'); return; }
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
-    if(!prompt){ setStatus('Escribe primero la peticiÃ³n.', 'err'); return; }
-    setStatus('Consultando Geminiâ€¦', 'ok');
+    if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
+    setStatus('Consultando Gemini…', 'ok');
     var resEl=$('ceAiResult');
-    resEl.innerHTML='<div class="ce-ai-card"><div class="ce-ai-answer">â³ Analizando datos del evento con Gemini...</div></div>';
+    resEl.innerHTML='<div class="ce-ai-card"><div class="ce-ai-answer">⏳ Analizando datos del evento con Gemini...</div></div>';
     try{
       var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
       var data=await res.json().catch(function(){ return {}; });
       if(!res.ok || data.ok===false) throw new Error(data.error || ('HTTP '+res.status));
       renderResult(data);
-      setStatus(data.rejected?'PeticiÃ³n rechazada por Ã¡mbito.':'Respuesta generada.', data.rejected?'err':'ok');
+      setStatus(data.rejected?'Petición rechazada por ámbito.':'Respuesta generada.', data.rejected?'err':'ok');
     }catch(err){
       resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Gemini</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
@@ -104,7 +104,7 @@
     (data.tables||[]).forEach(function(tb){ html+=tableHtml(tb); });
     if(Array.isArray(data.files) && data.files.length){
       html+='<div class="ce-ai-card"><h3>Archivos generados</h3><div class="ce-ai-files">';
-      data.files.forEach(function(f,i){ html+='<button type="button" class="ce-ai-file-btn" data-file-index="'+i+'">â¬‡ï¸ '+esc(f.filename||('archivo_'+(i+1)))+'</button><button type="button" class="ce-ai-file-btn" data-file-preview="'+i+'">ðŸ‘ï¸ Ver</button>'; });
+      data.files.forEach(function(f,i){ html+='<button type="button" class="ce-ai-file-btn" data-file-index="'+i+'">⬇️ '+esc(f.filename||('archivo_'+(i+1)))+'</button><button type="button" class="ce-ai-file-btn" data-file-preview="'+i+'">👁️ Ver</button>'; });
       html+='</div><div id="ceAiFilePreview" class="ce-ai-preview" style="display:none"></div></div>';
     }
     var el=$('ceAiResult'); el.innerHTML=html;
@@ -114,7 +114,7 @@
   function chartHtml(ch){
     var labels=(ch.labels||[]).map(String), values=(ch.values||[]).map(Number); var max=Math.max.apply(null, values.concat([1]));
     var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var pct=Math.max(2, Math.min(100, (v/max)*100)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'GrÃ¡fica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function tableHtml(tb){

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - correcciones de navegaciÃ³n, casitas, menÃº, backup y Mapa de recursos. */
+/* ControlEvent v13.0_prod - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -87,7 +87,7 @@
       const showMap = currentTab() === 'mapa' && hasEvent() && $('tabMapaProductos') && !$('tabMapaProductos').classList.contains('hidden');
       mapBtn.hidden = !showMap;
       mapBtn.classList.toggle('is-visible', !!showMap);
-      mapBtn.textContent = 'âŒ‚';
+      mapBtn.textContent = '⌂';
       mapBtn.style.pointerEvents = showMap ? 'auto' : 'none';
     }
     const maintBtn = $('ceMaintFloatingTopV40');
@@ -95,7 +95,7 @@
       const showMaint = !!activeMaintenancePanel();
       maintBtn.hidden = !showMaint;
       maintBtn.classList.toggle('is-visible', showMaint);
-      maintBtn.textContent = 'âŒ‚';
+      maintBtn.textContent = '⌂';
       maintBtn.style.pointerEvents = showMaint ? 'auto' : 'none';
     }
   }
@@ -107,7 +107,7 @@
     const wrapped = function(){
       const hasAuthNow = !!auth();
       if(hasAuthNow && !hadAuth){
-        // v43.7: al entrar desde LOGIN, la primera ventana de trabajo serÃ¡ GRAFICAS.
+        // v43.7: al entrar desde LOGIN, la primera ventana de trabajo será GRAFICAS.
         setCurrentTab('graficas');
       }
       const result = old.apply(this, arguments);
@@ -161,7 +161,7 @@
     return list.find(row => String(row?.id || '') === String(id || '')) || null;
   }
   function isDelivered(row){
-    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÃ'));
+    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ'));
   }
   function handleDonationDelivered(event){
     const btn = event.target?.closest?.('#tabMapaProductos [data-mapa-donation-toggle="1"]');

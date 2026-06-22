@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - LowResourceLegacyPatch
+/* ControlEvent v13.0_prod - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
    - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
@@ -130,7 +130,7 @@
       document.body.classList.toggle('ce-event-not-finalized', !isFinalized());
     }catch(_){ }
 
-    // MenÃº principal: en GD deben estar todas desde el primer render post-login.
+    // Menú principal: en GD deben estar todas desde el primer render post-login.
     show($('tabIngresosBtn'), !ro);
     show($('tabDonacionesBtn'), !ro);
     show($('tabComprasBtn'), !ro);
@@ -138,7 +138,7 @@
     show($('tabResumenBtn'), gd || rw || ro);
     show($('tabGraficasBtn'), gd || rw || ro);
 
-    // Herramientas del pie y mantenimiento, replicando el criterio heredado crÃ­tico.
+    // Herramientas del pie y mantenimiento, replicando el criterio heredado crítico.
     show($('btnExportExcel'), (gd || rw || ro) && (!ro || isFinalized()));
     setDisabled($('btnExportExcel'), ro && !isFinalized());
     show($('btnOpenImport'), gd);
@@ -203,9 +203,9 @@
 
   function warmCoreDataScreens(reason){
     // V30.6: tras login/cambio de evento, precalienta las tres pantallas de captura
-    // para que Colaboradores, Donaciones y Compras no queden vacÃ­as si el render LITE
-    // ha evitado repintar una pestaÃ±a oculta. Se restaura la pestaÃ±a original antes
-    // de devolver el control, por lo que no deberÃ­a verse parpadeo.
+    // para que Colaboradores, Donaciones y Compras no queden vacías si el render LITE
+    // ha evitado repintar una pestaña oculta. Se restaura la pestaña original antes
+    // de devolver el control, por lo que no debería verse parpadeo.
     if(!hasAuth() || isRO()) return;
     const originalTab = currentTab();
     try{
@@ -267,7 +267,7 @@
       if(!hasAuth()) return undefined;
 
       // Punto clave v30.7: primer render autenticado y cambio real de evento no se recortan.
-      // AsÃ­ no quedan menÃºs GD ocultos ni paneles vacÃ­os tras login/selecciÃ³n de evento.
+      // Así no quedan menús GD ocultos ni paneles vacíos tras login/selección de evento.
       if(needsFullBootstrap()){
         return runFullBootstrap(this, arguments, 'auth-or-event-change');
       }

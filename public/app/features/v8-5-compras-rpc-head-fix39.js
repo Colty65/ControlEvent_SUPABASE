@@ -1,10 +1,10 @@
-﻿/* ControlEvent v8.5_prod FIX39 - COMPRAS RPC + CORRECCION CONTROLADA
-   Objetivo: que COMPRAS tenga un Ãºnico camino efectivo de escritura en pantalla real.
-   Se carga ANTES del CRUD raÃ­z antiguo para interceptar primero:
-     AÃ±adir compra    -> POST /api/crud/compras
+/* ControlEvent v8.5_prod FIX39 - COMPRAS RPC + CORRECCION CONTROLADA
+   Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
+   Se carga ANTES del CRUD raíz antiguo para interceptar primero:
+     Añadir compra    -> POST /api/crud/compras
      Modificar compra -> PUT  /api/crud/compras/:id
      Eliminar compra  -> DELETE /api/crud/compras/:id
-   Tras borrar, se quita la fila de memoria y del DOM aunque algÃºn render legacy conserve copia vieja.
+   Tras borrar, se quita la fila de memoria y del DOM aunque algún render legacy conserve copia vieja.
 */
 (function(){
   'use strict';
@@ -20,7 +20,7 @@
   function $(id){ return document.getElementById(id); }
   function num(v){
     if(typeof v==='number') return Number.isFinite(v)?v:0;
-    let s=String(v??'').replace(/â‚¬/g,'').replace(/\s/g,'').trim();
+    let s=String(v??'').replace(/€/g,'').replace(/\s/g,'').trim();
     if(!s) return 0;
     const c=s.lastIndexOf(','), d=s.lastIndexOf('.');
     if(c!==-1 && d!==-1){ s = c>d ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,''); }
@@ -70,12 +70,12 @@
   }
   async function openComprasCorrection(reason){
     const evId = selectedEventId();
-    if(!evId) throw new Error('No hay evento seleccionado para abrir correcciÃ³n de COMPRAS.');
+    if(!evId) throw new Error('No hay evento seleccionado para abrir corrección de COMPRAS.');
     const ev = selectedEvent();
-    const msg = 'Este evento ya estuvo FINALIZADO. Por seguridad no basta con ponerlo En curso.\n\nÂ¿Autorizar correcciÃ³n temporal de COMPRAS durante 30 minutos para este evento?\n\nEvento: ' + (ev?.titulo || evId);
-    if(!confirm(msg)) throw new Error('OperaciÃ³n cancelada: no se autorizÃ³ la correcciÃ³n temporal de COMPRAS.');
+    const msg = 'Este evento ya estuvo FINALIZADO. Por seguridad no basta con ponerlo En curso.\n\n¿Autorizar corrección temporal de COMPRAS durante 30 minutos para este evento?\n\nEvento: ' + (ev?.titulo || evId);
+    if(!confirm(msg)) throw new Error('Operación cancelada: no se autorizó la corrección temporal de COMPRAS.');
     return apiJson('/api/crud/eventos/'+encodeURIComponent(evId)+'/correccion-compras', {
-      method:'POST', headers:headers(), body:JSON.stringify({minutes:30, reason:reason||'CorrecciÃ³n manual de COMPRAS', __crudRowOnly:true})
+      method:'POST', headers:headers(), body:JSON.stringify({minutes:30, reason:reason||'Corrección manual de COMPRAS', __crudRowOnly:true})
     });
   }
   async function apiJsonCompraWithCorrection(url, init, reason){
@@ -88,7 +88,7 @@
   }
   function validate(payload, action){
     if(!canWrite()) throw new Error('Usuario sin permiso de escritura en COMPRAS.');
-    if(isFinalizado()) throw new Error('Evento Finalizado: no se permite '+action+' compras. Cambia antes la situaciÃ³n a En curso.');
+    if(isFinalizado()) throw new Error('Evento Finalizado: no se permite '+action+' compras. Cambia antes la situación a En curso.');
     if(!payload.eventId) throw new Error('No hay evento seleccionado.');
     if(action!=='eliminar' && !payload.productoId) throw new Error('Falta producto.');
   }
@@ -166,13 +166,13 @@
         if(card) card.remove();
       });
     });
-    // Importante: no reescribir comprasList en cada mutaciÃ³n. En FIX34 eso podÃ­a
+    // Importante: no reescribir comprasList en cada mutación. En FIX34 eso podía
     // provocar bucles de MutationObserver y dejar la interfaz aparentemente inactiva.
     const wrap=$('comprasList');
     if(wrap && !wrap.querySelector('.itemcard') && !wrap.querySelector('.empty')){
       const empty=document.createElement('div');
       empty.className='empty';
-      empty.textContent='TodavÃ­a no hay compras u otros gastos para este evento.';
+      empty.textContent='Todavía no hay compras u otros gastos para este evento.';
       wrap.appendChild(empty);
     }
   }
@@ -204,7 +204,7 @@
   function renderAndScrub(){
     // Render completo solo para recalcular saldos/listados con memoria ya sincronizada.
     // Durante este render, cualquier PUT /api/state legacy se responde local-only.
-    try{ withNoStateWrites(()=>{ if(typeof render==='function') render(); }); }catch(err){ console.warn(LOG,'render fallÃ³',err); }
+    try{ withNoStateWrites(()=>{ if(typeof render==='function') render(); }); }catch(err){ console.warn(LOG,'render falló',err); }
     scrubDeletedFromDom();
     setTimeout(scrubDeletedFromDom, 0);
     setTimeout(scrubDeletedFromDom, 100);
@@ -221,7 +221,7 @@
   }
   function unlockUi(){
     // Desbloqueo fuerte: tras la baja no debe quedar ninguna capa/estado legacy
-    // impidiendo navegar a otro menÃº o cambiar de evento.
+    // impidiendo navegar a otro menú o cambiar de evento.
     busy=false;
     const removeBusyFrom = (el)=>{
       if(!el) return;
@@ -246,7 +246,7 @@
           'ce-v5011-logged-out','ce-v5013-logged-out','ce-v506-logged-out'
         );
       }
-    }catch(err){ console.warn(LOG,'unlockUi fuerte fallÃ³ parcialmente',err); }
+    }catch(err){ console.warn(LOG,'unlockUi fuerte falló parcialmente',err); }
   }
   function unlockUiRepeated(){
     unlockUi();
@@ -256,11 +256,11 @@
     try{
       const fn = Function('return (typeof '+name+'===\"function\")?'+name+':null')();
       if(typeof fn === 'function') return fn();
-    }catch(err){ console.warn(LOG,'fallÃ³ '+name,err); }
+    }catch(err){ console.warn(LOG,'falló '+name,err); }
     try{
       const fn = window[name];
       if(typeof fn === 'function') return fn();
-    }catch(err){ console.warn(LOG,'fallÃ³ window.'+name,err); }
+    }catch(err){ console.warn(LOG,'falló window.'+name,err); }
   }
   function renderCompraViewsFull(opts){
     opts = opts || {};
@@ -270,8 +270,8 @@
         s.compras = (Array.isArray(s.compras)?s.compras:[]).filter(c=>text(c.id)!==text(id));
       });
     }catch(_){}
-    // Primero render completo protegido para que se recalcule TODO: saldos, resumen, grÃ¡ficas y compras.
-    // DespuÃ©s repasamos mÃ³dulos concretos por si la app los mantiene separados.
+    // Primero render completo protegido para que se recalcule TODO: saldos, resumen, gráficas y compras.
+    // Después repasamos módulos concretos por si la app los mantiene separados.
     renderAndScrub();
     callGlobal('renderBudget');
     callGlobal('renderCompras');
@@ -296,7 +296,7 @@
       deletedIds.forEach(id=>{ s.compras=(Array.isArray(s.compras)?s.compras:[]).filter(c=>text(c.id)!==text(id)); });
       try{ Function('s','state=s;')(s); }catch(_){ }
       try{ window.state=s; }catch(_){ }
-    }catch(err){ console.warn(LOG,'No se pudo sincronizar /api/state tras operaciÃ³n',err); }
+    }catch(err){ console.warn(LOG,'No se pudo sincronizar /api/state tras operación',err); }
   }
   function eventById(id){ return arr('eventos').find(e=>text(e.id)===text(id))||null; }
   function eventSituationFromForm(id){
@@ -310,11 +310,11 @@
     return text(sel?.value || eventById(id)?.situacion || 'En curso');
   }
   async function updateEventoSituacion(id){
-    if(!id) throw new Error('Falta id de evento para cambiar situaciÃ³n.');
-    if(!authObj() || text(authObj().nivel).toUpperCase()!=='GD') throw new Error('Solo GD puede cambiar la situaciÃ³n del evento.');
+    if(!id) throw new Error('Falta id de evento para cambiar situación.');
+    if(!authObj() || text(authObj().nivel).toUpperCase()!=='GD') throw new Error('Solo GD puede cambiar la situación del evento.');
     const old=eventById(id);
     const next=eventSituationFromForm(id);
-    if(!next) throw new Error('Falta situaciÃ³n del evento.');
+    if(!next) throw new Error('Falta situación del evento.');
     if(old && text(old.situacion)===next){
       // No hay cambio real: evitamos que un handler legacy intente insertar/upsert de ce_eventos.
       return {ok:true, noChange:true};
@@ -325,8 +325,8 @@
     if(old) old.situacion=next;
     await syncStateNoRender();
     if(next === 'Finalizado'){
-      // DecisiÃ³n drÃ¡stica: al finalizar se cierran permisos de correcciÃ³n en SQL
-      // y se recarga la app. No se deja ningÃºn render legacy vivo con memoria vieja.
+      // Decisión drástica: al finalizar se cierran permisos de corrección en SQL
+      // y se recarga la app. No se deja ningún render legacy vivo con memoria vieja.
       try{ sessionStorage.setItem('ce_fix39_restore_event', id); sessionStorage.setItem('ce_fix39_restore_tab', 'resumen'); }catch(_){ }
       toast('Evento Finalizado en BBDD. Recargando datos reales...');
       setTimeout(()=>{ try{ window.location.reload(); }catch(_){ window.location.href=window.location.href; } }, 650);
@@ -334,7 +334,7 @@
     }
     renderCompraViewsFull();
     if(old && text(old.situacion)==='Finalizado' && next==='En curso'){
-      alert('Evento abierto en En curso. Por seguridad, COMPRAS de un evento ya finalizado siguen bloqueadas hasta autorizar correcciÃ³n temporal cuando intentes aÃ±adir/modificar/eliminar.');
+      alert('Evento abierto en En curso. Por seguridad, COMPRAS de un evento ya finalizado siguen bloqueadas hasta autorizar corrección temporal cuando intentes añadir/modificar/eliminar.');
     }
     return data;
   }
@@ -345,14 +345,14 @@
     try{ localStorage.setItem(storageKey(), JSON.stringify(stateObj())); }catch(err){ console.warn(LOG,'No se pudo persistir localStorage antes de recargar',err); }
   }
   function toast(msg){
-    // v9.5.1: sin avisos flotantes negros; solo consola para depuraciÃ³n.
+    // v9.5.1: sin avisos flotantes negros; solo consola para depuración.
     try{ console.info(LOG || '[ControlEvent v13.0_prod]', msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX39: dejamos de confiar en repintados parciales legacy.
     // Tras confirmar DELETE en BBDD, se guarda en local la foto actual del estado
-    // sin la compra y se recarga la app. Es el equivalente automÃ¡tico a lo que
-    // el usuario hacÃ­a manualmente cambiando de evento para ver la realidad.
+    // sin la compra y se recarga la app. Es el equivalente automático a lo que
+    // el usuario hacía manualmente cambiando de evento para ver la realidad.
     try{ sessionStorage.setItem('ce_fix39_restore_event', selectedEventId()); }catch(_){ }
     try{ sessionStorage.setItem('ce_fix39_restore_tab', 'compras'); }catch(_){ }
     try{ sessionStorage.setItem('ce_fix39_deleted_compra', String(id||'')); }catch(_){ }
@@ -374,19 +374,19 @@
         if(evId && Array.isArray(s.eventos) && s.eventos.some(e=>String(e.id)===String(evId))){ s.selectedEventId=evId; }
         if(tab){ try{ currentMainTab=tab; }catch(_){ } }
         persistLocalNow();
-        withNoStateWrites(()=>{ try{ if(typeof render==='function') render(); }catch(err){ console.warn(LOG,'render restore fallÃ³',err); } });
+        withNoStateWrites(()=>{ try{ if(typeof render==='function') render(); }catch(err){ console.warn(LOG,'render restore falló',err); } });
         if(tab==='compras') callGlobal('renderCompras');
         callGlobal('renderBudget');
         callGlobal('renderGraficas');
         unlockUiRepeated();
-      }catch(err){ console.warn(LOG,'restoreAfterReload fallÃ³',err); }
+      }catch(err){ console.warn(LOG,'restoreAfterReload falló',err); }
     };
     setTimeout(apply, 250);
     setTimeout(apply, 900);
   }
 
   // Anulamos el inline onclick legacy de los botones de EVENTOS.
-  // En mantenimiento de eventos solo permitimos cambiar situaciÃ³n por RPC.
+  // En mantenimiento de eventos solo permitimos cambiar situación por RPC.
   try{
     window.saveEventRecord = function(id){
       updateEventoSituacion(id).catch(err=>{ console.error(LOG,err); alert(err?.message||String(err)); });
@@ -395,10 +395,10 @@
   }catch(_){ }
   function resetAdd(){
     ['buyProducto','buyTienda','buyResponsable'].forEach(id=>setElVal(id,''));
-    setElVal('buyUnidades','1.00'); setElVal('buyPrecio','0,00 â‚¬'); setElVal('buyTicket','');
+    setElVal('buyUnidades','1.00'); setElVal('buyPrecio','0,00 €'); setElVal('buyTicket','');
   }
   async function addCompra(){
-    const payload=addPayload(); validate(payload,'aÃ±adir');
+    const payload=addPayload(); validate(payload,'añadir');
     const data=await apiJsonCompraWithCorrection('/api/crud/compras', {method:'POST', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})}, 'Alta de compra');
     const item=normalizeItem(data?.item,payload); replaceCompraLocal(item); resetAdd();
     await syncStateNoRender();
@@ -406,14 +406,14 @@
   }
   async function saveCompra(id){
     const payload=rowPayload(id); validate(payload,'modificar');
-    const data=await apiJsonCompraWithCorrection('/api/crud/compras/'+encodeURIComponent(id), {method:'PUT', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})}, 'ModificaciÃ³n de compra');
+    const data=await apiJsonCompraWithCorrection('/api/crud/compras/'+encodeURIComponent(id), {method:'PUT', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})}, 'Modificación de compra');
     const item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
     await syncStateNoRender();
     renderCompraViewsFull({flashId:id, flashClass:'ce-crud-flash-update'});
   }
   async function deleteCompra(id, btn){
     const payload=rowPayload(id); validate(payload,'eliminar');
-    if(!confirm('Â¿Eliminar esta lÃ­nea de compra en BBDD?')){ unlockUiRepeated(); return; }
+    if(!confirm('¿Eliminar esta línea de compra en BBDD?')){ unlockUiRepeated(); return; }
     const oldTxt = btn ? btn.textContent : '';
     const card=btn?.closest?.('.itemcard') || cardForId(id);
     try{
@@ -429,7 +429,7 @@
       deletedIds.add(text(id));
       removeCompraLocal(id);
       if(card) card.classList.add('ce-crud-deleted');
-      try{ await syncStateNoRender(); }catch(err){ console.warn(LOG,'sync posterior a baja fallÃ³',err); }
+      try{ await syncStateNoRender(); }catch(err){ console.warn(LOG,'sync posterior a baja falló',err); }
       removeCompraLocal(id);
       scrubDeletedFromDom();
       unlockUiRepeated();
@@ -494,10 +494,10 @@
     @keyframes ceCrudPulseFix38{from{filter:saturate(1.0) brightness(1)}to{filter:saturate(1.18) brightness(1.06)}}
   `;
   try{ document.head.appendChild(style); }catch(_){ }
-  // La siguiente interacciÃ³n de navegaciÃ³n limpia posibles restos de bloqueo legacy.
+  // La siguiente interacción de navegación limpia posibles restos de bloqueo legacy.
   window.addEventListener('pointerdown', (ev)=>{
     const nav=ev.target?.closest?.('#mainTabs button,#selectedEvent,#btnSoftRefresh,#btnLogout,.tab');
     if(nav) unlockUiRepeated();
   }, true);
-  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX39 con correcciÃ³n controlada y finalizaciÃ³n con recarga');
+  console.info(LOG,'activo en HEAD: COMPRAS RPC FIX39 con corrección controlada y finalización con recarga');
 })();

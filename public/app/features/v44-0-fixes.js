@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - correcciÃ³n mÃ­nima sobre v44.0:
-   - navegaciÃ³n de PlanificaciÃ³n inicial sin contaminar el resto de pestaÃ±as;
-   - entrada desde login siempre con selecciÃ³n de evento pendiente;
+/* ControlEvent v13.0_prod - corrección mínima sobre v44.0:
+   - navegación de Planificación inicial sin contaminar el resto de pestañas;
+   - entrada desde login siempre con selección de evento pendiente;
    - pantalla limpia con icono mientras se selecciona evento.
    No toca COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS. */
 (function(){

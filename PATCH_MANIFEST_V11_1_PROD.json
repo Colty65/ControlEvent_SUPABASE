@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "v13.0_prod",
   "base": "v11.0_prod + hotfixes Gemini",
   "date": "2026-06-19",

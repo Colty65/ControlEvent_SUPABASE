@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - exportaciones seguras, ediciÃ³n sin falso duplicado, mapa de recursos y globos de borrado. */
+/* ControlEvent v13.0_prod - exportaciones seguras, edición sin falso duplicado, mapa de recursos y globos de borrado. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -130,7 +130,7 @@
     });
   }
   function styleWorkbook(wb){
-    try{ wb.creator = `Â©oltyLAB '26_${VERSION}`; wb.created = new Date(); }catch(_){ }
+    try{ wb.creator = `©oltyLAB '26_${VERSION}`; wb.created = new Date(); }catch(_){ }
     wb.eachSheet(ws => {
       try{ ws.views = [{state:'frozen', ySplit:1}]; }catch(_){ }
       try{ ws.eachRow((row, rn) => { row.eachCell(cell => { cell.alignment = {vertical:'middle', wrapText:true}; cell.border = {top:{style:'thin', color:{argb:'FFE5E7EB'}}, left:{style:'thin', color:{argb:'FFE5E7EB'}}, bottom:{style:'thin', color:{argb:'FFE5E7EB'}}, right:{style:'thin', color:{argb:'FFE5E7EB'}}}; if(rn === 1){ cell.font = {bold:true, color:{argb:'FFFFFFFF'}}; cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF93465E'}}; } }); }); }catch(_){ }
@@ -196,23 +196,23 @@
       const valorDonado = don.reduce((s,r)=>s+rowValue(r),0);
       const gastado = buy.filter(isPaidCompra).reduce((s,r)=>s+rowValue(r),0);
       const pteCompra = buy.filter(r=>!isPaidCompra(r)).reduce((s,r)=>s+rowValue(r),0);
-      addSheet(wb, 'RESUMEN', ['Concepto','Importe','ObservaciÃ³n'], [
+      addSheet(wb, 'RESUMEN', ['Concepto','Importe','Observación'], [
         ['Evento', currentEventTitle(), ev.descripcion || ev.EVENTOS_DESCRIPCION || ''],
-        ['Emitido por', `Â©oltyLAB '26_${VERSION}_${ymd()}`, ''],
+        ['Emitido por', `©oltyLAB '26_${VERSION}_${ymd()}`, ''],
         ['INGRESOS INGRESADOS', ingresoReal, 'No incluye pendientes'],
         ['INGRESOS PENDIENTES', ingresoPendiente, 'Pendiente de ingresar'],
-        ['SALDO LÃMITE', ingresoPrevisto, 'Ingresado + pendiente'],
+        ['SALDO LÍMITE', ingresoPrevisto, 'Ingresado + pendiente'],
         ['DONACION DE PRODUCTO', valorDonado, 'Valor estimado'],
         ['COMPRAS GASTADAS', gastado, 'TKXX + GASTOS CORRIENTES'],
         ['PTE.COMPRA', pteCompra, 'Compras pendientes'],
         ['SALDO OPERATIVO', ingresoReal - gastado, 'Ingresado - gastado']
       ]);
-      addSheet(wb, 'INGRESOS', ['Nombre','Rango','SituaciÃ³n','NÃºmero','Importe total'], inc.map(r => [personName(r.personaId) || r.nombre || '', byId('personas', r.personaId)?.rango || '', r.situacion || '', r.numero || 0, incomeTotal(r)]));
+      addSheet(wb, 'INGRESOS', ['Nombre','Rango','Situación','Número','Importe total'], inc.map(r => [personName(r.personaId) || r.nombre || '', byId('personas', r.personaId)?.rango || '', r.situacion || '', r.numero || 0, incomeTotal(r)]));
       addSheet(wb, 'COMPRAS', ['Tienda','Ticket','Producto','Segmento','Destino','Unidades','Precio','Importe','Responsable'], buy.map(r => { const p=byId('productos', r.productoId)||{}; return [storeName(r.tiendaId) || '', r.ticketDonacion || r.ticket || '', productName(r.productoId) || r.producto || '', p.segmento || '', p.destino || '', r.unidades || 0, parseNum(r.precio || p.precio || p.defaultPrecio || 0), rowValue(r), personName(r.responsableId) || '']; }));
-      addSheet(wb, 'DONACIONES', ['Donante','Tipo','Producto','Segmento','Destino','Unidades','Precio','Valor','Responsable','Entregado'], don.map(r => { const p=byId('productos', r.productoId)||{}; return [donorName(r), r.ticketDonacion || r.ticket || '', productName(r.productoId) || r.producto || '', p.segmento || '', p.destino || '', r.unidades || 0, parseNum(r.precio || p.precio || p.defaultPrecio || 0), rowValue(r), personName(r.responsableId) || '', r.donacionEntregada || r.entregadoDonacion || r.entregado ? 'SÃ­' : 'No']; }));
+      addSheet(wb, 'DONACIONES', ['Donante','Tipo','Producto','Segmento','Destino','Unidades','Precio','Valor','Responsable','Entregado'], don.map(r => { const p=byId('productos', r.productoId)||{}; return [donorName(r), r.ticketDonacion || r.ticket || '', productName(r.productoId) || r.producto || '', p.segmento || '', p.destino || '', r.unidades || 0, parseNum(r.precio || p.precio || p.defaultPrecio || 0), rowValue(r), personName(r.responsableId) || '', r.donacionEntregada || r.entregadoDonacion || r.entregado ? 'Sí' : 'No']; }));
       const byDestino = new Map();
       cmp.forEach(r => { const p=byId('productos', r.productoId)||{}; const key=p.destino || 'Sin destino'; byDestino.set(key,(byDestino.get(key)||0)+rowValue(r)); });
-      addSheet(wb, 'GRAFICAS', ['AgrupaciÃ³n','Valor'], Array.from(byDestino.entries()).sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')));
+      addSheet(wb, 'GRAFICAS', ['Agrupación','Valor'], Array.from(byDestino.entries()).sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')));
       styleWorkbook(wb);
       await protectWorkbook(wb);
       const buffer = await wb.xlsx.writeBuffer();
@@ -227,7 +227,7 @@
       const overlay = document.createElement('div');
       overlay.id = 'ceBackupScopeV437';
       overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:18px;';
-      overlay.innerHTML = `<div style="max-width:420px;width:100%;background:#fff;border-radius:20px;padding:18px;box-shadow:0 22px 60px rgba(0,0,0,.28);font-family:system-ui,-apple-system,Segoe UI,sans-serif;"><h3 style="margin:0 0 8px;color:#111827;">Descarga de datos</h3><p style="margin:0 0 14px;color:#475569;font-size:14px;">Elige quÃ© backup quieres descargar.</p><div style="display:grid;gap:10px;"><button type="button" data-scope="event" style="padding:12px;border-radius:14px;border:1px solid #93465e;background:#93465e;color:white;font-weight:900;">Evento seleccionado</button><button type="button" data-scope="all" style="padding:12px;border-radius:14px;border:1px solid #d1d5db;background:white;color:#111827;font-weight:900;">Todos los eventos</button><button type="button" data-scope="cancel" style="padding:10px;border:0;background:transparent;color:#64748b;font-weight:800;">Cancelar</button></div></div>`;
+      overlay.innerHTML = `<div style="max-width:420px;width:100%;background:#fff;border-radius:20px;padding:18px;box-shadow:0 22px 60px rgba(0,0,0,.28);font-family:system-ui,-apple-system,Segoe UI,sans-serif;"><h3 style="margin:0 0 8px;color:#111827;">Descarga de datos</h3><p style="margin:0 0 14px;color:#475569;font-size:14px;">Elige qué backup quieres descargar.</p><div style="display:grid;gap:10px;"><button type="button" data-scope="event" style="padding:12px;border-radius:14px;border:1px solid #93465e;background:#93465e;color:white;font-weight:900;">Evento seleccionado</button><button type="button" data-scope="all" style="padding:12px;border-radius:14px;border:1px solid #d1d5db;background:white;color:#111827;font-weight:900;">Todos los eventos</button><button type="button" data-scope="cancel" style="padding:10px;border:0;background:transparent;color:#64748b;font-weight:800;">Cancelar</button></div></div>`;
       const done = value => { overlay.remove(); resolve(value); };
       overlay.addEventListener('click', e => { const b=e.target.closest('button[data-scope]'); if(b) done(b.dataset.scope); else if(e.target === overlay) done('cancel'); });
       document.body.appendChild(overlay);
@@ -237,9 +237,9 @@
     const res = await fetch(`/api/export/backup?scope=${encodeURIComponent(scope)}&eventId=${encodeURIComponent(selectedEventId())}&v=50.24`, {cache:'no-store'});
     if(!res.ok) throw new Error(await res.text().catch(()=>`HTTP ${res.status}`));
     const ct = String(res.headers.get('content-type') || '').toLowerCase();
-    if(ct.includes('text/html')) throw new Error('La ruta de backup del servidor no devolviÃ³ un Excel');
+    if(ct.includes('text/html')) throw new Error('La ruta de backup del servidor no devolvió un Excel');
     const blob = await res.blob();
-    if(!blob || !blob.size) throw new Error('El backup del servidor estÃ¡ vacÃ­o');
+    if(!blob || !blob.size) throw new Error('El backup del servidor está vacío');
     const name = res.headers.get('x-filename') || `${VERSION_FILE}_BACKUP_${scope === 'all' ? 'TODOS' : fileSafe(currentEventTitle())}_${ymd()}.xlsx`;
     downloadBuffer(blob, name);
   }
@@ -248,7 +248,7 @@
     const wb = new ExcelJS.Workbook();
     const stateObj = st();
     const keys = ['eventos','personas','tiendas','productos','colaboradores','compras','ticketImages','usuarios','users'];
-    addSheet(wb, 'METADATOS', ['Campo','Valor'], [['VersiÃ³n', VERSION], ['Ãmbito', scope === 'all' ? 'TODOS' : 'EVENTO'], ['Evento', scope === 'all' ? 'TODOS' : currentEventTitle()], ['Fecha', new Date().toLocaleString('es-ES')]]);
+    addSheet(wb, 'METADATOS', ['Campo','Valor'], [['Versión', VERSION], ['Ámbito', scope === 'all' ? 'TODOS' : 'EVENTO'], ['Evento', scope === 'all' ? 'TODOS' : currentEventTitle()], ['Fecha', new Date().toLocaleString('es-ES')]]);
     keys.forEach(key => {
       const source = Array.isArray(stateObj[key]) ? stateObj[key] : [];
       const rows = source.filter(row => scope === 'all' || !('eventId' in (row || {})) || norm(row?.eventId) === selectedEventId()).map(primitiveRow);
@@ -296,7 +296,7 @@
       if(box && !box.querySelector('.saldo-limite')){
         const card = document.createElement('div');
         card.className = 'mapa-metric ok saldo-limite';
-        card.innerHTML = `<div class="mapa-metric-label">SALDO LÃMITE</div><div class="mapa-metric-value">${esc(moneyFmt(income))}</div><div class="mapa-metric-note">Ingresos totales previstos: ingresados + pendientes</div>`;
+        card.innerHTML = `<div class="mapa-metric-label">SALDO LÍMITE</div><div class="mapa-metric-value">${esc(moneyFmt(income))}</div><div class="mapa-metric-note">Ingresos totales previstos: ingresados + pendientes</div>`;
         box.appendChild(card);
       }
     }catch(_){ }

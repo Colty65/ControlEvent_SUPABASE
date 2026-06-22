@@ -1,6 +1,6 @@
-﻿{
+{
   "version": "ControlEvent v13.0_prod",
-  "descripcion": "Ticket IA: limpieza total al abrir/limpiar, sin TKxx preseleccionado, iconos compactos repartidos y activos, mensajes en cabecera, compras previstas flexibles y sin lÃ­neas explicativas, actualizaciÃ³n de avisos negros legacy.",
+  "descripcion": "Ticket IA: limpieza total al abrir/limpiar, sin TKxx preseleccionado, iconos compactos repartidos y activos, mensajes en cabecera, compras previstas flexibles y sin líneas explicativas, actualización de avisos negros legacy.",
   "ficheros_principales": [
     "public/app/features/v9-5-2-ticketauto-compras.js",
     "public/app/features/v9-5-1-login-event-clean.js",

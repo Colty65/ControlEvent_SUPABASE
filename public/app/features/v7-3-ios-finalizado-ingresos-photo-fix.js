@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - iOS/iPadOS Finalizado: INGRESOS en grande con informaciÃ³n y retorno al globo origen.
+/* ControlEvent v13.0_prod - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
    Alcance: solo visor iOS/iPadOS para fotos de INGRESOS en evento Finalizado. Sin cambios de datos, Excel, cache ni render general. */
 (function(){
   'use strict';
@@ -39,7 +39,7 @@
   function same(a,b){ return String(a || '') === String(b || ''); }
   function parseNum(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
@@ -47,7 +47,7 @@
   }
   function money(value){
     try{ if(typeof window.money === 'function') return window.money(Number(value || 0)); }catch(_){ }
-    try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(value || 0)); }catch(_){ return `${Number(value || 0).toFixed(2)} â‚¬`; }
+    try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(value || 0)); }catch(_){ return `${Number(value || 0).toFixed(2)} €`; }
   }
 
   function receiptKeys(id){
@@ -104,9 +104,9 @@
     const situacion = norm(row.situacion || row.ingreso || row.formaPago || 'Pendiente');
     const lines = [];
     if(nombre) lines.push(nombre);
-    if(situacion) lines.push(`SituaciÃ³n|${situacion}`);
+    if(situacion) lines.push(`Situación|${situacion}`);
     if(rango) lines.push(`Rango|${rango}`);
-    if(id || numero) lines.push(`NÂº personas|${String(numero)}`);
+    if(id || numero) lines.push(`Nº personas|${String(numero)}`);
     if(id) lines.push(`Importe obligatorio|${money(obligatorio)}`);
     if(id) lines.push(`Importe voluntario|${money(voluntario)}`);
     if(id) lines.push(`Total ingreso|${money(total)}`);

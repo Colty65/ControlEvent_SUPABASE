@@ -1,10 +1,10 @@
-﻿import { registerExcelModule, ensureExcelJS as ensureRuntimeExcelJS } from './_excel-runtime.js';
+import { registerExcelModule, ensureExcelJS as ensureRuntimeExcelJS } from './_excel-runtime.js';
 
 export const meta = {
   name: 'backup',
   version: 'v33.7',
   mode: 'server-backup-download-with-client-fallback',
-  description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no estÃ¡ disponible.'
+  description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
 const BACKUP_VERSION = 'ControlEvent v13.0_prod';
@@ -51,10 +51,10 @@ async function downloadServerBackup(scope){
   if(!response.ok){
     let detail = '';
     try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }catch(_){ detail = await response.text().catch(()=> ''); }
-    throw new Error(`Servidor no generÃ³ backup (${response.status}). ${detail || ''}`.trim());
+    throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
   }
   const blob = await response.blob();
-  if(!blob || blob.size === 0) throw new Error('El servidor devolviÃ³ un backup vacÃ­o.');
+  if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
   const filename = filenameFromDisposition(response.headers.get('content-disposition')) || backupFileName(scope, scope);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -366,7 +366,7 @@ function liveCanonicalInfo(key, value, liveIndex, scopedEventIds){
         if(exact) return exact;
         const tk = ticketToken(tkInner);
         const candidates = liveIndex.byEventToken.get(`${ev}|${tk}`);
-        // Solo se permite resolver una clave reducida TKxx si en ese evento hay una Ãºnica compra viva con ese TKxx.
+        // Solo se permite resolver una clave reducida TKxx si en ese evento hay una única compra viva con ese TKxx.
         if(candidates && candidates.size === 1) return liveIndex.index.get([...candidates][0]);
       }
     }
@@ -422,7 +422,7 @@ function splitLongText(value, size = 30000){
 }
 function setupWorkbook(ExcelJS){
   const wb = new ExcelJS.Workbook();
-  wb.creator = `${BACKUP_VERSION} - Â©oltyLAB '26`;
+  wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`;
   wb.created = new Date();
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
   const fills = {title:'FF111827', soft:'FFF8FAFC', white:'FFFFFFFF'};
@@ -480,7 +480,7 @@ function backupVersionText(value){
   return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
 }
 function enforceBackupVersion(wb){
-  try{ wb.creator = `${BACKUP_VERSION} - Â©oltyLAB '26`; }catch(_){ }
+  try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }
   try{ wb.lastModifiedBy = BACKUP_VERSION; }catch(_){ }
   try{
     (wb.worksheets || []).forEach(ws => {
@@ -570,7 +570,7 @@ export async function run(options = {}){
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
-  try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$â‚¬-C0A]'; }catch(_){ }
+  try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
   addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
   addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
   addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));

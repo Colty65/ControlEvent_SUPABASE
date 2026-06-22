@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - guardia de sesiÃ³n visible.
-   Evita que la cabecera quede en "Sin acceso" dentro de una sesiÃ³n activa por refrescos/renderizados tardÃ­os. */
+/* ControlEvent v13.0_prod - guardia de sesión visible.
+   Evita que la cabecera quede en "Sin acceso" dentro de una sesión activa por refrescos/renderizados tardíos. */
 (function(){
   'use strict';
   if(window.__ceV952SessionGuard) return;
@@ -88,5 +88,5 @@
   window.addEventListener('controlevent:runtime-ready', tick, false);
   window.addEventListener('focus', tick, false);
   setInterval(tick, 900);
-  console.info('[CE v9.5.2] Guardia de sesiÃ³n activa');
+  console.info('[CE v9.5.2] Guardia de sesión activa');
 })();

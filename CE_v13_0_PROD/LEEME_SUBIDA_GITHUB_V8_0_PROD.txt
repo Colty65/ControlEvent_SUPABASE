@@ -1,8 +1,0 @@
-ControlEvent v8.0_prod
-
-Cambios:
-- Aislamiento de fotos TKxx por evento: no se usan claves globales TK01/Tienda|TK01 para visualizar o guardar fotos.
-- BACKUP: EVENTO_CODIGO en TICKETS/TICKETS_PARTES se calcula también desde la ruta/clave codificada de la imagen cuando la clave antigua venía genérica.
-- Versión actualizada a ControlEvent v8.0_prod / ControlEvent_v8_0_prod.
-
-Base: v7.3_prod.

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
+/* ControlEvent v13.0_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
    Parche acotado sobre v4.0_prod:
    - No toca login.
    - No toca INFOEVENTO/BACKUP salvo textos de version globales.
@@ -102,7 +102,7 @@
       if(decoded.startsWith(ev + '|')) variants.add(decoded);
       else addScopedVariant(variants, ev, decoded);
     }
-    // Si la URL trae clave codificada completa (evento|tienda|TKxx), no recrear la clave genÃ©rica raw TKxx.
+    // Si la URL trae clave codificada completa (evento|tienda|TKxx), no recrear la clave genérica raw TKxx.
     if(raw.startsWith(ev + '|')) variants.add(raw);
     else if(!decoded) addScopedVariant(variants, ev, raw);
     const labels = Array.from(variants).map(k => k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k);

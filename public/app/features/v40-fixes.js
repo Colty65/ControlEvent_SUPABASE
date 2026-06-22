@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - Ajustes finales
+/* ControlEvent v13.0_prod - Ajustes finales
    - Duplicidad de compras por Producto + Tienda + Ticket.
-   - BotÃ³n flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
+   - Botón flotante tipo casa en mantenimiento de PERSONAS, TIENDAS y PRODUCTOS.
    - Mantiene INFOEVENTO legacy protegido; conserva backup seguro con alcance TODOS. */
 (function(){
   'use strict';
@@ -149,14 +149,14 @@
   function resetDonationInputs(){
     ['donProducto','donDonante','donResponsable'].forEach(id => { const el = $(id); if(el) el.value = ''; });
     if($('donUnidades')) $('donUnidades').value = '1.00';
-    if($('donPrecio')) $('donPrecio').value = '0,00 â‚¬';
+    if($('donPrecio')) $('donPrecio').value = '0,00 €';
     if($('donImporte')) $('donImporte').value = '';
     try{ if($('donTicket') && typeof DONATION_TICKET_OPTIONS !== 'undefined') $('donTicket').value = DONATION_TICKET_OPTIONS[0]; }catch(_){ }
   }
 
   function installDonationDuplicateGuard(){
     // v41.0: la duplicidad de donaciones se comprueba solo ANTES de insertar.
-    // Tras una alta nueva no se busca ni se salta al registro reciÃ©n creado.
+    // Tras una alta nueva no se busca ni se salta al registro recién creado.
     if(!window.__ceV410DonationChangeGuardInstalled){
       window.__ceV410DonationChangeGuardInstalled = true;
       window.addEventListener('change', ev => {
@@ -176,7 +176,7 @@
       const donorRef = donationInputDonor();
       const found = findDonationDuplicate(productId, donorRef, '');
       if(found){
-        alert(`Ya existe esta donaciÃ³n con el mismo Producto + Donante.\n\nProducto: ${productName(found)}\nDonante: ${donorName(found)}\n\nSe muestra el registro existente para modificarlo si procede.`);
+        alert(`Ya existe esta donación con el mismo Producto + Donante.\n\nProducto: ${productName(found)}\nDonante: ${donorName(found)}\n\nSe muestra el registro existente para modificarlo si procede.`);
         jumpToDonation(found);
         return;
       }
@@ -244,12 +244,12 @@
       st().compras.push(rec);
       ['buyProducto','buyTienda','buyResponsable'].forEach(id => { const el = $(id); if(el) el.value = ''; });
       if($('buyUnidades')) $('buyUnidades').value = '1.00';
-      if($('buyPrecio')) $('buyPrecio').value = '0,00 â‚¬';
+      if($('buyPrecio')) $('buyPrecio').value = '0,00 €';
       if($('buyTicket')) $('buyTicket').value = '';
       saveNow();
       setTabCompras();
       renderNow();
-      // v41.0: en altas nuevas no se salta al registro reciÃ©n creado.
+      // v41.0: en altas nuevas no se salta al registro recién creado.
       // Solo se posiciona sobre el registro cuando se detecta duplicado antes de insertar.
       setTimeout(() => { try{ $('buyProducto')?.focus?.({preventScroll:true}); }catch(_){} }, 80);
     };
@@ -309,7 +309,7 @@
       btn.id = 'ceMaintFloatingTopV40';
       btn.type = 'button';
       btn.className = 'ce-maint-floating-top-v40';
-      btn.textContent = 'âŒ‚';
+      btn.textContent = '⌂';
       btn.title = 'Volver al inicio';
       btn.setAttribute('aria-label','Volver al inicio en mantenimiento');
       const handler = ev => {
@@ -358,7 +358,7 @@
       s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar ExcelJS.'));
       document.head.appendChild(s);
     });
-    if(!window.ExcelJS?.Workbook) throw new Error('ExcelJS no estÃ¡ disponible.');
+    if(!window.ExcelJS?.Workbook) throw new Error('ExcelJS no está disponible.');
     return window.ExcelJS;
   }
   function stamp(date = new Date()){
@@ -378,11 +378,11 @@
   }
   function setupBook(ExcelJS){
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB '26`;
+    wb.creator = `${VERSION} - ©oltyLAB '26`;
     wb.created = new Date();
     const border = {top:{style:'thin',color:{argb:'FFDDE2EA'}},left:{style:'thin',color:{argb:'FFDDE2EA'}},bottom:{style:'thin',color:{argb:'FFDDE2EA'}},right:{style:'thin',color:{argb:'FFDDE2EA'}}};
     const fills = {title:'FF8F3F55', head:'FF111827', soft:'FFF8FAFC', warn:'FFFFE4EC', ok:'FFECFDF5', bad:'FFFEF2F2', white:'FFFFFFFF'};
-    const euroFmt = '#,##0.00 [$â‚¬-C0A]';
+    const euroFmt = '#,##0.00 [$€-C0A]';
     function ws(name, widths){ const sheet = wb.addWorksheet(name); sheet.columns = widths.map(width => ({width})); sheet.properties.defaultRowHeight = 21; return sheet; }
     function paint(cell, fill='white', bold=false, color='FF111827'){
       cell.border = border;
@@ -444,7 +444,7 @@
   function tiendaTicket(){
     const map = new Map();
     comprasForEvent().forEach(row => {
-      const label = isDonation(ticket(row)) ? `DONACION Â· ${donorName(row)} Â· ${ticket(row)}` : `${storeName(row)} Â· ${ticket(row) || 'Pte.Compra u otros gastos'}`;
+      const label = isDonation(ticket(row)) ? `DONACION · ${donorName(row)} · ${ticket(row)}` : `${storeName(row)} · ${ticket(row) || 'Pte.Compra u otros gastos'}`;
       if(!map.has(label)) map.set(label, {label, importe:0, unidades:0, lineas:0});
       const item = map.get(label);
       item.importe += value(row); item.unidades += units(row); item.lineas += 1;
@@ -454,26 +454,26 @@
   async function exportInfoEventoV40(){
     const ev = currentEvent();
     if(!ev){ alert('Elige un evento antes de sacar INFOEVENTO.'); return; }
-    if(isRO() && !isFinalized()){ alert('Usuario RO: solo puede sacar INFOEVENTO si el evento estÃ¡ Finalizado.'); return; }
+    if(isRO() && !isFinalized()){ alert('Usuario RO: solo puede sacar INFOEVENTO si el evento está Finalizado.'); return; }
     const ExcelJS = await ensureExcelJS();
     const x = setupBook(ExcelJS);
     const t = stamp();
-    const emitted = `Â©oltyLAB '26_${VERSION_FILE}_${t.dd}${t.mm}${t.yyyy}_${t.hh}:${t.mi}:${t.ss}`;
+    const emitted = `©oltyLAB '26_${VERSION_FILE}_${t.dd}${t.mm}${t.yyyy}_${t.hh}:${t.mi}:${t.ss}`;
     const s = summary();
     let r = 1;
     const wsR = x.ws('RESUMEN', [32,55,18,18,18,18]);
     x.text(wsR,r,1,'Emitido por','soft',true); wsR.mergeCells(r,2,r,6); x.text(wsR,r++,2,emitted,'soft',true);
     x.title(wsR,r++,'RESUMEN DEL EVENTO',6);
-    x.text(wsR,r,1,'TÃ­tulo del evento','white',true); wsR.mergeCells(r,2,r,6); x.text(wsR,r++,2,ev.titulo || '','white',true);
+    x.text(wsR,r,1,'Título del evento','white',true); wsR.mergeCells(r,2,r,6); x.text(wsR,r++,2,ev.titulo || '','white',true);
     const descRows = Math.max(2, Math.min(10, Math.ceil(norm(ev.descripcion).length / 85) || 2));
-    x.text(wsR,r,1,'DescripciÃ³n del evento','white',true); wsR.mergeCells(r,2,r + descRows - 1,6); x.text(wsR,r,2,ev.descripcion || '','soft'); wsR.getCell(r,2).alignment = {vertical:'top', horizontal:'left', wrapText:true}; for(let rr=r; rr<r+descRows; rr++) wsR.getRow(rr).height = 23; r += descRows;
-    [['SituaciÃ³n', ev.situacion || ''],['Fecha inicio', ev.fechaIni || ''],['Fecha fin', ev.fechaFin || ''],['Precio evento', fmtMoney(ev.precio || 0)]].forEach(([a,b]) => { x.text(wsR,r,1,a,'white',true); x.text(wsR,r++,2,b); });
+    x.text(wsR,r,1,'Descripción del evento','white',true); wsR.mergeCells(r,2,r + descRows - 1,6); x.text(wsR,r,2,ev.descripcion || '','soft'); wsR.getCell(r,2).alignment = {vertical:'top', horizontal:'left', wrapText:true}; for(let rr=r; rr<r+descRows; rr++) wsR.getRow(rr).height = 23; r += descRows;
+    [['Situación', ev.situacion || ''],['Fecha inicio', ev.fechaIni || ''],['Fecha fin', ev.fechaFin || ''],['Precio evento', fmtMoney(ev.precio || 0)]].forEach(([a,b]) => { x.text(wsR,r,1,a,'white',true); x.text(wsR,r++,2,b); });
     r++;
     x.headers(wsR,r++,['Concepto','Importe','','','','']);
-    [['Ingreso dinero',s.ingresoDinero],['Pendiente ingresos',s.pendienteIngresos],['Comprado',s.comprado],['Gastos organizaciÃ³n',s.gastos],['Pte.Compra u otros gastos',s.pendiente],['DonaciÃ³n de producto',s.donado],['Saldo actual',s.saldoActual],['Saldo operativo',s.saldoOperativo]].forEach(([label,val]) => { x.text(wsR,r,1,label,val < 0 ? 'bad' : 'white', true); x.euro(wsR,r++,2,val,val < 0 ? 'bad' : 'white', true); });
+    [['Ingreso dinero',s.ingresoDinero],['Pendiente ingresos',s.pendienteIngresos],['Comprado',s.comprado],['Gastos organización',s.gastos],['Pte.Compra u otros gastos',s.pendiente],['Donación de producto',s.donado],['Saldo actual',s.saldoActual],['Saldo operativo',s.saldoOperativo]].forEach(([label,val]) => { x.text(wsR,r,1,label,val < 0 ? 'bad' : 'white', true); x.euro(wsR,r++,2,val,val < 0 ? 'bad' : 'white', true); });
 
     const wsI = x.ws('INGRESOS', [34,12,18,18,18,18,18,18]);
-    x.title(wsI,1,'INGRESOS',8); x.headers(wsI,3,['Colaborador/a','Rango','NÃºmero','SituaciÃ³n','Obligatorio','Voluntario','Ingresado','Pendiente']);
+    x.title(wsI,1,'INGRESOS',8); x.headers(wsI,3,['Colaborador/a','Rango','Número','Situación','Obligatorio','Voluntario','Ingresado','Pendiente']);
     r = 4; selectedRows().collabRows.slice().sort((a,b)=>norm(person(a.personaId).nombre).localeCompare(norm(person(b.personaId).nombre), 'es')).forEach(row => { const cv = collabValue(row); x.text(wsI,r,1,cv.persona.nombre || ''); x.text(wsI,r,2,cv.persona.rango || ''); x.number(wsI,r,3,cv.numero); x.text(wsI,r,4,row.situacion || ''); x.euro(wsI,r,5,cv.obligatorio); x.euro(wsI,r,6,cv.voluntario); x.euro(wsI,r,7,cv.ingresado); x.euro(wsI,r++,8,cv.pendiente, cv.pendiente ? 'warn' : 'white'); }); x.autoFilter(wsI,3,8);
 
     const wsC = x.ws('COMPRAS Y OTROS GASTOS', [30,12,14,16,26,26,26,20,18]);
@@ -481,7 +481,7 @@
     r = 4; selectedRows().comprasRows.filter(row => !isDonation(ticket(row))).sort((a,b)=>segmentName(a).localeCompare(segmentName(b),'es') || productName(a).localeCompare(productName(b),'es')).forEach(row => { x.text(wsC,r,1,productName(row)); x.number(wsC,r,2,units(row)); x.euro(wsC,r,3,price(row)); x.euro(wsC,r,4,value(row), !ticket(row) ? 'warn' : 'white'); x.text(wsC,r,5,ticket(row) || 'Pte.Compra u otros gastos'); x.text(wsC,r,6,storeName(row)); x.text(wsC,r,7,responsibleName(row)); x.text(wsC,r,8,segmentName(row)); x.text(wsC,r++,9,destinoName(row)); }); x.autoFilter(wsC,3,9);
 
     const wsD = x.ws('DONACIONES DE PRODUCTO', [30,12,14,16,22,30,26,20,18,16]);
-    x.title(wsD,1,'DONACIONES DE PRODUCTO',10); x.headers(wsD,3,['Producto','Unidades','Precio','Valor estimado','Tipo donaciÃ³n','Donante','Responsable','Segmento','Destino','Entregado']);
+    x.title(wsD,1,'DONACIONES DE PRODUCTO',10); x.headers(wsD,3,['Producto','Unidades','Precio','Valor estimado','Tipo donación','Donante','Responsable','Segmento','Destino','Entregado']);
     r = 4; selectedRows().comprasRows.filter(row => isDonation(ticket(row))).sort((a,b)=>segmentName(a).localeCompare(segmentName(b),'es') || productName(a).localeCompare(productName(b),'es') || donorName(a).localeCompare(donorName(b),'es')).forEach(row => { const delivered = row.donacionEntregada || row.entregadoDonacion || row.entregado === true; x.text(wsD,r,1,productName(row)); x.number(wsD,r,2,units(row)); x.euro(wsD,r,3,price(row)); x.euro(wsD,r,4,value(row)); x.text(wsD,r,5,ticket(row)); x.text(wsD,r,6,donorName(row)); x.text(wsD,r,7,responsibleName(row)); x.text(wsD,r,8,segmentName(row)); x.text(wsD,r,9,destinoName(row)); x.text(wsD,r++,10,delivered ? 'SI' : 'NO', delivered ? 'ok' : 'warn'); }); x.autoFilter(wsD,3,10);
 
     function sheetGrouping(name, title, rows){ const ws = x.ws(name,[32,16,16,22,18,18]); x.title(ws,1,title,6); x.headers(ws,3,[name.includes('SEGMENTO')?'Segmento':'Destino','Comprado','Donado','Pte.Compra','Gastos org.','Total']); let rr = 4; rows.forEach(it => { x.text(ws,rr,1,it.label); x.euro(ws,rr,2,it.comprado); x.euro(ws,rr,3,it.donado); x.euro(ws,rr,4,it.pendiente,it.pendiente?'warn':'white'); x.euro(ws,rr,5,it.gastos); x.euro(ws,rr++,6,it.total); }); x.autoFilter(ws,3,6); }
@@ -489,11 +489,11 @@
     sheetGrouping('CALCULOS_DESTINO','CALCULOS POR DESTINO',grouping('destino'));
 
     const wsTT = x.ws('CALCULOS_TIENDA_TICKET', [54,16,16,16]);
-    x.title(wsTT,1,'CALCULOS POR TIENDA Y TICKET',4); x.headers(wsTT,3,['Tienda / Ticket / DonaciÃ³n','Importe','Unidades','LÃ­neas']);
+    x.title(wsTT,1,'CALCULOS POR TIENDA Y TICKET',4); x.headers(wsTT,3,['Tienda / Ticket / Donación','Importe','Unidades','Líneas']);
     r = 4; tiendaTicket().forEach(row => { x.text(wsTT,r,1,row.label); x.euro(wsTT,r,2,row.importe); x.number(wsTT,r,3,row.unidades); x.number(wsTT,r++,4,row.lineas); }); x.autoFilter(wsTT,3,4);
 
     const wsG = x.ws('GRAFICAS', [34,18,18]);
-    x.title(wsG,1,'GRAFICAS DEL EVENTO - DATOS BASE',3); x.headers(wsG,3,['Concepto','Valor','ObservaciÃ³n']);
+    x.title(wsG,1,'GRAFICAS DEL EVENTO - DATOS BASE',3); x.headers(wsG,3,['Concepto','Valor','Observación']);
     r = 4; [['INGRESOS',s.ingresoDinero,''],['DONACION DE PRODUCTO',s.donado,''],['GASTOS',money(s.comprado+s.gastos),''],['PTE.COMPRA',s.pendiente,''],['SALDO ACTUAL',s.saldoActual,s.saldoActual < 0 ? 'Negativo' : ''],['SALDO OPERATIVO',s.saldoOperativo,s.saldoOperativo < 0 ? 'Negativo' : '']].forEach(([a,b,c]) => { x.text(wsG,r,1,a,b < 0 ? 'bad' : 'white', true); x.euro(wsG,r,2,b,b < 0 ? 'bad' : 'white', true); x.text(wsG,r++,3,c); });
 
     await makeDownload(x.wb, `${VERSION_FILE}_INFOEVENTO-${cleanFilePart(ev.titulo || 'EVENTO')}_${t.yyyy}${t.mm}${t.dd}.xlsx`);
@@ -553,10 +553,10 @@
       let detail = '';
       try{ const data = await response.json(); detail = data?.error || JSON.stringify(data); }
       catch(_){ detail = await response.text().catch(()=> ''); }
-      throw new Error(`Servidor no generÃ³ backup (${response.status}). ${detail || ''}`.trim());
+      throw new Error(`Servidor no generó backup (${response.status}). ${detail || ''}`.trim());
     }
     const blob = await response.blob();
-    if(!blob || blob.size === 0) throw new Error('El servidor devolviÃ³ un backup vacÃ­o.');
+    if(!blob || blob.size === 0) throw new Error('El servidor devolvió un backup vacío.');
     const filename = filenameFromDisposition(response.headers.get('content-disposition')) || `${VERSION_FILE}_BACKUP_${scope || 'TODOS'}.xlsx`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -582,7 +582,7 @@
     try{
       if(window.ControlEventExcel?.run) return window.ControlEventExcel.run('exportExcel', {source:'v43.8-legacy-infoevento'});
     }catch(err){ return Promise.reject(err); }
-    alert('INFOEVENTO no estÃ¡ disponible todavÃ­a. Espera a que termine de cargar la app y vuelve a intentarlo.');
+    alert('INFOEVENTO no está disponible todavía. Espera a que termine de cargar la app y vuelve a intentarlo.');
   }
 
   function installExcelGuards(){

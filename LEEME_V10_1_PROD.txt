@@ -1,49 +1,49 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 =======================
 
-VersiÃ³n generada sobre v10.0_prod.
+Versión generada sobre v10.0_prod.
 
 Cambios incluidos:
 
-1. VersiÃ³n
-- VersiÃ³n visible y tÃ©cnica actualizada a v13.0_prod.
+1. Versión
+- Versión visible y técnica actualizada a v13.0_prod.
 - package.json / package-lock.json actualizados a 10.3.0-prod.
 - BACKUP e INFOEVENTO actualizados a ControlEvent_v13.0_prod.
 - Cabecera inicial compacta con miniatura CE + v13.0_prod.
 
-2. RESUMEN PRESUPUESTARIO / CÃ¡lculos por tienda y ticket
-- BotÃ³n Adjuntar sustituido visualmente por icono de clip ðŸ“Ž.
-- BotÃ³n Eliminar sustituido visualmente por papelera ðŸ—‘ï¸.
-- Refuerzo de hidrataciÃ³n de imÃ¡genes/botones para que no tarden tanto en aparecer tras entrar o cambiar de evento.
+2. RESUMEN PRESUPUESTARIO / Cálculos por tienda y ticket
+- Botón Adjuntar sustituido visualmente por icono de clip 📎.
+- Botón Eliminar sustituido visualmente por papelera 🗑️.
+- Refuerzo de hidratación de imágenes/botones para que no tarden tanto en aparecer tras entrar o cambiar de evento.
 
 3. Alta asistida de COMPRAS / Ticket IA
 - Antes de procesar se exige Ticket, Tienda y Responsable.
 - Si falta alguno, no se graba nada en COMPRAS.
-- Eliminado el botÃ³n flotante de casita dentro de la ventana Ticket IA.
+- Eliminado el botón flotante de casita dentro de la ventana Ticket IA.
 
 4. Mapa de recursos
 - Clic en TKxx abre detalle contable + imagen del ticket.
-- BotÃ³n Cerrar reforzado para funcionar tambiÃ©n en eventos Finalizados.
-- La imagen se recarga de forma fresca y acotada al evento seleccionado para evitar mostrar una foto de otro TK/evento por cachÃ©.
-- Si el TKxx no tiene imagen, se muestra â€œNo hay imagen del ticket.â€ en grande.
+- Botón Cerrar reforzado para funcionar también en eventos Finalizados.
+- La imagen se recarga de forma fresca y acotada al evento seleccionado para evitar mostrar una foto de otro TK/evento por caché.
+- Si el TKxx no tiene imagen, se muestra “No hay imagen del ticket.” en grande.
 
 5. Recarga de datos por evento
-- La carga eventScoped reintenta respuestas aparentemente vacÃ­as antes de aplicarlas, para evitar que parezca que los datos desaparecen de la BBDD por una carga parcial.
+- La carga eventScoped reintenta respuestas aparentemente vacías antes de aplicarlas, para evitar que parezca que los datos desaparecen de la BBDD por una carga parcial.
 
 6. Compartir pantalla
-- El botÃ³n ðŸ“º deja de ser solo informativo.
-- Abre un panel con opciones reales disponibles segÃºn navegador: pantalla completa, Presentation API si existe, compartir URL, copiar URL y selector nativo de pantalla.
+- El botón 📺 deja de ser solo informativo.
+- Abre un panel con opciones reales disponibles según navegador: pantalla completa, Presentation API si existe, compartir URL, copiar URL y selector nativo de pantalla.
 
 7. COMPRAS
-- Eliminado el texto â€œCompras normales y otros gastos, con responsable opcional.â€
+- Eliminado el texto “Compras normales y otros gastos, con responsable opcional.”
 - En registros Pte.Compra se mantiene el contenido rojo, pero se evita que los botones Modificar/Eliminar hereden el rojo.
-- Corregida la presentaciÃ³n del bloque Buscar compra.
+- Corregida la presentación del bloque Buscar compra.
 
 8. GRAFICAS
-- Refuerzo tÃ¡ctil en porciones de queso y leyenda.
-- Las leyendas pasan a ser zonas grandes pulsables para mÃ³viles/tablets cuando la porciÃ³n del grÃ¡fico es pequeÃ±a.
+- Refuerzo táctil en porciones de queso y leyenda.
+- Las leyendas pasan a ser zonas grandes pulsables para móviles/tablets cuando la porción del gráfico es pequeña.
 
 Validaciones realizadas:
 - node --check en scripts modificados principales.
 - parseo correcto de package.json y package-lock.json.
-- comprobaciÃ³n de integridad ZIP.
+- comprobación de integridad ZIP.

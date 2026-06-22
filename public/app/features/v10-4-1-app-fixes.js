@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
+/* ControlEvent v13.0_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
 (function(){
   'use strict';
   if(window.__ceV1041AppFixes) return; window.__ceV1041AppFixes=true;
@@ -14,7 +14,7 @@
   function compact(v){ return norm(v).replace(/\s+/g,''); }
   function money(v){
     if(typeof v==='number') return isFinite(v)?v:0;
-    var s=text(v).replace(/â‚¬/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
+    var s=text(v).replace(/€/g,'').replace(/\s/g,'').trim(); if(!s) return 0;
     var c=s.lastIndexOf(','), d=s.lastIndexOf('.');
     if(c!==-1 && d!==-1) s=c>d ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
     else if(c!==-1) s=s.replace(/\./g,'').replace(',','.');
@@ -76,7 +76,7 @@
     var txt=text(row.textContent||'');
     var unit=0,total=0,m;
     m=txt.match(/x\s*([0-9]+(?:[\.,][0-9]{1,3})?)/i); if(m) unit=money(m[1]);
-    var nums=txt.match(/[0-9]+(?:[\.,][0-9]{1,3})?\s*â‚¬/g); if(nums&&nums.length) total=money(nums[nums.length-1]);
+    var nums=txt.match(/[0-9]+(?:[\.,][0-9]{1,3})?\s*€/g); if(nums&&nums.length) total=money(nums[nums.length-1]);
     return {prod:prod,unit:unit,total:total};
   }
   function pendingCandidate(p, ai){
@@ -94,7 +94,7 @@
     box.querySelectorAll('.ce-ai-pending-row').forEach(function(row){
       var p=pendingInfoFromRow(row), cand=pendingCandidate(p,ai);
       row.classList.toggle('ce-ai-pending-candidate-v1041', !!cand);
-      if(cand) row.title='Posible compra ya realizada en este ticket. MÃ¡rcala solo si quieres eliminarla.';
+      if(cand) row.title='Posible compra ya realizada en este ticket. Márcala solo si quieres eliminarla.';
     });
   }
 
@@ -119,14 +119,14 @@
       if(!imgs.length){ buttons.forEach(function(b){ b.remove(); }); return; }
       var first=buttons[0]; buttons.slice(1).forEach(function(b){ b.remove(); });
       if(!first){
-        first=document.createElement('button'); first.type='button'; first.className='outline small ce-v1041-ingreso-download'; first.title='Descargar justificante'; first.setAttribute('aria-label','Descargar justificante'); first.textContent='â¬‡ï¸';
+        first=document.createElement('button'); first.type='button'; first.className='outline small ce-v1041-ingreso-download'; first.title='Descargar justificante'; first.setAttribute('aria-label','Descargar justificante'); first.textContent='⬇️';
         var anchor=imgs[0]; if(anchor.parentNode) anchor.parentNode.insertBefore(first, anchor.nextSibling); else card.appendChild(first);
       }else{
         first.classList.add('ce-v1041-ingreso-download');
       }
       first.onclick=function(ev){ stop(ev); var img=imgs[0]; return downloadSrc(img && (img.currentSrc||img.src), 'justificante_ingreso_'+(idx+1)); };
     });
-    // Limpia cadenas de botones insertadas justo despuÃ©s de una miniatura: deja solo el primero.
+    // Limpia cadenas de botones insertadas justo después de una miniatura: deja solo el primero.
     root.querySelectorAll('.ce-v104-ingreso-download,.ce-v1041-ingreso-download').forEach(function(btn){
       var prev=btn.previousElementSibling;
       if(prev && prev.matches && prev.matches('button,.ce-v104-ingreso-download,.ce-v1041-ingreso-download,.ce-ticket-download-v95')) btn.remove();
@@ -134,7 +134,7 @@
   }
   function handleIngresoDownload(ev){ var btn=ev.target&&ev.target.closest&&ev.target.closest('.ce-v1041-ingreso-download'); if(!btn) return; stop(ev); var card=btn.closest('.itemcard,.rowline,.card,.ce-v509-receipt-field,.ce-v504-receipt-strip,.ce-v502-receipt-strip,.ce-v465-receipt-strip')||btn.parentElement; var img=card&&Array.prototype.slice.call(card.querySelectorAll('img')).filter(isIngresoImg)[0]; if(img) downloadSrc(img.currentSrc||img.src,'justificante_ingreso'); return false; }
 
-  // --- Carga estable por evento: cachÃ© por evento y recarga tras cambios de opciÃ³n ---
+  // --- Carga estable por evento: caché por evento y recarga tras cambios de opción ---
   var lastGoodByEvent=Object.create(null), loadingEvent='';
   function snapshotGood(){
     var ev=selectedEventId(); if(!ev) return;
@@ -161,19 +161,19 @@
     }, delay||160);
   }
 
-  // --- Compartir pantalla: panel claro, sin botones que abren el diÃ¡logo equivocado de Chrome ---
+  // --- Compartir pantalla: panel claro, sin botones que abren el diálogo equivocado de Chrome ---
   function ensureShareButton1041(){
     var stack=document.querySelector('.appname-stack'); if(!stack) return;
     var actions=stack.querySelector('.user-actions')||stack;
     var old=$('ceShareScreenBtn'); if(old) old.style.display='none';
     var btn=$('ceShareScreenBtn1041');
-    if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn1041'; btn.className='outline small'; btn.title='Duplicar pantalla en TV/proyector'; btn.setAttribute('aria-label','Duplicar pantalla en TV/proyector'); btn.textContent='ðŸ“º'; actions.insertBefore(btn, actions.firstChild||null); }
+    if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.id='ceShareScreenBtn1041'; btn.className='outline small'; btn.title='Duplicar pantalla en TV/proyector'; btn.setAttribute('aria-label','Duplicar pantalla en TV/proyector'); btn.textContent='📺'; actions.insertBefore(btn, actions.firstChild||null); }
   }
   function openSharePanel1041(){
     var old=$('ceShareScreenPanel1041'); if(old) old.remove(); var old2=$('ceShareScreenPanel'); if(old2) old2.remove();
-    var html='<div id="ceShareScreenPanel1041"><div class="box"><div class="head"><div>ðŸ“º Duplicar esta app en TV / proyector</div><button type="button" class="outline small" data-ce-share1041-close>Cerrar</button></div>'+ 
-      '<div class="ce-share1041-help"><b>La app no puede elegir directamente una TV cercana:</b> por seguridad lo hace Windows, iPad/iPhone o Android. Lo correcto es duplicar la pantalla del dispositivo, no â€œpresentar dispositivoâ€ desde Chrome si ese cuadro aparece vacÃ­o.<br><br><b>Windows/PC:</b> deja esta app en pantalla completa y pulsa <b>Win + K</b>. Elige la TV/proyector en el panel lateral de Windows.<br><b>iPad/iPhone:</b> Centro de control â†’ <b>Duplicar pantalla</b> â†’ Apple TV/AirPlay compatible.<br><b>Android:</b> ajustes rÃ¡pidos â†’ <b>Enviar pantalla / Cast</b>.</div>'+ 
-      '<div class="ce-share1041-actions"><button type="button" class="modify small" data-ce-share1041-full>â›¶ Pantalla completa</button><button type="button" class="outline small" data-ce-share1041-win>ðŸªŸ Abrir Proyectar Windows</button><button type="button" class="outline small" data-ce-share1041-url>ðŸ”— Copiar enlace</button></div>'+ 
+    var html='<div id="ceShareScreenPanel1041"><div class="box"><div class="head"><div>📺 Duplicar esta app en TV / proyector</div><button type="button" class="outline small" data-ce-share1041-close>Cerrar</button></div>'+ 
+      '<div class="ce-share1041-help"><b>La app no puede elegir directamente una TV cercana:</b> por seguridad lo hace Windows, iPad/iPhone o Android. Lo correcto es duplicar la pantalla del dispositivo, no “presentar dispositivo” desde Chrome si ese cuadro aparece vacío.<br><br><b>Windows/PC:</b> deja esta app en pantalla completa y pulsa <b>Win + K</b>. Elige la TV/proyector en el panel lateral de Windows.<br><b>iPad/iPhone:</b> Centro de control → <b>Duplicar pantalla</b> → Apple TV/AirPlay compatible.<br><b>Android:</b> ajustes rápidos → <b>Enviar pantalla / Cast</b>.</div>'+ 
+      '<div class="ce-share1041-actions"><button type="button" class="modify small" data-ce-share1041-full>⛶ Pantalla completa</button><button type="button" class="outline small" data-ce-share1041-win>🪟 Abrir Proyectar Windows</button><button type="button" class="outline small" data-ce-share1041-url>🔗 Copiar enlace</button></div>'+ 
       '<div id="ceShareStatus1041" class="ce-share1041-status">Pulsa Pantalla completa y luego usa Win+K / AirPlay / Cast desde el sistema.</div></div></div>';
     document.body.insertAdjacentHTML('beforeend',html);
   }
@@ -183,7 +183,7 @@
     if(t.closest('#ceShareScreenBtn1041')){ stop(ev); openSharePanel1041(); return false; }
     if(t.closest('[data-ce-share1041-close]')){ stop(ev); var p=$('ceShareScreenPanel1041'); if(p) p.remove(); return false; }
     if(t.closest('[data-ce-share1041-full]')){ stop(ev); var de=document.documentElement; if(de.requestFullscreen) de.requestFullscreen().then(function(){shareStatus('Pantalla completa activada. Ahora pulsa Win+K o usa AirPlay/Cast.');}).catch(function(e){shareStatus('No se pudo activar pantalla completa: '+(e&&e.message?e.message:'navegador no compatible'));}); else shareStatus('Este navegador no permite pantalla completa desde la app.'); return false; }
-    if(t.closest('[data-ce-share1041-win]')){ stop(ev); shareStatus('Intento abrir la configuraciÃ³n de Proyectar de Windows. Si no se abre, pulsa Win+K manualmente.'); try{ window.location.href='ms-settings:project'; }catch(_){} return false; }
+    if(t.closest('[data-ce-share1041-win]')){ stop(ev); shareStatus('Intento abrir la configuración de Proyectar de Windows. Si no se abre, pulsa Win+K manualmente.'); try{ window.location.href='ms-settings:project'; }catch(_){} return false; }
     if(t.closest('[data-ce-share1041-url]')){ stop(ev); var u=location.href; if(navigator.clipboard) navigator.clipboard.writeText(u).then(function(){shareStatus('Enlace copiado. Puedes abrir la misma app en otro dispositivo.');}).catch(function(){prompt('Copia esta URL:',u);}); else prompt('Copia esta URL:',u); return false; }
   }
 

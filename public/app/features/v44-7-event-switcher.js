@@ -1,6 +1,6 @@
-﻿/* ControlEvent v13.0_prod - selector de evento unificado y render activo Ãºnico.
+/* ControlEvent v13.0_prod - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
-   cambiar selectedEventId rÃ¡pido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
+   cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
@@ -34,14 +34,14 @@
   };
   const TAB_BY_BUTTON = Object.entries(BUTTON_BY_TAB).reduce((acc,[tab,id]) => (acc[id]=tab, acc), {});
   const MENU_LABELS = {
-    tabIngresosBtn:['ðŸ¤','Ingresos'],
-    tabDonacionesBtn:['ðŸŽ','Donaciones'],
-    tabComprasBtn:['ðŸ›’','Compras y gastos'],
-    tabMapaBtn:['ðŸ§­','Mapa de recursos'],
-    tabDocumentosBtn:['ðŸ“','Documentos'],
-    tabPlanificacionBtn:['ðŸ§ ','PlanificaciÃ³n inicial'],
-    tabResumenBtn:['ðŸ§¾','Resumen'],
-    tabGraficasBtn:['ðŸ“Š','GrÃ¡ficas']
+    tabIngresosBtn:['🤝','Ingresos'],
+    tabDonacionesBtn:['🎁','Donaciones'],
+    tabComprasBtn:['🛒','Compras y gastos'],
+    tabMapaBtn:['🧭','Mapa de recursos'],
+    tabDocumentosBtn:['📁','Documentos'],
+    tabPlanificacionBtn:['🧠','Planificación inicial'],
+    tabResumenBtn:['🧾','Resumen'],
+    tabGraficasBtn:['📊','Gráficas']
   };
   const EVENT_MENU_ORDER = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
   const DYNAMIC_IDS = {
@@ -104,7 +104,7 @@
   function tabFromButtonId(id){ return TAB_BY_BUTTON[String(id || '')] || ''; }
   function currentTab(){
     const memorized = safe(() => window.__ceCurrentMainTab || '', '');
-    // v8.5.2: DOCUMENTOS es una pestaÃ±a aÃ±adida por parche. Renders legacy antiguos
+    // v8.5.2: DOCUMENTOS es una pestaña añadida por parche. Renders legacy antiguos
     // pueden tocar currentMainTab a ingresos/resumen; no deben sacar al usuario de DOCUMENTOS.
     if(String(memorized) === 'documentos' && (!auth() || roleAllowsTab('documentos'))) return 'documentos';
     const appTab = safe(() => window.ControlEventApp?.navigation?.currentMainTab || '', '');
@@ -130,7 +130,7 @@
   function rememberEvent(id){ if(!hasValidEvent(id)) return; try{ sessionStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } try{ localStorage.setItem(SELECT_KEY, String(id)); }catch(_){ } }
   function persistLocal(){
     // v45.4: el cambio de evento NO debe serializar todo el estado.
-    // En mÃ³viles, JSON.stringify(state) puede incluir muchos registros o imÃ¡genes de tickets y bloquear la UI.
+    // En móviles, JSON.stringify(state) puede incluir muchos registros o imágenes de tickets y bloquear la UI.
     return undefined;
   }
   function scheduleRemoteSave(){
@@ -195,9 +195,9 @@
     transition.watchdog = setTimeout(() => {
       if(token && token !== transition.token) return;
       if(!transition.active) return;
-      console.warn('[v45.4] Watchdog libera transiciÃ³n bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
+      console.warn('[v45.4] Watchdog libera transición bloqueada', {eventId:transition.eventId, targetTab:transition.targetTab});
       finishTransition(token);
-      notice('Control recuperado. Puedes volver a elegir evento u opciÃ³n.');
+      notice('Control recuperado. Puedes volver a elegir evento u opción.');
     }, Number(ms || (isMobileLike() ? 9000 : 6000)));
   }
   function sameSelectionStillRunning(id){
@@ -273,7 +273,7 @@
   }
   function unlockMenuShell(){
     if(!auth()) return;
-    // v45.4: si venimos de un usuario RO, quitar restos de ocultaciÃ³n antes de reconstruir menÃº/paneles.
+    // v45.4: si venimos de un usuario RO, quitar restos de ocultación antes de reconstruir menú/paneles.
     if(!isRO()){
       try{ document.body.classList.remove('ce-role-ro-v452'); }catch(_){ }
       Object.values(PANEL_BY_TAB).forEach(id => {
@@ -368,14 +368,14 @@
     const clave = String($('loginClave')?.value || '');
     const error = $('authError');
     if(error) error.textContent = '';
-    if(!ident || !clave){ if(error) error.textContent = 'Introduce identificaciÃ³n y clave.'; return false; }
+    if(!ident || !clave){ if(error) error.textContent = 'Introduce identificación y clave.'; return false; }
     loginBusyV447 = true;
     setLoginLoading(true);
     notice('Comprobando acceso...');
     try{
       const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({identificacion:ident, clave})});
       const data = await res.json().catch(() => ({}));
-      if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no vÃ¡lido');
+      if(!res.ok || !data.ok || !data.user) throw new Error(data.error || 'Acceso no válido');
       try{ authUser = data.user; }catch(_){ }
       window.authUser = data.user;
       try{ localStorage.removeItem('ControlEvent_v13.0_prod_session'); }catch(_){ } // v50.27: no persistir sesion ligera
@@ -399,7 +399,7 @@
       setTimeout(() => { try{ if(isGD()) call('fetchAccessUsers'); }catch(_){ } }, 0);
       return false;
     }catch(err){
-      console.error('[v45.4] login rÃ¡pido', err);
+      console.error('[v45.4] login rápido', err);
       if(error) error.textContent = err?.message || String(err);
       try{ authUser = null; }catch(_){ }
       window.authUser = null;
@@ -626,7 +626,7 @@
     shell();
     ensureEventPlaceholder();
     showLoading(targetTab, wasEvent ? 'Cargando nuevo evento...' : 'Cargando evento seleccionado...');
-    notice(wasEvent ? 'Cargando nuevo eventoâ€¦ preparando ventana activa' : 'Cargando evento seleccionadoâ€¦ preparando GrÃ¡ficas');
+    notice(wasEvent ? 'Cargando nuevo evento… preparando ventana activa' : 'Cargando evento seleccionado… preparando Gráficas');
     queueActive(targetTab, token, {delay: options.delay});
     return false;
   }
@@ -679,7 +679,7 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      notice(isRO() ? 'Usuario RO: solo Resumen, Mapa de recursos, Documentos y GrÃ¡ficas.' : 'OpciÃ³n no disponible para este usuario.');
+      notice(isRO() ? 'Usuario RO: solo Resumen, Mapa de recursos, Documentos y Gráficas.' : 'Opción no disponible para este usuario.');
       setTimeout(() => { try{ shell(); }catch(_){ } }, 0);
       return false;
     }
@@ -703,7 +703,7 @@
   function handleSelectedChange(event){
     const sel = event.target?.closest?.('#selectedEvent');
     if(!sel) return;
-    // Los listeners antiguos invocan window.changeSelectedEvent; esta barrera evita renders duplicados si llega hasta aquÃ­.
+    // Los listeners antiguos invocan window.changeSelectedEvent; esta barrera evita renders duplicados si llega hasta aquí.
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();

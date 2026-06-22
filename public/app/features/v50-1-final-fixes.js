@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - ajustes visuales PRODUCTOS, eventos finalizados y navegaciÃ³n compacta.
-   - PRODUCTOS usa una mecÃ¡nica propia y temprana de Modificar para no saltar al inicio.
+/* ControlEvent v13.0_prod - ajustes visuales PRODUCTOS, eventos finalizados y navegación compacta.
+   - PRODUCTOS usa una mecánica propia y temprana de Modificar para no saltar al inicio.
    - La fila modificada queda en negrita como en el resto de mantenimientos.
    - Los justificantes de ingresos se sincronizan con /api/ticket-images con criterio servidor-no-destructivo.
 */
@@ -28,7 +28,7 @@
   const canWrite = () => role() === 'GD' || role() === 'RW';
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
@@ -137,7 +137,7 @@
     const p = byId('productos', id);
     if(!p){ alert('No se encuentra el producto.'); return false; }
     const nombre = norm(getVal('edit-producto-nombre', id));
-    if(!nombre){ alert('El nombre no puede estar vacÃ­o.'); return false; }
+    if(!nombre){ alert('El nombre no puede estar vacío.'); return false; }
     const scroll = captureScroll(btn);
     p.nombre = nombre;
     try{ p.__ceModified = true; p._ceModified = true; p.modified = true; }catch(_){}
@@ -156,7 +156,7 @@
     return false;
   }
 
-  // Se registra antes de los parches v46 cuando este archivo se carga antes: asÃ­ PRODUCTOS no cae en el manejador antiguo que saltaba al inicio.
+  // Se registra antes de los parches v46 cuando este archivo se carga antes: así PRODUCTOS no cae en el manejador antiguo que saltaba al inicio.
   window.addEventListener('click', function(ev){
     const btn = ev.target?.closest?.('button[data-action="save-producto"]');
     if(btn) return saveProducto(btn, ev);
@@ -186,7 +186,7 @@
     document.head.appendChild(style);
   }
 
-  // Justificantes de ingresos: servidor como fuente segura, sin machacar una imagen existente con referencias vacÃ­as.
+  // Justificantes de ingresos: servidor como fuente segura, sin machacar una imagen existente con referencias vacías.
   const receiptCache = new Map();
   const deletedKey = 'ControlEvent_ingreso_receipts_deleted_v500';
   function selectedId(){ try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return String(ev.id); }catch(_){ } return String(st().selectedEventId || ''); }
@@ -223,7 +223,7 @@
   }
   function protectReceiptImagesBeforeSave(){
     const store = imageStore(); const refs = st().ticketImageRefs || {};
-    // Nunca se guarda una referencia vacÃ­a de INGRESO sobre una imagen existente.
+    // Nunca se guarda una referencia vacía de INGRESO sobre una imagen existente.
     Object.keys({...store, ...refs}).forEach(key => {
       if(!/\|INGRESO[:|]/i.test(key) && !/^INGRESO[:|]/i.test(key)) return;
       const fullKey = key.includes('|') && !key.startsWith('INGRESO:') ? key : key;
@@ -315,8 +315,8 @@
   }
   function applyCompactUi(){
     try{ document.body.classList.add('ce-v501-compact-icons'); }catch(_){ }
-    try{ document.querySelectorAll('#mainTabs .tab').forEach(btn => { btn.setAttribute('aria-label', btn.title || btn.getAttribute('aria-label') || (btn.textContent||'').trim() || 'OpciÃ³n'); }); }catch(_){ }
-    try{ document.querySelectorAll('.footer .iconbtn').forEach(btn => { btn.setAttribute('aria-label', btn.title || 'OpciÃ³n'); }); }catch(_){ }
+    try{ document.querySelectorAll('#mainTabs .tab').forEach(btn => { btn.setAttribute('aria-label', btn.title || btn.getAttribute('aria-label') || (btn.textContent||'').trim() || 'Opción'); }); }catch(_){ }
+    try{ document.querySelectorAll('.footer .iconbtn').forEach(btn => { btn.setAttribute('aria-label', btn.title || 'Opción'); }); }catch(_){ }
   }
   function install(){
     injectStyle(); applyVersion(); applyCompactUi(); applyFinalizadoOptions(); wrapFetchForReceiptDelete(); wrapSaveState(); wrapRender(); applyProductBold(); hydrateIngresoReceipts(false); setTimeout(uploadLocalReceiptDataUrls, 1500);

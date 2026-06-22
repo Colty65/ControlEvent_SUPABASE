@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - Mapa de recursos
+/* ControlEvent v13.0_prod - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
@@ -95,7 +95,7 @@
   }
   function unitPriceFmtFrom(unidades, importe){
     const p = unitPriceFrom(unidades, importe);
-    return p > 0 ? `${moneyFmt(p)} / ud.` : 'â€”';
+    return p > 0 ? `${moneyFmt(p)} / ud.` : '—';
   }
   function productName(row){ return productOf(row)?.nombre || row?.producto || 'Producto sin nombre'; }
   function segmentName(row){ return productOf(row)?.segmento || 'Sin segmento'; }
@@ -170,7 +170,7 @@
     try{ localStorage.setItem(shoppingStorageKey(), JSON.stringify(Array.from(set || []))); }catch(_){ }
   }
   function isDonationDelivered(row){
-    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÃ'));
+    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ'));
   }
   function setDonationDelivered(row, delivered){
     if(!row) return false;
@@ -189,7 +189,7 @@
     const id = item?.row?.id || item?.id || '';
     if(!id) return '';
     const delivered = isDonationDelivered(item?.row);
-    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}">${delivered ? 'âœ“ Entregado' : 'â—‹ Marcar entregado'}</button>`;
+    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}">${delivered ? '✓ Entregado' : '○ Marcar entregado'}</button>`;
   }
   function toggleShoppingChecked(key){
     const k = String(key || '');
@@ -207,7 +207,7 @@
     if(btn){
       btn.classList.toggle('is-checked', !!checked);
       btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
-      btn.innerHTML = checked ? '<span>âœ“</span> Comprado ahora' : '<span>â—‹</span> Marcar comprado';
+      btn.innerHTML = checked ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado';
       btn.setAttribute('aria-label', checked ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora');
       btn.removeAttribute('title');
     }
@@ -256,7 +256,7 @@
     const eventTotalDonado = eventDonations.reduce((sum, row) => sum + rowValue(row), 0);
     const eventProductsWithDonations = new Set(eventDonations.map(row => String(row.productoId || '')).filter(Boolean)).size;
 
-    // Listado: sÃ­ respeta el filtro de responsables.
+    // Listado: sí respeta el filtro de responsables.
     const rows = rowsAll.filter(row => rowMatchesResponsable(row));
     const buys = rows.filter(row => !isDonation(row.ticketDonacion));
     const donations = rows.filter(row => isDonation(row.ticketDonacion));
@@ -274,7 +274,7 @@
         unidades,
         valor,
         precioUnitario: unitPriceFrom(unidades, valor),
-        tipo: row.ticketDonacion || 'DonaciÃ³n',
+        tipo: row.ticketDonacion || 'Donación',
         responsable: responsibleName(row),
         entregada: isDonationDelivered(row)
       });
@@ -335,7 +335,7 @@
       return a.producto.localeCompare(b.producto, 'es');
     });
 
-    // V40.0: una donaciÃ³n asociada a un producto con compra se muestra solo en la primera ficha
+    // V40.0: una donación asociada a un producto con compra se muestra solo en la primera ficha
     // de compra de ese producto. Las siguientes compras del mismo producto no repiten esas donaciones.
     const donationProductsAlreadyShown = new Set();
     result.forEach(group => {
@@ -411,7 +411,7 @@
     const allChecked = !selectedResponsables || selectedResponsables.size === 0;
     return `<div class="mapa-filter mapa-filter-v3013" id="${FILTER_ID}">
       <button type="button" class="mapa-filter-toggle" data-mapa-filter-toggle="1" aria-expanded="false">
-        <strong>Responsables</strong><span>${esc(filterLabel(options))}</span><em>â–¾</em>
+        <strong>Responsables</strong><span>${esc(filterLabel(options))}</span><em>▾</em>
       </button>
       <div class="mapa-filter-panel" data-mapa-filter-panel="1" hidden>
         <label class="mapa-filter-option all"><input type="checkbox" value="__ALL__" ${allChecked ? 'checked' : ''}> Todos los responsables</label>
@@ -430,7 +430,7 @@
       if(!toggle || !panel) return;
       const open = !panel.hidden;
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      const em = toggle.querySelector('em'); if(em) em.textContent = open ? 'â–´' : 'â–¾';
+      const em = toggle.querySelector('em'); if(em) em.textContent = open ? '▴' : '▾';
     };
     toggle?.addEventListener('click', event => {
       try{ event.preventDefault(); event.stopPropagation(); }catch(_){ }
@@ -453,7 +453,7 @@
       const next = $(FILTER_ID);
       const nextPanel = next?.querySelector('[data-mapa-filter-panel]');
       const nextToggle = next?.querySelector('[data-mapa-filter-toggle]');
-      if(nextPanel && nextToggle){ nextPanel.hidden = false; nextToggle.setAttribute('aria-expanded','true'); const em = nextToggle.querySelector('em'); if(em) em.textContent = 'â–´'; }
+      if(nextPanel && nextToggle){ nextPanel.hidden = false; nextToggle.setAttribute('aria-expanded','true'); const em = nextToggle.querySelector('em'); if(em) em.textContent = '▴'; }
     };
     filter.addEventListener('change', event => {
       const input = event.target;
@@ -475,7 +475,7 @@
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>uds.</span></div>
         <div><strong>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</strong><span>precio</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
-        <div><strong>${esc(item.responsable || 'â€”')}</strong><span>resp.</span></div>
+        <div><strong>${esc(item.responsable || '—')}</strong><span>resp.</span></div>
         <div class="donation-delivered-cell">${renderDonationDeliveredButton(item)}</div>
       </div>`).join('')}</div>`;
   }
@@ -484,7 +484,7 @@
     if(!items.length) return '';
     return `<div class="mapa-donation-list donation-only-compact-list">${items.map(item => `
       <div class="mapa-donation-row donation-only-row">
-        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}${item.responsable ? ' Â· Resp. ' + esc(item.responsable) : ''}</span></div>
+        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}${item.responsable ? ' · Resp. ' + esc(item.responsable) : ''}</span></div>
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
         <div class="donation-delivered-cell">${renderDonationDeliveredButton(item)}</div>
@@ -568,7 +568,7 @@
       rememberSearchInput(input);
       const query = input.value || productSearchText || '';
       const ok = focusFirstProduct(query);
-      // V31.4: bÃºsqueda finalizada => limpiar lo tecleado para que la siguiente bÃºsqueda no repita el registro anterior.
+      // V31.4: búsqueda finalizada => limpiar lo tecleado para que la siguiente búsqueda no repita el registro anterior.
       clearSearch();
       return ok;
     };
@@ -651,7 +651,7 @@
       btn.setAttribute('data-mapa-back-top', '1');
       btn.setAttribute('aria-label', 'Volver al inicio del Mapa de recursos');
       btn.title = 'Volver al inicio';
-      btn.textContent = 'âŒ‚';
+      btn.textContent = '⌂';
       btn.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, true);
       btn.addEventListener('pointerup', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, true);
       btn.addEventListener('touchend', event => { try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ } scrollToMapaTop(); return false; }, {capture:true, passive:false});
@@ -671,7 +671,7 @@
       btn.addEventListener('keydown', event => { if(event.key === 'Enter' || event.key === ' '){ try{ event.preventDefault(); }catch(_){ } scrollToDonationHeader(); } });
     }
   }
-  function dataProductText(parts){ return esc(parts.filter(Boolean).join(' Â· ')); }
+  function dataProductText(parts){ return esc(parts.filter(Boolean).join(' · ')); }
 
   function handleMapaInternalAction(event){
     const donationToggle = event.target?.closest?.('#tabMapaProductos [data-mapa-donation-toggle="1"]');
@@ -732,9 +732,9 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('VALORACION DEL EVENTO', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
-        ${renderMetric('DONACION DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donaciÃ³n del evento Â· pulsar para ir a donados`, 'ok jump-donados')}
+        ${renderMetric('DONACION DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
-        ${renderMetric('SALDO LÃMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
+        ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
@@ -752,7 +752,7 @@
     const shoppingChecked = readShoppingChecked();
     const cards = data.groups.map(group => {
       const checkedNow = !group.isResolvedTk && shoppingChecked.has(group.key);
-      const responsablesTxt = Array.from(group.responsables.values()).join(', ') || 'â€”';
+      const responsablesTxt = Array.from(group.responsables.values()).join(', ') || '—';
       const donorTxt = group.donationRows.map(item => item.donor).join(', ');
       const searchText = dataProductText([group.tienda, group.ticket, group.producto, group.segmento, group.destino, responsablesTxt, donorTxt]);
       const donationBlock = group.donationRows.length ? `
@@ -760,7 +760,7 @@
           <div class="mapa-subtitle">Donantes</div>
           ${renderDonationRows(group.donationRows)}
         </div>` : '';
-      const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" aria-label="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleShop&&window.ControlEventMapaProductos.toggleShop(this,event)}catch(_e){};return false;">${checkedNow ? '<span>âœ“</span> Comprado ahora' : '<span>â—‹</span> Marcar comprado'}</button>`;
+      const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" aria-label="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleShop&&window.ControlEventMapaProductos.toggleShop(this,event)}catch(_e){};return false;">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>`;
       return `
       <article class="mapa-product-card mapa-product-card-compact compra-card ${group.isResolvedTk ? 'resolved-tk purchased-locked' : 'pending-buy'} ${checkedNow ? 'shop-checked' : ''}" data-product-text="${searchText}" data-shop-key="${esc(group.key)}">
         <div class="mapa-product-head compact">
@@ -772,9 +772,9 @@
         </div>
         <div class="mapa-product-resp"><b>Responsable:</b> ${esc(responsablesTxt)}</div>
         <div class="mapa-product-compact-line" role="list">
-          <div class="buy" role="listitem"><span>Compra</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. Â· ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))} Â· ${esc(moneyFmt(group.importeCompra))}</strong></div>
-          <div class="don" role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. Â· ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} Â· ${esc(moneyFmt(group.valorDonado))}</strong></div>
-          <div class="need" role="listitem"><span>Necesidad</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. Â· ${esc(moneyFmt(group.necesidadValor))}</strong></div>
+          <div class="buy" role="listitem"><span>Compra</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. · ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))} · ${esc(moneyFmt(group.importeCompra))}</strong></div>
+          <div class="don" role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} · ${esc(moneyFmt(group.valorDonado))}</strong></div>
+          <div class="need" role="listitem"><span>Necesidad</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. · ${esc(moneyFmt(group.necesidadValor))}</strong></div>
         </div>
         ${donationBlock}
       </article>`;
@@ -794,7 +794,7 @@
               <div class="mapa-product-title"><h3>${esc(item.producto)}</h3></div>
               <div class="mapa-tags compact"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div>
             </div>
-            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. Â· ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} Â· ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
+            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
             <div class="mapa-donation-block compact donation-only-block">${renderDonationRowsCompact(item.donationRows)}</div>
           </article>`;
         }).join('')}
@@ -803,7 +803,7 @@
     wrap.innerHTML = cards + onlyDonationBlock;
     normalizeMapaLabelsV3013();
     bindShoppingButtonsDirect();
-    // V31.4: no repetir automÃ¡ticamente la bÃºsqueda anterior tras renderizar.
+    // V31.4: no repetir automáticamente la búsqueda anterior tras renderizar.
   }
 
   function normalizeMapaLabelsV3013(){
@@ -825,7 +825,7 @@
   }
   function applyMapVisibility(){
     if(isAuthVisible()) return;
-    // V31.2: no forzar de nuevo la pestaÃ±a Mapa en cada render; evita secuestrar el menÃº mÃ³vil.
+    // V31.2: no forzar de nuevo la pestaña Mapa en cada render; evita secuestrar el menú móvil.
     const active = currentTab() === TAB_NAME;
     const eventReady = hasEvent();
     const panel = $(PANEL_ID), btn = $(BUTTON_ID);
@@ -847,7 +847,7 @@
     Array.from(document.querySelectorAll('.mobile-menu-grid')).forEach(grid => {
       const existing = grid.querySelector('.mobile-menu-action[data-target="tabMapaBtn"]');
       if(existing){
-        const desired = '<span class="mi">ðŸ§­</span>Mapa de recursos';
+        const desired = '<span class="mi">🧭</span>Mapa de recursos';
         if(existing.innerHTML.trim() !== desired) existing.innerHTML = desired;
         return;
       }
@@ -855,7 +855,7 @@
       const resumen = grid.querySelector('.mobile-menu-action[data-target="tabResumenBtn"]');
       if(!compras && !resumen) return;
       const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'mobile-menu-action'; btn.dataset.target = 'tabMapaBtn'; btn.innerHTML = '<span class="mi">ðŸ§­</span>Mapa de recursos';
+      btn.type = 'button'; btn.className = 'mobile-menu-action'; btn.dataset.target = 'tabMapaBtn'; btn.innerHTML = '<span class="mi">🧭</span>Mapa de recursos';
       (compras || resumen).insertAdjacentElement(compras ? 'afterend' : 'beforebegin', btn);
     });
     bindDirectMapaButton();
@@ -931,7 +931,7 @@
       }, 80);
     };
   })();
-  // V31.2: sin MutationObserver global para no repintar mientras se usa el menÃº o el filtro.
+  // V31.2: sin MutationObserver global para no repintar mientras se usa el menú o el filtro.
   [0, 120, 400, 900, 1800].forEach(ms => setTimeout(() => { if(isAuthVisible()) return; applyMapVisibility(); ensureMobileMenuAction(); bindDirectMapaButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }, ms));
   window.ControlEventMapaProductos = {version: VERSION, mode: 'mapa-recursos-v410', render: renderMapaProductos, build: buildMapaProductos, show: forceShowMapa, goDonados: scrollToDonationHeader, goTop: scrollToMapaTop, toggleShop: activateShoppingButton, toggleDonationDelivered, sync: () => { applyMapVisibility(); ensureMobileMenuAction(); ensureFloatingHomeButton(); if(currentTab() === TAB_NAME) renderMapaProductos(); }};
 })();

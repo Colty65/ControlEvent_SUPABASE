@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - HOTFIX mÃ­nimo: bÃºsqueda finalizados, recarga puntual COMPRAS/DONACIONES y ayuda compartir pantalla. */
+/* ControlEvent v13.0_prod - HOTFIX mínimo: búsqueda finalizados, recarga puntual COMPRAS/DONACIONES y ayuda compartir pantalla. */
 (function(){
   'use strict';
   if(window.__ceV105HotfixBusquedaRecargaCompartir) return;
@@ -106,7 +106,7 @@
     var cards=cardsIn(list, kind);
     var found=cards.find(function(c){ return matches(rowText(c, kind), toks); });
     if(found){ highlight(found); return false; }
-    // Segundo pase: buscar en estado por si la ficha quedÃ³ reciÃ©n renderizada con selects protegidos.
+    // Segundo pase: buscar en estado por si la ficha quedó recién renderizada con selects protegidos.
     var ev=selectedEventId();
     var rows=arr('compras').filter(function(r){
       if(ev && trim(r.eventId || r.event_id)!==ev) return false;
@@ -126,7 +126,7 @@
       var byText=cards.find(function(c){ return pname && rowText(c, kind).indexOf(fold(pname))>=0; });
       if(byText){ highlight(byText); return false; }
     }
-    alert('No se ha encontrado ningÃºn registro con ese texto.');
+    alert('No se ha encontrado ningún registro con ese texto.');
     return false;
   }
   function handleSearch(ev){
@@ -205,14 +205,14 @@
     if(help && !help.__ceV105hfShareText){
       help.__ceV105hfShareText=true;
       help.innerHTML='<b>Para duplicar en una TV/proyector sin HDMI:</b><br>'+ 
-        '<b>Windows/PC:</b> 1) En la TV activa â€œDuplicar pantalla / Screen Share / Miracastâ€ si existe. 2) Pulsa aquÃ­ â€œPantalla completaâ€. 3) Pulsa <b>Win+K</b> y elige la TV. Si la lista sale vacÃ­a, Windows no estÃ¡ encontrando ninguna pantalla inalÃ¡mbrica compatible; la app no puede forzar que aparezca.<br>'+ 
-        '<b>iPad/iPhone:</b> Centro de control â†’ <b>Duplicar pantalla / AirPlay</b> â†’ elige Apple TV o TV compatible.<br>'+ 
-        '<b>Android:</b> Ajustes rÃ¡pidos â†’ <b>Enviar pantalla / Smart View / Cast</b>.';
+        '<b>Windows/PC:</b> 1) En la TV activa “Duplicar pantalla / Screen Share / Miracast” si existe. 2) Pulsa aquí “Pantalla completa”. 3) Pulsa <b>Win+K</b> y elige la TV. Si la lista sale vacía, Windows no está encontrando ninguna pantalla inalámbrica compatible; la app no puede forzar que aparezca.<br>'+ 
+        '<b>iPad/iPhone:</b> Centro de control → <b>Duplicar pantalla / AirPlay</b> → elige Apple TV o TV compatible.<br>'+ 
+        '<b>Android:</b> Ajustes rápidos → <b>Enviar pantalla / Smart View / Cast</b>.';
     }
     var box=p.querySelector('.box');
     if(box && !p.querySelector('.ce-share-warning')){
       var div=document.createElement('div'); div.className='ce-share-warning';
-      div.textContent='Si al pulsar Win+K aparece la ventana â€œTransmitirâ€ sin pantallas disponibles, no es fallo de ControlEvent: el PC no ve ninguna TV compatible en la red o la TV no tiene activado el modo de recepciÃ³n inalÃ¡mbrica.';
+      div.textContent='Si al pulsar Win+K aparece la ventana “Transmitir” sin pantallas disponibles, no es fallo de ControlEvent: el PC no ve ninguna TV compatible en la red o la TV no tiene activado el modo de recepción inalámbrica.';
       var status=p.querySelector('#ceShareStatus');
       if(status) status.parentNode.insertBefore(div, status.nextSibling); else box.appendChild(div);
     }

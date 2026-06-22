@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - ajuste minimo sobre v50.9.
+/* ControlEvent v13.0_prod - ajuste minimo sobre v50.9.
    - Salir: evita que quede la app borrosa si el overlay de login no termina de pintar.
    - INGRESOS: recoloca justificante / adjuntar / borrar al extremo derecho del registro.
 */
@@ -157,7 +157,7 @@
     patchRenders();
     moveIngresoReceiptFields();
     if(!isMobile()) return;
-    // En movil, si quedaron estilos inline del dock anterior tras salir, se limpiarÃ¡n al salir con showLoginClean.
+    // En movil, si quedaron estilos inline del dock anterior tras salir, se limpiarán al salir con showLoginClean.
   }
 
   // Captura temprana: el listener de v50.19 puede dispararse antes; por eso tambien se ha corregido directamente v50-8-final-fixes.js.

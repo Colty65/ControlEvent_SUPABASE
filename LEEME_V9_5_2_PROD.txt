@@ -1,21 +1,21 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Cambios incluidos:
 
 1) Ticket IA / COMPRAS
-- El botÃ³n Quitar de cada lÃ­nea de ticket IA se sustituye por una papelera pequeÃ±a en la misma columna.
-- Se mantiene la compactaciÃ³n de la pantalla de v9.5.1.
+- El botón Quitar de cada línea de ticket IA se sustituye por una papelera pequeña en la misma columna.
+- Se mantiene la compactación de la pantalla de v9.5.1.
 
-2) PRODUCTOS: actualizaciÃ³n de precio existente
-- Se aÃ±ade una ruta backend dedicada: PUT /api/crud/productos/:id/precio.
-- Cuando un producto ya existe, Ticket IA llama a esa ruta y actualiza defaultPrecio/precio con el Ãºltimo precio del ticket.
-- La respuesta backend devuelve tambiÃ©n precio como alias de defaultPrecio para que el mantenimiento PRODUCTOS y el estado local lo reflejen.
-- La actualizaciÃ³n solo toca Ãºltimo precio conocido y tienda habitual; no cambia nombre, segmento ni destino.
+2) PRODUCTOS: actualización de precio existente
+- Se añade una ruta backend dedicada: PUT /api/crud/productos/:id/precio.
+- Cuando un producto ya existe, Ticket IA llama a esa ruta y actualiza defaultPrecio/precio con el último precio del ticket.
+- La respuesta backend devuelve también precio como alias de defaultPrecio para que el mantenimiento PRODUCTOS y el estado local lo reflejen.
+- La actualización solo toca último precio conocido y tienda habitual; no cambia nombre, segmento ni destino.
 
-3) Guardia de sesiÃ³n visible
-- Se aÃ±ade public/app/features/v9-5-2-session-guard.js.
-- Si durante una sesiÃ³n activa algÃºn refresco deja la cabecera en â€œSin accesoâ€ aunque haya datos visibles, se restaura el usuario en memoria.
-- El guardia respeta el botÃ³n Salir y /api/logout: al salir no restaura la sesiÃ³n.
+3) Guardia de sesión visible
+- Se añade public/app/features/v9-5-2-session-guard.js.
+- Si durante una sesión activa algún refresco deja la cabecera en “Sin acceso” aunque haya datos visibles, se restaura el usuario en memoria.
+- El guardia respeta el botón Salir y /api/logout: al salir no restaura la sesión.
 
 Ficheros principales modificados:
 - public/app/features/v9-5-2-ticketauto-compras.js
@@ -35,4 +35,4 @@ Validaciones realizadas:
 - node --check routes/crud.routes.js
 - node --check services/crud.service.js
 - node --check lib/supabase-normalized.js
-- ValidaciÃ³n JSON de package.json y package-lock.json
+- Validación JSON de package.json y package-lock.json

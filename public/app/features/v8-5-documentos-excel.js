@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
+/* ControlEvent v13.0_prod - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
    Parche aislado: no cambia la mecanica de mantenimiento DOCXX; solo extiende Excel. */
 (function(){
   'use strict';
@@ -103,7 +103,7 @@
     ws.mergeCells(2,1,2,5);
     ws.getCell(2,1).value = ev.titulo || ev.id || '';
     paint(ws.getCell(2,1), 'FFF8FAFC', true);
-    ['CÃ³digo','Fecha','DescripciÃ³n','Foto/URL','Imagen'].forEach((h, idx) => {
+    ['Código','Fecha','Descripción','Foto/URL','Imagen'].forEach((h, idx) => {
       const c = ws.getCell(4, idx + 1);
       c.value = h;
       paint(c, 'FF111827', true, 'FFFFFFFF');
@@ -154,7 +154,7 @@
       script.onerror = () => reject(new Error('No se pudo cargar ExcelJS para DOCUMENTOS.'));
       document.head.appendChild(script);
     });
-    if(!window.ExcelJS?.Workbook) throw new Error('ExcelJS no quedÃ³ disponible para DOCUMENTOS.');
+    if(!window.ExcelJS?.Workbook) throw new Error('ExcelJS no quedó disponible para DOCUMENTOS.');
     return window.ExcelJS;
   }
   function hookWorkbook(ExcelJS){

@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - Bundle legacy generado desde scripts legacy-inline extraÃ­dos. */
-/* Mantiene el orden original de ejecuciÃ³n para compatibilidad. */
+/* ControlEvent v13.0_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-01.js ===== */
 
@@ -33,10 +33,10 @@ if(!state.summaryTiendaSort) state.summaryTiendaSort = 'tienda';
 function uid(){ return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
 function money(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n||0)); }
 function numberEs(n){ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2}).format(Number(n||0)); }
-function euroInputValue(n){ return numberEs(Number(n||0)) + ' â‚¬'; }
+function euroInputValue(n){ return numberEs(Number(n||0)) + ' €'; }
 function parseEuroInput(v){
   if(typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  let s = String(v ?? '').replace(/â‚¬/g,'').replace(/\s/g,'').trim();
+  let s = String(v ?? '').replace(/€/g,'').replace(/\s/g,'').trim();
   if(!s) return 0;
 
   const lastComma = s.lastIndexOf(',');
@@ -93,7 +93,7 @@ async function loadScriptWithFallback(urls){
       lastError = err;
     }
   }
-  throw lastError || new Error('No se pudo cargar ninguna librerÃ­a externa.');
+  throw lastError || new Error('No se pudo cargar ninguna librería externa.');
 }
 
 async function ensureSheetJS(){
@@ -166,9 +166,9 @@ function renderAcceso(){
     row.className = 'itemcard maint-soft';
     row.innerHTML = `
       <div class="rowline persona">
-        <div class="field"><label>IdentificaciÃ³n</label><input value="${escapeHtml(u.identificacion)}" data-action="edit-acceso-identificacion" data-id="${escapeHtml(u.identificacion)}" /></div>
+        <div class="field"><label>Identificación</label><input value="${escapeHtml(u.identificacion)}" data-action="edit-acceso-identificacion" data-id="${escapeHtml(u.identificacion)}" /></div>
         <div class="field"><label>Nombre</label><input value="${escapeHtml(u.nombre)}" data-action="edit-acceso-nombre" data-id="${escapeHtml(u.identificacion)}" /></div>
-        <div class="field"><label>Clave</label><input type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢" data-action="edit-acceso-clave" data-id="${escapeHtml(u.identificacion)}" /></div>
+        <div class="field"><label>Clave</label><input type="password" placeholder="••••••" data-action="edit-acceso-clave" data-id="${escapeHtml(u.identificacion)}" /></div>
         <div class="field"><label>Nivel</label><select data-action="edit-acceso-nivel" data-id="${escapeHtml(u.identificacion)}">${['RO','RW','GD'].map(v => `<option value="${v}" ${v===u.nivel?'selected':''}>${v}</option>`).join('')}</select></div>
         <button type="button" class="modify small" data-action="save-acceso" data-id="${escapeHtml(u.identificacion)}" onclick="saveAccessUser('${escapeHtml(u.identificacion)}'); return false;">Modificar</button>
         <button type="button" class="danger small" data-action="delete-acceso" data-id="${escapeHtml(u.identificacion)}" onclick="deleteAccessUser('${escapeHtml(u.identificacion)}'); return false;" ${authUser && u.identificacion===authUser.identificacion ? 'disabled' : ''}>Eliminar</button>
@@ -356,7 +356,7 @@ async function importInitialWorkbook(){
     document.getElementById('maintenanceWrapper').classList.add('hidden');
     render();
     setImportStatus(
-      'ImportaciÃ³n completada.\n' +
+      'Importación completada.\n' +
       `EVENTOS: ${nextState.eventos.length}\n` +
       `PERSONAS: ${nextState.personas.length}\n` +
       `TIENDAS: ${nextState.tiendas.length}\n` +
@@ -367,19 +367,19 @@ async function importInitialWorkbook(){
       'ok'
     );
   }catch(err){
-    setImportStatus('Error en la importaciÃ³n: ' + (err?.message || err), 'bad');
+    setImportStatus('Error en la importación: ' + (err?.message || err), 'bad');
   }
 }
 
 function defaultState(){
   const defaults = {
     personas: [
-      {id:uid(), nombre:'JesÃºs y acompaÃ±ante', rango:'SOCIO'},
+      {id:uid(), nombre:'Jesús y acompañante', rango:'SOCIO'},
       {id:uid(), nombre:'Ana', rango:'SOCIO'},
-      {id:uid(), nombre:'FundaciÃ³n amiga', rango:'DONANTE'}
+      {id:uid(), nombre:'Fundación amiga', rango:'DONANTE'}
     ],
     eventos: [
-      {id:uid(), titulo:'Comida Primavera', precio:15, fechaIni:'01/05/25', fechaFin:'02/05/25', situacion:'En curso', descripcion:'Evento de ejemplo para organizar compras y colaboraciÃ³n econÃ³mica.'},
+      {id:uid(), titulo:'Comida Primavera', precio:15, fechaIni:'01/05/25', fechaFin:'02/05/25', situacion:'En curso', descripcion:'Evento de ejemplo para organizar compras y colaboración económica.'},
       {id:uid(), titulo:'Cena Verano', precio:20, fechaIni:'15/08/25', fechaFin:'16/08/25', situacion:'En curso', descripcion:'Segundo evento de ejemplo.'}
     ],
     tiendas: [
@@ -398,7 +398,7 @@ function defaultState(){
   defaults.selectedEventId = defaults.eventos[0].id;
   defaults.productos = [
     {id:uid(), nombre:'Refresco', segmento:'BEBIDA', destino:'APERITIVO'},
-    {id:uid(), nombre:'CarbÃ³n', segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'}
+    {id:uid(), nombre:'Carbón', segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'}
   ];
   return defaults;
 }
@@ -711,7 +711,7 @@ function summaryByTiendaTicket(){
 
   const rows = Object.entries(filled).map(([k,obj]) => {
     const label = obj.donated && obj.products.length
-      ? `${k} Â· ${obj.products.join(' Â· ')}`
+      ? `${k} · ${obj.products.join(' · ')}`
       : k;
     return {
       k,
@@ -757,7 +757,7 @@ function renderSummaryList(targetId, rows){
   if(targetId === 'summaryTiendaTicket'){
     const tools = document.createElement('div');
     tools.className = 'hint';
-    tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> Â· <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket/DonaciÃ³n/Otros Gastos</a>';
+    tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> · <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket/Donación/Otros Gastos</a>';
     wrap.appendChild(tools);
   }
 
@@ -782,7 +782,7 @@ function renderSummaryList(targetId, rows){
       const inputId = `ticketUpload_${idx}`;
       const encodedKey = encodeURIComponent(r.k);
       const preview = r.image ? `<img class="ticket-thumb" src="${r.image}" alt="ticket" />` : '';
-      div.innerHTML = `<span>${escapeHtml(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">ðŸ“Ž</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">ðŸ—‘ï¸</button>` : ''}</span></span>`;
+      div.innerHTML = `<span>${escapeHtml(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">📎</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">🗑️</button>` : ''}</span></span>`;
     } else {
       div.innerHTML = `<span>${escapeHtml(textLabel)}</span>${amountHtml}`;
     }
@@ -895,7 +895,7 @@ async function doLogin(){
   const error = document.getElementById('authError');
   if(error) error.textContent = '';
   if(!ident || !clave){
-    if(error) error.textContent = 'Introduce identificaciÃ³n y clave.';
+    if(error) error.textContent = 'Introduce identificación y clave.';
     return;
   }
   authBusy = true;
@@ -906,7 +906,7 @@ async function doLogin(){
       body: JSON.stringify({identificacion: ident, clave})
     });
     const data = await res.json();
-    if(!res.ok || !data.ok) throw new Error(data.error || 'Acceso no vÃ¡lido');
+    if(!res.ok || !data.ok) throw new Error(data.error || 'Acceso no válido');
     authUser = data.user;
     const fresh = await fetch('/api/state', {cache:'no-store'});
     const serverState = await fresh.json();
@@ -944,7 +944,7 @@ async function doChangePassword(){
   if(error) error.textContent = '';
 
   if(!ident || !actual){
-    if(error) error.textContent = 'Introduce identificaciÃ³n y clave actual.';
+    if(error) error.textContent = 'Introduce identificación y clave actual.';
     return;
   }
   if(!nueva1 || !nueva2){
@@ -1078,7 +1078,7 @@ function renderHeader(){
   st.className = 'status-pill ' + (fin ? 'status-finalizado' : 'status-curso');
   const bubble = document.getElementById('eventDescBubble');
   if(bubble){
-    bubble.textContent = ev?.descripcion || 'Sin descripciÃ³n del evento.';
+    bubble.textContent = ev?.descripcion || 'Sin descripción del evento.';
     bubble.classList.toggle('hidden', !showEventDesc);
   }
   const p = document.getElementById('btnTogglePower');
@@ -1144,7 +1144,7 @@ function renderIngresosSummary(){
     const div = document.createElement('div');
     const cls = item.tipo === 'Pendiente' ? 'warn' : (item.tipo === 'TOTAL INGRESOS' ? 'ok' : 'ok');
     div.className = 'metric ' + cls;
-    div.innerHTML = `<div class="label">${escapeHtml(item.tipo)}</div><div class="value">${item.personas} Â· ${money(item.importe)}</div>`;
+    div.innerHTML = `<div class="label">${escapeHtml(item.tipo)}</div><div class="value">${item.personas} · ${money(item.importe)}</div>`;
     grid.appendChild(div);
   });
 }
@@ -1153,7 +1153,7 @@ function renderColabs(){
   const wrap = document.getElementById('collabList');
   const rows = collabsForEvent();
   if(!rows.length){
-    wrap.innerHTML = '<div class="empty">TodavÃ­a no hay personas colaboradoras para este evento.</div>';
+    wrap.innerHTML = '<div class="empty">Todavía no hay personas colaboradoras para este evento.</div>';
     return;
   }
   wrap.innerHTML = '';
@@ -1170,7 +1170,7 @@ function renderColabs(){
           </select>
         </div>
         <div class="field">
-          <label>NÃºmero</label>
+          <label>Número</label>
           <input type="number" min="0" step="1" value="${Number(r.numero||0)}" data-action="edit-collab-numero" data-id="${r.id}" />
         </div>
         <div class="field">
@@ -1216,12 +1216,12 @@ function renderBudget(){
         </div>
       </div>
       <div class="budget-panel donantes">
-        <h3>DONACIÃ“N DE PRODUCTO</h3>
+        <h3>DONACIÓN DE PRODUCTO</h3>
         <div class="budget-rows">
           <div class="budget-subrows">
-            <div class="budget-subrow"><span>DonaciÃ³n de producto tiendas</span><span>${escapeHtml(money(b.donacionProducto.donadoTienda))}</span></div>
-            <div class="budget-subrow"><span>DonaciÃ³n de producto socios</span><span>${escapeHtml(money(b.donacionProducto.donadoSocio))}</span></div>
-            <div class="budget-subrow"><span>DonaciÃ³n de producto no socios</span><span>${escapeHtml(money(b.donacionProducto.donadoOtros))}</span></div>
+            <div class="budget-subrow"><span>Donación de producto tiendas</span><span>${escapeHtml(money(b.donacionProducto.donadoTienda))}</span></div>
+            <div class="budget-subrow"><span>Donación de producto socios</span><span>${escapeHtml(money(b.donacionProducto.donadoSocio))}</span></div>
+            <div class="budget-subrow"><span>Donación de producto no socios</span><span>${escapeHtml(money(b.donacionProducto.donadoOtros))}</span></div>
           </div>
           <div class="budget-row budget-subgroup"><strong>Valor producto donado</strong><span>${escapeHtml(money(b.donacionProducto.valorDonado))}</span></div>
         </div>
@@ -1231,8 +1231,8 @@ function renderBudget(){
         <div class="budget-rows">
           <div class="budget-row"><strong>INGRESOS</strong><span>${escapeHtml(money(b.operativa.ingresoDinero))}</span></div>
           <div class="budget-row"><strong>GASTO POR COMPRAS</strong><span>${escapeHtml(money(b.operativa.gastoCompras))}</span></div>
-          <div class="budget-row"><strong>GASTOS DE ORGANIZACIÃ“N</strong><span>${escapeHtml(money(b.operativa.gastosOrganizacion))}</span></div>
-          <div class="budget-row"><strong>PTE. DE COMPRAS Y/O GASTOS DE ORGANIZACIÃ“N</strong><span style="color:#c2410c">${escapeHtml(money(b.operativa.pendiente))}</span></div>
+          <div class="budget-row"><strong>GASTOS DE ORGANIZACIÓN</strong><span>${escapeHtml(money(b.operativa.gastosOrganizacion))}</span></div>
+          <div class="budget-row"><strong>PTE. DE COMPRAS Y/O GASTOS DE ORGANIZACIÓN</strong><span style="color:#c2410c">${escapeHtml(money(b.operativa.pendiente))}</span></div>
           <div class="budget-row"><strong>SALDO OPERATIVO</strong><span style="color:${b.operativa.saldoOperativo>=0 ? '#047857' : '#b91c1c'}">${escapeHtml(money(b.operativa.saldoOperativo))}</span></div>
         </div>
       </div>`;
@@ -1268,11 +1268,11 @@ function renderCompras(){
   }
 
   if(!rows.length){
-    wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>';
+    wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>';
     return;
   }
 
-  wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+  wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
 
   rows.forEach(r => {
     const pending = String(r.ticketDonacion || '').trim() === '';
@@ -1394,12 +1394,12 @@ function renderEventos(){
     row.innerHTML = `
       ${e.id===state.selectedEventId ? '<div class="badge-active">Activo</div>' : ''}
       <div class="rowline evento">
-        <div class="field"><label>TÃ­tulo</label><input value="${escapeHtml(e.titulo)}" data-action="edit-evento-titulo" data-id="${e.id}" /></div>
+        <div class="field"><label>Título</label><input value="${escapeHtml(e.titulo)}" data-action="edit-evento-titulo" data-id="${e.id}" /></div>
         <div class="field"><label>Precio</label><input type="number" min="0" step="0.01" value="${Number(e.precio||0)}" data-action="edit-evento-precio" data-id="${e.id}" /></div>
         <div class="field"><label>Fecha ini</label><input value="${escapeHtml(e.fechaIni||'')}" data-action="edit-evento-fechaini" data-id="${e.id}" /></div>
         <div class="field"><label>Fecha fin</label><input value="${escapeHtml(e.fechaFin||'')}" data-action="edit-evento-fechafin" data-id="${e.id}" /></div>
-        <div class="field"><label>DescripciÃ³n</label><input value="${escapeHtml(e.descripcion||'')}" data-action="edit-evento-descripcion" data-id="${e.id}" /></div>
-        <div class="field"><label>SituaciÃ³n</label><select data-action="edit-evento-situacion" data-id="${e.id}">${EVENT_SITUATIONS.map(v => `<option value="${v}" ${v===e.situacion?'selected':''}>${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Descripción</label><input value="${escapeHtml(e.descripcion||'')}" data-action="edit-evento-descripcion" data-id="${e.id}" /></div>
+        <div class="field"><label>Situación</label><select data-action="edit-evento-situacion" data-id="${e.id}">${EVENT_SITUATIONS.map(v => `<option value="${v}" ${v===e.situacion?'selected':''}>${v}</option>`).join('')}</select></div>
         <button type="button" class="modify small" data-action="save-evento" data-id="${e.id}" onclick="saveEventRecord(\'${e.id}\'); return false;">Modificar</button>
         <button type="button" class="danger small" data-action="delete-evento" data-id="${e.id}">Eliminar</button>
       </div>
@@ -1450,7 +1450,7 @@ function renderProductos(){
   wrap.innerHTML = '';
   const hdr = document.createElement('div');
   hdr.className = 'hint';
-  hdr.innerHTML = 'Ordenar por: <a href="#" class="link-sort" data-sort-producto="nombre">Nombre</a> Â· <a href="#" class="link-sort" data-sort-producto="segmento">Segmento</a> Â· <a href="#" class="link-sort" data-sort-producto="destino">Destino</a> Â· <a href="#" class="link-sort" data-sort-producto="tienda">Tienda</a>';
+  hdr.innerHTML = 'Ordenar por: <a href="#" class="link-sort" data-sort-producto="nombre">Nombre</a> · <a href="#" class="link-sort" data-sort-producto="segmento">Segmento</a> · <a href="#" class="link-sort" data-sort-producto="destino">Destino</a> · <a href="#" class="link-sort" data-sort-producto="tienda">Tienda</a>';
   wrap.appendChild(hdr);
   list.forEach(p => {
     const row = document.createElement('div');
@@ -1578,7 +1578,7 @@ function addProducto(){
     eventId: state.selectedEventId
   });
   document.getElementById('newProductoNombre').value = '';
-  document.getElementById('newProductoPrecio').value = '0,00 â‚¬';
+  document.getElementById('newProductoPrecio').value = '0,00 €';
   render();
 }
 
@@ -1597,7 +1597,7 @@ function addColab(){
   document.getElementById('collabPersona').value = '';
   document.getElementById('collabNumero').value = '1';
   document.getElementById('collabSituacion').value = 'Pendiente';
-  document.getElementById('collabImporte').value = '0,00 â‚¬';
+  document.getElementById('collabImporte').value = '0,00 €';
   render();
 }
 
@@ -1627,11 +1627,11 @@ function renderDonaciones(){
   }
 
   if(!rows.length){
-    wrap.innerHTML = '<div class="empty">TodavÃ­a no hay donaciones de producto para este evento.</div>';
+    wrap.innerHTML = '<div class="empty">Todavía no hay donaciones de producto para este evento.</div>';
     return;
   }
 
-  wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderDonaciones(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderDonaciones(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
+  wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderDonaciones(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderDonaciones(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
 
   rows.forEach(r => {
     const row = document.createElement('div');
@@ -1657,7 +1657,7 @@ function renderDonaciones(){
           <input class="soft-readonly" readonly value="${money(r.valor)}" />
         </div>
         <div class="field">
-          <label>Tipo de donaciÃ³n</label>
+          <label>Tipo de donación</label>
           <select data-action="edit-compra-ticket" data-id="${r.id}">
             ${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${escapeHtml(v)}</option>`).join('')}
           </select>
@@ -1748,7 +1748,7 @@ function renderGraficas(){
     <div class="chart-shell">
       <div class="chart-grid">
         <div class="chart-stat"><div class="k">Ingreso dinero</div><div class="v">${escapeHtml(money(ingresoTotal))}</div></div>
-        <div class="chart-stat"><div class="k">DonaciÃ³n de producto</div><div class="v">${escapeHtml(money(donacionProducto))}</div></div>
+        <div class="chart-stat"><div class="k">Donación de producto</div><div class="v">${escapeHtml(money(donacionProducto))}</div></div>
         <div class="chart-stat"><div class="k">Gasto total</div><div class="v">${escapeHtml(money(gastoTotal))}</div></div>
         <div class="chart-stat"><div class="k">Saldo operativo</div><div class="v">${escapeHtml(money(saldo))}</div></div>
       </div>
@@ -1761,7 +1761,7 @@ function renderGraficas(){
           </div>
         </div>
         <div class="chart-row">
-          <div class="chart-label">DONACIÃ“N DE PRODUCTO</div>
+          <div class="chart-label">DONACIÓN DE PRODUCTO</div>
           <div class="chart-track" data-tip="Valor producto donado: ${escapeHtml(money(donacionProducto))}" title="Valor producto donado: ${escapeHtml(money(donacionProducto))}">
             <div class="chart-seg" data-tip="Tiendas: ${escapeHtml(money(b.donacionProducto.donadoTienda))}" title="Tiendas: ${escapeHtml(money(b.donacionProducto.donadoTienda))}" style="width:${(Number(b.donacionProducto.donadoTienda||0)/maxVal)*100}%;background:#fcd34d;"></div><div class="chart-seg" data-tip="Socios: ${escapeHtml(money(b.donacionProducto.donadoSocio))}" title="Socios: ${escapeHtml(money(b.donacionProducto.donadoSocio))}" style="width:${(Number(b.donacionProducto.donadoSocio||0)/maxVal)*100}%;background:#f59e0b;"></div><div class="chart-seg" data-tip="Otros: ${escapeHtml(money(b.donacionProducto.donadoOtros))}" title="Otros: ${escapeHtml(money(b.donacionProducto.donadoOtros))}" style="width:${(Number(b.donacionProducto.donadoOtros||0)/maxVal)*100}%;background:#b45309;"></div>
             <div class="chart-center-value">${escapeHtml(money(donacionProducto))}</div>
@@ -1770,7 +1770,7 @@ function renderGraficas(){
         <div class="chart-row">
           <div class="chart-label">GASTOS</div>
           <div class="chart-track" data-tip="Gasto total: ${escapeHtml(money(gastoTotal))}" title="Gasto total: ${escapeHtml(money(gastoTotal))}">
-            <div class="chart-seg" data-tip="Gasto por compras: ${escapeHtml(money(compraMoney))}" title="Gasto por compras: ${escapeHtml(money(compraMoney))}" style="width:${gastoCompPct}%;background:#fca5a5;"></div><div class="chart-seg" data-tip="Gastos de organizaciÃ³n: ${escapeHtml(money(orgMoney))}" title="Gastos de organizaciÃ³n: ${escapeHtml(money(orgMoney))}" style="width:${gastoOrgPct}%;background:#dc2626;"></div>
+            <div class="chart-seg" data-tip="Gasto por compras: ${escapeHtml(money(compraMoney))}" title="Gasto por compras: ${escapeHtml(money(compraMoney))}" style="width:${gastoCompPct}%;background:#fca5a5;"></div><div class="chart-seg" data-tip="Gastos de organización: ${escapeHtml(money(orgMoney))}" title="Gastos de organización: ${escapeHtml(money(orgMoney))}" style="width:${gastoOrgPct}%;background:#dc2626;"></div>
             <div class="chart-center-value">${escapeHtml(money(gastoTotal))}</div>
           </div>
         </div>
@@ -2060,12 +2060,12 @@ async function exportSeedWorkbook(){
   try{
     await ensureExcelJS();
   }catch(err){
-    alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+    alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
     return;
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+  wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -2171,7 +2171,7 @@ async function exportExcel(){
   try{
     await ensureExcelJS();
   }catch(err){
-    alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+    alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
     return;
   }
 
@@ -2185,12 +2185,12 @@ async function exportExcel(){
   const tiendaRows = summaryByTiendaTicket();
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+  wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
   wb.created = new Date();
 
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
   const fills = { title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', white:'FFFFFFFF' };
-  const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+  const moneyFmt = '#,##0.00 [$€-C0A]';
   const numFmt = '0.00';
 
   function baseSheet(name, widths){
@@ -2318,7 +2318,7 @@ async function exportExcel(){
     if(desc){
       ctx.fillStyle = '#64748b';
       ctx.font = 'bold 16px Arial';
-      ctx.fillText('DescripciÃ³n del evento:', 40, 74);
+      ctx.fillText('Descripción del evento:', 40, 74);
       ctx.fillStyle = '#334155';
       ctx.font = '15px Arial';
       const lines = wrapText(desc, 240, 74, 900, 22);
@@ -2327,7 +2327,7 @@ async function exportExcel(){
     if(titleTxt){
       ctx.fillStyle = '#64748b';
       ctx.font = 'bold 16px Arial';
-      ctx.fillText('TÃ­tulo del evento:', 40, cardsY);
+      ctx.fillText('Título del evento:', 40, cardsY);
       ctx.fillStyle = '#111827';
       ctx.font = 'bold 18px Arial';
       const titleLines = wrapText(titleTxt, 200, cardsY, 940, 24);
@@ -2336,7 +2336,7 @@ async function exportExcel(){
 
     const cards = [
       ['Ingreso dinero', fmt(socioMoney + donanteMoney)],
-      ['DonaciÃ³n de producto', fmt(donProd)],
+      ['Donación de producto', fmt(donProd)],
       ['Gasto total', fmt(compraMoney + orgMoney)],
       ['Saldo operativo', fmt(saldo)]
     ];
@@ -2356,7 +2356,7 @@ async function exportExcel(){
     ctx.fillStyle = '#475569'; ctx.font = '15px Arial'; ctx.fillText('Socios: ' + fmt(socioMoney), 310, yBase + 55); ctx.fillText('Donantes: ' + fmt(donanteMoney), 580, yBase + 55);
 
     yBase += 100;
-    drawTrack(yBase, 'DONACIÃ“N DE PRODUCTO', [
+    drawTrack(yBase, 'DONACIÓN DE PRODUCTO', [
       {value:Number(budget.donacionProducto.donadoTienda||0), color:'#fcd34d'},
       {value:Number(budget.donacionProducto.donadoSocio||0), color:'#f59e0b'},
       {value:Number(budget.donacionProducto.donadoOtros||0), color:'#b45309'}
@@ -2368,7 +2368,7 @@ async function exportExcel(){
       {value:compraMoney, color:'#fca5a5'},
       {value:orgMoney, color:'#dc2626'}
     ], fmt(compraMoney + orgMoney));
-    ctx.fillStyle = '#475569'; ctx.fillText('Compras: ' + fmt(compraMoney), 310, yBase + 55); ctx.fillText('OrganizaciÃ³n: ' + fmt(orgMoney), 620, yBase + 55);
+    ctx.fillStyle = '#475569'; ctx.fillText('Compras: ' + fmt(compraMoney), 310, yBase + 55); ctx.fillText('Organización: ' + fmt(orgMoney), 620, yBase + 55);
 
     yBase += 100;
     drawTrack(yBase, 'SALDO OPERATIVO', [
@@ -2382,27 +2382,27 @@ async function exportExcel(){
   const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
   let r = 1;
   mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v13.0_prod - Â©oltyLAB â€™26');
+  putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v13.0_prod - ©oltyLAB ’26');
   putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
   putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
-  wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'DescripciÃ³n del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
-  putText(wsRes,r,1,'SituaciÃ³n'); putText(wsRes,r++,2,ev.situacion || 'En curso', (ev.situacion === 'Finalizado' ? 'bad' : 'ok'));
+  wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
+  putText(wsRes,r,1,'Situación'); putText(wsRes,r++,2,ev.situacion || 'En curso', (ev.situacion === 'Finalizado' ? 'bad' : 'ok'));
   putText(wsRes,r,1,'Precio evento'); putMoney(wsRes,r++,2,ev.precio);
   putText(wsRes,r,1,'Ingreso dinero'); putMoney(wsRes,r++,2,budget.ingresosDinero.totalIngresado);
   putText(wsRes,r,1,'Gasto por compras'); putMoney(wsRes,r++,2,budget.operativa.gastoCompras);
-  putText(wsRes,r,1,'Gastos de organizaciÃ³n'); putMoney(wsRes,r++,2,budget.operativa.gastosOrganizacion);
+  putText(wsRes,r,1,'Gastos de organización'); putMoney(wsRes,r++,2,budget.operativa.gastosOrganizacion);
   putText(wsRes,r,1,'Valor producto donado'); putMoney(wsRes,r++,2,budget.donacionProducto.valorDonado);
-  putText(wsRes,r,1,'DonaciÃ³n de producto tiendas'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoTienda);
-  putText(wsRes,r,1,'DonaciÃ³n de producto socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoSocio);
-  putText(wsRes,r,1,'DonaciÃ³n de productos otros'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoOtros);
+  putText(wsRes,r,1,'Donación de producto tiendas'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoTienda);
+  putText(wsRes,r,1,'Donación de producto socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoSocio);
+  putText(wsRes,r,1,'Donación de productos otros'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoOtros);
   putText(wsRes,r,1,'Saldo operativo'); putMoney(wsRes,r++,2,budget.operativa.saldoOperativo, budget.operativa.saldoOperativo >= 0 ? 'ok' : 'bad');
-  putText(wsRes,r,1,'Fecha y hora emisiÃ³n'); putText(wsRes,r++,2,new Date().toLocaleString('es-ES'));
+  putText(wsRes,r,1,'Fecha y hora emisión'); putText(wsRes,r++,2,new Date().toLocaleString('es-ES'));
 
   // INGRESOS
   const wsIng = baseSheet('INGRESOS', [34, 9, 16, 18, 18, 18]);
   r = 1;
   mergeTitle(wsIng, r++, 'INGRESOS DE SOCIOS Y DONANTES', 6);
-  titleRow(wsIng, r++, ['Colaborador/a','NÃºmero','Ingreso','Importe obligatorio','Importe voluntario','Total compromiso']);
+  titleRow(wsIng, r++, ['Colaborador/a','Número','Ingreso','Importe obligatorio','Importe voluntario','Total compromiso']);
   collabs.forEach(item => {
     putText(wsIng,r,1,`${item.persona?.nombre || ''} (${item.persona?.rango || ''})`);
     putNum(wsIng,r,2,item.numero);
@@ -2439,7 +2439,7 @@ async function exportExcel(){
   const wsDon = baseSheet('DONACIONES DE PRODUCTO', [28, 16, 16, 10, 14, 14, 20, 24, 22]);
   r = 1;
   mergeTitle(wsDon, r++, 'DONACIONES DE PRODUCTO', 9);
-  titleRow(wsDon, r++, ['Producto','Segmento','Destino','ud','Precio','Valor','Tienda o Donante','Tipo de donaciÃ³n','Responsable']);
+  titleRow(wsDon, r++, ['Producto','Segmento','Destino','ud','Precio','Valor','Tienda o Donante','Tipo de donación','Responsable']);
   donacionesSolo.forEach(item => {
     putText(wsDon,r,1,item.producto?.nombre || '');
     putText(wsDon,r,2,item.producto?.segmento || '');
@@ -2457,7 +2457,7 @@ async function exportExcel(){
   // AGR. SEGMENTO
   const wsSeg = baseSheet('AGR. SEGMENTO', [40, 18]);
   r = 1;
-  mergeTitle(wsSeg, r++, 'CÃLCULOS POR AGRUPACIÃ“N - SEGMENTO', 2);
+  mergeTitle(wsSeg, r++, 'CÁLCULOS POR AGRUPACIÓN - SEGMENTO', 2);
   titleRow(wsSeg, r++, ['Segmento','Importe']);
   segRows.forEach(item => {
     putText(wsSeg,r,1,item.k);
@@ -2470,7 +2470,7 @@ async function exportExcel(){
   // AGR. DESTINO
   const wsDest = baseSheet('AGR. DESTINO', [40, 18]);
   r = 1;
-  mergeTitle(wsDest, r++, 'CÃLCULOS POR AGRUPACIÃ“N - DESTINO', 2);
+  mergeTitle(wsDest, r++, 'CÁLCULOS POR AGRUPACIÓN - DESTINO', 2);
   titleRow(wsDest, r++, ['Destino','Importe']);
   destRows.forEach(item => {
     putText(wsDest,r,1,item.k);
@@ -2483,7 +2483,7 @@ async function exportExcel(){
   // AGR. TIENDA-TICKET
   const wsTT = baseSheet('AGR.TIENDA-TICKET', [44, 18, 20]);
   r = 1;
-  mergeTitle(wsTT, r++, 'CÃLCULOS POR AGRUPACIÃ“N - TIENDA Y TICKET/DONACIÃ“N/OTROS GASTOS', 3);
+  mergeTitle(wsTT, r++, 'CÁLCULOS POR AGRUPACIÓN - TIENDA Y TICKET/DONACIÓN/OTROS GASTOS', 3);
   titleRow(wsTT, r++, ['Tienda y Ticket u Otros gastos','Importe','Ticket']);
   tiendaRows.forEach(item => {
     putText(wsTT,r,1,item.k);
@@ -2502,16 +2502,16 @@ async function exportExcel(){
 
   // GRAFICAS
   const wsGraf = baseSheet('GRAFICAS', [24,24,24,24]);
-  mergeTitle(wsGraf, 1, 'GRÃFICAS DEL EVENTO', 4);
-  putText(wsGraf, 2, 1, 'DescripciÃ³n del evento');
+  mergeTitle(wsGraf, 1, 'GRÁFICAS DEL EVENTO', 4);
+  putText(wsGraf, 2, 1, 'Descripción del evento');
   wsGraf.mergeCells(2,2,2,4);
   putText(wsGraf, 2, 2, ev.descripcion || '');
   wsGraf.getCell(2,2).alignment = {vertical:'middle', wrapText:true};
   wsGraf.getRow(2).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 40) * 16));
   putText(wsGraf, 4, 1, 'Ingreso dinero'); putMoney(wsGraf, 4, 2, budget.ingresosDinero.totalIngresado);
-  putText(wsGraf, 5, 1, 'DonaciÃ³n de producto valorada'); putMoney(wsGraf, 5, 2, budget.donacionProducto.valorDonado);
+  putText(wsGraf, 5, 1, 'Donación de producto valorada'); putMoney(wsGraf, 5, 2, budget.donacionProducto.valorDonado);
   putText(wsGraf, 6, 1, 'Gasto por compras'); putMoney(wsGraf, 6, 2, budget.operativa.gastoCompras);
-  putText(wsGraf, 7, 1, 'Gastos de organizaciÃ³n'); putMoney(wsGraf, 7, 2, budget.operativa.gastosOrganizacion);
+  putText(wsGraf, 7, 1, 'Gastos de organización'); putMoney(wsGraf, 7, 2, budget.operativa.gastosOrganizacion);
   addImageToCell(wsGraf, makeChartDataUrl(), 9, 1);
 
   const buffer = await wb.xlsx.writeBuffer();
@@ -2531,7 +2531,7 @@ async function exportExcel(){
   function opt(id){ return document.getElementById(id); }
   function ensureV92Ui(){
     const donList = document.querySelector('#tabDonaciones .section-title p');
-    if(donList) donList.textContent = 'MantÃ©n las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.';
+    if(donList) donList.textContent = 'Mantén las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.';
     const buyTitle = document.querySelector('#tabCompras .section-title h2');
     if(buyTitle) buyTitle.textContent = 'Compras y otros gastos del evento';
     const importBtn = document.getElementById('btnOpenImport');
@@ -2932,7 +2932,7 @@ function donorOptions(){
     wrap.innerHTML = '';
     const hdr = document.createElement('div');
     hdr.className = 'hint';
-    hdr.innerHTML = 'Ordenar por: <a href="#" class="link-sort" data-sort-producto="nombre">Nombre</a> Â· <a href="#" class="link-sort" data-sort-producto="segmento">Segmento</a> Â· <a href="#" class="link-sort" data-sort-producto="destino">Destino</a>';
+    hdr.innerHTML = 'Ordenar por: <a href="#" class="link-sort" data-sort-producto="nombre">Nombre</a> · <a href="#" class="link-sort" data-sort-producto="segmento">Segmento</a> · <a href="#" class="link-sort" data-sort-producto="destino">Destino</a>';
     wrap.appendChild(hdr);
     list.forEach(p => {
       const row = document.createElement('div');
@@ -3032,7 +3032,7 @@ function donorOptions(){
     opt('collabPersona').value = '';
     opt('collabNumero').value = '1';
     opt('collabSituacion').value = 'Pendiente';
-    opt('collabImporte').value = '0,00 â‚¬';
+    opt('collabImporte').value = '0,00 €';
     render();
   };
 
@@ -3052,7 +3052,7 @@ function donorOptions(){
     });
     opt('buyProducto').value = '';
     opt('buyUnidades').value = '1.00';
-    opt('buyPrecio').value = '0,00 â‚¬';
+    opt('buyPrecio').value = '0,00 €';
     opt('buyTicket').value = '';
     opt('buyTienda').value = '';
     opt('buyResponsable').value = '';
@@ -3075,7 +3075,7 @@ function donorOptions(){
     });
     opt('donProducto').value = '';
     opt('donUnidades').value = '1.00';
-    opt('donPrecio').value = '0,00 â‚¬';
+    opt('donPrecio').value = '0,00 €';
     opt('donTicket').value = DONATION_TICKET_OPTIONS[0];
     opt('donDonante').value = '';
     opt('donResponsable').value = '';
@@ -3106,10 +3106,10 @@ function donorOptions(){
       responsable:(a,b)=> (a.responsable?.nombre||'').localeCompare((b.responsable?.nombre||''),'es') || (a.producto?.nombre||'').localeCompare((b.producto?.nombre||''),'es'),
     };
     rows.sort(sorts[state.comprasSort] || sorts.producto);
-    if(!rows.length){ wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>'; return; }
+    if(!rows.length){ wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>'; return; }
     const socios = sociosOnly().slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
     const tiendas = tiendasGenerales().slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
     rows.forEach(r => {
       const pending = String(r.ticketDonacion || '').trim() === '';
       const row = document.createElement('div');
@@ -3144,10 +3144,10 @@ function donorOptions(){
       if(primary !== 0) return primary;
       return (a.producto?.nombre||'').localeCompare((b.producto?.nombre||''),'es');
     });
-    if(!rows.length){ wrap.innerHTML = '<div class="empty">TodavÃ­a no hay donaciones de producto para este evento.</div>'; return; }
+    if(!rows.length){ wrap.innerHTML = '<div class="empty">Todavía no hay donaciones de producto para este evento.</div>'; return; }
     const socios = sociosOnly().slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
     const donors = donorOptions();
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> Â· <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donaciÃ³n</a> Â· <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> Â· <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> · <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donación</a> · <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> · <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
     rows.forEach(r => {
       const row = document.createElement('div');
       row.className = 'itemcard';
@@ -3157,7 +3157,7 @@ function donorOptions(){
           <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${Number(r.unidades||0)}" data-action="edit-donacion-unidades" data-id="${r.id}" /></div>
           <div class="field"><label>Precio</label><input class="money-text" type="text" value="${euroInputValue(r.producto?.precio||0)}" data-action="edit-donacion-precio" data-id="${r.id}" /></div>
           <div class="field"><label>Valor</label><input class="soft-readonly" readonly value="${moneyText(r.valor)}" /></div>
-          <div class="field"><label>Tipo de donaciÃ³n</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select></div>
+          <div class="field"><label>Tipo de donación</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select></div>
           <div class="field"><label>Donante</label><select data-action="edit-donacion-donante" data-id="${r.id}"><option value="" ${!r.donorRef?'selected':''}>-- elige donante --</option>${donors.map(d => `<option value="${d.value}" ${d.value===r.donorRef?'selected':''}>${escapeHtml(d.label)}</option>`).join('')}</select></div>
           <div class="field"><label>Responsable</label><select data-action="edit-donacion-responsable" data-id="${r.id}"><option value="" ${!r.responsableId?'selected':''}>-- sin responsable --</option>${socios.map(p => `<option value="${p.id}" ${p.id===r.responsableId?'selected':''}>${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
           <div style="display:flex;gap:8px;align-items:end"><button type="button" class="modify small" data-action="save-donacion" data-id="${r.id}">Modificar</button><button type="button" class="danger small" data-action="delete-donacion" data-id="${r.id}">Eliminar</button></div>
@@ -3220,7 +3220,7 @@ function donorOptions(){
         let id = String(value ?? '').trim();
         if(!id) id = (typeof uid === 'function') ? uid() : ('id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
         if(usedImportIdsV831.has(id)){
-          // Solo evitamos colisiÃ³n interna si el Excel estÃ¡ mal duplicado. Un ID vÃ¡lido del backup se respeta siempre que sea Ãºnico.
+          // Solo evitamos colisión interna si el Excel está mal duplicado. Un ID válido del backup se respeta siempre que sea único.
           id = (typeof uid === 'function') ? uid() : ('id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
         }
         usedImportIdsV831.add(id);
@@ -3393,11 +3393,11 @@ function donorOptions(){
 
       render();
       setImportStatus(
-        `ImportaciÃ³n completada (${mode}).\nPERSONAS: ${state.personas.length}\nEVENTOS: ${state.eventos.length}\nTIENDAS: ${state.tiendas.length}\nPRODUCTOS: ${state.productos.length}\nINGRESOS: ${state.colaboradores.length}\nCOMPRAS: ${state.compras.filter(x => !isDonationTicket(x.ticketDonacion)).length}\nDONACIONES: ${state.compras.filter(x => isDonationTicket(x.ticketDonacion)).length}`,
+        `Importación completada (${mode}).\nPERSONAS: ${state.personas.length}\nEVENTOS: ${state.eventos.length}\nTIENDAS: ${state.tiendas.length}\nPRODUCTOS: ${state.productos.length}\nINGRESOS: ${state.colaboradores.length}\nCOMPRAS: ${state.compras.filter(x => !isDonationTicket(x.ticketDonacion)).length}\nDONACIONES: ${state.compras.filter(x => isDonationTicket(x.ticketDonacion)).length}`,
         'ok'
       );
     }catch(err){
-      setImportStatus('Error en la importaciÃ³n: ' + (err?.message || err), 'bad');
+      setImportStatus('Error en la importación: ' + (err?.message || err), 'bad');
     }
   }
 
@@ -3407,11 +3407,11 @@ function donorOptions(){
     try{
       await ensureExcelJS();
     }catch(err){
-      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+    wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
     wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
@@ -3682,7 +3682,7 @@ async function saveAccessUser(existingId=''){
     : (document.getElementById('newAccesoNivel')?.value || 'RO');
 
   if(!identificacion || !nombre || (!existingId && !clave)){
-    alert('IdentificaciÃ³n, nombre y clave son obligatorios al dar de alta.');
+    alert('Identificación, nombre y clave son obligatorios al dar de alta.');
     return;
   }
 
@@ -3710,10 +3710,10 @@ async function saveAccessUser(existingId=''){
 async function deleteAccessUser(identificacion){
   if(!isGodRole() || !identificacion) return;
   if(authUser && identificacion === authUser.identificacion){
-    alert('No puedes eliminar el acceso con el que estÃ¡s logado.');
+    alert('No puedes eliminar el acceso con el que estás logado.');
     return;
   }
-  if(!confirm('Â¿Eliminar este usuario de acceso?')) return;
+  if(!confirm('¿Eliminar este usuario de acceso?')) return;
   const res = await fetch('/api/access-users/' + encodeURIComponent(identificacion), {method:'DELETE'});
   const data = await res.json();
   if(!res.ok || !data.ok){
@@ -3920,7 +3920,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
             </div>
           </div>
           <div class="chart-row">
-            <div class="chart-label">DONACIÃ“N DE PRODUCTO</div>
+            <div class="chart-label">DONACIÓN DE PRODUCTO</div>
             <div class="chart-track">
               ${seg(g.donado,'#f59e0b','Donado: ' + moneyTextV(g.donado))}
               ${seg(g.pendienteDonar,'#9ca3af','Pendiente de donar: ' + moneyTextV(g.pendienteDonar))}
@@ -3995,7 +3995,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 28px Arial';
-    ctx.fillText('GRÃFICAS DEL EVENTO', 40, 42);
+    ctx.fillText('GRÁFICAS DEL EVENTO', 40, 42);
 
     let y = 80;
     drawBar(y,'INGRESOS',[
@@ -4005,7 +4005,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       {value:g.pendienteIngreso, color:'#f59e0b'}
     ], fmt(g.banco + g.bizum + g.efectivo + g.pendienteIngreso));
     y += 100;
-    drawBar(y,'DONACIÃ“N DE PRODUCTO',[
+    drawBar(y,'DONACIÓN DE PRODUCTO',[
       {value:g.donado, color:'#f59e0b'},
       {value:g.pendienteDonar, color:'#9ca3af'}
     ], fmt(g.donado + g.pendienteDonar));
@@ -4160,12 +4160,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           </div>
         </div>
         <div class="budget-panel donantes">
-          <h3>DONACIÃ“N DE PRODUCTO</h3>
+          <h3>DONACIÓN DE PRODUCTO</h3>
           <div class="budget-rows">
             <div class="budget-subrows">
-              <div class="budget-subrow"><span>DonaciÃ³n de producto tiendas</span><span>${escapeHtml(money(b.donacionProducto.donadoTienda))}</span></div>
-              <div class="budget-subrow"><span>DonaciÃ³n de producto socios</span><span>${escapeHtml(money(b.donacionProducto.donadoSocio))}</span></div>
-              <div class="budget-subrow"><span>DonaciÃ³n de producto no socios</span><span>${escapeHtml(money(b.donacionProducto.donadoOtros))}</span></div>
+              <div class="budget-subrow"><span>Donación de producto tiendas</span><span>${escapeHtml(money(b.donacionProducto.donadoTienda))}</span></div>
+              <div class="budget-subrow"><span>Donación de producto socios</span><span>${escapeHtml(money(b.donacionProducto.donadoSocio))}</span></div>
+              <div class="budget-subrow"><span>Donación de producto no socios</span><span>${escapeHtml(money(b.donacionProducto.donadoOtros))}</span></div>
             </div>
             <div class="budget-row budget-subgroup"><strong>Valor producto donado</strong><span>${escapeHtml(money(b.donacionProducto.valorDonado))}</span></div>
           </div>
@@ -4175,8 +4175,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           <div class="budget-rows">
             <div class="budget-row"><strong>INGRESOS</strong><span>${escapeHtml(money(b.operativa.ingresoDinero))}</span></div>
             <div class="budget-row"><strong>GASTO POR COMPRAS</strong><span>${escapeHtml(money(b.operativa.gastoCompras))}</span></div>
-            <div class="budget-row"><strong>GASTOS DE ORGANIZACIÃ“N</strong><span>${escapeHtml(money(b.operativa.gastosOrganizacion))}</span></div>
-            <div class="budget-row"><strong>PTE. DE COMPRAS Y/O GASTOS DE ORGANIZACIÃ“N</strong><span style="color:#c2410c">${escapeHtml(money(b.operativa.pendiente))}</span></div>
+            <div class="budget-row"><strong>GASTOS DE ORGANIZACIÓN</strong><span>${escapeHtml(money(b.operativa.gastosOrganizacion))}</span></div>
+            <div class="budget-row"><strong>PTE. DE COMPRAS Y/O GASTOS DE ORGANIZACIÓN</strong><span style="color:#c2410c">${escapeHtml(money(b.operativa.pendiente))}</span></div>
             <div class="budget-row"><strong>SALDO OPERATIVO</strong><span style="color:${b.operativa.saldoOperativo >= 0 ? '#047857' : '#b91c1c'}">${escapeHtml(money(b.operativa.saldoOperativo))}</span></div>
           </div>
         </div>`;
@@ -4193,11 +4193,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ensureProductRefPrices();
     $('newProductoSegmento').innerHTML = SEGMENT_OPTIONS.map(v => `<option value="${v}">${v}</option>`).join('');
     $('newProductoDestino').innerHTML = DESTINO_OPTIONS.map(v => `<option value="${v}">${v}</option>`).join('');
-    if($('newProductoPrecio') && !$('newProductoPrecio').value) $('newProductoPrecio').value = '0,00 â‚¬';
+    if($('newProductoPrecio') && !$('newProductoPrecio').value) $('newProductoPrecio').value = '0,00 €';
     const wrap = $('productosList');
     const list = (state.productos || []).slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
     if(!list.length){ wrap.innerHTML = '<div class="empty">No hay productos.</div>'; return; }
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="currentProductSort=\'nombre\'; renderProductos(); return false;">Nombre</a> Â· <a href="#" onclick="currentProductSort=\'segmento\'; renderProductos(); return false;">Segmento</a> Â· <a href="#" onclick="currentProductSort=\'destino\'; renderProductos(); return false;">Destino</a> Â· <a href="#" onclick="currentProductSort=\'precio\'; renderProductos(); return false;">Precio referencia</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="currentProductSort=\'nombre\'; renderProductos(); return false;">Nombre</a> · <a href="#" onclick="currentProductSort=\'segmento\'; renderProductos(); return false;">Segmento</a> · <a href="#" onclick="currentProductSort=\'destino\'; renderProductos(); return false;">Destino</a> · <a href="#" onclick="currentProductSort=\'precio\'; renderProductos(); return false;">Precio referencia</a></div>';
     const sorted = list.sort((a,b)=>{
       const sort = currentProductSort || 'nombre';
       if(sort === 'precio') return productRefPrice(a) - productRefPrice(b) || (a.nombre||'').localeCompare((b.nombre||''),'es');
@@ -4231,7 +4231,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       defaultPrecio: precioRef
     });
     $('newProductoNombre').value = '';
-    if($('newProductoPrecio')) $('newProductoPrecio').value = '0,00 â‚¬';
+    if($('newProductoPrecio')) $('newProductoPrecio').value = '0,00 €';
     render();
   };
 
@@ -4319,7 +4319,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(p) p.defaultPrecio = precio;
     $('buyProducto').value = '';
     $('buyUnidades').value = '1.00';
-    $('buyPrecio').value = '0,00 â‚¬';
+    $('buyPrecio').value = '0,00 €';
     $('buyTicket').value = '';
     $('buyTienda').value = '';
     $('buyResponsable').value = '';
@@ -4343,7 +4343,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
     $('donProducto').value = '';
     $('donUnidades').value = '1.00';
-    $('donPrecio').value = '0,00 â‚¬';
+    $('donPrecio').value = '0,00 €';
     $('donTicket').value = DONATION_TICKET_OPTIONS[0];
     $('donDonante').value = '';
     $('donResponsable').value = '';
@@ -4360,10 +4360,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       responsable:(a,b)=> (a.responsable?.nombre||'').localeCompare((b.responsable?.nombre||''),'es') || (a.producto?.nombre||'').localeCompare((b.producto?.nombre||''),'es'),
     };
     rows.sort(sorts[state.comprasSort] || sorts.producto);
-    if(!rows.length){ wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>'; return; }
+    if(!rows.length){ wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>'; return; }
     const socios = (typeof socioResponsableOptions === 'function' ? socioResponsableOptions() : []).slice();
     const tiendas = (typeof tiendasGenerales === 'function' ? tiendasGenerales() : []).slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
     rows.forEach(r => {
       const pending = String(r.ticketDonacion || '').trim() === '';
       const row = document.createElement('div');
@@ -4398,10 +4398,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       if(p !== 0) return p;
       return (a.producto?.nombre||'').localeCompare((b.producto?.nombre||''),'es');
     });
-    if(!rows.length){ wrap.innerHTML = '<div class="empty">TodavÃ­a no hay donaciones de producto para este evento.</div>'; return; }
+    if(!rows.length){ wrap.innerHTML = '<div class="empty">Todavía no hay donaciones de producto para este evento.</div>'; return; }
     const socios = (typeof socioResponsableOptions === 'function' ? socioResponsableOptions() : []).slice();
     const donors = (typeof donorOptions === 'function' ? donorOptions() : []).slice();
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> Â· <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donaciÃ³n</a> Â· <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> Â· <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> · <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donación</a> · <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> · <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
     rows.forEach(r => {
       const row = document.createElement('div');
       row.className = 'itemcard';
@@ -4411,7 +4411,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${Number(r.unidades||0)}" data-action="edit-donacion-unidades" data-id="${r.id}" /></div>
           <div class="field"><label>Precio</label><input class="money-text" type="text" value="${euroText(r.precioCalc || 0)}" data-action="edit-donacion-precio" data-id="${r.id}" /></div>
           <div class="field"><label>Valor</label><input class="soft-readonly" readonly value="${moneyTextV(r.valor)}" /></div>
-          <div class="field"><label>Tipo de donaciÃ³n</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select></div>
+          <div class="field"><label>Tipo de donación</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${escapeHtml(v)}</option>`).join('')}</select></div>
           <div class="field"><label>Donante</label><select data-action="edit-donacion-donante" data-id="${r.id}"><option value="" ${!r.donorRef?'selected':''}>-- elige donante --</option>${donors.map(d => `<option value="${d.value}" ${d.value===r.donorRef?'selected':''}>${escapeHtml(d.label)}</option>`).join('')}</select></div>
           <div class="field"><label>Responsable</label><select data-action="edit-donacion-responsable" data-id="${r.id}"><option value="" ${!r.responsableId?'selected':''}>-- sin responsable --</option>${socios.map(p => `<option value="${p.value}" ${p.value===r.responsableId?'selected':''}>${escapeHtml(p.label)}</option>`).join('')}</select></div>
           <div style="display:flex;gap:8px;align-items:end"><button type="button" class="modify small" data-action="save-donacion" data-id="${r.id}">Modificar</button><button type="button" class="danger small" data-action="delete-donacion" data-id="${r.id}">Eliminar</button></div>
@@ -4428,7 +4428,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{
       await ensureExcelJS();
     }catch(err){
-      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
       return;
     }
 
@@ -4444,12 +4444,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = summaryByTiendaTicket();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+    wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = { title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', white:'FFFFFFFF' };
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     const numFmt = '0.00';
 
     function baseSheet(name, widths){
@@ -4525,27 +4525,27 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsRes = baseSheet('RESUMEN', [34, 26, 16, 16, 16, 16, 16, 16, 16]);
     let r = 1;
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 4);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v13.0_prod - Â©oltyLAB â€™26');
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,'ControlEvent v13.0_prod - ©oltyLAB ’26');
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo);
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`(del ${ev.fechaIni || ''} al ${ev.fechaFin || ''})`);
-    wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'DescripciÃ³n del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
-    putText(wsRes,r,1,'SituaciÃ³n'); putText(wsRes,r++,2,ev.situacion || 'En curso', (ev.situacion === 'Finalizado' ? 'bad' : 'ok'));
+    wsRes.mergeCells(r,2,r,6); putText(wsRes,r,1,'Descripción del evento'); putText(wsRes,r,2,ev.descripcion || ''); wsRes.getCell(r,2).alignment = {vertical:'middle', wrapText:true}; wsRes.getRow(r).height = Math.max(22, Math.min(120, 20 + Math.ceil(String(ev.descripcion||'').length / 55) * 16)); r++;
+    putText(wsRes,r,1,'Situación'); putText(wsRes,r++,2,ev.situacion || 'En curso', (ev.situacion === 'Finalizado' ? 'bad' : 'ok'));
     putText(wsRes,r,1,'Precio evento'); putMoney(wsRes,r++,2,ev.precio);
     putText(wsRes,r,1,'Ingreso dinero'); putMoney(wsRes,r++,2,budget.ingresosDinero.totalIngresado);
     putText(wsRes,r,1,'Gasto por compras'); putMoney(wsRes,r++,2,budget.operativa.gastoCompras);
-    putText(wsRes,r,1,'Gastos de organizaciÃ³n'); putMoney(wsRes,r++,2,budget.operativa.gastosOrganizacion);
+    putText(wsRes,r,1,'Gastos de organización'); putMoney(wsRes,r++,2,budget.operativa.gastosOrganizacion);
     putText(wsRes,r,1,'Valor producto donado'); putMoney(wsRes,r++,2,budget.donacionProducto.valorDonado);
-    putText(wsRes,r,1,'DonaciÃ³n de producto tiendas'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoTienda);
-    putText(wsRes,r,1,'DonaciÃ³n de producto socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoSocio);
-    putText(wsRes,r,1,'DonaciÃ³n de producto no socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoOtros);
+    putText(wsRes,r,1,'Donación de producto tiendas'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoTienda);
+    putText(wsRes,r,1,'Donación de producto socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoSocio);
+    putText(wsRes,r,1,'Donación de producto no socios'); putMoney(wsRes,r++,2,budget.donacionProducto.donadoOtros);
     putText(wsRes,r,1,'Saldo operativo'); putMoney(wsRes,r++,2,budget.operativa.saldoOperativo, budget.operativa.saldoOperativo >= 0 ? 'ok' : 'bad');
-    putText(wsRes,r,1,'Fecha y hora emisiÃ³n'); putText(wsRes,r++,2,new Date().toLocaleString('es-ES'));
+    putText(wsRes,r,1,'Fecha y hora emisión'); putText(wsRes,r++,2,new Date().toLocaleString('es-ES'));
 
     // INGRESOS
     const wsIng = baseSheet('INGRESOS', [34, 9, 16, 18, 18, 18]);
     r = 1;
     mergeTitle(wsIng, r++, 'INGRESOS', 6);
-    titleRow(wsIng, r++, ['Colaborador/a','NÃºmero','Tipo ingreso','Importe SOCIO','Importe NO SOCIO','TOTAL']);
+    titleRow(wsIng, r++, ['Colaborador/a','Número','Tipo ingreso','Importe SOCIO','Importe NO SOCIO','TOTAL']);
     collabs.forEach(item => {
       putText(wsIng,r,1,`${item.persona?.nombre || ''} (${item.persona?.rango || ''})`);
       putNum(wsIng,r,2,item.numero);
@@ -4582,7 +4582,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const wsDon = baseSheet('DONACIONES DE PRODUCTO', [28, 16, 16, 10, 14, 14, 20, 24, 22]);
     r = 1;
     mergeTitle(wsDon, r++, 'DONACIONES DE PRODUCTO', 9);
-    titleRow(wsDon, r++, ['Producto','Segmento','Destino','ud','Precio','Valor','Donante','Tipo de donaciÃ³n','Responsable']);
+    titleRow(wsDon, r++, ['Producto','Segmento','Destino','ud','Precio','Valor','Donante','Tipo de donación','Responsable']);
     donacionesSolo.forEach(item => {
       putText(wsDon,r,1,item.producto?.nombre || '');
       putText(wsDon,r,2,item.producto?.segmento || '');
@@ -4600,7 +4600,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     // AGR. SEGMENTO
     const wsSeg = baseSheet('AGR. SEGMENTO', [40, 18]);
     r = 1;
-    mergeTitle(wsSeg, r++, 'CÃLCULOS POR AGRUPACIÃ“N - SEGMENTO', 2);
+    mergeTitle(wsSeg, r++, 'CÁLCULOS POR AGRUPACIÓN - SEGMENTO', 2);
     titleRow(wsSeg, r++, ['Segmento','Importe']);
     segRows.forEach(item => {
       putText(wsSeg,r,1,item.k);
@@ -4613,7 +4613,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     // AGR. DESTINO
     const wsDest = baseSheet('AGR. DESTINO', [40, 18]);
     r = 1;
-    mergeTitle(wsDest, r++, 'CÃLCULOS POR AGRUPACIÃ“N - DESTINO', 2);
+    mergeTitle(wsDest, r++, 'CÁLCULOS POR AGRUPACIÓN - DESTINO', 2);
     titleRow(wsDest, r++, ['Destino','Importe']);
     destRows.forEach(item => {
       putText(wsDest,r,1,item.k);
@@ -4626,7 +4626,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     // AGR. TIENDA-TICKET
     const wsTT = baseSheet('AGR.TIENDA-TICKET', [44, 18, 20]);
     r = 1;
-    mergeTitle(wsTT, r++, 'CÃLCULOS POR AGRUPACIÃ“N - TIENDA Y TICKET/DONACIÃ“N/OTROS GASTOS', 3);
+    mergeTitle(wsTT, r++, 'CÁLCULOS POR AGRUPACIÓN - TIENDA Y TICKET/DONACIÓN/OTROS GASTOS', 3);
     titleRow(wsTT, r++, ['Tienda y Ticket u Otros gastos','Importe','Ticket']);
     tiendaRows.forEach(item => {
       putText(wsTT,r,1,item.k);
@@ -4644,7 +4644,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     // GRAFICAS
     const wsGraf = baseSheet('GRAFICAS', [24,24,24,24]);
-    mergeTitle(wsGraf, 1, 'GRÃFICAS DEL EVENTO', 4);
+    mergeTitle(wsGraf, 1, 'GRÁFICAS DEL EVENTO', 4);
     addImageToCell(wsGraf, await makeChartImageDataUrl(), 3, 1);
 
     const buffer = await wb.xlsx.writeBuffer();
@@ -4886,7 +4886,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       </div>`;
     wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">
       ${row('INGRESOS', g.ingresos.total, g.ingresos.segs, g.ingresos.total)}
-      ${row('DONACIÃ“N DE PRODUCTO', g.donaciones.total, g.donaciones.segs, g.donaciones.total)}
+      ${row('DONACIÓN DE PRODUCTO', g.donaciones.total, g.donaciones.segs, g.donaciones.total)}
       ${row('GASTOS', g.gastos.total, g.gastos.segs, g.gastos.total)}
       ${row('SALDO OPERATIVO', g.saldo.total, g.saldo.segs, g.saldo.realizado)}
     </div></div>`;
@@ -4935,10 +4935,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 28px Arial';
-    ctx.fillText('GRÃFICAS DEL EVENTO', 40, 42);
+    ctx.fillText('GRÁFICAS DEL EVENTO', 40, 42);
     let y = 92;
     drawRow(y,'INGRESOS',g.ingresos.total,g.ingresos.segs,g.ingresos.total); y += 108;
-    drawRow(y,'DONACIÃ“N DE PRODUCTO',g.donaciones.total,g.donaciones.segs,g.donaciones.total); y += 108;
+    drawRow(y,'DONACIÓN DE PRODUCTO',g.donaciones.total,g.donaciones.segs,g.donaciones.total); y += 108;
     drawRow(y,'GASTOS',g.gastos.total,g.gastos.segs,g.gastos.total); y += 108;
     drawRow(y,'SALDO OPERATIVO',g.saldo.total,g.saldo.segs,g.saldo.realizado);
     return canvas.toDataURL('image/png');
@@ -5099,7 +5099,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
             </div>
           </div>
           <div class="chart-row">
-            <div class="chart-label">DONACIÃ“N DE PRODUCTO: ${esc(moneyFmt(g.donations.total))}</div>
+            <div class="chart-label">DONACIÓN DE PRODUCTO: ${esc(moneyFmt(g.donations.total))}</div>
             <div>
               <div class="chart-track">
                 ${donationItems.map(x => seg(x.value, x.color, x.label + ': ' + moneyFmt(x.value))).join('')}
@@ -5122,7 +5122,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
               <div class="chart-track">
                 ${saldoItems.map(x => seg(x.value, x.color, x.label + ': ' + moneyFmt(g.saldo.realizado))).join('')}
               </div>
-              ${buildLegendHtml([{label:'Saldo realizado (ingresos realizados â€“ gastos realizados)', value:g.saldo.realizado, color:saldoItems[0].color}])}
+              ${buildLegendHtml([{label:'Saldo realizado (ingresos realizados – gastos realizados)', value:g.saldo.realizado, color:saldoItems[0].color}])}
             </div>
           </div>
         </div>
@@ -5152,7 +5152,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         ]
       },
       {
-        label:`DONACIÃ“N DE PRODUCTO: ${fmt(g.donations.total)}`,
+        label:`DONACIÓN DE PRODUCTO: ${fmt(g.donations.total)}`,
         items:[
           {label:'Donado por socios', value:g.donations.socios, color:'#f59e0b'},
           {label:'Donado por no socios', value:g.donations.noSocios, color:'#b45309'},
@@ -5170,7 +5170,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       {
         label:`SALDO OPERATIVO: ${fmt(g.saldo.total)}`,
         items:[
-          {label:'Saldo realizado (ingresos realizados â€“ gastos realizados)', value:Math.abs(g.saldo.realizado), color:g.saldo.realizado >= 0 ? '#0f766e' : '#b91c1c'}
+          {label:'Saldo realizado (ingresos realizados – gastos realizados)', value:Math.abs(g.saldo.realizado), color:g.saldo.realizado >= 0 ? '#0f766e' : '#b91c1c'}
         ]
       }
     ];
@@ -5211,7 +5211,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 28px Arial';
-    ctx.fillText('GRÃFICAS DEL EVENTO', 40, 42);
+    ctx.fillText('GRÁFICAS DEL EVENTO', 40, 42);
 
     let y = 84;
     rows.forEach(row => {
@@ -5234,7 +5234,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return canvas.toDataURL('image/png');
   };
 
-  // Refresca la grÃ¡fica con la nueva estructura
+  // Refresca la gráfica con la nueva estructura
   if(typeof renderGraficas === 'function'){
     renderGraficas = function(){ renderGraphOnly(); };
   }
@@ -5320,7 +5320,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
     if(byId('buyProducto')) byId('buyProducto').value = '';
     if(byId('buyUnidades')) byId('buyUnidades').value = '1.00';
-    if(byId('buyPrecio')) byId('buyPrecio').value = '0,00 â‚¬';
+    if(byId('buyPrecio')) byId('buyPrecio').value = '0,00 €';
     if(byId('buyImporte')) byId('buyImporte').value = '';
     if(byId('buyTicket')) byId('buyTicket').value = '';
     if(byId('buyTienda')) byId('buyTienda').value = '';
@@ -5340,13 +5340,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     };
     rows.sort(sorts[state.comprasSort] || sorts.producto);
     if(!rows.length){
-      wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>';
+      wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>';
       return;
     }
     const socios = allSocios();
     const tiendas = allTiendas();
     const productos = allProductos();
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'tienda\'; renderCompras(); return false;">Tienda</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
 
     rows.forEach(r => {
       const pending = String(r.ticketDonacion || '').trim() === '';
@@ -5367,7 +5367,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
   };
 
-  // Refresca visualmente cuando se abra la pestaÃ±a de compras o tras cargar
+  // Refresca visualmente cuando se abra la pestaña de compras o tras cargar
   const rerenderComprasIfVisible = () => {
     try{
       if(byId('tabCompras') && !byId('tabCompras').classList.contains('hidden')) renderCompras();
@@ -5489,7 +5489,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     const rows = Object.entries(filled).map(([k,obj]) => {
       const label = obj.donated && obj.products.length
-        ? `${k} Â· ${obj.products.join(' Â· ')}`
+        ? `${k} · ${obj.products.join(' · ')}`
         : k;
       return {
         k,
@@ -5526,7 +5526,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return rows;
   };
 
-  // refresco inmediato si el resumen estÃ¡ visible
+  // refresco inmediato si el resumen está visible
   const rerenderResumen = () => {
     try{
       if(typeof renderBudget === 'function') renderBudget();
@@ -5584,7 +5584,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       }
 
       if(donation){
-        // Una lÃ­nea por donaciÃ³n realizada, evitando la megacadena de productos.
+        // Una línea por donación realizada, evitando la megacadena de productos.
         const key = `${tienda} | ${rawTicket} | ${productName} | ${c.id}`;
         rows.push({
           k: key,
@@ -5662,7 +5662,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-06.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #6. */
-/* ==== V14.4 FIX AGRUPACIÃ“N TIENDA/TICKET/DONACIÃ“N ==== */
+/* ==== V14.4 FIX AGRUPACIÓN TIENDA/TICKET/DONACIÓN ==== */
 (function(){
   function donorGroupingName(c){
     try{
@@ -5719,7 +5719,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     const rows = Object.entries(filled).map(([k,obj]) => {
       const label = obj.donated && obj.products.length
-        ? `${k} Â· ${obj.products.join(' Â· ')}`
+        ? `${k} · ${obj.products.join(' · ')}`
         : k;
 
       return {
@@ -5777,7 +5777,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-07.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #7. */
-/* ==== V14.4 CORRECCIÃ“N FINAL AGRUPACIÃ“N TIENDA/TICKET ==== */
+/* ==== V14.4 CORRECCIÓN FINAL AGRUPACIÓN TIENDA/TICKET ==== */
 (function(){
   function holderNameForRow(c){
     try{
@@ -5798,7 +5798,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return '';
   }
 
-  // Restaurar la lÃ³gica buena de v13.2 y solo cambiar "holder" para donaciones
+  // Restaurar la lógica buena de v13.2 y solo cambiar "holder" para donaciones
   summaryByTiendaTicket = function(){
     const filled = {};
     const pending = {};
@@ -5865,7 +5865,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-08.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #8. */
-/* ==== V14.4 CORRECCIÃ“N 2 DONANTE REAL EN AGRUPACIÃ“N ==== */
+/* ==== V14.4 CORRECCIÓN 2 DONANTE REAL EN AGRUPACIÓN ==== */
 (function(){
   function holderNameForRowV2(c){
     try{
@@ -5886,7 +5886,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           }
         }
 
-        // Compatibilidad con datos antiguos donde el donante quedÃ³ en tiendaId
+        // Compatibilidad con datos antiguos donde el donante quedó en tiendaId
         if(c?.tiendaId && typeof tiendaById === 'function'){
           const t = tiendaById(c.tiendaId);
           if(t?.nombre && String(t.nombre).trim()) return String(t.nombre).trim();
@@ -6020,7 +6020,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const personas = allPersonasSorted();
 
     if(!rows.length){
-      wrap.innerHTML = '<div class="empty">TodavÃ­a no hay personas colaboradoras para este evento.</div>';
+      wrap.innerHTML = '<div class="empty">Todavía no hay personas colaboradoras para este evento.</div>';
       return;
     }
 
@@ -6038,7 +6038,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
             </select>
           </div>
           <div class="field">
-            <label>NÃºmero</label>
+            <label>Número</label>
             <input type="number" min="0" step="1" value="${Number(r.numero||0)}" data-action="edit-collab-numero" data-id="${r.id}" />
           </div>
           <div class="field">
@@ -6072,7 +6072,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(targetId === 'summaryTiendaTicket'){
       const tools = document.createElement('div');
       tools.className = 'hint';
-      tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> Â· <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket</a>';
+      tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> · <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket</a>';
       wrap.appendChild(tools);
     }
 
@@ -6098,7 +6098,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const inputId = `ticketUpload_${idx}`;
         const encodedKey = encodeURIComponent(r.k);
         const preview = r.image ? `<img class="ticket-thumb" src="${r.image}" alt="ticket" />` : '';
-        div.innerHTML = `<span>${escapeHtml(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">ðŸ“Ž</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">ðŸ—‘ï¸</button>` : ''}</span></span>`;
+        div.innerHTML = `<span>${escapeHtml(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">📎</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">🗑️</button>` : ''}</span></span>`;
       } else {
         div.innerHTML = `<span>${escapeHtml(textLabel)}</span>${amountHtml}`;
       }
@@ -6154,7 +6154,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{
       await ensureExcelJS();
     }catch(err){
-      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
       return;
     }
 
@@ -6170,12 +6170,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = typeof summaryByTiendaTicket === 'function' ? summaryByTiendaTicket() : [];
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+    wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = { title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', white:'FFFFFFFF' };
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     const numFmt = '0.00';
 
     function baseSheet(name, widths){
@@ -6246,23 +6246,23 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     // RESUMEN
     const wsRes = baseSheet('RESUMEN', [32,18,18,18,18]);
     mergeTitle(wsRes, 1, 'RESUMEN DEL EVENTO', 5);
-    putText(wsRes, 2, 1, 'TÃ­tulo del evento'); putText(wsRes, 2, 2, ev.titulo || '');
-    putText(wsRes, 3, 1, 'DescripciÃ³n del evento'); wsRes.mergeCells(3,2,3,5); putText(wsRes, 3, 2, ev.descripcion || '');
+    putText(wsRes, 2, 1, 'Título del evento'); putText(wsRes, 2, 2, ev.titulo || '');
+    putText(wsRes, 3, 1, 'Descripción del evento'); wsRes.mergeCells(3,2,3,5); putText(wsRes, 3, 2, ev.descripcion || '');
     putText(wsRes, 4, 1, 'Fecha inicio'); putText(wsRes, 4, 2, ev.fechaIni || '');
     putText(wsRes, 4, 3, 'Fecha fin'); putText(wsRes, 4, 4, ev.fechaFin || '');
     putText(wsRes, 5, 1, 'Precio evento'); putMoney(wsRes, 5, 2, ev.precio || 0);
     putText(wsRes, 7, 1, 'Ingreso dinero'); putMoney(wsRes, 7, 2, budget.ingresosDinero?.totalIngresado || 0);
     putText(wsRes, 8, 1, 'Ingreso comprometido'); putMoney(wsRes, 8, 2, budget.ingresosDinero?.totalComprometido || 0);
-    putText(wsRes, 9, 1, 'DonaciÃ³n de producto'); putMoney(wsRes, 9, 2, budget.donacionProducto?.valorDonado || 0);
+    putText(wsRes, 9, 1, 'Donación de producto'); putMoney(wsRes, 9, 2, budget.donacionProducto?.valorDonado || 0);
     putText(wsRes, 10, 1, 'Gasto por compras'); putMoney(wsRes, 10, 2, budget.operativa?.gastoCompras || 0);
-    putText(wsRes, 11, 1, 'Gastos de organizaciÃ³n'); putMoney(wsRes, 11, 2, budget.operativa?.gastosOrganizacion || 0);
+    putText(wsRes, 11, 1, 'Gastos de organización'); putMoney(wsRes, 11, 2, budget.operativa?.gastosOrganizacion || 0);
     putText(wsRes, 12, 1, 'Pendiente de compra'); putMoney(wsRes, 12, 2, budget.operativa?.pendiente || 0);
     putText(wsRes, 13, 1, 'Saldo operativo'); putMoney(wsRes, 13, 2, budget.operativa?.saldoOperativo || 0);
 
     // INGRESOS
     const wsIng = baseSheet('INGRESOS', [28,10,16,16,16,16]);
     mergeTitle(wsIng, 1, 'INGRESOS', 6);
-    titleRow(wsIng, 3, ['Colaborador/a','NÃºmero','Tipo ingreso','Importe SOCIO','Importe NO SOCIO','TOTAL']);
+    titleRow(wsIng, 3, ['Colaborador/a','Número','Tipo ingreso','Importe SOCIO','Importe NO SOCIO','TOTAL']);
     let r = 4;
     collabs.forEach(item => {
       putText(wsIng, r, 1, item.persona?.nombre || '');
@@ -6293,7 +6293,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     // DONACIONES
     const wsDon = baseSheet('DONACIONES DE PRODUCTO', [26,10,14,14,20,24,24]);
     mergeTitle(wsDon, 1, 'DONACIONES DE PRODUCTO', 7);
-    titleRow(wsDon, 3, ['Producto','Unidades','Precio','Valor','Tipo de donaciÃ³n','Donante','Responsable']);
+    titleRow(wsDon, 3, ['Producto','Unidades','Precio','Valor','Tipo de donación','Donante','Responsable']);
     r = 4;
     donacionesSolo.forEach(item => {
       putText(wsDon, r, 1, item.producto?.nombre || '');
@@ -6308,7 +6308,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     // CALCULOS
     const wsSeg = baseSheet('CALCULOS_SEGMENTO', [42,18]);
-    mergeTitle(wsSeg, 1, 'CÃLCULOS POR AGRUPACIÃ“N - SEGMENTO', 2);
+    mergeTitle(wsSeg, 1, 'CÁLCULOS POR AGRUPACIÓN - SEGMENTO', 2);
     titleRow(wsSeg, 3, ['Concepto','Importe']);
     r = 4;
     segRows.forEach(it => {
@@ -6318,7 +6318,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wsDest = baseSheet('CALCULOS_DESTINO', [42,18]);
-    mergeTitle(wsDest, 1, 'CÃLCULOS POR AGRUPACIÃ“N - DESTINO', 2);
+    mergeTitle(wsDest, 1, 'CÁLCULOS POR AGRUPACIÓN - DESTINO', 2);
     titleRow(wsDest, 3, ['Concepto','Importe']);
     r = 4;
     destRows.forEach(it => {
@@ -6328,7 +6328,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wsTienda = baseSheet('CALCULOS_TIENDA_TICKET', [48,18]);
-    mergeTitle(wsTienda, 1, 'CÃLCULOS POR AGRUPACIÃ“N - TIENDA Y TICKET', 2);
+    mergeTitle(wsTienda, 1, 'CÁLCULOS POR AGRUPACIÓN - TIENDA Y TICKET', 2);
     titleRow(wsTienda, 3, ['Concepto','Importe']);
     r = 4;
     tiendaRows.forEach(it => {
@@ -6339,7 +6339,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     // GRAFICAS: EXACTAMENTE como pantalla (imagen con leyenda/desglose)
     const wsGraf = baseSheet('GRAFICAS', [24,24,24,24]);
-    mergeTitle(wsGraf, 1, 'GRÃFICAS DEL EVENTO', 4);
+    mergeTitle(wsGraf, 1, 'GRÁFICAS DEL EVENTO', 4);
     const chartDataUrl = (typeof makeChartImageDataUrl === 'function')
       ? await makeChartImageDataUrl()
       : ((typeof makeChartDataUrl === 'function') ? await makeChartDataUrl() : null);
@@ -6386,7 +6386,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   window.xlsxFilename = filenameV153;
 
-  // Nombre del archivo de descarga de datos con versiÃ³n correcta
+  // Nombre del archivo de descarga de datos con versión correcta
   const prevExportSeedWorkbook = typeof exportSeedWorkbook === 'function' ? exportSeedWorkbook : null;
   if(prevExportSeedWorkbook){
     exportSeedWorkbook = async function(){
@@ -6394,11 +6394,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       try{
         await ensureExcelJS();
       }catch(err){
-        alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+        alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
         return;
       }
       const wb = new ExcelJS.Workbook();
-      wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+      wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
       wb.created = new Date();
 
       const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -6501,7 +6501,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
     if($('buyProducto')) $('buyProducto').value = '';
     if($('buyUnidades')) $('buyUnidades').value = '1.00';
-    if($('buyPrecio')) $('buyPrecio').value = '0,00 â‚¬';
+    if($('buyPrecio')) $('buyPrecio').value = '0,00 €';
     if($('buyImporte')) $('buyImporte').value = '';
     if($('buyTicket')) $('buyTicket').value = '';
     if($('buyTienda')) $('buyTienda').value = '';
@@ -6522,7 +6522,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     rows.sort(sorts[state.comprasSort] || sorts.producto);
 
     if(!rows.length){
-      wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>';
+      wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>';
       return;
     }
 
@@ -6530,7 +6530,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendas = allTiendas();
     const socios = allSocios();
 
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
 
     rows.forEach(r => {
       const pending = String(r.ticketDonacion || '').trim() === '';
@@ -6587,7 +6587,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
   }, true);
 
-  // Hoja GRAFICAS exactamente como pantalla y barras mÃ¡s a la derecha
+  // Hoja GRAFICAS exactamente como pantalla y barras más a la derecha
   makeChartImageDataUrl = async function(){
     const canvas = document.createElement('canvas');
     canvas.width = 1500;
@@ -6618,7 +6618,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       {label:'Pendiente de comprar', value:g.expenses?.pendiente || 0, color:'#fb7185'}
     ];
     const saldoItems = [
-      {label:'Saldo realizado (ingresos realizados â€“ gastos realizados)', value:Math.abs(g.saldo?.realizado || 0), color:(g.saldo?.realizado || 0) >= 0 ? '#0f766e' : '#b91c1c'}
+      {label:'Saldo realizado (ingresos realizados – gastos realizados)', value:Math.abs(g.saldo?.realizado || 0), color:(g.saldo?.realizado || 0) >= 0 ? '#0f766e' : '#b91c1c'}
     ];
 
     const maxVal = Math.max(
@@ -6685,11 +6685,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 28px Arial';
-    ctx.fillText('GRÃFICAS DEL EVENTO', 40, 44);
+    ctx.fillText('GRÁFICAS DEL EVENTO', 40, 44);
 
     let y = 88;
     y = drawRow(y, 'INGRESOS', Number(g.incomes?.total || 0), incomeItems);
-    y = drawRow(y, 'DONACIÃ“N DE PRODUCTO', Number(g.donations?.total || 0), donationItems);
+    y = drawRow(y, 'DONACIÓN DE PRODUCTO', Number(g.donations?.total || 0), donationItems);
     y = drawRow(y, 'GASTOS', Number(g.expenses?.total || 0), expenseItems);
     y = drawRow(y, 'SALDO OPERATIVO', Number(g.saldo?.total || 0), saldoItems);
 
@@ -6743,13 +6743,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function collabItemsFor(filterFn){
     return (typeof collabsForEvent === 'function' ? collabsForEvent() : [])
       .filter(filterFn)
-      .map(r => `${r.persona?.nombre || 'Sin nombre'} â€” ${moneyF(r.total || 0)}`);
+      .map(r => `${r.persona?.nombre || 'Sin nombre'} — ${moneyF(r.total || 0)}`);
   }
 
   function donationItemsFor(ticketCode){
     return (typeof comprasForEvent === 'function' ? comprasForEvent() : [])
       .filter(r => String(r.ticketDonacion || '').trim() === ticketCode)
-      .map(r => `${donorName(r) || 'Sin tienda'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`);
+      .map(r => `${donorName(r) || 'Sin tienda'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`);
   }
 
   function graphDataV160(){
@@ -6890,8 +6890,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       {label:'Gastos corrientes', value:g.expenses.corrientes, color:'#ef4444'},
       {label:'Pte. Compra u otros gastos', value:g.expenses.pendiente, color:'#fb7185'}
     ];
-    const saldoActualItems = [{label:'Saldo actual (ingresos realizados â€“ gastos realizados)', value:Math.abs(g.saldoActual), color:g.saldoActual >= 0 ? '#0f766e' : '#b91c1c'}];
-    const saldoOperativoItems = [{label:'Saldo operativo (ingresos â€“ gastos)', value:Math.abs(g.saldoOperativo), color:g.saldoOperativo >= 0 ? '#155e75' : '#7f1d1d'}];
+    const saldoActualItems = [{label:'Saldo actual (ingresos realizados – gastos realizados)', value:Math.abs(g.saldoActual), color:g.saldoActual >= 0 ? '#0f766e' : '#b91c1c'}];
+    const saldoOperativoItems = [{label:'Saldo operativo (ingresos – gastos)', value:Math.abs(g.saldoOperativo), color:g.saldoOperativo >= 0 ? '#155e75' : '#7f1d1d'}];
 
     wrap.innerHTML = `
       <div class="chart-shell">
@@ -6901,7 +6901,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
             <div><div class="chart-track">${incomeItems.map(x => seg(x.value, x.color, x.label + ': ' + moneyF(x.value))).join('')}</div>${buildLegendHtml(incomeItems)}</div>
           </div>
           <div class="chart-row">
-            <div class="chart-label">DONACIÃ“N DE PRODUCTO: ${esc(moneyF(g.donations.total))}</div>
+            <div class="chart-label">DONACIÓN DE PRODUCTO: ${esc(moneyF(g.donations.total))}</div>
             <div><div class="chart-track">${donationItems.map(x => seg(x.value, x.color, x.label + ': ' + moneyF(x.value))).join('')}</div>${buildLegendHtml(donationItems)}</div>
           </div>
           <div class="chart-row">
@@ -6948,7 +6948,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const head = document.createElement('div');
       head.className = 'vbars-wrap';
       head.innerHTML = `
-        <div class="vbars-total">${title} Â· TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div>
+        <div class="vbars-total">${title} · TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div>
         <div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>
       `;
       wrap.appendChild(head);
@@ -6962,7 +6962,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const h2 = Math.max(8, (Number(r.donado||0) / maxVal) * 170);
         const h3 = Math.max(8, (Number(r.pendiente||0) / maxVal) * 170);
         card.innerHTML = `
-          <div class="vbars-title">${esc(r.label)} Â· ${esc(moneyF(r.total))}</div>
+          <div class="vbars-title">${esc(r.label)} · ${esc(moneyF(r.total))}</div>
           <div class="vbars-chart">
             <div class="vbar-col" title="Comprado: ${esc(moneyF(r.comprado))}">
               <div class="vbar-value">${esc(moneyF(r.comprado))}</div>
@@ -6990,7 +6990,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(targetId === 'summaryTiendaTicket'){
       const tools = document.createElement('div');
       tools.className = 'hint';
-      tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> Â· <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket</a>';
+      tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> · <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket</a>';
       wrap.appendChild(tools);
     }
 
@@ -7015,7 +7015,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const inputId = `ticketUpload_${idx}`;
         const encodedKey = encodeURIComponent(r.k);
         const preview = r.image ? `<img class="ticket-thumb" src="${r.image}" alt="ticket" />` : '';
-        div.innerHTML = `<span>${esc(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">ðŸ“Ž</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">ðŸ—‘ï¸</button>` : ''}</span></span>`;
+        div.innerHTML = `<span>${esc(textLabel)}</span><span style="display:flex;align-items:center;gap:8px;">${amountHtml}<span class="ticket-actions"><button type="button" class="outline small" onclick="document.getElementById('${inputId}').click()">📎</button><input id="${inputId}" class="ticket-file-input" type="file" accept="image/*" onchange="uploadTicketImage(event, '${encodedKey}')">${preview}${r.image ? `<button type="button" class="outline small" onclick="removeTicketImage('${encodedKey}')">🗑️</button>` : ''}</span></span>`;
       } else {
         div.innerHTML = `<span>${esc(textLabel)}</span>${amountHtml}`;
       }
@@ -7054,12 +7054,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           </div>
         </div>
         <div class="budget-panel donantes">
-          <h3>DONACIÃ“N DE PRODUCTO</h3>
+          <h3>DONACIÓN DE PRODUCTO</h3>
           <div class="budget-rows">
             <div class="budget-subrows">
-              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listTiendas))}">DonaciÃ³n de producto tiendas</span><span>${esc(moneyF(b.donacionProducto.donadoTienda))}</span></div>
-              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listSocios))}">DonaciÃ³n de producto socios</span><span>${esc(moneyF(b.donacionProducto.donadoSocio))}</span></div>
-              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listNoSocios))}">DonaciÃ³n de producto no socios</span><span>${esc(moneyF(b.donacionProducto.donadoOtros))}</span></div>
+              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listTiendas))}">Donación de producto tiendas</span><span>${esc(moneyF(b.donacionProducto.donadoTienda))}</span></div>
+              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listSocios))}">Donación de producto socios</span><span>${esc(moneyF(b.donacionProducto.donadoSocio))}</span></div>
+              <div class="budget-subrow"><span class="summary-tip" title="${esc(listTitle(b.donacionProducto.listNoSocios))}">Donación de producto no socios</span><span>${esc(moneyF(b.donacionProducto.donadoOtros))}</span></div>
             </div>
             <div class="budget-row budget-subgroup"><strong>Valor producto donado</strong><span>${esc(moneyF(b.donacionProducto.valorDonado))}</span></div>
           </div>
@@ -7125,14 +7125,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     let rows = (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => !(typeof isDonationTicket === 'function' && isDonationTicket(r.ticketDonacion))).slice();
     rows = sortComprasRows(rows);
     if(!rows.length){
-      wrap.innerHTML = '<div class="empty">TodavÃ­a no hay compras u otros gastos para este evento.</div>';
+      wrap.innerHTML = '<div class="empty">Todavía no hay compras u otros gastos para este evento.</div>';
       return;
     }
     const productos = (typeof productosGenerales === 'function' ? productosGenerales() : (state.productos || [])).slice().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
     const tiendas = allTiendas().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
     const socios = allSocios().sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es'));
 
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> Â· <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket u otros gastos</a> Â· <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.comprasSort=\'producto\'; renderCompras(); return false;">Producto</a> · <a href="#" onclick="state.comprasSort=\'ticket\'; renderCompras(); return false;">Ticket u otros gastos</a> · <a href="#" onclick="state.comprasSort=\'responsable\'; renderCompras(); return false;">Responsable</a></div>';
 
     rows.forEach(r => {
       const pending = String(r.ticketDonacion || '').trim() === '';
@@ -7251,11 +7251,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 30px Arial';
-    ctx.fillText('GRÃFICAS DEL EVENTO', 40, 46);
+    ctx.fillText('GRÁFICAS DEL EVENTO', 40, 46);
 
     let y = 90;
     y = drawRow(y, 'INGRESOS', g.incomes.total, incomeItems);
-    y = drawRow(y, 'DONACIÃ“N DE PRODUCTO', g.donations.total, donationItems);
+    y = drawRow(y, 'DONACIÓN DE PRODUCTO', g.donations.total, donationItems);
     y = drawRow(y, 'GASTOS', g.expenses.total, expenseItems);
     y = drawRow(y, 'SALDO ACTUAL', g.saldoActual, saldoActualItems);
     y = drawRow(y, 'SALDO OPERATIVO', g.saldoOperativo, saldoOperativoItems);
@@ -7269,11 +7269,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{
       await ensureExcelJS();
     }catch(err){
-      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
       return;
     }
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+    wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
@@ -7341,7 +7341,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{
       await ensureExcelJS();
     }catch(err){
-      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexiÃ³n a internet.');
+      alert('No se pudo cargar el motor de Excel. Coloca exceljs.min.js en la carpeta vendor o usa conexión a internet.');
       return;
     }
 
@@ -7360,12 +7360,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'ControlEvent v13.0_prod - Â©oltyLAB â€™26';
+    wb.creator = 'ControlEvent v13.0_prod - ©oltyLAB ’26';
     wb.created = new Date();
 
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = { title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', white:'FFFFFFFF' };
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     const numFmt = '0.00';
     function baseSheet(name, widths){
       const ws = wb.addWorksheet(name);
@@ -7416,23 +7416,23 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     const wsRes = baseSheet('RESUMEN', [36,34,18,18,18]);
     mergeTitle(wsRes, 1, 'RESUMEN DEL EVENTO', 5);
-    putText(wsRes, 2, 1, 'TÃ­tulo del evento'); wsRes.mergeCells(2,2,2,5); putText(wsRes, 2, 2, ev.titulo || '');
-    putText(wsRes, 3, 1, 'DescripciÃ³n del evento'); wsRes.mergeCells(3,2,4,5); putText(wsRes, 3, 2, ev.descripcion || '');
+    putText(wsRes, 2, 1, 'Título del evento'); wsRes.mergeCells(2,2,2,5); putText(wsRes, 2, 2, ev.titulo || '');
+    putText(wsRes, 3, 1, 'Descripción del evento'); wsRes.mergeCells(3,2,4,5); putText(wsRes, 3, 2, ev.descripcion || '');
     wsRes.getCell(3,2).alignment = {vertical:'top', wrapText:true};
     wsRes.getRow(3).height = 95; wsRes.getRow(4).height = 35;
-    putText(wsRes, 5, 1, 'SituaciÃ³n del evento'); putText(wsRes, 5, 2, ev.situacion || '');
+    putText(wsRes, 5, 1, 'Situación del evento'); putText(wsRes, 5, 2, ev.situacion || '');
     putText(wsRes, 6, 1, 'Fecha inicio'); putText(wsRes, 6, 2, ev.fechaIni || '');
     putText(wsRes, 7, 1, 'Fecha fin'); putText(wsRes, 7, 2, ev.fechaFin || '');
     putText(wsRes, 8, 1, 'Precio evento'); putMoney(wsRes, 8, 2, ev.precio || 0);
     putText(wsRes, 10, 1, 'Ingresos'); putMoney(wsRes, 10, 2, budget.operativa.ingresos || 0);
-    putText(wsRes, 11, 1, 'DonaciÃ³n de producto'); putMoney(wsRes, 11, 2, budget.donacionProducto.valorDonado || 0);
+    putText(wsRes, 11, 1, 'Donación de producto'); putMoney(wsRes, 11, 2, budget.donacionProducto.valorDonado || 0);
     putText(wsRes, 12, 1, 'Gastos'); putMoney(wsRes, 12, 2, Number(budget.operativa.gastoCompras || 0) + Number(budget.operativa.gastosOrganizacion || 0) + Number(budget.operativa.pendiente || 0));
     putText(wsRes, 13, 1, 'Saldo actual'); putMoney(wsRes, 13, 2, budget.operativa.saldoActual || 0);
     putText(wsRes, 14, 1, 'Saldo operativo'); putMoney(wsRes, 14, 2, budget.operativa.saldoOperativo || 0);
 
     const wsIng = baseSheet('INGRESOS', [34,12,18,18,18,18]);
     mergeTitle(wsIng, 1, 'INGRESOS', 6);
-    titleRow(wsIng, 3, ['Colaborador/a','NÃºmero','Tipo ingreso','Importe socio','Importe no socio','TOTAL']);
+    titleRow(wsIng, 3, ['Colaborador/a','Número','Tipo ingreso','Importe socio','Importe no socio','TOTAL']);
     let r = 4;
     let tNum = 0, tSoc = 0, tNoSoc = 0, tTot = 0;
     collabs.forEach(item => {
@@ -7480,7 +7480,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
     const wsDon = baseSheet('DONACIONES DE PRODUCTO', [30,12,16,18,22,28,28]);
     mergeTitle(wsDon, 1, 'DONACIONES DE PRODUCTO', 7);
-    titleRow(wsDon, 3, ['Producto','Unidades','Precio','Valor estimado','Tipo de donaciÃ³n','Donante','Responsable']);
+    titleRow(wsDon, 3, ['Producto','Unidades','Precio','Valor estimado','Tipo de donación','Donante','Responsable']);
     r = 4;
     let totalValDon = 0;
     donacionesSolo.forEach(item => {
@@ -7499,7 +7499,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     putMoney(wsDon, r, 4, totalValDon);
 
     const wsSeg = baseSheet('CALCULOS_SEGMENTO', [32,16,16,22,16]);
-    mergeTitle(wsSeg, 1, 'CÃLCULOS SEGMENTO', 5);
+    mergeTitle(wsSeg, 1, 'CÁLCULOS SEGMENTO', 5);
     titleRow(wsSeg, 3, ['Segmento','Comprado','Donado','Pte. Compra u otros gastos','TOTAL']);
     r = 4;
     let sgC=0, sgD=0, sgP=0, sgT=0;
@@ -7516,7 +7516,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     putMoney(wsSeg, r, 2, sgC); putMoney(wsSeg, r, 3, sgD); putMoney(wsSeg, r, 4, sgP); putMoney(wsSeg, r, 5, sgT);
 
     const wsDest = baseSheet('CALCULOS_DESTINO', [32,16,16,22,16]);
-    mergeTitle(wsDest, 1, 'CÃLCULOS DESTINO', 5);
+    mergeTitle(wsDest, 1, 'CÁLCULOS DESTINO', 5);
     titleRow(wsDest, 3, ['Destino','Comprado','Donado','Pte. Compra u otros gastos','TOTAL']);
     r = 4;
     let dsC=0, dsD=0, dsP=0, dsT=0;
@@ -7533,7 +7533,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     putMoney(wsDest, r, 2, dsC); putMoney(wsDest, r, 3, dsD); putMoney(wsDest, r, 4, dsP); putMoney(wsDest, r, 5, dsT);
 
     const wsTienda = baseSheet('CALCULO_TIENDA_TICKET', [58,20]);
-    mergeTitle(wsTienda, 1, 'CÃLCULO TIENDA TICKET', 2);
+    mergeTitle(wsTienda, 1, 'CÁLCULO TIENDA TICKET', 2);
     titleRow(wsTienda, 3, ['Concepto','Importe']);
     r = 4;
     let tt = 0;
@@ -7547,7 +7547,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     putMoney(wsTienda, r, 2, tt);
 
     const wsGraf = baseSheet('GRAFICAS', [24,24,24,24]);
-    mergeTitle(wsGraf, 1, 'GRÃFICAS DEL EVENTO', 4);
+    mergeTitle(wsGraf, 1, 'GRÁFICAS DEL EVENTO', 4);
     const dataUrl = await makeChartImageDataUrlV160();
     addImageToSheet(wsGraf, dataUrl, 3, 1, 1450, 760);
 
@@ -7734,7 +7734,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
   function incomeLines(filterFn){
     const rows = typeof collabsForEvent === 'function' ? collabsForEvent() : [];
-    return rows.filter(filterFn).map(r => `${r.persona?.nombre || 'Sin nombre'} â€” ${moneyF(r.total || 0)}`);
+    return rows.filter(filterFn).map(r => `${r.persona?.nombre || 'Sin nombre'} — ${moneyF(r.total || 0)}`);
   }
 
   const _renderIngresosSummary = typeof renderIngresosSummary === 'function' ? renderIngresosSummary : null;
@@ -7768,9 +7768,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         donado: donados.reduce((a,b)=>a+Number(b.valor||0),0),
         pendiente: pendientes.reduce((a,b)=>a+Number(b.valor||0),0),
         total: 0,
-        listComprado: comprados.map(c => `${c.producto?.nombre || 'Producto'} â€” ${moneyF(c.valor || 0)}`),
-        listDonado: donados.map(c => `${c.producto?.nombre || 'Producto'} â€” ${moneyF(c.valor || 0)}`),
-        listPendiente: pendientes.map(c => `${c.producto?.nombre || 'Producto'} â€” ${moneyF(c.valor || 0)}`)
+        listComprado: comprados.map(c => `${c.producto?.nombre || 'Producto'} — ${moneyF(c.valor || 0)}`),
+        listDonado: donados.map(c => `${c.producto?.nombre || 'Producto'} — ${moneyF(c.valor || 0)}`),
+        listPendiente: pendientes.map(c => `${c.producto?.nombre || 'Producto'} — ${moneyF(c.valor || 0)}`)
       };
     }).map(r => ({...r, total: r.comprado + r.donado + r.pendiente}));
   }
@@ -7788,7 +7788,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const head = document.createElement('div');
       head.className = 'vbars-wrap';
       head.innerHTML = `
-        <div class="vbars-total">Por segmento â€“ TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div>
+        <div class="vbars-total">Por segmento – TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div>
         <div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>
       `;
       wrap.appendChild(head);
@@ -7801,7 +7801,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const card = document.createElement('div');
         card.className = 'vbars-card';
         card.innerHTML = `
-          <div class="vbars-title">${esc(r.label)} Â· ${esc(moneyF(r.total))}</div>
+          <div class="vbars-title">${esc(r.label)} · ${esc(moneyF(r.total))}</div>
           <div class="vbars-chart">
             <div class="vbar-col" title="${esc((r.listComprado.length ? r.listComprado.join('\n') : 'Sin productos'))}">
               <div class="vbar-value">${esc(moneyF(r.comprado))}</div>
@@ -7860,9 +7860,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       'Donado por no socios': donationLines('DONADO OTROS')
     };
     const expenseDetails = {
-      'Gastado en TKxx': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => !isDonationTicket(r.ticketDonacion) && !isCurrentExpenseTicket(r.ticketDonacion) && String(r.ticketDonacion || '').trim() !== '').map(r => `${r.producto?.nombre || 'Producto'} â€” ${r.ticketDonacion} â€” ${moneyF(r.valor || 0)}`),
-      'Gastos corrientes': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => isCurrentExpenseTicket(r.ticketDonacion)).map(r => `${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`),
-      'Pte. Compra u otros gastos': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => !isDonationTicket(r.ticketDonacion) && String(r.ticketDonacion || '').trim() === '').map(r => `${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`)
+      'Gastado en TKxx': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => !isDonationTicket(r.ticketDonacion) && !isCurrentExpenseTicket(r.ticketDonacion) && String(r.ticketDonacion || '').trim() !== '').map(r => `${r.producto?.nombre || 'Producto'} — ${r.ticketDonacion} — ${moneyF(r.valor || 0)}`),
+      'Gastos corrientes': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => isCurrentExpenseTicket(r.ticketDonacion)).map(r => `${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`),
+      'Pte. Compra u otros gastos': (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => !isDonationTicket(r.ticketDonacion) && String(r.ticketDonacion || '').trim() === '').map(r => `${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`)
     };
     if(tracks[0]){
       const titles = ['Socios Banco','Socios Bizum','Socios Efectivo','No socios Banco','No socios Bizum','No socios Efectivo','Pendiente de ingresar'];
@@ -7975,12 +7975,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const v = fn(a,b);
       return v !== 0 ? v : (a.producto?.nombre||'').localeCompare((b.producto?.nombre||''),'es');
     });
-    if(!rows.length){ wrap.innerHTML = '<div class="empty">TodavÃ­a no hay donaciones de producto para este evento.</div>'; return; }
+    if(!rows.length){ wrap.innerHTML = '<div class="empty">Todavía no hay donaciones de producto para este evento.</div>'; return; }
 
     const productos = allProductsV162();
     const socios = allSociosV162();
     const donors = (typeof donorOptions === 'function' ? donorOptions() : []).slice().sort((a,b)=>(a.label||'').localeCompare((b.label||''),'es'));
-    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> Â· <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donaciÃ³n</a> Â· <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> Â· <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
+    wrap.innerHTML = '<div class="hint">Ordenar por: <a href="#" onclick="state.donacionesSort=\'producto\'; renderDonaciones(); return false;">Producto</a> · <a href="#" onclick="state.donacionesSort=\'ticket\'; renderDonaciones(); return false;">Tipo de donación</a> · <a href="#" onclick="state.donacionesSort=\'donante\'; renderDonaciones(); return false;">Donante</a> · <a href="#" onclick="state.donacionesSort=\'responsable\'; renderDonaciones(); return false;">Responsable</a></div>';
     rows.forEach(r => {
       const precioVal = Number(r.precio != null ? r.precio : (r.precioCalc != null ? r.precioCalc : priceRefV162(r.producto)));
       const valorVal = precioVal * Number(r.unidades || 0);
@@ -7994,7 +7994,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${Number(r.unidades||0)}" data-action="edit-donacion-unidades" data-id="${r.id}" /></div>
           <div class="field"><label>Precio</label><input class="money-text" type="text" value="${euroF(precioVal)}" data-action="edit-donacion-precio" data-id="${r.id}" /></div>
           <div class="field"><label>Valor</label><input class="soft-readonly" readonly value="${moneyF(valorVal)}" /></div>
-          <div class="field"><label>Tipo de donaciÃ³n</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
+          <div class="field"><label>Tipo de donación</label><select data-action="edit-donacion-ticket" data-id="${r.id}">${DONATION_TICKET_OPTIONS.map(v => `<option value="${v}" ${v===r.ticketDonacion?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
           <div class="field"><label>Donante</label><select data-action="edit-donacion-donante" data-id="${r.id}"><option value="" ${!r.donorRef?'selected':''}>-- elige donante --</option>${donors.map(d => `<option value="${d.value}" ${d.value===r.donorRef?'selected':''}>${esc(d.label)}</option>`).join('')}</select></div>
           <div class="field"><label>Responsable</label><select data-action="edit-donacion-responsable" data-id="${r.id}"><option value="" ${!r.responsableId?'selected':''}>-- sin responsable --</option>${socios.map(p => `<option value="${p.id}" ${p.id===r.responsableId?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></div>
           <div style="display:flex;gap:8px;align-items:end"><button type="button" class="modify small" data-action="save-donacion" data-id="${r.id}">Modificar</button><button type="button" class="danger small" data-action="delete-donacion" data-id="${r.id}">Eliminar</button></div>
@@ -8125,9 +8125,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         donado,
         pendiente,
         total: comprado + donado + pendiente,
-        listComprado: comprados.map(c => `${c.producto?.nombre || 'Producto'} â€” ${c.tienda?.nombre || ''} â€” ${c.ticketDonacion || ''} â€” ${moneyF(c.valor || 0)}`),
-        listDonado: donados.map(c => `${donorNameV162(c) || 'Sin donante'} â€” ${c.producto?.nombre || 'Producto'} â€” ${moneyF(c.valor || 0)}`),
-        listPendiente: pendientes.map(c => `${c.producto?.nombre || 'Producto'} â€” ${moneyF(c.valor || 0)}`)
+        listComprado: comprados.map(c => `${c.producto?.nombre || 'Producto'} — ${c.tienda?.nombre || ''} — ${c.ticketDonacion || ''} — ${moneyF(c.valor || 0)}`),
+        listDonado: donados.map(c => `${donorNameV162(c) || 'Sin donante'} — ${c.producto?.nombre || 'Producto'} — ${moneyF(c.valor || 0)}`),
+        listPendiente: pendientes.map(c => `${c.producto?.nombre || 'Producto'} — ${moneyF(c.valor || 0)}`)
       };
     });
   }
@@ -8147,7 +8147,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const title = targetId === 'summarySegmento' ? 'Por segmento' : 'Por destino';
       const head = document.createElement('div');
       head.className = 'vbars-wrap';
-      head.innerHTML = `<div class="vbars-total">${title} â€“ TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>`;
+      head.innerHTML = `<div class="vbars-total">${title} – TOTAL GENERAL: ${esc(moneyF(totalGeneral))}</div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>`;
       wrap.appendChild(head);
       const grid = document.createElement('div');
       grid.className = 'vbars-grid';
@@ -8158,7 +8158,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const cardDiv = document.createElement('div');
         cardDiv.className = 'vbars-card';
         cardDiv.innerHTML = `
-          <div class="vbars-title">${esc(r.label)} Â· ${esc(moneyF(r.total))}</div>
+          <div class="vbars-title">${esc(r.label)} · ${esc(moneyF(r.total))}</div>
           <div class="vbars-chart">
             <div class="vbar-col" title="${esc((r.listComprado?.length ? r.listComprado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${esc(moneyF(r.comprado))}</div><div class="vbar-stick" style="height:${h1}px;background:#dc2626"></div><div class="vbar-label">Comprado</div></div>
             <div class="vbar-col" title="${esc((r.listDonado?.length ? r.listDonado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${esc(moneyF(r.donado))}</div><div class="vbar-stick" style="height:${h2}px;background:#f59e0b"></div><div class="vbar-label">Donado</div></div>
@@ -8172,9 +8172,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(_renderSummaryListV162) return _renderSummaryListV162(targetId, rows);
   };
 
-  function linesIncomeV162(fn){ return (typeof collabsForEvent === 'function' ? collabsForEvent() : []).filter(fn).map(r => `${r.persona?.nombre || 'Sin nombre'} â€” ${moneyF(r.total || 0)}`); }
-  function linesDonationV162(ticket){ return (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => String(r.ticketDonacion || '').trim() === ticket).map(r => `${donorNameV162(r) || 'Sin donante'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`); }
-  function linesExpenseV162(fn){ return (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(fn).map(r => `${r.tienda?.nombre || 'Sin tienda'} â€” ${r.ticketDonacion || 'Pte.Compra u otros gastos'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`); }
+  function linesIncomeV162(fn){ return (typeof collabsForEvent === 'function' ? collabsForEvent() : []).filter(fn).map(r => `${r.persona?.nombre || 'Sin nombre'} — ${moneyF(r.total || 0)}`); }
+  function linesDonationV162(ticket){ return (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(r => String(r.ticketDonacion || '').trim() === ticket).map(r => `${donorNameV162(r) || 'Sin donante'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`); }
+  function linesExpenseV162(fn){ return (typeof comprasForEvent === 'function' ? comprasForEvent() : []).filter(fn).map(r => `${r.tienda?.nombre || 'Sin tienda'} — ${r.ticketDonacion || 'Pte.Compra u otros gastos'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`); }
   function segHtmlV162(value, maxVal, color, title){
     const w = (Math.max(0, Number(value || 0)) / maxVal) * 100;
     return `<div class="chart-seg" title="${esc(title)}" style="width:${w}%;background:${color};"></div>`;
@@ -8218,7 +8218,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     function row(label, total, items){
       return `<div class="chart-row"><div class="chart-label">${esc(label)}: ${esc(moneyF(total))}</div><div><div class="chart-track">${items.map(it => segHtmlV162(it.value, maxVal, it.color, `${it.label}: ${moneyF(it.value)}\n${(it.lines && it.lines.length ? it.lines : ['Sin registros']).join('\n')}`)).join('')}</div>${legendHtmlV162(items)}</div></div>`;
     }
-    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', totalIncome, incomeItems)}${row('DONACIÃ“N DE PRODUCTO', totalDon, donationItems)}${row('GASTOS', totalExp, expenseItems)}${row('SALDO OPERATIVO', saldoOperativo, saldoItems)}</div></div>`;
+    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', totalIncome, incomeItems)}${row('DONACIÓN DE PRODUCTO', totalDon, donationItems)}${row('GASTOS', totalExp, expenseItems)}${row('SALDO OPERATIVO', saldoOperativo, saldoItems)}</div></div>`;
   };
 
   const _renderBudgetV162 = typeof renderBudget === 'function' ? renderBudget : null;
@@ -8286,12 +8286,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
             if(n) return n;
           }
         }
-        // Si por algÃºn motivo se guardÃ³ sÃ³lo el id o el nombre, intentarlo igualmente.
+        // Si por algún motivo se guardó sólo el id o el nombre, intentarlo igualmente.
         const byPerson = personName(raw);
         if(byPerson) return byPerson;
         const byStore = storeName(raw);
         if(byStore) return byStore;
-        // Ãšltimo recurso: evitar celda vacÃ­a si el valor guardado era un texto Ãºtil.
+        // Último recurso: evitar celda vacía si el valor guardado era un texto útil.
         if(!/^[PT]:/i.test(raw)) return raw;
       }
       const byTiendaId = storeName(c?.tiendaId);
@@ -8342,13 +8342,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function collabItemsV163(filterFn){
     return (typeof collabsForEvent === 'function' ? collabsForEvent() : [])
       .filter(filterFn)
-      .map(r => `${r.persona?.nombre || 'Sin nombre'} â€” ${moneyF(r.total || 0)}`);
+      .map(r => `${r.persona?.nombre || 'Sin nombre'} — ${moneyF(r.total || 0)}`);
   }
 
   function donationItemsV163(ticketCode){
     return comprasForEvent()
       .filter(r => norm(r.ticketDonacion) === ticketCode)
-      .map(r => `${resolveDonorNameV163(r) || 'Sin donante'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`);
+      .map(r => `${resolveDonorNameV163(r) || 'Sin donante'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`);
   }
 
   budgetSummary = function(){
@@ -8398,13 +8398,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   };
 
   function graphLinesIncomeV163(fn){
-    return (typeof collabsForEvent === 'function' ? collabsForEvent() : []).filter(fn).map(r => `${r.persona?.nombre || 'Sin nombre'} â€” ${moneyF(r.total || 0)}`);
+    return (typeof collabsForEvent === 'function' ? collabsForEvent() : []).filter(fn).map(r => `${r.persona?.nombre || 'Sin nombre'} — ${moneyF(r.total || 0)}`);
   }
   function graphLinesDonationV163(ticket){
-    return comprasForEvent().filter(r => norm(r.ticketDonacion) === ticket).map(r => `${resolveDonorNameV163(r) || 'Sin donante'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`);
+    return comprasForEvent().filter(r => norm(r.ticketDonacion) === ticket).map(r => `${resolveDonorNameV163(r) || 'Sin donante'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`);
   }
   function graphLinesExpenseV163(fn){
-    return comprasForEvent().filter(fn).map(r => `${r.tienda?.nombre || 'Sin tienda'} â€” ${r.ticketDonacion || 'Pte.Compra u otros gastos'} â€” ${r.producto?.nombre || 'Producto'} â€” ${moneyF(r.valor || 0)}`);
+    return comprasForEvent().filter(fn).map(r => `${r.tienda?.nombre || 'Sin tienda'} — ${r.ticketDonacion || 'Pte.Compra u otros gastos'} — ${r.producto?.nombre || 'Producto'} — ${moneyF(r.valor || 0)}`);
   }
 
   function graphPartsV163(){
@@ -8460,7 +8460,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       }).join('');
       return `<div class="chart-row"><div class="chart-label">${esc(label)}: ${esc(moneyF(total))}</div><div><div class="chart-track">${segs}</div>${legendHtmlV163(items)}</div></div>`;
     }
-    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
+    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
   };
 
   window.makeChartImageDataUrlV160 = async function(){
@@ -8471,7 +8471,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const ctx = canvas.getContext('2d');
     const maxVal = Math.max(1, g.totalIncome, g.totalDon, g.totalExp, Math.abs(g.saldoOperativo));
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText('GRÃFICAS DEL EVENTO', 40, 48);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText('GRÁFICAS DEL EVENTO', 40, 48);
     function drawRow(y, label, total, items){
       ctx.fillStyle = '#111827'; ctx.font = 'bold 22px Arial'; ctx.fillText(`${label}: ${moneyF(total)}`, 40, y);
       const x = 360, w = 1010, h = 36;
@@ -8495,7 +8495,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
     let y = 110;
     y = drawRow(y, 'INGRESOS', g.totalIncome, g.incomeItems);
-    y = drawRow(y, 'DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems);
+    y = drawRow(y, 'DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems);
     y = drawRow(y, 'GASTOS', g.totalExp, g.expenseItems);
     drawRow(y, 'SALDO OPERATIVO', g.saldoOperativo, g.saldoItems);
     return canvas.toDataURL('image/png');
@@ -8519,7 +8519,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const escV164 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
   const fmtMoneyV164 = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   };
   const normV164 = v => String(v ?? '').trim();
   const isDonV164 = v => (typeof isDonationTicket === 'function') ? isDonationTicket(v) : /^DONADO/i.test(normV164(v));
@@ -8601,7 +8601,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return true;
   }
 
-  // Compra: al elegir producto del desplegable, saltar al registro existente sin pulsar AÃ±adir.
+  // Compra: al elegir producto del desplegable, saltar al registro existente sin pulsar Añadir.
   document.addEventListener('change', function(e){
     const t = e.target;
     if(!t || t.id !== 'buyProducto' || (typeof isLocked === 'function' && isLocked())) return;
@@ -8636,9 +8636,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         label:k,
         comprado, donado, pendiente,
         total: comprado + donado + pendiente,
-        listComprado: comprados.map(c => `${productNameV164(c)} â€” ${storeNameV164(c) || 'Sin tienda'} â€” ${normV164(c.ticketDonacion)} â€” ${fmtMoneyV164(valueCompraV164(c))}`),
-        listDonado: donados.map(c => `${resolveDonorNameV164(c) || 'Sin donante'} â€” ${productNameV164(c)} â€” ${fmtMoneyV164(valueCompraV164(c))}`),
-        listPendiente: pendientes.map(c => `${productNameV164(c)} â€” ${fmtMoneyV164(valueCompraV164(c))}`)
+        listComprado: comprados.map(c => `${productNameV164(c)} — ${storeNameV164(c) || 'Sin tienda'} — ${normV164(c.ticketDonacion)} — ${fmtMoneyV164(valueCompraV164(c))}`),
+        listDonado: donados.map(c => `${resolveDonorNameV164(c) || 'Sin donante'} — ${productNameV164(c)} — ${fmtMoneyV164(valueCompraV164(c))}`),
+        listPendiente: pendientes.map(c => `${productNameV164(c)} — ${fmtMoneyV164(valueCompraV164(c))}`)
       };
     });
   }
@@ -8656,7 +8656,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const title = targetId === 'summarySegmento' ? 'Por segmento' : 'Por destino';
     const head = document.createElement('div');
     head.className = 'vbars-wrap';
-    head.innerHTML = `<div class="vbars-total">${title} â€“ TOTAL GENERAL: ${escV164(fmtMoneyV164(totalGeneral))}</div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>`;
+    head.innerHTML = `<div class="vbars-total">${title} – TOTAL GENERAL: ${escV164(fmtMoneyV164(totalGeneral))}</div><div class="chart-note"><span><span class="legend-dot" style="background:#dc2626"></span>Comprado</span> <span><span class="legend-dot" style="background:#f59e0b"></span>Donado</span> <span><span class="legend-dot" style="background:#fb7185"></span>Pte. Compra u otros gastos</span></div>`;
     wrap.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'vbars-grid';
@@ -8666,7 +8666,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const h3 = Math.max(8, (Number(r.pendiente||0) / maxVal) * 170);
       const cardDiv = document.createElement('div');
       cardDiv.className = 'vbars-card';
-      cardDiv.innerHTML = `<div class="vbars-title">${escV164(r.label)} Â· ${escV164(fmtMoneyV164(r.total))}</div><div class="vbars-chart"><div class="vbar-col" title="${escV164((r.listComprado?.length ? r.listComprado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.comprado))}</div><div class="vbar-stick" style="height:${h1}px;background:#dc2626"></div><div class="vbar-label">Comprado</div></div><div class="vbar-col" title="${escV164((r.listDonado?.length ? r.listDonado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.donado))}</div><div class="vbar-stick" style="height:${h2}px;background:#f59e0b"></div><div class="vbar-label">Donado</div></div><div class="vbar-col" title="${escV164((r.listPendiente?.length ? r.listPendiente.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.pendiente))}</div><div class="vbar-stick" style="height:${h3}px;background:#fb7185"></div><div class="vbar-label">Pte. Compra u otros gastos</div></div></div>`;
+      cardDiv.innerHTML = `<div class="vbars-title">${escV164(r.label)} · ${escV164(fmtMoneyV164(r.total))}</div><div class="vbars-chart"><div class="vbar-col" title="${escV164((r.listComprado?.length ? r.listComprado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.comprado))}</div><div class="vbar-stick" style="height:${h1}px;background:#dc2626"></div><div class="vbar-label">Comprado</div></div><div class="vbar-col" title="${escV164((r.listDonado?.length ? r.listDonado.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.donado))}</div><div class="vbar-stick" style="height:${h2}px;background:#f59e0b"></div><div class="vbar-label">Donado</div></div><div class="vbar-col" title="${escV164((r.listPendiente?.length ? r.listPendiente.join('\n') : 'Sin productos'))}"><div class="vbar-value">${escV164(fmtMoneyV164(r.pendiente))}</div><div class="vbar-stick" style="height:${h3}px;background:#fb7185"></div><div class="vbar-label">Pte. Compra u otros gastos</div></div></div>`;
       grid.appendChild(cardDiv);
     });
     wrap.appendChild(grid);
@@ -8700,7 +8700,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       if(pn && !filled[key].products.includes(pn)) filled[key].products.push(pn);
     });
     const rows = Object.values(filled).map(obj => {
-      const label = obj.donated && obj.products.length ? `${obj.k} Â· ${obj.products.join(' Â· ')}` : obj.k;
+      const label = obj.donated && obj.products.length ? `${obj.k} · ${obj.products.join(' · ')}` : obj.k;
       return {...obj, label, pending:false, image:getTicketImageV164(obj.k)};
     }).concat(Object.entries(pending).map(([k,v]) => ({k, label:k, v, rawTicket:'', pending:true, donated:false, attachable:false, image:''})));
     const sortMode = state.summaryTiendaSort || 'tienda';
@@ -8761,7 +8761,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     wrap.innerHTML = '';
     const tools = document.createElement('div');
     tools.className = 'hint';
-    tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> Â· <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket/DonaciÃ³n/Otros Gastos</a>';
+    tools.innerHTML = 'Ordenar por: <a href="#" onclick="state.summaryTiendaSort=\'tienda\'; renderBudget(); return false;">Tienda</a> · <a href="#" onclick="state.summaryTiendaSort=\'ticket\'; renderBudget(); return false;">Ticket/Donación/Otros Gastos</a>';
     wrap.appendChild(tools);
     if(!rows.length){
       const empty = document.createElement('div');
@@ -8781,8 +8781,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       let actions = '';
       if(r.attachable && !r.pending){
         const preview = r.image ? `<img class="ticket-thumb" src="${r.image}" alt="ticket" />` : '<span class="hint">Sin imagen</span>';
-        const del = r.image ? `<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImageV164('${encoded}')">ðŸ—‘ï¸</button>` : '';
-        actions = `<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImageV164('${encoded}')">ðŸ“Ž</button>${preview}${del}</span>`;
+        const del = r.image ? `<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImageV164('${encoded}')">🗑️</button>` : '';
+        actions = `<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImageV164('${encoded}')">📎</button>${preview}${del}</span>`;
       }
       div.innerHTML = `<span>${escV164(r.label || r.k)}</span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">${amountHtml}${actions}</span>`;
       wrap.appendChild(div);
@@ -8798,9 +8798,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const rows = collabsV164();
     const compras = comprasV164();
     const sum = arr => arr.reduce((a,b)=>a+Number(b||0),0);
-    const incomeLine = fn => rows.filter(fn).map(r => `${personNameV164(r)} â€” ${fmtMoneyV164(Number(r.total || (Number(r.numero||1) * Number(r.importe||0))))}`);
-    const donationLine = ticket => compras.filter(r => normV164(r.ticketDonacion) === ticket).map(r => `${resolveDonorNameV164(r) || 'Sin donante'} â€” ${productNameV164(r)} â€” ${fmtMoneyV164(valueCompraV164(r))}`);
-    const expenseLine = fn => compras.filter(fn).map(r => `${storeNameV164(r) || 'Sin tienda'} â€” ${normV164(r.ticketDonacion) || 'Pte.Compra u otros gastos'} â€” ${productNameV164(r)} â€” ${fmtMoneyV164(valueCompraV164(r))}`);
+    const incomeLine = fn => rows.filter(fn).map(r => `${personNameV164(r)} — ${fmtMoneyV164(Number(r.total || (Number(r.numero||1) * Number(r.importe||0))))}`);
+    const donationLine = ticket => compras.filter(r => normV164(r.ticketDonacion) === ticket).map(r => `${resolveDonorNameV164(r) || 'Sin donante'} — ${productNameV164(r)} — ${fmtMoneyV164(valueCompraV164(r))}`);
+    const expenseLine = fn => compras.filter(fn).map(r => `${storeNameV164(r) || 'Sin tienda'} — ${normV164(r.ticketDonacion) || 'Pte.Compra u otros gastos'} — ${productNameV164(r)} — ${fmtMoneyV164(valueCompraV164(r))}`);
     const incomeItems = [
       {label:'Socios Banco', value:sum(rows.filter(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Banco').map(r => r.total)), color:'#2563eb', lines:incomeLine(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Banco')},
       {label:'Socios Bizum', value:sum(rows.filter(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Bizum').map(r => r.total)), color:'#16a34a', lines:incomeLine(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Bizum')},
@@ -8849,7 +8849,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       }).join('');
       return `<div class="chart-row"><div class="chart-label">${escV164(label)}: ${escV164(fmtMoneyV164(total))}</div><div><div class="chart-track">${segs}</div>${legendV164(items)}</div></div>`;
     }
-    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
+    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
   };
 
   async function makeChartImageDataUrlV164(){
@@ -8859,7 +8859,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const ctx = canvas.getContext('2d');
     const maxVal = Math.max(1, g.totalIncome, g.totalDon, g.totalExp, Math.abs(g.saldoOperativo));
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 32px Arial'; ctx.fillText('GRÃFICAS DEL EVENTO', 40, 52);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 32px Arial'; ctx.fillText('GRÁFICAS DEL EVENTO', 40, 52);
     function drawRow(y, label, total, items){
       ctx.fillStyle = '#111827'; ctx.font = 'bold 22px Arial'; ctx.fillText(`${label}: ${fmtMoneyV164(total)}`, 40, y);
       const x = 390, w = 1120, h = 38;
@@ -8883,7 +8883,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
     let y = 112;
     y = drawRow(y, 'INGRESOS', g.totalIncome, g.incomeItems);
-    y = drawRow(y, 'DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems);
+    y = drawRow(y, 'DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems);
     y = drawRow(y, 'GASTOS', g.totalExp, g.expenseItems);
     drawRow(y, 'SALDO OPERATIVO', g.saldoOperativo, g.saldoItems);
     return canvas.toDataURL('image/png');
@@ -8901,7 +8901,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
     const title = kind === 'segmento' ? 'POR SEGMENTO' : 'POR DESTINO';
     const totalGeneral = rows.reduce((a,b)=>a+Number(b.total||0),0);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText(`${title} â€“ TOTAL GENERAL: ${fmtMoneyV164(totalGeneral)}`, 35, 48);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText(`${title} – TOTAL GENERAL: ${fmtMoneyV164(totalGeneral)}`, 35, 48);
     ctx.font = '16px Arial';
     const legends = [['#dc2626','Comprado'],['#f59e0b','Donado'],['#fb7185','Pte. Compra u otros gastos']];
     let lx = 35;
@@ -8909,7 +8909,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const maxVal = Math.max(1, ...rows.flatMap(r => [Number(r.comprado||0), Number(r.donado||0), Number(r.pendiente||0)]));
     let y = 126;
     rows.forEach(r => {
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} Â· ${fmtMoneyV164(r.total)}`, 35, y);
+      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} · ${fmtMoneyV164(r.total)}`, 35, y);
       const x = 360, w = 930, h = 16;
       const vals = [[r.comprado,'#dc2626','Comprado'],[r.donado,'#f59e0b','Donado'],[r.pendiente,'#fb7185','Pte. Compra u otros gastos']];
       vals.forEach((v, i) => {
@@ -8966,7 +8966,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(typeof isLocked === 'function' && isLocked()) return;
     try{ await ensureExcelJS(); }catch(err){ alert('No se pudo cargar el motor de Excel.'); return; }
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB â€™26`; wb.created = new Date();
+    wb.creator = `${VERSION} - ©oltyLAB ’26`; wb.created = new Date();
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     function sheet(name, headers, rows){
@@ -9002,10 +9002,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(!ev) return;
     try{ await ensureExcelJS(); }catch(err){ alert('No se pudo cargar el motor de Excel.'); return; }
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB â€™26`; wb.created = new Date();
+    wb.creator = `${VERSION} - ©oltyLAB ’26`; wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = {title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', refund:'FFFFF4F4', greenSoft:'FFEFFFF4', white:'FFFFFFFF', soft:'FFF8FAFC'};
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     function baseSheet(name, widths){ const ws = wb.addWorksheet(name); ws.properties.defaultRowHeight = 22; ws.columns = widths.map(w=>({width:w})); return ws; }
     function paint(cell, fill='white'){ cell.border=border; cell.alignment={vertical:'middle', wrapText:true}; if(fills[fill]) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:fills[fill]}}; }
     function titleRow(ws,r,headers){ headers.forEach((h,i)=>{ const c=ws.getCell(r,i+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:fills.title}}; c.border=border; c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; }); ws.getRow(r).height=24; }
@@ -9051,21 +9051,21 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 7);
     putText(wsRes,r,1,'Evento'); putText(wsRes,r++,2,ev.titulo||'');
     putText(wsRes,r,1,'Fechas'); putText(wsRes,r++,2,`${ev.fechaIni||''}${ev.fechaFin ? ' - ' + ev.fechaFin : ''}`);
-    putText(wsRes,r,1,'DescripciÃ³n'); wsRes.mergeCells(r,2,r+3,7); const dc=wsRes.getCell(r,2); dc.value=ev.descripcion||''; paint(dc,'soft'); dc.alignment={vertical:'top',wrapText:true}; for(let rr=r; rr<=r+3; rr++) wsRes.getRow(rr).height=32; r += 4;
+    putText(wsRes,r,1,'Descripción'); wsRes.mergeCells(r,2,r+3,7); const dc=wsRes.getCell(r,2); dc.value=ev.descripcion||''; paint(dc,'soft'); dc.alignment={vertical:'top',wrapText:true}; for(let rr=r; rr<=r+3; rr++) wsRes.getRow(rr).height=32; r += 4;
     putText(wsRes,r,1,'Precio'); putMoney(wsRes,r++,2,Number(ev.precio||0));
     putText(wsRes,r,1,'Ingresado'); putMoney(wsRes,r++,2,budget?.ingresosDinero?.totalIngresado || 0,'white',true);
     putText(wsRes,r,1,'Pendiente'); putMoney(wsRes,r++,2,budget?.ingresosDinero?.pendiente || 0,'warn',true);
     putText(wsRes,r,1,'Saldo operativo'); putMoney(wsRes,r++,2,budget?.operativa?.saldoOperativo || graphPartsV164().saldoOperativo,(budget?.operativa?.saldoOperativo || graphPartsV164().saldoOperativo) >= 0 ? 'ok':'bad',true);
-    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,`${VERSION} - Â©oltyLAB â€™26`);
+    putText(wsRes,r,1,'Generado por'); putText(wsRes,r++,2,`${VERSION} - ©oltyLAB ’26`);
     r += 2;
-    mergeTitle(wsRes, r++, 'GRÃFICAS DE CÃLCULOS POR AGRUPACIÃ“N', 7);
+    mergeTitle(wsRes, r++, 'GRÁFICAS DE CÁLCULOS POR AGRUPACIÓN', 7);
     putText(wsRes, r, 1, 'Por segmento'); wsRes.getCell(r,1).font = {bold:true,color:{argb:'FF111827'}}; r += 1;
     addImage(wsRes, await makeGroupingChartImageV164('segmento'), r, 1, 1180, 480); wsRes.getRow(r).height = 360; r += 19;
     putText(wsRes, r, 1, 'Por destino'); wsRes.getCell(r,1).font = {bold:true,color:{argb:'FF111827'}}; r += 1;
     addImage(wsRes, await makeGroupingChartImageV164('destino'), r, 1, 1180, 480); wsRes.getRow(r).height = 360;
 
     const wsIng = baseSheet('INGRESOS', [30,12,18,18,18,18,18]);
-    mergeTitle(wsIng,1,'INGRESOS',7); titleRow(wsIng,3,['Nombre','NÃºmero','SituaciÃ³n','Rango','Importe socio','Total','Pendiente']);
+    mergeTitle(wsIng,1,'INGRESOS',7); titleRow(wsIng,3,['Nombre','Número','Situación','Rango','Importe socio','Total','Pendiente']);
     r=4; let totalIng=0, totalPend=0;
     collabs.forEach(it=>{ const persona=it.persona||personByIdV164(it.personaId); const total=Number(it.total || (Number(it.numero||1)*Number(it.importe||ev.precio||0))); const pendiente=it.situacion==='Pendiente'?total:0; putText(wsIng,r,1,persona.nombre||''); putNum(wsIng,r,2,it.numero||1); putText(wsIng,r,3,it.situacion||''); putText(wsIng,r,4,persona.rango||''); putMoney(wsIng,r,5,it.importe || ev.precio || 0); putMoney(wsIng,r,6,total); putMoney(wsIng,r,7,pendiente,pendiente?'warn':'white'); totalIng += total; totalPend += pendiente; r++; });
     titleRow(wsIng,r,['TOTAL','','','','','', '']); putMoney(wsIng,r,6,totalIng,'white',true); putMoney(wsIng,r,7,totalPend,'warn',true);
@@ -9077,7 +9077,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     titleRow(wsCom,r,['TOTAL','','','','','','','']); putMoney(wsCom,r,4,totalCom,'white',true);
 
     const wsDon = baseSheet('DONACIONES DE PRODUCTO', [32,12,16,16,22,28,24,18]);
-    mergeTitle(wsDon,1,'DONACIONES DE PRODUCTO',8); titleRow(wsDon,3,['Producto','Unidades','Precio','Importe','Tipo donaciÃ³n','Donante','Responsable','Origen']);
+    mergeTitle(wsDon,1,'DONACIONES DE PRODUCTO',8); titleRow(wsDon,3,['Producto','Unidades','Precio','Importe','Tipo donación','Donante','Responsable','Origen']);
     r=4; let totalDon=0;
     donacionesSolo.forEach(it=>{ const val=valueCompraV164(it); const donor=resolveDonorNameV164(it)||'Sin donante'; putText(wsDon,r,1,productNameV164(it)); putNum(wsDon,r,2,it.unidades||0); putMoney(wsDon,r,3,it.precio ?? productByIdV164(it.productoId).precio ?? 0); putMoney(wsDon,r,4,val); putText(wsDon,r,5,it.ticketDonacion||''); putText(wsDon,r,6,donor); putText(wsDon,r,7,personByIdV164(it.responsableId).nombre||''); putText(wsDon,r,8,it.donorRef||it.tiendaId||''); totalDon += val; r++; });
     titleRow(wsDon,r,['TOTAL','','','','','','','']); putMoney(wsDon,r,4,totalDon,'white',true);
@@ -9090,11 +9090,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       titleRow(ws,rr,['TOTAL GENERAL','','','','']); putMoney(ws,rr,2,c,'white',true); putMoney(ws,rr,3,d,'white',true); putMoney(ws,rr,4,p,p?'warn':'white',true); putMoney(ws,rr,5,t,'white',true);
       return ws;
     }
-    const wsSeg = writeGroupingSheet('CALCULOS_SEGMENTO','CÃLCULOS SEGMENTO',segRows);
-    const wsDest = writeGroupingSheet('CALCULOS_DESTINO','CÃLCULOS DESTINO',destRows);
+    const wsSeg = writeGroupingSheet('CALCULOS_SEGMENTO','CÁLCULOS SEGMENTO',segRows);
+    const wsDest = writeGroupingSheet('CALCULOS_DESTINO','CÁLCULOS DESTINO',destRows);
 
     const wsTT = baseSheet('CALCULOS_TIENDA_TICKET', [56,16,42]);
-    mergeTitle(wsTT,1,'CÃLCULOS TIENDA Y TICKET',3); titleRow(wsTT,3,['Concepto','Importe','Imagen']);
+    mergeTitle(wsTT,1,'CÁLCULOS TIENDA Y TICKET',3); titleRow(wsTT,3,['Concepto','Importe','Imagen']);
     r=4; let tt=0;
     tiendaRows.forEach(it=>{
       putText(wsTT,r,1,it.label||it.k||'',it.pending?'warn':'white');
@@ -9106,7 +9106,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     titleRow(wsTT,r,['TOTAL','','']); putMoney(wsTT,r,2,tt,'white',true); putText(wsTT,r,3,'');
 
     const wsGraf = baseSheet('GRAFICAS', [28,28,28,28,28]);
-    mergeTitle(wsGraf,1,'GRÃFICAS DEL EVENTO',5);
+    mergeTitle(wsGraf,1,'GRÁFICAS DEL EVENTO',5);
     addImage(wsGraf, await makeChartImageDataUrlV164(), 3, 1, 1350, 625);
     wsGraf.getRow(3).height = 470;
 
@@ -9141,7 +9141,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const escV171 = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));
   const moneyV171 = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   };
   const isDonV171 = v => (typeof isDonationTicket === 'function') ? isDonationTicket(v) : /^DONADO/i.test(normV171(v));
   const isCurrentV171 = v => (typeof isCurrentExpenseTicket === 'function') ? isCurrentExpenseTicket(v) : normV171(v) === 'GASTOS CORRIENTES';
@@ -9219,15 +9219,15 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const n = Number(r.numero || 0);
       const importeSocio = Number(r.base != null ? r.base : (n * eventPrice()));
       const voluntario = Number(r.donation != null ? r.donation : (r.importe || 0));
-      return `${personNameV171(r)} â€” NÂº ${n} â€” Socio: ${moneyV171(importeSocio)} â€” Voluntario: ${moneyV171(voluntario)} â€” Total: ${moneyV171(totalCol(r))} â€” ${r.situacion || ''}`;
+      return `${personNameV171(r)} — Nº ${n} — Socio: ${moneyV171(importeSocio)} — Voluntario: ${moneyV171(voluntario)} — Total: ${moneyV171(totalCol(r))} — ${r.situacion || ''}`;
     });
     const donationLine = ticket => compras.filter(r => normV171(r.ticketDonacion) === ticket).slice().sort((a,b)=> resolveDonorNameV171(a).localeCompare(resolveDonorNameV171(b),'es') || productNameV171(a).localeCompare(productNameV171(b),'es')).map(r => {
       const u = Number(r.unidades || 0), pr = unitPrice(r), val = valueCompraV171(r);
-      return `${resolveDonorNameV171(r)} â€” ${productNameV171(r)} â€” ${u} uds x ${moneyV171(pr)} = ${moneyV171(val)} â€” ${normV171(r.ticketDonacion)}`;
+      return `${resolveDonorNameV171(r)} — ${productNameV171(r)} — ${u} uds x ${moneyV171(pr)} = ${moneyV171(val)} — ${normV171(r.ticketDonacion)}`;
     });
     const expenseLine = fn => compras.filter(fn).slice().sort((a,b)=> (normV171(a.ticketDonacion)||'Pte.Compra u otros gastos').localeCompare(normV171(b.ticketDonacion)||'Pte.Compra u otros gastos','es') || productNameV171(a).localeCompare(productNameV171(b),'es')).map(r => {
       const u = Number(r.unidades || 0), pr = unitPrice(r), val = valueCompraV171(r);
-      return `${normV171(r.ticketDonacion) || 'Pte.Compra u otros gastos'} â€” ${productNameV171(r)} â€” ${storeNameV171(r) || 'Sin tienda'} â€” ${u} uds x ${moneyV171(pr)} = ${moneyV171(val)}`;
+      return `${normV171(r.ticketDonacion) || 'Pte.Compra u otros gastos'} — ${productNameV171(r)} — ${storeNameV171(r) || 'Sin tienda'} — ${u} uds x ${moneyV171(pr)} = ${moneyV171(val)}`;
     });
     const incomeItems = [
       {label:'Socios Banco', value:sum(rows.filter(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Banco').map(totalCol)), color:'#2563eb', lines:incomeLine(r => r.persona?.rango === 'SOCIO' && r.situacion === 'Banco')},
@@ -9281,7 +9281,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       }).join('');
       return `<div class="chart-row"><div class="chart-label">${escV171(label)}: ${escV171(moneyV171(total))}</div><div><div class="chart-track">${segs}</div>${legendV171(items)}</div></div>`;
     }
-    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
+    wrap.innerHTML = `<div class="chart-shell"><div class="chart-bars">${row('INGRESOS', g.totalIncome, g.incomeItems)}${row('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${row('GASTOS', g.totalExp, g.expenseItems)}${row('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>`;
   };
 
   async function makeChartImageDataUrlV171(){
@@ -9291,11 +9291,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const ctx = canvas.getContext('2d');
     const maxVal = Math.max(1, g.totalIncomeRaw || g.totalIncome, g.totalDon, g.totalExp, Math.abs(g.saldoOperativo));
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 34px Arial'; ctx.fillText('GRÃFICAS DEL EVENTO', 42, 54);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 34px Arial'; ctx.fillText('GRÁFICAS DEL EVENTO', 42, 54);
     function drawRow(y, label, total, items){
       ctx.fillStyle = '#111827'; ctx.font = 'bold 22px Arial';
       ctx.fillText(`${label}: ${moneyV171(total)}`, 42, y);
-      // Barras mÃ¡s desplazadas a la derecha para que la etiqueta de DONACIÃ“N DE PRODUCTO no se monte.
+      // Barras más desplazadas a la derecha para que la etiqueta de DONACIÓN DE PRODUCTO no se monte.
       const x = 560, w = 1080, h = 38;
       ctx.fillStyle = '#f3f4f6'; ctx.fillRect(x, y-29, w, h);
       let cx = x;
@@ -9317,7 +9317,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
     let y = 116;
     y = drawRow(y, 'INGRESOS', g.totalIncome, g.incomeItems);
-    y = drawRow(y, 'DONACIÃ“N DE PRODUCTO', g.totalDon, g.donationItems);
+    y = drawRow(y, 'DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems);
     y = drawRow(y, 'GASTOS', g.totalExp, g.expenseItems);
     drawRow(y, 'SALDO OPERATIVO', g.saldoOperativo, g.saldoItems);
     return canvas.toDataURL('image/png');
@@ -9341,7 +9341,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
     const title = kind === 'segmento' ? 'POR SEGMENTO' : 'POR DESTINO';
     const totalGeneral = rows.reduce((a,b)=>a+Number(b.total||0),0);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText(`${title} â€“ TOTAL GENERAL: ${moneyV171(totalGeneral)}`, 35, 48);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 30px Arial'; ctx.fillText(`${title} – TOTAL GENERAL: ${moneyV171(totalGeneral)}`, 35, 48);
     ctx.font = '16px Arial';
     const legends = [['#dc2626','Comprado'],['#f59e0b','Donado'],['#fb7185','Pte. Compra u otros gastos']];
     let lx = 35;
@@ -9349,7 +9349,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const maxVal = Math.max(1, ...rows.flatMap(r => [Number(r.comprado||0), Number(r.donado||0), Number(r.pendiente||0)]));
     let y = 126;
     rows.forEach(r => {
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} Â· ${moneyV171(r.total)}`, 35, y);
+      ctx.fillStyle = '#111827'; ctx.font = 'bold 18px Arial'; ctx.fillText(`${r.label} · ${moneyV171(r.total)}`, 35, y);
       const x = 360, w = 930, h = 16;
       [[r.comprado,'#dc2626','Comprado'],[r.donado,'#f59e0b','Donado'],[r.pendiente,'#fb7185','Pte. Compra u otros gastos']].forEach((v, i) => {
         const yy = y - 4 + i*24;
@@ -9430,7 +9430,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       }
       return await zip.generateAsync({type:'arraybuffer'});
     }catch(err){
-      console.warn('No se pudo reforzar internamente la protecciÃ³n XLSX:', err);
+      console.warn('No se pudo reforzar internamente la protección XLSX:', err);
       return buffer;
     }
   }
@@ -9509,7 +9509,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const hh = pad(date.getHours());
     const mi = pad(date.getMinutes());
     const ss = pad(date.getSeconds());
-    return `Emitido por â€œÂ©oltyLAB â€™26_ControlEvent_v13.0_prod_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}â€`;
+    return `Emitido por “©oltyLAB ’26_ControlEvent_v13.0_prod_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
 
   async function exportExcelV171(){
@@ -9518,10 +9518,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(!ev) return;
     try{ await ensureExcelJS(); }catch(err){ alert('No se pudo cargar el motor de Excel.'); return; }
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB â€™26`; wb.created = new Date();
+    wb.creator = `${VERSION} - ©oltyLAB ’26`; wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const fills = {title:'FF111827', ok:'FFECFDF5', bad:'FFFEF2F2', warn:'FFFFF7ED', refund:'33FF0000', white:'FFFFFFFF', soft:'FFF8FAFC'};
-    const moneyFmt = '#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt = '#,##0.00 [$€-C0A]';
     function baseSheet(name, widths){ const ws = wb.addWorksheet(name); ws.properties.defaultRowHeight = 22; ws.columns = widths.map(w=>({width:w})); return ws; }
     function paint(cell, fill='white'){ cell.border=border; cell.alignment={vertical:'middle', wrapText:true}; if(fills[fill]) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:fills[fill]}}; }
     function titleRow(ws,r,headers){ headers.forEach((h,i)=>{ const c=ws.getCell(r,i+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:fills.title}}; c.border=border; c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; }); ws.getRow(r).height=24; }
@@ -9555,7 +9555,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const tiendaRows = (function(rows){
       // v21.5.1: Refuerzo real para que CALCULOS_TIENDA_TICKET lleve las fotos.
       // No dependemos solo de row.image; buscamos en state.ticketImages por todas las claves usadas
-      // histÃ³ricamente: eventId|Tienda | TKxx, eventId|Tienda|TKxx, eventId|TKxx, etc.
+      // históricamente: eventId|Tienda | TKxx, eventId|Tienda|TKxx, eventId|TKxx, etc.
       const evId = String(ev.id || (state && state.selectedEventId) || '');
       const imgs = (state && state.ticketImages) ? state.ticketImages : {};
       const clean = v => String(v ?? '').trim();
@@ -9574,7 +9574,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const parts = src.split('|').map(x=>clean(x)).filter(Boolean);
         if(parts.length >= 2){
           const tienda = parts[0];
-          const tk = parts[1].split('Â·')[0].trim();
+          const tk = parts[1].split('·')[0].trim();
           add(`${tienda} | ${tk}`); add(`${tienda}|${tk}`); add(`${tk} | ${tienda}`); add(`${tk}|${tienda}`); add(tk);
         }
         if(clean(row.rawTicket)){
@@ -9585,9 +9585,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
           const keys = [c, makeKey(c), `${evId}|${c}`];
           for(const k of keys){ if(imgs[k]) return imgs[k]; }
         }
-        // BÃºsqueda flexible por contenido, dentro del evento activo.
+        // Búsqueda flexible por contenido, dentro del evento activo.
         const srcUp = compact(src);
-        const ticketPart = compact((parts[1] || row.rawTicket || '').split('Â·')[0]);
+        const ticketPart = compact((parts[1] || row.rawTicket || '').split('·')[0]);
         const tiendaPart = compact(parts[0] || '');
         for(const [k,v] of Object.entries(imgs)){
           const ks = String(k);
@@ -9611,11 +9611,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     wsRes.mergeCells(r,1,r,7);
     putText(wsRes, r++, 1, emittedByTextV171(new Date()), 'soft', true);
     mergeTitle(wsRes, r++, 'RESUMEN DEL EVENTO', 7);
-    putText(wsRes,r,1,'TÃ­tulo del evento'); wsRes.mergeCells(r,2,r,7); putText(wsRes,r++,2,ev.titulo||'', 'white', true);
+    putText(wsRes,r,1,'Título del evento'); wsRes.mergeCells(r,2,r,7); putText(wsRes,r++,2,ev.titulo||'', 'white', true);
     const descText = normV171(ev.descripcion || '');
     const explicitLines = descText ? descText.split(/\r?\n/).length : 1;
     const descRows = Math.max(3, Math.min(40, Math.ceil(descText.length / 72) + explicitLines - 1));
-    putText(wsRes,r,1,'DescripciÃ³n del evento');
+    putText(wsRes,r,1,'Descripción del evento');
     wsRes.mergeCells(r,2,r+descRows-1,5);
     const dc=wsRes.getCell(r,2);
     dc.value=descText;
@@ -9625,7 +9625,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     for(let rr=r; rr<r+descRows; rr++) wsRes.getRow(rr).height=24;
     r += descRows;
     r += 1;
-    putText(wsRes,r,1,'SituaciÃ³n del evento'); putText(wsRes,r++,2,ev.situacion || ev.estado || 'En curso');
+    putText(wsRes,r,1,'Situación del evento'); putText(wsRes,r++,2,ev.situacion || ev.estado || 'En curso');
     putText(wsRes,r,1,'Fecha inicio'); putText(wsRes,r++,2,ev.fechaIni || '');
     putText(wsRes,r,1,'Fecha fin'); putText(wsRes,r++,2,ev.fechaFin || '');
     putText(wsRes,r,1,'Precio evento'); putMoney(wsRes,r++,2,Number(ev.precio||0));
@@ -9636,12 +9636,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const saldoActualResumen = Number.isFinite(Number(budget?.operativa?.saldoActual)) ? Number(budget.operativa.saldoActual) : g.saldoActual;
     const saldoOperativoResumen = Number.isFinite(Number(budget?.operativa?.saldoOperativo)) ? Number(budget.operativa.saldoOperativo) : g.saldoOperativo;
     putText(wsRes,r,1,'Ingresos'); putMoney(wsRes,r++,2,ingresosResumen,'white',true);
-    putText(wsRes,r,1,'DonaciÃ³n de producto'); putMoney(wsRes,r++,2,donacionResumen,'white',true);
+    putText(wsRes,r,1,'Donación de producto'); putMoney(wsRes,r++,2,donacionResumen,'white',true);
     putText(wsRes,r,1,'Gastos'); putMoney(wsRes,r++,2,gastosResumen,'white',true);
     putText(wsRes,r,1,'Saldo actual'); putMoney(wsRes,r++,2,saldoActualResumen,saldoActualResumen>=0?'ok':'bad',true);
     putText(wsRes,r,1,'Saldo operativo'); putMoney(wsRes,r++,2,saldoOperativoResumen,saldoOperativoResumen>=0?'ok':'bad',true);
     r += 7;
-    mergeTitle(wsRes, r++, 'GRÃFICAS DE CÃLCULOS POR AGRUPACIÃ“N', 7);
+    mergeTitle(wsRes, r++, 'GRÁFICAS DE CÁLCULOS POR AGRUPACIÓN', 7);
     r += 2;
     putText(wsRes, r, 1, 'Por segmento', 'white', true); r += 1;
     const segImgHeight = 430;
@@ -9653,7 +9653,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     reserveImageRows(wsRes, r, destImgHeight, 0);
 
     const wsIng = baseSheet('INGRESOS', [28,10,16,14,15,17,15,15]);
-    mergeTitle(wsIng,1,'INGRESOS',8); titleRow(wsIng,3,['Nombre','NÃºmero','SituaciÃ³n','Rango','Importe socio','Importe voluntario','Total','Pendiente']);
+    mergeTitle(wsIng,1,'INGRESOS',8); titleRow(wsIng,3,['Nombre','Número','Situación','Rango','Importe socio','Importe voluntario','Total','Pendiente']);
     r=4; let totalSocioIng=0, totalVolIng=0, totalIng=0, totalPend=0;
     collabs.forEach(it=>{
       const persona=it.persona||personByIdV171(it.personaId);
@@ -9670,10 +9670,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const specialFill = isDevIngresos ? 'refund' : (isPenaArrastre ? 'greenSoft' : 'white');
       const nameCell = putText(wsIng,r,1,nombrePersona, specialFill);
       if(isDevIngresos){
-        addCellNote(nameCell, 'Este importe se corresponde con el dinero devuelto a personas\nque pagan el evento pero se les exime del pago.\nSe meten primero como que pagan\ny despuÃ©s se les devuelve.');
+        addCellNote(nameCell, 'Este importe se corresponde con el dinero devuelto a personas\nque pagan el evento pero se les exime del pago.\nSe meten primero como que pagan\ny después se les devuelve.');
       }
       if(isPenaArrastre){
-        addCellNote(nameCell, 'Dinero que se saca de la cuenta de la peÃ±a\npara contribuir al pago de este evento.\nFijarte en el importe de la celda Total:\nal ser PERSONA SOCIO, parte aparece como importe socio\ny el resto como Importe voluntario.');
+        addCellNote(nameCell, 'Dinero que se saca de la cuenta de la peña\npara contribuir al pago de este evento.\nFijarte en el importe de la celda Total:\nal ser PERSONA SOCIO, parte aparece como importe socio\ny el resto como Importe voluntario.');
       }
       putNum(wsIng,r,2,numero, specialFill); putText(wsIng,r,3,it.situacion||'', specialFill); putText(wsIng,r,4,persona.rango||'', specialFill);
       putMoney(wsIng,r,5,importeSocio, specialFill); putMoney(wsIng,r,6,importeVoluntario, specialFill); putMoney(wsIng,r,7,total, specialFill); putMoney(wsIng,r,8,pendiente, isDevIngresos ? 'refund' : (pendiente?'warn':'white'));
@@ -9688,7 +9688,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     titleRow(wsCom,r,['TOTAL','','','','','','','','']); putMoney(wsCom,r,5,totalCom,'white',true);
 
     const wsDon = baseSheet('DONACIONES DE PRODUCTO', [14,24,9,11,12,16,20,18]);
-    mergeTitle(wsDon,1,'DONACIONES DE PRODUCTO',8); titleRow(wsDon,3,['Segmento','Producto','Unidades','Precio','Importe','Tipo donaciÃ³n','Donante','Responsable']);
+    mergeTitle(wsDon,1,'DONACIONES DE PRODUCTO',8); titleRow(wsDon,3,['Segmento','Producto','Unidades','Precio','Importe','Tipo donación','Donante','Responsable']);
     r=4; let totalDon=0;
     donacionesSolo.forEach(it=>{ const val=valueCompraV171(it); const donor=resolveDonorNameV171(it)||'Sin donante'; putText(wsDon,r,1,productSegmentV171(it)); putText(wsDon,r,2,productNameV171(it)); putNum(wsDon,r,3,it.unidades||0); putMoney(wsDon,r,4,it.precio ?? productByIdV171(it.productoId).precio ?? 0); putMoney(wsDon,r,5,val); putText(wsDon,r,6,it.ticketDonacion||''); putText(wsDon,r,7,donor); putText(wsDon,r,8,personByIdV171(it.responsableId).nombre||''); totalDon += val; r++; });
     titleRow(wsDon,r,['TOTAL','','','','','','','']); putMoney(wsDon,r,5,totalDon,'white',true);
@@ -9701,11 +9701,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       titleRow(ws,rr,['TOTAL GENERAL','','','','']); putMoney(ws,rr,2,c,'white',true); putMoney(ws,rr,3,d,'white',true); putMoney(ws,rr,4,p,p?'warn':'white',true); putMoney(ws,rr,5,t,'white',true);
       return ws;
     }
-    writeGroupingSheet('CALCULOS_SEGMENTO','CÃLCULOS SEGMENTO',segRows);
-    writeGroupingSheet('CALCULOS_DESTINO','CÃLCULOS DESTINO',destRows);
+    writeGroupingSheet('CALCULOS_SEGMENTO','CÁLCULOS SEGMENTO',segRows);
+    writeGroupingSheet('CALCULOS_DESTINO','CÁLCULOS DESTINO',destRows);
 
     const wsTT = baseSheet('CALCULOS_TIENDA_TICKET', [56,16,42]);
-    mergeTitle(wsTT,1,'CÃLCULOS TIENDA Y TICKET',3); titleRow(wsTT,3,['Concepto','Importe','Imagen']);
+    mergeTitle(wsTT,1,'CÁLCULOS TIENDA Y TICKET',3); titleRow(wsTT,3,['Concepto','Importe','Imagen']);
     r=4; let tt=0;
     tiendaRows.forEach(it=>{
       putText(wsTT,r,1,it.label||it.k||'',it.pending?'warn':'white');
@@ -9717,7 +9717,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     titleRow(wsTT,r,['TOTAL','','']); putMoney(wsTT,r,2,tt,'white',true); putText(wsTT,r,3,'');
 
     const wsGraf = baseSheet('GRAFICAS', [30,30,30,30,30,30]);
-    mergeTitle(wsGraf,1,'GRÃFICAS DEL EVENTO',6);
+    mergeTitle(wsGraf,1,'GRÁFICAS DEL EVENTO',6);
     addImage(wsGraf, await makeChartImageDataUrlV171(), 3, 1, 1420, 625);
     wsGraf.getRow(3).height = 470;
 
@@ -9767,13 +9767,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-18-v180-tooltips-and-grouping-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #18. */
-/* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÃ“N Y AGRUPACIÃ“N DE DONACIONES ==== */
+/* ==== V18.0 FIXES: GLOBOS AMPLIADOS, ORDENACIÓN Y AGRUPACIÓN DE DONACIONES ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const norm = v => String(v ?? '').trim();
   const fmt = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   };
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
   const byId = (list, id) => (list || []).find(x => String(x.id) === String(id)) || null;
@@ -9826,12 +9826,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function lineExpense(c){
     const u = Number(c?.unidades || 0), pr = unitPrice(c), val = value(c);
     const resp = persona(c?.responsableId).nombre || c?.responsable?.nombre || '';
-    return `${ticketLabel(c)} â€” ${productName(c)} â€” ${storeName(c) || 'Sin tienda'} â€” ${u} uds x ${fmt(pr)} = ${fmt(val)}${resp ? ' â€” Resp.: ' + resp : ''}`;
+    return `${ticketLabel(c)} — ${productName(c)} — ${storeName(c) || 'Sin tienda'} — ${u} uds x ${fmt(pr)} = ${fmt(val)}${resp ? ' — Resp.: ' + resp : ''}`;
   }
   function lineDonation(c){
     const u = Number(c?.unidades || 0), pr = unitPrice(c), val = value(c);
     const resp = persona(c?.responsableId).nombre || c?.responsable?.nombre || '';
-    return `${donorName(c)} â€” ${productName(c)} â€” ${ticketLabel(c)} â€” ${u} uds x ${fmt(pr)} = ${fmt(val)}${resp ? ' â€” Resp.: ' + resp : ''}`;
+    return `${donorName(c)} — ${productName(c)} — ${ticketLabel(c)} — ${u} uds x ${fmt(pr)} = ${fmt(val)}${resp ? ' — Resp.: ' + resp : ''}`;
   }
   function listOrEmpty(arr, empty='Sin elementos'){ return arr && arr.length ? arr : [empty]; }
   function incomeLine(r){
@@ -9839,7 +9839,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const base = Number(r?.base != null ? r.base : (n * Number(event().precio || 0)));
     const vol = Number(r?.donation != null ? r.donation : (r?.importe || 0));
     const total = Number(r?.total != null ? r.total : (base + vol));
-    return `${personNameFromRow(r)} â€” NÂº ${n} â€” Importe socio: ${fmt(base)} â€” Voluntario: ${fmt(vol)} â€” Total: ${fmt(total)} â€” ${r?.situacion || ''}`;
+    return `${personNameFromRow(r)} — Nº ${n} — Importe socio: ${fmt(base)} — Voluntario: ${fmt(vol)} — Total: ${fmt(total)} — ${r?.situacion || ''}`;
   }
 
   function donationRows(ticketCode){ return compras().filter(c => norm(c.ticketDonacion) === ticketCode); }
@@ -9852,8 +9852,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       g.total += value(c); g.rows.push(c);
     });
     return Array.from(map.values()).sort((a,b)=>cmpText(a.donor,b.donor)).flatMap(g => {
-      const details = g.rows.slice().sort(cmpDonorProduct).map(c => `Â· ${productName(c)} â€” ${Number(c.unidades || 0)} uds x ${fmt(unitPrice(c))} = ${fmt(value(c))}`);
-      return [`${g.donor} â€” TOTAL ${fmt(g.total)}`, ...details];
+      const details = g.rows.slice().sort(cmpDonorProduct).map(c => `· ${productName(c)} — ${Number(c.unidades || 0)} uds x ${fmt(unitPrice(c))} = ${fmt(value(c))}`);
+      return [`${g.donor} — TOTAL ${fmt(g.total)}`, ...details];
     });
   }
 
@@ -10081,7 +10081,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const selectedCode = scope === 'TODOS' ? 'TODOS' : (eventCode[scope] || 'EV001');
     const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
     const wb = new ExcelJS.Workbook();
-    wb.creator = `${VERSION} - Â©oltyLAB â€™26`; wb.created = new Date();
+    wb.creator = `${VERSION} - ©oltyLAB ’26`; wb.created = new Date();
     const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
     const headFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
     function makeSheet(name, headers, rows){
@@ -10093,12 +10093,12 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       ws.columns.forEach((col,idx)=>{ let w=col.width||14; col.eachCell({includeEmpty:true}, cell => { w = Math.max(w, Math.min(70, String(cell.value ?? '').length + 3)); }); col.width = idx === headers.indexOf('IMAGEN_BASE64_PARTE') ? 72 : Math.min(70,w); });
       return ws;
     }
-    makeSheet('METADATOS', ['CAMPO','VALOR'], [['VERSION', VERSION], ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle], ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode], ['FECHA_DESCARGA', nowStamp()], ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'], ['NOTA', 'Las imÃ¡genes grandes de tickets se dividen en TICKETS_PARTES para evitar ficheros Excel corruptos.']]);
+    makeSheet('METADATOS', ['CAMPO','VALOR'], [['VERSION', VERSION], ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle], ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode], ['FECHA_DESCARGA', nowStamp()], ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'], ['NOTA', 'Las imágenes grandes de tickets se dividen en TICKETS_PARTES para evitar ficheros Excel corruptos.']]);
     makeSheet('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo||'', Number(e.precio||0), e.fechaIni||'', e.fechaFin||'', e.situacion||'En curso', e.descripcion||'']));
     makeSheet('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre||'', p.rango||'SOCIO']));
     makeSheet('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre||'']));
     const wsProductosBackupV190 = makeSheet('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre||'', p.segmento||'', p.destino||'', Number((p.defaultPrecio ?? p.precio) || 0)]));
-    try{ wsProductosBackupV190.getColumn(6).numFmt = '#,##0.00 [$â‚¬-C0A]'; }catch(_){ }
+    try{ wsProductosBackupV190.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
     makeSheet('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId]||'', c.id||'', personCode[c.personaId]||'', Number(c.numero||0), c.situacion||'Pendiente', Number(c.importe||0)]));
     makeSheet('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(c.ticketDonacion)).map(c => [eventCode[c.eventId]||'', c.id||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', storeCode[c.tiendaId]||'', personCode[c.responsableId]||'']));
     makeSheet('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(c.ticketDonacion)).map(c => { const [kind,id] = String(c.donorRef||'').split(':'); return [eventCode[c.eventId]||'', c.id||'', productCode[c.productoId]||'', Number(c.unidades||0), Number(c.precio||0), c.ticketDonacion||'', kind==='P'?'PERSONA':(kind==='T'?'TIENDA':''), kind==='P' ? (personCode[id]||'') : (kind==='T' ? (storeCode[id]||'') : ''), personCode[c.responsableId]||'']; }));
@@ -10172,7 +10172,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-20-v190-integrity-tooltips-export-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #20. */
-/* ==== V19.0: globos con scroll, nombres de Excel/backup, precio â‚¬ en backup e integridad al eliminar ==== */
+/* ==== V19.0: globos con scroll, nombres de Excel/backup, precio € en backup e integridad al eliminar ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -10300,7 +10300,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function incomeLine(r){
     const persona = r.persona || (state?.personas || []).find(p => String(p.id) === String(r.personaId)) || {};
     const total = Number(r.total ?? ((Number(r.numero||0) * Number((typeof selectedEvent === 'function' ? selectedEvent()?.precio : 0) || 0)) + Number(r.importe||0)));
-    return `â€¢ ${persona.nombre || 'Sin nombre'} â€” ${moneyF(total)}`;
+    return `• ${persona.nombre || 'Sin nombre'} — ${moneyF(total)}`;
   }
   function applyIncomeTooltips(){
     const grid = $('ingresosSummaryGrid');
@@ -10325,10 +10325,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       card.removeAttribute('title'); card.removeAttribute('data-v181-tip'); card.removeAttribute('data-tip');
       const value = card.querySelector('.value');
       if(value){
-        const parts = String(value.textContent || '').split('Â·');
+        const parts = String(value.textContent || '').split('·');
         if(parts.length >= 2){
           const persons = parts[0].trim();
-          value.textContent = `${persons} Â· ${moneyF(total)}`;
+          value.textContent = `${persons} · ${moneyF(total)}`;
         }
       }
     });
@@ -10363,7 +10363,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       if(!map.has(key)) map.set(key, {donor, ticket, total:0, lines:[]});
       const rec = map.get(key);
       rec.total += val;
-      rec.lines.push(`â€¢ ${productName(c)} â€” Cantidad: ${numberF(qty)} â€” Precio estimado: ${moneyF(price)} â€” Valor estimado: ${moneyF(val)}`);
+      rec.lines.push(`• ${productName(c)} — Cantidad: ${numberF(qty)} — Precio estimado: ${moneyF(price)} — Valor estimado: ${moneyF(val)}`);
     });
     map.forEach(rec => rec.lines.sort((a,b)=>a.localeCompare(b,'es')));
     return map;
@@ -10377,7 +10377,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const label = item.querySelector('span')?.textContent || '';
       for(const [key, rec] of details.entries()){
         if(label.startsWith(key)){
-          item.setAttribute('data-ce-tip', `DONACIÃ“N\nDONANTE: ${rec.donor}\nTIPO: ${rec.ticket}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`);
+          item.setAttribute('data-ce-tip', `DONACIÓN\nDONANTE: ${rec.donor}\nTIPO: ${rec.ticket}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`);
           item.setAttribute('data-tip-bg', '#fff7ed');
           item.removeAttribute('title'); item.removeAttribute('data-v181-tip'); item.removeAttribute('data-tip');
           break;
@@ -10449,7 +10449,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       try{
         if(typeof exportExcel === 'function') exportExcel();
         else if(typeof window.exportExcel === 'function') window.exportExcel();
-        else alert('No se encontrÃ³ la funciÃ³n de exportaciÃ³n a Excel.');
+        else alert('No se encontró la función de exportación a Excel.');
       }catch(err){
         console.error(err);
         alert('No se pudo generar el Excel. Revisa la consola para ver el detalle del error.');
@@ -10492,7 +10492,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch] || ch));
   const moneyF = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   };
   const numF = v => {
     try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0, maximumFractionDigits:2}).format(Number(v || 0)); }
@@ -10650,7 +10650,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const vol = Number(r?.donation != null ? r.donation : (r?.importe || 0));
     const total = Number(r?.total != null ? r.total : base + vol);
     const name = r?.persona?.nombre || personaName(r?.personaId) || 'Sin nombre';
-    return `${name} â€” NÂº ${numF(n)} â€” Importe socio: ${moneyF(base)} â€” Voluntario: ${moneyF(vol)} â€” Total: ${moneyF(total)} â€” ${r?.situacion || ''}`;
+    return `${name} — Nº ${numF(n)} — Importe socio: ${moneyF(base)} — Voluntario: ${moneyF(vol)} — Total: ${moneyF(total)} — ${r?.situacion || ''}`;
   }
   function applyBudgetTooltips(){
     const wrap = $('budgetLayout');
@@ -10666,27 +10666,27 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       `PENDIENTE: ${moneyF(b.ingresosDinero?.pendiente || 0)}`,
       '',
       `SOCIOS: ${moneyF(socios.ingresado || socios.importe || 0)}`,
-      ...((socios.listImporte || []).map(x => `â€¢ ${x}`)),
+      ...((socios.listImporte || []).map(x => `• ${x}`)),
       '',
       `NO SOCIOS: ${moneyF(noSocios.ingresado || noSocios.importe || 0)}`,
-      ...((noSocios.listImporte || []).map(x => `â€¢ ${x}`))
+      ...((noSocios.listImporte || []).map(x => `• ${x}`))
     ].join('\n');
     const donText = [
-      'DONACIÃ“N DE PRODUCTO',
+      'DONACIÓN DE PRODUCTO',
       `VALOR PRODUCTO DONADO: ${moneyF(d.valorDonado || 0)}`,
       '',
       `TIENDAS: ${moneyF(d.donadoTienda || 0)}`,
-      ...((d.listTiendas || []).map(x => `â€¢ ${x}`)),
+      ...((d.listTiendas || []).map(x => `• ${x}`)),
       '',
       `SOCIOS: ${moneyF(d.donadoSocio || 0)}`,
-      ...((d.listSocios || []).map(x => `â€¢ ${x}`)),
+      ...((d.listSocios || []).map(x => `• ${x}`)),
       '',
       `NO SOCIOS: ${moneyF(d.donadoOtros || 0)}`,
-      ...((d.listNoSocios || []).map(x => `â€¢ ${x}`))
+      ...((d.listNoSocios || []).map(x => `• ${x}`))
     ].join('\n');
     const panels = wrap.querySelectorAll('.budget-panel');
     const pIng = Array.from(panels).find(p => normUp(p.querySelector('h3')?.textContent || '').includes('INGRES'));
-    const pDon = Array.from(panels).find(p => normUp(p.querySelector('h3')?.textContent || '').includes('DONACION') || normUp(p.querySelector('h3')?.textContent || '').includes('DONACIÃ“N'));
+    const pDon = Array.from(panels).find(p => normUp(p.querySelector('h3')?.textContent || '').includes('DONACION') || normUp(p.querySelector('h3')?.textContent || '').includes('DONACIÓN'));
     setTip(pIng, ingresoText, '#ffffff', true);
     pIng?.querySelectorAll('.budget-row,.budget-subrow').forEach(el => setTip(el, ingresoText, '#ffffff', true));
     setTip(pDon, donText, '#ffffff', true);
@@ -10696,7 +10696,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function detailTextForGraphItem(groupLabel, it){
     const amount = it?.displayValue ?? it?.value ?? 0;
     const lines = Array.isArray(it?.lines) ? it.lines : [];
-    return `${groupLabel}\n${it?.label || ''}: ${moneyF(amount)}${lines.length ? '\n\n' + lines.map(x => `â€¢ ${x}`).join('\n') : ''}`;
+    return `${groupLabel}\n${it?.label || ''}: ${moneyF(amount)}${lines.length ? '\n\n' + lines.map(x => `• ${x}`).join('\n') : ''}`;
   }
   function applyGraphTooltips(){
     const wrap = $('eventChartWrap');
@@ -10707,7 +10707,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(!g) return;
     const groups = [
       ['INGRESOS', g.incomeItems || []],
-      ['DONACIÃ“N DE PRODUCTO', g.donationItems || []],
+      ['DONACIÓN DE PRODUCTO', g.donationItems || []],
       ['GASTOS', g.expenseItems || []],
       ['SALDO OPERATIVO', g.saldoItems || []]
     ];
@@ -10742,7 +10742,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const cols = card.querySelectorAll('.vbar-col');
         specs.forEach(([label, valKey, listKey, color], j) => {
           const list = Array.isArray(r[listKey]) ? r[listKey] : [];
-          const text = `${title}\n${r.label || ''}\n${label}: ${moneyF(r[valKey] || 0)}\n\n${list.length ? list.map(x => `â€¢ ${x}`).join('\n') : 'Sin productos'}`;
+          const text = `${title}\n${r.label || ''}\n${label}: ${moneyF(r[valKey] || 0)}\n\n${list.length ? list.map(x => `• ${x}`).join('\n') : 'Sin productos'}`;
           const col = cols[j];
           if(col){ setTip(col, text, color, true); }
           const stick = col?.querySelector?.('.vbar-stick');
@@ -10761,7 +10761,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const qty = Number(c.unidades || 0);
       const price = productoPrice(c);
       const val = productoValue(c);
-      const line = `â€¢ ${productoName(c)} â€” Cantidad: ${numF(qty)} â€” Precio: ${moneyF(price)} â€” Importe: ${moneyF(val)}`;
+      const line = `• ${productoName(c)} — Cantidad: ${numF(qty)} — Precio: ${moneyF(price)} — Importe: ${moneyF(val)}`;
       if(isDon(t)){
         const donor = donorName(c);
         const key = `${donor} | ${t}`;
@@ -10787,15 +10787,15 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const label = norm(labelEl?.textContent || '');
       if(!label || normUp(label) === 'TOTAL') return;
       for(const [key, rec] of donationMap.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           if(labelEl) labelEl.textContent = key;
-          setTip(item, `DONACIÃ“N\n${key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
-          setTip(labelEl, `DONACIÃ“N\n${key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
+          setTip(item, `DONACIÓN\n${key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
+          setTip(labelEl, `DONACIÓN\n${key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
           return;
         }
       }
       for(const [key, rec] of purchaseMap.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           setTip(item, `TIENDA | TICKET\n${key}\nTOTAL: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
           setTip(labelEl, `TIENDA | TICKET\n${key}\nTOTAL: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`, '#ffffff', true);
           return;
@@ -10870,7 +10870,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-22-v192-tooltip-size-bold-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #22. */
-/* ==== V19.2: tamaÃ±o de globos y negritas en productos, donantes/personas e importes totales ==== */
+/* ==== V19.2: tamaño de globos y negritas en productos, donantes/personas e importes totales ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -10881,26 +10881,26 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return el.getAttribute('data-ce-tip') || el.getAttribute('data-v181-tip') || el.getAttribute('data-tip') || el.getAttribute('title') || '';
   };
   function boldAmounts(html){
-    // Formatos tÃ­picos: 1.234,56 â‚¬, 123 â‚¬, â‚¬ 1.234,56, con espacio normal o NBSP.
-    html = html.replace(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(â‚¬|EUR)/gi, '<strong>$1 $2</strong>');
-    html = html.replace(/(â‚¬|EUR)(?:\s|&nbsp;|\u00a0)*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi, '<strong>$1 $2</strong>');
+    // Formatos típicos: 1.234,56 €, 123 €, € 1.234,56, con espacio normal o NBSP.
+    html = html.replace(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(€|EUR)/gi, '<strong>$1 $2</strong>');
+    html = html.replace(/(€|EUR)(?:\s|&nbsp;|\u00a0)*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi, '<strong>$1 $2</strong>');
     return html;
   }
   function boldSemanticParts(lineHtml){
     let h = lineHtml;
-    // LÃ­neas de totales completas en negrita para que el importe total destaque.
+    // Líneas de totales completas en negrita para que el importe total destaque.
     if(/^\s*(TOTAL|VALOR PRODUCTO DONADO|TOTAL INGRESADO|TOTAL COMPROMETIDO|PENDIENTE|SALDO|IMPORTE TOTAL|TOTAL ESTIMADO)/i.test(h.replace(/<[^>]+>/g,''))){
       h = '<strong>' + h + '</strong>';
       return boldAmounts(h);
     }
-    // Producto al inicio de lÃ­neas de detalle: "â€¢ Producto â€” Cantidad...".
-    h = h.replace(/^((?:\s*â€¢\s*)?)([^â€”\-\|:]+)(\s+[â€”-]\s+(?:Cantidad|Precio|Importe|Unidades|Estado|Ticket)\b)/i, '$1<strong>$2</strong>$3');
-    // Donantes/personas tras etiqueta explÃ­cita.
-    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE):\s*([^\nâ€”\|]+)/gi, '$1: <strong>$2</strong>');
+    // Producto al inicio de líneas de detalle: "• Producto — Cantidad...".
+    h = h.replace(/^((?:\s*•\s*)?)([^—\-\|:]+)(\s+[—-]\s+(?:Cantidad|Precio|Importe|Unidades|Estado|Ticket)\b)/i, '$1<strong>$2</strong>$3');
+    // Donantes/personas tras etiqueta explícita.
+    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE):\s*([^\n—\|]+)/gi, '$1: <strong>$2</strong>');
     // Formato de Por tienda y ticket: "Donante | DONADO..." o "Tienda | TICKET...".
     h = h.replace(/^([^\|\n]+)(\s*\|\s*(?:DONADO|TICKET)\b)/i, '<strong>$1</strong>$2');
-    // ViÃ±etas de personas/donantes en listados: "â€¢ Nombre â€” 123 â‚¬".
-    h = h.replace(/^(\s*â€¢\s*)([^â€”\n]+)(\s+â€”\s+)/, '$1<strong>$2</strong>$3');
+    // Viñetas de personas/donantes en listados: "• Nombre — 123 €".
+    h = h.replace(/^(\s*•\s*)([^—\n]+)(\s+—\s+)/, '$1<strong>$2</strong>$3');
     return boldAmounts(h);
   }
   function tipHtml(raw){
@@ -10988,7 +10988,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-23-v193-tooltip-click-sort-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #23. */
-/* ==== V19.3: globos por clic, orden alfabÃ©tico y negrita controlada ==== */
+/* ==== V19.3: globos por clic, orden alfabético y negrita controlada ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -10998,7 +10998,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const moneyF = v => {
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   };
   const numF = v => {
     try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0, maximumFractionDigits:2}).format(Number(v || 0)); }
@@ -11074,17 +11074,17 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
 
   function sortKey(line){
-    let s = String(line || '').replace(/^\s*â€¢\s*/, '').trim();
+    let s = String(line || '').replace(/^\s*•\s*/, '').trim();
     s = s.replace(/^(DONANTE|SOCIO|NO SOCIO|PERSONA|PRODUCTO|TIENDA)\s*:\s*/i,'');
-    s = s.split(/\s+[â€”-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
+    s = s.split(/\s+[—-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
     return normUp(s);
   }
   function sortConsecutiveBullets(lines){
     const out = [];
     for(let i=0; i<lines.length;){
-      if(/^\s*â€¢\s*/.test(lines[i] || '')){
+      if(/^\s*•\s*/.test(lines[i] || '')){
         const block = [];
-        while(i < lines.length && /^\s*â€¢\s*/.test(lines[i] || '')) block.push(lines[i++]);
+        while(i < lines.length && /^\s*•\s*/.test(lines[i] || '')) block.push(lines[i++]);
         block.sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
         out.push(...block);
       }else{
@@ -11129,7 +11129,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const price = productoPrice(c);
       const val = productoValue(c);
       const prod = productoName(c);
-      const line = `â€¢ ${prod} â€” Cantidad: ${numF(qty)} â€” Precio estimado: ${moneyF(price)} â€” Valor estimado: ${moneyF(val)}`;
+      const line = `• ${prod} — Cantidad: ${numF(qty)} — Precio estimado: ${moneyF(price)} — Valor estimado: ${moneyF(val)}`;
       if(isDon(t)){
         const donor = donorName(c);
         const key = `${donor} | ${t}`;
@@ -11157,10 +11157,10 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       let label = norm(labelEl?.textContent || '');
       if(!label || normUp(label) === 'TOTAL') return;
       for(const [, rec] of donationMap){
-        if(label === rec.key || label.startsWith(rec.key + ' Â·') || label.startsWith(rec.key + ' -')){
+        if(label === rec.key || label.startsWith(rec.key + ' ·') || label.startsWith(rec.key + ' -')){
           // El registro visible queda limpio: Donante | DONADO xxxxx, sin detalle.
           if(labelEl) labelEl.textContent = rec.key;
-          const tip = `DONACIÃ“N\n${rec.key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`;
+          const tip = `DONACIÓN\n${rec.key}\nTOTAL ESTIMADO: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`;
           setTip(item, tip, '#ffffff', true);
           setTip(labelEl, tip, '#ffffff', true);
           if(valueEl) setTip(valueEl, tip, '#ffffff', true);
@@ -11168,7 +11168,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         }
       }
       for(const [, rec] of purchaseMap){
-        if(label === rec.key || label.startsWith(rec.key + ' Â·') || label.startsWith(rec.key + ' -')){
+        if(label === rec.key || label.startsWith(rec.key + ' ·') || label.startsWith(rec.key + ' -')){
           const tip = `TIENDA | TICKET\n${rec.key}\nTOTAL: ${moneyF(rec.total)}\n\n${rec.lines.join('\n')}`;
           setTip(item, tip, '#ffffff', true);
           setTip(labelEl, tip, '#ffffff', true);
@@ -11191,7 +11191,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     });
   }
 
-  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:â‚¬|EUR)|(?:â‚¬|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
+  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:€|EUR)|(?:€|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
   function boldLastMoney(html){
     let matches = [...html.matchAll(moneyRe)];
     if(!matches.length) return html;
@@ -11200,9 +11200,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function boldOnlySemantic(lineHtml){
     let h = lineHtml;
-    h = h.replace(/^(\s*â€¢\s*)([^â€”\|:]+)(\s*(?:â€”|\||:)\s*)/i, '$1<strong>$2</strong>$3');
-    h = h.replace(/^([^â€”\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
-    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^â€”\n\|:]+)/gi, '$1: <strong>$2</strong>');
+    h = h.replace(/^(\s*•\s*)([^—\|:]+)(\s*(?:—|\||:)\s*)/i, '$1<strong>$2</strong>$3');
+    h = h.replace(/^([^—\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
+    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^—\n\|:]+)/gi, '$1: <strong>$2</strong>');
     return boldLastMoney(h);
   }
   function tipHtml(raw){
@@ -11346,7 +11346,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     btn.type = 'button';
     btn.id = 'pwaInstallBtn';
     btn.className = 'pwa-install-btn';
-    btn.innerHTML = 'ðŸ“² Instalar app';
+    btn.innerHTML = '📲 Instalar app';
     btn.addEventListener('click', async () => {
       if(deferredPrompt){
         deferredPrompt.prompt();
@@ -11356,9 +11356,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         return;
       }
       if(isIOS()){
-        alert('Para instalar ControlEvent en iPhone: abre esta pÃ¡gina en Safari, pulsa Compartir y elige â€œAÃ±adir a pantalla de inicioâ€. DespuÃ©s se abrirÃ¡ como app, sin barra de navegador.');
+        alert('Para instalar ControlEvent en iPhone: abre esta página en Safari, pulsa Compartir y elige “Añadir a pantalla de inicio”. Después se abrirá como app, sin barra de navegador.');
       }else{
-        alert('Para instalar ControlEvent: abre el menÃº del navegador y elige â€œInstalar appâ€ o â€œAÃ±adir a pantalla de inicioâ€.');
+        alert('Para instalar ControlEvent: abre el menú del navegador y elige “Instalar app” o “Añadir a pantalla de inicio”.');
       }
     });
     document.body.appendChild(btn);
@@ -11389,7 +11389,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-25-v194-tooltip-excel-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #25. */
-/* ==== V19.4: los globos no cambian al mover el cursor y el botÃ³n Excel queda cableado de forma directa ==== */
+/* ==== V19.4: los globos no cambian al mover el cursor y el botón Excel queda cableado de forma directa ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -11397,7 +11397,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:â‚¬|EUR)|(?:â‚¬|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
+  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:€|EUR)|(?:€|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
 
   let activeTarget = null;
   let activeRaw = '';
@@ -11412,17 +11412,17 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return el.getAttribute('data-ce-tip') || el.getAttribute('data-v181-tip') || el.getAttribute('data-tip') || el.getAttribute('title') || '';
   }
   function sortKey(line){
-    let s = String(line || '').replace(/^\s*â€¢\s*/, '').trim();
+    let s = String(line || '').replace(/^\s*•\s*/, '').trim();
     s = s.replace(/^(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*/i,'');
-    s = s.split(/\s+[â€”-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
+    s = s.split(/\s+[—-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
     return normUp(s);
   }
   function sortConsecutiveBullets(lines){
     const out = [];
     for(let i=0;i<lines.length;){
-      if(/^\s*â€¢\s*/.test(lines[i] || '')){
+      if(/^\s*•\s*/.test(lines[i] || '')){
         const block = [];
-        while(i<lines.length && /^\s*â€¢\s*/.test(lines[i] || '')) block.push(lines[i++]);
+        while(i<lines.length && /^\s*•\s*/.test(lines[i] || '')) block.push(lines[i++]);
         block.sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
         out.push(...block);
       }else{
@@ -11442,9 +11442,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function boldOnlySemantic(lineHtml){
     let h = lineHtml;
-    h = h.replace(/^(\s*â€¢\s*)([^â€”\|:]+)(\s*(?:â€”|\||:)\s*)/i, '$1<strong>$2</strong>$3');
-    h = h.replace(/^([^â€”\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
-    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^â€”\n\|:]+)/gi, '$1: <strong>$2</strong>');
+    h = h.replace(/^(\s*•\s*)([^—\|:]+)(\s*(?:—|\||:)\s*)/i, '$1<strong>$2</strong>$3');
+    h = h.replace(/^([^—\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
+    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^—\n\|:]+)/gi, '$1: <strong>$2</strong>');
     return boldLastMoney(h);
   }
   function tipHtml(raw){
@@ -11526,8 +11526,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }
   }
 
-  // Los parches anteriores tenÃ­an escuchas de mousemove que reescribÃ­an el globo.
-  // Esta rutina vuelve a fijar el contenido activo despuÃ©s de cada movimiento.
+  // Los parches anteriores tenían escuchas de mousemove que reescribían el globo.
+  // Esta rutina vuelve a fijar el contenido activo después de cada movimiento.
   ['mouseover','mousemove','mouseenter','focusin'].forEach(evt => {
     document.addEventListener(evt, ev => {
       if(activeTarget){
@@ -11610,7 +11610,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   async function runExcelExport(){
     try{
       const fn = (typeof exportExcel === 'function') ? exportExcel : (typeof window.exportExcel === 'function' ? window.exportExcel : null);
-      if(!fn){ alert('No se encontrÃ³ la funciÃ³n de exportaciÃ³n a Excel.'); return; }
+      if(!fn){ alert('No se encontró la función de exportación a Excel.'); return; }
       const ret = fn.call(window);
       if(ret && typeof ret.then === 'function') await ret;
     }catch(err){
@@ -11680,7 +11680,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:â‚¬|EUR)|(?:â‚¬|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
+  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:€|EUR)|(?:€|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/gi;
 
   let activeOwner = null;
   let closeTimer = null;
@@ -11688,7 +11688,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 
   function moneyF(v){
     try{ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v || 0)); }
-    catch(_){ return `${Number(v || 0).toFixed(2)} â‚¬`; }
+    catch(_){ return `${Number(v || 0).toFixed(2)} €`; }
   }
   function numF(v){
     try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(v || 0)); }
@@ -11703,9 +11703,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return el.getAttribute('data-ce-tip-v1952') || el.getAttribute('data-ce-tip') || el.getAttribute('data-v181-tip') || el.getAttribute('data-tip') || el.getAttribute('title') || '';
   }
   function sortKey(line){
-    let s = String(line || '').replace(/^\s*â€¢\s*/, '').trim();
+    let s = String(line || '').replace(/^\s*•\s*/, '').trim();
     s = s.replace(/^(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*/i,'');
-    s = s.split(/\s+[â€”-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
+    s = s.split(/\s+[—-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
     return normUp(s);
   }
   function sortRecordBlock(lines){
@@ -11713,7 +11713,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function isRecordLine(line){
     const s = String(line || '').trim();
-    return /^â€¢\s*/.test(s) || /\s[â€”-]\s/.test(s) || /\|/.test(s);
+    return /^•\s*/.test(s) || /\s[—-]\s/.test(s) || /\|/.test(s);
   }
   function sortTipText(raw){
     const lines = String(raw || '').replace(/\r\n/g,'\n').split('\n');
@@ -11737,9 +11737,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function boldOnlySemantic(lineHtml){
     let h = lineHtml;
-    h = h.replace(/^(\s*â€¢\s*)([^â€”\|:]+)(\s*(?:â€”|\||:)\s*)/i, '$1<strong>$2</strong>$3');
-    h = h.replace(/^([^â€”\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
-    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^â€”\n\|:]+)/gi, '$1: <strong>$2</strong>');
+    h = h.replace(/^(\s*•\s*)([^—\|:]+)(\s*(?:—|\||:)\s*)/i, '$1<strong>$2</strong>$3');
+    h = h.replace(/^([^—\|:]+)(\s*\|\s*(?:DONADO|TICKET)\b.*)$/i, '<strong>$1</strong>$2');
+    h = h.replace(/\b(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*([^—\n\|:]+)/gi, '$1: <strong>$2</strong>');
     return boldLastMoney(h);
   }
   function tipHtml(raw){
@@ -11870,8 +11870,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const price = Number(c?.precio ?? c?.precioCalc ?? productoPrecio(c?.productoId));
     const val = Number(c?.valor ?? (qty * price));
     return donation
-      ? `â€¢ ${prod} â€” Cantidad: ${numF(qty)} â€” Precio estimado: ${moneyF(price)} â€” Valor estimado: ${moneyF(val)}`
-      : `â€¢ ${prod} â€” Cantidad: ${numF(qty)} â€” Precio: ${moneyF(price)} â€” Importe: ${moneyF(val)}`;
+      ? `• ${prod} — Cantidad: ${numF(qty)} — Precio estimado: ${moneyF(price)} — Valor estimado: ${moneyF(val)}`
+      : `• ${prod} — Cantidad: ${numF(qty)} — Precio: ${moneyF(price)} — Importe: ${moneyF(val)}`;
   }
   function applyBudgetSpecificTips(){
     const b = (typeof budgetSummary === 'function') ? budgetSummary() : null;
@@ -11879,8 +11879,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const compras = (typeof comprasForEvent === 'function') ? comprasForEvent() : [];
     const socioRows = rows.filter(r => r.persona?.rango === 'SOCIO');
     const noSocioRows = rows.filter(r => r.persona?.rango !== 'SOCIO');
-    const linesCollab = arr => arr.map(r => `â€¢ ${r.persona?.nombre || personaNombre(r.personaId)} â€” NÂº: ${numF(r.numero || 0)} â€” Total: ${moneyF(r.total ?? r.importe ?? 0)}`).sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
-    const donationLines = ticket => compras.filter(c => norm(c.ticketDonacion) === ticket).map(c => `â€¢ ${donorName(c)} â€” ${productLine(c,true).replace(/^â€¢\s*/, '')}`).sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
+    const linesCollab = arr => arr.map(r => `• ${r.persona?.nombre || personaNombre(r.personaId)} — Nº: ${numF(r.numero || 0)} — Total: ${moneyF(r.total ?? r.importe ?? 0)}`).sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
+    const donationLines = ticket => compras.filter(c => norm(c.ticketDonacion) === ticket).map(c => `• ${donorName(c)} — ${productLine(c,true).replace(/^•\s*/, '')}`).sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'es'));
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row => {
       const label = norm(row.querySelector('span')?.textContent || '');
       let text = '';
@@ -11894,9 +11894,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       else if(/Importe no socios|Importe donantes/i.test(label)) text = `NO SOCIOS / IMPORTE NO SOCIOS\n${(b?.ingresosDinero?.noSocios?.listImporte || b?.ingresosDinero?.donantes?.listImporte || linesCollab(noSocioRows)).join('\n') || 'Sin registros'}`;
       else if(/Ingresado no socios|Ingresado donantes/i.test(label)) text = `NO SOCIOS / INGRESADO NO SOCIOS\n${(b?.ingresosDinero?.noSocios?.listIngresado || b?.ingresosDinero?.donantes?.listIngresado || linesCollab(noSocioRows.filter(r=>r.situacion!=='Pendiente'))).join('\n') || 'Sin registros'}`;
       else if(/Pendiente no socios|Pendiente donantes/i.test(label)) text = `NO SOCIOS / PENDIENTE NO SOCIOS\n${(b?.ingresosDinero?.noSocios?.listPendiente || b?.ingresosDinero?.donantes?.listPendiente || linesCollab(noSocioRows.filter(r=>r.situacion==='Pendiente'))).join('\n') || 'Sin registros'}`;
-      else if(/DonaciÃ³n de producto tiendas/i.test(label)) text = `DONACIÃ“N DE PRODUCTO / TIENDAS\n${(b?.donacionProducto?.listTiendas || donationLines('DONADO TIENDA')).join('\n') || 'Sin registros'}`;
-      else if(/DonaciÃ³n de producto socios/i.test(label)) text = `DONACIÃ“N DE PRODUCTO / SOCIOS\n${(b?.donacionProducto?.listSocios || donationLines('DONADO SOCIO')).join('\n') || 'Sin registros'}`;
-      else if(/DonaciÃ³n de producto no socios/i.test(label)) text = `DONACIÃ“N DE PRODUCTO / NO SOCIOS\n${(b?.donacionProducto?.listNoSocios || donationLines('DONADO OTROS')).join('\n') || 'Sin registros'}`;
+      else if(/Donación de producto tiendas/i.test(label)) text = `DONACIÓN DE PRODUCTO / TIENDAS\n${(b?.donacionProducto?.listTiendas || donationLines('DONADO TIENDA')).join('\n') || 'Sin registros'}`;
+      else if(/Donación de producto socios/i.test(label)) text = `DONACIÓN DE PRODUCTO / SOCIOS\n${(b?.donacionProducto?.listSocios || donationLines('DONADO SOCIO')).join('\n') || 'Sin registros'}`;
+      else if(/Donación de producto no socios/i.test(label)) text = `DONACIÓN DE PRODUCTO / NO SOCIOS\n${(b?.donacionProducto?.listNoSocios || donationLines('DONADO OTROS')).join('\n') || 'Sin registros'}`;
       if(text){
         setNewTip(row, text, '#ffffff');
         const first = row.querySelector('span'); if(first) setNewTip(first, text, '#ffffff');
@@ -11923,7 +11923,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   async function runExcelExportV1952(){
     try{
       const fn = (typeof exportExcel === 'function') ? exportExcel : (typeof window.exportExcel === 'function' ? window.exportExcel : null);
-      if(!fn){ alert('No se encontrÃ³ la funciÃ³n de exportaciÃ³n a Excel.'); return; }
+      if(!fn){ alert('No se encontró la función de exportación a Excel.'); return; }
       const ret = fn.call(window);
       if(ret && typeof ret.then === 'function') await ret;
     }catch(err){
@@ -12025,20 +12025,20 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm = v => String(v ?? '').trim();
   const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:â‚¬|EUR)|(?:â‚¬|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/i;
+  const moneyRe = /(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)(?:\s|&nbsp;|\u00a0)*(?:€|EUR)|(?:€|EUR)(?:\s|&nbsp;|\u00a0)*(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/i;
   let activeOwner = null;
   let insideTip = false;
   let closeTimer = null;
 
   function sortKey(line){
-    let s = String(line || '').replace(/^\s*â€¢\s*/, '').trim();
+    let s = String(line || '').replace(/^\s*•\s*/, '').trim();
     s = s.replace(/^(DONANTE|SOCIO|NO SOCIO|PERSONA|NOMBRE|PRODUCTO|TIENDA)\s*:\s*/i,'');
-    s = s.split(/\s+[â€”-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
+    s = s.split(/\s+[—-]\s+|\s*\|\s*|\s*:\s*/)[0] || s;
     return normUp(s);
   }
   function isRecordLine(line){
     const s = String(line || '').trim();
-    return /^â€¢\s*/.test(s) || /\s[â€”-]\s/.test(s) || /\|/.test(s);
+    return /^•\s*/.test(s) || /\s[—-]\s/.test(s) || /\|/.test(s);
   }
   function sortTipText(raw){
     const lines = String(raw || '').replace(/\r\n/g,'\n').split('\n');
@@ -12060,7 +12060,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     return el.getAttribute('data-ce-tip-v196') || el.getAttribute('data-ce-tip-v1952') || el.getAttribute('data-ce-tip') || el.getAttribute('data-v181-tip') || el.getAttribute('data-tip') || el.getAttribute('title') || '';
   }
   function splitRecord(line){
-    return String(line || '').replace(/^\s*â€¢\s*/,'').split(/\s+[â€”-]\s+|\s*\|\s*/).map(x=>x.trim()).filter(Boolean);
+    return String(line || '').replace(/^\s*•\s*/,'').split(/\s+[—-]\s+|\s*\|\s*/).map(x=>x.trim()).filter(Boolean);
   }
   function boldFinalMoney(html){
     if(!moneyRe.test(html)) return html;
@@ -12102,7 +12102,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         continue;
       }
       const h = esc(line);
-      if(/\b(TOTAL|SOCIOS|NO SOCIOS|DONACI[Ã“O]N|INGRESOS|COMPRADO|PENDIENTE|DONADO|TICKET|PERSONAS|PRODUCTOS)\b/i.test(line)) parts.push('<div class="ce-tip-title">' + boldFinalMoney(h) + '</div>');
+      if(/\b(TOTAL|SOCIOS|NO SOCIOS|DONACI[ÓO]N|INGRESOS|COMPRADO|PENDIENTE|DONADO|TICKET|PERSONAS|PRODUCTOS)\b/i.test(line)) parts.push('<div class="ce-tip-title">' + boldFinalMoney(h) + '</div>');
       else parts.push('<div class="ce-tip-text">' + boldFinalMoney(h) + '</div>');
       i++;
     }
@@ -12389,7 +12389,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         if(cells[1]) cells[1].style.fontWeight = '900';
       }
       const last = cells[cells.length-1];
-      if(last && /â‚¬/.test(last.textContent || '')) last.style.fontWeight = '900';
+      if(last && /€/.test(last.textContent || '')) last.style.fontWeight = '900';
     });
   }
   const obs = new MutationObserver(() => setTimeout(applyTooltipLayout,0));
@@ -12400,7 +12400,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     let g = null; try{ if(typeof graphPartsV171 === 'function') g = graphPartsV171(); }catch(_){ }
     if(!g) return;
     const rows = wrap.querySelectorAll('.chart-row');
-    // DONACIÃ“N DE PRODUCTO: quitar columna de tipo DONADO y poner total destacado.
+    // DONACIÓN DE PRODUCTO: quitar columna de tipo DONADO y poner total destacado.
     const donationSegs = rows[1]?.querySelectorAll?.('.chart-seg') || [];
     const donationSpecs = [
       ['DONADO TIENDAS', 'DONADO TIENDA', g.donationItems?.[0]],
@@ -12413,7 +12413,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const lines = donationRows(code);
       setTip(seg, titleText(title, item.value || rowsTotal(code), lines), item.color || getComputedStyle(seg).backgroundColor || '#fff', 'donation');
     });
-    // GASTOS: TKXX | tienda | Producto | uds x Precio = total, con tienda mÃ¡s ancha por CSS.
+    // GASTOS: TKXX | tienda | Producto | uds x Precio = total, con tienda más ancha por CSS.
     const expenseSegs = rows[2]?.querySelectorAll?.('.chart-seg') || [];
     const expenseSpecs = [
       ['GASTADO POR TICKET', 'ticket', g.expenseItems?.[0]],
@@ -12432,9 +12432,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row => {
       const label = norm(row.querySelector('span')?.textContent || '');
       let code='', title='';
-      if(/DonaciÃ³n de producto tiendas/i.test(label)){ code='DONADO TIENDA'; title='DONACIÃ“N DE PRODUCTO / TIENDAS'; }
-      else if(/DonaciÃ³n de producto socios/i.test(label)){ code='DONADO SOCIO'; title='DONACIÃ“N DE PRODUCTO / SOCIOS'; }
-      else if(/DonaciÃ³n de producto no socios/i.test(label)){ code='DONADO OTROS'; title='DONACIÃ“N DE PRODUCTO / NO SOCIOS'; }
+      if(/Donación de producto tiendas/i.test(label)){ code='DONADO TIENDA'; title='DONACIÓN DE PRODUCTO / TIENDAS'; }
+      else if(/Donación de producto socios/i.test(label)){ code='DONADO SOCIO'; title='DONACIÓN DE PRODUCTO / SOCIOS'; }
+      else if(/Donación de producto no socios/i.test(label)){ code='DONADO OTROS'; title='DONACIÓN DE PRODUCTO / NO SOCIOS'; }
       if(!code) return;
       const lines = donationRows(code);
       const total = compras().filter(c => ticket(c) === code).reduce((a,b)=>a+value(b),0);
@@ -12461,7 +12461,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const cols = card.querySelectorAll('.vbar-col');
         specs.forEach(([label,valKey,listKey,color],j)=>{
           const rawLines = Array.isArray(r[listKey]) ? r[listKey] : [];
-          const lines = rawLines.filter(x => norm(x) && normUp(x) !== 'SIN PRODUCTOS' && !/^Sin productos/i.test(x)).map(x => String(x).replace(/\s+[â€”-]\s+/g,' | '));
+          const lines = rawLines.filter(x => norm(x) && normUp(x) !== 'SIN PRODUCTOS' && !/^Sin productos/i.test(x)).map(x => String(x).replace(/\s+[—-]\s+/g,' | '));
           const total = Number(r[valKey] || 0);
           const text = `${title}\n${r.label || ''}\nTOTAL: ${fmtMoney(total)}\n\n${lines.length ? lines.join('\n') : 'Sin productos'}`;
           const col = cols[j];
@@ -12494,14 +12494,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const labelEl = item.querySelector('span'); const label = norm(labelEl?.textContent || '');
       if(!label || normUp(label) === 'TOTAL') return;
       for(const [key,rec] of donations.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           if(labelEl) labelEl.textContent = key;
-          const text = titleText('DONACIÃ“N', rec.total, rec.lines, 'Sin productos donados');
+          const text = titleText('DONACIÓN', rec.total, rec.lines, 'Sin productos donados');
           setTip(item,text,'#ffffff','donation'); if(labelEl) setTip(labelEl,text,'#ffffff','donation'); return;
         }
       }
       for(const [key,rec] of purchases.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           const text = `${key}\nTOTAL: ${fmtMoney(rec.total)}\n\n${rec.lines.length ? rec.lines.join('\n') : 'Sin productos comprados'}`;
           setTip(item,text,'#ffffff','ticketpurchase'); if(labelEl) setTip(labelEl,text,'#ffffff','ticketpurchase'); return;
         }
@@ -12589,7 +12589,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     btn.__v200ExcelFixed = true;
     btn.addEventListener('click', async ev => {
       ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
-      try{ const fn = (typeof exportExcel === 'function') ? exportExcel : window.exportExcel; if(!fn) throw new Error('No se encontrÃ³ exportExcel'); await fn(); }
+      try{ const fn = (typeof exportExcel === 'function') ? exportExcel : window.exportExcel; if(!fn) throw new Error('No se encontró exportExcel'); await fn(); }
       catch(err){ console.error('Error exportando INFOEVENTO v20.0', err); alert('No se pudo descargar la INFOEVENTO. Revisa la consola.'); }
     }, true);
   }
@@ -12683,7 +12683,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     const n = Number(r.numero || 0);
     const socio = normUp(personRange(r)) === 'SOCIO' ? Number(r.base != null ? r.base : (n * eventPrice())) : 0;
     const voluntario = Number(r.donation != null ? r.donation : (r.importe || 0));
-    return `${personName(r)} | NÂº ${fmtNum(n)} | Socio ${fmtMoney(socio)} | Voluntario ${fmtMoney(voluntario)} | Total ${fmtMoney(incomeTotal(r))}`;
+    return `${personName(r)} | Nº ${fmtNum(n)} | Socio ${fmtMoney(socio)} | Voluntario ${fmtMoney(voluntario)} | Total ${fmtMoney(incomeTotal(r))}`;
   }
   function incomeRowsFor(label){
     const l = normUp(label);
@@ -12740,9 +12740,9 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row => {
       const label = norm(row.querySelector('span')?.textContent || '');
       let code='', title='';
-      if(/DonaciÃ³n de producto tiendas/i.test(label)){ code='DONADO TIENDA'; title='DONACIÃ“N DE PRODUCTO / TIENDAS'; }
-      else if(/DonaciÃ³n de producto socios/i.test(label)){ code='DONADO SOCIO'; title='DONACIÃ“N DE PRODUCTO / SOCIOS'; }
-      else if(/DonaciÃ³n de producto no socios/i.test(label)){ code='DONADO OTROS'; title='DONACIÃ“N DE PRODUCTO / NO SOCIOS'; }
+      if(/Donación de producto tiendas/i.test(label)){ code='DONADO TIENDA'; title='DONACIÓN DE PRODUCTO / TIENDAS'; }
+      else if(/Donación de producto socios/i.test(label)){ code='DONADO SOCIO'; title='DONACIÓN DE PRODUCTO / SOCIOS'; }
+      else if(/Donación de producto no socios/i.test(label)){ code='DONADO OTROS'; title='DONACIÓN DE PRODUCTO / NO SOCIOS'; }
       if(!code) return;
       const lines = donationRows(code);
       const total = compras().filter(c => ticket(c) === code).reduce((a,b)=>a+value(b),0);
@@ -12767,7 +12767,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
         const r = rows[i] || {};
         const cols = card.querySelectorAll('.vbar-col');
         specs.forEach(([label,valKey,listKey,color],j)=>{
-          const lines = (Array.isArray(r[listKey]) ? r[listKey] : []).filter(x => norm(x) && !/^Sin productos/i.test(x)).map(x => String(x).replace(/\s+[â€”-]\s+/g,' | '));
+          const lines = (Array.isArray(r[listKey]) ? r[listKey] : []).filter(x => norm(x) && !/^Sin productos/i.test(x)).map(x => String(x).replace(/\s+[—-]\s+/g,' | '));
           const total = Number(r[valKey] || 0);
           const text = `${title}\n${r.label || ''}\n${label}\nTOTAL: ${fmtMoney(total)}\n\n${lines.length ? lines.join('\n') : 'Sin productos'}`;
           const col = cols[j];
@@ -12799,14 +12799,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const labelEl = item.querySelector('span'); const label = norm(labelEl?.textContent || '');
       if(!label || normUp(label) === 'TOTAL') return;
       for(const [key,rec] of donations.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           if(labelEl) labelEl.textContent = key;
-          const text = titleText('DONACIÃ“N', rec.total, rec.lines, 'Sin productos donados');
+          const text = titleText('DONACIÓN', rec.total, rec.lines, 'Sin productos donados');
           setTip(item,text,'#ffffff','donationv201'); if(labelEl) setTip(labelEl,text,'#ffffff','donationv201'); return;
         }
       }
       for(const [key,rec] of purchases.entries()){
-        if(label === key || label.startsWith(key + ' Â·') || label.startsWith(key + ' -')){
+        if(label === key || label.startsWith(key + ' ·') || label.startsWith(key + ' -')){
           const text = `${key}\nTOTAL: ${fmtMoney(rec.total)}\n\n${rec.lines.length ? rec.lines.join('\n') : 'Sin productos comprados'}`;
           setTip(item,text,'#ffffff','ticketpurchasev201'); if(labelEl) setTip(labelEl,text,'#ffffff','ticketpurchasev201'); return;
         }
@@ -12852,7 +12852,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{ renderLockState(); }catch(_){ }
     const btn = $('btnToggleMaintenance');
     if(btn){ btn.classList.add('maint-btn-open'); btn.classList.remove('maint-btn-closed'); }
-    // v21.0: NO abrir automÃ¡ticamente el selector de archivo.
+    // v21.0: NO abrir automáticamente el selector de archivo.
     // El usuario debe pulsar manualmente en el input Archivo Excel tras elegir REPLACE/RESUME.
   }
   window.addEventListener('click', ev => {
@@ -12886,7 +12886,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-30-v202-final-fixes-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #30. */
-/* ==== V20.2: toggle mantenimiento, carga sin selector automÃ¡tico, globos y fotos ==== */
+/* ==== V20.2: toggle mantenimiento, carga sin selector automático, globos y fotos ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -12894,7 +12894,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm = v => String(v ?? '').trim();
   const normUp = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const esc = v => (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-  const moneyFmt = v => { try{ return (typeof money === 'function') ? money(Number(v||0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return Number(v||0).toFixed(2)+' â‚¬'; } };
+  const moneyFmt = v => { try{ return (typeof money === 'function') ? money(Number(v||0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return Number(v||0).toFixed(2)+' €'; } };
   const numFmt = v => { try{ return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(v||0)); }catch(_){ return String(v ?? ''); } };
   function st(){ try{ if(typeof state !== 'undefined') return state; }catch(_){ } return window.state || {}; }
   function evId(){ try{ const ev = (typeof selectedEvent === 'function') ? selectedEvent() : null; return String(ev?.id || st().selectedEventId || ''); }catch(_){ return String(st().selectedEventId || ''); } }
@@ -12961,7 +12961,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     try{ renderLockState(); }catch(_){ }
     const btn=$('btnToggleMaintenance'); if(btn){ btn.classList.add('maint-btn-open'); btn.classList.remove('maint-btn-closed'); }
   }
-  // Ãšltimo interceptor: separa mantenimiento y carga, sin abrir el selector de archivo automÃ¡ticamente.
+  // Último interceptor: separa mantenimiento y carga, sin abrir el selector de archivo automáticamente.
   window.addEventListener('click', ev => {
     const btn = ev.target?.closest?.('button'); if(!btn) return;
     if(btn.id === 'btnToggleMaintenance'){
@@ -12990,7 +12990,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     [['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{
       const wrap=$(id); if(!wrap) return;
       wrap.querySelectorAll('.vbars-card').forEach(card=>{
-        const label = norm((card.querySelector('.vbars-title')?.textContent || '').split('Â·')[0]);
+        const label = norm((card.querySelector('.vbars-title')?.textContent || '').split('·')[0]);
         const data = groupingLines(label, kind);
         const cols = card.querySelectorAll('.vbar-col');
         const specs = [
@@ -13046,13 +13046,13 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       const encoded = encodeURIComponent(label);
       const img = st().ticketImages?.[imgKey(label)] || '';
       const preview = img ? `<img class="ticket-thumb" src="${img}" alt="foto" />` : '<span class="hint">Sin imagen</span>';
-      const del = img ? `<button type="button" class="outline small ce-photo-btn-v202" title="Eliminar foto" onclick="removeTicketImageV202('${encoded}'); return false;">ðŸ—‘ï¸</button>` : '';
-      const html = `<span class="ticket-actions"><button type="button" class="outline small ce-photo-btn-v202" title="Insertar foto" onclick="uploadTicketImageV202('${encoded}'); return false;">ðŸ“Ž</button>${preview}${del}</span>`;
+      const del = img ? `<button type="button" class="outline small ce-photo-btn-v202" title="Eliminar foto" onclick="removeTicketImageV202('${encoded}'); return false;">🗑️</button>` : '';
+      const html = `<span class="ticket-actions"><button type="button" class="outline small ce-photo-btn-v202" title="Insertar foto" onclick="uploadTicketImageV202('${encoded}'); return false;">📎</button>${preview}${del}</span>`;
       if(actions) actions.outerHTML = html; else right.insertAdjacentHTML('beforeend', html);
     });
   }
   function formatGraphTips(){
-    // Fuerza que INGRESOS y DONACIÃ“N usen el layout de primera columna + total, sin poner en negrita el precio intermedio.
+    // Fuerza que INGRESOS y DONACIÓN usen el layout de primera columna + total, sin poner en negrita el precio intermedio.
     document.querySelectorAll('#eventChartWrap .chart-seg[data-ce-tip-v196]').forEach(seg=>{
       const raw = seg.getAttribute('data-ce-tip-v196') || '';
       if(/DONADO|DONACI/i.test(raw)) seg.setAttribute('data-ce-tip-layout-v20','donationv201');
@@ -13091,14 +13091,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function jumpToCompra(row){if(!row)return false; try{currentMainTab='compras'; showComprasEvent=true;}catch(_){} try{if(typeof render==='function')render();}catch(_){} setTimeout(()=>setFound(locateCompraRow(row.id)),120); return true;}
   function maybeJumpFromInputs(){const productId=$('buyProducto')?.value||''; const tiendaId=$('buyTienda')?.value||''; if(!productId)return false; const found=findCompraSameProductStore(productId,tiendaId); if(!found)return false; jumpToCompra(found); return true;}
   document.addEventListener('change',function(ev){const t=ev.target; if(!t||!['buyProducto','buyTienda'].includes(t.id))return; if(typeof isLocked==='function'&&isLocked())return; try{if(typeof updateBuyPreview==='function')updateBuyPreview();}catch(_){} if(maybeJumpFromInputs()){ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();}},true);
-  window.addCompra = addCompra = function(){try{if(!selectedEvent())return;}catch(_){if(!selectedId())return;} const productId=$('buyProducto')?.value||''; if(!productId)return; const tiendaId=$('buyTienda')?.value||''; const found=findCompraSameProductStore(productId,tiendaId); if(found){jumpToCompra(found); return;} const rec={id:(typeof uid==='function'?uid():(Date.now()+'_'+Math.random().toString(36).slice(2))),eventId:selectedId(),productoId:productId,unidades:Number($('buyUnidades')?.value||0),precio:(typeof parseEuroInput==='function'?parseEuroInput($('buyPrecio')?.value||0):Number($('buyPrecio')?.value||0)),ticketDonacion:$('buyTicket')?.value||'',tiendaId:tiendaId,responsableId:$('buyResponsable')?.value||''}; if(!Array.isArray(st().compras))st().compras=[]; st().compras.push(rec); ['buyProducto','buyTienda','buyResponsable'].forEach(id=>{const el=$(id); if(el)el.value='';}); if($('buyUnidades'))$('buyUnidades').value='1.00'; if($('buyPrecio'))$('buyPrecio').value='0,00 â‚¬'; if($('buyTicket'))$('buyTicket').value=''; try{currentMainTab='compras'; showComprasEvent=true;}catch(_){} try{if(typeof render==='function')render();}catch(_){} setTimeout(()=>setFound(locateCompraRow(rec.id)),150);};
+  window.addCompra = addCompra = function(){try{if(!selectedEvent())return;}catch(_){if(!selectedId())return;} const productId=$('buyProducto')?.value||''; if(!productId)return; const tiendaId=$('buyTienda')?.value||''; const found=findCompraSameProductStore(productId,tiendaId); if(found){jumpToCompra(found); return;} const rec={id:(typeof uid==='function'?uid():(Date.now()+'_'+Math.random().toString(36).slice(2))),eventId:selectedId(),productoId:productId,unidades:Number($('buyUnidades')?.value||0),precio:(typeof parseEuroInput==='function'?parseEuroInput($('buyPrecio')?.value||0):Number($('buyPrecio')?.value||0)),ticketDonacion:$('buyTicket')?.value||'',tiendaId:tiendaId,responsableId:$('buyResponsable')?.value||''}; if(!Array.isArray(st().compras))st().compras=[]; st().compras.push(rec); ['buyProducto','buyTienda','buyResponsable'].forEach(id=>{const el=$(id); if(el)el.value='';}); if($('buyUnidades'))$('buyUnidades').value='1.00'; if($('buyPrecio'))$('buyPrecio').value='0,00 €'; if($('buyTicket'))$('buyTicket').value=''; try{currentMainTab='compras'; showComprasEvent=true;}catch(_){} try{if(typeof render==='function')render();}catch(_){} setTimeout(()=>setFound(locateCompraRow(rec.id)),150);};
   function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;});}
   function normalizeDownloadName(){const proto=HTMLAnchorElement.prototype; if(proto.click.__v210Wrapped)return; const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v210Wrapped=true; proto.click=wrapped;}
   function getTipSource(el){for(const a of ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title']){const v=el.getAttribute?.(a); if(norm(v))return v;} return '';}
   function adoptTips(){document.querySelectorAll('[data-ce-tip-v196],[data-ce-tip-v1952],[data-ce-tip],[data-v181-tip],[data-tip],[title]').forEach(el=>{if(el.closest?.('button[data-action^="delete-"]'))return; const raw=getTipSource(el); if(!norm(raw))return; const layout=el.getAttribute('data-ce-tip-layout-v20')||el.getAttribute('data-ce-tip-layout-v21')||'default'; const bg=el.getAttribute('data-tip-bg-v196')||el.getAttribute('data-tip-bg-v1952')||el.getAttribute('data-tip-bg')||getComputedStyle(el).backgroundColor||'#fff'; el.setAttribute('data-ce-tip-v21',raw); el.setAttribute('data-ce-tip-layout-v21',layout); el.setAttribute('data-tip-bg-v21',bg); ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title'].forEach(a=>el.removeAttribute(a));}); ['ceTooltipV190','ceTooltipV1952','ceTooltipV196'].forEach(id=>{const t=$(id); if(t)t.style.display='none';});}
   let activeOwner=null, closeTimer=null; function getTip(){let tip=$('ceTooltipV21'); if(!tip){tip=document.createElement('div');tip.id='ceTooltipV21';document.body.appendChild(tip);} return tip;}
   function sortTipText(text){const lines=String(text||'').split('\n'); const out=[],block=[]; const flush=()=>{if(block.length){block.sort((a,b)=>normUp(a).localeCompare(normUp(b),'es')); out.push(...block.splice(0));}}; lines.forEach(line=>{if(!line.trim()||/^(TOTAL|INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE|GAST|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS|TK|TICKET)/i.test(line.trim())){flush(); out.push(line);}else block.push(line);}); flush(); return out.join('\n');}
-  function renderTipHtml(text){const lines=sortTipText(text).split('\n'); const parts=[]; let table=[]; const flushTable=()=>{if(!table.length)return; parts.push('<table class="ce-v21-table"><tbody>'+table.map(cells=>'<tr>'+cells.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'); table=[];}; lines.forEach(line=>{if(!line.trim()){flushTable(); parts.push('<div class="ce-v21-blank"></div>'); return;} if(line.includes('|')){table.push(line.split('|').map(s=>s.trim())); return;} flushTable(); const html=esc(line).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*â‚¬|\d+(?:,\d{2})?\s*â‚¬)/g,'<strong>$1</strong>'); if(/^(TOTAL|INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE|GAST|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS)/i.test(line.trim()))parts.push('<div class="ce-v21-title">'+html+'</div>'); else parts.push('<div class="ce-v21-text">'+html+'</div>');}); flushTable(); return parts.join('');}
+  function renderTipHtml(text){const lines=sortTipText(text).split('\n'); const parts=[]; let table=[]; const flushTable=()=>{if(!table.length)return; parts.push('<table class="ce-v21-table"><tbody>'+table.map(cells=>'<tr>'+cells.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'); table=[];}; lines.forEach(line=>{if(!line.trim()){flushTable(); parts.push('<div class="ce-v21-blank"></div>'); return;} if(line.includes('|')){table.push(line.split('|').map(s=>s.trim())); return;} flushTable(); const html=esc(line).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*€|\d+(?:,\d{2})?\s*€)/g,'<strong>$1</strong>'); if(/^(TOTAL|INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE|GAST|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS)/i.test(line.trim()))parts.push('<div class="ce-v21-title">'+html+'</div>'); else parts.push('<div class="ce-v21-text">'+html+'</div>');}); flushTable(); return parts.join('');}
   function placeTip(tip,owner){const r=owner.getBoundingClientRect(); tip.style.display='block'; tip.style.left='0px'; tip.style.top='0px'; const tr=tip.getBoundingClientRect(); let left=Math.min(Math.max(8,r.left),innerWidth-tr.width-8); let top=r.bottom+8; if(top+tr.height>innerHeight-8)top=Math.max(8,r.top-tr.height-8); tip.style.left=Math.round(Math.max(8,left))+'px'; tip.style.top=Math.round(Math.max(8,top))+'px';}
   function openTip(owner){const text=owner.getAttribute('data-ce-tip-v21'); if(!norm(text))return false; const tip=getTip(); activeOwner=owner; clearTimeout(closeTimer); tip.innerHTML=renderTipHtml(text); tip.style.background=owner.getAttribute('data-tip-bg-v21')||'#fff'; tip.style.color='#111827'; Array.from(tip.classList).forEach(c=>{if(c.startsWith('ce-v21-layout-'))tip.classList.remove(c);}); tip.classList.add('ce-v21-layout-'+(owner.getAttribute('data-ce-tip-layout-v21')||'default')); placeTip(tip,owner); return true;}
   function closeTip(){const tip=$('ceTooltipV21'); if(tip)tip.style.display='none'; activeOwner=null;} function scheduleClose(){clearTimeout(closeTimer); closeTimer=setTimeout(()=>{const tip=$('ceTooltipV21'); if(!tip)return; if(!tip.matches(':hover')&&!(activeOwner&&activeOwner.matches(':hover')))closeTip();},180);}
@@ -13118,7 +13118,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const VERSION='ControlEvent v13.0_prod'; const VERSION_FILE='ControlEvent_v13.0_prod';
   const $=id=>document.getElementById(id); const norm=v=>String(v??'').trim();
   const normUp=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-  const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' â‚¬';}};
+  const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
   const num=v=>{try{return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(v||0));}catch(_){return String(v??'');}};
   function st(){try{if(typeof state!=='undefined')return state;}catch(_){} return window.state||{};}
   function ev(){try{return (typeof selectedEvent==='function'?selectedEvent():null)||{};}catch(_){return{};}}
@@ -13144,11 +13144,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function lineIngreso(r){const per=r.persona||persona(r.personaId)||{}; const nombre=per.nombre||r.nombre||'Sin nombre'; const precio=Number(ev().precio||0); const n=Number(r.numero||0); const esSocio=normUp(per.rango||'')==='SOCIO'; const socio=esSocio?Number(r.base!=null?r.base:n*precio):0; const vol=Number(r.donation!=null?r.donation:(r.importe||0)); const ing=normUp(r.situacion||'')==='PENDIENTE'?0:totalIngreso(r); const pte=normUp(r.situacion||'')==='PENDIENTE'?totalIngreso(r):0; return `${nombre} | ${num(n)} | ${money(socio)} | ${money(vol)} | ${money(ing)} | ${money(pte)} | ${money(totalIngreso(r))}`;}
   function applyBudgetIncomeTips(){
     const rows=ingresos(); const socios=rows.filter(r=>normUp((r.persona||persona(r.personaId)).rango||'')==='SOCIO'); const nosocios=rows.filter(r=>normUp((r.persona||persona(r.personaId)).rango||'')!=='SOCIO');
-    const make=(title,baseRows,mode)=>{let list=baseRows; if(mode==='ing')list=baseRows.filter(r=>normUp(r.situacion||'')!=='PENDIENTE'); if(mode==='pte')list=baseRows.filter(r=>normUp(r.situacion||'')==='PENDIENTE'); list=list.slice().sort((a,b)=>cmp((a.persona||persona(a.personaId)).nombre,(b.persona||persona(b.personaId)).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return `${title}\nNombre | NÂº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\nTOTAL: ${money(total)}\n\n${list.length?list.map(lineIngreso).join('\n'):'Sin registros'}`;};
+    const make=(title,baseRows,mode)=>{let list=baseRows; if(mode==='ing')list=baseRows.filter(r=>normUp(r.situacion||'')!=='PENDIENTE'); if(mode==='pte')list=baseRows.filter(r=>normUp(r.situacion||'')==='PENDIENTE'); list=list.slice().sort((a,b)=>cmp((a.persona||persona(a.personaId)).nombre,(b.persona||persona(b.personaId)).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return `${title}\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\nTOTAL: ${money(total)}\n\n${list.length?list.map(lineIngreso).join('\n'):'Sin registros'}`;};
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row=>{const label=norm(row.querySelector('span')?.textContent||''); if(!label)return; const prev=row.closest('.budget-subrows')?.previousElementSibling?.textContent||''; const isNo=/NO\s+SOCIOS/i.test(prev); let text=''; if(label==='Personas')text=make(`${isNo?'NO SOCIOS':'SOCIOS'} / PERSONAS`,isNo?nosocios:socios,'all'); else if(/Importe socios/i.test(label))text=make('SOCIOS / IMPORTE SOCIO',socios,'all'); else if(/Ingresado socios/i.test(label))text=make('SOCIOS / INGRESADO SOCIO',socios,'ing'); else if(/Pendiente socios/i.test(label))text=make('SOCIOS / PENDIENTE SOCIO',socios,'pte'); else if(/Importe no socios|Importe donantes/i.test(label))text=make('NO SOCIOS / IMPORTE NO SOCIO',nosocios,'all'); else if(/Ingresado no socios|Ingresado donantes/i.test(label))text=make('NO SOCIOS / INGRESADO NO SOCIO',nosocios,'ing'); else if(/Pendiente no socios|Pendiente donantes/i.test(label))text=make('NO SOCIOS / PENDIENTE NO SOCIO',nosocios,'pte'); if(text){setTip(row,text,'#fff','incomev211'); row.querySelectorAll('span,strong').forEach(x=>setTip(x,text,'#fff','incomev211'));}});
   }
   function groupingData(label,kind){const rows=compras().filter(c=>{const p=producto(c.productoId); const v=kind==='segmento'?(c.producto?.segmento||p.segmento||''):(c.producto?.destino||p.destino||''); return String(v)===String(label);}); const buy=rows.filter(c=>!isDon(ticket(c))&&ticket(c)!=='').sort((a,b)=>cmp(ticket(a),ticket(b))||cmp(tName(a),tName(b))||cmp(pName(a),pName(b))).map(c=>`${ticket(c)} | ${tName(c)} | ${pName(c)} | ${money(val(c))}`); const pending=rows.filter(c=>!isDon(ticket(c))&&ticket(c)==='').sort((a,b)=>cmp(ticket(a)||'PTE.COMPRA',ticket(b)||'PTE.COMPRA')||cmp(tName(a),tName(b))||cmp(pName(a),pName(b))).map(c=>`${ticket(c)||'PTE.COMPRA'} | ${tName(c)} | ${pName(c)} | ${money(val(c))}`); const donated=rows.filter(c=>isDon(ticket(c))).sort((a,b)=>cmp(donor(a),donor(b))||cmp(pName(a),pName(b))).map(c=>`${donor(c)} | ${pName(c)} | ${money(val(c))}`); return {buy,pending,donated,totalBuy:rows.filter(c=>!isDon(ticket(c))&&ticket(c)!=='').reduce((a,b)=>a+val(b),0),totalPending:rows.filter(c=>!isDon(ticket(c))&&ticket(c)==='').reduce((a,b)=>a+val(b),0),totalDonated:rows.filter(c=>isDon(ticket(c))).reduce((a,b)=>a+val(b),0)};}
-  function applyGroupingTips(){[['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('Â·')[0]); if(!label)return; const d=groupingData(label,kind); const cols=card.querySelectorAll('.vbar-col'); [[0,'Compra',d.buy,d.totalBuy,'#dc2626','groupingv211buy'],[1,'Donado',d.donated,d.totalDonated,'#f59e0b','groupingv211don'],[2,'Pte.Compra u otros gastos',d.pending,d.totalPending,'#fb7185','groupingv211pending']].forEach(([idx,name,lines,total,bg,layout])=>{const text=`${title}\n${label}\n${name}\nTOTAL: ${money(total)}\n\n${lines.length?lines.join('\n'):'Sin productos'}`; const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});}
+  function applyGroupingTips(){[['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('·')[0]); if(!label)return; const d=groupingData(label,kind); const cols=card.querySelectorAll('.vbar-col'); [[0,'Compra',d.buy,d.totalBuy,'#dc2626','groupingv211buy'],[1,'Donado',d.donated,d.totalDonated,'#f59e0b','groupingv211don'],[2,'Pte.Compra u otros gastos',d.pending,d.totalPending,'#fb7185','groupingv211pending']].forEach(([idx,name,lines,total,bg,layout])=>{const text=`${title}\n${label}\n${name}\nTOTAL: ${money(total)}\n\n${lines.length?lines.join('\n'):'Sin productos'}`; const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});}
   function closeTip(){const tip=$('ceTooltipV21'); if(tip)tip.style.display='none';}
   let hoverTimer=null; function wireCloseOnBlur(){const tip=$('ceTooltipV21'); const check=()=>{clearTimeout(hoverTimer); hoverTimer=setTimeout(()=>{const tip=$('ceTooltipV21'); if(!tip||tip.style.display==='none')return; const insideTip=tip.matches(':hover'); const insideOwner=!!document.querySelector('[data-ce-tip-v21]:hover'); if(!insideTip&&!insideOwner)closeTip();},160);}; document.addEventListener('mousemove',check,true); document.addEventListener('focusin',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},true); document.addEventListener('click',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},false);}
   function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); const proto=HTMLAnchorElement.prototype; if(!proto.click.__v211Wrapped){const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v211Wrapped=true; proto.click=wrapped;}}
@@ -13164,7 +13164,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
 ;/* ===== BEGIN legacy-inline-33-v212-final-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #33. */
-/* ==== V21.2: separaciÃ³n CARGA/MANTENIMIENTO, backup y globos finales ==== */
+/* ==== V21.2: separación CARGA/MANTENIMIENTO, backup y globos finales ==== */
 (function(){
   const VERSION='ControlEvent v13.0_prod';
   const VERSION_FILE='ControlEvent_v13.0_prod';
@@ -13172,7 +13172,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).toUpperCase();
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const money=v=>{try{ if(typeof formatEuro==='function') return formatEuro(Number(v||0)); }catch(_){} try{ if(typeof money==='function') return money(Number(v||0)); }catch(_){} return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' â‚¬';};
+  const money=v=>{try{ if(typeof formatEuro==='function') return formatEuro(Number(v||0)); }catch(_){} try{ if(typeof money==='function') return money(Number(v||0)); }catch(_){} return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';};
   const num=v=>Number(v||0).toLocaleString('es-ES');
   const cmp=(a,b)=>up(a).localeCompare(up(b),'es');
   function st(){try{return state||{};}catch(_){return window.state||{};}}
@@ -13218,7 +13218,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     if(/^ControlEvent_v\d+_\d+(?:_\d+)?_descarga_datos\.xlsx$/i.test(n)) n=`${VERSION_FILE}_BACKUP_TODOS_${ymd(now)}_${hms(now)}.xlsx`;
     return n;
   }
-  // Como exportSeedWorkbook usa una funciÃ³n de nombre cerrada en otro parche, normalizamos tambiÃ©n el tÃ­tulo del evento del backup en el momento del click del enlace.
+  // Como exportSeedWorkbook usa una función de nombre cerrada en otro parche, normalizamos también el título del evento del backup en el momento del click del enlace.
   function currentBackupTitleFromUI(){const sel=$('ceBackupScopeV181'); if(!sel) return ''; if(sel.value==='TODOS')return 'TODOS'; const opt=sel.options[sel.selectedIndex]; return opt?opt.textContent:'';}
   document.addEventListener('click',function(ev){const ok=ev.target?.closest?.('#ceBackupOkV181'); if(ok){const title=currentBackupTitleFromUI(); if(title) window.__ceLastBackupTitleV212=sanitizeTitle(title);}},true);
   const proto=HTMLAnchorElement.prototype;
@@ -13261,7 +13261,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       list.sort((a,b)=>cmp((a.persona||persona(a.personaId)||{}).nombre,(b.persona||persona(b.personaId)||{}).nombre));
       const total=list.reduce((a,b)=>a+totalIngreso(b),0);
       const body=list.map(r=>{const v=ingresoVals(r); return `${v.nombre} | ${num(v.n)} | ${money(v.socio)} | ${money(v.vol)} | ${money(v.ing)} | ${money(v.pte)} | ${money(v.total)}`;}).join('\n')||'Sin registros';
-      return `${title}\nTOTAL: ${money(total)}\n\nNombre | NÂº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\n${body}`;
+      return `${title}\nTOTAL: ${money(total)}\n\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\n${body}`;
     };
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row=>{
       const label=norm(row.querySelector('span')?.textContent||''); if(!label)return; const prev=row.closest('.budget-subrows')?.previousElementSibling?.textContent||''; const isNo=/NO\s+SOCIOS/i.test(prev); let text='';
@@ -13296,7 +13296,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function applyGraphTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; let g=null; try{g=typeof graphPartsV171==='function'?graphPartsV171():null;}catch(_){} if(!g)return; const rows=wrap.querySelectorAll('.chart-row');
     const incomeSegs=rows[0]?.querySelectorAll?.('.chart-seg')||[];
-    incomeSegs.forEach((seg,i)=>{const item=g.incomeItems?.[i]; if(!item)return; const lines=incomeRowsFor(item.label||''); setTip(seg,tipTitle(item.label||'INGRESOS',item.value||0,lines,'Nombre | NÂº | Importe socio | Importe voluntario | Total'),item.color||getComputedStyle(seg).backgroundColor||'#fff','graphincomev212');});
+    incomeSegs.forEach((seg,i)=>{const item=g.incomeItems?.[i]; if(!item)return; const lines=incomeRowsFor(item.label||''); setTip(seg,tipTitle(item.label||'INGRESOS',item.value||0,lines,'Nombre | Nº | Importe socio | Importe voluntario | Total'),item.color||getComputedStyle(seg).backgroundColor||'#fff','graphincomev212');});
     const donSegs=rows[1]?.querySelectorAll?.('.chart-seg')||[]; const donSpecs=[['Donado por tiendas','DONADO TIENDA',g.donationItems?.[0]],['Donado por socios','DONADO SOCIO',g.donationItems?.[1]],['Donado por no socios','DONADO OTROS',g.donationItems?.[2]]];
     donSegs.forEach((seg,i)=>{const [title,code,item]=donSpecs[i]||[]; if(!item)return; const lines=donationRowsGrouped(code); setTip(seg,tipTitle(title,item.value||0,lines,'Donante | Producto | Uds x precio | Total'),item.color||getComputedStyle(seg).backgroundColor||'#fff','graphdonationv212');});
     const expSegs=rows[2]?.querySelectorAll?.('.chart-seg')||[]; const expSpecs=[['Gastado por ticket','ticket',g.expenseItems?.[0]],['Gastos corrientes','current',g.expenseItems?.[1]],['Pendiente de compra','pending',g.expenseItems?.[2]]];
@@ -13323,7 +13323,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   const clean=v=>String(v||'evento').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/_+/g,'_')||'evento';
-  const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' â‚¬';}};
+  const money=v=>{try{return (typeof window.money==='function'?window.money(Number(v||0)):new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)));}catch(_){return Number(v||0).toFixed(2).replace('.',',')+' €';}};
   const num=v=>{try{return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(v||0));}catch(_){return String(v??'');}};
   const cmp=(a,b)=>up(a).localeCompare(up(b),'es');
   function st(){try{if(typeof state!=='undefined')return state;}catch(_){} return window.state||{};}
@@ -13359,7 +13359,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function applySummaryIncomeTips(){
     const grid=$('ingresosSummaryGrid'); if(!grid)return;
     const base=ingresos();
-    const make=(title,fn)=>{const rows=base.filter(fn).sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=rows.reduce((a,b)=>a+totalIngreso(b),0); return titleWithLines(title,total,'PERSONAS | NÂº | Rango | Importe socio | Importe voluntario | Total',rows.map(r=>ingresoLine(r,false)));};
+    const make=(title,fn)=>{const rows=base.filter(fn).sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=rows.reduce((a,b)=>a+totalIngreso(b),0); return titleWithLines(title,total,'PERSONAS | Nº | Rango | Importe socio | Importe voluntario | Total',rows.map(r=>ingresoLine(r,false)));};
     Array.from(grid.children||[]).forEach(card=>{
       const label=up(card.querySelector('.label')?.textContent||card.textContent||''); let text='';
       if(label.includes('EFECTIVO')) text=make('RESUMEN DE INGRESOS / EFECTIVO',r=>up(r.situacion)==='EFECTIVO');
@@ -13372,7 +13372,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   }
   function applyBudgetIncomeTips(){
     const rows=ingresos(); const socios=rows.filter(r=>up((r.persona||persona(r.personaId)).rango)==='SOCIO'); const nosocios=rows.filter(r=>up((r.persona||persona(r.personaId)).rango)!=='SOCIO');
-    const make=(title,baseRows,mode)=>{let list=baseRows.slice(); if(mode==='ing')list=list.filter(r=>up(r.situacion)!=='PENDIENTE'); if(mode==='pte')list=list.filter(r=>up(r.situacion)==='PENDIENTE'); list.sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return titleWithLines(title,total,'PERSONAS | NÂº | Rango | Importe socio | Importe voluntario | Ingresado | Pendiente | Total',list.map(r=>ingresoLine(r,true)));};
+    const make=(title,baseRows,mode)=>{let list=baseRows.slice(); if(mode==='ing')list=list.filter(r=>up(r.situacion)!=='PENDIENTE'); if(mode==='pte')list=list.filter(r=>up(r.situacion)==='PENDIENTE'); list.sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return titleWithLines(title,total,'PERSONAS | Nº | Rango | Importe socio | Importe voluntario | Ingresado | Pendiente | Total',list.map(r=>ingresoLine(r,true)));};
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row=>{const label=norm(row.querySelector('span')?.textContent||''); if(!label)return; const prev=row.closest('.budget-subrows')?.previousElementSibling?.textContent||''; const isNo=/NO\s+SOCIOS/i.test(prev); let text='';
       if(label==='Personas')text=make(`${isNo?'NO SOCIOS':'SOCIOS'} / PERSONAS`,isNo?nosocios:socios,'all');
       else if(/Importe socios/i.test(label))text=make('SOCIOS / IMPORTE SOCIO',socios,'all');
@@ -13388,14 +13388,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function donationRowsGrouped(code){const rows=compras().filter(c=>!code||ticket(c)===code).sort((a,b)=>cmp(donorName(a),donorName(b))||cmp(productName(a),productName(b))); const out=[]; let cur=null,total=0; rows.forEach((c,i)=>{const d=donorName(c); if(cur!==null&&d!==cur){out.push(`TOTAL DONANTE ${cur} | | | | ${money(total)}`); out.push(''); total=0;} cur=d; total+=value(c); out.push(`${d} | ${productName(c)} | ${num(Number(c.unidades||0))} | ${money(price(c))} | ${money(value(c))}`); if(i===rows.length-1)out.push(`TOTAL DONANTE ${d} | | | | ${money(total)}`);}); return out;}
   function applyBudgetDonationCombinedTip(){
     const codes=['DONADO TIENDA','DONADO SOCIO','DONADO OTROS']; const rows=codes.flatMap(code=>donationRows(code)); const total=codes.reduce((a,code)=>a+compras().filter(c=>ticket(c)===code).reduce((s,c)=>s+value(c),0),0);
-    const text=titleWithLines('DONACIÃ“N DE PRODUCTO / VALOR PRODUCTO DONADO',total,'DONANTE | Producto | Uds | Precio estimado | Valor estimado',rows);
+    const text=titleWithLines('DONACIÓN DE PRODUCTO / VALOR PRODUCTO DONADO',total,'DONANTE | Producto | Uds | Precio estimado | Valor estimado',rows);
     document.querySelectorAll('#budgetLayout .budget-row,#budgetLayout .budget-subgroup').forEach(row=>{const label=up(row.querySelector('strong')?.textContent||row.textContent||''); if(label.includes('VALOR PRODUCTO DONADO'))setOnSelfAndChildren(row,text,'#fff','budgetdonationcombinedv213');});
   }
   function applyGraphTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; let g=null; try{g=typeof graphPartsV171==='function'?graphPartsV171():(typeof graphData==='function'?graphData():null);}catch(_){} if(!g)return; const rows=wrap.querySelectorAll('.chart-row');
     const incomeSegs=rows[0]?.querySelectorAll?.('.chart-seg')||[];
     const incomeSpecs=[['Socios Banco',r=>up((r.persona||persona(r.personaId)).rango)==='SOCIO'&&up(r.situacion)==='BANCO'],['Socios Bizum',r=>up((r.persona||persona(r.personaId)).rango)==='SOCIO'&&up(r.situacion)==='BIZUM'],['Socios Efectivo',r=>up((r.persona||persona(r.personaId)).rango)==='SOCIO'&&up(r.situacion)==='EFECTIVO'],['No socios Banco',r=>up((r.persona||persona(r.personaId)).rango)!=='SOCIO'&&up(r.situacion)==='BANCO'],['No socios Bizum',r=>up((r.persona||persona(r.personaId)).rango)!=='SOCIO'&&up(r.situacion)==='BIZUM'],['No socios Efectivo',r=>up((r.persona||persona(r.personaId)).rango)!=='SOCIO'&&up(r.situacion)==='EFECTIVO'],['Pendiente de ingresar',r=>up(r.situacion)==='PENDIENTE']];
-    const incomeItems=g.incomeItems||[]; incomeSegs.forEach((seg,i)=>{const [title,fn]=incomeSpecs[i]||[]; if(!title)return; const regs=ingresos().filter(fn).sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=regs.reduce((a,b)=>a+totalIngreso(b),0); const text=titleWithLines(title,total,'PERSONAS | NÂº | Rango | Importe socio | Importe voluntario | Total',regs.map(r=>ingresoLine(r,false))); setTip(seg,text,incomeItems[i]?.color||getComputedStyle(seg).backgroundColor||'#fff','graphincomev213');});
+    const incomeItems=g.incomeItems||[]; incomeSegs.forEach((seg,i)=>{const [title,fn]=incomeSpecs[i]||[]; if(!title)return; const regs=ingresos().filter(fn).sort((a,b)=>cmp(ingresoVals(a).nombre,ingresoVals(b).nombre)); const total=regs.reduce((a,b)=>a+totalIngreso(b),0); const text=titleWithLines(title,total,'PERSONAS | Nº | Rango | Importe socio | Importe voluntario | Total',regs.map(r=>ingresoLine(r,false))); setTip(seg,text,incomeItems[i]?.color||getComputedStyle(seg).backgroundColor||'#fff','graphincomev213');});
     const donSegs=rows[1]?.querySelectorAll?.('.chart-seg')||[]; const donSpecs=[['Donado por tiendas','DONADO TIENDA'],['Donado por socios','DONADO SOCIO'],['Donado por no socios','DONADO OTROS']]; const donItems=g.donationItems||[];
     donSegs.forEach((seg,i)=>{const [title,code]=donSpecs[i]||[]; if(!code)return; const total=compras().filter(c=>ticket(c)===code).reduce((a,b)=>a+value(b),0); const text=titleWithLines(title,total,'DONANTE | Producto | Uds | Precio estimado | Valor estimado',donationRowsGrouped(code)); setTip(seg,text,donItems[i]?.color||getComputedStyle(seg).backgroundColor||'#fff','graphdonationv213');});
     const expSegs=rows[2]?.querySelectorAll?.('.chart-seg')||[]; const expItems=g.expenseItems||[]; const specs=[['Gastado por ticket','ticket'],['Gastos corrientes','current'],['Pte. Compra u otros gastos','pending']];
@@ -13410,14 +13410,14 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); normalizeDownloads();}
   async function safeInfoEventoExport(){
     await (typeof ensureExcelJS==='function'?ensureExcelJS():Promise.resolve());
-    const wb=new ExcelJS.Workbook(); wb.creator=VERSION+' - Â©oltyLAB â€™26'; wb.created=new Date();
+    const wb=new ExcelJS.Workbook(); wb.creator=VERSION+' - ©oltyLAB ’26'; wb.created=new Date();
     const border={top:{style:'thin',color:{argb:'FFDDE2EA'}},left:{style:'thin',color:{argb:'FFDDE2EA'}},bottom:{style:'thin',color:{argb:'FFDDE2EA'}},right:{style:'thin',color:{argb:'FFDDE2EA'}}};
-    const moneyFmt='#,##0.00 [$â‚¬-C0A]';
+    const moneyFmt='#,##0.00 [$€-C0A]';
     function ws(name,widths){const s=wb.addWorksheet(String(name).slice(0,31)); s.columns=widths.map(w=>({width:w})); return s;}
     function cell(s,r,c,v,bold=false,isMoney=false){const x=s.getCell(r,c); x.value=isMoney?Number(v||0):(v==null?'':v); if(isMoney)x.numFmt=moneyFmt; x.border=border; x.alignment={vertical:'middle',wrapText:true}; x.font={bold:!!bold,color:{argb:'FF111827'}}; return x;}
     function header(s,r,vals){vals.forEach((v,i)=>{const c=cell(s,r,i+1,v,true); c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111827'}}; c.font={bold:true,color:{argb:'FFFFFFFF'}};});}
-    const e=ev(); let r=1; const s1=ws('RESUMEN',[24,60,18]); header(s1,r++,['Campo','Valor','Importe']); cell(s1,r,1,'Evento',true); cell(s1,r++,2,e.titulo||''); cell(s1,r,1,'Fechas',true); cell(s1,r++,2,`${e.fechaIni||''}${e.fechaFin?' - '+e.fechaFin:''}`); cell(s1,r,1,'Precio evento',true); cell(s1,r++,3,Number(e.precio||0),true,true); cell(s1,r,1,'DescripciÃ³n',true); cell(s1,r++,2,String(e.descripcion||'').slice(0,32000));
-    const si=ws('INGRESOS',[32,9,14,16,16,16,16]); header(si,1,['Nombre','NÃºmero','Rango','Importe socio','Importe voluntario','Total','SituaciÃ³n']); r=2; ingresos().forEach(x=>{const v=ingresoVals(x); cell(si,r,1,v.nombre); cell(si,r,2,v.n); cell(si,r,3,v.rango); cell(si,r,4,v.socio,false,true); cell(si,r,5,v.vol,false,true); cell(si,r,6,v.total,false,true); cell(si,r,7,v.situacion); r++;});
+    const e=ev(); let r=1; const s1=ws('RESUMEN',[24,60,18]); header(s1,r++,['Campo','Valor','Importe']); cell(s1,r,1,'Evento',true); cell(s1,r++,2,e.titulo||''); cell(s1,r,1,'Fechas',true); cell(s1,r++,2,`${e.fechaIni||''}${e.fechaFin?' - '+e.fechaFin:''}`); cell(s1,r,1,'Precio evento',true); cell(s1,r++,3,Number(e.precio||0),true,true); cell(s1,r,1,'Descripción',true); cell(s1,r++,2,String(e.descripcion||'').slice(0,32000));
+    const si=ws('INGRESOS',[32,9,14,16,16,16,16]); header(si,1,['Nombre','Número','Rango','Importe socio','Importe voluntario','Total','Situación']); r=2; ingresos().forEach(x=>{const v=ingresoVals(x); cell(si,r,1,v.nombre); cell(si,r,2,v.n); cell(si,r,3,v.rango); cell(si,r,4,v.socio,false,true); cell(si,r,5,v.vol,false,true); cell(si,r,6,v.total,false,true); cell(si,r,7,v.situacion); r++;});
     const sc=ws('COMPRAS_GASTOS',[18,28,10,14,14,18,26]); header(sc,1,['Ticket','Producto','Uds','Precio','Importe','Tienda','Responsable']); r=2; compras().filter(c=>!isDon(ticket(c))).forEach(c=>{cell(sc,r,1,ticket(c)||'PTE.COMPRA'); cell(sc,r,2,productName(c)); cell(sc,r,3,Number(c.unidades||0)); cell(sc,r,4,price(c),false,true); cell(sc,r,5,value(c),false,true); cell(sc,r,6,storeName(c)); cell(sc,r,7,persona(c.responsableId).nombre||''); r++;});
     const sd=ws('DONACIONES',[24,28,10,14,14,28]); header(sd,1,['Donante','Producto','Uds','Precio estimado','Valor estimado','Tipo']); r=2; compras().filter(c=>isDon(ticket(c))).forEach(c=>{cell(sd,r,1,donorName(c)); cell(sd,r,2,productName(c)); cell(sd,r,3,Number(c.unidades||0)); cell(sd,r,4,price(c),false,true); cell(sd,r,5,value(c),false,true); cell(sd,r,6,ticket(c)); r++;});
     const buf=await wb.xlsx.writeBuffer(); const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); const a=document.createElement('a'); const d=new Date(); const y=String(d.getFullYear()),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'); a.href=URL.createObjectURL(blob); a.download=`${VERSION_FILE}_INFOEVENTO-${clean(e.titulo||'evento')}_${y}${m}${day}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
@@ -13433,19 +13433,19 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   window.exportExcel=exportExcel=async function(){
     try{
       if(!previousExport){
-        throw new Error('No se ha encontrado la funciÃ³n principal original de exportaciÃ³n INFOEVENTO.');
+        throw new Error('No se ha encontrado la función principal original de exportación INFOEVENTO.');
       }
       return await previousExport.apply(this,arguments);
     }catch(err){
       window.__ultimoErrorInfoEvento=err;
       console.group('ERROR INFOEVENTO - ControlEvent v13.0_prod');
-      console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o cÃ³digo.', err);
+      console.error('No se ha generado INFOEVENTO reducido. Se muestra el error real para poder corregir datos o código.', err);
       try{console.error('Stack:', err&&err.stack?err.stack:'Sin stack disponible');}catch(_){}
       try{console.log('Evento activo:', ev());}catch(_){}
       try{console.log('Ingresos del evento:', ingresos());}catch(_){}
       try{console.log('Compras/donaciones/gastos del evento:', compras());}catch(_){}
       console.groupEnd();
-      alert('No se pudo descargar INFOEVENTO completo.\n\n' + describeInfoEventoError(err) + '\n\nAbre la consola para ver el detalle. No se ha generado ningÃºn Excel reducido.');
+      alert('No se pudo descargar INFOEVENTO completo.\n\n' + describeInfoEventoError(err) + '\n\nAbre la consola para ver el detalle. No se ha generado ningún Excel reducido.');
       throw err;
     }
   };
@@ -13522,7 +13522,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-36-v214-donaciones-grafica-fix.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #36. */
-/* ==== V21.4: donaciones duplicadas por Producto+Donante y correcciÃ³n grÃ¡fico ingresos socio ==== */
+/* ==== V21.4: donaciones duplicadas por Producto+Donante y corrección gráfico ingresos socio ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -13540,7 +13540,7 @@ window.addCellNote = addCellNote;
   function tienda(id){ try{ if(typeof tiendaById === 'function') return tiendaById(id) || {}; }catch(_){ } return (st().tiendas||[]).find(t => String(t.id) === String(id)) || {}; }
   function isDon(v){ try{ if(typeof isDonationTicket === 'function') return isDonationTicket(v); }catch(_){ } return up(v).startsWith('DONADO'); }
   function isCurrent(v){ try{ if(typeof isCurrentExpenseTicket === 'function') return isCurrentExpenseTicket(v); }catch(_){ } return up(v) === 'GASTOS CORRIENTES'; }
-  function money(v){ try{ if(typeof formatEuro === 'function') return formatEuro(Number(v||0)); }catch(_){} try{ if(typeof window.money === 'function') return window.money(Number(v||0)); }catch(_){} return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' â‚¬'; }
+  function money(v){ try{ if(typeof formatEuro === 'function') return formatEuro(Number(v||0)); }catch(_){} try{ if(typeof window.money === 'function') return window.money(Number(v||0)); }catch(_){} return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
   function donorLabelFromRef(ref){
     const raw = norm(ref);
     if(!raw) return '';
@@ -13579,17 +13579,17 @@ window.addCellNote = addCellNote;
   function resetDonationInputs(){
     ['donProducto','donDonante','donResponsable'].forEach(id => { const el=$(id); if(el) el.value=''; });
     if($('donUnidades')) $('donUnidades').value = '1.00';
-    if($('donPrecio')) $('donPrecio').value = '0,00 â‚¬';
+    if($('donPrecio')) $('donPrecio').value = '0,00 €';
     if($('donImporte')) $('donImporte').value = '';
     try{ if($('donTicket') && typeof DONATION_TICKET_OPTIONS !== 'undefined') $('donTicket').value = DONATION_TICKET_OPTIONS[0]; }catch(_){ }
   }
-  // Refuerzo extra: seleccionar producto en Donaciones solo actualiza la previsualizaciÃ³n; nunca salta al registro.
+  // Refuerzo extra: seleccionar producto en Donaciones solo actualiza la previsualización; nunca salta al registro.
   document.addEventListener('change', function(ev){
     const t = ev.target;
     if(!t || t.id !== 'donProducto') return;
     try{ if(typeof updateDonationPreview === 'function') updateDonationPreview(); }catch(_){ }
   }, true);
-  // AÃ±adir donaciÃ³n: duplicidad Ãºnicamente por Producto + Donante.
+  // Añadir donación: duplicidad únicamente por Producto + Donante.
   window.addDonation = addDonation = function(){
     try{ if(typeof selectedEvent === 'function' && !selectedEvent()) return; }catch(_){ if(!selectedId()) return; }
     const productId = $('donProducto')?.value || '';
@@ -13622,9 +13622,9 @@ window.addCellNote = addCellNote;
   function forma(r){ return up(r?.situacion || ''); }
   function eventPrice(){ return Number(selectedEv().precio || 0); }
   function socioAmount(r){
-    // En la grÃ¡fica de INGRESOS, la parte de SOCIOS debe coincidir con Resumen presupuestario:
-    // Importe socio = NÃºmero x Precio evento. No usar r.total, r.base ni r.importeSocio porque
-    // en algunos eventos antiguos pueden contener aportaciÃ³n voluntaria u otro importe acumulado.
+    // En la gráfica de INGRESOS, la parte de SOCIOS debe coincidir con Resumen presupuestario:
+    // Importe socio = Número x Precio evento. No usar r.total, r.base ni r.importeSocio porque
+    // en algunos eventos antiguos pueden contener aportación voluntaria u otro importe acumulado.
     const n = Number(r?.numero || 0);
     return n * eventPrice();
   }
@@ -13640,9 +13640,9 @@ window.addCellNote = addCellNote;
     const socio = rango(r) === 'SOCIO' ? socioAmount(r) : 0;
     const vol = rango(r) === 'SOCIO' ? 0 : rowTotal(r);
     const total = rowTotal(r);
-    return `${personName(r)} â€” NÂº ${n} â€” Importe socio: ${money(socio)} â€” Importe voluntario: ${money(vol)} â€” Total: ${money(total)} â€” ${r?.situacion || ''}`;
+    return `${personName(r)} — Nº ${n} — Importe socio: ${money(socio)} — Importe voluntario: ${money(vol)} — Total: ${money(total)} — ${r?.situacion || ''}`;
   }
-  // Corregimos el origen de la barra INGRESOS para que SOCIOS compute como el resumen: nÃºmero x precio evento, no total con voluntario.
+  // Corregimos el origen de la barra INGRESOS para que SOCIOS compute como el resumen: número x precio evento, no total con voluntario.
   const oldGraphParts = typeof window.graphPartsV171 === 'function' ? window.graphPartsV171 : null;
   function graphPartsFixed(){
     const g = oldGraphParts ? oldGraphParts() : {incomeItems:[],donationItems:[],expenseItems:[],saldoItems:[],totalDon:0,totalExp:0,saldoOperativo:0};
@@ -13697,7 +13697,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-37-v2141-graph-income-socio-strict-fix.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #37. */
-/* ==== V21.4.1: correcciÃ³n estricta Socios Banco/Bizum/Efectivo = NÃºmero x Precio evento ==== */
+/* ==== V21.4.1: corrección estricta Socios Banco/Bizum/Efectivo = Número x Precio evento ==== */
 (function(){
   const VERSION='ControlEvent v13.0_prod';
   function refreshVersion(){
@@ -13706,7 +13706,7 @@ window.addCellNote = addCellNote;
   }
   function run(){
     refreshVersion();
-    try{ if(typeof renderGraficas === 'function') renderGraficas(); }catch(e){ console.warn('No se pudo refrescar GrÃ¡ficas tras fix v21.5', e); }
+    try{ if(typeof renderGraficas === 'function') renderGraficas(); }catch(e){ console.warn('No se pudo refrescar Gráficas tras fix v21.5', e); }
   }
   window.addEventListener('DOMContentLoaded',()=>setTimeout(run,350));
   window.addEventListener('load',()=>setTimeout(run,900));
@@ -13764,7 +13764,7 @@ window.addCellNote = addCellNote;
   function resetDonationInputs(){
     ['donProducto','donDonante','donResponsable'].forEach(id => { const el=$(id); if(el) el.value=''; });
     if($('donUnidades')) $('donUnidades').value = '1.00';
-    if($('donPrecio')) $('donPrecio').value = '0,00 â‚¬';
+    if($('donPrecio')) $('donPrecio').value = '0,00 €';
     if($('donImporte')) $('donImporte').value = '';
     try{ if($('donTicket') && typeof DONATION_TICKET_OPTIONS !== 'undefined') $('donTicket').value = DONATION_TICKET_OPTIONS[0]; }catch(_){ }
   }
@@ -13781,7 +13781,7 @@ window.addCellNote = addCellNote;
     return false;
   }, true);
 
-  // AÃ‘ADIR DONACIÃ“N: solo aquÃ­ se comprueba duplicidad, y por Producto + Donante.
+  // AÑADIR DONACIÓN: solo aquí se comprueba duplicidad, y por Producto + Donante.
   window.addDonation = addDonation = function(){
     try{ if(typeof selectedEvent === 'function' && !selectedEvent()) return; }catch(_){ if(!evId()) return; }
     const productId = $('donProducto')?.value || '';
@@ -13824,7 +13824,7 @@ window.addCellNote = addCellNote;
     return '';
   }
   function splitKeyLike(value){
-    const v=norm(value).split('Â·')[0].trim();
+    const v=norm(value).split('·')[0].trim();
     const parts=v.split('|').map(x=>norm(x)).filter(Boolean);
     return parts;
   }
@@ -13853,7 +13853,7 @@ window.addCellNote = addCellNote;
     }
     for(const c of Array.from(new Set(candidates))){ const img=imageByCandidate(c); if(img) return img; }
 
-    // BÃºsqueda flexible dentro de las imÃ¡genes del evento activo: coinciden ticket y tienda.
+    // Búsqueda flexible dentro de las imágenes del evento activo: coinciden ticket y tienda.
     const imgs=st().ticketImages || {}; const prefix=`${evId()}|`;
     const parts=splitKeyLike(row.k || row.label);
     const a=up(parts[0]||''), b=up(parts[1]||row.rawTicket||'');
@@ -13904,7 +13904,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-39-v216-excel-ticket-images-protection-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #39. */
-/* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protecciÃ³n reforzada ==== */
+/* ==== V21.6: fotos tickets en CALCULOS_TIENDA_TICKET y protección reforzada ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -13924,7 +13924,7 @@ window.addCellNote = addCellNote;
   function stripEventPrefix(k){ const id=evId(); k=String(k||''); return id && k.startsWith(id+'|') ? k.slice(id.length+1) : k; }
   function compact(v){
     return up(v)
-      .replace(/Â·.*$/,'')
+      .replace(/·.*$/,'')
       .replace(/\b(TIENDA|TICKET|FOTO|IMAGEN)\b/g,'')
       .replace(/\s*\|\s*/g,'|')
       .replace(/\s+/g,' ')
@@ -13942,7 +13942,7 @@ window.addCellNote = addCellNote;
     const direct=[c,imageKey(c),`${id}|${c}`];
     const parts=c.split('|').map(x=>norm(x)).filter(Boolean);
     if(parts.length>=2){
-      const a=parts[0], b=parts[1].split('Â·')[0].trim();
+      const a=parts[0], b=parts[1].split('·')[0].trim();
       direct.push(`${a}|${b}`, `${a} | ${b}`, `${b}|${a}`, `${b} | ${a}`, imageKey(`${a}|${b}`), imageKey(`${a} | ${b}`), imageKey(`${b}|${a}`), imageKey(`${b} | ${a}`), imageKey(b), `${id}|${b}`);
     }
     for(const k of Array.from(new Set(direct))){ if(dataUrlOk(imgs[k])) return imgs[k]; }
@@ -13973,11 +13973,11 @@ window.addCellNote = addCellNote;
       const img = dataUrlOk(row.image) ? row.image : findImageForConcept(concept);
       if(img && concept){
         s.ticketImages[imageKey(concept)] = img;
-        const cleanLabel = norm(row.label || '').split('Â·')[0].trim();
+        const cleanLabel = norm(row.label || '').split('·')[0].trim();
         if(cleanLabel) s.ticketImages[imageKey(cleanLabel)] = img;
       }
     });
-    // TambiÃ©n se crean claves canÃ³nicas a partir de las compras reales: Tienda | TKxx.
+    // También se crean claves canónicas a partir de las compras reales: Tienda | TKxx.
     compras().forEach(c=>{
       const tk=ticket(c); if(!tk || isDonation(tk) || isCurrent(tk)) return;
       const canonical=`${storeName(c)} | ${tk}`;
@@ -14038,7 +14038,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-40-v217-final-ticket-images-book-protection-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #40. */
-/* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protecciÃ³n open_excel_arrastre ==== */
+/* ==== V21.7: fotos tickets en CALCULOS_TIENDA_TICKET + protección open_excel_arrastre ==== */
 (function(){
   const VERSION = 'ControlEvent v13.0_prod';
   const VERSION_FILE = 'ControlEvent_v13.0_prod';
@@ -14064,7 +14064,7 @@ window.addCellNote = addCellNote;
     return up(v)
       .replace(/^\s*[^|]+\|\s*TICKET\s*/i,'')
       .replace(/\b(TIENDA\s*\|\s*TICKET|TIENDA|TICKET|IMAGEN|FOTO)\b/g,'')
-      .replace(/Â·.*$/,'')
+      .replace(/·.*$/,'')
       .replace(/\s*\|\s*/g,'|')
       .replace(/\s+/g,' ')
       .trim();
@@ -14097,12 +14097,12 @@ window.addCellNote = addCellNote;
     const out=[];
     [row?.k,row?.label,row?.key,row?.clave,row?.concepto].forEach(v=>addCandidate(out,v));
     const src=norm(row?.k || row?.label || '');
-    const srcClean=src.split('Â·')[0].trim();
+    const srcClean=src.split('·')[0].trim();
     addCandidate(out, srcClean);
     const parts=srcClean.split('|').map(x=>norm(x)).filter(Boolean);
     const raw=norm(row?.rawTicket || '');
     if(parts.length>=2){
-      const a=parts[0], b=parts[1].split('Â·')[0].trim();
+      const a=parts[0], b=parts[1].split('·')[0].trim();
       [ `${a} | ${b}`, `${a}|${b}`, `${b} | ${a}`, `${b}|${a}`, b ].forEach(v=>addCandidate(out,v));
     }
     if(raw){
@@ -14164,7 +14164,7 @@ window.addCellNote = addCellNote;
       if(!r.image || r.pending || r.donated || r.attachable===false) return;
       const label=norm(r.k || r.label || ''); if(!label) return;
       s.ticketImages[imageKey(label)] = normalizeImageValue(r.image);
-      const clean=label.split('Â·')[0].trim(); if(clean) s.ticketImages[imageKey(clean)] = normalizeImageValue(r.image);
+      const clean=label.split('·')[0].trim(); if(clean) s.ticketImages[imageKey(clean)] = normalizeImageValue(r.image);
       const tk=ticketToken(label); if(tk) s.ticketImages[imageKey(tk)] = normalizeImageValue(r.image);
     });
   }
@@ -14178,12 +14178,12 @@ window.addCellNote = addCellNote;
     window.summaryByTiendaTicket=wrapped;
   }
 
-  // Ãšltimo refuerzo antes de generar INFOEVENTO: normaliza claves y permite base64 puro.
+  // Último refuerzo antes de generar INFOEVENTO: normaliza claves y permite base64 puro.
   const prevExport = typeof exportExcel === 'function' ? exportExcel : window.exportExcel;
   if(prevExport && !prevExport.__v217Wrapped){
     const wrappedExport = async function(){
       normalizeTicketImagesForExcelV217();
-      // Durante la exportaciÃ³n, summaryByTiendaTicket devuelve siempre filas enriquecidas con image.
+      // Durante la exportación, summaryByTiendaTicket devuelve siempre filas enriquecidas con image.
       return await prevExport.apply(this, arguments);
     };
     wrappedExport.__v217Wrapped=true;
@@ -14191,7 +14191,7 @@ window.addCellNote = addCellNote;
     window.exportExcel=wrappedExport;
   }
 
-  // ExcelJS: acepta imÃ¡genes antiguas guardadas como base64 sin cabecera.
+  // ExcelJS: acepta imágenes antiguas guardadas como base64 sin cabecera.
   function patchExcelJSAddImage(){
     try{
       if(!window.ExcelJS || !ExcelJS.Workbook || ExcelJS.Workbook.prototype.addImage.__v217Patched) return;
@@ -14210,7 +14210,7 @@ window.addCellNote = addCellNote;
     }catch(_){ }
   }
 
-  // ContraseÃ±a Ãºnica para hojas y estructura del libro, incluso cuando otros parches usen otra.
+  // Contraseña única para hojas y estructura del libro, incluso cuando otros parches usen otra.
   function patchProtectionAndDownloads(){
     try{
       if(window.ExcelJS && ExcelJS.Worksheet && ExcelJS.Worksheet.prototype.protect && !ExcelJS.Worksheet.prototype.protect.__v217Patched){
@@ -14264,7 +14264,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-41-v225-clean-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #41. */
-/* ==== V22.5: correcciÃ³n limpia de fotos de tickets y claves ACCESOS ==== */
+/* ==== V22.5: corrección limpia de fotos de tickets y claves ACCESOS ==== */
 (function(){
   const VERSION='ControlEvent v13.0_prod';
   const VERSION_FILE='ControlEvent_v13.0_prod';
@@ -14274,7 +14274,7 @@ window.addCellNote = addCellNote;
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
-  const masked=v=>/^[â€¢*â—Â·]+$/.test(String(v||''));
+  const masked=v=>/^[•*●·]+$/.test(String(v||''));
   const stateRef=()=>{ try{ if(typeof state!=='undefined') return state; }catch(_){ } return window.state||{}; };
   const currentEventId=()=>String(stateRef().selectedEventId||'');
   function role(){ try{return String(authUser?.nivel||'').toUpperCase();}catch(_){return '';} }
@@ -14288,7 +14288,7 @@ window.addCellNote = addCellNote;
     const pad=n=>String(n).padStart(2,'0');
     const dd=pad(date.getDate()), mm=pad(date.getMonth()+1), yyyy=date.getFullYear();
     const hh=pad(date.getHours()), mi=pad(date.getMinutes()), ss=pad(date.getSeconds());
-    return `Emitido por â€œÂ©oltyLAB â€™26_${VERSION_FILE}_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}â€`;
+    return `Emitido por “©oltyLAB ’26_${VERSION_FILE}_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   };
   try{emittedByTextV171=window.emittedByTextV171;}catch(_){ }
 
@@ -14296,8 +14296,8 @@ window.addCellNote = addCellNote;
     if(!cell||!text)return;
     let t=String(text||'').replace(/\s*\n\s*/g,' ').replace(/\s+/g,' ').trim();
     const low=t.toLowerCase();
-    if(low.includes('peÃ±a')||low.includes('arrastre')) t='Dinero de la cuenta de la peÃ±a que se utiliza para colaborar en este evento.';
-    if(low.includes('z_dev_ingresos')||low.includes('devolucion')||low.includes('devoluciÃ³n')) t='Este importe se corresponde con la/s devolucion/es realizadas en este evento.';
+    if(low.includes('peña')||low.includes('arrastre')) t='Dinero de la cuenta de la peña que se utiliza para colaborar en este evento.';
+    if(low.includes('z_dev_ingresos')||low.includes('devolucion')||low.includes('devolución')) t='Este importe se corresponde con la/s devolucion/es realizadas en este evento.';
     const width=Math.max(360,Math.min(760,140+t.length*5.2));
     const height=Math.max(95,Math.min(220,70+Math.ceil(t.length/62)*34));
     try{cell.note={texts:[{text:t}],margins:{insetmode:'custom',inset:[0.20,0.20,0.45,0.45]},protection:{locked:true,lockText:true},editAs:'twoCells',width,height};}
@@ -14352,7 +14352,7 @@ window.addCellNote = addCellNote;
     const s=String(label||'').trim(); const arr=[]; const add=x=>{x=String(x||'').trim(); if(x&&!arr.includes(x))arr.push(x);};
     if(eventId && s){ add(ticketImageKey(s,eventId)); add(`${eventId}|${s}`); }
     const tk=ticketToken(s); if(eventId && tk){ add(`${eventId}|${tk}`); }
-    const clean=s.split('Â·')[0].trim(); if(eventId && clean&&clean!==s){add(`${eventId}|${clean}`); const tk2=ticketToken(clean); if(tk2){add(`${eventId}|${tk2}`);}}
+    const clean=s.split('·')[0].trim(); if(eventId && clean&&clean!==s){add(`${eventId}|${clean}`); const tk2=ticketToken(clean); if(tk2){add(`${eventId}|${tk2}`);}}
     return arr;
   }
   function ensureTicketImages(){const s=stateRef(); if(!s.ticketImages||typeof s.ticketImages!=='object')s.ticketImages={}; return s.ticketImages;}
@@ -14414,7 +14414,7 @@ window.addCellNote = addCellNote;
   }
   async function removeTicketImageClean(encodedKey){
     const label=decodeURIComponent(encodedKey||''); if(!label)return;
-    if(!confirm('Â¿Eliminar la foto asociada a este ticket/donaciÃ³n/gasto?'))return;
+    if(!confirm('¿Eliminar la foto asociada a este ticket/donación/gasto?'))return;
     await deleteTicketImage(label); await persistNow(); try{if(typeof render==='function')render();}catch(_){ }
   }
   window.uploadTicketImageV164=uploadTicketImageClean; window.removeTicketImageV164=removeTicketImageClean;
@@ -14458,7 +14458,7 @@ window.addCellNote = addCellNote;
         const actions=row.querySelector('.ticket-actions'); if(!actions)return;
         if(!thumb){thumb=document.createElement('img');thumb.className='ticket-thumb';thumb.alt='ticket';actions.appendChild(thumb);} thumb.src=img;
         if(!actions.querySelector('button[data-ce-delete-img="1"],button[onclick*="removeTicketImage"]')){
-          const del=document.createElement('button'); del.type='button'; del.className='outline small'; del.title='Eliminar foto'; del.dataset.ceDeleteImg='1'; del.textContent='ðŸ—‘ï¸'; del.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();removeTicketImageClean(encodeURIComponent(label));},true); actions.appendChild(del);
+          const del=document.createElement('button'); del.type='button'; del.className='outline small'; del.title='Eliminar foto'; del.dataset.ceDeleteImg='1'; del.textContent='🗑️'; del.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();removeTicketImageClean(encodeURIComponent(label));},true); actions.appendChild(del);
         }
       });
     }catch(_){ }
@@ -14477,14 +14477,14 @@ window.addCellNote = addCellNote;
   function ensureTicketModal(){
     let modal=$('ceTicketImageModalV225'); if(modal)return modal;
     modal=document.createElement('div'); modal.id='ceTicketImageModalV225'; modal.className='ce-ticket-modal-v225';
-    modal.innerHTML='<div class="ce-ticket-modal-v225-box"><button type="button" class="ce-ticket-modal-v225-close" title="Cerrar">Ã—</button><img alt="Ticket ampliado"><div class="ce-ticket-modal-v225-hint">Pulsa fuera o ESC para cerrar</div></div>';
+    modal.innerHTML='<div class="ce-ticket-modal-v225-box"><button type="button" class="ce-ticket-modal-v225-close" title="Cerrar">×</button><img alt="Ticket ampliado"><div class="ce-ticket-modal-v225-hint">Pulsa fuera o ESC para cerrar</div></div>';
     modal.addEventListener('click',ev=>{if(ev.target===modal||ev.target.closest('.ce-ticket-modal-v225-close'))modal.classList.remove('visible');});
     document.body.appendChild(modal); return modal;
   }
   document.addEventListener('click',ev=>{const img=ev.target?.closest?.('img.ticket-thumb'); if(!img)return; if(window.ControlEventV310Photos&&img.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307,#ceTicketModalV234,#ceTicketImageModalV225,#ceV310PhotoViewer'))return; ev.preventDefault(); ev.stopPropagation(); const modal=ensureTicketModal(); modal.querySelector('img').src=img.src; modal.classList.add('visible');},true);
   document.addEventListener('keydown',ev=>{if(ev.key==='Escape')$('ceTicketImageModalV225')?.classList.remove('visible');},true);
 
-  // ---------- Claves: un solo botÃ³n estable, sin intervalos ni mensajes falsos ----------
+  // ---------- Claves: un solo botón estable, sin intervalos ni mensajes falsos ----------
   function unwrapPassword(input){
     if(!input)return null;
     let row=input.closest('.ce-v225-pass-row'); if(row)return row;
@@ -14501,7 +14501,7 @@ window.addCellNote = addCellNote;
     btn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();
       const show=input.type==='password';
       if(show){
-        // En ACCESOS, si el backend no entrega la clave, solo se podrÃ¡ ver la nueva clave que se escriba.
+        // En ACCESOS, si el backend no entrega la clave, solo se podrá ver la nueva clave que se escriba.
         if(masked(input.value)||input.value==='Clave no disponible') input.value='';
         try{input.type='text';input.setAttribute('type','text');}catch(_){ } btn.textContent='Ocultar';
       }else{try{input.type='password';input.setAttribute('type','password');}catch(_){ } btn.textContent='Ver';}
@@ -14538,7 +14538,7 @@ window.addCellNote = addCellNote;
     w.__v225Clean=true; try{fetchAccessUsers=w;}catch(_){ } window.fetchAccessUsers=w;
   }
 
-  // ---------- Permisos RO/RW bÃ¡sicos sin tocar otras zonas ----------
+  // ---------- Permisos RO/RW básicos sin tocar otras zonas ----------
   function setDisabled(el,disabled){if(!el)return; el.disabled=!!disabled; el.classList.toggle('ce-v225-ro-disabled',!!disabled); if(disabled)el.setAttribute('aria-disabled','true'); else el.removeAttribute('aria-disabled');}
   function applyPermissions(){
     updateVersion();
@@ -14551,7 +14551,7 @@ window.addCellNote = addCellNote;
     ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setDisabled($(id),!allow));
     document.querySelectorAll('[data-action^="edit-evento"],button[data-action="save-evento"],button[data-action="delete-evento"]').forEach(el=>setDisabled(el,!allow));
   }
-  document.addEventListener('click',ev=>{const blocked=ev.target?.closest?.('#btnOpenImport,#btnExportSeed,#btnStartImport,#importWorkbookFile,#importTicketFiles,#ceBackupOkV181'); if(blocked&&isRO()){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();alert('Usuario RO: no autorizado para cargas ni descargas de datos. SÃ­ puede descargar INFOEVENTO.'); return false;}},true);
+  document.addEventListener('click',ev=>{const blocked=ev.target?.closest?.('#btnOpenImport,#btnExportSeed,#btnStartImport,#importWorkbookFile,#importTicketFiles,#ceBackupOkV181'); if(blocked&&isRO()){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();alert('Usuario RO: no autorizado para cargas ni descargas de datos. Sí puede descargar INFOEVENTO.'); return false;}},true);
   document.addEventListener('click',ev=>{if(!canEvents())return; const btn=ev.target?.closest?.('button'); if(!btn)return; const action=btn.dataset.action||btn.id||''; if(action==='btnAddEvento'&&typeof addEvento==='function'){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();addEvento();return false;} if(action==='save-evento'&&typeof saveEventRecord==='function'){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();saveEventRecord(btn.dataset.id);return false;}},true);
 
   async function init(){
@@ -14570,7 +14570,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-42-v226-mobile-responsive-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #42. */
-/* ==== v22.8: menÃº mÃ³vil y navegaciÃ³n responsive ==== */
+/* ==== v22.8: menú móvil y navegación responsive ==== */
 (function(){
   const VERSION='ControlEvent v13.0_prod';
   const VERSION_FILE='ControlEvent_v13.0_prod';
@@ -14579,30 +14579,30 @@ window.addCellNote = addCellNote;
   function ensureMobileMenu(){
     if($('ceMobileMenuBtn')) return;
     const btn=document.createElement('button');
-    btn.type='button'; btn.id='ceMobileMenuBtn'; btn.className='mobile-menu-btn'; btn.innerHTML='<span>â˜°</span><span>MenÃº</span>';
+    btn.type='button'; btn.id='ceMobileMenuBtn'; btn.className='mobile-menu-btn'; btn.innerHTML='<span>☰</span><span>Menú</span>';
     const backdrop=document.createElement('div'); backdrop.id='ceMobileDrawerBackdrop'; backdrop.className='mobile-drawer-backdrop';
-    const drawer=document.createElement('aside'); drawer.id='ceMobileDrawer'; drawer.className='mobile-drawer'; drawer.setAttribute('aria-label','MenÃº mÃ³vil ControlEvent');
+    const drawer=document.createElement('aside'); drawer.id='ceMobileDrawer'; drawer.className='mobile-drawer'; drawer.setAttribute('aria-label','Menú móvil ControlEvent');
     drawer.innerHTML=`
-      <div class="mobile-drawer-head"><div><div class="mobile-drawer-title">ControlEvent</div><div class="hint">Modo mÃ³vil</div></div><button type="button" class="mobile-drawer-close" id="ceMobileDrawerClose">Cerrar</button></div>
+      <div class="mobile-drawer-head"><div><div class="mobile-drawer-title">ControlEvent</div><div class="hint">Modo móvil</div></div><button type="button" class="mobile-drawer-close" id="ceMobileDrawerClose">Cerrar</button></div>
       <div class="mobile-menu-section"><h3>Evento</h3><div class="mobile-menu-grid">
-        <button type="button" class="mobile-menu-action primary" data-target="tabIngresosBtn"><span class="mi">ðŸ¤</span>Ingresos</button>
-        <button type="button" class="mobile-menu-action" data-target="tabDonacionesBtn"><span class="mi">ðŸŽ</span>Donaciones</button>
-        <button type="button" class="mobile-menu-action" data-target="tabComprasBtn"><span class="mi">ðŸ›’</span>Compras y gastos</button>
-        <button type="button" class="mobile-menu-action" data-target="tabMapaBtn"><span class="mi">ðŸ§­</span>Mapa de recursos</button>
-        <button type="button" class="mobile-menu-action" data-target="tabResumenBtn"><span class="mi">ðŸ§¾</span>Resumen</button>
-        <button type="button" class="mobile-menu-action" data-target="tabGraficasBtn"><span class="mi">ðŸ“Š</span>GrÃ¡ficas</button>
+        <button type="button" class="mobile-menu-action primary" data-target="tabIngresosBtn"><span class="mi">🤝</span>Ingresos</button>
+        <button type="button" class="mobile-menu-action" data-target="tabDonacionesBtn"><span class="mi">🎁</span>Donaciones</button>
+        <button type="button" class="mobile-menu-action" data-target="tabComprasBtn"><span class="mi">🛒</span>Compras y gastos</button>
+        <button type="button" class="mobile-menu-action" data-target="tabMapaBtn"><span class="mi">🧭</span>Mapa de recursos</button>
+        <button type="button" class="mobile-menu-action" data-target="tabResumenBtn"><span class="mi">🧾</span>Resumen</button>
+        <button type="button" class="mobile-menu-action" data-target="tabGraficasBtn"><span class="mi">📊</span>Gráficas</button>
       </div></div>
       <div class="mobile-menu-section"><h3>Herramientas</h3><div class="mobile-menu-grid">
-        <button type="button" class="mobile-menu-action" data-target="btnExportExcel"><span class="mi">ðŸ“—</span>Excel INFOEVENTO</button>
-        <button type="button" class="mobile-menu-action" data-target="btnToggleMaintenance"><span class="mi">ðŸ§©</span>Mantenimiento</button>
-        <button type="button" class="mobile-menu-action" data-target="btnOpenImport"><span class="mi">ðŸ“¥</span>Carga inicial</button>
-        <button type="button" class="mobile-menu-action" data-target="btnExportSeed"><span class="mi">ðŸ’¾</span>Backup / descarga</button>
+        <button type="button" class="mobile-menu-action" data-target="btnExportExcel"><span class="mi">📗</span>Excel INFOEVENTO</button>
+        <button type="button" class="mobile-menu-action" data-target="btnToggleMaintenance"><span class="mi">🧩</span>Mantenimiento</button>
+        <button type="button" class="mobile-menu-action" data-target="btnOpenImport"><span class="mi">📥</span>Carga inicial</button>
+        <button type="button" class="mobile-menu-action" data-target="btnExportSeed"><span class="mi">💾</span>Backup / descarga</button>
       </div></div>
       <div class="mobile-menu-section"><h3>Vista</h3><div class="mobile-menu-grid">
-        <button type="button" class="mobile-menu-action" data-target="toggleEventDesc"><span class="mi">â“˜</span>DescripciÃ³n del evento</button>
-        <button type="button" class="mobile-menu-action" data-target="toggleIngresosSummary"><span class="mi">ðŸ’°</span>Resumen de ingresos</button>
-        <button type="button" class="mobile-menu-action" data-target="toggleComprasEvent"><span class="mi">ðŸ§°</span>Compras del evento</button>
-        <button type="button" class="mobile-menu-action" data-target="toggleComprasSummary"><span class="mi">ðŸ“ˆ</span>CÃ¡lculos / resumen</button>
+        <button type="button" class="mobile-menu-action" data-target="toggleEventDesc"><span class="mi">ⓘ</span>Descripción del evento</button>
+        <button type="button" class="mobile-menu-action" data-target="toggleIngresosSummary"><span class="mi">💰</span>Resumen de ingresos</button>
+        <button type="button" class="mobile-menu-action" data-target="toggleComprasEvent"><span class="mi">🧰</span>Compras del evento</button>
+        <button type="button" class="mobile-menu-action" data-target="toggleComprasSummary"><span class="mi">📈</span>Cálculos / resumen</button>
       </div></div>`;
     document.body.appendChild(btn); document.body.appendChild(backdrop); document.body.appendChild(drawer);
     btn.addEventListener('click',openDrawer);
@@ -14645,7 +14645,7 @@ window.addCellNote = addCellNote;
   const esc=s=>String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
   const canEventsV227=()=>!!window.authUser && ['RW','GD'].includes(String(window.authUser.nivel||''));
 
-  // 1) Cambio de evento: no refrescar desde servidor justo despuÃ©s ni volver al anterior.
+  // 1) Cambio de evento: no refrescar desde servidor justo después ni volver al anterior.
   window.changeSelectedEvent = async function(value){
     const s=st();
     const id=String(value||'');
@@ -14664,7 +14664,7 @@ window.addCellNote = addCellNote;
     }
   },true);
 
-  // 2) EVENTOS: RW/GD puede modificar; se guarda siempre la situaciÃ³n del registro editado.
+  // 2) EVENTOS: RW/GD puede modificar; se guarda siempre la situación del registro editado.
   window.saveEventRecord = function(id){
     if(!canEventsV227()) return;
     const s=st();
@@ -14708,7 +14708,7 @@ window.addCellNote = addCellNote;
     w.__v227=true; try{renderLockState=w;}catch(_){} window.renderLockState=w;
   }
 
-  // 3) MenÃº mÃ³vil: botÃ³n Cerrar al final y cierre por delegaciÃ³n robusta.
+  // 3) Menú móvil: botón Cerrar al final y cierre por delegación robusta.
   function patchMobileMenu(){
     const drawer=$('ceMobileDrawer');
     if(!drawer) return;
@@ -14717,7 +14717,7 @@ window.addCellNote = addCellNote;
     if(!grid){
       const sec=document.createElement('div');
       sec.className='mobile-menu-section';
-      sec.innerHTML='<h3>Salir</h3><div class="mobile-menu-grid" id="ceMobileCloseGridV227"><button type="button" class="mobile-menu-action close-v227" data-mobile-close-v227="1"><span class="mi">Ã—</span>Cerrar menÃº</button></div>';
+      sec.innerHTML='<h3>Salir</h3><div class="mobile-menu-grid" id="ceMobileCloseGridV227"><button type="button" class="mobile-menu-action close-v227" data-mobile-close-v227="1"><span class="mi">×</span>Cerrar menú</button></div>';
       drawer.appendChild(sec);
     }
   }
@@ -14734,13 +14734,13 @@ window.addCellNote = addCellNote;
   function realClave(u){
     for(const k of ['clave','password','pass','claveClara','clave_plana','plainPassword']){
       const v=u&&u[k];
-      if(v!=null && String(v).trim() && !/^â€¢+$/.test(String(v).trim())) return String(v);
+      if(v!=null && String(v).trim() && !/^•+$/.test(String(v).trim())) return String(v);
     }
     return '';
   }
   function passRowHTML(id,value,placeholder='Nueva clave (opcional)'){
     const has=value!=='';
-    return `<div class="ce-v227-pass-row"><input type="password" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="new-password" data-ce-acceso-clave-v227="${esc(id)}" /><button type="button" class="ce-v227-eye" data-ce-eye-v227="${esc(id)}">Ver</button></div>${has?'':'<div class="ce-v227-access-note">La clave guardada no estÃ¡ disponible en claro. Escribe una nueva clave solo si quieres cambiarla.</div>'}`;
+    return `<div class="ce-v227-pass-row"><input type="password" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="new-password" data-ce-acceso-clave-v227="${esc(id)}" /><button type="button" class="ce-v227-eye" data-ce-eye-v227="${esc(id)}">Ver</button></div>${has?'':'<div class="ce-v227-access-note">La clave guardada no está disponible en claro. Escribe una nueva clave solo si quieres cambiarla.</div>'}`;
   }
   window.renderAcceso = function(){
     const wrap=$('accesoList'); if(!wrap) return;
@@ -14752,7 +14752,7 @@ window.addCellNote = addCellNote;
       const id=String(u.identificacion||'');
       const row=document.createElement('div'); row.className='itemcard maint-soft';
       row.innerHTML=`<div class="rowline persona">
-        <div class="field"><label>IdentificaciÃ³n</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
+        <div class="field"><label>Identificación</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
         <div class="field"><label>Nombre</label><input value="${esc(u.nombre||'')}" data-action="edit-acceso-nombre" data-id="${esc(id)}" /></div>
         <div class="field"><label>Clave</label>${passRowHTML(id,realClave(u))}</div>
         <div class="field"><label>Nivel</label><select data-action="edit-acceso-nivel" data-id="${esc(id)}">${['RO','RW','GD'].map(v=>`<option value="${v}" ${v===u.nivel?'selected':''}>${v}</option>`).join('')}</select></div>
@@ -14770,7 +14770,7 @@ window.addCellNote = addCellNote;
     const nombre=id?String(get('edit-acceso-nombre','')).trim():String($('newAccesoNombre')?.value||'').trim();
     const clave=id?String(document.querySelector(`[data-ce-acceso-clave-v227="${CSS.escape(id)}"]`)?.value||''):String($('newAccesoClave')?.value||'');
     const nivel=id?String(get('edit-acceso-nivel','RO')):String($('newAccesoNivel')?.value||'RO');
-    if(!identificacion||!nombre||(!id&&!clave)){alert('IdentificaciÃ³n, nombre y clave son obligatorios al dar de alta.');return;}
+    if(!identificacion||!nombre||(!id&&!clave)){alert('Identificación, nombre y clave son obligatorios al dar de alta.');return;}
     const payload={identificacion,nombre,nivel,existingId:id};
     if(clave) payload.clave=clave;
     const res=await fetch('/api/access-users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -14827,7 +14827,7 @@ window.addCellNote = addCellNote;
     const body=$('comprasSummaryBody'); if(!body)return;
     let box=$('ceRoInfoV228');
     if(isRO()){
-      if(!box){box=document.createElement('div'); box.id='ceRoInfoV228'; box.className='ce-ro-info-v228'; box.textContent='Modo consulta: este usuario puede consultar Resumen, CÃ¡lculos por agrupaciÃ³n, Documentos y GrÃ¡ficas. No puede aÃ±adir, modificar ni eliminar datos ni fotos.'; body.insertBefore(box,body.firstChild);} 
+      if(!box){box=document.createElement('div'); box.id='ceRoInfoV228'; box.className='ce-ro-info-v228'; box.textContent='Modo consulta: este usuario puede consultar Resumen, Cálculos por agrupación, Documentos y Gráficas. No puede añadir, modificar ni eliminar datos ni fotos.'; body.insertBefore(box,body.firstChild);} 
     }else if(box){box.remove();}
   }
   function switchToAllowedForRO(){
@@ -14849,14 +14849,14 @@ window.addCellNote = addCellNote;
   function applyRoleVisibility(){
     setBodyRole();
     const ro=isRO(), rw=isRW(), gd=isGD();
-    // MenÃº principal de pestaÃ±as
+    // Menú principal de pestañas
     show($('tabIngresosBtn'), !ro);
     show($('tabDonacionesBtn'), !ro);
     show($('tabComprasBtn'), !ro);
     show($('tabMapaBtn'), gd||rw||ro);
     show($('tabResumenBtn'), gd||rw||ro);
     show($('tabGraficasBtn'), gd||rw||ro);
-    // PestaÃ±as/contenedores si un render antiguo los deja visibles
+    // Pestañas/contenedores si un render antiguo los deja visibles
     if(ro){ show($('tabIngresos'),false); show($('tabDonaciones'),false); show($('tabCompras'),false); }
     // Herramientas del pie
     show($('btnExportExcel'), (gd||rw||ro) && (!ro || isFinalized()));
@@ -14867,7 +14867,7 @@ window.addCellNote = addCellNote;
     // Mantenimiento ACCESOS solo GD. RW mantiene el resto de tablas, incluido EVENTOS.
     show($('mtAccesoBtn'), gd);
     if(!gd){ show($('mtAccesos'),false); show($('mtAcceso'),false); }
-    // MenÃº mÃ³vil
+    // Menú móvil
     ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn'].forEach(t=>hideMobileTarget(t,!ro));
     hideMobileTarget('tabMapaBtn',gd||rw||ro);
     hideMobileTarget('tabResumenBtn',gd||rw||ro);
@@ -14889,24 +14889,24 @@ window.addCellNote = addCellNote;
     const blockedRWorRO=t.closest('#btnOpenImport,#btnExportSeed,#btnStartImport,#importWorkbookFile,#importTicketFiles,#ceBackupOkV181,.mobile-menu-action[data-target="btnOpenImport"],.mobile-menu-action[data-target="btnExportSeed"]');
     if(blockedRWorRO && (isRO()||isRW())) return block((isRO()?'Usuario RO':'Usuario RW')+': no autorizado para carga ni descarga de datos.',evnt);
     const access=t.closest('#mtAccesoBtn,.mobile-menu-action[data-target="mtAccesoBtn"],[data-action="open-acceso"],[data-action="save-acceso"],[data-action="delete-acceso"],#btnAddAcceso,#newAccesoIdentificacion,#newAccesoClave,#newAccesoNivel');
-    if(access && !isGD()) return block('No autorizado: el mantenimiento de ACCESOS solo estÃ¡ disponible para usuarios GD.',evnt);
+    if(access && !isGD()) return block('No autorizado: el mantenimiento de ACCESOS solo está disponible para usuarios GD.',evnt);
     if(isRO()){
       const deniedTab=t.closest('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#btnToggleMaintenance,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="btnToggleMaintenance"]');
-      if(deniedTab) return block('Usuario RO: solo consulta de Resumen, CÃ¡lculos por agrupaciÃ³n, GrÃ¡ficas y Excel INFOEVENTO si el evento estÃ¡ finalizado.',evnt);
+      if(deniedTab) return block('Usuario RO: solo consulta de Resumen, Cálculos por agrupación, Gráficas y Excel INFOEVENTO si el evento está finalizado.',evnt);
       const excel=t.closest('#btnExportExcel,.mobile-menu-action[data-target="btnExportExcel"]');
-      if(excel && !isFinalized()) return block('Usuario RO: solo puede descargar INFOEVENTO cuando el evento estÃ¡ Finalizado.',evnt);
+      if(excel && !isFinalized()) return block('Usuario RO: solo puede descargar INFOEVENTO cuando el evento está Finalizado.',evnt);
       const photo=t.closest('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img],button[onclick*="uploadTicketImage"],button[onclick*="removeTicketImage"]');
-      if(photo) return block('Usuario RO: modo consulta. No puede aÃ±adir ni eliminar fotos.',evnt);
+      if(photo) return block('Usuario RO: modo consulta. No puede añadir ni eliminar fotos.',evnt);
     }
   },true);
   document.addEventListener('change',function(evnt){
     const t=evnt.target; if(!t||!t.closest)return;
     if((isRO()||isRW()) && t.closest('#importWorkbookFile,#importTicketFiles')) return block((isRO()?'Usuario RO':'Usuario RW')+': no autorizado para carga de datos.',evnt);
-    if(isRO() && t.closest('#summaryTiendaTicket input[type="file"],input.ticket-file-input')) return block('Usuario RO: modo consulta. No puede aÃ±adir fotos.',evnt);
+    if(isRO() && t.closest('#summaryTiendaTicket input[type="file"],input.ticket-file-input')) return block('Usuario RO: modo consulta. No puede añadir fotos.',evnt);
   },true);
   function guardPhotoFns(){
     ['uploadTicketImage','removeTicketImage','uploadTicketImageV164','removeTicketImageV164','uploadTicketImageV202','removeTicketImageV202'].forEach(name=>{
-      try{const fn=window[name]; if(typeof fn==='function' && !fn.__v228Guard){const wrapped=function(){if(isRO()){alert('Usuario RO: modo consulta. No puede aÃ±adir ni eliminar fotos.'); return false;} return fn.apply(this,arguments);}; wrapped.__v228Guard=true; window[name]=wrapped;}}catch(_){ }
+      try{const fn=window[name]; if(typeof fn==='function' && !fn.__v228Guard){const wrapped=function(){if(isRO()){alert('Usuario RO: modo consulta. No puede añadir ni eliminar fotos.'); return false;} return fn.apply(this,arguments);}; wrapped.__v228Guard=true; window[name]=wrapped;}}catch(_){ }
     });
   }
   function refreshVersion(){
@@ -15027,13 +15027,13 @@ window.addCellNote = addCellNote;
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation(); window.saveEventRecord(btn.dataset.id); return false;
   },true);
 
-  // ACCESOS: un Ãºnico botÃ³n estable y cache local de claves escritas/modificadas.
+  // ACCESOS: un único botón estable y cache local de claves escritas/modificadas.
   function getAccessCache(){try{return JSON.parse(localStorage.getItem(ACCESS_CACHE_KEY)||'{}')||{};}catch(_){return {};}}
   function setAccessCache(id,clave){if(!id||!clave)return; const c=getAccessCache(); c[String(id)]=String(clave); try{localStorage.setItem(ACCESS_CACHE_KEY,JSON.stringify(c));}catch(_){} }
-  function realClave(u){const id=String(u?.identificacion||''); const c=getAccessCache(); const raw=(u&&(u.clave||u.password||u.pass||u.clearPassword||u.claveClaro))||c[id]||''; if(/^â€¢+$|^\*+$/.test(String(raw)))return c[id]||''; return String(raw||'');}
+  function realClave(u){const id=String(u?.identificacion||''); const c=getAccessCache(); const raw=(u&&(u.clave||u.password||u.pass||u.clearPassword||u.claveClaro))||c[id]||''; if(/^•+$|^\*+$/.test(String(raw)))return c[id]||''; return String(raw||'');}
   function passRowHTML(id,value){
     const v=String(value||'');
-    return `<div class="ce-v229-pass-row"><input type="password" value="${esc(v)}" placeholder="Nueva clave (opcional)" autocomplete="new-password" data-ce-acceso-clave-v229="${esc(id)}" /><button type="button" class="ce-v229-eye" data-ce-eye-v229="${esc(id)}">Ver</button></div>${v?'':'<div class="ce-v229-access-note">La clave anterior no estÃ¡ disponible en claro. Escribe una nueva clave solo si quieres cambiarla.</div>'}`;
+    return `<div class="ce-v229-pass-row"><input type="password" value="${esc(v)}" placeholder="Nueva clave (opcional)" autocomplete="new-password" data-ce-acceso-clave-v229="${esc(id)}" /><button type="button" class="ce-v229-eye" data-ce-eye-v229="${esc(id)}">Ver</button></div>${v?'':'<div class="ce-v229-access-note">La clave anterior no está disponible en claro. Escribe una nueva clave solo si quieres cambiarla.</div>'}`;
   }
   window.renderAcceso = function(){
     const wrap=$('accesoList'); if(!wrap)return;
@@ -15043,7 +15043,7 @@ window.addCellNote = addCellNote;
     wrap.innerHTML='';
     list.forEach(u=>{const id=String(u.identificacion||''); const row=document.createElement('div'); row.className='itemcard maint-soft';
       row.innerHTML=`<div class="rowline persona">
-        <div class="field"><label>IdentificaciÃ³n</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
+        <div class="field"><label>Identificación</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
         <div class="field"><label>Nombre</label><input value="${esc(u.nombre||'')}" data-action="edit-acceso-nombre" data-id="${esc(id)}" /></div>
         <div class="field"><label>Clave</label>${passRowHTML(id,realClave(u))}</div>
         <div class="field"><label>Nivel</label><select data-action="edit-acceso-nivel" data-id="${esc(id)}">${['RO','RW','GD'].map(v=>`<option value="${v}" ${v===u.nivel?'selected':''}>${v}</option>`).join('')}</select></div>
@@ -15059,7 +15059,7 @@ window.addCellNote = addCellNote;
     const nombre=id?String(get('edit-acceso-nombre','')).trim():String($('newAccesoNombre')?.value||'').trim();
     const clave=id?String(document.querySelector(`[data-ce-acceso-clave-v229="${CSS.escape(id)}"]`)?.value||''):String($('newAccesoClave')?.value||'');
     const nivel=id?String(get('edit-acceso-nivel','RO')):String($('newAccesoNivel')?.value||'RO');
-    if(!identificacion||!nombre||(!id&&!clave)){alert('IdentificaciÃ³n, nombre y clave son obligatorios al dar de alta.');return;}
+    if(!identificacion||!nombre||(!id&&!clave)){alert('Identificación, nombre y clave son obligatorios al dar de alta.');return;}
     const payload={identificacion,nombre,nivel,existingId:id}; if(clave) payload.clave=clave;
     const res=await fetch('/api/access-users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json().catch(()=>({}));
@@ -15095,7 +15095,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-46-v233-estabilizacion-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #46. */
-/* ==== v23.3 ESTABILIZACIÃ“N: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
+/* ==== v23.3 ESTABILIZACIÓN: login limpio, accesos, finalizado consultable, globos y rendimiento ==== */
 (function(){
   'use strict';
   const VERSION='ControlEvent v13.0_prod';
@@ -15131,7 +15131,7 @@ window.addCellNote = addCellNote;
   function setTip(el,text,bg='#fff',layout='default'){if(!el||!norm(text))return; el.setAttribute('data-ce-tip-v21',text); el.setAttribute('data-tip-bg-v21',bg||'#fff'); el.setAttribute('data-ce-tip-layout-v21',layout||'default'); ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title'].forEach(a=>el.removeAttribute(a));}
   function table(title, header, lines, totalLabel, total){return [title,'',header].concat(lines.length?lines:['Sin registros'],'',`${totalLabel}: ${money(total||0)}`).join('\n');}
 
-  // 1) VersiÃ³n visible y descargas.
+  // 1) Versión visible y descargas.
   function refreshVersion(){
     try{document.title=VERSION;}catch(_){}
     document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{ if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||'')) el.textContent=VERSION; });
@@ -15139,7 +15139,7 @@ window.addCellNote = addCellNote;
     if(!proto.__ce_v233_click){const old=proto.click; proto.click=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/g,VERSION_FILE);}catch(_){} return old.apply(this,arguments);}; proto.__ce_v233_click=true;}
   }
 
-  // 2) Login: reconstrucciÃ³n limpia del formulario de acceso para eliminar botones duplicados y campos bloqueados.
+  // 2) Login: reconstrucción limpia del formulario de acceso para eliminar botones duplicados y campos bloqueados.
   function rebuildLogin(){
     const card=document.querySelector('#authOverlay .auth-card'); if(!card) return;
     if(card.dataset.ceV233Built==='1'){
@@ -15152,7 +15152,7 @@ window.addCellNote = addCellNote;
     card.innerHTML=`
       <h2>Acceso a ControlEvent</h2>
       <div class="auth-grid">
-        <div class="field"><label>IdentificaciÃ³n</label><input id="loginIdentificacion" autocomplete="username" /></div>
+        <div class="field"><label>Identificación</label><input id="loginIdentificacion" autocomplete="username" /></div>
         <div class="field"><label>Clave</label><div class="ce-pass-row-v233"><input id="loginClave" type="password" autocomplete="current-password" /><button type="button" class="outline small ce-pass-toggle-v233" data-target="loginClave">Ver</button></div></div>
       </div>
       <div id="authError" class="auth-error"></div>
@@ -15182,9 +15182,9 @@ window.addCellNote = addCellNote;
     if(id==='btnChangePassword'){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation(); try{doChangePassword();}catch(err){console.error(err); const er=$('authError'); if(er)er.textContent='Error al cambiar clave. Revisa consola.';} return false;}
   },true);
 
-  // 3) ACCESOS limpio: solo GD, acceso por botÃ³n, campo estable con Ver/Ocultar.
+  // 3) ACCESOS limpio: solo GD, acceso por botón, campo estable con Ver/Ocultar.
   function accessUsersList(){try{return Array.isArray(accessUsers)?accessUsers:(Array.isArray(window.accessUsers)?window.accessUsers:[]);}catch(_){return Array.isArray(window.accessUsers)?window.accessUsers:[];}}
-  function clearPwd(u){const c=norm(u?.clave||u?.password||u?.plainClave||u?.clearPassword||''); return /^[â€¢*]+$/.test(c)?'':c;}
+  function clearPwd(u){const c=norm(u?.clave||u?.password||u?.plainClave||u?.clearPassword||''); return /^[•*]+$/.test(c)?'':c;}
   function renderAccesosV233(){
     const wrap=$('accesoList'); if(!wrap)return;
     if(!isGD()){wrap.innerHTML='<div class="empty">Solo un usuario GD puede mantener ACCESOS.</div>'; return;}
@@ -15193,7 +15193,7 @@ window.addCellNote = addCellNote;
     if(!list.length){wrap.innerHTML='<div class="empty">No hay usuarios en ACCESOS.</div>';return;}
     list.forEach(u=>{const id=norm(u.identificacion||u.id||''); const clave=clearPwd(u); const safeId=id.replace(/[^a-zA-Z0-9_-]/g,'_'); const row=document.createElement('div'); row.className='itemcard maint-soft'; row.innerHTML=`
       <div class="rowline persona">
-        <div class="field"><label>IdentificaciÃ³n</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
+        <div class="field"><label>Identificación</label><input value="${esc(id)}" data-action="edit-acceso-identificacion" data-id="${esc(id)}" /></div>
         <div class="field"><label>Nombre</label><input value="${esc(u.nombre||'')}" data-action="edit-acceso-nombre" data-id="${esc(id)}" /></div>
         <div class="field"><label>Clave</label><div class="ce-pass-row-v233"><input id="accClave_${safeId}" type="password" value="${esc(clave)}" placeholder="Nueva clave (opcional)" data-action="edit-acceso-clave" data-id="${esc(id)}" autocomplete="new-password" /><button type="button" class="outline small ce-pass-toggle-v233" data-target="accClave_${safeId}">Ver</button></div></div>
         <div class="field"><label>Nivel</label><select data-action="edit-acceso-nivel" data-id="${esc(id)}">${['RO','RW','GD'].map(v=>`<option value="${v}" ${v===u.nivel?'selected':''}>${v}</option>`).join('')}</select></div>
@@ -15213,7 +15213,7 @@ window.addCellNote = addCellNote;
   document.addEventListener('click',function(e){const btn=e.target.closest?.('#mtAccesoBtn,[data-target="mtAccesoBtn"],[data-action="open-acceso"]'); if(btn){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openAccessV233();return false;}},true);
   document.addEventListener('click',function(e){const b=e.target.closest?.('[data-action="save-acceso"],[data-action="delete-acceso"]'); if(!b)return; if(!isGD()){e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); alert('Solo GD puede mantener ACCESOS.'); return false;}},true);
 
-  // 4) Evento finalizado: navegaciÃ³n consultable. Bloquea cambios fuera de EVENTOS.
+  // 4) Evento finalizado: navegación consultable. Bloquea cambios fuera de EVENTOS.
   try{window.isLocked=function(){return false;}; if(typeof isLocked!=='undefined') isLocked=function(){return false;};}catch(_){}
   function isMutatingAction(action,id){
     if(!action&&!id)return false;
@@ -15238,19 +15238,19 @@ window.addCellNote = addCellNote;
   function totalize(lines,keyFn,valFn,label){const out=[];let prev=null,sub=0;lines.forEach((r,i)=>{const k=keyFn(r); if(prev!==null&&k!==prev){out.push(`${label} ${prev} | | | | | ${money(sub)}`);out.push('');sub=0;} prev=k; out.push(r.__line); sub+=valFn(r); if(i===lines.length-1)out.push(`${label} ${k} | | | | | ${money(sub)}`);}); return out;}
   function graphDonationTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; const rows=wrap.querySelectorAll('.chart-row'); const segs=rows[1]?.querySelectorAll?.('.chart-seg')||[];
-    [['DONADO TIENDA','Donado tiendas'],['DONADO SOCIO','Donado socios'],['DONADO OTROS','Donado no socios']].forEach(([code,title],i)=>{const seg=segs[i]; if(!seg)return; const data=compras().filter(c=>ticket(c)===code).map(c=>{c.__line=`${donorName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`;return c;}).sort((a,b)=>cmp(donorName(a),donorName(b))||cmp(prodName(a),prodName(b))); const lines=totalize(data,donorName,value,'Total donante'); const total=data.reduce((s,c)=>s+value(c),0); setTip(seg,table('GRÃFICAS / DONACIÃ“N DE PRODUCTO / '+title,'Donante | Producto | Uds | Precio estimado | Valor estimado',lines,'TOTAL ESTIMADO',total),'#fff','graphdonationv233');});
+    [['DONADO TIENDA','Donado tiendas'],['DONADO SOCIO','Donado socios'],['DONADO OTROS','Donado no socios']].forEach(([code,title],i)=>{const seg=segs[i]; if(!seg)return; const data=compras().filter(c=>ticket(c)===code).map(c=>{c.__line=`${donorName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`;return c;}).sort((a,b)=>cmp(donorName(a),donorName(b))||cmp(prodName(a),prodName(b))); const lines=totalize(data,donorName,value,'Total donante'); const total=data.reduce((s,c)=>s+value(c),0); setTip(seg,table('GRÁFICAS / DONACIÓN DE PRODUCTO / '+title,'Donante | Producto | Uds | Precio estimado | Valor estimado',lines,'TOTAL ESTIMADO',total),'#fff','graphdonationv233');});
   }
   function graphExpenseTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; const rows=wrap.querySelectorAll('.chart-row'); const segs=rows[2]?.querySelectorAll?.('.chart-seg')||[];
-    [['ticket','Gastado por ticket'],['current','Gastos corrientes'],['pending','Pte. Compra u otros gastos']].forEach(([kind,title],i)=>{const seg=segs[i]; if(!seg)return; let data=compras().filter(c=>!isDonation(ticket(c))); if(kind==='ticket')data=data.filter(c=>ticket(c)&&!isCurrent(ticket(c))); if(kind==='current')data=data.filter(c=>isCurrent(ticket(c))); if(kind==='pending')data=data.filter(c=>!ticket(c)); data=data.map(c=>{c.__key=ticket(c)||'PTE.COMPRA'; c.__line=`${c.__key} | ${tiendaName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`; return c;}).sort((a,b)=>cmp(a.__key,b.__key)||cmp(tiendaName(a),tiendaName(b))||cmp(prodName(a),prodName(b))); const lines=totalize(data,c=>c.__key,value,'Total'); const total=data.reduce((s,c)=>s+value(c),0); setTip(seg,table('GRÃFICAS / GASTOS / '+title,'Ticket | Tienda | Producto | Uds | Precio | Total',lines,'TOTAL',total),'#fff','graphexpensev233');});
+    [['ticket','Gastado por ticket'],['current','Gastos corrientes'],['pending','Pte. Compra u otros gastos']].forEach(([kind,title],i)=>{const seg=segs[i]; if(!seg)return; let data=compras().filter(c=>!isDonation(ticket(c))); if(kind==='ticket')data=data.filter(c=>ticket(c)&&!isCurrent(ticket(c))); if(kind==='current')data=data.filter(c=>isCurrent(ticket(c))); if(kind==='pending')data=data.filter(c=>!ticket(c)); data=data.map(c=>{c.__key=ticket(c)||'PTE.COMPRA'; c.__line=`${c.__key} | ${tiendaName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`; return c;}).sort((a,b)=>cmp(a.__key,b.__key)||cmp(tiendaName(a),tiendaName(b))||cmp(prodName(a),prodName(b))); const lines=totalize(data,c=>c.__key,value,'Total'); const total=data.reduce((s,c)=>s+value(c),0); setTip(seg,table('GRÁFICAS / GASTOS / '+title,'Ticket | Tienda | Producto | Uds | Precio | Total',lines,'TOTAL',total),'#fff','graphexpensev233');});
   }
   function groupingTips(){
-    [['summarySegmento','segmento','CÃLCULOS POR AGRUPACIÃ“N / POR SEGMENTO'],['summaryDestino','destino','CÃLCULOS POR AGRUPACIÃ“N / POR DESTINO']].forEach(([id,field,title])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('Â·')[0]); if(!label)return; const cols=card.querySelectorAll('.vbar-col'); const base=compras().filter(c=>norm(producto(c.productoId)[field]||c.producto?.[field]||'Sin '+field)===label); const specs=[['Comprado',c=>!isDonation(ticket(c))&&ticket(c),'#dc2626','groupingv233buy'],['Donado',c=>isDonation(ticket(c)),'#f59e0b','groupingv233don'],['Pte. Compra u otros gastos',c=>!isDonation(ticket(c))&&!ticket(c),'#fb7185','groupingv233pending']]; specs.forEach(([name,filter,bg,layout],idx)=>{const data=base.filter(filter).map(c=>`${name==='Donado'?donorName(c):(ticket(c)||'PTE.COMPRA')} | ${tiendaName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`).sort((a,b)=>cmp(a,b)); const total=base.filter(filter).reduce((s,c)=>s+value(c),0); const text=table(`${title} / ${label} / ${name}`,'Ticket/Donante | Tienda | Producto | Uds | Precio | Total',data,name==='Donado'?'TOTAL ESTIMADO':'TOTAL',total); const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});
+    [['summarySegmento','segmento','CÁLCULOS POR AGRUPACIÓN / POR SEGMENTO'],['summaryDestino','destino','CÁLCULOS POR AGRUPACIÓN / POR DESTINO']].forEach(([id,field,title])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('·')[0]); if(!label)return; const cols=card.querySelectorAll('.vbar-col'); const base=compras().filter(c=>norm(producto(c.productoId)[field]||c.producto?.[field]||'Sin '+field)===label); const specs=[['Comprado',c=>!isDonation(ticket(c))&&ticket(c),'#dc2626','groupingv233buy'],['Donado',c=>isDonation(ticket(c)),'#f59e0b','groupingv233don'],['Pte. Compra u otros gastos',c=>!isDonation(ticket(c))&&!ticket(c),'#fb7185','groupingv233pending']]; specs.forEach(([name,filter,bg,layout],idx)=>{const data=base.filter(filter).map(c=>`${name==='Donado'?donorName(c):(ticket(c)||'PTE.COMPRA')} | ${tiendaName(c)} | ${prodName(c)} | ${num(units(c))} | ${money(price(c))} | ${money(value(c))}`).sort((a,b)=>cmp(a,b)); const total=base.filter(filter).reduce((s,c)=>s+value(c),0); const text=table(`${title} / ${label} / ${name}`,'Ticket/Donante | Tienda | Producto | Uds | Precio | Total',data,name==='Donado'?'TOTAL ESTIMADO':'TOTAL',total); const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});
     const tt=$('summaryTiendaTicket'); if(tt)tt.querySelectorAll('[data-ce-tip-v21]').forEach(el=>{let t=el.getAttribute('data-ce-tip-v21')||''; if(/DONADO|Donado/i.test(t))el.setAttribute('data-ce-tip-v21',t.replace(/\bTOTAL\s*:/ig,'TOTAL ESTIMADO:'));});
   }
 
   // 6) RO: INFOEVENTO si evento finalizado.
-  document.addEventListener('click',function(e){const b=e.target.closest?.('#btnExportExcel'); if(!b)return; if(isRO()&&!isFinalized()){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();alert('Usuario RO: solo puede sacar INFOEVENTO si el evento estÃ¡ Finalizado.');return false;}},true);
+  document.addEventListener('click',function(e){const b=e.target.closest?.('#btnExportExcel'); if(!b)return; if(isRO()&&!isFinalized()){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();alert('Usuario RO: solo puede sacar INFOEVENTO si el evento está Finalizado.');return false;}},true);
 
   let pending=false;
   function applyAll(){pending=false; refreshVersion(); rebuildLogin(); applyFinalizedUI(); graphDonationTips(); graphExpenseTips(); groupingTips();}
@@ -15269,7 +15269,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-47-v234-fixes-script.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #47. */
-/* ==== v23.4: claves, grÃ¡fico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
+/* ==== v23.4: claves, gráfico/Excel, globos encolumnados, foto ampliada, RW EVENTOS, estado color ==== */
 (function(){
   'use strict';
   const VERSION='ControlEvent v13.0_prod';
@@ -15322,7 +15322,7 @@ window.addCellNote = addCellNote;
 
   function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); try{const proto=HTMLAnchorElement.prototype;if(!proto.__ce_v234_click){const old=proto.click;proto.click=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/g,VERSION_FILE);}catch(_){}return old.apply(this,arguments);};proto.__ce_v234_click=true;}}catch(_){} }
 
-  // Claves: deja un solo botÃ³n estable por campo y elimina el primero/duplicados anteriores.
+  // Claves: deja un solo botón estable por campo y elimina el primero/duplicados anteriores.
   function ensureOneToggle(input){
     if(!input)return; input.disabled=false; input.readOnly=false; input.style.pointerEvents='auto'; input.style.userSelect='text';
     const field=input.closest('.field')||input.parentElement; if(!field)return;
@@ -15335,7 +15335,7 @@ window.addCellNote = addCellNote;
   }
   function normalizePasswordButtons(){['loginClave','changeNewPassword1','changeNewPassword2'].forEach(id=>ensureOneToggle($(id)));}
 
-  // GrÃ¡ficas: origen Ãºnico y corregido para pantalla y Excel GRAFICAS.
+  // Gráficas: origen único y corregido para pantalla y Excel GRAFICAS.
   function graphPartsV234(){
     const rows=collabs();
     const comprasRows=compras();
@@ -15366,16 +15366,16 @@ window.addCellNote = addCellNote;
   function applyGraphTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; let g; try{g=graphPartsV234();}catch(_){return;} const rows=wrap.querySelectorAll('.chart-row');
     const donationSegs=rows[1]?.querySelectorAll?.('.chart-seg')||[];
-    g.donationItems.forEach((it,i)=>{const seg=donationSegs[i]; if(!seg)return; const data=it.lines.map(x=>x.split('|').map(s=>s.trim())).map(a=>({donor:a[0],prod:a[1],uds:a[2],precio:a[3],total:a[4]})); const objs=data.map(o=>{o.__line=`${o.donor} | ${o.prod} | ${o.uds} | ${o.precio} | ${o.total}`; return o;}); const lines=totalize(objs,o=>o.donor,o=>parseNum(o.total),'Total donante'); setTip(seg,table('GRÃFICAS / DONACIÃ“N DE PRODUCTO / '+it.label,'Donante | Producto | Uds | Precio estimado | Valor estimado',lines,'TOTAL ESTIMADO',it.value),it.color||getComputedStyle(seg).backgroundColor,'graphdonationv234');});
+    g.donationItems.forEach((it,i)=>{const seg=donationSegs[i]; if(!seg)return; const data=it.lines.map(x=>x.split('|').map(s=>s.trim())).map(a=>({donor:a[0],prod:a[1],uds:a[2],precio:a[3],total:a[4]})); const objs=data.map(o=>{o.__line=`${o.donor} | ${o.prod} | ${o.uds} | ${o.precio} | ${o.total}`; return o;}); const lines=totalize(objs,o=>o.donor,o=>parseNum(o.total),'Total donante'); setTip(seg,table('GRÁFICAS / DONACIÓN DE PRODUCTO / '+it.label,'Donante | Producto | Uds | Precio estimado | Valor estimado',lines,'TOTAL ESTIMADO',it.value),it.color||getComputedStyle(seg).backgroundColor,'graphdonationv234');});
     const expenseSegs=rows[2]?.querySelectorAll?.('.chart-seg')||[];
-    g.expenseItems.forEach((it,i)=>{const seg=expenseSegs[i]; if(!seg)return; const objs=it.lines.map(x=>x.split('|').map(s=>s.trim())).map(a=>({tk:a[0],tienda:a[1],prod:a[2],uds:a[3],precio:a[4],total:a[5],__line:`${a[0]} | ${a[1]} | ${a[2]} | ${a[3]} | ${a[4]} | ${a[5]}`})); const lines=totalize(objs,o=>o.tk,o=>parseNum(o.total),'Total'); setTip(seg,table('GRÃFICAS / GASTOS / '+it.label,'Ticket | Tienda | Producto | Uds | Precio | Total',lines,'TOTAL',it.value),it.color||getComputedStyle(seg).backgroundColor,'graphexpensev234');});
+    g.expenseItems.forEach((it,i)=>{const seg=expenseSegs[i]; if(!seg)return; const objs=it.lines.map(x=>x.split('|').map(s=>s.trim())).map(a=>({tk:a[0],tienda:a[1],prod:a[2],uds:a[3],precio:a[4],total:a[5],__line:`${a[0]} | ${a[1]} | ${a[2]} | ${a[3]} | ${a[4]} | ${a[5]}`})); const lines=totalize(objs,o=>o.tk,o=>parseNum(o.total),'Total'); setTip(seg,table('GRÁFICAS / GASTOS / '+it.label,'Ticket | Tienda | Producto | Uds | Precio | Total',lines,'TOTAL',it.value),it.color||getComputedStyle(seg).backgroundColor,'graphexpensev234');});
   }
 
   function applyStatusColor(){const el=$('eventStatus'); if(!el)return; const fin=up(ev().situacion)==='FINALIZADO'; el.classList.toggle('ce-v234-finalizado',fin); el.classList.toggle('ce-v234-curso',!fin); el.classList.toggle('status-finalizado',fin); el.classList.toggle('status-curso',!fin);}
   function applyEventRW(){if(!(isRW()||isGD()))return; document.querySelectorAll('#mtEventos input,#mtEventos select,#mtEventos textarea,#mtEventos button,[data-action^="edit-evento"],button[data-action="save-evento"],button[data-action="delete-evento"],#btnAddEvento,#mtEventosBtn').forEach(el=>{el.disabled=false;el.readOnly=false;el.classList.remove('locked','ce-v225-ro-disabled');el.style.pointerEvents='auto';el.style.opacity='1';el.removeAttribute('aria-disabled');});}
 
   function renderInfoHtml(text){const lines=String(text||'').split('\n'); let rows=[]; const html=[]; const flush=()=>{if(!rows.length)return; html.push('<table><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'); rows=[];}; lines.forEach(line=>{if(!line.trim()){flush();html.push('<div style="height:8px"></div>');return;} if(line.includes('|'))rows.push(line.split('|').map(s=>s.trim())); else{flush();html.push('<div style="font-weight:800;margin:4px 0 8px">'+esc(line)+'</div>');}}); flush(); return html.join('');}
-  function ensurePhotoModal(){let m=$('ceTicketModalV234'); if(m)return m; m=document.createElement('div'); m.id='ceTicketModalV234'; m.className='ce-ticket-modal-v234'; m.innerHTML='<div class="ce-ticket-modal-v234-box"><button type="button" class="ce-ticket-modal-v234-close">Ã—</button><div class="ce-ticket-modal-v234-info"></div><div class="ce-ticket-modal-v234-imgwrap"><img alt="Ticket ampliado"></div></div>'; m.addEventListener('click',evnt=>{if(evnt.target===m||evnt.target.closest('.ce-ticket-modal-v234-close'))m.classList.remove('visible');},true); document.body.appendChild(m); return m;}
+  function ensurePhotoModal(){let m=$('ceTicketModalV234'); if(m)return m; m=document.createElement('div'); m.id='ceTicketModalV234'; m.className='ce-ticket-modal-v234'; m.innerHTML='<div class="ce-ticket-modal-v234-box"><button type="button" class="ce-ticket-modal-v234-close">×</button><div class="ce-ticket-modal-v234-info"></div><div class="ce-ticket-modal-v234-imgwrap"><img alt="Ticket ampliado"></div></div>'; m.addEventListener('click',evnt=>{if(evnt.target===m||evnt.target.closest('.ce-ticket-modal-v234-close'))m.classList.remove('visible');},true); document.body.appendChild(m); return m;}
   function ticketInfoForThumb(img){let el=img.closest('[data-ce-tip-v21]')||img.closest('.summary-item,.budget-row,.itemcard,.chart-row')?.querySelector?.('[data-ce-tip-v21]'); let text=el?.getAttribute('data-ce-tip-v21')||''; if(!text){const row=img.closest('.summary-item,.budget-row,.itemcard'); text=row?.innerText||'Sin detalle asociado';} return text;}
   window.addEventListener('click',function(evnt){const img=evnt.target?.closest?.('img.ticket-thumb'); if(!img)return; if(window.ControlEventV310Photos&&img.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307,#ceTicketModalV234,#ceTicketImageModalV225,#ceV310PhotoViewer'))return; evnt.preventDefault();evnt.stopPropagation();evnt.stopImmediatePropagation(); try{$('ceTicketImageModalV225')?.classList.remove('visible');}catch(_){} const m=ensurePhotoModal(); m.querySelector('img').src=img.src; m.querySelector('.ce-ticket-modal-v234-info').innerHTML=renderInfoHtml(ticketInfoForThumb(img)); m.classList.add('visible'); return false;},true);
   document.addEventListener('keydown',evnt=>{if(evnt.key==='Escape')$('ceTicketModalV234')?.classList.remove('visible');},true);
@@ -15420,7 +15420,7 @@ window.addCellNote = addCellNote;
     document.body.classList.toggle('ce-v235-finalizado',isFinalized());
     // ACCESOS solo GD.
     show($('mtAccesoBtn'),isGD());
-    // Carga y descarga de datos solo GD, incluso si el evento estÃ¡ finalizado.
+    // Carga y descarga de datos solo GD, incluso si el evento está finalizado.
     ['btnOpenImport','btnExportSeed'].forEach(id=>show($(id),isGD()));
     document.querySelectorAll('.mobile-menu-action[data-target="btnOpenImport"],.mobile-menu-action[data-target="btnExportSeed"]').forEach(el=>show(el,isGD()));
     document.querySelectorAll('.mobile-menu-action[data-target="mtAccesoBtn"]').forEach(el=>show(el,isGD()));
@@ -15428,14 +15428,14 @@ window.addCellNote = addCellNote;
     const canEvents=isGD()||isRW();
     ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setEnabled($(id),canEvents));
     document.querySelectorAll('#mtEventos input,#mtEventos select,#mtEventos textarea,#mtEventos button,[data-action^="edit-evento"],button[data-action="save-evento"],button[data-action="delete-evento"]').forEach(el=>setEnabled(el,canEvents));
-    // Evento finalizado: navegar/visualizar sÃ­, cambios de fotos no.
+    // Evento finalizado: navegar/visualizar sí, cambios de fotos no.
     if(isFinalized()){
       document.querySelectorAll('.locked,.app-lockable.locked').forEach(el=>{el.classList.remove('locked');el.style.pointerEvents='auto';el.style.opacity='1';el.style.filter='none';});
       document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
       document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb').forEach(img=>{img.style.display='inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';});
     }
     if(isRO()){
-      // RO en curso: no modificar fotos, pero sÃ­ ver miniaturas y abrirlas.
+      // RO en curso: no modificar fotos, pero sí ver miniaturas y abrirlas.
       document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
       document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb').forEach(img=>{img.style.display='inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';});
     }
@@ -15477,7 +15477,7 @@ window.addCellNote = addCellNote;
     });
   }
 
-  // Interceptores mÃ­nimos de alta prioridad: no rompen la navegaciÃ³n, solo fuerzan permisos solicitados.
+  // Interceptores mínimos de alta prioridad: no rompen la navegación, solo fuerzan permisos solicitados.
   document.addEventListener('click',function(ev){
     const t=ev.target;
     const acceso=t.closest?.('#mtAccesoBtn,.mobile-menu-action[data-target="mtAccesoBtn"],[data-action="open-acceso"]');
@@ -15573,7 +15573,7 @@ window.addCellNote = addCellNote;
     return out;
   }
   async function pushState(){
-    // FIX24: eliminado guardado masivo. CRUD explÃ­cito solamente.
+    // FIX24: eliminado guardado masivo. CRUD explícito solamente.
     return {ok:true, localOnly:true, fix:'FIX24'};
   }
 
@@ -15595,17 +15595,17 @@ window.addCellNote = addCellNote;
     else Object.assign(s, serverState||{});
   }
 
-  // Login conservador: no reconstruye pantalla, solo garantiza que entra y carga estado despuÃ©s.
+  // Login conservador: no reconstruye pantalla, solo garantiza que entra y carga estado después.
   const oldDoLogin=typeof doLogin==='function'?doLogin:null;
   async function loginV2363(){
     const ident=String($('loginIdentificacion')?.value||'').trim();
     const clave=String($('loginClave')?.value||'');
     const err=$('authError'); if(err) err.textContent='';
-    if(!ident||!clave){ if(err) err.textContent='Introduce identificaciÃ³n y clave.'; return false; }
+    if(!ident||!clave){ if(err) err.textContent='Introduce identificación y clave.'; return false; }
     try{
       const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identificacion:ident,clave})});
       const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.ok||!data.user) throw new Error(data.error||'Acceso no vÃ¡lido');
+      if(!res.ok||!data.ok||!data.user) throw new Error(data.error||'Acceso no válido');
       await loadFreshState();
       authUser=data.user; window.authUser=data.user; sessionSave(data.user);
       try{ if(String(authUser.nivel||'')==='GD' && typeof fetchAccessUsers==='function') await fetchAccessUsers(); }catch(e){console.warn(e);}
@@ -15621,7 +15621,7 @@ window.addCellNote = addCellNote;
   },true);
   ['loginIdentificacion','loginClave'].forEach(id=>setTimeout(()=>{const el=$(id); if(el&&!el.__v2363){el.__v2363=true; el.disabled=false; el.readOnly=false; el.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault(); loginV2363();}});}},300));
 
-  // Logout limpia sesiÃ³n local ligera.
+  // Logout limpia sesión local ligera.
   const oldLogout=typeof logout==='function'?logout:null;
   if(oldLogout){ try{ logout=function(){ sessionClear(); return oldLogout.apply(this,arguments); }; window.logout=logout; }catch(_){ } }
 
@@ -15631,7 +15631,7 @@ window.addCellNote = addCellNote;
       reader.onerror=()=>reject(reader.error||new Error('No se pudo leer la foto'));
       reader.onload=()=>{
         const img=new Image();
-        img.onerror=()=>reject(new Error('Imagen no vÃ¡lida'));
+        img.onerror=()=>reject(new Error('Imagen no válida'));
         img.onload=()=>{
           const max=1100; let w=img.width,h=img.height; const r=Math.min(max/w,max/h,1); w=Math.round(w*r); h=Math.round(h*r);
           const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
@@ -15690,7 +15690,7 @@ window.addCellNote = addCellNote;
     window.removeTicketImage=removeTicketImage; window.removeTicketImageV202=removeTicketImage;
   }catch(_){ }
 
-  // DiagnÃ³stico sencillo en consola.
+  // Diagnóstico sencillo en consola.
   window.__ceLocalDiag=async function(){
     const s=stateRef();
     const local={eventos:s.eventos?.length||0, ingresos:s.colaboradores?.length||0, compras:s.compras?.length||0, fotos:Object.keys(s.ticketImages||{}).length};
@@ -15698,7 +15698,7 @@ window.addCellNote = addCellNote;
     console.table(local); console.log(server); return {local,server};
   };
 
-  // Reanudar sesiÃ³n solo con usuario ligero; el estado se carga despuÃ©s.
+  // Reanudar sesión solo con usuario ligero; el estado se carga después.
   async function tryResume(){
     // v50.27: desactivado. El arranque correcto es siempre login limpio.
     try{ sessionClear(); }catch(_){ }
@@ -15714,7 +15714,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-50-v2364-income-total-and-version-fix.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #50. */
-/* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versiÃ³n Excel correcta ==== */
+/* ==== v23.6.4 local: INGRESOS siempre por TOTAL real + versión Excel correcta ==== */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -15732,7 +15732,7 @@ window.addCellNote = addCellNote;
     const p = row.persona || persona(row.personaId);
     const isSocio = up(p.rango || row.rango || '') === 'SOCIO';
     const n = num(row.numero);
-    // No usar row.total/base antiguos para grÃ¡ficos: pueden venir de versiones previas y estar desfasados.
+    // No usar row.total/base antiguos para gráficos: pueden venir de versiones previas y estar desfasados.
     const obligatorio = isSocio ? n * eventPrice() : 0;
     const voluntario = row.importe != null ? num(row.importe) : (row.donation != null ? num(row.donation) : 0);
     return {persona:p, obligatorio, voluntario, total: obligatorio + voluntario};
@@ -15768,7 +15768,7 @@ window.addCellNote = addCellNote;
     return incomes;
   }
 
-  // Enriquecer siempre colaboradores con TOTAL real calculado desde nÃºmero/precio/voluntario.
+  // Enriquecer siempre colaboradores con TOTAL real calculado desde número/precio/voluntario.
   try{
     const oldCollabs = typeof collabsForEvent==='function' ? collabsForEvent : null;
     if(oldCollabs && !oldCollabs.__ce_v2364_total){
@@ -15812,7 +15812,7 @@ window.addCellNote = addCellNote;
   patchGraphFunction('graphData');
   patchGraphFunction('graphDataV160');
 
-  // Refuerzo de versiÃ³n visible y nombres INFOEVENTO/Emitido por.
+  // Refuerzo de versión visible y nombres INFOEVENTO/Emitido por.
   function setVersion(){
     try{ document.title = VERSION; }catch(_){ }
     document.querySelectorAll('.appname-stack span').forEach(el=>{ if(/ControlEvent/i.test(el.textContent||'')) el.textContent = VERSION; });
@@ -15840,7 +15840,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-51-v2365-income-total-and-issuedby-final-fix.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #51. */
-/* ==== v23.6.5 local: correcciÃ³n final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
+/* ==== v23.6.5 local: corrección final INGRESOS por TOTAL real + Emitido por v23.6.5 ==== */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -15877,7 +15877,7 @@ window.addCellNote = addCellNote;
   function voluntaryAmount(r, obligatorio){
     const fields = ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'];
     for(const f of fields){ if(r && r[f] != null && String(r[f]).trim() !== '') return parseNum(r[f]); }
-    // En datos antiguos puede existir total ya calculado. Si no hay campo voluntario explÃ­cito, para socio se recupera como total-obligatorio.
+    // En datos antiguos puede existir total ya calculado. Si no hay campo voluntario explícito, para socio se recupera como total-obligatorio.
     if(r && r.total != null && String(r.total).trim() !== '') return Math.max(0, parseNum(r.total) - parseNum(obligatorio));
     return 0;
   }
@@ -16001,7 +16001,7 @@ window.addCellNote = addCellNote;
     const pad = n => String(n).padStart(2,'0');
     const dd = pad(date.getDate()), mm = pad(date.getMonth()+1), yyyy = date.getFullYear();
     const hh = pad(date.getHours()), mi = pad(date.getMinutes()), ss = pad(date.getSeconds());
-    return `Emitido por â€œÂ©oltyLAB â€™26_${VERSION_FILE}_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}â€`;
+    return `Emitido por “©oltyLAB ’26_${VERSION_FILE}_${dd}${mm}${yyyy}_${hh}:${mi}:${ss}”`;
   }
   function patchVersion(){
     try{ document.title = VERSION; }catch(_){ }
@@ -16036,7 +16036,7 @@ window.addCellNote = addCellNote;
 ;/* ===== BEGIN legacy-inline-52-v2366-direct-income-chart-fix.js ===== */
 
 /* ControlEvent v13.0_prod - JS legacy extraido de public/index.html. Bloque inline #52. */
-/* ==== v23.6.6 local: cÃ¡lculo directo y Ãºnico de INGRESOS por TOTAL real ==== */
+/* ==== v23.6.6 local: cálculo directo y único de INGRESOS por TOTAL real ==== */
 (function(){
   'use strict';
   const VERSION='ControlEvent v13.0_prod';
@@ -16126,7 +16126,7 @@ window.addCellNote = addCellNote;
     const sal2=[{label:'Saldo operativo',value:Math.abs(g.saldoOperativo),color:g.saldoOperativo>=0?'#155e75':'#7f1d1d'}];
     wrap.innerHTML=`<div class="chart-shell"><div class="chart-bars">
       <div class="chart-row"><div class="chart-label">INGRESOS: ${money(g.incomes.total)}</div><div><div class="chart-track">${inc.map(x=>seg(x.value,x.color,x.label+': '+money(x.value),max)).join('')}</div>${legend(inc)}</div></div>
-      <div class="chart-row"><div class="chart-label">DONACIÃ“N DE PRODUCTO: ${money(g.donations.total)}</div><div><div class="chart-track">${don.map(x=>seg(x.value,x.color,x.label+': '+money(x.value),max)).join('')}</div>${legend(don)}</div></div>
+      <div class="chart-row"><div class="chart-label">DONACIÓN DE PRODUCTO: ${money(g.donations.total)}</div><div><div class="chart-track">${don.map(x=>seg(x.value,x.color,x.label+': '+money(x.value),max)).join('')}</div>${legend(don)}</div></div>
       <div class="chart-row"><div class="chart-label">GASTOS: ${money(g.expenses.total)}</div><div><div class="chart-track">${exp.map(x=>seg(x.value,x.color,x.label+': '+money(x.value),max)).join('')}</div>${legend(exp)}</div></div>
       <div class="chart-row"><div class="chart-label">SALDO ACTUAL: ${money(g.saldoActual)}</div><div><div class="chart-track">${sal1.map(x=>seg(x.value,x.color,x.label+': '+money(g.saldoActual),max)).join('')}</div>${legend([{label:'Saldo actual',value:g.saldoActual,color:sal1[0].color}])}</div></div>
       <div class="chart-row"><div class="chart-label">SALDO OPERATIVO: ${money(g.saldoOperativo)}</div><div><div class="chart-track">${sal2.map(x=>seg(x.value,x.color,x.label+': '+money(g.saldoOperativo),max)).join('')}</div>${legend([{label:'Saldo operativo',value:g.saldoOperativo,color:sal2[0].color}])}</div></div>
@@ -16137,11 +16137,11 @@ window.addCellNote = addCellNote;
     const max=Math.max(1,g.incomes.total,g.donations.total,g.expenses.total,Math.abs(g.saldoOperativo));
     const rows=[
       {label:`INGRESOS: ${money(g.incomes.total)}`,items:[{label:'Socios Banco',value:g.incomes.socioBanco,color:'#2563eb'},{label:'Socios Bizum',value:g.incomes.socioBizum,color:'#16a34a'},{label:'Socios Efectivo',value:g.incomes.socioEfectivo,color:'#84cc16'},{label:'No socios Banco',value:g.incomes.noSocioBanco,color:'#60a5fa'},{label:'No socios Bizum',value:g.incomes.noSocioBizum,color:'#34d399'},{label:'No socios Efectivo',value:g.incomes.noSocioEfectivo,color:'#bef264'},{label:'Pendiente',value:g.incomes.pendiente,color:'#f59e0b'}]},
-      {label:`DONACIÃ“N DE PRODUCTO: ${money(g.donations.total)}`,items:[{label:'Donado tiendas',value:g.donations.tiendas,color:'#fcd34d'},{label:'Donado socios',value:g.donations.socios,color:'#f59e0b'},{label:'Donado no socios',value:g.donations.noSocios,color:'#b45309'}]},
+      {label:`DONACIÓN DE PRODUCTO: ${money(g.donations.total)}`,items:[{label:'Donado tiendas',value:g.donations.tiendas,color:'#fcd34d'},{label:'Donado socios',value:g.donations.socios,color:'#f59e0b'},{label:'Donado no socios',value:g.donations.noSocios,color:'#b45309'}]},
       {label:`GASTOS: ${money(g.expenses.total)}`,items:[{label:'TKxx',value:g.expenses.tk,color:'#dc2626'},{label:'Gastos corrientes',value:g.expenses.corrientes,color:'#ef4444'},{label:'Pte. compra',value:g.expenses.pendiente,color:'#fb7185'}]},
       {label:`SALDO OPERATIVO: ${money(g.saldoOperativo)}`,items:[{label:'Saldo operativo',value:Math.abs(g.saldoOperativo),color:g.saldoOperativo>=0?'#155e75':'#7f1d1d'}]}
     ];
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.font='bold 24px Arial'; ctx.fillStyle='#111827'; ctx.fillText('ControlEvent - GrÃ¡ficas del evento',40,45);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.font='bold 24px Arial'; ctx.fillStyle='#111827'; ctx.fillText('ControlEvent - Gráficas del evento',40,45);
     let y=95; rows.forEach(row=>{ctx.font='bold 20px Arial';ctx.fillStyle='#111827';ctx.fillText(row.label,40,y); let x0=330,barW=790,h=34,x=x0; ctx.fillStyle='#f3f4f6';ctx.fillRect(x0,y-25,barW,h); row.items.forEach(it=>{const w=(Math.max(0,num(it.value))/max)*barW; if(w>0){ctx.fillStyle=it.color;ctx.fillRect(x,y-25,w,h); x+=w;}}); let lx=x0,ly=y+35; ctx.font='15px Arial'; row.items.filter(it=>num(it.value)!==0).forEach(it=>{const t=`${it.label}: ${money(it.value)}`; const tw=ctx.measureText(t).width+32; if(lx+tw>1120){lx=x0;ly+=24;} ctx.fillStyle=it.color;ctx.fillRect(lx,ly-12,12,12); ctx.fillStyle='#334155';ctx.fillText(t,lx+18,ly); lx+=tw;}); y+=150;});
     return canvas.toDataURL('image/png');
   }
@@ -16153,7 +16153,7 @@ window.addCellNote = addCellNote;
     try{ window.graphData=graphDataFixed; graphData=graphDataFixed; }catch(_){ window.graphData=graphDataFixed; }
     try{ window.renderGraficas=renderGraphFixed; renderGraficas=renderGraphFixed; }catch(_){ window.renderGraficas=renderGraphFixed; }
     try{ window.makeChartImageDataUrl=chartImageFixed; window.makeChartImageDataUrlV160=chartImageFixed; window.makeChartImageDataUrlV164=chartImageFixed; window.makeChartImageDataUrlV171=chartImageFixed; makeChartImageDataUrl=chartImageFixed; makeChartImageDataUrlV160=chartImageFixed; makeChartImageDataUrlV164=chartImageFixed; makeChartImageDataUrlV171=chartImageFixed; }catch(_){ window.makeChartImageDataUrl=chartImageFixed; }
-    try{ window.emittedByTextV171=function(date=new Date()){const p=n=>String(n).padStart(2,'0');return `Emitido por â€œÂ©oltyLAB â€™26_${VERSION_FILE}_${p(date.getDate())}${p(date.getMonth()+1)}${date.getFullYear()}_${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}â€`;}; emittedByTextV171=window.emittedByTextV171; }catch(_){ }
+    try{ window.emittedByTextV171=function(date=new Date()){const p=n=>String(n).padStart(2,'0');return `Emitido por “©oltyLAB ’26_${VERSION_FILE}_${p(date.getDate())}${p(date.getMonth()+1)}${date.getFullYear()}_${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}”`;}; emittedByTextV171=window.emittedByTextV171; }catch(_){ }
   }
   const oldRender=typeof render==='function'?render:null;
   if(oldRender&&!oldRender.__ce_v2366){ const w=function(){const r=oldRender.apply(this,arguments); setTimeout(()=>{patch(); try{ if((typeof currentMainTab!=='undefined'&&currentMainTab==='graficas')||!$('tabGraficas')?.classList.contains('hidden')) renderGraphFixed(); }catch(_){ }},40); return r;}; w.__ce_v2366=true; try{render=w;window.render=w;}catch(_){ } }
@@ -16234,7 +16234,7 @@ window.addCellNote = addCellNote;
     try{ if(typeof ticketImageStateKey === 'function') return ticketImageStateKey(label, id); }catch(_){ }
     return `${id}|${label}`;
   }
-  function cleanLabel(label){ return norm(label).split('Â·')[0].split('Â·')[0].trim(); }
+  function cleanLabel(label){ return norm(label).split('·')[0].split('·')[0].trim(); }
   function ticketToken(label){
     const m = up(label).match(/\b(?:TK|TICKET)\s*[-_]*\s*[A-Z0-9]+\b/);
     return m ? m[0].replace(/\s+/g,'') : '';
@@ -16334,7 +16334,7 @@ window.addCellNote = addCellNote;
     });
     const rows = [...filled.values(), ...pending.values()].map(r => {
       const products = Array.from(new Set((r.products || []).filter(Boolean)));
-      const label = r.donated && products.length ? `${r.k} Â· ${products.join(' Â· ')}` : r.k;
+      const label = r.donated && products.length ? `${r.k} · ${products.join(' · ')}` : r.k;
       return {...r, label, image: r.attachable ? imageRefFor(r.k) : ''};
     });
     const sortMode = st().summaryTiendaSort || 'tienda';
@@ -16478,7 +16478,7 @@ window.addCellNote = addCellNote;
       }).join('');
       const card = document.createElement('div');
       card.className = 'vbars-card';
-      card.innerHTML = `<div class="vbars-title">${esc(r.label)} Â· ${esc(money(r.total))}</div><div class="vbars-chart ce-v24-vbars-chart">${cols}</div>`;
+      card.innerHTML = `<div class="vbars-title">${esc(r.label)} · ${esc(money(r.total))}</div><div class="vbars-chart ce-v24-vbars-chart">${cols}</div>`;
       grid.appendChild(card);
     });
     wrap.appendChild(grid);

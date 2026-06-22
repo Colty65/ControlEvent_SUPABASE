@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - cierre de versiÃ³n y descarga/Excel sin carga periÃ³dica.
-   Alcance: versiÃ³n, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
+/* ControlEvent v13.0_prod - cierre de versión y descarga/Excel sin carga periódica.
+   Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
@@ -46,7 +46,7 @@
   function currentEventTitle(){
     const sel = document.getElementById('selectedEvent');
     const raw = sel?.selectedOptions?.[0]?.textContent || sel?.options?.[sel.selectedIndex]?.textContent || '';
-    return clean(raw.replace(/^\s*(FINALIZADO|EN CURSO)\s*[-â€“:]?\s*/i,''));
+    return clean(raw.replace(/^\s*(FINALIZADO|EN CURSO)\s*[-–:]?\s*/i,''));
   }
   function normalizeDownloadName(name){
     let n = normalizeText(name || '');
@@ -95,7 +95,7 @@
   function scrubWorkbook(wb){
     if(!wb || wb.__ceV73Scrubbed) return wb;
     wb.__ceV73Scrubbed = true;
-    safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - Â©oltyLAB '26`); }, null);
+    safe(() => { wb.creator = normalizeText(wb.creator || `${VERSION} - ©oltyLAB '26`); }, null);
     safe(() => { wb.lastModifiedBy = VERSION; }, null);
     safe(() => { (wb.worksheets || []).forEach(ws => { ws.eachRow(row => row.eachCell(cell => { cell.value = scrubValue(cell.value); })); }); }, null);
     return wb;

@@ -1,21 +1,21 @@
-﻿ControlEvent v13.0_prod - RESCATE ESTABLE
+ControlEvent v13.0_prod - RESCATE ESTABLE
 
 Motivo:
-La cadena de hotfix sobre v10.4.2 introdujo refrescos repetidos, temblores de pantalla, pÃ©rdida de foco en buscadores y problemas de arranque/login.
-Esta versiÃ³n prioriza estabilidad y fluidez sobre la animaciÃ³n de bienvenida.
+La cadena de hotfix sobre v10.4.2 introdujo refrescos repetidos, temblores de pantalla, pérdida de foco en buscadores y problemas de arranque/login.
+Esta versión prioriza estabilidad y fluidez sobre la animación de bienvenida.
 
 Cambios principales:
-- VersiÃ³n cambiada a v13.0_prod en referencias activas.
-- Desactivado el estabilizador de vistas automÃ¡tico que repintaba varias veces al cambiar de menÃº o evento.
-- Eliminada la lÃ³gica experimental de prelogin/welcome/cohetes que podÃ­a dejar la app sin montar o dispararse en el momento incorrecto.
+- Versión cambiada a v13.0_prod en referencias activas.
+- Desactivado el estabilizador de vistas automático que repintaba varias veces al cambiar de menú o evento.
+- Eliminada la lógica experimental de prelogin/welcome/cohetes que podía dejar la app sin montar o dispararse en el momento incorrecto.
 - El login se muestra directamente desde el inicio, sin logo grande previo de la app.
 - Se conserva Ticket Auto con candidatos:
   * normal: sin similitud.
   * rojo: producto similar y misma tienda.
   * naranja: producto similar pero tienda distinta.
   * la fila superior IA/manual se pinta con el mismo color que el posible emparejamiento.
-- Se conserva el buscador reforzado de COMPRAS/DONACIONES para que no encuentre la propia caja de bÃºsqueda.
-- Documentos/Ingresos: limpieza de botones de descarga duplicados y conservaciÃ³n de miniaturas.
+- Se conserva el buscador reforzado de COMPRAS/DONACIONES para que no encuentre la propia caja de búsqueda.
+- Documentos/Ingresos: limpieza de botones de descarga duplicados y conservación de miniaturas.
 
 Archivos tocados de forma deliberada:
 - index.html
@@ -30,4 +30,4 @@ Archivos tocados de forma deliberada:
 
 Notas:
 - No se ha vuelto a tocar la base funcional de datos ni backend.
-- Se evita cualquier setInterval/render automÃ¡tico aÃ±adido por los Ãºltimos hotfix.
+- Se evita cualquier setInterval/render automático añadido por los últimos hotfix.

@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - HOTFIX mÃ­nimo: documentos con tÃ­tulo evento, descarga ticket en resumen y botones sin heredar rojo. */
+/* ControlEvent v13.0_prod - HOTFIX mínimo: documentos con título evento, descarga ticket en resumen y botones sin heredar rojo. */
 (function(){
   'use strict';
   if(window.__ceV105HotfixFotosDocsBotones) return;
@@ -41,8 +41,8 @@
       '.ce-v105-ticket-save{width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:0!important;border-radius:10px!important;font-size:17px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-left:6px!important;vertical-align:middle!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;border:1px solid #cbd5e1!important;box-shadow:0 1px 3px rgba(15,23,42,.14)!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important}\n'+
       '#tabCompras button.modify,#tabCompras button.danger,#comprasList button.modify,#comprasList button.danger,#tabCompras .modify.small,#tabCompras .danger.small,#comprasList .modify.small,#comprasList .danger.small{color:#fff!important;-webkit-text-fill-color:#fff!important;font-weight:900!important}\n'+
       '#tabResumen button[title="Adjuntar foto"],#summaryTiendaTicket button[title="Adjuntar foto"],#tabResumen button[aria-label="Adjuntar foto"],#summaryTiendaTicket button[aria-label="Adjuntar foto"],#tabResumen button[title="Eliminar foto"],#summaryTiendaTicket button[title="Eliminar foto"],#tabResumen button[aria-label="Eliminar foto"],#summaryTiendaTicket button[aria-label="Eliminar foto"]{font-size:0!important}\n'+
-      '#tabResumen button[title="Adjuntar foto"]::before,#summaryTiendaTicket button[title="Adjuntar foto"]::before,#tabResumen button[aria-label="Adjuntar foto"]::before,#summaryTiendaTicket button[aria-label="Adjuntar foto"]::before{content:"ðŸ“Ž";font-size:17px!important}\n'+
-      '#tabResumen button[title="Eliminar foto"]::before,#summaryTiendaTicket button[title="Eliminar foto"]::before,#tabResumen button[aria-label="Eliminar foto"]::before,#summaryTiendaTicket button[aria-label="Eliminar foto"]::before{content:"ðŸ—‘ï¸";font-size:17px!important}\n';
+      '#tabResumen button[title="Adjuntar foto"]::before,#summaryTiendaTicket button[title="Adjuntar foto"]::before,#tabResumen button[aria-label="Adjuntar foto"]::before,#summaryTiendaTicket button[aria-label="Adjuntar foto"]::before{content:"📎";font-size:17px!important}\n'+
+      '#tabResumen button[title="Eliminar foto"]::before,#summaryTiendaTicket button[title="Eliminar foto"]::before,#tabResumen button[aria-label="Eliminar foto"]::before,#summaryTiendaTicket button[aria-label="Eliminar foto"]::before{content:"🗑️";font-size:17px!important}\n';
     document.head.appendChild(st);
   }
 
@@ -78,7 +78,7 @@
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'outline small ce-v105-ticket-save';
-    b.textContent = 'ðŸ’¾';
+    b.textContent = '💾';
     b.title = 'Guardar foto del ticket';
     b.setAttribute('aria-label','Guardar foto del ticket');
     function go(ev){ stop(ev); return downloadSrc(imgSrc(img), guessTicketName(img,idx)); }
@@ -106,8 +106,8 @@
       Array.prototype.slice.call(root.querySelectorAll('button')).forEach(function(b){
         if(b.classList && b.classList.contains('ce-v105-ticket-save')) return;
         var lab = fold((b.textContent||'')+' '+(b.title||'')+' '+(b.getAttribute('aria-label')||''));
-        if(/ADJUNTAR|INSERTAR FOTO|SUBIR FOTO|CAMBIAR FOTO/.test(lab) && !/JUSTIFICANTE/.test(lab)){ b.textContent='ðŸ“Ž'; b.title='Adjuntar foto'; b.setAttribute('aria-label','Adjuntar foto'); }
-        if(/ELIMINAR FOTO/.test(lab) || (/^\s*ELIMINAR\s*$/.test(fold(b.textContent||'')) && /FOTO|TICKET/.test(lab))){ b.textContent='ðŸ—‘ï¸'; b.title='Eliminar foto'; b.setAttribute('aria-label','Eliminar foto'); }
+        if(/ADJUNTAR|INSERTAR FOTO|SUBIR FOTO|CAMBIAR FOTO/.test(lab) && !/JUSTIFICANTE/.test(lab)){ b.textContent='📎'; b.title='Adjuntar foto'; b.setAttribute('aria-label','Adjuntar foto'); }
+        if(/ELIMINAR FOTO/.test(lab) || (/^\s*ELIMINAR\s*$/.test(fold(b.textContent||'')) && /FOTO|TICKET/.test(lab))){ b.textContent='🗑️'; b.title='Eliminar foto'; b.setAttribute('aria-label','Eliminar foto'); }
       });
     });
   }

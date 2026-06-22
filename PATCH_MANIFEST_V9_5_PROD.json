@@ -1,17 +1,17 @@
-﻿{
+{
   "version": "ControlEvent v13.0_prod",
   "base": "ControlEvent v9.4_prod",
   "changes": [
-    "Eliminado MATERIAL como opciÃ³n del desplegable Segmento",
-    "Pantalla Tickets IA mÃ¡s compacta y sin lÃ­neas explicativas redundantes",
+    "Eliminado MATERIAL como opción del desplegable Segmento",
+    "Pantalla Tickets IA más compacta y sin líneas explicativas redundantes",
     "Botones principales de Tickets IA convertidos a iconos",
-    "BotÃ³n Tickets IA compacto en cabecera derecha de COMPRAS",
+    "Botón Tickets IA compacto en cabecera derecha de COMPRAS",
     "Desplegables reales para Segmento y Destino",
     "Gemini recibe responsables/tiendas existentes y puede devolver responsable",
-    "SelecciÃ³n automÃ¡tica de Responsable desde Gemini o desde las indicaciones del usuario",
-    "Refuerzo actualizaciÃ³n precio PRODUCTOS existentes",
-    "Parche de login para no mostrar evento aparente antes de elecciÃ³n real",
-    "VersiÃ³n actualizada a v13.0_prod en referencias activas"
+    "Selección automática de Responsable desde Gemini o desde las indicaciones del usuario",
+    "Refuerzo actualización precio PRODUCTOS existentes",
+    "Parche de login para no mostrar evento aparente antes de elección real",
+    "Versión actualizada a v13.0_prod en referencias activas"
   ],
   "files_added": [
     "public/app/features/v9-5-ticketauto-compras.js",

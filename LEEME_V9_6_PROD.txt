@@ -1,13 +1,13 @@
-﻿ControlEvent v13.0_prod
+ControlEvent v13.0_prod
 
 Cambios principales:
 - Cabecera compacta: miniatura CE + v13.0_prod en lugar de texto largo ControlEvent.
 - Ticket IA detecta TKxx si aparece escrito en foto o indicaciones y lo selecciona en el desplegable.
-- Ticket IA en mÃ³vil se reorganiza en vertical: foto, controles y tablas debajo. En PC/iPad se mantiene distribuciÃ³n actual.
-- Reforzado refresco de GRÃFICAS tras cambio de evento para evitar donaciones sin pintar hasta refrescar.
+- Ticket IA en móvil se reorganiza en vertical: foto, controles y tablas debajo. En PC/iPad se mantiene distribución actual.
+- Reforzado refresco de GRÁFICAS tras cambio de evento para evitar donaciones sin pintar hasta refrescar.
 - Descarga de fotos restringida a INGRESOS y RESUMEN PRESUPUESTARIO.
-- Globos: se ocultan fechas/textos que tapaban miniaturas y queda miniatura con ampliaciÃ³n.
-- En eventos Finalizados se permite usar bÃºsqueda de Donaciones/Compras.
-- Mapa de recursos: cajas de responsables mÃ¡s compactas en iPad/mÃ³vil.
+- Globos: se ocultan fechas/textos que tapaban miniaturas y queda miniatura con ampliación.
+- En eventos Finalizados se permite usar búsqueda de Donaciones/Compras.
+- Mapa de recursos: cajas de responsables más compactas en iPad/móvil.
 - Mapa de recursos: TKxx clicable en registros comprados para abrir detalle contable + foto de ticket.
-- Refuerzo de actualizaciÃ³n de precio en PRODUCTOS cuando el producto ya existe.
+- Refuerzo de actualización de precio en PRODUCTOS cuando el producto ya existe.

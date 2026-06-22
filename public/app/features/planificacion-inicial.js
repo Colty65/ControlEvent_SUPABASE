@@ -1,5 +1,5 @@
-/* ControlEvent v13.0_prod - Planificación inicial con Zuzu y réplica segura.
-   La propuesta revisable puede nacer de un evento modelo o de una propuesta generada por Zuzu. */
+/* ControlEvent v13.0_prod - Planificación inicial con Zuzu.
+   Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v13.0_prod';
@@ -10,27 +10,11 @@
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const PURCHASE_TICKET_OPTIONS = ['', 'GASTOS CORRIENTES', ...Array.from({length:50}, (_,i)=>`TK${String(i+1).padStart(2,'0')}`)];
   const DONATION_TICKET_OPTIONS = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
-  const PLANNING_MODES = [
-    {value:'BASE', label:'Replicar un evento Finalizado', needsModel:true, usesZuzu:false},
-    {value:'ZUZU_TOTAL', label:'Encargo total a Zuzu', needsModel:false, usesZuzu:true},
-    {value:'ZUZU_PARTIAL', label:'Encargo parcial a Zuzu', needsModel:true, usesZuzu:true}
-  ];
-  const CONTENT_OPTIONS = [
-    {value:'ALL', label:'Todos los datos del evento modelo', modules:['INGRESOS','COMPRAS','DONACIONES']},
-    {value:'INGRESOS', label:'Solo los datos de INGRESOS', modules:['INGRESOS']},
-    {value:'COMPRAS', label:'Solo los datos de COMPRAS', modules:['COMPRAS']},
-    {value:'DONACIONES', label:'Solo los datos de DONACIONES', modules:['DONACIONES']},
-    {value:'INGRESOS_COMPRAS', label:'Usar INGRESOS + COMPRAS', modules:['INGRESOS','COMPRAS']},
-    {value:'INGRESOS_DONACIONES', label:'Usar INGRESOS + DONACIONES', modules:['INGRESOS','DONACIONES']},
-    {value:'COMPRAS_DONACIONES', label:'Usar COMPRAS + DONACIONES', modules:['COMPRAS','DONACIONES']}
-  ];
   let initialized = false;
   let lastProposal = [];
   let lastIncomeProposal = [];
   let lastSourceEvent = null;
   let lastCreatedEventId = "";
-  let lastPlanningMeta = {};
-  let lastZuzuResult = null;
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function state(){ return app()?.state || window.state || {}; }
@@ -56,12 +40,7 @@
     return Number.isFinite(n) ? n : 0;
   }
   function normalizeText(value){ return up(value).replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim(); }
-  function rowEventId(row){ return String(row?.eventId || row?.event_id || ''); }
-  function rowProductId(row){ return String(row?.productoId || row?.producto_id || ''); }
-  function rowPersonId(row){ return String(row?.personaId || row?.persona_id || ''); }
-  function rowTicket(row){ return String(row?.ticketDonacion || row?.ticket_donacion || row?.ticket || row?.ticketOtrosGastos || row?.ticket_otros_gastos || '').trim(); }
-  function rowDonorRef(row){ return String(row?.donorRef || row?.donor_ref || ''); }
-  function productOf(row){ return byId('productos', rowProductId(row)) || null; }
+  function productOf(row){ return byId('productos', row?.productoId) || null; }
   function productName(row){ return productOf(row)?.nombre || row?.producto || 'Producto sin nombre'; }
   function segmentName(row){ return productOf(row)?.segmento || row?.segmento || 'Sin segmento'; }
   function destinoName(row){ return productOf(row)?.destino || row?.destino || 'Sin destino'; }
@@ -69,11 +48,11 @@
   function personaOf(id){ return byId('personas', id) || null; }
   function tiendaName(id){ return tiendaOf(id)?.nombre || 'Sin tienda'; }
   function personaName(id){ return personaOf(id)?.nombre || 'Sin responsable'; }
-  function rowResponsible(row){ return String(row?.responsableId || row?.responsable_id || row?.responsable || row?.socioResponsableId || row?.socio_responsable_id || ''); }
-  function rowTienda(row){ const p = productOf(row) || {}; return String(row?.tiendaId || row?.tienda_id || p.tiendaId || p.defaultTiendaId || p.tienda_id || p.default_tienda_id || ''); }
-  function isDonation(row){ return DONATION_TYPES.includes(rowTicket(row)); }
+  function rowResponsible(row){ return String(row?.responsableId || row?.responsable || row?.socioResponsableId || ''); }
+  function rowTienda(row){ const p = productOf(row) || {}; return String(row?.tiendaId || p.tiendaId || p.defaultTiendaId || ''); }
+  function isDonation(row){ return DONATION_TYPES.includes(String(row?.ticketDonacion || row?.ticket || '').trim()); }
   function ticketLabel(row){
-    const raw = rowTicket(row);
+    const raw = String(row?.ticketDonacion || '').trim();
     if(isDonation(row)) return raw || 'DONADO';
     return raw || 'Pte.Compra u otros gastos';
   }
@@ -122,7 +101,6 @@
     if(!panel) return;
     panel.querySelectorAll('input, select, textarea, button').forEach(el => {
       if(el.id === 'btnPlanApplyDisabled' || el.hasAttribute('data-plan-keep-disabled')) return;
-      if(el.id === 'planEventoBase' && !modeNeedsModel()) return;
       el.disabled = false;
       if(el.classList?.contains('soft-readonly') || el.dataset?.planOutput) return;
       if(el.hasAttribute('data-plan-readonly')) return;
@@ -135,183 +113,34 @@
   function socios(){ return rows('personas').filter(p => up(p.rango || '') === 'SOCIO').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function tiendas(){ return rows('tiendas').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function finalizados(){ return rows('eventos').filter(e => up(e.situacion || '') === 'FINALIZADO').slice().sort((a,b)=>dateKey(b)-dateKey(a)); }
-  function planningMode(){
-    const value = document.getElementById('planFuenteHistorica')?.value || 'BASE';
-    return PLANNING_MODES.find(item => item.value === value) || PLANNING_MODES[0];
+  function planMode(){ return String(document.getElementById('planFuenteHistorica')?.value || 'REPLICA').toUpperCase(); }
+  function planContent(){ return String(document.getElementById('planNivelPropuesta')?.value || 'TODO').toUpperCase(); }
+  function planContentLabel(value){
+    const map = {
+      TODO:'Todos los datos del evento modelo', INGRESOS:'Solo los datos de INGRESOS', COMPRAS:'Solo los datos de COMPRAS', DONACIONES:'Solo los datos de DONACIONES',
+      INGRESOS_COMPRAS:'Usar INGRESOS + COMPRAS', INGRESOS_DONACIONES:'Usar INGRESOS + DONACIONES', COMPRAS_DONACIONES:'Usar COMPRAS + DONACIONES'
+    };
+    return map[String(value||'TODO').toUpperCase()] || map.TODO;
   }
-  function contentOption(){
-    const value = document.getElementById('planNivelPropuesta')?.value || 'ALL';
-    return CONTENT_OPTIONS.find(item => item.value === value) || CONTENT_OPTIONS[0];
-  }
-  function contentModules(){ return contentOption().modules.slice(); }
-  function contentAllows(moduleName){ return contentModules().includes(moduleName); }
-  function firstDefaultResponsable(){ return document.getElementById('planResponsable')?.value || socios()[0]?.id || ''; }
-  function firstDefaultTienda(){ return document.getElementById('planTienda')?.value || tiendas()[0]?.id || ''; }
-  function modeNeedsModel(){ return planningMode().needsModel; }
-  function modeUsesZuzu(){ return planningMode().usesZuzu; }
-  function syncPlanningModeFields(){
-    const mode = planningMode();
+  function updatePlanModeUI(){
+    const mode = planMode();
     const base = document.getElementById('planEventoBase');
+    const btn = document.getElementById('btnGenerarPlanificacion');
+    if(btn) btn.textContent = 'Generar propuesta';
     if(base){
-      base.disabled = !mode.needsModel;
-      if(!mode.needsModel) base.value = '';
+      const noProcede = mode === 'ZUZU_TOTAL';
+      base.disabled = noProcede;
+      base.closest?.('.field')?.classList?.toggle('plan-no-procede', noProcede);
+      if(noProcede){
+        base.dataset.oldValue = base.value || base.dataset.oldValue || '';
+        base.innerHTML = '<option value=>No procede</option>';
+        base.value = '';
+      }else{
+        const events = finalizados();
+        setOptions(base, events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], base.dataset.oldValue || events[0]?.id || '');
+        base.disabled = false;
+      }
     }
-  }
-  function findByName(listName, name){
-    const target = normalizeText(name);
-    if(!target) return null;
-    return rows(listName).find(item => normalizeText(item?.nombre || item?.titulo || '') === target)
-      || rows(listName).find(item => {
-        const current = normalizeText(item?.nombre || item?.titulo || '');
-        return current && (current.includes(target) || target.includes(current));
-      })
-      || null;
-  }
-  function findProductByName(name){ return findByName('productos', name); }
-  function findTiendaByName(name){ return findByName('tiendas', name); }
-  function findPersonaByName(name){ return findByName('personas', name); }
-  function normalizeDonationType(value){
-    const clean = up(value);
-    if(clean.includes('TIENDA')) return 'DONADO TIENDA';
-    if(clean.includes('SOCIO')) return 'DONADO SOCIO';
-    if(clean.includes('OTRO')) return 'DONADO OTROS';
-    return 'DONADO OTROS';
-  }
-  function donorRefFromLabel(label, donationType){
-    const raw = String(label || '').trim();
-    if(!raw) return '';
-    const person = findPersonaByName(raw);
-    if(person) return `P:${person.id}`;
-    const store = findTiendaByName(raw);
-    if(store) return `T:${store.id}`;
-    if(normalizeDonationType(donationType) === 'DONADO TIENDA'){
-      const fallback = findTiendaByName(raw) || tiendaOf(firstDefaultTienda());
-      return fallback?.id ? `T:${fallback.id}` : '';
-    }
-    return '';
-  }
-  function numberFromAi(value){
-    const n = parseNum(value);
-    return Number.isFinite(n) ? n : 0;
-  }
-  function columnIndex(columns, names){
-    const normalized = columns.map(normalizeText);
-    for(const name of names){
-      const idx = normalized.findIndex(col => col === normalizeText(name) || col.includes(normalizeText(name)));
-      if(idx >= 0) return idx;
-    }
-    return -1;
-  }
-  function buildZuzuPlanningPrompt(source){
-    const mode = planningMode();
-    const content = contentOption();
-    const modules = content.modules.join(', ');
-    const sourceLine = source
-      ? `Evento modelo obligatorio: "${source.titulo || 'Sin título'}" (${source.fechaIni || ''} - ${source.fechaFin || ''}).`
-      : 'Sin evento modelo: analiza todos los eventos finalizados disponibles como histórico y usa catálogo de productos, tiendas y personas cuando haga falta.';
-    const lines = [
-      'PLANIFICACION INICIAL CONTROL EVENT CON ZUZU.',
-      'Objetivo: generar una propuesta editable para crear un evento NUEVO, no modificar eventos existentes.',
-      `Modo de planificación: ${mode.label}.`,
-      `Contenido solicitado: ${content.label}. Módulos que debe usar ControlEvent: ${modules}.`,
-      sourceLine,
-      `Nombre del evento nuevo: ${fieldValue('planEventoTitulo') || 'pendiente de nombre'}.`,
-      `Fecha inicio organización/evento: ${fieldValue('planFechaIni') || 'sin indicar'}.`,
-      `Fecha fin evento/contable: ${fieldValue('planFechaFin') || 'sin indicar'}.`,
-      `Días de duración: ${fieldValue('planDias') || '1'}.`,
-      `Número estimado de personas: ${fieldValue('planPersonas') || 'sin indicar'}.`,
-      `Responsable por defecto: ${personaName(firstDefaultResponsable())}.`,
-      `Tienda por defecto: ${tiendaName(firstDefaultTienda())}.`,
-      `Descripción breve: ${fieldValue('planDescripcion') || 'sin descripción'}.`,
-      `Información para la construcción: ${fieldValue('planInfo') || 'sin instrucciones adicionales'}.`,
-      '',
-      'Devuelve una respuesta breve y, si proceden COMPRAS o DONACIONES, una tabla titulada exactamente "Propuesta de compras y donaciones".',
-      'Columnas obligatorias de esa tabla: Tipo, Producto, Unidades, Precio, Tienda, Responsable, Tipo de donación, Donante, Segmento, Destino, Motivo.',
-      'Tipo debe ser COMPRA o DONACION. Precio en euros por unidad. No uses códigos internos.',
-      'Si el modo es réplica parcial, parte del evento modelo pero ajusta cantidades/variedad según días, personas e instrucciones.',
-      'Si el modo es encargo total, inventa solo lo razonable para el evento nuevo usando el histórico y el catálogo como referencia.'
-    ];
-    return lines.join('\n');
-  }
-  async function callZuzuPlanning(source){
-    const prompt = buildZuzuPlanningPrompt(source);
-    const selectedEventId = source?.id || '';
-    const res = await fetch('/api/event-ai/analyze', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({prompt, selectedEventId})
-    });
-    const data = await res.json().catch(() => ({}));
-    if(!res.ok || data.ok === false) throw new Error(data.error || data.message || `HTTP ${res.status}`);
-    return data;
-  }
-  function zuzuProposalRows(data){
-    const out = [];
-    const tables = Array.isArray(data?.tables) ? data.tables : [];
-    tables.forEach((table, tableIndex) => {
-      const columns = Array.isArray(table?.columns) ? table.columns : [];
-      const rowsData = Array.isArray(table?.rows) ? table.rows : [];
-      const productIdx = columnIndex(columns, ['Producto','Artículo','Articulo','Nombre producto']);
-      const unitsIdx = columnIndex(columns, ['Unidades','Cantidad']);
-      if(productIdx < 0 || unitsIdx < 0) return;
-      const typeIdx = columnIndex(columns, ['Tipo']);
-      const priceIdx = columnIndex(columns, ['Precio','Precio unitario','Precio rfa']);
-      const storeIdx = columnIndex(columns, ['Tienda','Proveedor']);
-      const personIdx = columnIndex(columns, ['Responsable']);
-      const donationIdx = columnIndex(columns, ['Tipo de donación','Tipo donación','Donación']);
-      const donorIdx = columnIndex(columns, ['Donante']);
-      const segmentIdx = columnIndex(columns, ['Segmento']);
-      const destinoIdx = columnIndex(columns, ['Destino']);
-      const reasonIdx = columnIndex(columns, ['Motivo','Razón','Razon','Justificación','Justificacion']);
-      rowsData.forEach((row, rowIndex) => {
-        const cells = Array.isArray(row) ? row : [];
-        const rawProduct = String(cells[productIdx] || '').trim();
-        if(!rawProduct) return;
-        const rawType = up(cells[typeIdx] || '');
-        const rawDonation = String(cells[donationIdx] || '').trim();
-        const tipo = rawType.includes('DON') || rawDonation ? 'DONACION' : 'COMPRA';
-        const product = findProductByName(rawProduct);
-        const store = findTiendaByName(cells[storeIdx] || '');
-        const person = findPersonaByName(cells[personIdx] || '');
-        const donationType = tipo === 'DONACION' ? normalizeDonationType(rawDonation || cells[typeIdx] || '') : '';
-        const price = numberFromAi(cells[priceIdx]);
-        out.push({
-          key: `zuzu:${tableIndex}:${rowIndex}:${normalizeText(rawProduct)}`,
-          include: true,
-          tipo,
-          sourceId: '',
-          productId: product?.id || '',
-          productName: product?.nombre || rawProduct,
-          segmento: product?.segmento || String(cells[segmentIdx] || '').trim() || 'SIN CLASIFICAR',
-          destino: product?.destino || String(cells[destinoIdx] || '').trim() || 'SIN CLASIFICAR',
-          unidades: Math.max(0, Math.round(numberFromAi(cells[unitsIdx]) * 100) / 100),
-          precio: price > 0 ? price : Number(product?.defaultPrecio ?? product?.precio ?? 0) || 0,
-          tiendaId: store?.id || firstDefaultTienda(),
-          responsableId: person?.id || firstDefaultResponsable(),
-          ticketDonacion: tipo === 'DONACION' ? donationType : '',
-          donorRef: tipo === 'DONACION' ? donorRefFromLabel(cells[donorIdx], donationType) : '',
-          sourceTiendaId: '',
-          sourcePrecio: price,
-          confidence: product ? 'Zuzu + catálogo' : 'Zuzu producto nuevo',
-          reason: String(cells[reasonIdx] || '').trim() || 'Propuesto por Zuzu según histórico, datos del evento e instrucciones.',
-          isNewProduct: !product
-        });
-      });
-    });
-    return out;
-  }
-  function renderZuzuInsight(){
-    if(!lastZuzuResult && !lastPlanningMeta?.zuzuError) return '';
-    const warnings = Array.isArray(lastZuzuResult?.warnings) ? lastZuzuResult.warnings : [];
-    const answer = lastPlanningMeta?.zuzuError
-      ? `Zuzu no pudo generar una propuesta nueva (${lastPlanningMeta.zuzuError}). Se mantiene el respaldo local.`
-      : (lastZuzuResult?.answer || 'Zuzu ha generado una propuesta estructurada.');
-    return `
-      <div class="planificacion-note compact-note plan-zuzu-note">
-        <strong>Zuzu:</strong> ${esc(answer)}
-        ${warnings.length ? `<ul>${warnings.slice(0,4).map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
-      </div>
-    `;
   }
   function donorOptions(){
     const out = [], seen = new Set();
@@ -341,9 +170,8 @@
   }
   function incomeRowsForEvent(eventId){
     const id = String(eventId || '');
-    return rows('colaboradores').filter(c => rowEventId(c) === id).map((c, index) => {
-      const personaId = rowPersonId(c);
-      const persona = personaOf(personaId) || {};
+    return rows('colaboradores').filter(c => String(c.eventId || '') === id).map((c, index) => {
+      const persona = personaOf(c.personaId) || {};
       const rango = up(persona.rango || c.rango || '');
       const numero = Math.max(0, Number(c.numero || 0));
       const voluntario = parseNum(c.importe ?? c.importeVoluntario ?? 0);
@@ -352,7 +180,7 @@
       return {
         key: `ingreso:${c.id || index}`,
         sourceId: c.id || '',
-        personaId,
+        personaId: c.personaId || '',
         personaName: persona.nombre || 'Persona sin nombre',
         rango: rango || 'SIN RANGO',
         numero,
@@ -415,23 +243,38 @@
   }
 
   function initForm(){
+    // V33.5: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
     const events = finalizados();
-    const mode = planningMode();
-    const eventOptions = events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}];
-    const baseOptions = mode.needsModel ? eventOptions : [{value:'', label:'No procede en encargo total a Zuzu'}].concat(eventOptions);
-    setOptions(document.getElementById('planEventoBase'), baseOptions, mode.needsModel ? (events[0]?.id || '') : '');
+    setOptions(document.getElementById('planEventoBase'), events.length ? events.map(e => ({value:e.id, label:`${e.fechaIni || '--/--/--'} · ${e.titulo || 'Evento sin título'} · FINALIZADO`})) : [{value:'', label:'No hay eventos finalizados disponibles'}], events[0]?.id || '');
     const fuente = document.getElementById('planFuenteHistorica');
-    if(fuente){ setOptions(fuente, PLANNING_MODES.map(({value,label}) => ({value,label})), fuente.value || 'BASE'); fuente.disabled = false; }
+    if(fuente){
+      setOptions(fuente, [
+        {value:'REPLICA', label:'Replicar un evento Finalizado'},
+        {value:'ZUZU_TOTAL', label:'Encargo total a Zuzu'},
+        {value:'ZUZU_PARCIAL', label:'Encargo parcial a Zuzu'}
+      ], fuente.value || 'REPLICA');
+      fuente.disabled = false;
+    }
     const nivel = document.getElementById('planNivelPropuesta');
-    if(nivel){ setOptions(nivel, CONTENT_OPTIONS.map(({value,label}) => ({value,label})), nivel.value || 'ALL'); nivel.disabled = false; }
-    syncPlanningModeFields();
+    if(nivel){
+      setOptions(nivel, [
+        {value:'TODO', label:'Todos los datos del evento modelo'},
+        {value:'INGRESOS', label:'Solo los datos de INGRESOS'},
+        {value:'COMPRAS', label:'Solo los datos de COMPRAS'},
+        {value:'DONACIONES', label:'Solo los datos de DONACIONES'},
+        {value:'INGRESOS_COMPRAS', label:'Usar INGRESOS + COMPRAS'},
+        {value:'INGRESOS_DONACIONES', label:'Usar INGRESOS + DONACIONES'},
+        {value:'COMPRAS_DONACIONES', label:'Usar COMPRAS + DONACIONES'}
+      ], nivel.value || 'TODO');
+      nivel.disabled = false;
+    }
+    updatePlanModeUI();
     const socioOptions = socios().map(p => ({value:p.id, label:p.nombre || 'Socio sin nombre'}));
     setOptions(document.getElementById('planResponsable'), socioOptions.length ? socioOptions : [{value:'', label:'Sin socios disponibles'}]);
     const tiendaOptions = tiendas().map(t => ({value:t.id, label:t.nombre || 'Tienda sin nombre'}));
     setOptions(document.getElementById('planTienda'), tiendaOptions.length ? tiendaOptions : [{value:'', label:'Sin tiendas disponibles'}]);
     updateDaysFromDates();
     unlockPlanControls();
-    syncPlanningModeFields();
   }
   function updateDaysFromDates(){
     const ini = document.getElementById('planFechaIni')?.value;
@@ -445,16 +288,14 @@
     }
   }
   function sourceEvent(){
-    if(!modeNeedsModel()) return null;
     const id = document.getElementById('planEventoBase')?.value || '';
     return byId('eventos', id);
   }
   function buildReplicaProposal(){
     const ev = sourceEvent();
-    if(!ev){ return {event:null, rows:[], incomes:[]}; }
+    if(!ev){ return {event:null, rows:[]}; }
     if(up(ev.situacion || '') !== 'FINALIZADO') return {event:ev, rows:[], incomes:[]};
-    const modules = contentModules();
-    const eventRows = rows('compras').filter(row => rowEventId(row) === String(ev.id || ''));
+    const eventRows = rows('compras').filter(row => String(row.eventId || '') === String(ev.id || ''));
     const mapped = eventRows.map((row, index) => {
       const product = productOf(row) || {};
       const tipo = isDonation(row) ? 'DONACION' : 'COMPRA';
@@ -463,7 +304,7 @@
         include: true,
         tipo,
         sourceId: row.id || '',
-        productId: product.id || rowProductId(row),
+        productId: product.id || row.productoId || '',
         productName: product.nombre || productName(row),
         segmento: product.segmento || segmentName(row),
         destino: product.destino || destinoName(row),
@@ -471,9 +312,9 @@
         precio: unitPrice(row),
         tiendaId: rowTienda(row),
         responsableId: rowResponsible(row),
-        ticketDonacion: rowTicket(row),
-        donorRef: rowDonorRef(row),
-        sourceTiendaId: rowTienda(row),
+        ticketDonacion: String(row.ticketDonacion || ''),
+        donorRef: String(row.donorRef || ''),
+        sourceTiendaId: String(row.tiendaId || ''),
         sourcePrecio: unitPrice(row),
         confidence: 'Réplica exacta',
         reason: tipo === 'DONACION'
@@ -481,13 +322,12 @@
           : 'Compra replicada tal cual desde el evento finalizado.'
       };
     });
-    const filtered = mapped.filter(item => (item.tipo === 'COMPRA' && modules.includes('COMPRAS')) || (item.tipo === 'DONACION' && modules.includes('DONACIONES')));
-    filtered.sort((a,b) => {
+    mapped.sort((a,b) => {
       const ta = a.tipo.localeCompare(b.tipo, 'es');
       if(ta) return ta;
       return String(tiendaName(a.tiendaId)).localeCompare(String(tiendaName(b.tiendaId)),'es') || String(a.ticketDonacion || '').localeCompare(String(b.ticketDonacion || ''),'es') || a.productName.localeCompare(b.productName,'es');
     });
-    return {event:ev, rows:filtered, incomes: modules.includes('INGRESOS') ? incomeRowsForEvent(ev.id) : []};
+    return {event:ev, rows:mapped, incomes: incomeRowsForEvent(ev.id)};
   }
 
   function renderProposal(){
@@ -500,22 +340,18 @@
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const ingresosInfo = incomeSummary(lastIncomeProposal);
-    const mode = lastPlanningMeta.mode || planningMode();
-    const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay compras ni donaciones de producto en la propuesta actual.</div>';
-    const sourceTitle = source?.titulo || (mode.value === 'ZUZU_TOTAL' ? 'Sin evento modelo · encargo total a Zuzu' : 'Sin evento modelo');
-    const sourceDates = source ? `${source.fechaIni || ''}${source?.fechaFin ? ' · ' + source.fechaFin : ''}` : (lastPlanningMeta.modules?.length ? `Módulos: ${lastPlanningMeta.modules.join(' + ')}` : '');
+    const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones en la propuesta generada.</div>';
     box.classList.remove('hidden');
     box.innerHTML = `
       <div class="plan-summary-grid">
-        <div class="plan-metric"><span>${mode.needsModel ? 'Evento modelo' : 'Histórico Zuzu'}</span><strong>${esc(sourceTitle)}</strong><small>${esc(sourceDates)}</small></div>
+        <div class="plan-metric"><span>Evento modelo</span><strong>${esc(source?.titulo || (planMode()==='ZUZU_TOTAL' ? 'No procede: encargo total a Zuzu' : 'Sin evento'))}</strong><small>${esc(source?.fechaIni || '')}${source?.fechaFin ? ' · ' + esc(source.fechaFin) : ''}</small></div>
         <div class="plan-metric"><span>Compras propuestas</span><strong>${compras.length}</strong><small>${money(totalCompras)} previstos</small></div>
         <div class="plan-metric"><span>Donaciones propuestas</span><strong>${donaciones.length}</strong><small>${money(totalDonaciones)} valor estimado</small></div>
-        <div class="plan-metric"><span>Ingresos previstos</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
+        <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderIngresosReplica(lastIncomeProposal)}
-      ${renderZuzuInsight()}
       <div class="planificacion-note compact-note">
-        <strong>Propuesta inicial:</strong> revisa, incluye o quita líneas antes de crear el evento real. Ingresos en Pendiente, donaciones con su tipo y compras en Pte.Compra u otros gastos.
+        <strong>Propuesta de planificación inicial:</strong> crea el evento real desde una propuesta revisada. Ingresos en Pendiente, donaciones tal cual y compras en Pte.Compra u otros gastos.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -540,8 +376,8 @@
       <div class="plan-product-card ${p.include ? '' : 'excluded'} ${p.tipo === 'DONACION' ? 'plan-donation-card' : 'plan-purchase-card'}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
         <div class="plan-product-head">
           <label class="plan-include"><input type="checkbox" data-plan-field="include" ${p.include ? 'checked' : ''}/> Incluir</label>
-          <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}${p.isNewProduct ? ' · producto nuevo' : ''}</span></div>
-          <span class="plan-confidence alta">${p.tipo === 'DONACION' ? 'Donación' : 'Compra'}${p.isNewProduct ? ' nueva' : ''}</span>
+          <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}</span></div>
+          <span class="plan-confidence alta">${p.tipo === 'DONACION' ? 'Donación' : 'Compra'}</span>
         </div>
         <div class="plan-product-grid replica-grid">
           <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${esc(p.unidades)}" data-plan-field="unidades" /></div>
@@ -624,69 +460,40 @@
   function proposedEventTitle(){
     const raw = fieldValue('planEventoTitulo');
     if(raw) return raw;
-    if(!modeNeedsModel()) return 'Nuevo evento planificado';
     const base = lastSourceEvent?.titulo || sourceEvent()?.titulo || 'Evento replicado';
     return 'Copia de ' + base;
-  }
-  function ensureProductForProposal(p, st){
-    if(p.productId) return p.productId;
-    if(!st.productos) st.productos = [];
-    const existing = findProductByName(p.productName);
-    if(existing?.id){
-      p.productId = existing.id;
-      return existing.id;
-    }
-    const name = String(p.productName || '').trim();
-    if(!name) return '';
-    const id = makeId();
-    st.productos.push({
-      id,
-      nombre: name,
-      segmento: String(p.segmento || 'SIN CLASIFICAR').trim() || 'SIN CLASIFICAR',
-      destino: String(p.destino || 'SIN CLASIFICAR').trim() || 'SIN CLASIFICAR',
-      defaultPrecio: Number(p.precio || 0),
-      precio: Number(p.precio || 0),
-      defaultTiendaId: String(p.tiendaId || firstDefaultTienda() || '')
-    });
-    p.productId = id;
-    p.isNewProduct = false;
-    p.reason = `${p.reason || 'Producto propuesto por Zuzu.'} Se creó ficha mínima de producto al generar el evento.`;
-    return id;
   }
   function confirmReplicaCreation(){
     const included = lastProposal.filter(p => p.include);
     const purchases = included.filter(p => p.tipo === 'COMPRA').length;
     const donations = included.filter(p => p.tipo === 'DONACION').length;
-    const newProducts = included.filter(p => !p.productId).length;
     const inc = incomeSummary(lastIncomeProposal);
     const title = proposedEventTitle();
     const msg = [
-      'Se va a crear un EVENTO REAL desde la propuesta inicial.',
+      'Se va a crear un EVENTO REAL a partir de la propuesta revisada.',
       '',
       'Evento nuevo: ' + title,
       'Ingresos a replicar: ' + inc.registros + ' registros (' + qty(inc.sociosPersonas) + ' SOCIOS · ' + qty(inc.noSociosPersonas) + ' NO SOCIOS)',
       'Compras a replicar: ' + purchases,
       'Donaciones de producto a replicar: ' + donations,
-      newProducts ? 'Productos nuevos a crear en catálogo: ' + newProducts : '',
       '',
-      'No se crearán ni eliminarán PERSONAS ni TIENDAS generales.',
-      'Solo se crearán PRODUCTOS nuevos si Zuzu los propuso y los has dejado incluidos.',
+      'No se crearán ni eliminarán PERSONAS, TIENDAS ni PRODUCTOS generales.',
       'Después podrás revisar y adaptar el evento desde las pantallas normales.',
       '',
       '¿Quieres continuar?'
-    ].filter(line => line !== '').join('\n');
+    ].join('\n');
     try{ return confirm(msg); }catch(_){ return false; }
   }
   function applyReplicaToRealEvent(){
     if(!isGD()) return;
     const source = lastSourceEvent || sourceEvent();
-    const mode = lastPlanningMeta.mode || planningMode();
-    if(mode.needsModel && !source){ try{ alert('Primero debes generar una propuesta desde un evento modelo.'); }catch(_){} return; }
-    if(mode.needsModel && up(source.situacion || '') !== 'FINALIZADO'){
-      try{ alert('Solo se puede crear desde un evento que esté FINALIZADO.'); }catch(_){}
+    const mode = planMode();
+    if(!source && mode !== 'ZUZU_TOTAL'){ try{ alert('Primero debes generar una propuesta.'); }catch(_){} return; }
+    if(source && up(source.situacion || '') !== 'FINALIZADO'){
+      try{ alert('El evento modelo debe estar FINALIZADO.'); }catch(_){}
       return;
     }
-    if(!lastProposal.length && !lastIncomeProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
+    if(!lastProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
     const st = state();
     if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
     const title = proposedEventTitle();
@@ -700,14 +507,9 @@
     const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source.fechaFin || source.fechaIni || '';
     const descUser = fieldValue('planDescripcion');
     const infoUser = fieldValue('planInfo');
-    const origen = source
-      ? 'Propuesta inicial creada desde evento modelo finalizado: ' + (source.titulo || 'sin título') + '.'
-      : 'Propuesta inicial creada por Zuzu sin evento modelo obligatorio.';
     const descripcion = [
       descUser || source?.descripcion || '',
-      origen,
-      lastPlanningMeta?.mode?.label ? 'Modo de planificación: ' + lastPlanningMeta.mode.label + '.' : '',
-      lastPlanningMeta?.modules?.length ? 'Contenido usado: ' + lastPlanningMeta.modules.join(', ') + '.' : '',
+      (source ? 'Propuesta inicial creada desde evento modelo: ' + (source.titulo || 'sin título') + '.' : 'Propuesta inicial creada por Zuzu sin evento modelo.'),
       infoUser ? 'Información de planificación: ' + infoUser : ''
     ].filter(Boolean).join('\n');
 
@@ -734,13 +536,12 @@
     });
 
     lastProposal.filter(p => p.include).forEach(p => {
-      const productId = ensureProductForProposal(p, st);
-      if(!productId) return;
+      if(!p.productId) return;
       const isDon = p.tipo === 'DONACION';
       st.compras.push({
         id: makeId(),
         eventId: newEventId,
-        productoId: productId,
+        productoId: p.productId,
         unidades: Number(p.unidades || 0),
         precio: Number(p.precio || 0),
         tiendaId: String(p.tiendaId || p.sourceTiendaId || ''),
@@ -758,49 +559,72 @@
     try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){}
   }
 
-  function showPlanningBusy(message){
-    const box = document.getElementById('planificacionResultado');
-    if(!box) return;
-    box.classList.remove('hidden');
-    box.innerHTML = `<div class="planificacion-note compact-note"><strong>${esc(message || 'Generando propuesta...')}</strong></div>`;
-  }
   async function generateProposal(){
     if(!isGD()) return;
-    const mode = planningMode();
-    const modules = contentModules();
-    const replica = buildReplicaProposal();
-    lastSourceEvent = replica.event;
-    lastZuzuResult = null;
-    lastPlanningMeta = {mode, content: contentOption(), modules, zuzuError: ''};
-    if(mode.needsModel && !replica.event){
-      lastIncomeProposal = [];
-      try{ alert('Debes elegir un evento modelo finalizado.'); }catch(_){ }
+    const mode = planMode();
+    const modelId = document.getElementById('planEventoBase')?.value || '';
+    if((mode === 'REPLICA' || mode === 'ZUZU_PARCIAL') && !modelId){
+      try{ alert('Debes elegir un Evento modelo finalizado para este modo de planificación.'); }catch(_){ }
       return;
     }
-    if(mode.needsModel && up(replica.event.situacion || '') !== 'FINALIZADO'){
-      lastIncomeProposal = [];
-      try{ alert('El evento modelo debe estar en situación FINALIZADO.'); }catch(_){ }
-      return;
-    }
-    lastProposal = replica.rows || [];
-    lastIncomeProposal = replica.incomes || [];
-    if(mode.usesZuzu){
-      showPlanningBusy('Zuzu está preparando la propuesta inicial...');
-      try{
-        const data = await callZuzuPlanning(replica.event);
-        lastZuzuResult = data;
-        const zuzuRows = zuzuProposalRows(data);
-        if(zuzuRows.length){
-          lastProposal = zuzuRows.filter(item => (item.tipo === 'COMPRA' && modules.includes('COMPRAS')) || (item.tipo === 'DONACION' && modules.includes('DONACIONES')));
-        }else if(!lastProposal.length){
-          lastPlanningMeta.zuzuError = 'no devolvió una tabla de propuesta con Producto y Unidades';
-        }
-      }catch(error){
-        lastPlanningMeta.zuzuError = error?.message || String(error);
+    const btn = document.getElementById('btnGenerarPlanificacion');
+    const oldText = btn?.textContent || '';
+    const box = document.getElementById('planificacionResultado');
+    try{
+      if(btn){ btn.disabled = true; btn.textContent = 'Zuzu está pensando...'; }
+      if(box){
+        box.classList.remove('hidden');
+        box.innerHTML = '<div class="planificacion-note compact-note"><strong>Zuzu está preparando la propuesta...</strong><br>Está leyendo históricos, módulos y condiciones de construcción.</div>';
       }
+      const payload = {
+        mode,
+        modelEventId: modelId,
+        content: planContent(),
+        title: fieldValue('planEventoTitulo'),
+        fechaIni: fieldValue('planFechaIni'),
+        fechaFin: fieldValue('planFechaFin'),
+        dias: Number(fieldValue('planDias') || 1),
+        personas: Number(fieldValue('planPersonas') || 0),
+        defaultResponsibleId: document.getElementById('planResponsable')?.value || '',
+        defaultStoreId: document.getElementById('planTienda')?.value || '',
+        descripcion: fieldValue('planDescripcion'),
+        info: fieldValue('planInfo')
+      };
+      const res = await fetch('/api/event-ai/planificacion-propuesta', {
+        method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', body: JSON.stringify(payload)
+      });
+      if(!res.ok){
+        let msg = 'No se pudo generar la propuesta (' + res.status + ')';
+        try{ const err = await res.json(); if(err?.error) msg = err.error; else if(err?.message) msg = err.message; }catch(_){ }
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      lastSourceEvent = data.event && data.event.id ? data.event : null;
+      lastProposal = Array.isArray(data.rows) ? data.rows : [];
+      lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
+      renderProposal();
+      const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
+      if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
+      document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
+    }catch(error){
+      console.warn('[ControlEvent v13.0_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
+        try{
+          const replica = buildReplicaProposal();
+          lastSourceEvent = replica.event;
+          lastProposal = replica.rows;
+          lastIncomeProposal = replica.incomes || [];
+          renderProposal();
+          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se muestra réplica local del evento modelo.</div>');
+          document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
+        }catch(_){ try{ alert(error?.message || error); }catch(__){} }
+      }else{
+        if(box){ box.classList.remove('hidden'); box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo generar la propuesta:</strong> '+esc(error?.message || error)+'</div>'; }
+      }
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = oldText || 'Generar propuesta'; }
+      unlockPlanControls();
     }
-    renderProposal();
-    document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
   function ensurePlanTopButton(){
@@ -971,8 +795,7 @@
       if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => { clearPlanificacionRuntimeFlag(); setTimeout(hidePlanificacion, 0); });
     });
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
-    bindOnce(document.getElementById('planFuenteHistorica'), 'change', () => { initForm(); syncPlanningModeFields(); });
-    bindOnce(document.getElementById('planNivelPropuesta'), 'change', () => { lastProposal = []; lastIncomeProposal = []; lastZuzuResult = null; });
+    bindOnce(document.getElementById('planFuenteHistorica'), 'change', updatePlanModeUI);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
     if(!document.__cePlanMobileClickV337){

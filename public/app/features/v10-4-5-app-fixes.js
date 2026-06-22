@@ -1,7 +1,7 @@
-﻿/* ControlEvent v13.0_prod - Rescate Documentos/Ingresos/Mapa mÃ³vil
-   - No hace render() ni recargas automÃ¡ticas.
-   - Restituye miniaturas y una Ãºnica flecha de descarga en Documentos e Ingresos.
-   - Reduce el filtro de responsables del Mapa en iPad/mÃ³vil.
+/* ControlEvent v13.0_prod - Rescate Documentos/Ingresos/Mapa móvil
+   - No hace render() ni recargas automáticas.
+   - Restituye miniaturas y una única flecha de descarga en Documentos e Ingresos.
+   - Reduce el filtro de responsables del Mapa en iPad/móvil.
 */
 (function(){
   'use strict';
@@ -54,7 +54,7 @@
     return (el && el.closest && el.closest('.ce-doc-item,.ce-doc-media,.ce-v509-receipt-field,.ce-v504-receipt-strip,.ce-v502-receipt-strip,.ce-v465-receipt-strip,.itemcard,.rowline,.card')) || (el && el.parentElement) || root;
   }
   function makeBtn(cls, title, getSrc, name){
-    var btn=document.createElement('button'); btn.type='button'; btn.textContent='â¬‡ï¸'; btn.title=title; btn.setAttribute('aria-label',title); btn.className='outline small ce-v1045-download '+cls;
+    var btn=document.createElement('button'); btn.type='button'; btn.textContent='⬇️'; btn.title=title; btn.setAttribute('aria-label',title); btn.className='outline small ce-v1045-download '+cls;
     btn.addEventListener('click',function(ev){ stop(ev); return downloadSrc(getSrc(), name); }, true);
     btn.addEventListener('pointerdown',function(ev){ ev.stopPropagation&&ev.stopPropagation(); }, true);
     btn.addEventListener('touchstart',function(ev){ ev.stopPropagation&&ev.stopPropagation(); }, {capture:true,passive:false});

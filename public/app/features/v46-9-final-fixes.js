@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v13.0_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -35,14 +35,14 @@
   function isLockedSafe(){ try{ return typeof isLocked === 'function' ? !!isLocked() : up(selectedEv()?.situacion) === 'FINALIZADO'; }catch(_){ return false; } }
   function parseEuro(value){
     if(typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/â‚¬/g,'');
+    let s = String(value ?? '').trim().replace(/\s/g,'').replace(/€/g,'');
     if(!s) return 0;
     if(s.includes(',') && s.includes('.')) s = s.replace(/\./g,'').replace(',', '.');
     else if(s.includes(',')) s = s.replace(',', '.');
     const n = Number(s);
     return Number.isFinite(n) ? n : 0;
   }
-  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} â‚¬`; } }
+  function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v || 0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
   function saveNow(){ try{ if(typeof saveState === 'function') return saveState(); }catch(_){ } try{ return window.saveState?.(); }catch(_){ } }
   function renderNow(){ try{ if(typeof render === 'function') return render(); }catch(_){ } try{ return window.render?.(); }catch(_){ } }
   function stop(ev){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ } return false; }
@@ -240,7 +240,7 @@
       try{ if(modal.__ceKeepTooltipTimer) clearInterval(modal.__ceKeepTooltipTimer); modal.remove(); }catch(_){ }
     });
     document.body.classList.remove('ce-v468-preserve-tooltips');
-    // RestauraciÃ³n Ãºnica del globo origen: sin intervalos ni reintentos que lo relancen al cerrar o perder foco.
+    // Restauración única del globo origen: sin intervalos ni reintentos que lo relancen al cerrar o perder foco.
     try{ restoreTooltipSnapshot(snapshot || lastTooltipSnapshot); enrichOpenTooltips(); }catch(_){ }
     return false;
   }
@@ -256,9 +256,9 @@
     ov.innerHTML = `<div class="ce-v468-modal-card" role="dialog" aria-modal="true">
       <div class="ce-v468-modal-head"><span>Justificante de ingreso</span><button type="button" class="outline small" data-close="1">Cerrar</button></div>
       <div class="ce-v468-modal-info"><h3>${esc(info.nombre)}</h3><table><tbody>
-        <tr><td>SituaciÃ³n</td><td>${esc(info.situacion)}</td></tr>
+        <tr><td>Situación</td><td>${esc(info.situacion)}</td></tr>
         <tr><td>Rango</td><td>${esc(info.rango || '-')}</td></tr>
-        <tr><td>NÂº personas</td><td>${esc(info.numero)}</td></tr>
+        <tr><td>Nº personas</td><td>${esc(info.numero)}</td></tr>
         <tr><td>Importe obligatorio</td><td>${esc(money(info.obligatorio))}</td></tr>
         <tr><td>Importe voluntario</td><td>${esc(money(info.voluntario))}</td></tr>
         <tr><td>Total ingreso</td><td>${esc(money(info.total))}</td></tr>
@@ -267,7 +267,7 @@
     </div>`;
     document.querySelectorAll('.ce-v468-modal').forEach(modal => { try{ if(modal.__ceKeepTooltipTimer) clearInterval(modal.__ceKeepTooltipTimer); modal.remove(); }catch(_){ } });
     document.body.appendChild(ov);
-    // v50.19: sin temporizador de restauraciÃ³n permanente; era la causa de globos que volvÃ­an a lanzarse y cierres dobles.
+    // v50.19: sin temporizador de restauración permanente; era la causa de globos que volvían a lanzarse y cierres dobles.
     ov.addEventListener('pointerdown', e => { try{ e.stopPropagation(); e.stopImmediatePropagation(); }catch(_){ } }, true);
     ov.addEventListener('wheel', e => { try{ e.stopPropagation(); }catch(_){ } }, true);
     ov.addEventListener('click', e => { if(e.target === ov || e.target?.closest?.('[data-close]')) return closeReceiptModal(ov, snapshot, e); try{ e.stopPropagation(); }catch(_){ } }, true);
@@ -298,7 +298,7 @@
   async function removeReceipt(id, ev){
     if(!canWrite()){ alert('No autorizado para modificar justificantes.'); return stop(ev || {}); }
     if(isLockedSafe()){ alert('Evento finalizado. No se puede modificar.'); return stop(ev || {}); }
-    if(!confirm('Â¿Eliminar el justificante de este ingreso?')) return stop(ev || {});
+    if(!confirm('¿Eliminar el justificante de este ingreso?')) return stop(ev || {});
     const scroll = captureScroll();
     deleteReceiptLocal(id); await deleteReceiptFromServer(id); saveNow(); renderNow(); restoreScroll(scroll);
     [80,220,520,1000].forEach(ms => setTimeout(() => { compactIngresoReceipts(); enrichOpenTooltips(); restoreScroll(scroll); }, ms));
@@ -315,7 +315,7 @@
       const id = collabCardId(card); if(!id) return;
       let box = card.querySelector('.ce-v465-receipt-strip');
       const src = receiptData(id);
-      const html = `${src ? `<button type="button" class="ce-v465-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v465" data-id="${esc(id)}"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v465-receipt-empty" title="Sin justificante">ðŸ“·</span>`}<button type="button" class="ce-v465-receipt-btn" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v465" data-id="${esc(id)}">ðŸ“Ž</button>${src ? `<button type="button" class="ce-v465-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v465" data-id="${esc(id)}">ðŸ—‘</button>` : ''}`;
+      const html = `${src ? `<button type="button" class="ce-v465-receipt-thumb" title="Ver justificante" data-action="ingreso-receipt-view-v465" data-id="${esc(id)}"><img alt="Justificante" src="${esc(src)}"></button>` : `<span class="ce-v465-receipt-empty" title="Sin justificante">📷</span>`}<button type="button" class="ce-v465-receipt-btn" title="${src ? 'Cambiar justificante' : 'Adjuntar justificante'}" data-action="ingreso-receipt-add-v465" data-id="${esc(id)}">📎</button>${src ? `<button type="button" class="ce-v465-receipt-btn danger" title="Eliminar justificante" data-action="ingreso-receipt-delete-v465" data-id="${esc(id)}">🗑</button>` : ''}`;
       if(box){ box.innerHTML = html; box.dataset.receiptHas = String(!!src); return; }
       box = document.createElement('div'); box.className='ce-v465-receipt-strip'; box.dataset.receiptHas=String(!!src); box.innerHTML=html;
       const actions = card.querySelector('button[data-action="save-collab"]')?.parentElement || card.querySelector('button[data-action="delete-collab"]')?.parentElement || card;
@@ -360,7 +360,7 @@
       const rows = Array.from(table.querySelectorAll('tr'));
       if(!rows.length) return;
       const first = rows[0];
-      const markers = Array.from(first.children).map((cell, idx) => ({cell, idx})).filter(x => x.cell.classList?.contains('ce-v465-thumb-cell') || /^\s*JUST\.?\s*$/i.test(String(x.cell.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()));
+      const markers = Array.from(first.children).map((cell, idx) => ({cell, idx})).filter(x => x.cell.classList?.contains('ce-v465-thumb-cell') || /^\s*JUST\.?\s*$/i.test(String(x.cell.textContent || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase()));
       if(markers.length <= 1){ table.dataset.ceV465Receipts='1'; table.dataset.ceV468Receipts='1'; return; }
       const keep = markers[0].idx;
       const remove = markers.slice(1).map(x => x.idx).sort((a,b)=>b-a);
@@ -374,7 +374,7 @@
   function enrichOpenTooltips(){ enrichGraphTooltip(); enrichBudgetTooltip(); dedupeReceiptThumbColumns(); }
 
   // v50.19: se desactiva la negrita persistente de PRODUCTOS porque provoca parpadeos
-  // y registros en negrita aleatoria al modificar. La gestiÃ³n de justificantes queda intacta.
+  // y registros en negrita aleatoria al modificar. La gestión de justificantes queda intacta.
   const modifiedProducts = new Set();
   function productNodes(id){ return []; }
   function commonContainer(nodes){ return null; }

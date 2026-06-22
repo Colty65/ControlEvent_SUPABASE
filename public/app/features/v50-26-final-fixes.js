@@ -1,4 +1,4 @@
-﻿/* ControlEvent v13.0_prod - logon limpio y globos rehidratados sin bucles pesados.
+/* ControlEvent v13.0_prod - logon limpio y globos rehidratados sin bucles pesados.
    - Marca TODAS las claves de evento elegido, incluida la antigua ce_v250_event_chosen.
    - Tras cambio de usuario + eleccion de evento, rehidrata globos de Resumen y Graficas.
    - No usa MutationObserver global ni setInterval.
@@ -154,7 +154,7 @@
     applyVersion();
   }
   function hydrateOnceSeries(reason){
-    // Serie corta y acotada: suficiente para esperar al render asÃ­ncrono sin crear bucles permanentes.
+    // Serie corta y acotada: suficiente para esperar al render asíncrono sin crear bucles permanentes.
     [0,180,520,1100,1900].forEach(ms => setTimeout(() => hydrateTooltips(reason), ms));
   }
   function patchLogout(){

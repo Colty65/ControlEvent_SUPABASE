@@ -1,5 +1,5 @@
-﻿/* ControlEvent v13.0_prod - desbloqueo real de herramientas de consulta con evento Finalizado.
-   Permite Zuzu, mantenimientos generales, BACKUP/Excel/importaciÃ³n/descarga. No cambia reglas backend de datos del evento finalizado. */
+/* ControlEvent v13.0_prod - desbloqueo real de herramientas de consulta con evento Finalizado.
+   Permite Zuzu, mantenimientos generales, BACKUP/Excel/importación/descarga. No cambia reglas backend de datos del evento finalizado. */
 (function(){
   'use strict';
   if (window.__ceV120FinalizadoHerramientasConsulta) return;
@@ -12,7 +12,7 @@
     '#backupPanel', '#excelPanel', '#importPanel', '#downloadPanel', '.ce-backup-overlay-v181', '.ce-backup-modal-v181', '#ceV120BackupScopeFix', '#ceBackupScopeV40', '#ceBackupScopeV257', '#ceBackupScopeSelectV841Id'
   ].join(',');
   const SAFE_BUTTON_SEL = [
-    '#ceGeminiLibreBtn', '.ce-zuzu-open', '#tabPlanificacionBtn', '#btnGenerarPlanificacion', '#btnPlanApplyReplica', '#btnToggleMaintenance', '#btnExportSeed', '#btnExportExcel', '#btnOpenImport',
+    '#ceGeminiLibreBtn', '#tabPlanificacionBtn', '#btnGenerarPlanificacion', '#btnPlanApplyReplica', '.ce-zuzu-open', '#btnToggleMaintenance', '#btnExportSeed', '#btnExportExcel', '#btnOpenImport',
     '#btnStartImport', '#btnClearImportStatus', '#mtPersonasBtn', '#mtEventosBtn', '#mtTiendasBtn', '#mtProductosBtn', '#mtAccesoBtn',
     '#btnBackup', '#btnDownloadBackup', '#btnDownloadInfoEvento', '#btnInfoEvento', '#btnExportData', '#btnImportData'
   ].join(',');
@@ -176,9 +176,9 @@
     if(scope === 'TODOS') params.set('scope','all');
     else { params.set('scope','event'); params.set('eventId', scope); }
     const res = await fetch('/api/export/backup?' + params.toString() + '&ts=' + Date.now(), {cache:'no-store'});
-    if(!res.ok) throw new Error('Servidor no generÃ³ BACKUP (' + res.status + ')');
+    if(!res.ok) throw new Error('Servidor no generó BACKUP (' + res.status + ')');
     const blob = await res.blob();
-    if(!blob || !blob.size) throw new Error('El BACKUP descargado estÃ¡ vacÃ­o.');
+    if(!blob || !blob.size) throw new Error('El BACKUP descargado está vacío.');
     downloadBlob(blob, fileNameFromDisposition(res.headers.get('content-disposition')) || 'ControlEvent_v13.0_prod_BACKUP.xlsx');
   }
   function openBackupDialogFinalizado(){

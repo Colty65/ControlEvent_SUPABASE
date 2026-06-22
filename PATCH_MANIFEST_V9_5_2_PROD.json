@@ -1,12 +1,12 @@
-﻿{
+{
   "version": "ControlEvent v13.0_prod",
-  "base": "versiÃ³n anterior v9.5.1",
+  "base": "versión anterior v9.5.1",
   "changes": [
-    "Ticket IA: sustituido Quitar por papelera pequeÃ±a por lÃ­nea",
-    "PRODUCTOS: nueva ruta dedicada para actualizar Ãºltimo precio de productos existentes",
+    "Ticket IA: sustituido Quitar por papelera pequeña por línea",
+    "PRODUCTOS: nueva ruta dedicada para actualizar último precio de productos existentes",
     "PRODUCTOS: productFromDb devuelve precio y defaultPrecio",
     "Ticket IA: al procesar producto existente llama a /api/crud/productos/:id/precio",
-    "GRAL: aÃ±adido guardia de sesiÃ³n visible para evitar cabecera Sin acceso durante sesiÃ³n activa"
+    "GRAL: añadido guardia de sesión visible para evitar cabecera Sin acceso durante sesión activa"
   ],
   "files_added": [
     "public/app/features/v9-5-2-ticketauto-compras.js",
