@@ -1274,6 +1274,8 @@ function planContentModules(content) {
   if (c === 'INGRESOS_COMPRAS') return ['INGRESOS','COMPRAS'];
   if (c === 'INGRESOS_DONACIONES') return ['INGRESOS','DONACIONES'];
   if (c === 'COMPRAS_DONACIONES') return ['COMPRAS','DONACIONES'];
+  if (c === 'INGRESOS_SOCIOS_OBLIGATORIOS') return ['INGRESOS_SOCIOS_OBLIGATORIOS'];
+  if (c === 'NINGUN_DATO') return [];
   return ['INGRESOS','COMPRAS','DONACIONES'];
 }
 function normPlanKey(value) { return norm(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim(); }
@@ -1323,6 +1325,53 @@ function planDonorRefFromLabel(label, maps) {
   const st = maps.storeByName.get(k);
   if (st?.id) return 'T:' + st.id;
   return '';
+}
+
+function planInfoDonationRules(info, maps) {
+  const raw = trim(info || '');
+  if (!raw) return [];
+  const rules = [];
+  function addRule(productText, donorLabel, respLabel, type = 'DONADO SOCIO') {
+    const cleanProduct = trim(productText).replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg|l|litros|botellas|latas|rollos|sacos|pack|packs)?\s*/i, '').replace(/[.:;]+$/,'').trim();
+    if (!cleanProduct || cleanProduct.length < 2) return;
+    const donorRef = planDonorRefFromLabel(donorLabel, maps);
+    const resp = maps.personByName.get(normPlanKey(respLabel || donorLabel));
+    rules.push({ productKey:normPlanKey(cleanProduct), productText:cleanProduct, donorRef, responsableId:trim(resp?.id), ticketDonacion:type, donorLabel:trim(donorLabel), responsableLabel:trim(respLabel || donorLabel) });
+  }
+  const existHeader = raw.match(/INFORMACION\s+SOBRE\s+EXISTENCIA[\s\S]{0,220}?DONADO\s+SOCIO\s+["“]([^"”]+)["”][\s\S]{0,160}?RESPONSABLE\s+["“]([^"”]+)["”]/i);
+  if (existHeader) {
+    const start = existHeader.index + existHeader[0].length;
+    const next = raw.slice(start).search(/\n\s*-?\s*POSIBLES\s+DONACIONES/i);
+    const block = next >= 0 ? raw.slice(start, start + next) : raw.slice(start);
+    block.split(/\n+/).forEach(line => {
+      const m = line.match(/^\s*[-•]\s*(.+)$/);
+      if (!m) return;
+      const item = m[1].split(':')[0].trim();
+      addRule(item, existHeader[1], existHeader[2], 'DONADO SOCIO');
+    });
+  }
+  const poss = raw.match(/POSIBLES\s+DONACIONES\s+DE\s+["“]([^"”]+)["”]\s*:\s*([\s\S]+)/i);
+  if (poss) {
+    poss[2].split(/[\n,;]+/).forEach(part => addRule(part, poss[1], poss[1], 'DONADO SOCIO'));
+  }
+  return rules.filter(r => r.donorRef || r.responsableId);
+}
+function planApplyDonationRules(rows, rules) {
+  const list = arr(rules);
+  if (!list.length) return rows;
+  return arr(rows).map(row => {
+    if (row.tipo !== 'DONACION') return row;
+    const key = normPlanKey(row.productName);
+    const rule = list.find(r => key.includes(r.productKey) || r.productKey.includes(key) || r.productKey.split(' ').filter(Boolean).some(tok => tok.length >= 5 && key.includes(tok)));
+    if (!rule) return row;
+    return {
+      ...row,
+      ticketDonacion: row.ticketDonacion || rule.ticketDonacion || 'DONADO SOCIO',
+      donorRef: row.donorRef || rule.donorRef,
+      responsableId: row.responsableId || rule.responsableId,
+      reason: trim(row.reason || 'Propuesta ajustada por Zuzu.') + ` Donante/responsable aplicado desde instrucciones del prompt: ${rule.donorLabel || rule.productText}.`
+    };
+  });
 }
 function planRowsForEvent(state, eventId, modules) {
   const maps = planBuildMaps(state);
@@ -1419,6 +1468,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
     tiendaPorDefecto: trim(form.defaultStoreName),
     filasHistoricasBase: compactRows,
     ingresosHistoricosBase: arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })),
+    reglasDonacionesDetectadas: planInfoDonationRules(form.info, planBuildMaps(state)).map(r => ({producto:r.productText, donante:r.donorLabel, responsable:r.responsableLabel, tipo:r.ticketDonacion})),
     catalogos: planCatalogForGemini(state)
   };
   return `Eres Zuzu dentro de ControlEvent, módulo de PLANIFICACIÓN INICIAL. Debes crear una propuesta revisable para un evento nuevo, usando históricos y las instrucciones del usuario.
@@ -1431,6 +1481,8 @@ Reglas:
 - Para modo "Encargo total a Zuzu", crea una propuesta con productos del catálogo e histórico general, sin depender de un único modelo.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
+- Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en las filas de DONACION.
+- Si modulosSolicitados está vacío por la opción Ningún dato, apóyate solo en la información del usuario y el catálogo de productos; no copies históricos de eventos.
 - No devuelvas más de 180 filas. Prioriza productos útiles.
 - La app mostrará la propuesta para que el usuario pueda editarla; no estás creando el evento real.
 
@@ -1493,9 +1545,10 @@ function matchPlanRows(aiRows, baseRows, state, form) {
       reason: trim(row?.reason) || 'Propuesta ajustada por Zuzu a partir del histórico y las instrucciones.'
     });
   });
-  return out.filter(r => r.productId && r.unidades >= 0);
+  return planApplyDonationRules(out.filter(r => r.productId && r.unidades >= 0), planInfoDonationRules(form.info, maps));
 }
 function buildTotalBaseRows(state, modules, form) {
+  if (!arr(modules).some(m => m === 'COMPRAS' || m === 'DONACIONES')) return [];
   const maps = planBuildMaps(state);
   const finalIds = new Set(arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion))).map(e => trim(e.id)).filter(Boolean));
   const grouped = new Map();

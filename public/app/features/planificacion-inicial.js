@@ -118,7 +118,8 @@
   function planContentLabel(value){
     const map = {
       TODO:'Todos los datos del evento modelo', INGRESOS:'Solo los datos de INGRESOS', COMPRAS:'Solo los datos de COMPRAS', DONACIONES:'Solo los datos de DONACIONES',
-      INGRESOS_COMPRAS:'Usar INGRESOS + COMPRAS', INGRESOS_DONACIONES:'Usar INGRESOS + DONACIONES', COMPRAS_DONACIONES:'Usar COMPRAS + DONACIONES'
+      INGRESOS_COMPRAS:'Usar INGRESOS + COMPRAS', INGRESOS_DONACIONES:'Usar INGRESOS + DONACIONES', COMPRAS_DONACIONES:'Usar COMPRAS + DONACIONES',
+      INGRESOS_SOCIOS_OBLIGATORIOS:'Ingresos obligatorios de todos los socios', NINGUN_DATO:'Ningún dato'
     };
     return map[String(value||'TODO').toUpperCase()] || map.TODO;
   }
@@ -215,6 +216,55 @@
     `;
   }
 
+  function planEstimatedEventPrice(totalCompras, estimatedPeople){
+    const people = Math.max(1, Number(estimatedPeople || fieldValue('planPersonas') || 0));
+    const raw = Number(totalCompras || 0) / people;
+    return Math.max(0, Math.ceil(raw * 100) / 100);
+  }
+  function proposalProductNeeds(proposals){
+    const map = new Map();
+    (Array.isArray(proposals) ? proposals : []).filter(p => p.include).forEach(p => {
+      const key = normalizeText(p.productName || '') || p.productId || 'producto';
+      const old = map.get(key) || {producto:p.productName || 'Producto', segmento:p.segmento || '', destino:p.destino || '', compra:0, donado:0, importeCompra:0, importeDonado:0};
+      if(p.tipo === 'DONACION'){
+        old.donado += Number(p.unidades || 0);
+        old.importeDonado += Number(p.unidades || 0) * Number(p.precio || 0);
+      }else{
+        old.compra += Number(p.unidades || 0);
+        old.importeCompra += Number(p.unidades || 0) * Number(p.precio || 0);
+      }
+      map.set(key, old);
+    });
+    return [...map.values()].sort((a,b)=>(b.importeCompra + b.importeDonado) - (a.importeCompra + a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
+  }
+  function renderPlanningNarrative(proposals, totalCompras, totalDonaciones){
+    const title = proposedEventTitle();
+    const prompt = fieldValue('planInfo');
+    const people = Math.max(0, Number(fieldValue('planPersonas') || 0));
+    const price = planEstimatedEventPrice(totalCompras, people || 1);
+    const valuation = Number(totalCompras || 0) + Number(totalDonaciones || 0);
+    const needs = proposalProductNeeds(proposals);
+    const preview = needs.slice(0, 45).map(x => {
+      const totalUnits = Number(x.compra || 0) + Number(x.donado || 0);
+      const parts = [];
+      if(x.donado > 0) parts.push(`${qty(x.donado)} donado`);
+      if(x.compra > 0) parts.push(`${qty(x.compra)} a comprar`);
+      return `<li><strong>${esc(x.producto)}</strong>: necesidad planificada ${qty(totalUnits)} ud. (${parts.join(' · ') || 'sin unidades'}).</li>`;
+    }).join('');
+    const more = needs.length > 45 ? `<p class="plan-mini-note">Se muestran los 45 productos principales de ${needs.length}. El detalle completo está en las líneas revisables inferiores.</p>` : '';
+    const requested = prompt ? `<p><strong>Lo que has pedido:</strong> ${esc(prompt).slice(0, 900)}${prompt.length > 900 ? '…' : ''}</p>` : '';
+    return `
+      <div class="planificacion-note compact-note plan-zuzu-narrative">
+        <strong>Lectura de Zuzu para ${esc(title)}:</strong>
+        ${requested}
+        <p>He preparado una propuesta revisable con <strong>${proposals.filter(p=>p.include && p.tipo==='COMPRA').length}</strong> compras y <strong>${proposals.filter(p=>p.include && p.tipo==='DONACION').length}</strong> donaciones. La idea es que primero se aproveche lo donado/existente y después se compre lo que falte.</p>
+        <p><strong>Total compras previstas:</strong> ${money(totalCompras)} · <strong>Donaciones/existencias estimadas:</strong> ${money(totalDonaciones)} · <strong>Valoración del evento:</strong> ${money(valuation)}.</p>
+        <p><strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, calculado como compras previstas / nº estimado de personas (${qty(people || 1)}).</p>
+        <details open><summary><strong>Cantidades producto por producto</strong></summary><ul>${preview || '<li>Sin productos propuestos.</li>'}</ul>${more}</details>
+      </div>`;
+  }
+
+
   function sociosParaIngresosIniciales(){
     // Regla preparada para inserción futura: si hay registro conjunto numero=2, prima sobre los individuales numero=1.
     const list = socios();
@@ -242,6 +292,27 @@
     return [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
   }
 
+  function buildMandatorySocioIncomeProposal(totalCompras){
+    const estimatedPeople = Math.max(1, Number(fieldValue('planPersonas') || 0));
+    const price = planEstimatedEventPrice(totalCompras || 0, estimatedPeople);
+    const selected = sociosParaIngresosIniciales();
+    return selected.map((p, index) => {
+      const numero = Math.max(1, Number(p.numeroIngreso || p.numero || 1));
+      return {
+        key: `socio-obligatorio:${p.id || index}`,
+        sourceId: '',
+        personaId: p.id || '',
+        personaName: p.nombre || 'Socio sin nombre',
+        rango: 'SOCIO',
+        numero,
+        situacion: 'Pendiente',
+        importeVoluntario: 0,
+        importeObligatorio: Math.round(numero * price * 100) / 100
+      };
+    });
+  }
+
+
   function initForm(){
     // V33.5: solo se replica un evento finalizado. Los campos históricos anteriores quedan bloqueados para no confundir.
     const events = finalizados();
@@ -264,7 +335,9 @@
         {value:'DONACIONES', label:'Solo los datos de DONACIONES'},
         {value:'INGRESOS_COMPRAS', label:'Usar INGRESOS + COMPRAS'},
         {value:'INGRESOS_DONACIONES', label:'Usar INGRESOS + DONACIONES'},
-        {value:'COMPRAS_DONACIONES', label:'Usar COMPRAS + DONACIONES'}
+        {value:'COMPRAS_DONACIONES', label:'Usar COMPRAS + DONACIONES'},
+        {value:'INGRESOS_SOCIOS_OBLIGATORIOS', label:'Ingresos obligatorios de todos los socios'},
+        {value:'NINGUN_DATO', label:'Ningún dato'}
       ], nivel.value || 'TODO');
       nivel.disabled = false;
     }
@@ -349,6 +422,7 @@
         <div class="plan-metric"><span>Donaciones propuestas</span><strong>${donaciones.length}</strong><small>${money(totalDonaciones)} valor estimado</small></div>
         <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
+      ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
         <strong>Propuesta de planificación inicial:</strong> crea el evento real desde una propuesta revisada. Ingresos en Pendiente, donaciones tal cual y compras en Pte.Compra u otros gastos.
@@ -484,7 +558,21 @@
     ].join('\n');
     try{ return confirm(msg); }catch(_){ return false; }
   }
-  function applyReplicaToRealEvent(){
+  async function crudUpsert(collection, payload){
+    const res = await fetch('/api/crud/' + encodeURIComponent(collection), {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':'row-crud-v8-5-fix28','X-ControlEvent-Row-Only':'1'},
+      cache:'no-store',
+      body: JSON.stringify({...payload, __crudRowOnly:true})
+    });
+    if(!res.ok){
+      let msg = await res.text().catch(() => '');
+      try{ const j = JSON.parse(msg); msg = j.error || j.message || msg; }catch(_){ }
+      throw new Error(msg || `Error guardando ${collection}`);
+    }
+    return res.json();
+  }
+  async function applyReplicaToRealEvent(){
     if(!isGD()) return;
     const source = lastSourceEvent || sourceEvent();
     const mode = planMode();
@@ -493,7 +581,7 @@
       try{ alert('El evento modelo debe estar FINALIZADO.'); }catch(_){}
       return;
     }
-    if(!lastProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
+    if(!lastProposal.length && !lastIncomeProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
     const st = state();
     if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
     const title = proposedEventTitle();
@@ -502,61 +590,61 @@
     if(duplicate){ try{ alert('Ya existe un evento con ese nombre. Cambia el nombre antes de crear la réplica.'); }catch(_){} return; }
     if(!confirmReplicaCreation()) return;
 
-    const newEventId = makeId();
-    const fechaIni = fieldValue('planFechaIni') || source.fechaIni || '';
-    const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source.fechaFin || source.fechaIni || '';
-    const descUser = fieldValue('planDescripcion');
-    const infoUser = fieldValue('planInfo');
-    const descripcion = [
-      descUser || source?.descripcion || '',
-      (source ? 'Propuesta inicial creada desde evento modelo: ' + (source.titulo || 'sin título') + '.' : 'Propuesta inicial creada por Zuzu sin evento modelo.'),
-      infoUser ? 'Información de planificación: ' + infoUser : ''
-    ].filter(Boolean).join('\n');
+    const btn = document.getElementById('btnPlanApplyReplica');
+    const oldText = btn?.textContent || 'Generar nuevo evento';
+    if(btn){ btn.disabled = true; btn.textContent = 'Generando evento...'; }
+    try{
+      const newEventId = makeId();
+      const fechaIni = fieldValue('planFechaIni') || source?.fechaIni || '';
+      const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source?.fechaFin || source?.fechaIni || '';
+      const descUser = fieldValue('planDescripcion');
+      const infoUser = fieldValue('planInfo');
+      const descripcion = [
+        descUser || source?.descripcion || '',
+        (source ? 'Propuesta inicial creada desde evento modelo: ' + (source.titulo || 'sin título') + '.' : 'Propuesta inicial creada por Zuzu sin evento modelo.'),
+        infoUser ? 'Información de planificación: ' + infoUser : ''
+      ].filter(Boolean).join('\n');
+      const included = lastProposal.filter(p => p.include);
+      const totalCompras = included.filter(p => p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+      const eventPrice = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) : parseNum(source?.precio || planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) || 0);
+      const newEvent = { id:newEventId, titulo:title, precio:eventPrice, fechaIni, fechaFin, situacion:'En curso', descripcion };
 
-    st.eventos.push({
-      id: newEventId,
-      titulo: title,
-      precio: parseNum(source?.precio || 0),
-      fechaIni,
-      fechaFin,
-      situacion: 'En curso',
-      descripcion
-    });
+      await crudUpsert('eventos', newEvent);
+      const savedCollabs = [];
+      for(const item of lastIncomeProposal){
+        if(!item.personaId) continue;
+        const row = { id: makeId(), eventId:newEventId, personaId:item.personaId, numero:Number(item.numero || 0), situacion:'Pendiente', importe:Number(item.importeVoluntario || 0) };
+        await crudUpsert('colaboradores', row);
+        savedCollabs.push(row);
+      }
+      const savedCompras = [];
+      for(const p of included){
+        if(!p.productId) continue;
+        const isDon = p.tipo === 'DONACION';
+        const row = {
+          id: makeId(), eventId:newEventId, productoId:p.productId, unidades:Number(p.unidades || 0), precio:Number(p.precio || 0),
+          tiendaId:String(p.tiendaId || p.sourceTiendaId || ''), ticketDonacion:isDon ? String(p.ticketDonacion || '') : '', donorRef:isDon ? String(p.donorRef || '') : '', responsableId:String(p.responsableId || '')
+        };
+        await crudUpsert('compras', row);
+        savedCompras.push(row);
+      }
 
-    lastIncomeProposal.forEach(item => {
-      if(!item.personaId) return;
-      st.colaboradores.push({
-        id: makeId(),
-        eventId: newEventId,
-        personaId: item.personaId,
-        numero: Number(item.numero || 0),
-        situacion: 'Pendiente',
-        importe: Number(item.importeVoluntario || 0)
-      });
-    });
-
-    lastProposal.filter(p => p.include).forEach(p => {
-      if(!p.productId) return;
-      const isDon = p.tipo === 'DONACION';
-      st.compras.push({
-        id: makeId(),
-        eventId: newEventId,
-        productoId: p.productId,
-        unidades: Number(p.unidades || 0),
-        precio: Number(p.precio || 0),
-        tiendaId: String(p.tiendaId || p.sourceTiendaId || ''),
-        ticketDonacion: isDon ? String(p.ticketDonacion || '') : '',
-        donorRef: isDon ? String(p.donorRef || '') : '',
-        responsableId: String(p.responsableId || '')
-      });
-    });
-
-    st.selectedEventId = newEventId;
-    lastCreatedEventId = newEventId;
-    callSave();
-    callRender();
-    try{ alert('Evento creado correctamente desde la réplica. Revísalo y adapta lo necesario.'); }catch(_){}
-    try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){}
+      st.eventos.push(newEvent);
+      savedCollabs.forEach(row => st.colaboradores.push(row));
+      savedCompras.forEach(row => st.compras.push(row));
+      st.selectedEventId = newEventId;
+      lastCreatedEventId = newEventId;
+      callRender();
+      try{ if(typeof window.fetchState === 'function') setTimeout(() => window.fetchState().catch?.(()=>{}), 300); }catch(_){ }
+      try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
+      try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){ }
+    }catch(error){
+      console.error('[ControlEvent v13.0_prod] Error generando evento real desde planificación:', error);
+      try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = oldText; }
+      unlockPlanControls();
+    }
   }
 
   async function generateProposal(){
@@ -602,6 +690,10 @@
       lastSourceEvent = data.event && data.event.id ? data.event : null;
       lastProposal = Array.isArray(data.rows) ? data.rows : [];
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
+      if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
+        const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+        lastIncomeProposal = buildMandatorySocioIncomeProposal(baseCompra);
+      }
       renderProposal();
       const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
       if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
@@ -614,6 +706,10 @@
           lastSourceEvent = replica.event;
           lastProposal = replica.rows;
           lastIncomeProposal = replica.incomes || [];
+          if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
+            const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+            lastIncomeProposal = buildMandatorySocioIncomeProposal(baseCompra);
+          }
           renderProposal();
           document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se muestra réplica local del evento modelo.</div>');
           document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
