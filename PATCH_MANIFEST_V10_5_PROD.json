@@ -1,6 +1,6 @@
 {
-  "version": "v11_3_3_prod",
-  "base": "CE_v11_3_3_prod_RESCATE_VERIFICADO.zip",
+  "version": "v12.0_prod",
+  "base": "CE_v12.0_prod_RESCATE_VERIFICADO.zip",
   "changed": [
     "index.html",
     "public/index.html",

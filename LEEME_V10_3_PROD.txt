@@ -1,7 +1,7 @@
-ControlEvent v11_3_3_prod
+ControlEvent v12.0_prod
 
 Cambios principales:
-- Versión cambiada a v11_3_3_prod en referencias activas.
+- Versión cambiada a v12.0_prod en referencias activas.
 - Mapa de recursos: clic en TKxx abre visor común con información contable completa y búsqueda flexible de imagen por evento+TKxx, admitiendo claves ampliadas como TK01 - tienda.
 - Visor común de tickets: tabla contable con scroll para tickets con muchos registros, imagen a la derecha y mensaje grande si no hay imagen.
 - Compras y Donaciones: buscador reforzado en eventos En curso y Finalizados; si encuentra, rodea la ficha en rojo y negrita.

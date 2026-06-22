@@ -1,4 +1,4 @@
-ControlEvent v11_3_3_prod - rescate final de estabilidad
+ControlEvent v12.0_prod - rescate final de estabilidad
 
 Cambios principales:
 - Eliminada la recarga automática tras login/CTRL+F5 que provocaba reentradas y temblores.

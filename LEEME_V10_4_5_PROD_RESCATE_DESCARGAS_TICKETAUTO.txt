@@ -1,4 +1,4 @@
-ControlEvent v11_3_3_prod - rescate puntual sobre v10.4.4
+ControlEvent v12.0_prod - rescate puntual sobre v10.4.4
 
 Cambios realizados:
 - Documentos del evento: se restituye la miniatura visible y una única flecha de descarga por documento.

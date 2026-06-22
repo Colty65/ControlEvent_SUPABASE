@@ -1,6 +1,6 @@
 {
-  "version": "v11_3_3_prod",
-  "base": "v11_3_3_prod",
+  "version": "v12.0_prod",
+  "base": "v12.0_prod",
   "touched_active_files": [
     "public/app/features/v10-4-app-fixes.js",
     "public/app/features/v10-4-6-app-fixes.js",

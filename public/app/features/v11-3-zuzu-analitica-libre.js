@@ -1,9 +1,9 @@
-/* ControlEvent v11_3_3_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v12.0_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v11_3_3_prod';
+  var VERSION='v12.0_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -73,7 +73,7 @@
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">⬇️</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
-        '<div class="ce-ai-result" id="ceAiResult"><div class="ce-ai-card"><h3>Primera versión</h3><div class="ce-ai-answer">Soy Zuzu. Puedo consultar módulos seguros de ControlEvent: INGRESOS, DONACIONES, COMPRAS, EVENTOS, PRODUCTOS, TIENDAS, PERSONAS, TICKETS y DOCUMENTOS. Si la petición es ambigua, te pediré que concretes antes de responder.</div></div></div>'+ 
+        '<div class="ce-ai-result" id="ceAiResult"></div>'+ 
       '</div></div>';
   }
   function clearZuzu(ev){
@@ -103,9 +103,9 @@
     if(!ev){ setStatus('Selecciona un evento antes de consultar.', 'err'); return; }
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    setStatus('Zuzu está preparando los datos…', 'ok');
+    setStatus('Zuzu está jubilao, hazte uno mientras........', 'ok');
     var resEl=$('ceAiResult');
-    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>🧡 Zuzu está trabajando</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">⏳</span> Preparando contexto seguro y extrayendo datos completos de ControlEvent...</div></div>';
+    resEl.innerHTML='<div class="ce-ai-card ce-ai-loading"><h3>🧡 Zuzu está jubilao, hazte uno mientras........</h3><div class="ce-ai-answer"><span class="ce-ai-spinner">⏳</span> Preparando datos y respuesta...</div></div>';
     try{
       var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
       var data=await res.json().catch(function(){ return {}; });
@@ -120,8 +120,8 @@
   function renderResult(data){
     var html='';
     var cls=data.rejected?' ce-ai-rejected':'';
-    html+='<div class="ce-ai-card'+cls+'"><h3>'+esc(data.title||'Resultado')+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div>'+(data.provider?'<p style="color:#64748b;font-weight:800;margin:10px 0 0">IA: '+esc(data.provider)+' '+esc(data.model||'')+'</p>':'')+'</div>';
-    if(Array.isArray(data.warnings) && data.warnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+data.warnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
+    html+='<div class="ce-ai-card'+cls+'"><h3>'+esc(data.title||'Resultado')+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
+    if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && Array.isArray(data.warnings) && data.warnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+data.warnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
     (data.charts||[]).forEach(function(ch){ html+=chartHtml(ch); });
     (data.tables||[]).forEach(function(tb){ html+=tableHtml(tb); });
     if(Array.isArray(data.files) && data.files.length){
@@ -135,10 +135,25 @@
   }
   function chartHtml(ch){
     var labels=(ch.labels||[]).map(String), values=(ch.values||[]).map(Number); var max=Math.max.apply(null, values.concat([1]));
+    var type=String(ch.type||'bar').toLowerCase();
+    if(type==='pie') return pieChartHtml(ch, labels, values);
+    if(type==='bar') return verticalChartHtml(ch, labels, values);
     var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var pct=Math.max(2, Math.min(100, (v/max)*100)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+  function chartColor(i){ return ['#38bdf8','#f97316','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
+  function pieChartHtml(ch, labels, values){
+    var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
+    var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartColor(i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
+    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartColor(i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
+  }
+  function verticalChartHtml(ch, labels, values){
+    var max=Math.max.apply(null, values.concat([1]));
+    var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(4, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
+  }
   function tableHtml(tb){
     var head=(tb.columns||[]).map(function(c){return '<th>'+esc(c)+'</th>';}).join('');
     var rows=(tb.rows||[]).map(function(r){ return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>'; }).join('');

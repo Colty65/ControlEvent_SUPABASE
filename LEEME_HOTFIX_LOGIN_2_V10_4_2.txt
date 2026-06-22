@@ -1,4 +1,4 @@
-HOTFIX LOGIN 2 sobre v11_3_3_prod
+HOTFIX LOGIN 2 sobre v12.0_prod
 
 Cambios mínimos:
 - Se elimina el uso de html.ce-prelogin-clean que podía dejar la app invisible tras login.

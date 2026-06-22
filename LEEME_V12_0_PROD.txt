@@ -1,0 +1,16 @@
+ControlEvent v12.0_prod
+
+Cambios principales:
+- Version actualizada a v12.0_prod / ControlEvent_v12.0_prod en referencias localizadas.
+- Carga por evento reforzada: al cambiar de evento se realiza una lectura acotada /api/state?eventId=... y se repinta la ventana activa. No hay refresco en bucle; solo una carga debounced por cambio de evento.
+- Zuzu limpia textos iniciales e internos de diagnóstico/auditoría en la interfaz.
+- Zuzu cambia el mensaje de espera a: "Zuzu está jubilao, hazte uno mientras........".
+- Zuzu ya no muestra al usuario el proveedor/modelo IA ni avisos técnicos normales.
+- Nuevos formatos gráficos básicos en la ventana Zuzu: barras verticales, barras horizontales y tartas.
+- Refuerzo real de uso con evento Finalizado para Zuzu, mantenimientos generales, BACKUP/Excel/importación/descarga mediante desbloqueo contextual de controles seguros.
+- Se mantiene el bloqueo de edición de datos propios de eventos Finalizados en backend.
+
+Validación realizada:
+- node --check en los ficheros JS tocados.
+- JSON de package.json y package-lock.json validado.
+- zip -T correcto.
