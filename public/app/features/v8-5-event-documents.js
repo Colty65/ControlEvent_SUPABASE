@@ -494,11 +494,18 @@
     return canvas.toDataURL('image/jpeg', 0.84);
   }
 
+  function imageWriteHeaders(){
+    return {
+      'Content-Type':'application/json',
+      'X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix26'
+    };
+  }
+
   async function uploadDocumentImage(eventId, code, dataUrl){
     const payload = {eventId, key: code, dataUrl};
     const res = await fetch('/api/ticket-images', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: imageWriteHeaders(),
       body: JSON.stringify(payload)
     });
     if(!res.ok){
@@ -512,7 +519,7 @@
   async function deleteDocumentImage(eventId, code){
     const res = await fetch('/api/ticket-images', {
       method: 'DELETE',
-      headers: {'Content-Type':'application/json'},
+      headers: imageWriteHeaders(),
       body: JSON.stringify({eventId, key: code})
     });
     if(!res.ok){
