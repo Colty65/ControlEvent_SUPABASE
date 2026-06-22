@@ -33,6 +33,29 @@
     }catch(_){ return null; }
   }
   function isFinalizado(){ return String(selectedEvent()?.situacion || '').trim().toUpperCase() === 'FINALIZADO'; }
+
+  let safeUntil = 0;
+  function isSafeAreaTarget(t){
+    try{
+      return !!(t && t.closest && t.closest('#ceGeminiLibreOverlay,#maintenanceWrapper,#maintenancePanel,#mtPersonas,#mtEventos,#mtTiendas,#mtProductos,#mtAcceso,#mtImportar,#btnToggleMaintenance,#btnExportSeed,#btnExportExcel,#btnOpenImport,#ceGeminiLibreBtn,.ce-zuzu-open'));
+    }catch(_){ return false; }
+  }
+  function markSafeTarget(t){ if(isSafeAreaTarget(t)){ safeUntil = Date.now() + 1200; } }
+  function safeContextActive(){ return Date.now() < safeUntil || isSafeAreaTarget(document.activeElement); }
+  function patchIsLockedContextual(){
+    try{
+      const old = (typeof window.isLocked === 'function' ? window.isLocked : (typeof isLocked === 'function' ? isLocked : null));
+      if(!old || old.__ceV1133FinalToolsContextual) return;
+      const wrapped = function(){
+        try{ if(safeContextActive()) return false; }catch(_){ }
+        return old.apply(this, arguments);
+      };
+      wrapped.__ceV1133FinalToolsContextual = true;
+      wrapped.__ceOriginalIsLocked = old;
+      window.isLocked = wrapped;
+      try{ isLocked = wrapped; }catch(_){ }
+    }catch(_){ }
+  }
   function unlock(el){
     if (!el) return;
     try { el.disabled = false; el.readOnly = false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled'); el.removeAttribute('inert'); } catch(_) {}
@@ -76,6 +99,7 @@
   }
   function apply(){
     injectStyle();
+    patchIsLockedContextual();
     const fin = isFinalizado();
     document.body.classList.toggle('ce-v1133-finalizado-tools', fin);
     if (!fin) return;
@@ -89,11 +113,14 @@
   function around(ev){
     try{
       const t = ev && ev.target;
+      markSafeTarget(t);
+      patchIsLockedContextual();
       const root = t && t.closest && t.closest('#maintenanceWrapper,#maintenancePanel,#ceGeminiLibreOverlay,#mtPersonas,#mtEventos,#mtTiendas,#mtProductos,#mtAcceso,#mtImportar');
       if (root) { unlock(root); root.querySelectorAll('button,input,select,textarea,[contenteditable]').forEach(unlock); unlock(t); }
     }catch(_){}
   }
-  ['focusin','keydown','keyup','beforeinput','input','pointerdown','mousedown','click','touchstart'].forEach(name => {
+  ['focusin','keydown','keyup','beforeinput','input','pointerdown','mousedown','click','touchstart','touchend','pointerup'].forEach(name => {
+    try { window.addEventListener(name, function(ev){ if (isFinalizado()) { markSafeTarget(ev && ev.target); patchIsLockedContextual(); } }, {capture:true, passive:false}); } catch(_) {}
     try { document.addEventListener(name, function(ev){ if (isFinalizado()) { around(ev); setTimeout(apply, 0); } }, true); } catch(_) {}
   });
   function wrapRenderLock(){

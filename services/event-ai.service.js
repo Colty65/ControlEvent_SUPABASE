@@ -341,7 +341,10 @@ Arquitectura obligatoria ya ejecutada por ControlEvent:
 3) Ahora recibes TODOS los registros entregados por esos módulos y el prompt original del usuario. Tu trabajo es cocinar/formatear la respuesta final exactamente según lo pedido.
 
 Reglas obligatorias:
-- Usa exclusivamente modulosExtraidos. No inventes datos ni completes huecos por intuición.
+- Usa exclusivamente modulosExtraidos y metricasCanonicas. No inventes datos ni completes huecos por intuición.
+- La respuesta principal debe ser legible para usuario final: máximo 10-12 líneas de explicación; no pegues JSON, arrays ni listados brutos dentro de answer.
+- Si hay muchos registros, resume y crea tablas de resumen. El detalle completo debe ir en tables o files, no en answer.
+- Devuelve SIEMPRE JSON válido. No uses markdown fuera de los campos de texto. No cortes strings. Si no puedes generar todo, prioriza resumen + tablas cortas + aviso.
 - Si el usuario cita eventos concretos entre comillas o por título, filtra la respuesta a esos eventos exactos. No mezcles otros eventos aunque aparezcan en el contexto.
 - Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
 - Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
@@ -366,6 +369,7 @@ Campos oficiales por módulo:
 - PERSONAS: Nombre persona; Rango.
 
 Formato de salida: SOLO JSON válido con el esquema indicado. Evita respuestas excesivamente largas: usa tablas y ficheros para detalle cuando sea necesario.
+Límites de presentación: answer <= 2500 caracteres; máximo 8 tablas; máximo 80 filas por tabla; máximo 8 gráficas. Si necesitas devolver más detalle, usa files en CSV.
 
 CONTEXTO CONTROL EVENT:
 ${ctx}
@@ -1022,16 +1026,26 @@ async function callGeminiEvent(prompt, context) {
       let parsed;
       try { parsed = JSON.parse(stripJsonText(outText)); }
       catch (e) {
+        // v11_3_3 hotfix: nunca mostrar al usuario una respuesta cruda/rota de Gemini.
+        // Si Gemini no respeta el JSON, se entrega una salida estructurada de ControlEvent
+        // con los datos canónicos y una advertencia.
+        const fallback = directDeterministicResultIfApplicable(prompt, context) || directGraphResultIfApplicable(prompt, context) || directModuleResultIfApplicable(prompt, context);
+        if (fallback) {
+          fallback.warnings = arr(fallback.warnings).concat('Gemini no devolvió JSON estructurado válido; se ha usado una salida estructurada de ControlEvent para no mostrar datos crudos ni desformateados.');
+          fallback.provider = `${fallback.provider || 'control-event'}-json-fallback`;
+          fallback.model = 'formato-local-por-json-invalido';
+          return fallback;
+        }
         return {
           ok: true,
           rejected: false,
-          title: 'Respuesta de Zuzu',
-          answer: outText.slice(0, 120000),
-          warnings: ['Gemini no devolvió JSON estructurado válido; se muestra la respuesta textual para no perder el análisis.'],
+          title: 'Respuesta de Zuzu no estructurada',
+          answer: 'Gemini no devolvió un JSON válido. ControlEvent ha evitado mostrar la respuesta cruda para no entregar una pantalla ilegible. Repite la consulta de forma algo más concreta o revisa la cuota/modelo de Gemini.',
+          warnings: ['Gemini no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
           charts: [],
           tables: [],
-          files: [],
-          provider: 'gemini-rest',
+          files: [{ filename: fileSafe('Zuzu_respuesta_gemini_no_estructurada_v11_3_3_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          provider: 'gemini-rest-json-fallback',
           model
         };
       }
