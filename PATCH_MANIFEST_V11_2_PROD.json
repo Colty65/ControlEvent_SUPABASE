@@ -1,5 +1,5 @@
 {
-  "version": "v13.0_prod",
+  "version": "v14_prod",
   "base": "version anterior de Analitica libre",
   "objetivo": "Zuzu / Analitica libre con contexto selectivo pero completo por evento objetivo",
   "archivos_clave": [

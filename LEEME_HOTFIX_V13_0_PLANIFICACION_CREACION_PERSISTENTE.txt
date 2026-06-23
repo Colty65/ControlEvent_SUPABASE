@@ -1,4 +1,4 @@
-HOTFIX sobre v13.0_prod - Planificación inicial
+HOTFIX sobre v14_prod - Planificación inicial
 
 Sin cambio de versión.
 

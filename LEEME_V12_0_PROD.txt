@@ -1,7 +1,7 @@
-ControlEvent v13.0_prod
+ControlEvent v14_prod
 
 Cambios principales:
-- Version actualizada a v13.0_prod / ControlEvent_v13.0_prod en referencias localizadas.
+- Version actualizada a v14_prod / ControlEvent_v14_prod en referencias localizadas.
 - Carga por evento reforzada: al cambiar de evento se realiza una lectura acotada /api/state?eventId=... y se repinta la ventana activa. No hay refresco en bucle; solo una carga debounced por cambio de evento.
 - Zuzu limpia textos iniciales e internos de diagnóstico/auditoría en la interfaz.
 - Zuzu cambia el mensaje de espera a: "Zuzu está jubilao, hazte uno mientras........".

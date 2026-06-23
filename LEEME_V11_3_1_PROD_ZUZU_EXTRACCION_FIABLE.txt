@@ -1,4 +1,4 @@
-ControlEvent v13.0_prod - Correccion Zuzu extraccion fiable
+ControlEvent v14_prod - Correccion Zuzu extraccion fiable
 
 Objetivo:
 - Evitar que Zuzu entregue listados incompletos cuando el usuario pide datos concretos de un modulo.
@@ -19,7 +19,7 @@ Cambios principales:
    - La respuesta indica cuantos registros se han extraido.
 
 4. Version:
-   - v13.0_prod / ControlEvent_v13.0_prod.
+   - v14_prod / ControlEvent_v14_prod.
 
 Validacion realizada:
 - node --check en services/event-context.service.js

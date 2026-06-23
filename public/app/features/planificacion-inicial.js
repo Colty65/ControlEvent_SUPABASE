@@ -1,8 +1,8 @@
-/* ControlEvent v13.0_prod - Planificación inicial con Zuzu.
+/* ControlEvent v14_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v13.0_prod';
+  const VERSION = 'ControlEvent v14_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -122,6 +122,52 @@
       INGRESOS_SOCIOS_OBLIGATORIOS:'Ingresos obligatorios de todos los socios', NINGUN_DATO:'Ningún dato'
     };
     return map[String(value||'TODO').toUpperCase()] || map.TODO;
+  }
+
+  function modulesForPlanContent(value){
+    const c = String(value || 'TODO').toUpperCase();
+    const map = {
+      TODO:['INGRESOS','COMPRAS','DONACIONES','PRODUCTOS','TIENDAS','PERSONAS'],
+      INGRESOS:['INGRESOS','PERSONAS'],
+      COMPRAS:['COMPRAS','PRODUCTOS','TIENDAS','PERSONAS'],
+      DONACIONES:['DONACIONES','PRODUCTOS','TIENDAS','PERSONAS'],
+      INGRESOS_COMPRAS:['INGRESOS','COMPRAS','PRODUCTOS','TIENDAS','PERSONAS'],
+      INGRESOS_DONACIONES:['INGRESOS','DONACIONES','PRODUCTOS','TIENDAS','PERSONAS'],
+      COMPRAS_DONACIONES:['COMPRAS','DONACIONES','PRODUCTOS','TIENDAS','PERSONAS'],
+      INGRESOS_SOCIOS_OBLIGATORIOS:['PERSONAS','INGRESOS','PRODUCTOS','TIENDAS'],
+      NINGUN_DATO:['PRODUCTOS','TIENDAS','PERSONAS']
+    };
+    return map[c] || map.TODO;
+  }
+  function planModeLabel(value){
+    const map = { REPLICA:'Replicar un evento Finalizado', ZUZU_TOTAL:'Encargo total a Zuzu', ZUZU_PARCIAL:'Encargo parcial a Zuzu' };
+    return map[String(value || '').toUpperCase()] || map.REPLICA;
+  }
+  function planProgressHtml(payload){
+    const mode = String(payload?.mode || planMode()).toUpperCase();
+    const content = String(payload?.content || planContent()).toUpperCase();
+    const title = payload?.title || fieldValue('planEventoTitulo') || 'evento nuevo';
+    const model = mode === 'ZUZU_TOTAL' ? 'No procede: creación desde cero' : (sourceEvent()?.titulo || 'evento modelo pendiente');
+    const modules = modulesForPlanContent(content);
+    const sources = [];
+    sources.push('Prompt de usuario e instrucciones de construcción');
+    if(mode === 'REPLICA') sources.push('Evento modelo finalizado: ' + model);
+    if(mode === 'ZUZU_PARCIAL') sources.push('Evento modelo como inspiración: ' + model);
+    if(mode === 'ZUZU_TOTAL') sources.push('Encargo total a Zuzu: sin copiar compras históricas de un evento concreto');
+    if(modules.includes('PRODUCTOS')) sources.push('Catálogo PRODUCTOS para precios de referencia');
+    if(modules.includes('TIENDAS')) sources.push('TIENDAS para tienda por defecto y compras');
+    if(modules.includes('PERSONAS')) sources.push('PERSONAS para responsable, donantes y socios obligatorios');
+    if(modules.includes('INGRESOS')) sources.push('INGRESOS/COLABORADORES según contenido seleccionado');
+    if(modules.includes('COMPRAS')) sources.push('COMPRAS históricas solo si el modo/contenido lo permite');
+    if(modules.includes('DONACIONES')) sources.push('DONACIONES/existencias escritas o históricas según el modo');
+    const chips = modules.map(m => `<span>${esc(m)}</span>`).join('');
+    const list = sources.map(x => `<li>${esc(x)}</li>`).join('');
+    return `<div class="plan-progress-card">
+      <div class="plan-progress-head"><div class="plan-spinner" aria-hidden="true"></div><div><strong>Zuzu está construyendo la propuesta de “${esc(title)}”</strong><p>${esc(planModeLabel(mode))} · ${esc(planContentLabel(content))}</p></div></div>
+      <div class="plan-progress-bar"><i></i></div>
+      <div class="plan-progress-modules">${chips}</div>
+      <ul>${list}</ul>
+    </div>`;
   }
   function updatePlanModeUI(){
     const mode = planMode();
@@ -826,7 +872,7 @@
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
       try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){ }
     }catch(error){
-      console.error('[ControlEvent v13.0_prod] Error generando evento real desde planificación:', error);
+      console.error('[ControlEvent v14_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText; }
@@ -849,7 +895,7 @@
       if(btn){ btn.disabled = true; btn.textContent = 'Zuzu está pensando...'; }
       if(box){
         box.classList.remove('hidden');
-        box.innerHTML = '<div class="planificacion-note compact-note"><strong>Zuzu está preparando la propuesta...</strong><br>Está leyendo históricos, módulos y condiciones de construcción.</div>';
+        box.innerHTML = planProgressHtml({ mode, content: planContent(), title: fieldValue('planEventoTitulo') });
       }
       const payload = {
         mode,
@@ -886,7 +932,7 @@
       if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
-      console.warn('[ControlEvent v13.0_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      console.warn('[ControlEvent v14_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
           const replica = buildReplicaProposal();
@@ -1013,7 +1059,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v13.0_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v14_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {

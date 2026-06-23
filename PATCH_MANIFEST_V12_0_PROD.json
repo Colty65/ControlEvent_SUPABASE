@@ -1,8 +1,8 @@
 {
-  "version": "v13.0_prod",
+  "version": "v14_prod",
   "base": "CE_v11_3_3_PROD_HOTFIX_ZUZU_FORMATO_FINALIZADO.zip",
   "changes": [
-    "Version bump a v13.0_prod / ControlEvent_v13.0_prod",
+    "Version bump a v14_prod / ControlEvent_v14_prod",
     "Carga fiable por evento mediante lectura event-scoped sin bucles",
     "Desbloqueo contextual de Zuzu, mantenimientos generales y herramientas de backup/import/export con evento Finalizado",
     "Limpieza visual de Zuzu y ocultacion de auditorias tecnicas normales",

@@ -1,4 +1,4 @@
-/* ControlEvent v13.0_prod FIX47 - COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN
+/* ControlEvent v14_prod FIX47 - COMPRAS/DONACIONES/EVENTOS RPC SIN RELOGIN
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras

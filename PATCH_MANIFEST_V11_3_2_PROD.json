@@ -1,12 +1,12 @@
 {
-  "version": "v13.0_prod",
+  "version": "v14_prod",
   "base": "CE_v11_3_3_PROD_HOTFIX_ZUZU_MODULOS_REALES_SIN_CAMBIAR_VERSION.zip",
   "changes": [
     "Zuzu usa módulos de consulta alineados con las querys probadas",
     "Salida humanizada y completa por evento en INGRESOS, COMPRAS, DONACIONES, EVENTOS, PRODUCTOS, TIENDAS y PERSONAS",
     "DONACIONES limpia donor_ref P:/T:/id y resuelve donante contra personas/tiendas",
     "Listados y gráficas directas salen de ControlEvent sin recorte por Gemini",
-    "Versión actualizada a v13.0_prod en referencias activas, BACKUP e INFOEVENTO"
+    "Versión actualizada a v14_prod en referencias activas, BACKUP e INFOEVENTO"
   ],
   "touchedMainFiles": [
     "services/event-context.service.js",

@@ -1,4 +1,4 @@
-ControlEvent v13.0_prod
+ControlEvent v14_prod
 
 Base: version anterior 10.5 con hotfixes previos.
 
@@ -27,4 +27,4 @@ Formato de respuesta esperado:
 - Archivos textuales descargables si Gemini los genera (CSV, TXT, HTML, JSON).
 
 Versión:
-- Cabecera, index, public/index, version.js, package.json, package-lock, BACKUP e INFOEVENTO actualizados a v13.0_prod / ControlEvent_v13.0_prod.
+- Cabecera, index, public/index, version.js, package.json, package-lock, BACKUP e INFOEVENTO actualizados a v14_prod / ControlEvent_v14_prod.
