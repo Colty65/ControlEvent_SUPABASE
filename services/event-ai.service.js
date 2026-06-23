@@ -1383,22 +1383,84 @@ function planRoundBuyUnits(productName, units) {
   if (planPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
   return round(Math.ceil(u * 100) / 100, 2);
 }
+function planConsumptionProfile(form) {
+  const info = normPlanKey((form?.info || '') + ' ' + (form?.descripcion || ''));
+  const people = Math.max(1, num(form?.personas) || 25);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const calor = /40|calor|temperatura|verano|mucho sol/.test(info);
+  const cubatas = /cubata|copa|copas|tardeo|barra libre/.test(info);
+  const cerveza = /cerveza|botellin|botellines|lata|barril/.test(info) || cubatas;
+  const noAlcoholCue = /niños|ninos|infantil|sin alcohol|no bebedores|abstemios/.test(info);
+  const beerPeople = Math.max(0, Math.round(people * (cerveza ? (noAlcoholCue ? 0.55 : 0.70) : 0.35)));
+  const cubaPeople = Math.max(0, Math.round(people * (cubatas ? (noAlcoholCue ? 0.35 : 0.45) : 0.15)));
+  const directSoftPeople = Math.max(1, Math.round(people * (noAlcoholCue ? 0.45 : 0.25)));
+  return { people, days, calor, cubatas, beerPeople, cubaPeople, directSoftPeople, cubatasTotal: cubaPeople * (cubatas ? 3.5 : 1.5) * days };
+}
+function planProductLooksTwoLiter(n) { return /botella.*2|2\s*l|2l|litro/.test(n) && !/lata|bote|33|25/.test(n); }
 function planMinimumNeed(productName, form, currentNeed) {
   const n = normPlanKey(productName || '');
-  const people = Math.max(1, num(form?.personas) || 25);
-  const info = normPlanKey(form?.info || '');
-  const calor = /40|calor|temperatura/.test(info);
-  const cubatas = /cubata|tardeo/.test(info);
+  const p = planConsumptionProfile(form);
   let min = 0;
-  if (/coca cola/.test(n) && !/zero|00/.test(n)) min = people * (cubatas ? 3 : 1.5);
-  else if (/coca cola.*zero|coca.*zero|coca.*00/.test(n)) min = people * (cubatas ? 1.5 : 0.7);
-  else if (/fanta|sprite|tonica|aquarius|acuarius|bitter/.test(n)) min = people * (cubatas ? 1.2 : 0.6);
-  else if (/cerveza/.test(n) && /lata|botellin|botellines|skol/.test(n)) min = people * (calor ? 4 : 3);
-  else if (/agua/.test(n) && /bot/.test(n)) min = people * (calor ? 2.5 : 1.5);
-  else if (/hielo|cubito/.test(n)) min = people * (calor ? 0.7 : 0.4);
-  else if (/ron|whisky|wiski|gin|ginebra/.test(n)) min = Math.max(currentNeed, cubatas ? Math.ceil(people / 8) : Math.ceil(people / 12));
+
+  if (/cerveza/.test(n) && /lata|botellin|botellines|skol|bote/.test(n)) {
+    // Referencia real ControlEvent: una persona consumidora media puede beber unas 5 latas/botellines en el día.
+    min = p.beerPeople * (p.calor ? 5 : 4.5) * p.days;
+  } else if (/barril/.test(n) && /cerveza/.test(n)) {
+    // Barril de 30/50 l: no mezclar con latas como si todos consumieran ambos máximos.
+    min = Math.max(num(currentNeed), Math.ceil((p.beerPeople * 1.6 * p.days) / 90));
+  } else if (/ron|whisky|wiski|gin|ginebra/.test(n)) {
+    // 1 botella estándar rinde aprox. 15-16 cubatas.
+    min = Math.max(num(currentNeed), Math.ceil(p.cubatasTotal / 16));
+  } else if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n)) {
+    if (planProductLooksTwoLiter(n)) {
+      // Botellas de 2 l: mezcla de cubatas + algo de consumo directo, sin tratar cada persona como botella individual.
+      const mixerBottles = p.cubatas ? Math.ceil(p.cubatasTotal / 8) : 0;
+      const directBottles = Math.ceil((p.directSoftPeople * (p.calor ? 0.7 : 0.45) * p.days) / 6);
+      min = mixerBottles + directBottles;
+    } else {
+      // Latas/botes directos: consumo parcial, no todos los asistentes al máximo.
+      min = p.directSoftPeople * (p.calor ? 1.5 : 1.0) * p.days;
+    }
+  } else if (/agua/.test(n) && /bot/.test(n)) {
+    min = p.people * (p.calor ? 2.0 : 1.25) * p.days;
+  } else if (/hielo|cubito/.test(n)) {
+    min = p.people * (p.calor ? 0.45 : 0.28) * p.days;
+  } else if (/gambon|gambones|langostino|langostinos/.test(n)) {
+    // Referencia del usuario: para una paella normal, 1 kg de gambones puede ser base suficiente; no saltar a 5 kg sin justificación.
+    min = Math.max(num(currentNeed), Math.min(2, Math.max(1, Math.ceil(p.people / 70))));
+  } else if (/arroz/.test(n)) {
+    min = Math.max(num(currentNeed), Math.ceil((p.people * 0.10) * 10) / 10);
+  } else if (/chorizo|morcilla|montado|panceta/.test(n)) {
+    // Cena informal: no todos comen una unidad completa de cada cosa.
+    if (/chorizo|montado/.test(n)) min = p.people * 0.70;
+    else if (/morcilla/.test(n)) min = p.people * 0.45;
+    else if (/panceta/.test(n)) min = p.people * 0.35;
+  }
   if (!min) return Math.max(0, num(currentNeed));
   return Math.max(num(currentNeed), Math.ceil(min));
+}
+function planCompraTotal(rows) {
+  return arr(rows).filter(r => r?.include !== false && r?.tipo === 'COMPRA').reduce((sum, r) => sum + num(r.unidades) * num(r.precio), 0);
+}
+function planBudgetGuard(rows, form) {
+  const people = Math.max(1, num(form?.personas) || 25);
+  const notes = [];
+  let out = arr(rows).map(r => ({...r}));
+  let total = planCompraTotal(out);
+  let per = total / people;
+  if (per > 25) notes.push(`Control de realidad: la propuesta queda en ${round(per,2)} €/persona, por encima del coste habitual de 25 €/persona.`);
+  if (per > 35) {
+    const factor = Math.max(0.35, (35 * people) / Math.max(1, total));
+    out = out.map(r => {
+      if (r?.tipo !== 'COMPRA' || r.include === false) return r;
+      const scaled = Math.max(0, round(num(r.unidades) * factor, 2));
+      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático: la propuesta superaba 35 €/persona y se ha reducido para aproximarla a coste real de evento.` };
+    });
+    total = planCompraTotal(out);
+    per = total / people;
+    notes.push(`Propuesta sobredimensionada: se ha reajustado automáticamente hacia el límite de 35 €/persona. Nuevo coste orientativo: ${round(per,2)} €/persona.`);
+  }
+  return { rows: out, notes };
 }
 function planPostProcessPlanningRows(rows, form, state) {
   const maps = planBuildMaps(state);
@@ -1419,8 +1481,8 @@ function planPostProcessPlanningRows(rows, form, state) {
     const currentNeed = g.donation + g.purchase;
     const need = planMinimumNeed(pname, form, currentNeed);
     let buy = Math.max(0, need - g.donation);
-    // La compra se propone con un 25% de margen sobre el déficit y, en bebidas de lata/botellín, a múltiplos de 24.
-    buy = planRoundBuyUnits(pname, buy * 1.25);
+    // Compra solo del déficit real: sin inflar por defecto. Las bebidas de lata/botellín siguen redondeándose a múltiplos de 24.
+    buy = planRoundBuyUnits(pname, buy);
     const price = planReasonablePlanPrice(pname, prod?.defaultPrecio ?? prod?.precio ?? 0);
     let firstPurchase = g.rows.find(i => out[i]?.tipo === 'COMPRA');
     if (buy > 0 && firstPurchase === undefined) {
@@ -1630,6 +1692,25 @@ function planMergeExplicitDonations(rows, explicitRows) {
   }
   return out;
 }
+function planSanitizeInventedDonations(rows, baseRows, explicitRows) {
+  const allowed = new Set();
+  arr(baseRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowed.add(trim(r.productId) || normPlanKey(r.productName)));
+  arr(explicitRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowed.add(trim(r.productId) || normPlanKey(r.productName)));
+  return arr(rows).map(row => {
+    if (row?.tipo !== 'DONACION') return row;
+    const key = trim(row.productId) || normPlanKey(row.productName);
+    if (allowed.has(key) || /^prompt|histor/i.test(trim(row.confidence)) || /^prompt|histor/i.test(trim(row.key))) return row;
+    return {
+      ...row,
+      tipo: 'COMPRA',
+      ticketDonacion: '',
+      donorRef: '',
+      include: row.include !== false,
+      confidence: 'Posible donación pendiente',
+      reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' No se acepta como donación porque no está confirmada por histórico real ni por el prompt; se mantiene como compra pendiente para no descontarla.'
+    };
+  });
+}
 
 function planInfoDonationRules(info, maps) {
   const raw = trim(info || '');
@@ -1780,6 +1861,11 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
 
 Reglas:
 - Devuelve SOLO JSON válido según el esquema.
+- Calculas COSTE REAL de evento, no precio de bar/restaurante: objetivo normal 25 €/persona y límite caro 35 €/persona para evento de 1 día. Si te vas por encima, ajusta cantidades antes de responder.
+- NO inventes productos donados. Solo devuelve DONACION si aparece como donación/existencia explícita en el prompt o en filas históricas base. Si crees que algo podría donarse, trátalo como COMPRA con la razón "posible donación pendiente de confirmar", pero NO lo descuentes.
+- Cerveza lata/botellín: usa como referencia hasta unas 5 unidades por persona consumidora en todo el día, no por todos los asistentes. Cubatas: 3 o 4 por persona consumidora; calcula refrescos de mezcla según cubatas, no como botella por persona.
+- Paella: evita saltos absurdos; para una paella normal 1 kg de gambones puede ser base suficiente y 5 kg solo si el número de personas lo justifica claramente.
+- Cena/barbacoa: no multipliques todos los productos por todos los asistentes; para una cena informal no todos comen chorizo + montado + morcilla + panceta completos.
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
@@ -1944,9 +2030,16 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   } else {
     aiNotes.push('Modo réplica: se conserva el evento modelo sin ajuste de IA.');
   }
-  rowsOut = planMergeExplicitDonations(rowsOut, planExplicitDonationRowsFromPrompt(form, state));
+  const explicitDonationRows = planExplicitDonationRowsFromPrompt(form, state);
+  rowsOut = planMergeExplicitDonations(rowsOut, explicitDonationRows);
+  rowsOut = planSanitizeInventedDonations(rowsOut, baseRows, explicitDonationRows);
   rowsOut = arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}`, tiendaId: trim(row.tiendaId || defaultStoreId), responsableId: trim(row.responsableId || defaultResponsibleId) }));
-  if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
+  if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
+    rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
+    const budget = planBudgetGuard(rowsOut, form);
+    rowsOut = budget.rows;
+    budget.notes.forEach(n => aiNotes.push(n));
+  }
   return {
     ok: true,
     version: 'v14_prod',

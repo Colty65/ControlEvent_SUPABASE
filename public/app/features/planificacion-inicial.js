@@ -15,6 +15,7 @@
   let lastIncomeProposal = [];
   let lastSourceEvent = null;
   let lastCreatedEventId = "";
+  let planResourceOrderMode = '';
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function state(){ return app()?.state || window.state || {}; }
@@ -298,6 +299,22 @@
     return Math.ceil(u * 100) / 100;
   }
   function planGroupKey(product){ return normalizeText(product || '') || 'producto'; }
+  function planProductOptions(selected){
+    const current = String(selected || '');
+    const opts = rows('productos').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(p => `<option value="${esc(p.id)}" ${String(p.id)===current?'selected':''}>${esc(p.nombre || 'Producto')}</option>`).join('');
+    return `<option value="" ${!current?'selected':''}>-- producto sin catálogo --</option>${opts}`;
+  }
+  function sortPlanResourceRows(list){
+    const mode = String(planResourceOrderMode || '').toUpperCase();
+    const arrRows = Array.isArray(list) ? list.slice() : [];
+    if(mode === 'TIENDA'){
+      return arrRows.sort((a,b)=>String(tiendaName(a.tiendaId)).localeCompare(String(tiendaName(b.tiendaId)),'es') || String(a.producto||'').localeCompare(String(b.producto||''),'es'));
+    }
+    if(mode === 'SEGMENTO_DESTINO'){
+      return arrRows.sort((a,b)=>String(a.segmento||'').localeCompare(String(b.segmento||''),'es') || String(a.destino||'').localeCompare(String(b.destino||''),'es') || String(a.producto||'').localeCompare(String(b.producto||''),'es'));
+    }
+    return arrRows;
+  }
   function planResourceRows(proposals){
     const map = new Map();
     (Array.isArray(proposals) ? proposals : []).forEach((p, idx) => {
@@ -334,10 +351,11 @@
       if(!row.productId && p.productId) row.productId = p.productId;
       map.set(key, row);
     });
-    return [...map.values()].map(row => {
+    const list = [...map.values()].map(row => {
       const baseNeed = row.necesidad > 0 ? row.necesidad : row.donado + row.compra;
       return {...row, necesidad: baseNeed};
-    }).sort((a,b)=>(b.importeCompra+b.importeDonado)-(a.importeCompra+a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
+    });
+    return sortPlanResourceRows(list);
   }
   function renderPlanResourceEditor(proposals){
     const rows = planResourceRows(proposals);
@@ -348,8 +366,8 @@
       const don = [...r.donantes.entries()].map(([k,v]) => `${qty(v)} ud. ${esc(k)}`).join('<br>') || '—';
       const buyBase = Math.max(0, Number(r.compra || 0));
       const price = Number(r.precioCompra || r.precioDonado || 0);
-      return `<tr class="plan-resource-edit-row ${r.include ? '' : 'excluded'}" data-plan-resource-key="${esc(r.key)}">
-        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong>${esc(r.producto)}</strong><small>${esc(r.segmento)} · ${esc(r.destino)}</small></td>
+      return `<tr class="plan-resource-edit-row ${r.include ? '' : 'excluded'}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
+        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong class="plan-resource-product-label">${esc(r.producto)}</strong><small class="plan-resource-meta">${esc(r.segmento)} · ${esc(r.destino)}</small><select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select>${Number(r.compra||0) <= 0 ? '<em class="plan-resource-excluded-label">Excluido inicialmente de compra</em>' : ''}</td>
         <td><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/><small>Necesidad total calculada</small></td>
         <td><strong>${qty(r.donado)} ud.</strong><small>${don}</small></td>
         <td><input type="number" min="0" step="0.01" value="${esc(buyBase)}" data-plan-resource-field="compra"/><small>Déficit a comprar editable</small></td>
@@ -359,7 +377,7 @@
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card">
-      <div class="section-title tiny-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: necesidad total, lo que ya está donado/existente y lo que queda por comprar.</p></div></div>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: necesidad total, lo que ya está donado/existente y lo que queda por comprar. Las filas con déficit 0 siguen visibles como excluidas.</p></div><div class="plan-resource-order-actions"><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button></div></div>
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table">
         <thead><tr><th>Producto</th><th>Necesidad</th><th>Donado / existente</th><th>A comprar</th><th>Precio / importe</th><th>Tienda</th><th>Responsable</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -367,11 +385,29 @@
     </div>`;
   }
   function renderPlanResourceVision(proposals){ return renderPlanResourceEditor(proposals); }
+  function injectPlanHotfixStyle(){
+    if(document.getElementById('cePlanNoMoveStyle')) return;
+    const st = document.createElement('style');
+    st.id = 'cePlanNoMoveStyle';
+    st.textContent = `
+      .plan-resource-edit-row.plan-row-changed{outline:4px solid rgba(245,158,11,.75)!important;box-shadow:0 0 0 6px rgba(245,158,11,.18)!important;background:#fffbeb!important;scroll-margin:120px!important}
+      .plan-resource-edit-row.plan-found{outline:4px solid rgba(37,99,235,.75)!important;box-shadow:0 0 0 6px rgba(37,99,235,.16)!important}
+      .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:180px!important}
+      .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
+      .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.plan-resource-order-actions button{white-space:nowrap}
+      .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
+    `;
+    document.head.appendChild(st);
+  }
   function renderPlanningNarrative(proposals, totalCompras, totalDonaciones){
     const title = proposedEventTitle();
     const people = Math.max(0, Number(fieldValue('planPersonas') || 0));
     const price = planEstimatedEventPrice(totalCompras, people || 1);
     const valuation = Number(totalCompras || 0) + Number(totalDonaciones || 0);
+    const costePersona = people > 0 ? Number(totalCompras || 0) / people : 0;
+    const realism = people > 0 && costePersona > 35
+      ? `<p class="plan-budget-warning"><strong>Aviso de realidad:</strong> ${esc(money(costePersona))} por persona supera el límite caro de referencia (${esc(money(35))}). Revisa cantidades antes de generar el evento.</p>`
+      : (people > 0 && costePersona > 25 ? `<p class="plan-budget-warning"><strong>Aviso:</strong> ${esc(money(costePersona))} por persona está por encima del coste habitual de referencia (${esc(money(25))}).</p>` : '');
     const prompt = fieldValue('planInfo');
     const conditions = [];
     const dias = Number(fieldValue('planDias') || 0); if(dias) conditions.push(`${qty(dias)} día(s)`);
@@ -386,7 +422,9 @@
         <strong>Lectura de Zuzu para ${esc(title)}:</strong>
         <p>He preparado una propuesta revisable atendiendo a las condiciones principales${conditions.length ? ': ' + esc(conditions.join(' · ')) : ''}. La lógica es: necesidad total prevista, menos donaciones/existencias, y compra solo del déficit revisable.</p>
         <p><strong>Total compras previstas:</strong> ${money(totalCompras)} · <strong>Donaciones/existencias estimadas:</strong> ${money(totalDonaciones)} · <strong>Valoración del evento:</strong> ${money(valuation)}.</p>
-        <p><strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, redondeado al alza para facilitar el cobro.</p>
+        <p><strong>Coste real de compra:</strong> ${people > 0 ? money(costePersona) + ' por persona' : 'sin personas estimadas'} · <strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, redondeado al alza para facilitar el cobro.</p>
+        ${realism}
+        <p><strong>Para afinar más a Zuzu:</strong> indica personas, comidas incluidas, nivel de bebida, niños/no bebedores, presupuesto objetivo y si hay donaciones/existencias confirmadas.</p>
       </div>`;
   }
 
@@ -655,24 +693,49 @@
     lastProposal.push(row);
     return lastProposal.length - 1;
   }
+  function markPlanRowChanged(tr){
+    if(!tr) return;
+    tr.classList.add('plan-row-changed');
+    clearTimeout(tr.__cePlanChangedTimer);
+    tr.__cePlanChangedTimer = setTimeout(() => { try{ tr.classList.remove('plan-row-changed'); }catch(_){ } }, 6500);
+  }
   function updateResourceEditorRow(key, tr, changedField){
     const group = productGroupFromKey(key);
     if(!group) return;
-    const include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
+    let include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
     const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || 0));
     let buy = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="compra"]')?.value || 0));
     const price = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="precio"]')?.value || 0));
     const tiendaId = tr.querySelector('[data-plan-resource-field="tiendaId"]')?.value || '';
     const responsableId = tr.querySelector('[data-plan-resource-field="responsableId"]')?.value || '';
+    const selectedProductId = tr.querySelector('[data-plan-resource-field="productId"]')?.value || '';
+    const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
+
     if(changedField === 'necesidad'){
-      buy = roundPurchaseUnits(group.producto, Math.max(0, need - Number(group.donado || 0)) * 1.25);
+      buy = roundPurchaseUnits(selectedProduct?.nombre || group.producto, Math.max(0, need - Number(group.donado || 0)));
       const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
       if(buyInput) buyInput.value = String(buy);
     }
+    if(changedField !== 'include' && buy > 0){
+      include = true;
+      const chk = tr.querySelector('[data-plan-resource-field="include"]');
+      if(chk) chk.checked = true;
+    }
+
+    const newName = selectedProduct?.nombre || group.producto || 'Producto';
+    const newSegment = selectedProduct?.segmento || group.segmento || 'Sin segmento';
+    const newDestino = selectedProduct?.destino || group.destino || 'Sin destino';
     group.allIndices.forEach(idx => {
       if(lastProposal[idx]){
         lastProposal[idx].include = include;
         lastProposal[idx].necesidadTotal = need || undefined;
+        if(selectedProductId){
+          lastProposal[idx].productId = selectedProductId;
+          lastProposal[idx].productName = newName;
+          lastProposal[idx].segmento = newSegment;
+          lastProposal[idx].destino = newDestino;
+          lastProposal[idx].manualProduct = true;
+        }
       }
     });
     let pidx = group.purchaseIndices[0];
@@ -682,14 +745,31 @@
       purchase.include = include && buy > 0;
       purchase.unidades = buy;
       purchase.precio = price || purchase.precio || 0;
-      purchase.tiendaId = tiendaId || purchase.tiendaId || '';
-      purchase.responsableId = responsableId || purchase.responsableId || '';
+      purchase.tiendaId = tiendaId;
+      purchase.responsableId = responsableId;
       purchase.necesidadTotal = need || undefined;
+      if(selectedProductId){
+        purchase.productId = selectedProductId;
+        purchase.productName = newName;
+        purchase.segmento = newSegment;
+        purchase.destino = newDestino;
+        purchase.manualProduct = true;
+      }
+      purchase.manualStore = changedField === 'tiendaId' || purchase.manualStore;
+      purchase.manualResponsible = changedField === 'responsableId' || purchase.manualResponsible;
     }
     const priceSmall = tr.querySelector('[data-plan-resource-field="precio"]')?.closest('td')?.querySelector('small');
     if(priceSmall) priceSmall.textContent = money(buy * (price || 0));
-    setTimeout(renderProposal, 0);
+    tr.classList.toggle('excluded', !(include && buy > 0));
+    tr.dataset.planProductName = normalizeText(newName);
+    tr.dataset.planResourceKey = planGroupKey(newName);
+    const label = tr.querySelector('.plan-resource-product-label');
+    if(label) label.textContent = newName;
+    const meta = tr.querySelector('.plan-resource-meta');
+    if(meta) meta.textContent = `${newSegment} · ${newDestino}`;
+    markPlanRowChanged(tr);
   }
+
 
   function searchProposalProduct(){
     const input = document.getElementById('planBuscarProducto');
@@ -722,9 +802,12 @@
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
-        const handler = () => updateResourceEditorRow(key, tr, input.dataset.planResourceField);
+        const handler = () => updateResourceEditorRow(tr.dataset.planResourceKey || key, tr, input.dataset.planResourceField);
         input.addEventListener('change', handler);
-        if(input.matches('input[type=number]')) input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); handler(); } });
+        if(input.matches('input[type=number]')){
+          input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); handler(); } });
+          input.addEventListener('input', () => { clearTimeout(input.__cePlanEditTimer); input.__cePlanEditTimer = setTimeout(handler, 260); });
+        }
       });
     });
     const setIncluded = mode => { lastProposal = lastProposal.map(p => ({...p, include: mode === 'all'})); renderProposal(); };
@@ -732,6 +815,8 @@
     document.getElementById('btnPlanSelectNone')?.addEventListener('click', () => setIncluded('none'));
     document.getElementById('btnPlanBuscarProducto')?.addEventListener('click', searchProposalProduct);
     document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); } });
+    document.getElementById('btnPlanOrdenTienda')?.addEventListener('click', () => { planResourceOrderMode = 'TIENDA'; renderProposal(); });
+    document.getElementById('btnPlanOrdenSegmentoDestino')?.addEventListener('click', () => { planResourceOrderMode = 'SEGMENTO_DESTINO'; renderProposal(); });
     document.getElementById('btnPlanApplyReplica')?.addEventListener('click', applyReplicaToRealEvent);
   }
   function updateProposalFromCard(idx, card, light){
@@ -1146,6 +1231,7 @@
   }
   function ensureReady(){
     if(!document.getElementById(PANEL_ID)) return;
+    injectPlanHotfixStyle();
     bindEvents();
     ensureMobileButton();
     hideByRole();

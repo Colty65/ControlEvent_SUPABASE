@@ -96,37 +96,89 @@
     try{ card.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ try{card.scrollIntoView();}catch(__){} }
     setTimeout(function(){ try{ card.classList.remove('ce-search-found-v105hf'); }catch(_){ } }, 9000);
   }
-  function runSearch(kind){
+  function rowHaystackFromState(r){
+    return fold([
+      r && r.id, r && r.ticketDonacion, r && r.ticket_donacion, r && r.ticket,
+      r && r.unidades, r && r.precio, r && r.importe, r && r.valor, r && r.total,
+      productName((r&&r.productoId)||(r&&r.producto_id)),
+      tiendaName((r&&r.tiendaId)||(r&&r.tienda_id)),
+      personaName((r&&r.responsableId)||(r&&r.responsable_id)),
+      personaName((r&&r.donanteId)||(r&&r.personaId)||(r&&r.persona_id)),
+      donorLabelFromRow(r), r && r.donorRef, r && r.observaciones, r && r.notas, r && r.fecha
+    ].join(' '));
+  }
+  function donorLabelFromRow(r){
+    var ref=trim(r && (r.donorRef || r.donor_ref));
+    if(!ref) return '';
+    if(/^P:/i.test(ref)) return personaName(ref.slice(2));
+    if(/^T:/i.test(ref)) return tiendaName(ref.slice(2));
+    return ref;
+  }
+  function stateRowsForKind(kind){
+    var ev=selectedEventId();
+    return arr('compras').filter(function(r){
+      if(ev && trim(r.eventId || r.event_id)!==ev) return false;
+      var don=isDonationTicket(r.ticketDonacion || r.ticket_donacion || r.ticket || '');
+      return kind==='donaciones' ? don : !don;
+    });
+  }
+  function findCardForRow(kind, row){
+    var list=$(kind==='donaciones'?'donacionesList':'comprasList');
+    var id=trim(row && row.id);
+    var cards=cardsIn(list, kind);
+    if(id){
+      var direct=cards.find(function(c){ return rowIdFromCard(c)===id; });
+      if(direct) return direct;
+      var safe=(window.CSS&&CSS.escape)?CSS.escape(id):id.replace(/"/g,'\\"');
+      var sel=document.querySelector((kind==='donaciones'?'#donacionesList':'#comprasList') + ' [data-id="'+safe+'"]');
+      if(sel && sel.closest) return sel.closest('.itemcard,.rowline,.card');
+      var byDomId=$(kind==='donaciones' ? 'donacionRow_'+id : 'compraRow_'+id);
+      if(byDomId) return byDomId.closest?.('.itemcard,.rowline,.card') || byDomId;
+    }
+    var rowHay=rowHaystackFromState(row);
+    var pname=fold(productName(row && (row.productoId || row.producto_id)));
+    return cards.find(function(c){
+      var txt=rowText(c, kind);
+      return (id && txt.indexOf(fold(id))>=0) || (pname && txt.indexOf(pname)>=0 && matches(rowHay, tokensOf(txt).slice(0,3)));
+    }) || null;
+  }
+  function showSearchNotice(message, silent){
+    if(silent) return;
+    try{ alert(message); }catch(_){ }
+  }
+  function highlightStateHit(kind, row, silent){
+    var card=findCardForRow(kind, row);
+    if(card){ highlight(card); return true; }
+    renderKind(kind);
+    setTimeout(function(){
+      var late=findCardForRow(kind, row);
+      if(late) highlight(late);
+      else showSearchNotice('Se ha encontrado el registro en los datos, pero no se ha podido localizar su ficha visible. Cambia de pestaña y vuelve a entrar.', silent);
+    }, 140);
+    return true;
+  }
+  function runSearch(kind, opts){
+    opts = opts || {};
     kind = kind || 'compras';
     var input=$(kind==='donaciones'?'donacionesSearchInput':'comprasSearchInput');
     var list=$(kind==='donaciones'?'donacionesList':'comprasList');
     if(!input || !list) return false;
     var toks=tokensOf(input.value || '');
     if(!toks.length) return false;
+
+    // Corrección móvil/iPad: la búsqueda se decide SIEMPRE contra el array real de datos,
+    // nunca contra la primera ficha visible del DOM. El DOM solo se usa después para saltar al ID estable.
+    var rows=stateRowsForKind(kind);
+    var stateHit=rows.find(function(r){ return matches(rowHaystackFromState(r), toks); });
+    if(stateHit){ highlightStateHit(kind, stateHit, !!opts.silent); try{ input.focus(); }catch(_){ } return false; }
+
+    // Último recurso visual: solo si no hay coincidencia en el estado local.
     var cards=cardsIn(list, kind);
     var found=cards.find(function(c){ return matches(rowText(c, kind), toks); });
-    if(found){ highlight(found); return false; }
-    // Segundo pase: buscar en estado por si la ficha quedó recién renderizada con selects protegidos.
-    var ev=selectedEventId();
-    var rows=arr('compras').filter(function(r){
-      if(ev && trim(r.eventId || r.event_id)!==ev) return false;
-      var don=isDonationTicket(r.ticketDonacion || r.ticket_donacion || r.ticket || '');
-      return kind==='donaciones' ? don : !don;
-    });
-    var stateHit=rows.find(function(r){
-      var hay=fold([r.id,r.ticketDonacion,r.ticket_donacion,r.ticket,r.unidades,r.precio,r.importe,r.valor,
-        productName(r.productoId||r.producto_id), tiendaName(r.tiendaId||r.tienda_id), personaName(r.responsableId||r.responsable_id), personaName(r.donanteId||r.personaId||r.persona_id), r.donorRef].join(' '));
-      return matches(hay,toks);
-    });
-    if(stateHit){
-      var id=trim(stateHit.id);
-      var byId=cards.find(function(c){ return rowIdFromCard(c)===id; });
-      if(byId){ highlight(byId); return false; }
-      var pname=productName(stateHit.productoId||stateHit.producto_id);
-      var byText=cards.find(function(c){ return pname && rowText(c, kind).indexOf(fold(pname))>=0; });
-      if(byText){ highlight(byText); return false; }
-    }
-    alert('No se ha encontrado ningún registro con ese texto.');
+    if(found){ highlight(found); try{ input.focus(); }catch(_){ } return false; }
+
+    showSearchNotice('No se ha encontrado ningún registro con ese texto.', !!opts.silent);
+    try{ input.focus(); }catch(_){ }
     return false;
   }
   function handleSearch(ev){
@@ -149,6 +201,16 @@
       el.disabled=false; el.readOnly=false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled');
       el.classList.add('ce-mapa-readonly-allowed','mobile-menu-action');
       el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); el.style.setProperty('visibility','visible','important');
+      if(!el.__ceV105hfInputSearchBound){
+        el.__ceV105hfInputSearchBound=true;
+        el.addEventListener('input', function(){
+          var kind = id==='donacionesSearchInput' ? 'donaciones' : 'compras';
+          clearTimeout(el.__ceV105hfSearchTimer);
+          el.__ceV105hfSearchTimer=setTimeout(function(){
+            if(tokensOf(el.value||'').join('').length >= 3) runSearch(kind, {silent:true, fromInput:true});
+          }, 420);
+        }, {passive:true});
+      }
     });
     ['comprasList','donacionesList','tabCompras','tabDonaciones'].forEach(function(id){
       var root=$(id); if(!root) return;
