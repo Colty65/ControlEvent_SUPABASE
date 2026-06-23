@@ -265,28 +265,55 @@
   }
 
 
+  function isPlanCoupleName(name){
+    const n = normalizeText(name || '');
+    // En PERSONAS no siempre existe un campo numero fiable. Para ingresos iniciales,
+    // consideramos pareja/grupo socio cuando el nombre contiene una unión explícita entre personas.
+    // Ej.: "Colty y Esther", "Cito y María José Díaz", "Isabel y Angel Téllez".
+    return /\b(Y|E)\b/.test(n) || n.includes(' + ');
+  }
+  function splitPlanCoupleName(name){
+    return normalizeText(name || '').split(/\s+(?:Y|E|\+)\s+/).map(normalizeText).filter(Boolean);
+  }
+  function singleCoveredByCouple(singleName, coupleName, parts){
+    const s = normalizeText(singleName || '');
+    const c = normalizeText(coupleName || '');
+    if(!s || s.length < 3) return false;
+    // Si "Colty" está dentro de "Colty y Esther", o "Maria Jose" dentro de
+    // "Cito y Maria Jose Diaz", no debe proponerse otra vez como socio individual.
+    if(c.includes(s)) return true;
+    return (parts || []).some(part => {
+      const p = normalizeText(part);
+      if(!p || p.length < 3) return false;
+      if(p === s || p.includes(s) || s.includes(p)) return true;
+      const pf = p.split(' ')[0] || '';
+      const sf = s.split(' ')[0] || '';
+      return pf.length >= 4 && sf.length >= 4 && pf === sf;
+    });
+  }
   function sociosParaIngresosIniciales(){
-    // Regla preparada para inserción futura: si hay registro conjunto numero=2, prima sobre los individuales numero=1.
+    // Regla v13.0 hotfix: para "Ingresos obligatorios de todos los socios" se usan
+    // parejas/grupos SOCIO escritos con "y/e/+" como numero=2, y solo los socios
+    // individuales que no estén ya contenidos en una pareja. Esto evita duplicar
+    // Colty+Esther como pareja y además Colty y Esther por separado.
     const list = socios();
     const selected = new Map();
-    const coveredSingles = new Set();
     const couples = [];
     list.forEach(p => {
-      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
+      const id = String(p.id || '');
       const name = normalizeText(p.nombre || '');
-      if(!name) return;
-      if(numero >= 2){
-        couples.push({persona:p, numero, name});
-        name.split(/\s+(?:Y|E|\+)\s+/).map(normalizeText).filter(Boolean).forEach(part => coveredSingles.add(part));
+      if(!id || !name) return;
+      if(isPlanCoupleName(name)){
+        couples.push({persona:p, name, parts:splitPlanCoupleName(name)});
+        selected.set(id, {...p, numeroIngreso:2});
       }
     });
-    couples.forEach(c => selected.set(String(c.persona.id), {...c.persona, numeroIngreso:c.numero}));
     list.forEach(p => {
       const id = String(p.id || '');
-      const numero = Math.max(1, Number(p.numero || p.NUMERO || p.personas || p.n || 1));
       const name = normalizeText(p.nombre || '');
-      if(!id || !name || numero >= 2) return;
-      if(coveredSingles.has(name)) return;
+      if(!id || !name || isPlanCoupleName(name)) return;
+      const covered = couples.some(c => singleCoveredByCouple(name, c.name, c.parts));
+      if(covered) return;
       selected.set(id, {...p, numeroIngreso:1});
     });
     return [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));

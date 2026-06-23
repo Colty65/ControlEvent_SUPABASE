@@ -1480,8 +1480,10 @@ Reglas:
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
 - Para modo "Encargo total a Zuzu", crea una propuesta con productos del catálogo e histórico general, sin depender de un único modelo.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
+- Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit; la DONACION representa lo que ya se tiene o se prevé recibir.
+- No agrupes productos bajo conceptos genéricos tipo "cosas de paella" si el usuario pide desglose: usa líneas concretas de arroz, carne, verduras, aceite, platos, vasos, hielo, agua, refrescos, pan, etc.
 - Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
-- Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en las filas de DONACION.
+- Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en todas esas filas de DONACION.
 - Si modulosSolicitados está vacío por la opción Ningún dato, apóyate solo en la información del usuario y el catálogo de productos; no copies históricos de eventos.
 - No devuelvas más de 180 filas. Prioriza productos útiles.
 - La app mostrará la propuesta para que el usuario pueda editarla; no estás creando el evento real.
