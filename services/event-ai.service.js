@@ -1327,6 +1327,201 @@ function planDonorRefFromLabel(label, maps) {
   return '';
 }
 
+function planFindProductLoose(label, maps) {
+  const key = normPlanKey(label);
+  if (!key) return null;
+  if (maps.productByName.has(key)) return maps.productByName.get(key);
+  const toks = key.split(' ').filter(t => t.length >= 3);
+  let best = null;
+  let bestScore = 0;
+  for (const p of maps.products.values()) {
+    const pk = normPlanKey(p?.nombre);
+    if (!pk) continue;
+    let score = 0;
+    if (pk.includes(key) || key.includes(pk)) score += 30;
+    toks.forEach(t => { if (pk.includes(t)) score += Math.min(8, t.length); });
+    const ptoks = pk.split(' ').filter(t => t.length >= 3);
+    ptoks.forEach(t => { if (key.includes(t)) score += Math.min(5, t.length); });
+    if (score > bestScore) { best = p; bestScore = score; }
+  }
+  return bestScore >= 10 ? best : null;
+}
+function planRefFromLooseLabel(label, maps, preferred = 'P') {
+  const direct = planDonorRefFromLabel(label, maps);
+  if (direct) return direct;
+  const key = normPlanKey(label);
+  if (!key) return '';
+  const scan = preferred === 'T' ? maps.stores : maps.people;
+  let best = null, bestScore = 0;
+  for (const row of scan.values()) {
+    const rk = normPlanKey(row?.nombre);
+    if (!rk) continue;
+    let score = 0;
+    if (rk === key) score += 100;
+    if (rk.includes(key) || key.includes(rk)) score += 30;
+    key.split(' ').filter(t=>t.length>=3).forEach(t => { if (rk.includes(t)) score += Math.min(8,t.length); });
+    if (score > bestScore) { best = row; bestScore = score; }
+  }
+  if (best && bestScore >= 12) return (preferred === 'T' ? 'T:' : 'P:') + best.id;
+  return '';
+}
+function planFindPersonLoose(label, maps) {
+  const key = normPlanKey(label);
+  if (!key) return null;
+  if (maps.personByName.has(key)) return maps.personByName.get(key);
+  let best = null, scoreBest = 0;
+  for (const p of maps.people.values()) {
+    const pk = normPlanKey(p?.nombre);
+    if (!pk) continue;
+    let score = 0;
+    if (pk === key) score += 100;
+    if (pk.includes(key) || key.includes(pk)) score += 30;
+    key.split(' ').filter(t=>t.length>=3).forEach(t => { if (pk.includes(t)) score += Math.min(7,t.length); });
+    if (score > scoreBest) { best = p; scoreBest = score; }
+  }
+  return scoreBest >= 12 ? best : null;
+}
+function planFindStoreLoose(label, maps) {
+  const key = normPlanKey(label);
+  if (!key) return null;
+  if (maps.storeByName.has(key)) return maps.storeByName.get(key);
+  let best = null, scoreBest = 0;
+  for (const t of maps.stores.values()) {
+    const tk = normPlanKey(t?.nombre);
+    if (!tk) continue;
+    let score = 0;
+    if (tk === key) score += 100;
+    if (tk.includes(key) || key.includes(tk)) score += 30;
+    key.split(' ').filter(x=>x.length>=3).forEach(x => { if (tk.includes(x)) score += Math.min(7,x.length); });
+    if (score > scoreBest) { best = t; scoreBest = score; }
+  }
+  return scoreBest >= 12 ? best : null;
+}
+function planExtractBracket(text, names) {
+  const raw = trim(text || '');
+  for (const name of names) {
+    const re = new RegExp(name + '\\s*[:=]?\\s*(?:\\[([^\\]]+)\\]|["“]([^"”]+)["”]|([^,;\\n]+))', 'i');
+    const m = raw.match(re);
+    if (m) return trim(m[1] || m[2] || m[3] || '').replace(/[.。]+$/,'').trim();
+  }
+  return '';
+}
+function planCleanExplicitProductText(text) {
+  let s = trim(text || '').replace(/^[•\-]+\s*/, '').replace(/[.。]+$/,'').trim();
+  if (!s) return '';
+  if (s.includes(':')) s = s.split(':')[0].trim();
+  s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\s+(?:de\s+)?/i, '');
+  s = s.replace(/\b\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\b/ig, '').trim();
+  return s.replace(/\s+/g,' ').trim();
+}
+function planExplicitUnits(text) {
+  const raw = trim(text || '').replace(',', '.');
+  let m = raw.match(/^\s*[•\-]?\s*(\d+(?:\.\d+)?)/);
+  if (m) return Math.max(0, num(m[1]));
+  m = raw.match(/:\s*(\d+(?:\.\d+)?)/);
+  if (m) return Math.max(0, num(m[1]));
+  return 1;
+}
+function planBlockBetween(raw, startRe, endReList) {
+  const m = raw.match(startRe);
+  if (!m) return '';
+  const start = m.index + m[0].length;
+  let end = raw.length;
+  for (const re of endReList) {
+    const sub = raw.slice(start).search(re);
+    if (sub >= 0) end = Math.min(end, start + sub);
+  }
+  return raw.slice(start, end);
+}
+function planExplicitItemLines(block) {
+  const out = [];
+  trim(block).split(/\n+/).forEach(line => {
+    const s = trim(line);
+    if (!s) return;
+    const m = s.match(/^\s*[•\-]\s*(.+)$/);
+    if (m) out.push(m[1]);
+  });
+  // También soporta una línea tipo "Productos: 1 queso, 1 lata, barril..."
+  const prodLine = block.match(/Productos?\s*:\s*([\s\S]+)/i);
+  if (prodLine) {
+    prodLine[1].split(/[,;]+|\s+y\s+/i).forEach(part => { const p = trim(part); if (p) out.push(p); });
+  }
+  return out;
+}
+function planExplicitDonationRowsFromPrompt(form, state) {
+  const info = trim(form?.info || '');
+  if (!info) return [];
+  const maps = planBuildMaps(state);
+  const rowsOut = [];
+  function addRows(block, defaults) {
+    const donorLabel = defaults.donor || defaults.store || 'Sin donante';
+    const responsableLabel = defaults.responsable || donorLabel;
+    const storeLabel = defaults.store || donorLabel;
+    const donorRef = planRefFromLooseLabel(donorLabel, maps, defaults.preferredDonorKind || 'P') || planRefFromLooseLabel(storeLabel, maps, 'T');
+    const resp = planFindPersonLoose(responsableLabel, maps);
+    const store = planFindStoreLoose(storeLabel, maps);
+    for (const item of planExplicitItemLines(block)) {
+      const productoTexto = planCleanExplicitProductText(item);
+      const prod = planFindProductLoose(productoTexto, maps);
+      if (!prod?.id) continue;
+      const unidades = Math.max(0.01, planExplicitUnits(item));
+      rowsOut.push({
+        key:`prompt-don:${rowsOut.length}:${prod.id}`,
+        include:true,
+        tipo:'DONACION',
+        productId:trim(prod.id),
+        productName:trim(prod.nombre || productoTexto),
+        segmento:trim(prod.segmento || 'Sin segmento'),
+        destino:trim(prod.destino || 'Sin destino'),
+        unidades:round(unidades, 2),
+        precio:round(prod.defaultPrecio ?? prod.precio ?? 0, 4),
+        tiendaId:trim(store?.id || form.defaultStoreId || ''),
+        responsableId:trim(resp?.id || form.defaultResponsibleId || ''),
+        ticketDonacion:defaults.ticketDonacion || 'DONADO SOCIO',
+        donorRef,
+        confidence:'Prompt explícito',
+        reason:`Existencia/donación indicada literalmente por el usuario (${donorLabel}).`
+      });
+    }
+  }
+  const existBlock = planBlockBetween(info, /EXISTENCIAS\s+QUE\s+YA\s+TENEMOS\s*:?/i, [/DONACIONES\s+PREVISTAS\s*:?/i, /CRITERIO\s+DE\s+C[ÁA]LCULO\s*:?/i, /RESULTADO\s+QUE\s+QUIERO\s*:?/i]);
+  if (existBlock) {
+    const header = existBlock.split(/\n/).slice(0, 5).join('\n');
+    addRows(existBlock, {
+      ticketDonacion:/DONADO\s+TIENDA/i.test(header) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(header) ? 'DONADO OTROS' : 'DONADO SOCIO'),
+      donor:planExtractBracket(header, ['Donante']) || planExtractBracket(header, ['de', 'socio']) || 'Peña El Arrastre',
+      store:planExtractBracket(header, ['Tienda']) || 'PEÑA EL ARRASTRE',
+      responsable:planExtractBracket(header, ['responsable', 'Responsable']) || trim(form.defaultResponsibleName || ''),
+      preferredDonorKind:'P'
+    });
+  }
+  const donatedBlock = planBlockBetween(info, /DONACIONES\s+PREVISTAS\s*:?/i, [/CRITERIO\s+DE\s+C[ÁA]LCULO\s*:?/i, /RESULTADO\s+QUE\s+QUIERO\s*:?/i]);
+  if (donatedBlock) {
+    const header = donatedBlock.split(/\n/).slice(0, 12).join('\n');
+    addRows(donatedBlock, {
+      ticketDonacion:/DONADO\s+TIENDA/i.test(header) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(header) ? 'DONADO OTROS' : 'DONADO SOCIO'),
+      donor:planExtractBracket(header, ['Donante']) || planExtractBracket(header, ['DE']) || 'Donante previsto',
+      store:planExtractBracket(header, ['Tienda']) || '',
+      responsable:planExtractBracket(header, ['Responsable']) || planExtractBracket(header, ['Donante']) || trim(form.defaultResponsibleName || ''),
+      preferredDonorKind:'P'
+    });
+  }
+  const seen = new Set();
+  return rowsOut.filter(r => {
+    const k = [r.productId, r.donorRef, r.ticketDonacion, r.unidades].join('|');
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+function planMergeExplicitDonations(rows, explicitRows) {
+  const out = arr(rows).slice();
+  for (const ex of arr(explicitRows)) {
+    const found = out.some(r => r.tipo === 'DONACION' && trim(r.productId) === trim(ex.productId) && trim(r.donorRef) === trim(ex.donorRef) && Math.abs(num(r.unidades) - num(ex.unidades)) < 0.01);
+    if (!found) out.unshift(ex);
+  }
+  return out;
+}
+
 function planInfoDonationRules(info, maps) {
   const raw = trim(info || '');
   if (!raw) return [];
@@ -1458,7 +1653,7 @@ function planCatalogForGemini(state) {
   };
 }
 function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
-  const compactRows = arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
+  const compactRows = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
   const ctx = {
     modo: planModeLabel(form.mode),
     modulosSolicitados: modules,
@@ -1469,6 +1664,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
     filasHistoricasBase: compactRows,
     ingresosHistoricosBase: arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })),
     reglasDonacionesDetectadas: planInfoDonationRules(form.info, planBuildMaps(state)).map(r => ({producto:r.productText, donante:r.donorLabel, responsable:r.responsableLabel, tipo:r.ticketDonacion})),
+    existenciasYDonacionesExplicitas: planExplicitDonationRowsFromPrompt(form, state).map(r => ({producto:r.productName, unidades:r.unidades, precio:r.precio, tipoDonacion:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId, tienda:r.tiendaId})),
     catalogos: planCatalogForGemini(state)
   };
   return `Eres Zuzu dentro de ControlEvent, módulo de PLANIFICACIÓN INICIAL. Debes crear una propuesta revisable para un evento nuevo, usando históricos y las instrucciones del usuario.
@@ -1478,9 +1674,11 @@ Reglas:
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
-- Para modo "Encargo total a Zuzu", crea una propuesta con productos del catálogo e histórico general, sin depender de un único modelo.
+- Para modo "Encargo total a Zuzu", NO copies listas históricas de otros eventos: diseña el evento desde cero con el prompt del usuario, usando solo catálogo/precios como apoyo y las existencias/donaciones explícitas que haya escrito.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
-- Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit; la DONACION representa lo que ya se tiene o se prevé recibir.
+- Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
+- Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
+- Para bebidas en lata/botellín, si propones compra y el usuario pide múltiplos de 24, redondea las unidades de compra al alza al múltiplo de 24.
 - No agrupes productos bajo conceptos genéricos tipo "cosas de paella" si el usuario pide desglose: usa líneas concretas de arroz, carne, verduras, aceite, platos, vasos, hielo, agua, refrescos, pan, etc.
 - Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
 - Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en todas esas filas de DONACION.
@@ -1521,13 +1719,14 @@ function matchPlanRows(aiRows, baseRows, state, form) {
     const pid = trim(row?.productId);
     let prod = pid ? maps.products.get(pid) : null;
     if (!prod) prod = maps.productByName.get(normPlanKey(row?.producto));
+    if (!prod) prod = planFindProductLoose(row?.producto, maps);
     const base = prod ? (baseByProduct.get(trim(prod.id)) || baseByProduct.get(normPlanKey(prod.nombre))) : null;
     if (!prod && !base) return;
     const tipo = /^DON/i.test(trim(row?.tipo)) ? 'DONACION' : 'COMPRA';
     const ticketDonacion = tipo === 'DONACION' ? (trim(row?.ticketDonacion) || 'DONADO OTROS') : '';
-    const tienda = maps.storeByName.get(normPlanKey(row?.tienda));
-    const responsable = maps.personByName.get(normPlanKey(row?.responsable));
-    const donorRef = tipo === 'DONACION' ? (planDonorRefFromLabel(row?.donante, maps) || base?.donorRef || '') : '';
+    const tienda = maps.storeByName.get(normPlanKey(row?.tienda)) || planFindStoreLoose(row?.tienda, maps);
+    const responsable = maps.personByName.get(normPlanKey(row?.responsable)) || planFindPersonLoose(row?.responsable, maps);
+    const donorRef = tipo === 'DONACION' ? (planDonorRefFromLabel(row?.donante, maps) || planRefFromLooseLabel(row?.donante, maps, /^DONADO\s+TIENDA/i.test(ticketDonacion) ? 'T' : 'P') || base?.donorRef || '') : '';
     out.push({
       ...(base || {}),
       key: `zuzu:${idx}:${trim(prod?.id || base?.productId)}`,
@@ -1606,7 +1805,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     const err = new Error('Debes elegir un Evento modelo finalizado para este modo de planificación.');
     err.status = 400; throw err;
   }
-  let baseRows = (m === 'ZUZU_TOTAL') ? buildTotalBaseRows(state, modules, form) : planRowsForEvent(state, modelEventId, modules);
+  let baseRows = (m === 'ZUZU_TOTAL') ? [] : planRowsForEvent(state, modelEventId, modules);
   const sourceAtt = sourceEvent ? planAttendeesForEvent(state, sourceEvent.id) : 0;
   const targetAtt = num(personas) || sourceAtt || 30;
   const sourceDays = sourceEvent ? Math.max(1, 1) : 1;
@@ -1633,6 +1832,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   } else {
     aiNotes.push('Modo réplica: se conserva el evento modelo sin ajuste de IA.');
   }
+  rowsOut = planMergeExplicitDonations(rowsOut, planExplicitDonationRowsFromPrompt(form, state));
   rowsOut = arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}`, tiendaId: trim(row.tiendaId || defaultStoreId), responsableId: trim(row.responsableId || defaultResponsibleId) }));
   return {
     ok: true,

@@ -237,27 +237,76 @@
     });
     return [...map.values()].sort((a,b)=>(b.importeCompra + b.importeDonado) - (a.importeCompra + a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
   }
+  function planResourceRows(proposals){
+    const map = new Map();
+    (Array.isArray(proposals) ? proposals : []).filter(p => p.include).forEach(p => {
+      const key = normalizeText(p.productName || '') || p.productId || `producto-${map.size}`;
+      const row = map.get(key) || {
+        producto: p.productName || 'Producto', segmento: p.segmento || '', destino: p.destino || '', necesidad:0,
+        compra:0, donado:0, importeCompra:0, importeDonado:0, donantes:new Map(), compras:new Map()
+      };
+      const units = Number(p.unidades || 0);
+      const importe = units * Number(p.precio || 0);
+      row.necesidad += units;
+      if(p.tipo === 'DONACION'){
+        row.donado += units;
+        row.importeDonado += importe;
+        const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(p.donorRef)} · Resp. ${personaName(p.responsableId)}`;
+        row.donantes.set(label, (row.donantes.get(label) || 0) + units);
+      }else{
+        row.compra += units;
+        row.importeCompra += importe;
+        const label = `${tiendaName(p.tiendaId)} · Resp. ${personaName(p.responsableId)}`;
+        row.compras.set(label, (row.compras.get(label) || 0) + units);
+      }
+      map.set(key, row);
+    });
+    return [...map.values()].sort((a,b)=>(b.importeCompra+b.importeDonado)-(a.importeCompra+a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
+  }
+  function renderPlanResourceVision(proposals){
+    const rows = planResourceRows(proposals);
+    if(!rows.length) return '';
+    const tr = rows.map(r => {
+      const don = [...r.donantes.entries()].map(([k,v]) => `${qty(v)} ud. ${k}`).join('<br>') || '—';
+      const comp = [...r.compras.entries()].map(([k,v]) => `${qty(v)} ud. ${k}`).join('<br>') || '—';
+      return `<tr>
+        <td><strong>${esc(r.producto)}</strong><br><small>${esc(r.segmento)} · ${esc(r.destino)}</small></td>
+        <td>${qty(r.necesidad)} ud.</td>
+        <td>${qty(r.donado)} ud.<br><small>${don}</small></td>
+        <td>${qty(r.compra)} ud.<br><small>${comp}</small></td>
+        <td>${money(r.importeDonado)}</td>
+        <td>${money(r.importeCompra)}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="planificacion-note compact-note plan-resource-vision">
+      <strong>Visión global tipo Mapa de recursos</strong>
+      <p>Para revisar de un vistazo cada producto: necesidad calculada, lo donado/existente y lo que queda a comprar.</p>
+      <div class="table-scroll"><table class="ce-table plan-resource-table">
+        <thead><tr><th>Producto</th><th>Necesidad</th><th>Donado / existente</th><th>A comprar</th><th>Valor donado</th><th>Importe compra</th></tr></thead>
+        <tbody>${tr}</tbody>
+      </table></div>
+    </div>`;
+  }
   function renderPlanningNarrative(proposals, totalCompras, totalDonaciones){
     const title = proposedEventTitle();
     const prompt = fieldValue('planInfo');
     const people = Math.max(0, Number(fieldValue('planPersonas') || 0));
     const price = planEstimatedEventPrice(totalCompras, people || 1);
     const valuation = Number(totalCompras || 0) + Number(totalDonaciones || 0);
-    const needs = proposalProductNeeds(proposals);
+    const needs = planResourceRows(proposals);
     const preview = needs.slice(0, 45).map(x => {
-      const totalUnits = Number(x.compra || 0) + Number(x.donado || 0);
       const parts = [];
-      if(x.donado > 0) parts.push(`${qty(x.donado)} donado`);
+      if(x.donado > 0) parts.push(`${qty(x.donado)} donado/existente`);
       if(x.compra > 0) parts.push(`${qty(x.compra)} a comprar`);
-      return `<li><strong>${esc(x.producto)}</strong>: necesidad planificada ${qty(totalUnits)} ud. (${parts.join(' · ') || 'sin unidades'}).</li>`;
+      return `<li><strong>${esc(x.producto)}</strong>: necesidad cubierta prevista ${qty(x.necesidad)} ud. (${parts.join(' · ') || 'sin unidades'}).</li>`;
     }).join('');
-    const more = needs.length > 45 ? `<p class="plan-mini-note">Se muestran los 45 productos principales de ${needs.length}. El detalle completo está en las líneas revisables inferiores.</p>` : '';
-    const requested = prompt ? `<p><strong>Lo que has pedido:</strong> ${esc(prompt).slice(0, 900)}${prompt.length > 900 ? '…' : ''}</p>` : '';
+    const more = needs.length > 45 ? `<p class="plan-mini-note">Se muestran los 45 productos principales de ${needs.length}. El detalle completo está en la visión global y en las líneas revisables inferiores.</p>` : '';
+    const requested = prompt ? `<p><strong>Lectura humana de Zuzu:</strong> he tomado tu encargo como una planificación editable: primero se reflejan existencias/donaciones y después se propone comprar el déficit. En bebidas en lata/botellín se recomienda revisar múltiplos de 24 y margen de seguridad.</p>` : '';
     return `
       <div class="planificacion-note compact-note plan-zuzu-narrative">
         <strong>Lectura de Zuzu para ${esc(title)}:</strong>
         ${requested}
-        <p>He preparado una propuesta revisable con <strong>${proposals.filter(p=>p.include && p.tipo==='COMPRA').length}</strong> compras y <strong>${proposals.filter(p=>p.include && p.tipo==='DONACION').length}</strong> donaciones. La idea es que primero se aproveche lo donado/existente y después se compre lo que falte.</p>
+        <p>Propuesta revisable con <strong>${proposals.filter(p=>p.include && p.tipo==='COMPRA').length}</strong> compras y <strong>${proposals.filter(p=>p.include && p.tipo==='DONACION').length}</strong> donaciones/existencias.</p>
         <p><strong>Total compras previstas:</strong> ${money(totalCompras)} · <strong>Donaciones/existencias estimadas:</strong> ${money(totalDonaciones)} · <strong>Valoración del evento:</strong> ${money(valuation)}.</p>
         <p><strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, calculado como compras previstas / nº estimado de personas (${qty(people || 1)}).</p>
         <details open><summary><strong>Cantidades producto por producto</strong></summary><ul>${preview || '<li>Sin productos propuestos.</li>'}</ul>${more}</details>
@@ -450,6 +499,7 @@
         <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
+      ${renderPlanResourceVision(proposals)}
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
         <strong>Propuesta de planificación inicial:</strong> crea el evento real desde una propuesta revisada. Ingresos en Pendiente, donaciones tal cual y compras en Pte.Compra u otros gastos.
