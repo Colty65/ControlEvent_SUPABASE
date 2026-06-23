@@ -1653,3 +1653,20 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .donation-delivered-cell{min-width:0!important;justify-content:flex-start!important;}
   .mapa-donation-delivered{padding:7px 10px!important;min-height:38px!important;touch-action:manipulation!important;position:relative!important;z-index:3!important;}
 }
+
+/* v13.0 hotfix planificación: propuesta editable tipo Mapa de recursos */
+.plan-resource-editor-card{border:1px solid #dbeafe;border-radius:18px;background:#f8fbff;padding:12px;margin:12px 0;box-shadow:0 8px 22px rgba(15,23,42,.04);}
+.plan-resource-editor-card .tiny-title{margin-bottom:8px;}
+.plan-resource-edit-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1120px;}
+.plan-resource-edit-table th{background:#eaf3ff;color:#075985;font-weight:900;text-align:left;padding:8px 10px;border-bottom:1px solid #d7e6f8;}
+.plan-resource-edit-table td{vertical-align:top;padding:8px 10px;border-bottom:1px solid #e5eef9;background:#fff;}
+.plan-resource-edit-table tr:nth-child(even) td{background:#f9fcff;}
+.plan-resource-edit-table tr.excluded td{opacity:.55;background:#f3f4f6;}
+.plan-resource-edit-table input,.plan-resource-edit-table select{width:100%;min-width:84px;border:1px solid #d7e3f2;border-radius:12px;padding:8px 9px;background:#fff;font-weight:800;color:#111827;}
+.plan-resource-edit-table small{display:block;color:#64748b;font-size:.72rem;line-height:1.25;margin-top:4px;}
+.plan-resource-main strong{display:block;color:#7c2d12;font-size:.96rem;line-height:1.15;}
+.plan-resource-main .plan-include{margin-bottom:4px;}
+.plan-advanced-lines{margin-top:10px;border:1px dashed #d1d5db;border-radius:14px;padding:8px 10px;background:#fff;}
+.plan-advanced-lines summary{font-weight:900;color:#334155;cursor:pointer;}
+.plan-resource-edit-row.plan-found{outline:3px solid #f59e0b;box-shadow:0 0 0 6px rgba(245,158,11,.18);}
+@media (max-width:900px){.plan-resource-edit-table{min-width:920px;}.plan-resource-editor-card{overflow:auto;}}

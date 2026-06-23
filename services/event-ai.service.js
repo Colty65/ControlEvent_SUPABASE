@@ -1251,7 +1251,8 @@ function planAiSchema() {
             responsable: { type: 'STRING' },
             donante: { type: 'STRING' },
             include: { type: 'BOOLEAN' },
-            reason: { type: 'STRING' }
+            reason: { type: 'STRING' },
+            necesidadTotal: { type: 'NUMBER', description: 'Necesidad total calculada para el evento antes de restar donaciones/existencias' }
           },
           required: ['tipo','producto','unidades','precio','reason']
         }
@@ -1346,6 +1347,114 @@ function planFindProductLoose(label, maps) {
   }
   return bestScore >= 10 ? best : null;
 }
+function planReasonablePlanPrice(productName, catalogPrice = 0) {
+  const n = normPlanKey(productName || '');
+  const c = num(catalogPrice);
+  const reasonable = (fallback, max = Infinity) => (c > 0 && c <= max ? round(c,4) : fallback);
+  if (/hielo|cubito/.test(n)) return reasonable(0.9, 3);
+  if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n) && /lata|bote|33|25/.test(n)) return reasonable(0.75, 2);
+  if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n) && /botella.*2|2\s*l/.test(n)) return reasonable(1.6, 4);
+  if (/agua/.test(n) && /bot/.test(n)) return reasonable(0.35, 2);
+  if (/cerveza/.test(n) && /lata|skol|bote/.test(n)) return reasonable(0.55, 2);
+  if (/cerveza/.test(n) && /botell/.test(n)) return reasonable(0.45, 2);
+  if (/barril/.test(n) && /50/.test(n)) return reasonable(110, 180);
+  if (/barril/.test(n) && /30/.test(n)) return reasonable(70, 140);
+  if (/ron/.test(n)) return reasonable(14, 35);
+  if (/whisky|wiski|jb|dyc|walker/.test(n)) return reasonable(12, 35);
+  if (/gin|ginebra|beefeater|larios|puerto de indias/.test(n)) return reasonable(13, 35);
+  if (/jamon/.test(n)) return reasonable(70, 180);
+  if (/queso/.test(n)) return reasonable(20, 80);
+  if (/pan/.test(n)) return reasonable(1.2, 5);
+  if (/servilleta|vasos|copa|cuchara|tenedor|plato/.test(n)) return reasonable(0.04, 2);
+  if (/bolsa.*basura|sacos.*basura/.test(n)) return reasonable(0.4, 3);
+  if (/fairy|jabon|ambientador|papel|rollo/.test(n)) return reasonable(c || 2.5, 12);
+  if (c > 0) return round(c,4);
+  return 1;
+}
+function planPackRoundedProduct(productName) {
+  const n = normPlanKey(productName || '');
+  if (/(lata|latas|botellin|botellines|bote|botes)/.test(n) && /(cerveza|coca|fanta|sprite|tonica|aquarius|acuarius|refresco|bitter)/.test(n)) return true;
+  if (/(coca cola|fanta|sprite|tonica|aquarius|acuarius|cerveza skol)/.test(n) && !/botella\s*2/.test(n)) return true;
+  return false;
+}
+function planRoundBuyUnits(productName, units) {
+  const u = Math.max(0, num(units));
+  if (!u) return 0;
+  if (planPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
+  return round(Math.ceil(u * 100) / 100, 2);
+}
+function planMinimumNeed(productName, form, currentNeed) {
+  const n = normPlanKey(productName || '');
+  const people = Math.max(1, num(form?.personas) || 25);
+  const info = normPlanKey(form?.info || '');
+  const calor = /40|calor|temperatura/.test(info);
+  const cubatas = /cubata|tardeo/.test(info);
+  let min = 0;
+  if (/coca cola/.test(n) && !/zero|00/.test(n)) min = people * (cubatas ? 3 : 1.5);
+  else if (/coca cola.*zero|coca.*zero|coca.*00/.test(n)) min = people * (cubatas ? 1.5 : 0.7);
+  else if (/fanta|sprite|tonica|aquarius|acuarius|bitter/.test(n)) min = people * (cubatas ? 1.2 : 0.6);
+  else if (/cerveza/.test(n) && /lata|botellin|botellines|skol/.test(n)) min = people * (calor ? 4 : 3);
+  else if (/agua/.test(n) && /bot/.test(n)) min = people * (calor ? 2.5 : 1.5);
+  else if (/hielo|cubito/.test(n)) min = people * (calor ? 0.7 : 0.4);
+  else if (/ron|whisky|wiski|gin|ginebra/.test(n)) min = Math.max(currentNeed, cubatas ? Math.ceil(people / 8) : Math.ceil(people / 12));
+  if (!min) return Math.max(0, num(currentNeed));
+  return Math.max(num(currentNeed), Math.ceil(min));
+}
+function planPostProcessPlanningRows(rows, form, state) {
+  const maps = planBuildMaps(state);
+  const grouped = new Map();
+  const out = arr(rows).map((r, idx) => ({...r, key:r.key || `plan:${idx}`}));
+  out.forEach((r, idx) => {
+    const k = normPlanKey(r.productName || r.producto || r.productId || `p${idx}`);
+    const g = grouped.get(k) || {key:k, rows:[], donation:0, purchase:0, productName:r.productName || r.producto || '', productId:r.productId || '', segment:r.segmento, destino:r.destino};
+    g.rows.push(idx);
+    const units = num(r.unidades);
+    if (r.tipo === 'DONACION') g.donation += units; else g.purchase += units;
+    if (!g.productId && r.productId) g.productId = r.productId;
+    grouped.set(k, g);
+  });
+  for (const g of grouped.values()) {
+    const prod = g.productId ? maps.products.get(trim(g.productId)) : planFindProductLoose(g.productName, maps);
+    const pname = trim(prod?.nombre || g.productName);
+    const currentNeed = g.donation + g.purchase;
+    const need = planMinimumNeed(pname, form, currentNeed);
+    let buy = Math.max(0, need - g.donation);
+    // La compra se propone con un 25% de margen sobre el déficit y, en bebidas de lata/botellín, a múltiplos de 24.
+    buy = planRoundBuyUnits(pname, buy * 1.25);
+    const price = planReasonablePlanPrice(pname, prod?.defaultPrecio ?? prod?.precio ?? 0);
+    let firstPurchase = g.rows.find(i => out[i]?.tipo === 'COMPRA');
+    if (buy > 0 && firstPurchase === undefined) {
+      firstPurchase = out.length;
+      out.push({
+        key:`auto-deficit:${g.key}`,
+        include:true,
+        tipo:'COMPRA', productId:trim(prod?.id || g.productId), productName:pname, segmento:trim(prod?.segmento || g.segment || 'Sin segmento'), destino:trim(prod?.destino || g.destino || 'Sin destino'),
+        unidades:buy, precio, tiendaId:trim(form.defaultStoreId), responsableId:trim(form.defaultResponsibleId), ticketDonacion:'', donorRef:'', confidence:'Déficit calculado',
+        reason:'Compra creada automáticamente como déficit tras restar existencias/donaciones.'
+      });
+      g.rows.push(firstPurchase);
+    }
+    g.rows.forEach(i => {
+      if (!out[i]) return;
+      out[i].necesidadTotal = round(need,2);
+      out[i].donadoTotal = round(g.donation,2);
+      out[i].aComprarCalculado = round(buy,2);
+      if (out[i].tipo === 'DONACION') out[i].precio = planReasonablePlanPrice(pname, out[i].precio || price);
+    });
+    if (firstPurchase !== undefined && out[firstPurchase]) {
+      out[firstPurchase].include = buy > 0;
+      out[firstPurchase].unidades = buy;
+      out[firstPurchase].precio = price;
+      out[firstPurchase].tiendaId = trim(out[firstPurchase].tiendaId || form.defaultStoreId);
+      out[firstPurchase].responsableId = trim(out[firstPurchase].responsableId || form.defaultResponsibleId);
+      out[firstPurchase].necesidadTotal = round(need,2);
+      out[firstPurchase].donadoTotal = round(g.donation,2);
+      out[firstPurchase].aComprarCalculado = round(buy,2);
+    }
+  }
+  return out.filter(r => r.productId || r.productName);
+}
+
 function planRefFromLooseLabel(label, maps, preferred = 'P') {
   const direct = planDonorRefFromLabel(label, maps);
   if (direct) return direct;
@@ -1474,7 +1583,7 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         segmento:trim(prod.segmento || 'Sin segmento'),
         destino:trim(prod.destino || 'Sin destino'),
         unidades:round(unidades, 2),
-        precio:round(prod.defaultPrecio ?? prod.precio ?? 0, 4),
+        precio:planReasonablePlanPrice(prod.nombre || productoTexto, prod.defaultPrecio ?? prod.precio ?? 0),
         tiendaId:trim(store?.id || form.defaultStoreId || ''),
         responsableId:trim(resp?.id || form.defaultResponsibleId || ''),
         ticketDonacion:defaults.ticketDonacion || 'DONADO SOCIO',
@@ -1674,7 +1783,7 @@ Reglas:
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
-- Para modo "Encargo total a Zuzu", NO copies listas históricas de otros eventos: diseña el evento desde cero con el prompt del usuario, usando solo catálogo/precios como apoyo y las existencias/donaciones explícitas que haya escrito.
+- Para modo "Encargo total a Zuzu", NO copies listas históricas de otros eventos ni repitas una lista vieja: diseña el evento desde cero con el prompt del usuario. Usa el catálogo/precios solo como referencia de productos y precio, y respeta exactamente las existencias/donaciones explícitas que haya escrito.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
 - Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
@@ -1683,7 +1792,9 @@ Reglas:
 - Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
 - Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en todas esas filas de DONACION.
 - Si modulosSolicitados está vacío por la opción Ningún dato, apóyate solo en la información del usuario y el catálogo de productos; no copies históricos de eventos.
-- No devuelvas más de 180 filas. Prioriza productos útiles.
+- Sé creativo y operativo como organizador experto: propone menús completos pero razonables para aperitivo, comida, tardeo/cubatas, cena, limpieza y menaje si se han pedido. No te limites a repetir literalmente el prompt.
+- En cada producto, intenta devolver necesidadTotal: necesidad total antes de restar donado/existente. Las líneas DONACION representan lo que ya hay o se donará; las líneas COMPRA representan solo el déficit.
+- No devuelvas más de 180 filas. Prioriza productos útiles y evita productos absurdos o no pedidos.
 - La app mostrará la propuesta para que el usuario pueda editarla; no estás creando el evento real.
 
 CONTEXTO:
@@ -1737,13 +1848,14 @@ function matchPlanRows(aiRows, baseRows, state, form) {
       segmento: trim(prod?.segmento || base?.segmento || 'Sin segmento'),
       destino: trim(prod?.destino || base?.destino || 'Sin destino'),
       unidades: Math.max(0, round(row?.unidades, 2)),
-      precio: num(row?.precio) > 0 ? round(row.precio, 4) : round(base?.precio || prod?.defaultPrecio || prod?.precio, 4),
+      precio: planReasonablePlanPrice(prod?.nombre || base?.productName || row?.producto, num(row?.precio) > 0 ? row.precio : (base?.precio || prod?.defaultPrecio || prod?.precio)),
       tiendaId: trim(tienda?.id || base?.tiendaId || defaults.tiendaId),
       responsableId: trim(responsable?.id || base?.responsableId || defaults.responsableId),
       ticketDonacion,
       donorRef,
       confidence: 'Zuzu',
-      reason: trim(row?.reason) || 'Propuesta ajustada por Zuzu a partir del histórico y las instrucciones.'
+      necesidadTotal: num(row?.necesidadTotal) > 0 ? round(row.necesidadTotal, 2) : undefined,
+      reason: trim(row?.reason) || 'Propuesta ajustada por Zuzu a partir del menú, asistentes, duración, temperatura y existencias.'
     });
   });
   return planApplyDonationRules(out.filter(r => r.productId && r.unidades >= 0), planInfoDonationRules(form.info, maps));
@@ -1774,7 +1886,7 @@ function buildTotalBaseRows(state, modules, form) {
     const row = g.row;
     const prod = planProduct(row, maps) || {};
     const avgUnits = Math.max(0.5, round(g.unidades / Math.max(1, g.count), 2));
-    const precio = g.unidades ? round(g.importe / g.unidades, 4) : round(row.precio || prod.defaultPrecio || prod.precio, 4);
+    const precio = planReasonablePlanPrice(prod.nombre || row.producto, g.unidades ? round(g.importe / g.unidades, 4) : (row.precio || prod.defaultPrecio || prod.precio));
     return {
       key:`total:${idx}:${prod.id || row.productoId}`,
       include:true,
@@ -1834,6 +1946,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   rowsOut = planMergeExplicitDonations(rowsOut, planExplicitDonationRowsFromPrompt(form, state));
   rowsOut = arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}`, tiendaId: trim(row.tiendaId || defaultStoreId), responsableId: trim(row.responsableId || defaultResponsibleId) }));
+  if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
   return {
     ok: true,
     version: 'v13.0_prod',

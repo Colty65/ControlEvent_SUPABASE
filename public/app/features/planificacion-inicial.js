@@ -219,7 +219,9 @@
   function planEstimatedEventPrice(totalCompras, estimatedPeople){
     const people = Math.max(1, Number(estimatedPeople || fieldValue('planPersonas') || 0));
     const raw = Number(totalCompras || 0) / people;
-    return Math.max(0, Math.ceil(raw * 100) / 100);
+    // En planificación la entrada se redondea al alza a múltiplos de 5 €.
+    // Ej.: 28,36 € => 30 €. Evita importes incómodos para cobrar en caja.
+    return Math.max(0, Math.ceil(raw / 5) * 5);
   }
   function proposalProductNeeds(proposals){
     const map = new Map();
@@ -237,81 +239,111 @@
     });
     return [...map.values()].sort((a,b)=>(b.importeCompra + b.importeDonado) - (a.importeCompra + a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
   }
+  function isPackRoundedProduct(name){
+    const n = normalizeText(name || '');
+    if(/\b(?:LATA|LATAS|BOTELLIN|BOTELLINES|BOTE|BOTES)\b/.test(n) && /(CERVEZA|COCA|FANTA|SPRITE|TONICA|AQUARIUS|ACUARIUS|REFRESCO|BITTER)/.test(n)) return true;
+    if(/\b(?:COCA\s*COLA|FANTA|SPRITE|TONICA|AQUARIUS|ACUARIUS|CERVEZA\s+SKOL)\b/.test(n) && !/BOTELLA\s*2/.test(n)) return true;
+    return false;
+  }
+  function roundPurchaseUnits(productName, units){
+    const u = Math.max(0, Number(units || 0));
+    if(!u) return 0;
+    if(isPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
+    return Math.ceil(u * 100) / 100;
+  }
+  function planGroupKey(product){ return normalizeText(product || '') || 'producto'; }
   function planResourceRows(proposals){
     const map = new Map();
-    (Array.isArray(proposals) ? proposals : []).filter(p => p.include).forEach(p => {
-      const key = normalizeText(p.productName || '') || p.productId || `producto-${map.size}`;
+    (Array.isArray(proposals) ? proposals : []).forEach((p, idx) => {
+      const key = planGroupKey(p.productName || p.productId || `producto-${idx}`);
       const row = map.get(key) || {
-        producto: p.productName || 'Producto', segmento: p.segmento || '', destino: p.destino || '', necesidad:0,
-        compra:0, donado:0, importeCompra:0, importeDonado:0, donantes:new Map(), compras:new Map()
+        key, producto: p.productName || 'Producto', productId:p.productId || '', segmento: p.segmento || '', destino: p.destino || '', necesidad:0,
+        compra:0, donado:0, importeCompra:0, importeDonado:0, precioCompra:0, precioDonado:0,
+        donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
+        tiendaId:'', responsableId:''
       };
+      row.allIndices.push(idx);
+      if(p.include) row.include = true;
       const units = Number(p.unidades || 0);
       const importe = units * Number(p.precio || 0);
-      row.necesidad += units;
+      const needHint = Number(p.necesidadTotal || p.necesidad || p.necesidadCalculada || 0);
+      if(needHint > row.necesidad) row.necesidad = needHint;
       if(p.tipo === 'DONACION'){
         row.donado += units;
         row.importeDonado += importe;
+        row.precioDonado = row.precioDonado || Number(p.precio || 0);
+        row.donationIndices.push(idx);
         const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(p.donorRef)} · Resp. ${personaName(p.responsableId)}`;
         row.donantes.set(label, (row.donantes.get(label) || 0) + units);
       }else{
         row.compra += units;
         row.importeCompra += importe;
+        row.precioCompra = row.precioCompra || Number(p.precio || 0);
+        row.purchaseIndices.push(idx);
+        row.tiendaId = row.tiendaId || p.tiendaId || '';
+        row.responsableId = row.responsableId || p.responsableId || '';
         const label = `${tiendaName(p.tiendaId)} · Resp. ${personaName(p.responsableId)}`;
         row.compras.set(label, (row.compras.get(label) || 0) + units);
       }
+      if(!row.productId && p.productId) row.productId = p.productId;
       map.set(key, row);
     });
-    return [...map.values()].sort((a,b)=>(b.importeCompra+b.importeDonado)-(a.importeCompra+a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
+    return [...map.values()].map(row => {
+      const baseNeed = row.necesidad > 0 ? row.necesidad : row.donado + row.compra;
+      return {...row, necesidad: baseNeed};
+    }).sort((a,b)=>(b.importeCompra+b.importeDonado)-(a.importeCompra+a.importeDonado) || String(a.producto).localeCompare(String(b.producto),'es'));
   }
-  function renderPlanResourceVision(proposals){
+  function renderPlanResourceEditor(proposals){
     const rows = planResourceRows(proposals);
     if(!rows.length) return '';
+    const tiendaOpts = (selected) => tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(selected)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
+    const respOpts = (selected) => socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
     const tr = rows.map(r => {
-      const don = [...r.donantes.entries()].map(([k,v]) => `${qty(v)} ud. ${k}`).join('<br>') || '—';
-      const comp = [...r.compras.entries()].map(([k,v]) => `${qty(v)} ud. ${k}`).join('<br>') || '—';
-      return `<tr>
-        <td><strong>${esc(r.producto)}</strong><br><small>${esc(r.segmento)} · ${esc(r.destino)}</small></td>
-        <td>${qty(r.necesidad)} ud.</td>
-        <td>${qty(r.donado)} ud.<br><small>${don}</small></td>
-        <td>${qty(r.compra)} ud.<br><small>${comp}</small></td>
-        <td>${money(r.importeDonado)}</td>
-        <td>${money(r.importeCompra)}</td>
+      const don = [...r.donantes.entries()].map(([k,v]) => `${qty(v)} ud. ${esc(k)}`).join('<br>') || '—';
+      const buyBase = Math.max(0, Number(r.compra || 0));
+      const price = Number(r.precioCompra || r.precioDonado || 0);
+      return `<tr class="plan-resource-edit-row ${r.include ? '' : 'excluded'}" data-plan-resource-key="${esc(r.key)}">
+        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong>${esc(r.producto)}</strong><small>${esc(r.segmento)} · ${esc(r.destino)}</small></td>
+        <td><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/><small>Necesidad total calculada</small></td>
+        <td><strong>${qty(r.donado)} ud.</strong><small>${don}</small></td>
+        <td><input type="number" min="0" step="0.01" value="${esc(buyBase)}" data-plan-resource-field="compra"/><small>Déficit a comprar editable</small></td>
+        <td><input type="number" min="0" step="0.01" value="${esc(price)}" data-plan-resource-field="precio"/><small>${esc(money(Number(r.compra || 0) * price))}</small></td>
+        <td><select data-plan-resource-field="tiendaId">${tiendaOpts(r.tiendaId) || '<option value="">Sin tiendas</option>'}</select></td>
+        <td><select data-plan-resource-field="responsableId">${respOpts(r.responsableId) || '<option value="">Sin socios</option>'}</select></td>
       </tr>`;
     }).join('');
-    return `<div class="planificacion-note compact-note plan-resource-vision">
-      <strong>Visión global tipo Mapa de recursos</strong>
-      <p>Para revisar de un vistazo cada producto: necesidad calculada, lo donado/existente y lo que queda a comprar.</p>
-      <div class="table-scroll"><table class="ce-table plan-resource-table">
-        <thead><tr><th>Producto</th><th>Necesidad</th><th>Donado / existente</th><th>A comprar</th><th>Valor donado</th><th>Importe compra</th></tr></thead>
+    return `<div class="plan-resource-editor-card">
+      <div class="section-title tiny-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: necesidad total, lo que ya está donado/existente y lo que queda por comprar.</p></div></div>
+      <div class="table-scroll"><table class="ce-table plan-resource-edit-table">
+        <thead><tr><th>Producto</th><th>Necesidad</th><th>Donado / existente</th><th>A comprar</th><th>Precio / importe</th><th>Tienda</th><th>Responsable</th></tr></thead>
         <tbody>${tr}</tbody>
       </table></div>
     </div>`;
   }
+  function renderPlanResourceVision(proposals){ return renderPlanResourceEditor(proposals); }
   function renderPlanningNarrative(proposals, totalCompras, totalDonaciones){
     const title = proposedEventTitle();
-    const prompt = fieldValue('planInfo');
     const people = Math.max(0, Number(fieldValue('planPersonas') || 0));
     const price = planEstimatedEventPrice(totalCompras, people || 1);
     const valuation = Number(totalCompras || 0) + Number(totalDonaciones || 0);
-    const needs = planResourceRows(proposals);
-    const preview = needs.slice(0, 45).map(x => {
-      const parts = [];
-      if(x.donado > 0) parts.push(`${qty(x.donado)} donado/existente`);
-      if(x.compra > 0) parts.push(`${qty(x.compra)} a comprar`);
-      return `<li><strong>${esc(x.producto)}</strong>: necesidad cubierta prevista ${qty(x.necesidad)} ud. (${parts.join(' · ') || 'sin unidades'}).</li>`;
-    }).join('');
-    const more = needs.length > 45 ? `<p class="plan-mini-note">Se muestran los 45 productos principales de ${needs.length}. El detalle completo está en la visión global y en las líneas revisables inferiores.</p>` : '';
-    const requested = prompt ? `<p><strong>Lectura humana de Zuzu:</strong> he tomado tu encargo como una planificación editable: primero se reflejan existencias/donaciones y después se propone comprar el déficit. En bebidas en lata/botellín se recomienda revisar múltiplos de 24 y margen de seguridad.</p>` : '';
+    const prompt = fieldValue('planInfo');
+    const conditions = [];
+    const dias = Number(fieldValue('planDias') || 0); if(dias) conditions.push(`${qty(dias)} día(s)`);
+    if(people) conditions.push(`${qty(people)} personas estimadas`);
+    if(/40\s*grados|40\s*º|calor|temperatura/i.test(prompt)) conditions.push('calor alto: revisar hielo, agua, refrescos y cerveza');
+    if(/aperitivo/i.test(prompt)) conditions.push('aperitivo');
+    if(/paella/i.test(prompt)) conditions.push('comida tipo paella');
+    if(/cubatas|tardeo/i.test(prompt)) conditions.push('tardeo/cubatas');
+    if(/barbacoa|cena/i.test(prompt)) conditions.push('cena/barbacoa');
     return `
       <div class="planificacion-note compact-note plan-zuzu-narrative">
         <strong>Lectura de Zuzu para ${esc(title)}:</strong>
-        ${requested}
-        <p>Propuesta revisable con <strong>${proposals.filter(p=>p.include && p.tipo==='COMPRA').length}</strong> compras y <strong>${proposals.filter(p=>p.include && p.tipo==='DONACION').length}</strong> donaciones/existencias.</p>
+        <p>He preparado una propuesta revisable atendiendo a las condiciones principales${conditions.length ? ': ' + esc(conditions.join(' · ')) : ''}. La lógica es: necesidad total prevista, menos donaciones/existencias, y compra solo del déficit revisable.</p>
         <p><strong>Total compras previstas:</strong> ${money(totalCompras)} · <strong>Donaciones/existencias estimadas:</strong> ${money(totalDonaciones)} · <strong>Valoración del evento:</strong> ${money(valuation)}.</p>
-        <p><strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, calculado como compras previstas / nº estimado de personas (${qty(people || 1)}).</p>
-        <details open><summary><strong>Cantidades producto por producto</strong></summary><ul>${preview || '<li>Sin productos propuestos.</li>'}</ul>${more}</details>
+        <p><strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, redondeado al alza para facilitar el cobro.</p>
       </div>`;
   }
+
 
 
   function isPlanCoupleName(name){
@@ -365,7 +397,17 @@
       if(covered) return;
       selected.set(id, {...p, numeroIngreso:1});
     });
-    return [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+    let out = [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+    const totalPersonas = arr => arr.reduce((sum,p) => sum + Number(p.numeroIngreso || 1), 0);
+    // En la operativa real de la peña, los socios se controlan por parejas/grupos
+    // y unos pocos solteros. Si aparecen demasiados individuales por estar también
+    // dados de alta como persona suelta, se conserva parejas/grupos y los solteros
+    // conocidos, evitando que se duplique la asistencia inicial.
+    if(totalPersonas(out) > 33){
+      const solterosPreferentes = ['JAVIER','VICENTE','JOSE MANUEL','MIGUEL ANGEL','ERNESTO'];
+      out = out.filter(p => Number(p.numeroIngreso || 1) >= 2 || solterosPreferentes.some(name => normalizeText(p.nombre || '') === name || normalizeText(p.nombre || '').startsWith(name + ' ')));
+    }
+    return out.sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
   }
 
   function buildMandatorySocioIncomeProposal(totalCompras){
@@ -502,7 +544,7 @@
       ${renderPlanResourceVision(proposals)}
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
-        <strong>Propuesta de planificación inicial:</strong> crea el evento real desde una propuesta revisada. Ingresos en Pendiente, donaciones tal cual y compras en Pte.Compra u otros gastos.
+        <strong>Propuesta de planificación inicial:</strong> ajusta la tabla tipo Mapa de recursos y genera el evento real cuando esté revisada. Los ingresos se crearán en Pendiente, las existencias como donaciones y las compras como Pte.Compra u otros gastos.
       </div>
       <div class="plan-search-line">
         <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
@@ -513,7 +555,7 @@
         <button type="button" class="outline" id="btnPlanSelectNone">Quitar todo</button>
         <button type="button" class="secondary" id="btnPlanApplyReplica">Generar nuevo evento</button>
       </div>
-      <div class="plan-proposal-list" id="planProposalList">${cards}</div>
+      <details class="plan-advanced-lines"><summary>Detalle avanzado de líneas que se crearán</summary><div class="plan-proposal-list" id="planProposalList">${cards}</div></details>
     `;
     bindProposalControls();
   }
@@ -543,13 +585,73 @@
       </div>
     `;
   }
+  function productGroupFromKey(key){ return planResourceRows(lastProposal).find(r => String(r.key) === String(key)) || null; }
+  function createPurchaseForGroup(group, units, price, tiendaId, responsableId){
+    const baseIndex = group.allIndices[0];
+    const base = lastProposal[baseIndex] || {};
+    const row = {
+      ...base,
+      key:`plan-buy-extra:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      include: units > 0,
+      tipo:'COMPRA',
+      productId: group.productId || base.productId || '',
+      productName: group.producto || base.productName || 'Producto',
+      segmento: group.segmento || base.segmento || '',
+      destino: group.destino || base.destino || '',
+      unidades: Math.max(0, Number(units || 0)),
+      precio: Math.max(0, Number(price || base.precio || 0)),
+      tiendaId: tiendaId || document.getElementById('planTienda')?.value || '',
+      responsableId: responsableId || document.getElementById('planResponsable')?.value || '',
+      ticketDonacion:'',
+      donorRef:'',
+      reason:'Compra creada desde la visión global de planificación.'
+    };
+    lastProposal.push(row);
+    return lastProposal.length - 1;
+  }
+  function updateResourceEditorRow(key, tr, changedField){
+    const group = productGroupFromKey(key);
+    if(!group) return;
+    const include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
+    const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || 0));
+    let buy = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="compra"]')?.value || 0));
+    const price = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="precio"]')?.value || 0));
+    const tiendaId = tr.querySelector('[data-plan-resource-field="tiendaId"]')?.value || '';
+    const responsableId = tr.querySelector('[data-plan-resource-field="responsableId"]')?.value || '';
+    if(changedField === 'necesidad'){
+      buy = roundPurchaseUnits(group.producto, Math.max(0, need - Number(group.donado || 0)) * 1.25);
+      const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
+      if(buyInput) buyInput.value = String(buy);
+    }
+    group.allIndices.forEach(idx => {
+      if(lastProposal[idx]){
+        lastProposal[idx].include = include;
+        lastProposal[idx].necesidadTotal = need || undefined;
+      }
+    });
+    let pidx = group.purchaseIndices[0];
+    if((pidx === undefined || pidx < 0) && buy > 0) pidx = createPurchaseForGroup(group, buy, price, tiendaId, responsableId);
+    const purchase = pidx !== undefined ? lastProposal[pidx] : null;
+    if(purchase){
+      purchase.include = include && buy > 0;
+      purchase.unidades = buy;
+      purchase.precio = price || purchase.precio || 0;
+      purchase.tiendaId = tiendaId || purchase.tiendaId || '';
+      purchase.responsableId = responsableId || purchase.responsableId || '';
+      purchase.necesidadTotal = need || undefined;
+    }
+    const priceSmall = tr.querySelector('[data-plan-resource-field="precio"]')?.closest('td')?.querySelector('small');
+    if(priceSmall) priceSmall.textContent = money(buy * (price || 0));
+    setTimeout(renderProposal, 0);
+  }
+
   function searchProposalProduct(){
     const input = document.getElementById('planBuscarProducto');
     const term = normalizeText(input?.value || '');
     if(!term){ input?.focus(); return; }
-    const cards = Array.from(document.querySelectorAll('#planProposalList .plan-product-card'));
-    const found = cards.find(card => String(card.dataset.planProductName || '').includes(term));
-    document.querySelectorAll('#planProposalList .plan-product-card.plan-found').forEach(el => el.classList.remove('plan-found'));
+    const cards = Array.from(document.querySelectorAll('.plan-product-card, .plan-resource-edit-row'));
+    const found = cards.find(card => String(card.dataset.planProductName || card.querySelector('strong')?.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().includes(term));
+    document.querySelectorAll('.plan-product-card.plan-found, .plan-resource-edit-row.plan-found').forEach(el => el.classList.remove('plan-found'));
     if(found){
       found.classList.add('plan-found');
       found.scrollIntoView({behavior:'smooth', block:'center'});
@@ -569,6 +671,14 @@
         input.addEventListener('input', () => {
           if(input.dataset.planField === 'unidades' || input.dataset.planField === 'precio') updateProposalFromCard(idx, card, true);
         });
+      });
+    });
+    box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
+      const key = tr.dataset.planResourceKey || '';
+      tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
+        const handler = () => updateResourceEditorRow(key, tr, input.dataset.planResourceField);
+        input.addEventListener('change', handler);
+        if(input.matches('input[type=number]')) input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); handler(); } });
       });
     });
     const setIncluded = mode => { lastProposal = lastProposal.map(p => ({...p, include: mode === 'all'})); renderProposal(); };
