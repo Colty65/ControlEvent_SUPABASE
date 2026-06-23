@@ -1448,19 +1448,43 @@ function planBudgetGuard(rows, form) {
   let out = arr(rows).map(r => ({...r}));
   let total = planCompraTotal(out);
   let per = total / people;
-  if (per > 25) notes.push(`Control de realidad: la propuesta queda en ${round(per,2)} €/persona, por encima del coste habitual de 25 €/persona.`);
-  if (per > 35) {
-    const factor = Math.max(0.35, (35 * people) / Math.max(1, total));
+  const initialPer = per;
+  if (initialPer > 35) {
+    // Se ajusta a 32,50 €/persona, no a 35 exactos, para dejar margen a redondeos y evitar mensajes contradictorios.
+    const targetPer = 32.5;
+    const factor = Math.max(0.25, (targetPer * people) / Math.max(1, total));
     out = out.map(r => {
       if (r?.tipo !== 'COMPRA' || r.include === false) return r;
-      const scaled = Math.max(0, round(num(r.unidades) * factor, 2));
-      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático: la propuesta superaba 35 €/persona y se ha reducido para aproximarla a coste real de evento.` };
+      const before = num(r.unidades);
+      const scaled = Math.max(0, round(before * factor, 2));
+      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial estaba por encima de 35 €/persona y se ha reducido para acercarla a coste real de evento.` };
     });
     total = planCompraTotal(out);
     per = total / people;
-    notes.push(`Propuesta sobredimensionada: se ha reajustado automáticamente hacia el límite de 35 €/persona. Nuevo coste orientativo: ${round(per,2)} €/persona.`);
+    notes.push(`Control de coste: la primera propuesta salía a ${round(initialPer,2)} €/persona. Zuzu la ha reducido a ${round(per,2)} €/persona de compra prevista para acercarla al rango real de 25-35 €/persona.`);
+  } else if (initialPer > 25) {
+    notes.push(`Control de coste: la propuesta queda en ${round(initialPer,2)} €/persona de compra prevista. Está por encima del objetivo normal de 25 €/persona, pero dentro del rango revisable.`);
+  } else {
+    notes.push(`Control de coste: la propuesta queda en ${round(initialPer,2)} €/persona de compra prevista, dentro del objetivo normal de coste.`);
   }
   return { rows: out, notes };
+}
+
+function planReadableNotes(rawNotes, rows, form, budgetNotes) {
+  const people = Math.max(1, num(form?.personas) || 25);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const total = planCompraTotal(rows);
+  const per = total / people;
+  const title = trim(form?.title) || 'evento nuevo';
+  const useful = arr(rawNotes)
+    .map(n => trim(n))
+    .filter(Boolean)
+    // Evita mezclar mensajes de Gemini sobre costes anteriores con el coste final postprocesado.
+    .filter(n => !/(coste|persona|25|35|sobredimensionad|reajust|control de realidad|precio orientativo|dentro del rango)/i.test(n))
+    .slice(0, 2);
+  const base = `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). La compra prevista final es ${round(total,2)} €: ${round(per,2)} €/persona. Las donaciones/existencias solo se descuentan si están confirmadas por el prompt o por histórico real.`;
+  const guide = `Para afinar de verdad, usa el campo de información como una conversación guiada: asistentes que beben cerveza, asistentes que toman cubatas, niños/no bebedores, comidas incluidas, presupuesto objetivo y existencias/donaciones confirmadas.`;
+  return [base, ...arr(budgetNotes).map(n => trim(n)).filter(Boolean), ...useful, guide].filter(Boolean);
 }
 function planPostProcessPlanningRows(rows, form, state) {
   const maps = planBuildMaps(state);
@@ -2038,7 +2062,9 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
     const budget = planBudgetGuard(rowsOut, form);
     rowsOut = budget.rows;
-    budget.notes.forEach(n => aiNotes.push(n));
+    aiNotes = planReadableNotes(aiNotes, rowsOut, form, budget.notes);
+  } else {
+    aiNotes = planReadableNotes(aiNotes, rowsOut, form, []);
   }
   return {
     ok: true,

@@ -1,0 +1,50 @@
+HOTFIX3 SIN CAMBIO DE VERSIÓN - CONTROL EVENT v14_prod
+
+No se cambia versión visible, ni INFOEVENTO, ni BACKUP.
+
+Cambios principales:
+1) PLANIFICACIÓN INICIAL
+- El coloreado por SEGMENTO/DESTINO se aplica ahora a las celdas de cada registro cuando se pulsa "Orden segmento/destino".
+- La combinación de colores queda visible por bloques y se reubica con la ordenación.
+- En cada producto con donación/existencia aparece editable:
+  - Donante donación
+  - Responsable donación
+- La compra conserva sus propios campos separados:
+  - Tienda compra
+  - Responsable compra
+- El déficit a comprar se recalcula como necesidad total menos donación/existencia y se redondea al alza cuando procede.
+- Si un producto deja de estar excluido, la etiqueta pasa a SEGMENTO - DESTINO.
+
+2) ZUZU / CÁLCULOS
+- Se sustituyen las notas confusas por un resumen claro: compra final, coste/persona y reglas usadas.
+- Se eliminan mensajes contradictorios de Gemini sobre costes previos y coste final.
+- Si la primera propuesta supera 35 €/persona, se reduce hacia un rango realista con margen, evitando quedarse justo en 35 por redondeos.
+- Se recuerda que donaciones/existencias solo se descuentan si están confirmadas por prompt o histórico real.
+
+3) PLANTILLA RECOMENDADA PARA EL CAMPO "INFORMACIÓN PARA LA CONSTRUCCIÓN"
+Para que Zuzu calcule mejor, conviene escribir la información en bloques:
+
+OBJETIVO:
+Evento de 1 día para XX personas. Presupuesto objetivo: 25 €/persona. Límite máximo de coste: 35 €/persona.
+
+COMIDAS INCLUIDAS:
+- Aperitivo: ...
+- Comida: ...
+- Tardeo/cubatas: ...
+- Cena: ...
+
+BEBIDA:
+- Personas que beberán cerveza: XX
+- Personas que tomarán cubatas: XX
+- Personas sin alcohol / niños: XX
+- Cerveza: máximo 5 latas/botellines por consumidor en todo el día.
+- Cubatas: 3 o 4 por consumidor.
+- Refrescos: separar mezcla de consumo directo.
+
+EXISTENCIAS / DONACIONES CONFIRMADAS:
+DONADO SOCIO [Donante: Nombre] [Responsable: Nombre]
+- 20 Garrafa AGUA (5L)
+- 3 vino tinto
+
+COMPRA:
+Comprar solo el déficit real. No inventar donaciones. No sobredimensionar cantidades. Si una cantidad es dudosa, marcarla para revisar.
