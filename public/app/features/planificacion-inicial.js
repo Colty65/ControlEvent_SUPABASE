@@ -402,7 +402,13 @@
     if(!rows.length) return '';
     const tiendaOpts = (selected) => `<option value="" ${!selected?'selected':''}>-- tienda compra --</option>` + tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(selected)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
     const respOpts = (selected, label='-- responsable compra --') => `<option value="" ${!selected?'selected':''}>${esc(label)}</option>` + socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
-    const donorOpts = (selected) => `<option value="" ${!selected?'selected':''}>-- donante --</option>` + donorOptions().map(d => `<option value="${esc(d.value)}" ${String(d.value)===String(selected)?'selected':''}>${esc(d.label)}</option>`).join('');
+    const donorOpts = (selected) => {
+      const value = String(selected || '');
+      const list = donorOptions();
+      const has = list.some(d => String(d.value) === value);
+      const extra = value && !has ? `<option value="${esc(value)}" selected>${esc(donorLabel(value))}</option>` : '';
+      return `<option value="" ${!value?'selected':''}>-- donante --</option>` + extra + list.map(d => `<option value="${esc(d.value)}" ${String(d.value)===value?'selected':''}>${esc(d.label)}</option>`).join('');
+    };
     const tr = rows.map(r => {
       const hasDonation = Number(r.donado || 0) > 0 || (Array.isArray(r.donationIndices) && r.donationIndices.length > 0);
       const don = [...r.donantes.entries()].map(([k,v]) => `<span class="plan-donation-line"><b>Origen:</b> ${esc(k)} · <b>Cantidad:</b> ${qty(v)} ud.</span>`).join('<br>') || '<span class="plan-muted">Sin donación/existencia</span>';

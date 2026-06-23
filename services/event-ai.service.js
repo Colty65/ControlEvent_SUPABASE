@@ -1384,16 +1384,24 @@ function planRoundBuyUnits(productName, units) {
   return round(Math.ceil(u * 100) / 100, 2);
 }
 function planConsumptionProfile(form) {
-  const info = normPlanKey((form?.info || '') + ' ' + (form?.descripcion || ''));
+  const rawInfo = trim((form?.info || '') + ' ' + (form?.descripcion || ''));
+  const info = normPlanKey(rawInfo);
   const people = Math.max(1, num(form?.personas) || 25);
   const days = Math.max(1, num(form?.dias) || 1);
   const calor = /40|calor|temperatura|verano|mucho sol/.test(info);
   const cubatas = /cubata|copa|copas|tardeo|barra libre/.test(info);
   const cerveza = /cerveza|botellin|botellines|lata|barril/.test(info) || cubatas;
   const noAlcoholCue = /niños|ninos|infantil|sin alcohol|no bebedores|abstemios/.test(info);
-  const beerPeople = Math.max(0, Math.round(people * (cerveza ? (noAlcoholCue ? 0.55 : 0.70) : 0.35)));
-  const cubaPeople = Math.max(0, Math.round(people * (cubatas ? (noAlcoholCue ? 0.35 : 0.45) : 0.15)));
-  const directSoftPeople = Math.max(1, Math.round(people * (noAlcoholCue ? 0.45 : 0.25)));
+  function explicit(re) {
+    const m = rawInfo.match(re);
+    return m ? Math.max(0, Math.round(num(m[1]))) : 0;
+  }
+  const explicitBeer = explicit(/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+)/i);
+  const explicitCuba = explicit(/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+)/i);
+  const explicitNoAlcohol = explicit(/personas\s+sin\s+alcohol(?:\s*\/\s*ni[ñn]os|\s+o\s+ni[ñn]os|[^\n:]*)?\s*[:=]\s*(\d+)/i);
+  const beerPeople = explicitBeer || Math.max(0, Math.round(people * (cerveza ? (noAlcoholCue ? 0.55 : 0.70) : 0.35)));
+  const cubaPeople = explicitCuba || Math.max(0, Math.round(people * (cubatas ? (noAlcoholCue ? 0.35 : 0.45) : 0.15)));
+  const directSoftPeople = Math.max(1, explicitNoAlcohol || Math.round(people * (noAlcoholCue ? 0.45 : 0.25)));
   return { people, days, calor, cubatas, beerPeople, cubaPeople, directSoftPeople, cubatasTotal: cubaPeople * (cubatas ? 3.5 : 1.5) * days };
 }
 function planProductLooksTwoLiter(n) { return /botella.*2|2\s*l|2l|litro/.test(n) && !/lata|bote|33|25/.test(n); }
@@ -1403,14 +1411,15 @@ function planMinimumNeed(productName, form, currentNeed) {
   let min = 0;
 
   if (/cerveza/.test(n) && /lata|botellin|botellines|skol|bote/.test(n)) {
-    // Referencia real ControlEvent: una persona consumidora media puede beber unas 5 latas/botellines en el día.
-    min = p.beerPeople * (p.calor ? 5 : 4.5) * p.days;
+    // No se fuerza el máximo completo por cada marca/formato: el cupo de cerveza se reparte entre barril, latas y botellines.
+    // Si hay existencias/donaciones explícitas, se respetan y no se infla esa misma línea automáticamente.
+    min = num(currentNeed);
   } else if (/barril/.test(n) && /cerveza/.test(n)) {
-    // Barril de 30/50 l: no mezclar con latas como si todos consumieran ambos máximos.
-    min = Math.max(num(currentNeed), Math.ceil((p.beerPeople * 1.6 * p.days) / 90));
+    // Un barril ya cubre muchas cañas; no duplicar además el máximo de latas/botellines por persona.
+    min = num(currentNeed);
   } else if (/ron|whisky|wiski|gin|ginebra/.test(n)) {
-    // 1 botella estándar rinde aprox. 15-16 cubatas.
-    min = Math.max(num(currentNeed), Math.ceil(p.cubatasTotal / 16));
+    // Los cubatas se reparten entre varios alcoholes; no calcular 4 botellas de ron + 4 de whisky + 4 de ginebra.
+    min = Math.max(num(currentNeed), 1);
   } else if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n)) {
     if (planProductLooksTwoLiter(n)) {
       // Botellas de 2 l: mezcla de cubatas + algo de consumo directo, sin tratar cada persona como botella individual.
@@ -1482,7 +1491,9 @@ function planReadableNotes(rawNotes, rows, form, budgetNotes) {
     // Evita mezclar mensajes de Gemini sobre costes anteriores con el coste final postprocesado.
     .filter(n => !/(coste|persona|25|35|sobredimensionad|reajust|control de realidad|precio orientativo|dentro del rango)/i.test(n))
     .slice(0, 2);
-  const base = `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). La compra prevista final es ${round(total,2)} €: ${round(per,2)} €/persona. Las donaciones/existencias solo se descuentan si están confirmadas por el prompt o por histórico real.`;
+  const donCount = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).length;
+  const donUnits = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).reduce((sum, r) => sum + num(r.unidades), 0);
+  const base = `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). Compra prevista final: ${round(total,2)} € (${round(per,2)} €/persona). Donaciones/existencias detectadas: ${donCount} líneas / ${round(donUnits,2)} ud.; solo se descuentan si están confirmadas por el prompt o por histórico real.`;
   const guide = `Para afinar de verdad, usa el campo de información como una conversación guiada: asistentes que beben cerveza, asistentes que toman cubatas, niños/no bebedores, comidas incluidas, presupuesto objetivo y existencias/donaciones confirmadas.`;
   return [base, ...arr(budgetNotes).map(n => trim(n)).filter(Boolean), ...useful, guide].filter(Boolean);
 }
@@ -1611,7 +1622,9 @@ function planCleanExplicitProductText(text) {
 }
 function planExplicitUnits(text) {
   const raw = trim(text || '').replace(',', '.');
-  let m = raw.match(/^\s*[•\-]?\s*(\d+(?:\.\d+)?)/);
+  let m = raw.match(/(\d+(?:\.\d+)?)\s*pack[s]?\s+de\s+(\d+(?:\.\d+)?)\s*(?:ud\.?|unidades|latas|botellines|botellas|botes)/i);
+  if (m) return Math.max(0, num(m[1]) * num(m[2]));
+  m = raw.match(/^\s*[•\-]?\s*(\d+(?:\.\d+)?)/);
   if (m) return Math.max(0, num(m[1]));
   m = raw.match(/:\s*(\d+(?:\.\d+)?)/);
   if (m) return Math.max(0, num(m[1]));
@@ -1632,7 +1645,7 @@ function planExplicitItemLines(block) {
   const out = [];
   trim(block).split(/\n+/).forEach(line => {
     const s = trim(line);
-    if (!s) return;
+    if (!s || /^\s*[•\-]?\s*COMPRA\s*:/i.test(s)) return;
     const m = s.match(/^\s*[•\-]\s*(.+)$/);
     if (m) out.push(m[1]);
   });
@@ -1643,6 +1656,23 @@ function planExplicitItemLines(block) {
   }
   return out;
 }
+function planExplicitDonationSections(info) {
+  const raw = trim(info || '').replace(/\r/g, '');
+  if (!raw) return [];
+  const headerRe = /(?:^|\n)[^\n]*(?:(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A)|DONACIONES?|DONACION|EXISTENCIAS?)[^\n]*(?:Tratar\s+como\s+)?DONADO\s+(?:SOCIO|TIENDA|OTROS)[^\n]*/gi;
+  const matches = [];
+  let m;
+  while ((m = headerRe.exec(raw))) matches.push({ index:m.index, end:headerRe.lastIndex, header:trim(m[0]) });
+  return matches.map((h, idx) => {
+    let end = idx + 1 < matches.length ? matches[idx + 1].index : raw.length;
+    const tail = raw.slice(h.end);
+    const stopRe = /\n\s*(?:[•\-]\s*)?(?:COMPRA|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|OBJETIVO)\s*:/i;
+    const stop = tail.search(stopRe);
+    if (stop >= 0) end = Math.min(end, h.end + stop);
+    const typeMatch = h.header.match(/DONADO\s+(SOCIO|TIENDA|OTROS)/i);
+    return { header:h.header, block:raw.slice(h.end, end), ticketDonacion:typeMatch ? `DONADO ${typeMatch[1].toUpperCase()}` : 'DONADO SOCIO' };
+  }).filter(x => planExplicitItemLines(x.block).length);
+}
 function planExplicitDonationRowsFromPrompt(form, state) {
   const info = trim(form?.info || '');
   if (!info) return [];
@@ -1652,7 +1682,7 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     const donorLabel = defaults.donor || defaults.store || 'Sin donante';
     const responsableLabel = defaults.responsable || donorLabel;
     const storeLabel = defaults.store || donorLabel;
-    const donorRef = planRefFromLooseLabel(donorLabel, maps, defaults.preferredDonorKind || 'P') || planRefFromLooseLabel(storeLabel, maps, 'T');
+    const donorRef = planRefFromLooseLabel(donorLabel, maps, defaults.preferredDonorKind || 'P') || planRefFromLooseLabel(storeLabel, maps, 'T') || trim(donorLabel);
     const resp = planFindPersonLoose(responsableLabel, maps);
     const store = planFindStoreLoose(storeLabel, maps);
     for (const item of planExplicitItemLines(block)) {
@@ -1678,6 +1708,16 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         reason:`Existencia/donación indicada literalmente por el usuario (${donorLabel}).`
       });
     }
+  }
+  for (const section of planExplicitDonationSections(info)) {
+    const header = section.header;
+    addRows(section.block, {
+      ticketDonacion:section.ticketDonacion,
+      donor:planExtractBracket(header, ['Donante']) || (/PE[NÑ]A/i.test(header) ? 'Peña El Arrastre' : 'Donante indicado'),
+      store:section.ticketDonacion === 'DONADO TIENDA' ? (planExtractBracket(header, ['Donante']) || planExtractBracket(header, ['Tienda']) || '') : '',
+      responsable:planExtractBracket(header, ['Responsable']) || trim(form.defaultResponsibleName || ''),
+      preferredDonorKind:section.ticketDonacion === 'DONADO TIENDA' ? 'T' : 'P'
+    });
   }
   const existBlock = planBlockBetween(info, /EXISTENCIAS\s+QUE\s+YA\s+TENEMOS\s*:?/i, [/DONACIONES\s+PREVISTAS\s*:?/i, /CRITERIO\s+DE\s+C[ÁA]LCULO\s*:?/i, /RESULTADO\s+QUE\s+QUIERO\s*:?/i]);
   if (existBlock) {
@@ -1762,6 +1802,11 @@ function planInfoDonationRules(info, maps) {
   const poss = raw.match(/POSIBLES\s+DONACIONES\s+DE\s+["“]([^"”]+)["”]\s*:\s*([\s\S]+)/i);
   if (poss) {
     poss[2].split(/[\n,;]+/).forEach(part => addRule(part, poss[1], poss[1], 'DONADO SOCIO'));
+  }
+  for (const section of planExplicitDonationSections(raw)) {
+    const donor = planExtractBracket(section.header, ['Donante']) || (/PE[NÑ]A/i.test(section.header) ? 'Peña El Arrastre' : 'Donante indicado');
+    const resp = planExtractBracket(section.header, ['Responsable']) || donor;
+    planExplicitItemLines(section.block).forEach(item => addRule(item, donor, resp, section.ticketDonacion));
   }
   return rules.filter(r => r.donorRef || r.responsableId);
 }
