@@ -315,6 +315,41 @@
     }
     return arrRows;
   }
+  function planDeficitUnits(productName, deficit){
+    const d = Math.max(0, Number(deficit || 0));
+    if(!d) return 0;
+    const n = normalizeText(productName || '');
+    // Productos por peso/litro pueden mantener dos decimales; el resto se compra por unidades enteras.
+    if(/\b(KG|KILO|KILOS|LITRO|LITROS|GR|GRAMO|GRAMOS)\b/.test(n) && !/\b(BOTE|BOTES|LATA|LATAS|BOTELLA|BOTELLAS|SACO|SACOS|GARRAFA|GARRAFAS)\b/.test(n)){
+      return Math.ceil(d * 100) / 100;
+    }
+    return Math.ceil(d);
+  }
+  function planSegDestToken(row){ return `${up(row?.segmento || '')}__${up(row?.destino || '')}`; }
+  function planSegDestClass(row){
+    if(String(planResourceOrderMode || '').toUpperCase() !== 'SEGMENTO_DESTINO') return '';
+    const map = {
+      'COMIDA__APERITIVO':'plan-sd-comida-aperitivo',
+      'COMIDA__COMIDA':'plan-sd-comida-comida',
+      'COMIDA__CENA':'plan-sd-comida-cena',
+      'BEBIDA__APERITIVO':'plan-sd-bebida-aperitivo',
+      'BEBIDA__COMIDA':'plan-sd-bebida-comida',
+      'BEBIDA__CENA':'plan-sd-bebida-cena',
+      'BEBIDA__CUBATAS':'plan-sd-bebida-cubatas',
+      'INFRAESTRUCTURA__APERITIVO':'plan-sd-infra-aperitivo',
+      'INFRAESTRUCTURA__COMIDA':'plan-sd-infra-comida',
+      'INFRAESTRUCTURA__CUBATAS':'plan-sd-infra-cubatas',
+      'INFRAESTRUCTURA__CENA':'plan-sd-infra-cena',
+      'INFRAESTRUCTURA__INFRAESTRUCTURA':'plan-sd-infra-infra'
+    };
+    return map[planSegDestToken(row)] || 'plan-sd-rara';
+  }
+  function planResourceBadgeText(row){
+    const buy = Math.max(0, Number(row?.compra || 0));
+    const need = Math.max(0, Number(row?.necesidad || 0));
+    if(need <= 0 && buy <= 0) return 'Excluido inicialmente de compra';
+    return `${row?.segmento || 'Sin segmento'} - ${row?.destino || 'Sin destino'}`;
+  }
   function planResourceRows(proposals){
     const map = new Map();
     (Array.isArray(proposals) ? proposals : []).forEach((p, idx) => {
@@ -353,27 +388,31 @@
     });
     const list = [...map.values()].map(row => {
       const baseNeed = row.necesidad > 0 ? row.necesidad : row.donado + row.compra;
-      return {...row, necesidad: baseNeed};
+      const roundedDeficit = planDeficitUnits(row.producto, Math.max(0, baseNeed - row.donado));
+      const nextCompra = Math.max(Number(row.compra || 0), roundedDeficit);
+      return {...row, necesidad: baseNeed, compra: nextCompra};
     });
     return sortPlanResourceRows(list);
   }
   function renderPlanResourceEditor(proposals){
     const rows = planResourceRows(proposals);
     if(!rows.length) return '';
-    const tiendaOpts = (selected) => tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(selected)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
-    const respOpts = (selected) => socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
+    const tiendaOpts = (selected) => `<option value="" ${!selected?'selected':''}>-- tienda compra --</option>` + tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(selected)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
+    const respOpts = (selected) => `<option value="" ${!selected?'selected':''}>-- responsable compra --</option>` + socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
     const tr = rows.map(r => {
-      const don = [...r.donantes.entries()].map(([k,v]) => `${qty(v)} ud. ${esc(k)}`).join('<br>') || '—';
+      const don = [...r.donantes.entries()].map(([k,v]) => `<span class="plan-donation-line"><b>Donante:</b> ${esc(k)} · <b>Cantidad:</b> ${qty(v)} ud.</span>`).join('<br>') || '<span class="plan-muted">Sin donación/existencia</span>';
       const buyBase = Math.max(0, Number(r.compra || 0));
       const price = Number(r.precioCompra || r.precioDonado || 0);
-      return `<tr class="plan-resource-edit-row ${r.include ? '' : 'excluded'}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
-        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong class="plan-resource-product-label">${esc(r.producto)}</strong><small class="plan-resource-meta">${esc(r.segmento)} · ${esc(r.destino)}</small><select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select>${Number(r.compra||0) <= 0 ? '<em class="plan-resource-excluded-label">Excluido inicialmente de compra</em>' : ''}</td>
+      const rowClass = ['plan-resource-edit-row', r.include ? '' : 'excluded', planSegDestClass(r)].filter(Boolean).join(' ');
+      const badgeText = planResourceBadgeText({...r, compra:buyBase});
+      return `<tr class="${rowClass}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
+        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong class="plan-resource-product-label">${esc(r.producto)}</strong><small class="plan-resource-meta">${esc(r.segmento)} · ${esc(r.destino)}</small><select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select><em class="plan-resource-excluded-label">${esc(badgeText)}</em></td>
         <td><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/><small>Necesidad total calculada</small></td>
         <td><strong>${qty(r.donado)} ud.</strong><small>${don}</small></td>
         <td><input type="number" min="0" step="0.01" value="${esc(buyBase)}" data-plan-resource-field="compra"/><small>Déficit a comprar editable</small></td>
-        <td><input type="number" min="0" step="0.01" value="${esc(price)}" data-plan-resource-field="precio"/><small>${esc(money(Number(r.compra || 0) * price))}</small></td>
-        <td><select data-plan-resource-field="tiendaId">${tiendaOpts(r.tiendaId) || '<option value="">Sin tiendas</option>'}</select></td>
-        <td><select data-plan-resource-field="responsableId">${respOpts(r.responsableId) || '<option value="">Sin socios</option>'}</select></td>
+        <td><input type="number" min="0" step="0.01" value="${esc(price)}" data-plan-resource-field="precio"/><small>${esc(money(buyBase * price))}</small></td>
+        <td><select data-plan-resource-field="tiendaId">${tiendaOpts(buyBase > 0 ? r.tiendaId : '') || '<option value="">Sin tiendas</option>'}</select><small>Tienda de compra</small></td>
+        <td><select data-plan-resource-field="responsableId">${respOpts(buyBase > 0 ? r.responsableId : '') || '<option value="">Sin socios</option>'}</select><small>Responsable de compra</small></td>
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card">
@@ -394,8 +433,13 @@
       .plan-resource-edit-row.plan-found{outline:4px solid rgba(37,99,235,.75)!important;box-shadow:0 0 0 6px rgba(37,99,235,.16)!important}
       .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:180px!important}
       .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
+      .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.plan-resource-order-actions button{white-space:nowrap}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
+      .plan-resource-edit-row.plan-sd-comida-aperitivo{background:#f5ead8!important}.plan-resource-edit-row.plan-sd-comida-comida{background:#e7d1b4!important}.plan-resource-edit-row.plan-sd-comida-cena{background:#c99a68!important}
+      .plan-resource-edit-row.plan-sd-bebida-aperitivo{background:#ffedd5!important}.plan-resource-edit-row.plan-sd-bebida-comida{background:#fed7aa!important}.plan-resource-edit-row.plan-sd-bebida-cena{background:#fdba74!important}.plan-resource-edit-row.plan-sd-bebida-cubatas{background:#fecaca!important}
+      .plan-resource-edit-row.plan-sd-infra-aperitivo{background:#dbeafe!important}.plan-resource-edit-row.plan-sd-infra-comida{background:#bfdbfe!important}.plan-resource-edit-row.plan-sd-infra-cubatas{background:#93c5fd!important}.plan-resource-edit-row.plan-sd-infra-cena{background:#60a5fa!important}.plan-resource-edit-row.plan-sd-infra-infra{background:#86efac!important}
+      .plan-resource-edit-row.plan-sd-rara{background:#111827!important;color:#fff!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}.plan-resource-edit-row.plan-sd-rara small,.plan-resource-edit-row.plan-sd-rara strong{color:inherit!important}
     `;
     document.head.appendChild(st);
   }
@@ -712,7 +756,11 @@
     const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
 
     if(changedField === 'necesidad'){
-      buy = roundPurchaseUnits(selectedProduct?.nombre || group.producto, Math.max(0, need - Number(group.donado || 0)));
+      buy = planDeficitUnits(selectedProduct?.nombre || group.producto, Math.max(0, need - Number(group.donado || 0)));
+      const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
+      if(buyInput) buyInput.value = String(buy);
+    }else if(changedField === 'compra'){
+      buy = planDeficitUnits(selectedProduct?.nombre || group.producto, buy);
       const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
       if(buyInput) buyInput.value = String(buy);
     }
@@ -767,6 +815,11 @@
     if(label) label.textContent = newName;
     const meta = tr.querySelector('.plan-resource-meta');
     if(meta) meta.textContent = `${newSegment} · ${newDestino}`;
+    const badge = tr.querySelector('.plan-resource-excluded-label');
+    if(badge) badge.textContent = planResourceBadgeText({segmento:newSegment, destino:newDestino, necesidad:need, compra:buy});
+    tr.classList.remove('plan-sd-comida-aperitivo','plan-sd-comida-comida','plan-sd-comida-cena','plan-sd-bebida-aperitivo','plan-sd-bebida-comida','plan-sd-bebida-cena','plan-sd-bebida-cubatas','plan-sd-infra-aperitivo','plan-sd-infra-comida','plan-sd-infra-cubatas','plan-sd-infra-cena','plan-sd-infra-infra','plan-sd-rara');
+    const sdClass = planSegDestClass({segmento:newSegment,destino:newDestino});
+    if(sdClass) tr.classList.add(sdClass);
     markPlanRowChanged(tr);
   }
 

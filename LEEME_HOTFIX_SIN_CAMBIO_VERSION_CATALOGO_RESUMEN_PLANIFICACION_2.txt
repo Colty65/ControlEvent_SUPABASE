@@ -1,0 +1,54 @@
+ControlEvent v14_prod - HOTFIX sin cambio visible de versión
+
+NO se ha cambiado la versión visible de la app.
+NO se ha cambiado INFOEVENTO.
+NO se ha cambiado BACKUP.
+
+Cambios aplicados:
+
+1) PRODUCTOS / CATÁLOGO
+- Se elimina el bloqueo que impedía modificar el precio general del catálogo cuando el producto había sido usado en eventos finalizados.
+- El precio general del catálogo queda desacoplado del precio histórico usado en compras/donaciones de eventos anteriores.
+- Se permite actualizar precio de catálogo y tienda habitual si el nombre, segmento y destino del producto siguen siendo los mismos.
+
+2) RESUMEN PRESUPUESTARIO / SALDO ACTUAL
+- Una situación de ingreso vacía ahora se trata como Pendiente.
+- Antes, una situación vacía podía contarse como ingreso realizado.
+- El SALDO ACTUAL se recalcula como:
+  ingresos realmente ingresados - gastos realizados.
+- Si no hay ingresos reales ni compras realizadas, debe salir 0,00 €.
+
+3) PLANIFICACIÓN INICIAL / DONACIONES Y COMPRAS
+- Se separa visualmente la información de donación/existencia de la información de compra.
+- La columna Donado / existente muestra el donante y cantidad.
+- La tienda y responsable corresponden a compra, no al donante.
+- Si no hay déficit a comprar, la tienda/responsable quedan sin selección por defecto para evitar que aparezca una tienda falsa como 100 Montaditos.
+
+4) PLANIFICACIÓN INICIAL / ETIQUETAS DE FILA
+- Si necesidad y compra son 0, se mantiene "Excluido inicialmente de compra".
+- Si el producto deja de estar excluido, la etiqueta pasa a mostrar SEGMENTO - DESTINO.
+
+5) PLANIFICACIÓN INICIAL / DÉFICIT
+- El déficit a comprar se redondea al alza a unidad cuando el producto se compra por unidades.
+- Evita casos como necesidad 1 y déficit 0,85.
+
+6) ORDEN SEGMENTO/DESTINO
+- Al ordenar por SEGMENTO/DESTINO, cada combinación recibe fondo de color:
+  COMIDA/APERITIVO marrón claro
+  COMIDA/COMIDA marrón medio
+  COMIDA/CENA marrón oscuro
+  BEBIDA/APERITIVO naranja claro
+  BEBIDA/COMIDA naranja medio
+  BEBIDA/CENA naranja oscuro
+  BEBIDA/CUBATAS rojo claro
+  INFRAESTRUCTURA/APERITIVO azul claro
+  INFRAESTRUCTURA/COMIDA azul medio
+  INFRAESTRUCTURA/CUBATAS azul oscuro
+  INFRAESTRUCTURA/CENA azul más oscuro
+  INFRAESTRUCTURA/INFRAESTRUCTURA verde medio
+  Otras combinaciones: negro con letra blanca.
+
+Pruebas estáticas realizadas:
+- node --check public/app/features/planificacion-inicial.js
+- node --check public/app/features/v14-hotfix-catalogo-resumen-planificacion.js
+- node --check lib/supabase-normalized.js
