@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Si en GitHub permanecen archivos antiguos, puedes eliminar los legacy de versiones previas para evitar confusión.
 

@@ -1,6 +1,6 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
-Base: ControlEvent v5.1.0_prod.
+Base: ControlEvent v15_prod.
 
 Cambio quirurgico solicitado:
 - Solo PC / evento FINALIZADO.

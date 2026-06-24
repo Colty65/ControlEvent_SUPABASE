@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - reducción inicial de index.html
+# ControlEvent v15_prod - reducción inicial de index.html
 
 Versión basada en v26.4. Objetivo: empezar a aligerar `public/index.html` sin tocar lógica de negocio.
 
@@ -8,7 +8,7 @@ Versión basada en v26.4. Objetivo: empezar a aligerar `public/index.html` sin t
 - Se extraen 5 imágenes Base64 embebidas del HTML a `public/assets/embedded/`.
 - Se actualiza el Service Worker a `controlevent-shell-v50-24` y se cachean los nuevos assets.
 - Se mantiene el orden de los estilos legacy para respetar precedencias.
-- Se actualizan cadenas de versión a `ControlEvent v5.1.0_prod` / `ControlEvent_v5_1_0_prod`.
+- Se actualizan cadenas de versión a `ControlEvent v15_prod` / `ControlEvent_v15_prod`.
 
 ## Métrica de index.html
 

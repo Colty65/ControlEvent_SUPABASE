@@ -1,8 +1,8 @@
-/* ControlEvent v14_prod - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v15_prod - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v14_prod';
-  const VERSION_FILE = 'ControlEvent_v14_prod';
+  const VERSION = 'ControlEvent v15_prod';
+  const VERSION_FILE = 'ControlEvent_v15_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();

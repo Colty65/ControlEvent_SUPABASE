@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Hotfix: package.json/package-lock.json regenerados como JSON válido.
 Sustituir todos los archivos del repo por este paquete.

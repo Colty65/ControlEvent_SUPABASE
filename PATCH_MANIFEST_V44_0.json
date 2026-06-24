@@ -1,11 +1,11 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "notes": [
     "Corrige que en PC/iPad cualquier pestaña abriera Planificación inicial por un estado pegado.",
     "Refuerza acceso a Planificación inicial desde menú móvil sin envolver render global.",
     "Al entrar desde login fuerza selección explícita de evento y muestra pantalla limpia con icono.",
-    "Actualiza versión a v44.0 y el nombre de fichero ControlEvent_v5_1_0_prod.",
+    "Actualiza versión a v44.0 y el nombre de fichero ControlEvent_v15_prod.",
     "No cambia lógica de COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS."
   ],
   "changed_files": [

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Objetivo de la versión:
 - Estabilizar el flujo de arranque/login/evento sin volver a tocar los justificantes de INGRESOS que ya funcionan.
@@ -12,7 +12,7 @@ Cambios:
 5. Se añade v50-18-final-fixes.js como única capa final para login, selección de evento, dock móvil y rehidratación de globos.
 6. Globos de Resumen Presupuestario: las miniaturas Just. solo abren foto al pulsarlas expresamente, evitando la apertura automática de la primera foto.
 7. Dock móvil: Refres y Salir, uno encima de otro, abajo a la derecha.
-8. Versión unificada a ControlEvent v5.1.0_prod y cache PWA controlevent-shell-v50-24.
+8. Versión unificada a ControlEvent v15_prod y cache PWA controlevent-shell-v50-24.
 
 No se toca:
 - La gestión de justificantes dentro de INGRESOS.

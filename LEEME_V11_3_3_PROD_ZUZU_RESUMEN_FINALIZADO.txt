@@ -1,4 +1,4 @@
-ControlEvent v14_prod
+ControlEvent v15_prod
 
 Cambios principales:
 - Zuzu mantiene el flujo en 3 pasos: planificación Gemini -> extracción ControlEvent -> respuesta Gemini.
@@ -10,4 +10,4 @@ Cambios principales:
 - Se añade metricasCanonicas.porEvento al contexto de Zuzu para que Gemini tenga los totales oficiales por evento.
 - El saldo financiero se define como Ingresos total - Compras realizadas. Las donaciones se muestran aparte como valoración de producto donado.
 - Se refuerza el uso de Zuzu, mantenimientos generales, BACKUP/descarga e INFOEVENTO aunque el evento activo esté Finalizado, sin desbloquear la edición de datos propios del evento finalizado.
-- Versión actualizada a v14_prod / ControlEvent_v14_prod.
+- Versión actualizada a v15_prod / ControlEvent_v15_prod.

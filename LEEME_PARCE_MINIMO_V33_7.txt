@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - Parche mínimo correctivo
+ControlEvent v15_prod - Parche mínimo correctivo
 
 Subir encima de la versión actual respetando carpetas.
 No incluye package.json ni package-lock.json.
@@ -18,4 +18,4 @@ Cambios:
   * Al cambiar a Mapa de recursos u otra opción, se oculta realmente Planificación inicial.
   * El botón de Planificación inicial no queda marcado junto con Mapa.
   * Eliminado pequeño salto de scroll al entrar en Planificación inicial.
-- Versión actualizada a ControlEvent v5.1.0_prod y cache controlevent-shell-v50-24.
+- Versión actualizada a ControlEvent v15_prod y cache controlevent-shell-v50-24.

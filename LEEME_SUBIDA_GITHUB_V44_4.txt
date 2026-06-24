@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Base: v44.3
 
@@ -13,6 +13,6 @@ Cambios principales:
 - La limpieza de ventanas pesadas pasa a ser selectiva y limitada por ventana/evento.
 - Se reduce la reinstalación repetida de parches al cambiar de módulo.
 - Se mantiene GRAFICAS con motor estable queso + Por destino.
-- Versión actualizada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod.
+- Versión actualizada a ControlEvent v15_prod / ControlEvent_v15_prod.
 
 No se ha tocado la lógica de guardado de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.

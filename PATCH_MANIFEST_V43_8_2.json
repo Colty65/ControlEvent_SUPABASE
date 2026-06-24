@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "changes": [
     "Menú móvil estable tras Planificación inicial.",
     "Versión unificada en scripts activos y descargas.",

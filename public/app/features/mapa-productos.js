@@ -1,9 +1,9 @@
-/* ControlEvent v14_prod - Mapa de recursos
+/* ControlEvent v15_prod - Mapa de recursos
    Cruza compras + donaciones. V40: donaciones asociadas a compra se muestran solo una vez,
    la zona final queda limitada a producto donado fuera de necesidad de compra y permite marcar entregado. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v14_prod';
+  const VERSION = 'ControlEvent v15_prod';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';
@@ -20,6 +20,7 @@
   let lastRenderedEventId = null;
   let lastShopActivationAt = 0;
   let lastShopActivationKey = '';
+  let mapaSortMode = 'PRODUCTO';
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -154,6 +155,19 @@
       if(!map.has(id)) map.set(id, {id, name});
     });
     return Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  }
+
+  function sortMapaEntries(list, accessor){
+    const arrRows = Array.isArray(list) ? list.slice() : [];
+    const mode = String(mapaSortMode || 'PRODUCTO').toUpperCase();
+    return arrRows.sort((a,b) => {
+      const aa = accessor ? accessor(a) : a;
+      const bb = accessor ? accessor(b) : b;
+      if(mode === 'SEGMENTO_DESTINO'){
+        return String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || String(aa.producto||'').localeCompare(String(bb.producto||''),'es');
+      }
+      return String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es');
+    });
   }
 
   // V31.10: marcado visual local para usar Mapa de recursos como lista de la compra.
@@ -315,7 +329,7 @@
       if(rid && resp) group.responsables.set(rid, resp);
     });
 
-    const result = Array.from(groups.values()).map(group => {
+    const result = sortMapaEntries(Array.from(groups.values()).map(group => {
       const allDonationRows = (donationByProduct.get(group.productoId) || []).slice().sort((a,b)=>a.donor.localeCompare(b.donor,'es'));
       return {
         ...group,
@@ -328,12 +342,7 @@
         necesidadUnidades: Number(group.unidadesCompra || 0),
         necesidadValor: Number(group.importeCompra || 0)
       };
-    }).sort((a,b) => {
-      const tienda = a.tienda.localeCompare(b.tienda, 'es'); if(tienda !== 0) return tienda;
-      const ak = a.ticketSort || ticketSortKey(a.ticket), bk = b.ticketSort || ticketSortKey(b.ticket);
-      const tk = ak.join('|').localeCompare(bk.join('|'), 'es'); if(tk !== 0) return tk;
-      return a.producto.localeCompare(b.producto, 'es');
-    });
+    }));
 
     // V40.0: una donación asociada a un producto con compra se muestra solo en la primera ficha
     // de compra de ese producto. Las siguientes compras del mismo producto no repiten esas donaciones.
@@ -370,15 +379,17 @@
           donationRows: items.sort((a,b)=>a.donor.localeCompare(b.donor,'es'))
         };
       })
-      .sort((a,b)=>a.producto.localeCompare(b.producto,'es'));
+      ;
 
-    const filteredDonationValue = onlyDonations.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
-    const filteredProductsWithDonations = onlyDonations.length;
+    const onlyDonationsSorted = sortMapaEntries(onlyDonations);
+
+    const filteredDonationValue = onlyDonationsSorted.reduce((sum, item) => sum + Number(item.valorDonado || 0), 0);
+    const filteredProductsWithDonations = onlyDonationsSorted.length;
     const eventSaldoLimite = ingresosRaw().reduce((sum, row) => sum + ingresoTotal(row), 0);
 
     return {
       groups: result,
-      onlyDonations,
+      onlyDonations: onlyDonationsSorted,
       buys,
       donations,
       responsableOptions,
@@ -464,8 +475,7 @@
   }
 
   function renderMetric(label, value, note, kind){
-    const jumpAttrs = String(kind || '').includes('jump-donados') ? ' data-mapa-jump-donados="1" role="button" tabindex="0" title="Ir a productos donados"' : '';
-    return `<div class="mapa-metric ${kind || ''}"${jumpAttrs}${String(kind || '').includes('jump-donados') ? ' onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.goDonados&&window.ControlEventMapaProductos.goDonados()}catch(_e){}"' : ''}><div class="mapa-metric-label">${esc(label)}</div><div class="mapa-metric-value">${esc(value)}</div>${note ? `<div class="mapa-metric-note">${esc(note)}</div>` : ''}</div>`;
+    return `<div class="mapa-metric ${kind || ''}"><div class="mapa-metric-label">${esc(label)}</div><div class="mapa-metric-value">${esc(value)}</div>${note ? `<div class="mapa-metric-note">${esc(note)}</div>` : ''}</div>`;
   }
   function renderDonationRows(items){
     if(!items.length) return '<div class="mapa-donation-empty">Sin donaciones registradas de este producto para el filtro actual.</div>';
@@ -511,7 +521,8 @@
     return `<div class="mapa-product-search" id="mapaProductoSearchBox">
       <div class="field"><label>Buscar producto</label><input id="${SEARCH_ID}" class="ce-mapa-readonly-allowed mobile-menu-action" value="${esc(productSearchText)}" placeholder="Teclea parte del producto..." autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
       <button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}Btn">Buscar</button>
-      <span class="mapa-search-help">Busca el primer registro que contenga el texto y se posiciona en la lista.</span>
+      <div class="mapa-order-actions"><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortProduct">Orden producto</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortSegDest">Orden segmento/destino</button></div>
+      <span class="mapa-search-help">Busca el primer registro que contenga el texto y ordena toda la información por producto o por segmento-destino.</span>
     </div>`;
   }
   function productSearchTextOfCard(card){ return up(card?.dataset?.productText || card?.textContent || ''); }
@@ -551,8 +562,17 @@
   }
   function bindProductSearch(){
     const input = $(SEARCH_ID), btn = $(SEARCH_ID + 'Btn');
-    markSearchControl(input);
-    markSearchControl(btn);
+    const sortProduct = $(SEARCH_ID + 'SortProduct');
+    const sortSegDest = $(SEARCH_ID + 'SortSegDest');
+    [input, btn, sortProduct, sortSegDest].forEach(markSearchControl);
+    if(sortProduct && !sortProduct.__ceMapaSortBound){
+      sortProduct.__ceMapaSortBound = true;
+      sortProduct.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } mapaSortMode = 'PRODUCTO'; renderMapaProductos(); }, true);
+    }
+    if(sortSegDest && !sortSegDest.__ceMapaSortBound){
+      sortSegDest.__ceMapaSortBound = true;
+      sortSegDest.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } mapaSortMode = 'SEGMENTO_DESTINO'; renderMapaProductos(); }, true);
+    }
     if(!input || input.__ceMapaSearchBound){
       if(input) restoreProductSearchFocus();
       return;
@@ -732,16 +752,12 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('VALORACION DEL EVENTO', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
-        ${renderMetric('DONACION DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${eventSummary.productsWithDonations || 0} productos con donación del evento · pulsar para ir a donados`, 'ok jump-donados')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;
     bindResponsableFilter(data.responsableOptions);
     bindProductSearch();
     restoreProductSearchFocus();
-    const donationMetric = summary.querySelector('.mapa-metric.jump-donados');
-    if(donationMetric){ donationMetric.setAttribute('data-mapa-jump-donados','1'); donationMetric.setAttribute('role','button'); donationMetric.setAttribute('tabindex','0'); donationMetric.setAttribute('title','Ir a productos donados'); }
-    bindDonationSummaryJump();
     ensureFloatingHomeButton();
 
     if(!data.groups.length && !data.onlyDonations.length){

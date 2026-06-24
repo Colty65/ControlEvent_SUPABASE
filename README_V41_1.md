@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod
+# ControlEvent v15_prod
 
 Versión correctiva sobre v41.0.
 
@@ -14,7 +14,7 @@ Versión correctiva sobre v41.0.
 - Se elimina el botón del maletín rosa para ocultar/mostrar Compras y otros gastos del evento.
 - En Planificación inicial se elimina el texto antiguo con referencia a versión V33.7.
 - En Mapa de recursos, iPhone/Android permiten marcar como Entregado un producto solo donado.
-- Versión actualizada a ControlEvent v5.1.0_prod en cabecera, backup, service worker, metadatos y ficheros activos.
+- Versión actualizada a ControlEvent v15_prod en cabecera, backup, service worker, metadatos y ficheros activos.
 
 ## Archivos principales modificados
 

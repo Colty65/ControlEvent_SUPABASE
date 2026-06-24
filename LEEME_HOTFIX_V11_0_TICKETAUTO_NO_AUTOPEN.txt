@@ -1,4 +1,4 @@
-ControlEvent v14_prod - HOTFIX Ticket Auto no autoabrir
+ControlEvent v15_prod - HOTFIX Ticket Auto no autoabrir
 
 No cambia versión.
 

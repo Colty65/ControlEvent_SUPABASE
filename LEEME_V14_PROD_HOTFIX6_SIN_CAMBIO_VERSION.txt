@@ -1,5 +1,5 @@
-ControlEvent v14_prod - Hotfix planificación/donaciones/rendimiento
-Sin cambio de versión: se mantiene v14_prod en la app, INFOEVENTO y BACKUP.
+ControlEvent v15_prod - Hotfix planificación/donaciones/rendimiento
+Sin cambio de versión: se mantiene v15_prod en la app, INFOEVENTO y BACKUP.
 
 Cambios incluidos:
 - Las donaciones explícitas del prompt conservan sus unidades exactas; si hay déficit, se genera/actualiza compra pendiente.

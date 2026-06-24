@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "notes": [
     "Restaurado INFOEVENTO legacy protegido; el parche v40 ya no intercepta #btnExportExcel.",
     "Backup v40 se mantiene e intercepta solo descarga de datos.",

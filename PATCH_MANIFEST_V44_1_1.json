@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "objetivo": "Corregir el panel PERF para que muestre datos reales y permita copiar informe.",
   "changed_files": [
     "public/app/version.js",

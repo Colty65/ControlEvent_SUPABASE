@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Ajuste diagnóstico mantenimiento
+# ControlEvent v15_prod - Ajuste diagnóstico mantenimiento
 
 Versión correctiva conservadora.
 

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - Parche mínimo
+ControlEvent v15_prod - Parche mínimo
 
 Base esperada: V33.5 funcionando correctamente.
 
@@ -9,7 +9,7 @@ Cambios:
 - Replica compras y donaciones de producto incluidas en la propuesta.
 - No crea ni elimina PERSONAS, TIENDAS ni PRODUCTOS generales.
 - Baja de evento: aviso reforzado y eliminación controlada solo de EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
-- Versión visible y metadatos: ControlEvent v5.1.0_prod.
+- Versión visible y metadatos: ControlEvent v15_prod.
 - Caché: controlevent-shell-v50-24.
 
 Instalación:

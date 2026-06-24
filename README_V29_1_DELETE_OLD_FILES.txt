@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Si subes esta versión a GitHub, puedes borrar versiones antiguas de bundles legacy para evitar confusiones:
 

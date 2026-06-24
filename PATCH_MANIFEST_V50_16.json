@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "changes": [
     "Limpieza de marca ce_v5015_force_event_picker_after_login al seleccionar evento valido",
     "Rehidratacion de globos de Resumen tras seleccion de evento y al entrar en Resumen",

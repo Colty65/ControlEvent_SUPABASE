@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - GRAFICAS modular integrado en INFOEVENTO en modo auditoría
+# ControlEvent v15_prod - GRAFICAS modular integrado en INFOEVENTO en modo auditoría
 
 Versión progresiva sobre v27.3.
 

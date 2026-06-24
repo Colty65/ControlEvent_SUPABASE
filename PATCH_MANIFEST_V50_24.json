@@ -1,6 +1,6 @@
 {
   "version": "50.24.0",
-  "versionLabel": "ControlEvent v5.1.0_prod",
+  "versionLabel": "ControlEvent v15_prod",
   "base": "ControlEvent_SUPABASE-main_V50_22.zip",
   "purpose": "Emergencia: retirar v50.23 que bloqueaba login/CPU y mantener versión unificada.",
   "functionalChanges": [

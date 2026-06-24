@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - limpieza opcional
+ControlEvent v15_prod - limpieza opcional
 
 Si en el repositorio quedan archivos antiguos de la V29.4, se pueden borrar para evitar confusiones:
 

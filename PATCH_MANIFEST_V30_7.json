@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "changes": [
     "Corrección de sintaxis e instalación de budget-tooltips-lite.js.",
     "Globos de INGRESOS EN DINERO y DONACION DE PRODUCTO activados por delegación inmediata en filas reales.",

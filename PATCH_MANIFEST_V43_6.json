@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "desde": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "desde": "ControlEvent v15_prod",
   "tipo": "parche correctivo",
   "objetivo": "Eliminar el parpadeo de GRAFICAS y reducir gasto de recursos",
   "cambios": [

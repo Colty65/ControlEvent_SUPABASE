@@ -1,4 +1,4 @@
-ControlEvent v14_prod - HOTFIX sin cambio visible de versión
+ControlEvent v15_prod - HOTFIX sin cambio visible de versión
 
 NO se ha cambiado la versión visible de la app.
 NO se ha cambiado INFOEVENTO.

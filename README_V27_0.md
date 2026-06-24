@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Excel modular public facade
+# ControlEvent v15_prod - Excel modular public facade
 
 Esta versión inicia la extracción real de Excel del legacy sin cambiar el motor estable de generación.
 

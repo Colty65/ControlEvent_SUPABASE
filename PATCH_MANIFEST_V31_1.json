@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
   "changes": [
     "Mapa de recursos: buscador manual con botón/Enter",
     "Mapa de recursos: cabecera de productos donados simplificada con valor estimado",

@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod RESCATE ESTABLE
+# ControlEvent v15_prod RESCATE ESTABLE
 
 Versión generada desde la base estable v30.7 para salir del bloqueo de login de las v30.9.x.
 

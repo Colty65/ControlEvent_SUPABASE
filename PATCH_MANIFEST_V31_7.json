@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "base": "ControlEvent v5.1.0_prod estable",
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod estable",
   "changes": [
     "Mapa de recursos: fichas de producto compactas",
     "Menos información redundante por registro",

@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Mantenimiento diferido para móvil
+# ControlEvent v15_prod - Mantenimiento diferido para móvil
 
 Versión conservadora centrada en suavizar la entrada a **Mantenimiento** en móvil.
 

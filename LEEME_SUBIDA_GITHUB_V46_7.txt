@@ -1,7 +1,7 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Cambios principales:
 - Corregido el visor grande de justificantes de INGRESOS para NO SOCIO: ya no duplica el importe al mostrar el detalle.
 - Al cerrar la foto del justificante se mantiene el globo de origen abierto, tanto en RESUMEN PRESUPUESTARIO como en GRAFICAS.
 - Los globos no se cierran por clicks/foco del visor de justificantes.
-- Versión actualizada a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod.
+- Versión actualizada a ControlEvent v15_prod / ControlEvent_v15_prod.

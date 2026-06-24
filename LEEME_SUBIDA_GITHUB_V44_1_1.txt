@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Corrección del panel PERF de v44.1:
 - El botón PERF abre ahora un panel real con datos, no solo tooltip/texto.

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Cambios principales:
 - Estabilización de menús por rol RW/RO para evitar temblores/refrescos continuos.

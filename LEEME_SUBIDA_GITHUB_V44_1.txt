@@ -1,10 +1,10 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Versión de diagnóstico de rendimiento sobre v44.0.
 
 Cambios:
 - Añadido panel PERF no intrusivo para medir memoria JS, nodos DOM, renders, activaciones de módulos, long tasks y errores.
 - Botón PERF abajo a la izquierda. Permite copiar un informe para analizarlo después.
-- Actualizada versión a ControlEvent v5.1.0_prod / ControlEvent_v5_1_0_prod.
+- Actualizada versión a ControlEvent v15_prod / ControlEvent_v15_prod.
 
 No se cambia la lógica funcional de COMPRAS, DONACIONES, INFOEVENTO, BACKUP, GRAFICAS ni MAPA DE RECURSOS.

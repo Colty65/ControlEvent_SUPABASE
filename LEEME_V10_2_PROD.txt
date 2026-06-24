@@ -1,7 +1,7 @@
-ControlEvent v14_prod
+ControlEvent v15_prod
 
 Cambios principales:
-- Versión subida a v14_prod en referencias activas, cabecera, package y exportaciones BACKUP/INFOEVENTO.
+- Versión subida a v15_prod en referencias activas, cabecera, package y exportaciones BACKUP/INFOEVENTO.
 - Visor común de fotos de ticket para RESUMEN PRESUPUESTARIO/Cálculos por tienda y ticket y MAPA DE RECURSOS:
   arriba muestra título del evento en verde/rojo según En curso/Finalizado;
   debajo muestra TKxx, TIENDA y Responsable;

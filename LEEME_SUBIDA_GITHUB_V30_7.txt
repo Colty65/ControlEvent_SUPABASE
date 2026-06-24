@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod - SOLO SUBIR A GITHUB
+ControlEvent v15_prod - SOLO SUBIR A GITHUB
 
 Sube el contenido de este ZIP a la raíz del repositorio.
 

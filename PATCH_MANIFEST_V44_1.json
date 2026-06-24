@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v5.1.0_prod",
-  "version_file": "ControlEvent_v5_1_0_prod",
-  "base": "ControlEvent v5.1.0_prod",
+  "version": "ControlEvent v15_prod",
+  "version_file": "ControlEvent_v15_prod",
+  "base": "ControlEvent v15_prod",
   "type": "diagnostico-rendimiento",
   "changed_files": [
     "public/app/performance/perf-diagnostics-v44-1.js",

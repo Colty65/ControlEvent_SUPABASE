@@ -1,4 +1,4 @@
-# ControlEvent v5.1.0_prod - Listas compactas móviles
+# ControlEvent v15_prod - Listas compactas móviles
 
 Versión basada en v28.6.1 estable. Añade un modo compacto sólo para iPad/Android/equipos de baja memoria, para reducir el DOM de listas pesadas.
 

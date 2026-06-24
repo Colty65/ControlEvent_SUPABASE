@@ -1,8 +1,8 @@
-/* ControlEvent v14_prod - Planificación inicial con Zuzu.
+/* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v14_prod';
+  const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -15,7 +15,7 @@
   let lastIncomeProposal = [];
   let lastSourceEvent = null;
   let lastCreatedEventId = "";
-  let planResourceOrderMode = '';
+  let planResourceOrderMode = 'PRODUCTO';
 
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function state(){ return app()?.state || window.state || {}; }
@@ -322,15 +322,23 @@
     return `<option value="" ${!current?'selected':''}>-- producto sin catálogo --</option>${opts}`;
   }
   function sortPlanResourceRows(list){
-    const mode = String(planResourceOrderMode || '').toUpperCase();
+    const mode = String(planResourceOrderMode || 'PRODUCTO').toUpperCase();
     const arrRows = Array.isArray(list) ? list.slice() : [];
-    if(mode === 'TIENDA'){
-      return arrRows.sort((a,b)=>String(tiendaName(a.tiendaId)).localeCompare(String(tiendaName(b.tiendaId)),'es') || String(a.producto||'').localeCompare(String(b.producto||''),'es'));
-    }
     if(mode === 'SEGMENTO_DESTINO'){
       return arrRows.sort((a,b)=>String(a.segmento||'').localeCompare(String(b.segmento||''),'es') || String(a.destino||'').localeCompare(String(b.destino||''),'es') || String(a.producto||'').localeCompare(String(b.producto||''),'es'));
     }
-    return arrRows;
+    return arrRows.sort((a,b)=>String(a.producto||'').localeCompare(String(b.producto||''),'es') || String(a.segmento||'').localeCompare(String(b.segmento||''),'es') || String(a.destino||'').localeCompare(String(b.destino||''),'es'));
+  }
+  function sortPlanProposalDetailCards(list){
+    const arrRows = Array.isArray(list) ? list.slice() : [];
+    const mode = String(planResourceOrderMode || 'PRODUCTO').toUpperCase();
+    return arrRows.sort((a,b) => {
+      const pa = a?.p || {}, pb = b?.p || {};
+      if(mode === 'SEGMENTO_DESTINO'){
+        return String(pa.segmento||'').localeCompare(String(pb.segmento||''),'es') || String(pa.destino||'').localeCompare(String(pb.destino||''),'es') || String(pa.productName||'').localeCompare(String(pb.productName||''),'es') || String(pa.tipo||'').localeCompare(String(pb.tipo||''),'es');
+      }
+      return String(pa.productName||'').localeCompare(String(pb.productName||''),'es') || String(pa.segmento||'').localeCompare(String(pb.segmento||''),'es') || String(pa.destino||'').localeCompare(String(pb.destino||''),'es') || String(pa.tipo||'').localeCompare(String(pb.tipo||''),'es');
+    });
   }
   function planDeficitUnits(productName, deficit){
     const d = Math.max(0, Number(deficit || 0));
@@ -482,14 +490,14 @@
           </div>
           <strong class="plan-resource-product-label">${esc(r.producto)}</strong>
           <select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select>
-          <small class="plan-resource-meta"><b>SEGMENTO - DESTINO</b><span>${esc(r.segmento || 'Sin segmento')} - ${esc(r.destino || 'Sin destino')}</span></small>
+          <small class="plan-resource-meta"><b>SEGMENTO - DESTINO</b></small>
           <em class="plan-resource-excluded-label">${esc(badgeText)}</em>
         </td>
         <td class="plan-resource-flow">${donations}${purchase}${empty}</td>
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card">
-      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: a la izquierda la necesidad y el producto; a la derecha, las donaciones exactas y la compra del déficit. Las unidades donadas son informativas y no se recalculan solas.</p></div><div class="plan-resource-order-actions"><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button></div></div>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: a la izquierda la necesidad y el producto; a la derecha, las donaciones exactas y la compra del déficit. Las unidades donadas son informativas y no se recalculan solas.</p></div><div class="plan-resource-order-actions"><button type="button" class="outline" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button></div></div>
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
         <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -504,15 +512,15 @@
     st.textContent = `
       .plan-resource-edit-row.plan-row-changed{outline:4px solid rgba(245,158,11,.75)!important;box-shadow:0 0 0 6px rgba(245,158,11,.18)!important;background:#fffbeb!important;scroll-margin:120px!important}
       .plan-resource-edit-row.plan-found{outline:4px solid rgba(37,99,235,.75)!important;box-shadow:0 0 0 6px rgba(37,99,235,.16)!important}
-      .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:180px!important}
+      .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:120px!important;max-width:100%!important}
       .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
       .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.plan-resource-order-actions button{white-space:nowrap}
-      .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:50%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:50%!important}
-      .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(160px,260px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:22px!important;font-weight:950!important;text-align:center!important;padding:8px 10px!important;border-radius:12px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
-      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:74px 90px 96px minmax(96px,128px) 1fr 1fr!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#f7e7a7!important;border-color:#d4af37!important}.plan-resource-purchase-subrow{background:#fee2e2!important;border-color:#ef4444!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#b8860b!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
-      .plan-product-card.plan-donation-card{background:#d4af37!important;border-color:#b8860b!important;color:#fff!important}.plan-product-card.plan-purchase-card{background:#dc2626!important;border-color:#991b1b!important;color:#fff!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason,.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#fff!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence,.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.20)!important;color:#fff!important;border-color:rgba(255,255,255,.55)!important}
-      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}
+      .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:34%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:66%!important}
+      .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(88px,120px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:120px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
+      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:66px 78px 92px minmax(112px,140px) minmax(168px,1.4fr) minmax(168px,1.4fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:90px 80px 100px minmax(180px,1.3fr) minmax(180px,1.3fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
+      .plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
+      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}
       @media (max-width: 900px){.plan-resource-split-table{table-layout:auto!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child,.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:auto!important}.plan-resource-subrow{grid-template-columns:1fr 1fr!important}.plan-resource-general-top{grid-template-columns:auto 1fr!important}.plan-resource-split-table thead{display:none!important}.plan-resource-split-table tr,.plan-resource-split-table td{display:block!important;width:100%!important;border-radius:10px!important}}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
       .plan-resource-edit-row.plan-sd-comida-aperitivo>td{background:#f5ead8!important}.plan-resource-edit-row.plan-sd-comida-comida>td{background:#e7d1b4!important}.plan-resource-edit-row.plan-sd-comida-cena>td{background:#c99a68!important}
@@ -738,7 +746,7 @@
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const ingresosInfo = incomeSummary(lastIncomeProposal);
-    const detailCards = proposals.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0)));
+    const detailCards = sortPlanProposalDetailCards(proposals.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
     const cards = detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
     box.classList.remove('hidden');
     box.innerHTML = `
@@ -749,14 +757,14 @@
         <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
+      <div class="plan-search-line">
+        <input id="planBuscarProducto" type="search" placeholder="Buscar producto en Mapa de recursos y Detalle avanzado..." autocomplete="off" />
+        <button type="button" class="outline" id="btnPlanBuscarProducto">Buscar</button>
+      </div>
       ${renderPlanResourceVision(proposals)}
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
         <strong>Propuesta de planificación inicial:</strong> ajusta la tabla tipo Mapa de recursos y genera el evento real cuando esté revisada. Los ingresos se crearán en Pendiente, las existencias como donaciones y las compras como Pte.Compra u otros gastos.
-      </div>
-      <div class="plan-search-line">
-        <input id="planBuscarProducto" type="search" placeholder="Buscar producto en la propuesta..." autocomplete="off" />
-        <button type="button" class="outline" id="btnPlanBuscarProducto">Buscar</button>
       </div>
       <div class="plan-actions-line">
         <button type="button" class="outline" id="btnPlanSelectAll">Incluir todo</button>
@@ -921,7 +929,7 @@
     tr.dataset.planResourceKey = planGroupKey(newName);
     const label = tr.querySelector('.plan-resource-product-label');
     if(label) label.textContent = newName;
-    const meta = tr.querySelector('.plan-resource-meta span') || tr.querySelector('.plan-resource-meta');
+    const meta = tr.querySelector('.plan-resource-meta span');
     if(meta) meta.textContent = `${newSegment} - ${newDestino}`;
     const badge = tr.querySelector('.plan-resource-excluded-label');
     if(badge) badge.textContent = planResourceBadgeText({segmento:newSegment, destino:newDestino, necesidad:need, compra:buy});
@@ -949,6 +957,22 @@
     }
     if(input) input.value = '';
   }
+  function showPlanFactoryIndicator(message){
+    const box = document.getElementById('planificacionResultado');
+    if(!box) return;
+    let card = document.getElementById('planFactoryIndicator');
+    if(!card){
+      card = document.createElement('div');
+      card.id = 'planFactoryIndicator';
+      card.className = 'plan-factory-indicator';
+      box.prepend(card);
+    }
+    card.innerHTML = `<span class="plan-factory-icon" aria-hidden="true">🎉</span><div><strong>Zuzu está fabricando la fiesta…</strong><small>${esc(message || 'Creando el evento real y guardando compras, donaciones e ingresos.')}</small></div><span class="plan-factory-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  }
+  function hidePlanFactoryIndicator(){
+    try{ document.getElementById('planFactoryIndicator')?.remove(); }catch(_){ }
+  }
+
   function bindProposalControls(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
@@ -964,11 +988,18 @@
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
-        const handler = () => updateResourceEditorRow(tr.dataset.planResourceKey || key, tr, input.dataset.planResourceField);
+        const field = input.dataset.planResourceField;
+        const handler = () => updateResourceEditorRow(tr.dataset.planResourceKey || key, tr, field);
+        if(field === 'necesidad'){
+          // No recalcular mientras se teclean cifras de varios dígitos: se aplica al salir del campo o pulsar Enter.
+          input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); handler(); } });
+          input.addEventListener('blur', handler);
+          return;
+        }
         input.addEventListener('change', handler);
         if(input.matches('input[type=number]')){
           input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); handler(); } });
-          input.addEventListener('input', () => { clearTimeout(input.__cePlanEditTimer); input.__cePlanEditTimer = setTimeout(handler, 260); });
+          input.addEventListener('blur', handler);
         }
       });
     });
@@ -977,7 +1008,7 @@
     document.getElementById('btnPlanSelectNone')?.addEventListener('click', () => setIncluded('none'));
     document.getElementById('btnPlanBuscarProducto')?.addEventListener('click', searchProposalProduct);
     document.getElementById('planBuscarProducto')?.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); searchProposalProduct(); } });
-    document.getElementById('btnPlanOrdenTienda')?.addEventListener('click', () => { planResourceOrderMode = 'TIENDA'; renderProposal(); });
+    document.getElementById('btnPlanOrdenProducto')?.addEventListener('click', () => { planResourceOrderMode = 'PRODUCTO'; renderProposal(); });
     document.getElementById('btnPlanOrdenSegmentoDestino')?.addEventListener('click', () => { planResourceOrderMode = 'SEGMENTO_DESTINO'; renderProposal(); });
     document.getElementById('btnPlanApplyReplica')?.addEventListener('click', applyReplicaToRealEvent);
   }
@@ -1074,6 +1105,7 @@
     const oldText = btn?.textContent || 'Generar nuevo evento';
     if(btn){ btn.disabled = true; btn.textContent = 'Generando evento...'; }
     try{
+      showPlanFactoryIndicator('Zuzu está fabricando el evento y guardándolo en la base de datos.');
       const newEventId = makeId();
       const fechaIni = fieldValue('planFechaIni') || source?.fechaIni || '';
       const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source?.fechaFin || source?.fechaIni || '';
@@ -1119,10 +1151,11 @@
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
       try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){ }
     }catch(error){
-      console.error('[ControlEvent v14_prod] Error generando evento real desde planificación:', error);
+      console.error('[ControlEvent v15_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText; }
+      hidePlanFactoryIndicator();
       unlockPlanControls();
     }
   }
@@ -1179,7 +1212,7 @@
       if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
-      console.warn('[ControlEvent v14_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      console.warn('[ControlEvent v15_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
           const replica = buildReplicaProposal();
@@ -1306,7 +1339,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v14_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v15_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {

@@ -1,4 +1,4 @@
-ControlEvent v5.1.0_prod
+ControlEvent v15_prod
 
 Cambios principales:
 - PRODUCTOS: al Modificar conserva posición y marca el registro completo en negrita.
