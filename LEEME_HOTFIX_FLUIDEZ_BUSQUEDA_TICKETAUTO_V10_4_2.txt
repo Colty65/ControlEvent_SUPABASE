@@ -1,0 +1,18 @@
+HOTFIX sobre ControlEvent v15_prod / HOTFIX_LOGIN2
+
+Objetivo: corrección quirúrgica sin tocar masivamente la app.
+
+Archivos tocados:
+- public/app/features/v10-4-app-fixes.js
+- public/app/features/v10-4-2-app-fixes.js
+- public/app/features/v10-4-2-ticketauto-compras.js
+
+Cambios:
+1) Reducidos los repintados/refrescos repetidos que provocaban temblor al cambiar de menú o evento.
+2) Corregido el buscador de COMPRAS/DONACIONES para que no considere como resultado la propia caja de búsqueda.
+3) Ticket Auto:
+   - Compras previstas sin similitud: texto normal.
+   - Similitud y misma tienda: texto rojo.
+   - Similitud pero distinta tienda: texto naranja.
+   - La línea superior IA/manual emparejada se pinta con el mismo color que su candidata inferior.
+   - No se añade contorno rojo/naranja, solo color de texto.

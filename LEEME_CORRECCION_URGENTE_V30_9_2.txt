@@ -1,0 +1,7 @@
+ControlEvent v15_prod
+
+Esta versión corrige el fallo de la v30.9.1: el index.html apuntaba a JS v30.9.1 que no existían.
+Por eso se veía la app sin login y sin datos.
+
+En esta versión se han creado los ficheros versionados v30.9.2 y se ha verificado que todas las referencias existen.
+Subir el ZIP SOLO_SUBIR_GITHUB sustituyendo los archivos existentes.

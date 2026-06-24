@@ -1,0 +1,9 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "changes": [
+    "Menú móvil estable tras Planificación inicial.",
+    "Versión unificada en scripts activos y descargas.",
+    "Sin tocar motores INFOEVENTO/BACKUP ni mantenimientos."
+  ]
+}

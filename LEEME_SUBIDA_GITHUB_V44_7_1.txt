@@ -1,0 +1,20 @@
+ControlEvent v15_prod
+
+Corrección de estabilidad sobre v44.7.0.
+
+Objetivo:
+- Mantener el cambio de evento rápido de la v44.7.0, pero evitar los bloqueos intermitentes.
+- Tratar el cambio de evento como una preferencia local de pantalla, no como un guardado de datos del evento.
+- Reducir dobles renders y trabajos antiguos que podían quedarse activos en segundo plano.
+
+Cambios técnicos principales:
+- El selector de evento ya NO serializa todo el estado con JSON.stringify(state) al cambiar de evento.
+- El selector de evento ya NO llama a pushStateToServer() al cambiar de evento.
+- Se conserva solo el id del evento seleccionado en sessionStorage/localStorage pequeño.
+- Se añade protección contra dobles disparos del selector.
+- Se cancela cualquier render pendiente anterior antes de preparar el nuevo evento.
+- RESUMEN y GRAFICAS se difieren ligeramente para dejar respirar a móviles/tablets.
+- El optimizador v44.3 ya no lanza renders extra cuando el selector unificado v44.7.1 controla la navegación.
+- Actualizada versión visible, VERSION_FILE y cache del service worker.
+
+No se toca guardado funcional de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.

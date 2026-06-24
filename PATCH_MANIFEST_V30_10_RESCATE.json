@@ -1,0 +1,8 @@
+{
+  "version": "ControlEvent v15_prod RESCATE",
+  "base": "ControlEvent v15_prod",
+  "objetivo": "Recuperar login funcional y retirar cambios v30.8/v30.9 que bloqueaban inputs.",
+  "scripts_referenciados_validados": true,
+  "package_json_valido": true,
+  "cache": "controlevent-shell-v50-24-rescate"
+}

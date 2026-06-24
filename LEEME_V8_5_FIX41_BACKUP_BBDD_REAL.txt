@@ -1,0 +1,28 @@
+ControlEvent v8.5_prod - FIX41 BACKUP BBDD REAL
+
+OBJETIVO
+- Corregir la descarga BACKUP para que no dependa del filtro canónico de la app al exportar ce_ticket_images.
+- El BACKUP debe incluir la tabla real ce_ticket_images de Supabase, no solo las fotos que la app considera enlazadas a compras/ingresos/documentos vivos.
+
+FICHERO MODIFICADO
+- routes/export.routes.js
+
+CAMBIOS
+- Se lee ce_ticket_images directamente desde Supabase para el alcance elegido.
+- Se añade hoja CE_TICKET_IMAGES_BBDD con las columnas reales:
+  EVENT_ID, IMAGE_KEY, LABEL, PUBLIC_URL, PATHNAME, STORAGE_PATH, CONTENT_TYPE, SIZE_BYTES
+- La hoja TICKETS y TICKETS_PARTES se generan ahora desde ce_ticket_images real.
+- En METADATOS:
+  REGISTROS_TICKETS = filas reales exportadas desde ce_ticket_images.
+  REGISTROS_TICKETS_CANONICOS_APP = conteo antiguo filtrado por relaciones vivas de la app.
+
+EFECTO ESPERADO EN TU CASO ACTUAL
+- Si ce_ticket_images tiene 489 filas, el nuevo BACKUP debe tener 489 registros reales en CE_TICKET_IMAGES_BBDD.
+- La hoja TICKETS debe cuadrar con ese conteo.
+
+NO TOCA
+- No toca COMPRAS.
+- No toca INGRESOS.
+- No toca eventos.
+- No toca SQL.
+- No cambia global_write_lock.

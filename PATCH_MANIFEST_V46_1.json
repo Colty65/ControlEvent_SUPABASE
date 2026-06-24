@@ -1,0 +1,11 @@
+{
+  "version": "ControlEvent v15_prod",
+  "versionFile": "ControlEvent_v15_prod",
+  "base": "ControlEvent v15_prod",
+  "notes": [
+    "Cambios de edición/borrado sin pérdida de posición de ventana.",
+    "INFOEVENTO y BACKUP reforzados contra recursión.",
+    "Nuevos quesitos y globos detallados en GRAFICAS.",
+    "Versión revisada en app, Excel, backup, infoevento y service worker."
+  ]
+}

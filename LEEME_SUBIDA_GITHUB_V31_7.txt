@@ -1,0 +1,8 @@
+ControlEvent v15_prod
+
+Subir el contenido completo de este ZIP al repositorio.
+
+Cambio principal:
+- Mapa de recursos: fichas de producto compactas, con menos información redundante y más espacio útil.
+
+No se han tocado login, globos generales, BACKUP, INFOEVENTO ni el resto de pantallas.

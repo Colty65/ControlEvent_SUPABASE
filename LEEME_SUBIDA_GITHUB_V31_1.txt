@@ -1,0 +1,10 @@
+ControlEvent v15_prod
+
+Subir todos los archivos de este ZIP al repositorio, sustituyendo los anteriores.
+
+Cambios principales:
+- Buscador de productos en Mapa de recursos: solo busca con botón Buscar o tecla Enter.
+- Cabecera de productos donados: solo muestra número de productos donados para los responsables seleccionados y valor estimado.
+- Ficha Donado producto: al pulsar salta a la cabecera de productos donados.
+
+Después de desplegar, cerrar pestaña o forzar recarga para limpiar la caché del service worker.

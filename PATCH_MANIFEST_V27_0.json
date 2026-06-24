@@ -1,0 +1,59 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "purpose": "Excel modular public facade; exportExcel/exportSeedWorkbook pass through ControlEventExcel while legacy engine remains encapsulated.",
+  "indexHtml": {
+    "lines": 447,
+    "bytes": 21333,
+    "differenceFromV26_9Lines": 0
+  },
+  "modifiedCount": 30,
+  "addedCount": 4,
+  "deletedCount": 2,
+  "modified": [
+    "lib/supabase.js",
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/legacy-cleanup-report.json",
+    "public/app/diagnostics/legacy-cleanup.js",
+    "public/app/diagnostics/legacy-function-map.json",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/excel/ticket-images-sheet.js",
+    "public/modules/maintenance/_maintenance-runtime.js",
+    "public/modules/module-loader.js",
+    "public/modules/tickets/_ticket-runtime.js",
+    "public/modules/tickets/ticket-images.js",
+    "public/modules/tickets/ticket-modal.js",
+    "public/modules/tickets/ticket-storage.js",
+    "public/modules/views/_view-runtime.js",
+    "public/modules/views/mantenimiento.js",
+    "public/sw.js",
+    "routes/health.routes.js",
+    "scripts/dev-server-supabase.js",
+    "scripts/dev-server.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V27_0.md",
+    "README_V27_0_DELETE_OLD_LEGACY_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v27.0.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.0.js"
+  ],
+  "deleted": [
+    "public/app/legacy/legacy-bundle-after-modules-v26.9.js",
+    "public/app/legacy/legacy-bundle-before-modules-v26.9.js"
+  ],
+  "manualDeleteSuggested": [
+    "public/app/legacy/legacy-bundle-before-modules-v26.9.js",
+    "public/app/legacy/legacy-bundle-after-modules-v26.9.js"
+  ]
+}

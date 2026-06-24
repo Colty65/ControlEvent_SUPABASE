@@ -1,0 +1,17 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "changes": [
+    "Mapa de recursos: buscador manual con botón/Enter",
+    "Mapa de recursos: cabecera de productos donados simplificada con valor estimado",
+    "Mapa de recursos: clic en Donado producto salta a productos donados"
+  ],
+  "files": [
+    "public/app/features/mapa-productos.js",
+    "public/app/styles/app.css",
+    "public/app/version.js",
+    "public/sw.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

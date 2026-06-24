@@ -1,0 +1,65 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "modified": [
+    "README_V26_3.md",
+    "README_V26_4.md",
+    "README_V26_5.md",
+    "README_V26_6.md",
+    "README_V26_7.md",
+    "README_V26_7_DELETE_OLD_LEGACY_FILES.txt",
+    "README_V26_7_LEGACY_BUNDLES.json",
+    "README_V26_8.md",
+    "README_V26_8_DELETE_OLD_V26_7_BUNDLES.txt",
+    "lib/supabase.js",
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/legacy-function-map.json",
+    "public/app/diagnostics/legacy-map.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/excel/ticket-images-sheet.js",
+    "public/modules/maintenance/_maintenance-runtime.js",
+    "public/modules/module-loader.js",
+    "public/modules/tickets/_ticket-runtime.js",
+    "public/modules/tickets/ticket-images.js",
+    "public/modules/tickets/ticket-modal.js",
+    "public/modules/tickets/ticket-storage.js",
+    "public/modules/views/_view-runtime.js",
+    "public/modules/views/mantenimiento.js",
+    "public/sw.js",
+    "routes/health.routes.js",
+    "scripts/dev-server-supabase.js",
+    "scripts/dev-server.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V26_9.md",
+    "README_V26_9_DELETE_OLD_LEGACY_FILES.txt",
+    "public/app/diagnostics/legacy-cleanup-report.json",
+    "public/app/diagnostics/legacy-cleanup.js",
+    "public/app/legacy/legacy-bundle-after-modules-v26.9.js",
+    "public/app/legacy/legacy-bundle-before-modules-v26.9.js"
+  ],
+  "removed": [
+    "public/app/legacy/legacy-bundle-after-modules-v26.8.js",
+    "public/app/legacy/legacy-bundle-before-modules-v26.8.js"
+  ],
+  "counts": {
+    "modified": 38,
+    "added": 6,
+    "removed": 2,
+    "patchFilesToCopy": 45
+  },
+  "notes": [
+    "El parche no borra archivos automáticamente; usa README_V26_9_DELETE_OLD_LEGACY_FILES.txt si quieres limpiar los bundles antiguos."
+  ]
+}

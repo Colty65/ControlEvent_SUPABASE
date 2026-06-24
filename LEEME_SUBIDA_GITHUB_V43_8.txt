@@ -1,0 +1,7 @@
+ControlEvent v15_prod
+
+- Corrige DONACIONES: al modificar responsable/donante/producto/precio/unidades/tipo, la pantalla refresca a la primera.
+- No toca COMPRAS, que ya funcionaba correctamente.
+- Se desactivan los interceptores nuevos que habían sustituido INFOEVENTO y BACKUP.
+- INFOEVENTO y BACKUP vuelven al motor original legacy/modular que generaba los Excel completos, protegidos, totalizados y con gráficas.
+- Service worker/cache actualizado a v43.8.

@@ -1,0 +1,10 @@
+ControlEvent v8.5_prod - DOCUMENTOS RETOQUE FIX5
+
+Cambios incluidos:
+- Visor propio y limpio para DOCUMENTOS: se elimina y recrea en cada apertura para evitar bloqueo tras varias ampliaciones/cierres, especialmente en evento Finalizado, iPhone/iPad/Android.
+- Fechas de DOCUMENTOS mostradas/editadas como dd/mm/aaaa para evitar formatos nativos distintos o recortados en Android/iOS.
+- Descripción de DOCUMENTOS más marcada/negrita y con layout responsive: PC/iPad aprovecha ancho; móvil evita desplazamiento horizontal.
+- Refresco de estado con cache-busting en /api/state para que Refres/Refrescar traiga cambios reales del evento activo.
+- Caché/service worker actualizado a docfix5.
+
+No se han tocado BACKUP ni INFOEVENTO.

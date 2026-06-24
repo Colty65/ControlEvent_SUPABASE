@@ -1,0 +1,9 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "changes": [
+    "Mapa de recursos sin observador global continuo",
+    "Filtro responsables SOCIO estable",
+    "Globos de Resumen acotados para no interferir con GRAFICAS/DONACION DE PRODUCTO"
+  ]
+}

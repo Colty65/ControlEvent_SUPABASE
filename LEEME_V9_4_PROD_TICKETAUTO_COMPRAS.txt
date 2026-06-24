@@ -1,0 +1,42 @@
+ControlEvent v15_prod
+=======================
+
+Cambios aplicados sobre versión anterior:
+
+1. Tickets IA queda colocado en la ventana COMPRAS, en la cabecera de "Compras y otros gastos del evento", a la derecha del título.
+
+2. Se eliminan los avisos flotantes negros inferiores de operaciones internas. Los mensajes de depuración quedan solo en consola.
+
+3. El botón Limpiar de Tickets IA limpia también la zona de compras previstas pendientes, reinicializa desplegables y deja la pantalla preparada para una nueva foto.
+
+4. Las compras previstas pendientes ya no se limitan a la tienda detectada/elegida: se muestran todas las compras Pte.Compra del evento.
+
+5. La lista de compras previstas pendientes se puede ordenar por Tienda o por Producto.
+
+6. Se compacta la pantalla de Tickets IA: filas más estrechas, menos padding y más altura útil para ver líneas IA y candidatos Pte.Compra.
+
+7. Corrección importante PRODUCTOS: si el producto ya existe, el refresco de precio se hace mediante actualización segura de default_precio/default_tienda_id, sin modificar nombre, segmento ni destino, y sin quedar bloqueado por uso del producto en eventos finalizados.
+
+8. Gemini recibe ahora las indicaciones adicionales con prioridad real:
+   - puede añadir líneas indicadas explícitamente por el usuario,
+   - puede aplicar IVA/recargos/descuentos según la explicación,
+   - puede devolver segmento y destino si el usuario los indica.
+
+Ficheros principales modificados:
+- public/app/features/v9-5-ticketauto-compras.js
+- public/app/features/v8-5-compras-rpc-head-fix40.js
+- services/receipt-ai.service.js
+- lib/supabase-normalized.js
+- public/index.html
+- index.html
+- public/app/version.js
+- package.json
+- package-lock.json
+
+Validaciones realizadas:
+- node --check public/app/features/v9-5-ticketauto-compras.js
+- node --check services/receipt-ai.service.js
+- node --check routes/crud.routes.js
+- node --check lib/supabase-normalized.js
+- node --check public/app/features/v8-5-compras-rpc-head-fix40.js
+- parse JSON de package.json y package-lock.json

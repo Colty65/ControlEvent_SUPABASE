@@ -1,0 +1,15 @@
+ControlEvent v15_prod
+
+Subir el contenido de este ZIP sustituyendo los archivos existentes del repositorio.
+
+Objetivo principal:
+- Corregir que el login aparezca pero no deje teclear.
+
+Comprobado:
+- package.json válido.
+- package-lock.json válido.
+- scripts referenciados por index.html existentes.
+- sintaxis JS de scripts principales validada con node --check.
+
+Nota:
+- Después de subir, cerrar la pestaña de la app y abrir de nuevo para que el service worker coja el cache v30.9.3.

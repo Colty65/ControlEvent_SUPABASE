@@ -1,0 +1,32 @@
+ControlEvent v8.5_prod - FIX47 SOLO MODIFICADOS - DONACIONES RPC SIN RELOGIN
+
+Motivo:
+- COMPRAS ya escribía por /api/crud/compras, pero DONACIONES aún podía usar caminos legacy/locales.
+- Eso hacía que una donación apareciera en pantalla y desapareciera al cambiar situación/refrescar, porque realmente no estaba en ce_compras.
+
+Incluye:
+- public/app/features/v8-5-compras-rpc-head-fix40.js
+- public/index.html
+- index.html
+
+Cambios:
+- Añadir donación -> POST /api/crud/compras
+- Modificar donación -> PUT /api/crud/compras/:id
+- Eliminar donación -> DELETE /api/crud/compras/:id
+- Después de cada operación sincroniza /api/state paginado y repinta sin window.location.reload().
+- Mantiene también los cambios anteriores de COMPRAS y EVENTOS sin relogin.
+
+No toca:
+- SQL
+- global_write_lock
+- ce_compras directamente
+- BACKUP
+- FIX44 de paginación de /api/state
+
+Prueba recomendada:
+1. Evento En curso.
+2. Añadir una donación.
+3. Comprobar en Supabase:
+   select * from ce_compras where ticket_donacion ilike 'DONADO%' order by created_at desc limit 10;
+4. Cambiar evento a Finalizado.
+5. Volver a Donaciones y comprobar que la donación sigue visible.

@@ -1,0 +1,8 @@
+ControlEvent v15_prod
+
+Corrección del panel PERF de v44.1:
+- El botón PERF abre ahora un panel real con datos, no solo tooltip/texto.
+- Se usan eventos pointer/touch/click con propagación bloqueada para que el menú de la app no intercepte el botón.
+- El panel muestra memoria JS, DOM, renders, módulos, long tasks, mutaciones DOM, errores y registros por tabla.
+- Botón Copiar informe operativo.
+- Sin cambios funcionales en COMPRAS, DONACIONES, INFOEVENTO, BACKUP, GRAFICAS, MAPA DE RECURSOS, LOGIN ni Planificación inicial.

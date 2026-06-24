@@ -1,0 +1,7 @@
+public/index.html
+public/app/version.js
+public/app/features/v4-0-1-pc-photo-fix.js
+package.json
+index.html
+build-metrics.json
+public/app/diagnostics/build-metrics.json

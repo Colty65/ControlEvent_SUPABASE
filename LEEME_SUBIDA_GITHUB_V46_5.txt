@@ -1,0 +1,13 @@
+ControlEvent v15_prod
+
+Base: v46.4.
+
+Cambios principales:
+- INGRESOS: justificante compactado en línea con miniatura, botón adjuntar/cambiar y botón eliminar.
+- La miniatura del justificante se puede pulsar para ver la imagen en grande junto con la información del ingreso.
+- RESUMEN PRESUPUESTARIO: en los globos de INGRESADO SOCIOS e INGRESADO NO SOCIOS se añade miniatura de justificante cuando exista.
+- GRAFICAS: en el queso de INGRESOS se añade miniatura de justificante cuando exista.
+- GRAFICAS: ordenación de productos en globos: Donado por Donante + Producto; Comprado/Pte.Compra por Ticket + Tienda + Producto.
+- Globos: no se cierran al usar la ruleta o el ascensor del propio globo.
+
+Tras subir a Vercel conviene hacer una recarga fuerte para renovar service worker/cache.

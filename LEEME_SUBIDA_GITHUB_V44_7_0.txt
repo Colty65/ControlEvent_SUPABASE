@@ -1,0 +1,20 @@
+ControlEvent v15_prod
+
+Versión de replanteamiento del cambio de evento.
+
+Objetivo:
+- Usar el mismo flujo al elegir evento después del login y al cambiar de evento durante la explotación.
+- Cambiar selectedEventId de forma inmediata.
+- Limpiar rápidamente el DOM pesado de ventanas no activas.
+- Renderizar solo la ventana activa, no INGRESOS por defecto.
+- Si se pulsa otra opción de menú durante la carga, se respeta esa opción y se cancela el render pendiente anterior.
+
+Cambios técnicos:
+- Nuevo archivo: public/app/features/v44-7-event-switcher.js.
+- Nuevo selector de evento unificado con token anti-renders obsoletos.
+- Aviso no bloqueante de carga.
+- RESUMEN ya no dispara GRAFICAS de forma indirecta.
+- COMPRAS ya no activa RESUMEN en el módulo lazy.
+- Actualización de versión visible, VERSION_FILE y cache del service worker.
+
+No se toca guardado funcional de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.

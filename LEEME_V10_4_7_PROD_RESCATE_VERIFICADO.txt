@@ -1,0 +1,53 @@
+ControlEvent v15_prod
+
+Base: CE_v15_prod_RESCATE_AFINADO.zip
+
+Cambios aplicados:
+
+1) Versionado
+- index.html y public/index.html muestran v15_prod.
+- public/app/version.js actualizado a ControlEvent v15_prod.
+- package.json y package-lock.json actualizados a 10.4.7-prod.
+- routes/export.routes.js actualizado a:
+  * ControlEvent v15_prod
+  * ControlEvent_v15_prod
+- Parcheados los módulos activos que podían normalizar nombres de INFOEVENTO/BACKUP con ControlEvent_v15_prod:
+  * v40-fixes.js
+  * v7-3-prod-final-fix.js
+  * v50-24-final-fixes.js
+  * v50-26-final-fixes.js
+  * v50-27-hard-logout.js
+  * v8-4-1-backup-eventid-format.js
+  * v8-5-documentos-excel.js
+
+2) Ticket Auto
+- Nuevo script activo: public/app/features/v10-4-7-ticketauto-compras.js.
+- Ya no se sustituye automáticamente el producto leído en el ticket por el nombre parecido encontrado en PRODUCTOS.
+- El literal leído por la IA se mantiene en la línea.
+- El usuario puede elegir manualmente un producto existente desde el desplegable/lista de productos.
+- La grabación en PRODUCTOS solo actualiza un producto existente cuando el nombre elegido coincide de forma exacta/normalizada, no por parecido automático.
+- El emparejamiento con Compras previstas usa parejas únicas: una línea IA no colorea varios pendientes por una palabra genérica.
+- Misma tienda: rojo.
+- Tienda distinta: naranja vivo.
+- No se empareja SAL con ROSAL ni se colorea Fanta limón solo por compartir LIMÓN con Té al limón.
+- TE al limón/FUZE Tea limón y Acuarius/Acuarios se mantienen como similitudes válidas.
+
+3) Búsquedas COMPRAS/DONACIONES
+- Reforzado el buscador para buscar sobre texto real, valores escritos y opciones seleccionadas de cada ficha.
+- Si encuentra, rodea la ficha en rojo.
+- Si no encuentra, no se posiciona en el primer registro por defecto.
+
+4) Descargas INGRESOS/DOCUMENTOS
+- En Documentos se mantiene la descarga que ya funcionaba.
+- En Ingresos se añade un refuerzo específico por colaborador/justificante usando las claves INGRESO del estado cuando exista foto.
+- El objetivo es dejar una única flecha de descarga por justificante.
+
+5) Mapa de recursos iPad
+- Reducido tamaño de texto y checkboxes del filtro de responsables también para iPad.
+
+Validaciones realizadas:
+- node --check en los JS modificados principales.
+- node --check en routes/export.routes.js.
+- JSON válido en package.json y package-lock.json.
+- Revisión con grep de los ficheros activos de versión para evitar v10.4.6/v15_prod en los módulos tocados.
+- ZIP comprobado con unzip -t.

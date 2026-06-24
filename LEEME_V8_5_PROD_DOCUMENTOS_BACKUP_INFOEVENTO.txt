@@ -1,0 +1,10 @@
+ControlEvent v8.5_prod - DOCUMENTOS fase 2
+
+Cambios incluidos:
+1) Se refuerza la pantalla DOCUMENTOS para que los repintados tardíos del legacy no vuelvan a colocar RESUMEN/INGRESOS por encima tras abrir la pestaña.
+2) BACKUP incorpora la hoja DOCUMENTOS con EVENTO_CODIGO = id real del evento, DOC_CODIGO, fecha, descripción, clave DOCXX y URL/foto.
+3) Las fotos DOCXX se incluyen también en TICKETS/TICKETS_PARTES como cualquier otra imagen, usando el mismo esquema EVENTO_ID|DOCXX.
+4) La carga de un BACKUP con hoja DOCUMENTOS restaura la lista de documentos y enlaza sus imágenes DOCXX.
+5) INFOEVENTO añade una hoja DOCUMENTOS DEL EVENTO con fecha, descripción, URL y miniatura cuando es posible descargar/embeber la imagen.
+
+No se cambia la mecánica de mantenimiento de documentos que ya estaba funcionando.

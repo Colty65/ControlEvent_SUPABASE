@@ -1,0 +1,8 @@
+{
+  "version": "ControlEvent v15_prod",
+  "base": "ControlEvent v15_prod",
+  "changes": [
+    "Mapa de recursos: refuerzo directo de botones Marcar comprado/Comprado ahora tras cambio de evento"
+  ],
+  "cache": "controlevent-shell-v50-24"
+}

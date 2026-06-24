@@ -1,0 +1,20 @@
+ControlEvent v15_prod - SOLO SUBIR A GITHUB
+
+Esta versión parte de la V29.4 estable y añade la opción de menú "Mapa de productos".
+
+Pasos recomendados:
+1. Descomprime este ZIP.
+2. Copia su contenido encima de la carpeta real del repositorio GitHub.
+3. Asegúrate de que se sustituyen los ficheros existentes.
+4. Sube/commit/publish.
+5. En iPad/Android, cierra la pestaña anterior y abre de nuevo la app para evitar caché antigua.
+
+Comprobaciones rápidas:
+- La cabecera debe mostrar ControlEvent v15_prod.
+- Debe aparecer el icono 🧭 del nuevo menú.
+- La opción "Mapa de productos" debe estar disponible para usuarios GD, RW y RO.
+- En esa pantalla, las compras deben salir agrupadas por Tienda + Producto.
+- Si hay donaciones del mismo producto, deben aparecer debajo de la compra correspondiente.
+
+Si GitHub Pages mantiene caché antigua, prueba una vez con:
+?ceDiag=1

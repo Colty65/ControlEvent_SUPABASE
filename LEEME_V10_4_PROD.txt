@@ -1,0 +1,8 @@
+ControlEvent v15_prod
+
+Cambios principales:
+- Corrección de Ticket Auto: error productScore is not defined.
+- Descarga real de justificantes en INGRESOS.
+- Descarga en DOCUMENTOS sin abrir el visor ni bloquear la app.
+- Visor TKxx más robusto: imágenes localizadas por evento+TKxx, también desde Mapa de recursos.
+- Versión actualizada a v15_prod en referencias activas.

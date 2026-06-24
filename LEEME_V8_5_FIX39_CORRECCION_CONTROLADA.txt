@@ -1,0 +1,21 @@
+ControlEvent v8.5_prod FIX39 - CORRECCION CONTROLADA
+
+DECISION DRASTICA:
+- Mantener global_write_lock = ON.
+- Un evento que alguna vez estuvo Finalizado NO queda editable solo por pasarlo a En curso.
+- Para tocar COMPRAS de un evento previamente Finalizado se exige autorización temporal explícita.
+- Al Finalizar, SQL revoca automáticamente cualquier autorización de corrección.
+- Al Finalizar desde la app se recarga la aplicación para no dejar memoria legacy activa.
+
+Instalación:
+1) Ejecutar primero ControlEvent_SQL_FIX39_CORRECCION_CONTROLADA.sql en Supabase.
+2) Subir los ficheros modificados de este ZIP.
+
+Ficheros modificados:
+- public/app/features/v8-5-compras-rpc-head-fix39.js
+- public/index.html
+- index.html
+- routes/crud.routes.js
+- services/crud.service.js
+- lib/supabase-normalized.js
+- ControlEvent_SQL_FIX39_CORRECCION_CONTROLADA.sql

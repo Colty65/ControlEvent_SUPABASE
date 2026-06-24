@@ -1,0 +1,13 @@
+{
+  "version": "v29.3",
+  "base": "v29.2 estable de rendimiento desde v28.6.1",
+  "objective": "limpiar la experiencia de usuario manteniendo el modo LITE/turbo activo en iPad y Android",
+  "changes": [
+    "Se mantiene el rendimiento conseguido en v29.2: MobileLite + LowResource + Legacy Turbo.",
+    "Se oculta el indicador LITE ON/OFF y su contador en uso normal, para que la app quede limpia en producción.",
+    "El diagnóstico sigue disponible con ?ceDiag=1, sin afectar al usuario final.",
+    "Se actualizan versión visible, ficheros legacy y cache del service worker a v29.3.",
+    "No se toca la lógica funcional de INFOEVENTOS, BACKUP, Excel, compras, ingresos ni donaciones."
+  ],
+  "test": "En PC/iPhone no debe aparecer indicador. En iPad/Android tampoco debe aparecer en uso normal, pero la fluidez debe mantenerse. Con ?ceDiag=1 se puede ver el estado LITE/turbo."
+}

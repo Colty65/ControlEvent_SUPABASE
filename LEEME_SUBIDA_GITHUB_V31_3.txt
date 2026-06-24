@@ -1,0 +1,8 @@
+ControlEvent v15_prod - SOLO SUBIR GITHUB
+
+Subir todo el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
+
+Cambios principales:
+- Corrección de totales y salto en DONADO PRODUCTO dentro de Mapa de recursos.
+- Botón Volver arriba al final de productos donados.
+- Corrección del desplegable Ingreso en alta de colaboradores.

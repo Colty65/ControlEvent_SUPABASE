@@ -1,0 +1,22 @@
+{
+  "version": "ControlEvent v15_prod",
+  "from": "ControlEvent v15_prod",
+  "changes": [
+    "PRODUCTOS: Modificar se intercepta con una mecánica propia temprana para conservar la posición de la ventana, evitar el salto al inicio y marcar en negrita el registro modificado.",
+    "Justificantes de INGRESOS: sincronización reforzada con /api/ticket-images, con prioridad servidor cuando el navegador no tenga imagen local.",
+    "Servidor/Supabase: protección no destructiva para no pisar imágenes existentes con referencias vacías al guardar estado.",
+    "Versión actualizada a ControlEvent v15_prod / ControlEvent_v15_prod en cabecera, cache, INFOEVENTO, BACKUP, nombres de descarga y rutas de exportación."
+  ],
+  "mainFiles": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/v50-0-final-fixes.js",
+    "lib/supabase-normalized.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "server/paths.js"
+  ]
+}

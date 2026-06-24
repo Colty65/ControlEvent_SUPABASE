@@ -1,0 +1,23 @@
+{
+  "version": "v30.1",
+  "base": "v30.0",
+  "appVersion": "ControlEvent v15_prod",
+  "type": "functional-fix",
+  "changes": [
+    "Mapa de productos convertido en pantalla estable propia",
+    "Correccion de clic irregular en PC",
+    "Correccion de apertura en iPad y Android dentro del modo LITE/turbo",
+    "Mejora visual movil: tarjetas, chips deslizables y barra de necesidad",
+    "Menu Mapa de productos visible y desbloqueado para GD, RW y RO",
+    "No se toca la logica de INFOEVENTOS, BACKUP, Excel, ingresos, compras ni donaciones"
+  ],
+  "modifiedFiles": [
+    "public/index.html",
+    "public/app/features/mapa-productos.js",
+    "public/app/styles/app.css",
+    "public/app/legacy/legacy-bundle-before-modules-v30.1.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.1.js",
+    "public/app/version.js",
+    "public/sw.js"
+  ]
+}

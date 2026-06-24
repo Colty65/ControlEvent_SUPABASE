@@ -1,0 +1,469 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ControlEvent v15_prod</title>
+  <!-- ControlEvent v15_prod PWA / instalación móvil -->
+  <meta name="theme-color" content="#111827" />
+  <meta name="application-name" content="ControlEvent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="ControlEvent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./assets/icons/icon-512.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+
+    <link rel="stylesheet" href="./app/styles/app.css" />
+
+</head>
+<body>
+  <div id="authOverlay" class="auth-overlay hidden">
+    <div class="auth-card">
+      <h2>Acceso a ControlEvent</h2>
+            <div class="auth-grid">
+        <div class="field">
+          <label>Identificación</label>
+          <input id="loginIdentificacion" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label>Clave</label>
+          <input id="loginClave" type="password" autocomplete="current-password" />
+        </div>
+      </div>
+      <div id="authError" class="auth-error"></div>
+      <div class="auth-actions">
+        <button type="button" id="btnLogin" onclick="doLogin(); return false;">Entrar</button>
+        <button type="button" class="outline" id="btnToggleChangePassword">Cambiar clave</button>
+      </div>
+      <div id="changePasswordPanel" class="auth-change-panel hidden">
+        <div class="auth-grid">
+          <div class="field">
+            <label>Nueva clave</label>
+            <input id="changeNewPassword1" type="password" autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label>Repetir nueva clave</label>
+            <input id="changeNewPassword2" type="password" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="auth-subactions">
+          <button type="button" id="btnChangePassword">Guardar nueva clave</button>
+        </div>
+      </div>
+          </div>
+  
+        <div class="brand-user"><strong id="currentUserName">Sin acceso</strong><span id="currentUserLevel"></span></div>
+      </div>
+  <div class="header">
+    <div class="header-inner app">
+      <div class="brand"><img class="brand-logo-large" alt="ColtyLAB" src="./assets/embedded/coltylab-logo.png" />  <div class="brand-user"><strong id="brandCurrentUserName">Sin acceso</strong><span id="brandCurrentUserMeta"></span></div></div>
+      
+      <div class="centerhead">
+        <button type="button" id="toggleEventDesc" class="outline info-mini" title="Descripción del evento" onclick="toggleEventDescription(); return false;">ⓘ</button>
+        <div class="event-label">EVENTO:</div>
+        <div class="event-title-box"><select id="selectedEvent" onchange="changeSelectedEvent(this.value); return false;"></select></div>
+        <div class="event-dates" id="eventDates">(del --/--/-- al --/--/--)</div>
+        <div id="eventDescBubble" class="event-desc-bubble hidden"></div>
+        <div id="eventStatus" class="status-pill status-curso">En curso</div>
+      </div>
+      <div class="appname">
+        <div class="appname-stack">
+          <span>ControlEvent v15_prod</span>
+          <div id="headerDateTime" class="appclock"></div>
+                    <div class="user-actions">
+            <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <div class="main">
+      
+<div class="tabs app-lockable" id="mainTabs">
+        <button type="button" class="tab active" id="tabIngresosBtn" title="Colaboradores económicos"><span class="tabicon">🤝</span></button>
+        <button type="button" class="tab" id="tabDonacionesBtn" title="Donaciones de producto"><span class="tabicon">🎁</span></button>
+        <button type="button" class="tab" id="tabComprasBtn" title="Compras y otros gastos"><span class="tabicon">🛒</span></button>
+        <button type="button" class="tab" id="tabMapaBtn" aria-label="Mapa de recursos" onclick="try{ if(window.showMapaProductos){ window.showMapaProductos({reason:'inline-tab'}); } }catch(_e){} return false;"><span class="tabicon">🧭</span></button>
+        <button type="button" class="tab" id="tabResumenBtn" title="Resumen presupuestario y cálculos por agrupación"><span class="tabicon">🧾</span></button>
+        <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
+      </div>
+
+      <div id="noEventMessage" class="card hidden">
+        <div class="empty">No hay eventos. Crea uno desde mantenimiento.</div>
+      </div>
+
+      <div id="tabIngresos" class="app-lockable">
+        <div class="card">
+          <div class="toggle-row">
+            <div class="section-title" style="margin:0">
+              <div class="icon-badge">💶</div>
+              <div>
+                <h2>Resumen de Ingresos</h2>
+                <p>Desplegar o plegar el resumen por forma de ingreso.</p>
+              </div>
+            </div>
+            <button type="button" class="outline" id="toggleIngresosSummary">💰</button>
+          </div>
+          <div id="ingresosSummaryBody" class="collapsed-body hidden">
+            <div class="metrics" id="ingresosSummaryGrid"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <div class="icon-badge">🤝</div>
+            <div>
+              <h2>Ingresos de socios y Donantes (personas, empresas, asociaciones, etc)</h2>
+              <p>Socios y donantes con su forma de ingreso e importe donado.</p>
+            </div>
+          </div>
+          <div class="row-collab-form entry-zone">
+            <div class="field">
+              <label>Colaborador/a</label>
+              <select id="collabPersona"></select>
+            </div>
+            <div class="field">
+              <label>Número</label>
+              <input id="collabNumero" type="number" min="0" step="1" value="1" />
+            </div>
+            <div class="field">
+              <label>Ingreso</label>
+              <select id="collabSituacion"></select>
+            </div>
+            <div class="field">
+              <label>Importe voluntario</label>
+              <input id="collabImporte" class="money-text" type="text" value="0,00 €" />
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button type="button" id="btnAddColab">Añadir</button>
+            </div>
+          </div>
+          <div class="separator"></div>
+          <div id="collabList"></div>
+        </div>
+      </div>
+
+      <div id="tabCompras" class="hidden app-lockable">
+        <div class="card">
+          <div class="toggle-row">
+            <div class="section-title" style="margin:0">
+              <div class="icon-badge">🛒</div>
+              <div>
+                <h2>Compras y otros gastos del evento</h2>
+                <p>Compras normales y otros gastos, con responsable opcional.</p>
+              </div>
+            </div>
+            <button type="button" class="outline" id="toggleComprasEvent">🧰</button>
+          </div>
+          <div id="comprasEventBody" class="collapsed-body">
+            <div class="row-purchase-form entry-zone">
+              <div class="field">
+                <label>Producto</label>
+                <select id="buyProducto"></select>
+              </div>
+              <div class="field">
+                <label>Unidades</label>
+                <input id="buyUnidades" type="number" min="0" step="0.01" value="1.00" />
+              </div>
+              <div class="field">
+                <label>Precio</label>
+                <input id="buyPrecio" class="money-text" type="text" value="0,00 €" />
+              </div>
+              <div class="field">
+                <label>Importe</label>
+                <input id="buyImporte" class="soft-readonly" readonly />
+              </div>
+              <div class="field">
+                <label>Ticket u Otros gastos</label>
+                <select id="buyTicket"></select>
+              </div>
+              <div class="field">
+                <label>Tienda</label>
+                <select id="buyTienda"></select>
+              </div>
+              <div class="field">
+                <label>Responsable</label>
+                <select id="buyResponsable"></select>
+              </div>
+              <div class="field">
+                <label>&nbsp;</label>
+                <button type="button" id="btnAddCompra">Añadir</button>
+              </div>
+            </div>
+            <div class="separator"></div>
+            <div id="comprasList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabDonaciones" class="hidden app-lockable">
+        <div class="card">
+          <div class="section-title">
+            <div class="icon-badge">🎁</div>
+            <div>
+              <h2>Donaciones de producto</h2>
+              <p>Mantén las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.</p>
+            </div>
+          </div>
+          <div class="row-purchase-form entry-zone">
+            <div class="field">
+              <label>Producto</label>
+              <select id="donProducto"></select>
+            </div>
+            <div class="field">
+              <label>Unidades</label>
+              <input id="donUnidades" type="number" min="0" step="0.01" value="1.00" />
+            </div>
+            <div class="field">
+              <label>Precio</label>
+              <input id="donPrecio" class="money-text" type="text" value="0,00 €" />
+            </div>
+            <div class="field">
+              <label>Valor</label>
+              <input id="donImporte" class="soft-readonly" readonly />
+            </div>
+            <div class="field">
+              <label>Tipo de donación</label>
+              <select id="donTicket"></select>
+            </div>
+            <div class="field">
+              <label>Donante</label>
+              <select id="donDonante"></select>
+            </div>
+            <div class="field">
+              <label>Responsable</label>
+              <select id="donResponsable"></select>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button type="button" id="btnAddDonacion">Añadir</button>
+            </div>
+          </div>
+          <div class="separator"></div>
+          <div id="donacionesList"></div>
+        </div>
+      </div>
+
+      <div id="tabMapaProductos" class="hidden app-lockable">
+        <div class="card mapa-productos-card">
+          <div class="section-title">
+            <div class="icon-badge">🧭</div>
+            <div>
+              <h2>Mapa de recursos</h2>
+              <p>Vista conjunta de compras y donaciones para ver la necesidad real del evento por tienda y producto.</p>
+            </div>
+          </div>
+          <div id="mapaProductosSummary" class="mapa-summary-grid"></div>
+          <div class="separator"></div>
+          <div id="mapaProductosList"></div>
+        </div>
+      </div>
+
+      <div id="tabResumen" class="hidden app-lockable">
+        <div class="card">
+          <div class="toggle-row">
+            <div class="section-title" style="margin:0">
+              <div class="icon-badge">🧾</div>
+              <div>
+                <h2>Resumen presupuestario y cálculos por agrupación</h2>
+                <p>Desplegar o plegar la información económica del evento.</p>
+              </div>
+            </div>
+            <button type="button" class="outline" id="toggleComprasSummary">📈</button>
+          </div>
+          <div id="comprasSummaryBody" class="collapsed-body hidden">
+            <div class="card" style="box-shadow:none;margin:12px 0 0 0">
+              <div class="section-title">
+                <div class="icon-badge">👥</div>
+                <div>
+                  <h2>Resumen presupuestario</h2>
+                  <p>Resumen por socios, donantes, compras y donaciones del evento.</p>
+                </div>
+              </div>
+              <div class="budget-wrap"><div id="budgetLayout" class="budget-layout"></div></div>
+            </div>
+
+            <div class="card" style="box-shadow:none;margin:12px 0 0 0">
+              <div class="section-title">
+                <div class="icon-badge">🧾</div>
+                <div>
+                  <h2>Cálculos por agrupación</h2>
+                  <p>Importes por segmento, destino y por tienda y ticket/donación/otros gastos.</p>
+                </div>
+              </div>
+              <div class="summary-top-grid">
+                <div class="summary-card"><strong>Por segmento</strong><div id="summarySegmento"></div></div>
+                <div class="summary-card"><strong>Por destino</strong><div id="summaryDestino"></div></div>
+              </div>
+              <div class="summary-bottom-grid">
+                <div class="summary-card"><strong>Por tienda y Ticket</strong><div id="summaryTiendaTicket"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabGraficas" class="hidden app-lockable">
+        <div class="card">
+          <div class="section-title">
+            <div class="icon-badge">📊</div>
+            <div>
+              <h2>Gráficas del evento</h2>
+              <p>Panel visual completo del evento con barras y resúmenes rápidos.</p>
+            </div>
+          </div>
+          <div id="eventChartWrap"></div>
+        </div>
+      </div>
+
+      <div id="maintenanceWrapper" class="hidden">
+        <div class="maintenance-tabs">
+          <button type="button" class="tab active" id="mtPersonasBtn">👤 personas</button>
+          <button type="button" class="tab" id="mtEventosBtn">🎉 eventos</button>
+          <button type="button" class="tab" id="mtTiendasBtn">🏪 tiendas</button>
+          <button type="button" class="tab" id="mtProductosBtn">📦 productos</button>
+          <button type="button" class="tab hidden" id="mtAccesoBtn" onclick="openAccessMaintenance(); return false;">🔐 acceso</button>
+          
+        </div>
+
+        <div id="mtPersonas" class="card app-lockable">
+          <div class="section-title"><div class="icon-badge">👤</div><div><h2>PERSONAS</h2><p>Alta, modificación y borrado.</p></div></div>
+          <div class="rowline persona entry-zone">
+            <div class="field"><label>Nombre</label><input id="newPersonaNombre" /></div>
+            <div class="field"><label>Rango</label><select id="newPersonaRango"></select></div>
+            <button type="button" id="btnAddPersona">Añadir</button>
+            <div></div>
+          </div>
+          <div class="separator"></div>
+          <div id="personasList"></div>
+        </div>
+
+        <div id="mtEventos" class="card hidden app-lockable">
+          <div class="section-title"><div class="icon-badge">🎉</div><div><h2>EVENTOS</h2><p>Alta, modificación y borrado.</p></div></div>
+          <div class="rowline evento entry-zone">
+            <div class="field"><label>Título</label><input id="newEventoTitulo" /></div>
+            <div class="field"><label>Precio</label><input id="newEventoPrecio" type="number" min="0" step="0.01" value="0.00" /></div>
+            <div class="field"><label>Fecha ini</label><input id="newEventoFechaIni" placeholder="DD/MM/AA" /></div>
+            <div class="field"><label>Fecha fin</label><input id="newEventoFechaFin" placeholder="DD/MM/AA" /></div>
+            <div class="field"><label>Situación</label><select id="newEventoSituacion"></select></div>
+            <div class="field"><label>Descripción</label><textarea id="newEventoDescripcion"></textarea></div>
+            <button type="button" id="btnAddEvento">Añadir</button>
+            <div></div>
+          </div>
+          <div class="separator"></div>
+          <div id="eventosList"></div>
+        </div>
+
+        <div id="mtTiendas" class="card hidden app-lockable">
+          <div class="section-title"><div class="icon-badge">🏪</div><div><h2>TIENDAS</h2><p>Alta, modificación y borrado.</p></div></div>
+          <div class="rowline tienda entry-zone">
+            <div class="field"><label>Nombre</label><input id="newTiendaNombre" /></div>
+            <button type="button" id="btnAddTienda">Añadir</button>
+            <div></div>
+          </div>
+          <div class="separator"></div>
+          <div id="tiendasList"></div>
+        </div>
+
+        <div id="mtProductos" class="card hidden app-lockable">
+          <div class="section-title"><div class="icon-badge">📦</div><div><h2>PRODUCTOS</h2><p>Alta, modificación y borrado.</p></div></div>
+          <div class="rowline producto entry-zone">
+            <div class="field"><label>Nombre</label><input id="newProductoNombre" /></div>
+            <div class="field"><label>Segmento</label><select id="newProductoSegmento"></select></div>
+            <div class="field"><label>Destino</label><select id="newProductoDestino"></select></div>
+            <div class="field"><label>Precio referencia</label><input id="newProductoPrecio" class="money-text" type="text" value="0,00 €" /></div>
+            <button type="button" id="btnAddProducto">Añadir</button>
+            <div></div>
+          </div>
+          <div class="separator"></div>
+          <div id="productosList"></div>
+        </div>
+
+        <div id="mtImportar" class="card hidden">
+          <div class="section-title"><div class="icon-badge">📥</div><div><h2>CARGA INICIAL DE DATOS</h2><p>Importa PERSONAS, EVENTOS, TIENDAS, PRODUCTOS, INGRESOS, COMPRAS, DONACIONES y TICKETS desde una plantilla Excel.</p></div></div>
+          <div class="import-panel">
+            <div class="import-grid">
+              <div class="field">
+                <label>Modo de carga</label>
+                <select id="importMode">
+                  <option value="REPLACE" selected>REPLACE</option>
+                  <option value="RESUME">RESUME</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Archivo Excel (.xlsx)</label>
+                <input id="importWorkbookFile" type="file" accept=".xlsx,.xls" />
+              </div>
+              <div class="field">
+                <label>Fotos de tickets (opcional, varias)</label>
+                <input id="importTicketFiles" type="file" accept="image/*" multiple />
+              </div>
+              <div class="import-note">La importación puede REPLACE o RESUME. Para relacionar hojas se usan códigos: PERSONA_CODIGO, EVENTO_CODIGO, TIENDA_CODIGO y PRODUCTO_CODIGO. El formato de carga y el de descarga de datos es el mismo. La hoja TICKETS admite IMAGEN_BASE64 o cruce por nombre de archivo.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" id="btnStartImport">Importar datos</button>
+                <button type="button" class="outline" id="btnClearImportStatus">Limpiar mensaje</button>
+              </div>
+              <div id="importStatus" class="import-status hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="mtAcceso" class="card hidden">
+          <div class="section-title"><div class="icon-badge">🔐</div><div><h2>ACCESO</h2></div></div>
+          <div class="rowline persona entry-zone">
+            <div class="field"><label>Identificación</label><input id="newAccesoIdentificacion" /></div>
+            <div class="field"><label>Nombre</label><input id="newAccesoNombre" /></div>
+            <div class="field"><label>Clave</label><input id="newAccesoClave" type="password" /></div>
+            <div class="field"><label>Nivel</label>
+              <select id="newAccesoNivel">
+                <option value="RO">RO</option>
+                <option value="RW">RW</option>
+                <option value="GD">GD</option>
+              </select>
+            </div>
+            <button type="button" id="btnAddAcceso" onclick="saveAccessUser(); return false;">Añadir</button>
+            <div></div>
+          </div>
+          <div class="separator"></div>
+          <div id="accesoList"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<div class="footer">
+    <div class="footer-inner">
+      <button type="button" id="btnExportExcel" class="iconbtn outline app-lockable" title="Excel"><img class="footer-img" alt="Excel" src="./assets/embedded/footer-excel.jpg" /></button>
+      <button type="button" id="btnOpenImport" class="iconbtn outline app-lockable" title="Carga inicial"><img class="footer-img" alt="Carga inicial" src="./assets/embedded/footer-importacion.jpg" /></button>
+      <button type="button" id="btnExportSeed" class="iconbtn outline app-lockable" title="Descarga de datos"><img class="footer-img" alt="Descarga de datos" src="./assets/embedded/footer-descarga-datos.jpg" /></button>
+      <button type="button" id="btnToggleMaintenance" class="iconbtn secondary app-lockable maint-btn-closed" title="Mantenimiento de tablas generales"><img class="footer-img maint-footer-img" alt="Mantenimiento de tablas generales" src="./assets/embedded/footer-mantenimiento.png" /></button>
+    </div>
+  </div></div>
+
+<script src="./app/performance/low-resource-boot.js"></script>
+<script src="/api/bootstrap.js"></script>
+<script id="legacy-bundle-before-modules-v307" src="./app/legacy/legacy-bundle-before-modules-v30.7.js"></script>
+
+<script type="module" src="./modules/module-loader.js"></script>
+<script id="legacy-bundle-after-modules-v307" src="./app/legacy/legacy-bundle-after-modules-v30.7.js"></script>
+<script src="./app/features/mapa-productos.js"></script>
+<script src="./app/features/ingresos-select-fix.js"></script>
+<script src="./app/features/view-refresh-stabilizer.js"></script>
+<script src="./app/features/budget-tooltips-lite.js"></script>
+<script src="./app/features/summary-tienda-sort-fix.js"></script>
+<script src="./app/features/maintenance-duplicates-v31.6.js"></script>
+<script src="./app/performance/low-resource-legacy-patch.js"></script>
+<script type="module" src="./app/main.js"></script>
+
+</body>
+</html>
+
