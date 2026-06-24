@@ -1348,26 +1348,37 @@ function planDonorRefFromLabel(label, maps) {
   return '';
 }
 
+function planImportantProductTokens(key) {
+  return String(key || '').split(' ').filter(t => /\d/.test(t) || /^(cl|ml|l|kg|gr|ud|uds|unidad|unidades|lata|latas|botellin|botellines|botella|botellas|pack|packs)$/.test(t));
+}
 function planFindProductLoose(label, maps) {
   const key = normPlanKey(label);
   if (!key) return null;
+  // En donaciones/existencias no se debe inventar ni perder variantes reales:
+  // primero coincidencia exacta normalizada, incluyendo tamaños como "(2l)".
   if (maps.productByName.has(key)) return maps.productByName.get(key);
   const aliasKey = planProductAliasKey(label);
-  if (aliasKey && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
-  const toks = key.split(' ').filter(t => t.length >= 3);
+  if (aliasKey && aliasKey !== key && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
+  const toks = key.split(' ').filter(t => t.length >= 2);
+  const important = planImportantProductTokens(key);
   let best = null;
   let bestScore = 0;
   for (const p of maps.products.values()) {
     const pk = normPlanKey(p?.nombre);
     if (!pk) continue;
     let score = 0;
-    if (pk.includes(key) || key.includes(pk)) score += 30;
-    toks.forEach(t => { if (pk.includes(t)) score += Math.min(8, t.length); });
-    const ptoks = pk.split(' ').filter(t => t.length >= 3);
-    ptoks.forEach(t => { if (key.includes(t)) score += Math.min(5, t.length); });
+    if (pk === key) score += 1000;
+    const missingImportant = important.filter(t => !pk.includes(t)).length;
+    if (missingImportant) score -= 120 * missingImportant;
+    if (pk.includes(key) && !missingImportant) score += 120;
+    if (key.includes(pk) && !missingImportant) score += 45;
+    toks.forEach(t => { if (pk.split(' ').includes(t)) score += Math.min(16, t.length + 8); else if (pk.includes(t)) score += Math.min(8, t.length); });
+    const ptoks = pk.split(' ').filter(t => t.length >= 2);
+    ptoks.forEach(t => { if (key.split(' ').includes(t)) score += Math.min(8, t.length + 3); });
+    score -= Math.abs(pk.length - key.length) * 0.15;
     if (score > bestScore) { best = p; bestScore = score; }
   }
-  return bestScore >= 10 ? best : null;
+  return bestScore >= 18 ? best : null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');
@@ -1399,11 +1410,19 @@ function planPackRoundedProduct(productName) {
   if (/(coca cola|fanta|sprite|tonica|aquarius|acuarius|cerveza skol)/.test(n) && !/botella\s*2/.test(n)) return true;
   return false;
 }
+function planProductAllowsDecimalUnits(productName) {
+  const n = normPlanKey(productName || '');
+  if (!/(kg|kilo|kilos|gr|gramo|gramos|litro|litros)/.test(n)) return false;
+  // Si el propio nombre habla de botella, lata, bote, garrafa, pack, saco, etc., se compra por unidad/envase.
+  if (/(lata|latas|botellin|botellines|bote|botes|botella|botellas|garrafa|garrafas|saco|sacos|pack|packs|paquete|paquetes|barril|barriles)/.test(n)) return false;
+  return true;
+}
 function planRoundBuyUnits(productName, units) {
   const u = Math.max(0, num(units));
   if (!u) return 0;
-  if (planPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
-  return round(Math.ceil(u * 100) / 100, 2);
+  if (planPackRoundedProduct(productName)) return Math.max(24, Math.ceil(u / 24) * 24);
+  if (planProductAllowsDecimalUnits(productName)) return round(Math.ceil(u * 100) / 100, 2);
+  return Math.max(1, Math.ceil(u));
 }
 function planConsumptionProfile(form) {
   const rawInfo = trim((form?.info || '') + ' ' + (form?.descripcion || ''));
@@ -1489,8 +1508,9 @@ function planBudgetGuard(rows, form) {
     out = out.map(r => {
       if (r?.tipo !== 'COMPRA' || r.include === false) return r;
       const before = num(r.unidades);
-      const scaled = Math.max(0, round(before * factor, 2));
-      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial estaba por encima de 35 €/persona y se ha reducido para acercarla a coste real de evento.` };
+      const productName = trim(r.productName || r.producto || '');
+      const scaled = planRoundBuyUnits(productName, before * factor);
+      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial estaba por encima de 35 €/persona y se ha reducido para acercarla a coste real de evento. Redondeo final aplicado por unidad/pack real.` };
     });
     total = planCompraTotal(out);
     per = total / people;
@@ -1643,7 +1663,10 @@ function planCleanExplicitProductText(text) {
   if (!s) return '';
   if (s.includes(':')) s = s.split(':')[0].trim();
   s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\s+(?:de\s+)?/i, '');
-  s = s.replace(/\b\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\b/ig, '').trim();
+  s = s.replace(/^\d+(?:[,.]\d+)?\s+(?=\D)/i, '');
+  // No se eliminan medidas internas del nombre: "Aceite AOVE (2l): 1" debe seguir buscando "Aceite AOVE (2l)",
+  // no "Aceite AOVE". Solo quitamos una cantidad final explícita si viene como coletilla separada.
+  s = s.replace(/\s+[-–—]?\s*x?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\s*$/i, '').trim();
   return s.replace(/\s+/g,' ').trim();
 }
 function planExplicitUnits(text) {
@@ -2090,7 +2113,9 @@ function matchPlanRows(aiRows, baseRows, state, form) {
       productName: trim(prod?.nombre || base?.productName || row?.producto),
       segmento: trim(prod?.segmento || base?.segmento || 'Sin segmento'),
       destino: trim(prod?.destino || base?.destino || 'Sin destino'),
-      unidades: Math.max(0, round(row?.unidades, 2)),
+      unidades: tipo === 'COMPRA'
+        ? planRoundBuyUnits(prod?.nombre || base?.productName || row?.producto, row?.unidades)
+        : Math.max(0, round(row?.unidades, 2)),
       precio: planReasonablePlanPrice(prod?.nombre || base?.productName || row?.producto, num(row?.precio) > 0 ? row.precio : (base?.precio || prod?.defaultPrecio || prod?.precio)),
       tiendaId: trim(tienda?.id || base?.tiendaId || defaults.tiendaId),
       responsableId: trim(responsable?.id || base?.responsableId || defaults.responsableId),

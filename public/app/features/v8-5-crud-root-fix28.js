@@ -103,6 +103,45 @@
   async function readFreshState(){
     return apiJson('/api/state?ts='+Date.now(), {cache:'no-store'});
   }
+  const MAINT_SECTION_BY_COLLECTION={personas:'personas',tiendas:'tiendas',productos:'productos',eventos:'eventos'};
+  const MAINT_VIEW_BY_SECTION={personas:'mtPersonas',eventos:'mtEventos',tiendas:'mtTiendas',productos:'mtProductos',acceso:'mtAcceso',importar:'mtImportar'};
+  const MAINT_BTN_BY_SECTION={personas:'mtPersonasBtn',eventos:'mtEventosBtn',tiendas:'mtTiendasBtn',productos:'mtProductosBtn',acceso:'mtAccesoBtn',importar:'mtImportBtn'};
+  const MAIN_PANEL_IDS=['tabIngresos','tabDonaciones','tabCompras','tabMapaProductos','tabPlanificacionInicial','tabResumen','tabGraficas','tabDocumentos'];
+  function maintVisibleName(){
+    for(const [name,id] of Object.entries(MAINT_VIEW_BY_SECTION)){
+      const el=$(id);
+      if(el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none') return name;
+    }
+    return '';
+  }
+  function maintenanceSnapshot(collection){
+    const wrap=$('maintenanceWrapper');
+    const open=!!(wrap && !wrap.classList.contains('hidden') && getComputedStyle(wrap).display !== 'none');
+    let section=MAINT_SECTION_BY_COLLECTION[String(collection||'')] || maintVisibleName();
+    try{ section=section || window.ControlEventMaintenance?.current?.() || ''; }catch(_){ }
+    try{ section=section || window.ControlEventApp?.navigation?.currentMaintTab || ''; }catch(_){ }
+    if(section==='importacion') section='importar';
+    const scrolls=[];
+    ['maintenanceWrapper','personasList','eventosList','tiendasList','productosList','mtPersonas','mtEventos','mtTiendas','mtProductos'].forEach(id=>{
+      const el=$(id); if(el) scrolls.push([id, el.scrollLeft||0, el.scrollTop||0]);
+    });
+    return {open, section:section||'personas', scrolls};
+  }
+  function restoreMaintenanceSnapshot(snap){
+    if(!snap || !snap.open) return;
+    const section=snap.section || 'personas';
+    try{ if(window.ControlEventApp?.navigation){ window.ControlEventApp.navigation.currentMainTab='maintenance'; window.ControlEventApp.navigation.currentMaintTab=section; } }catch(_){ }
+    MAIN_PANEL_IDS.forEach(id=>{ const el=$(id); if(el) el.classList.add('hidden'); });
+    const wrap=$('maintenanceWrapper');
+    if(wrap){ wrap.classList.remove('hidden'); wrap.hidden=false; wrap.style.display=''; wrap.removeAttribute('aria-hidden'); }
+    Object.entries(MAINT_VIEW_BY_SECTION).forEach(([name,id])=>{ const el=$(id); if(el) el.classList.toggle('hidden', name!==section); });
+    Object.entries(MAINT_BTN_BY_SECTION).forEach(([name,id])=>{ const b=$(id); if(b) b.classList.toggle('active', name===section); });
+    const api=window.ControlEventMaintenance;
+    if(api && typeof api.activate==='function') setTimeout(()=>{
+      Promise.resolve(api.activate(section,{reason:'crud-root-restore-maintenance', force:true})).catch(e=>log('ControlEventMaintenance.activate restore falló', e));
+    }, 0);
+    setTimeout(()=>{ (snap.scrolls||[]).forEach(([id,x,y])=>{ const el=$(id); if(el){ el.scrollLeft=x; el.scrollTop=y; } }); }, 80);
+  }
   function replaceLocalState(fresh, keepSelected){
     if(!fresh || typeof fresh!=='object') return;
     const s=getState();
@@ -116,10 +155,16 @@
   }
   async function refreshFromDb(collection){
     const keep=selectedEventId();
+    const snap=maintenanceSnapshot(collection);
     const fresh=await readFreshState();
     replaceLocalState(fresh, keep);
+    if(snap.open){
+      try{ if(window.ControlEventApp?.navigation){ window.ControlEventApp.navigation.currentMainTab='maintenance'; window.ControlEventApp.navigation.currentMaintTab=snap.section || 'personas'; } }catch(_){ }
+    }
     renderNow();
+    restoreMaintenanceSnapshot(snap);
     refreshMaintenanceAfterSync(collection);
+    restoreMaintenanceSnapshot(snap);
     return fresh;
   }
   function replaceLocal(collection,row){ const a=arr(collection); const i=a.findIndex(x=>String(x.id||'')===String(row.id||'')); if(i>=0) a[i]={...a[i],...row}; else a.push(row); }

@@ -292,11 +292,18 @@
     if(/\b(?:COCA\s*COLA|FANTA|SPRITE|TONICA|AQUARIUS|ACUARIUS|CERVEZA\s+SKOL)\b/.test(n) && !/BOTELLA\s*2/.test(n)) return true;
     return false;
   }
+  function productAllowsDecimalUnits(productName){
+    const n = normalizeText(productName || '');
+    if(!/\b(KG|KILO|KILOS|LITRO|LITROS|GR|GRAMO|GRAMOS)\b/.test(n)) return false;
+    if(/\b(BOTE|BOTES|LATA|LATAS|BOTELLIN|BOTELLINES|BOTELLA|BOTELLAS|SACO|SACOS|GARRAFA|GARRAFAS|PACK|PACKS|PAQUETE|PAQUETES|BARRIL|BARRILES)\b/.test(n)) return false;
+    return true;
+  }
   function roundPurchaseUnits(productName, units){
     const u = Math.max(0, Number(units || 0));
     if(!u) return 0;
-    if(isPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
-    return Math.ceil(u * 100) / 100;
+    if(isPackRoundedProduct(productName)) return Math.max(24, Math.ceil(u / 24) * 24);
+    if(productAllowsDecimalUnits(productName)) return Math.ceil(u * 100) / 100;
+    return Math.max(1, Math.ceil(u));
   }
   function planProductAliasKey(value){
     const n = normalizeText(value || '');
@@ -355,14 +362,7 @@
     });
   }
   function planDeficitUnits(productName, deficit){
-    const d = Math.max(0, Number(deficit || 0));
-    if(!d) return 0;
-    const n = normalizeText(productName || '');
-    // Productos por peso/litro pueden mantener dos decimales; el resto se compra por unidades enteras.
-    if(/\b(KG|KILO|KILOS|LITRO|LITROS|GR|GRAMO|GRAMOS)\b/.test(n) && !/\b(BOTE|BOTES|LATA|LATAS|BOTELLA|BOTELLAS|SACO|SACOS|GARRAFA|GARRAFAS)\b/.test(n)){
-      return Math.ceil(d * 100) / 100;
-    }
-    return Math.ceil(d);
+    return roundPurchaseUnits(productName, deficit);
   }
   function planSegDestToken(row){ return `${up(row?.segmento || '')}__${up(row?.destino || '')}`; }
   function planSegDestClass(row){
@@ -503,6 +503,7 @@
             <label class="plan-need-large"><span>Necesidad calculada</span><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/></label>
           </div>
           <select class="plan-resource-product-select" data-plan-resource-field="productId" aria-label="Producto">${planProductOptions(r.productId, r.producto)}</select>
+          <div class="plan-resource-meta"><b>Segmento / destino</b><span data-plan-resource-meta>${esc((r.segmento || 'Sin segmento') + ' · ' + (r.destino || 'Sin destino'))}</span></div>
         </td>
         <td class="plan-resource-flow">${donations}${purchase}${empty}</td>
       </tr>`;
@@ -893,6 +894,10 @@
     const newName = selectedProduct?.nombre || group.producto || 'Producto';
     const newSegment = selectedProduct?.segmento || group.segmento || 'Sin segmento';
     const newDestino = selectedProduct?.destino || group.destino || 'Sin destino';
+    if(changedField !== 'necesidad' && buyInput){
+      const roundedBuy = planDeficitUnits(newName, buy);
+      if(Math.abs(roundedBuy - buy) > 0.0001){ buy = roundedBuy; buyInput.value = String(buy); }
+    }
     group.allIndices.forEach(idx => {
       if(lastProposal[idx]){
         lastProposal[idx].include = include;
@@ -961,6 +966,8 @@
     tr.classList.toggle('excluded', !(include && (buy > 0 || Number(group.donado || 0) > 0)));
     tr.dataset.planProductName = normalizeText(newName);
     tr.dataset.planResourceKey = planGroupKey(newName);
+    const meta = tr.querySelector('[data-plan-resource-meta]');
+    if(meta) meta.textContent = `${newSegment || 'Sin segmento'} · ${newDestino || 'Sin destino'}`;
     const productSelect = tr.querySelector('[data-plan-resource-field="productId"]');
     if(productSelect && !selectedProductId){
       const opt = productSelect.options && productSelect.options[productSelect.selectedIndex];
@@ -977,6 +984,14 @@
   function selectedOptionText(select){
     try{ return select && select.options && select.selectedIndex >= 0 ? String(select.options[select.selectedIndex]?.textContent || '') : ''; }catch(_){ return ''; }
   }
+  function textWithoutSelectOptions(card){
+    try{
+      const clone = card.cloneNode(true);
+      clone.querySelectorAll('select,option,script,style,button').forEach(el => el.remove());
+      clone.querySelectorAll('input,textarea').forEach(el => { if(el.value) el.setAttribute('data-current-value', el.value); });
+      return clone.textContent || '';
+    }catch(_){ return ''; }
+  }
   function planSearchHaystack(card){
     if(!card) return '';
     const values = [
@@ -984,12 +999,27 @@
       card.dataset?.productText || '',
       card.querySelector('.plan-resource-product-label')?.textContent || '',
       selectedOptionText(card.querySelector('[data-plan-resource-field="productId"]')),
+      card.querySelector('[data-plan-resource-meta]')?.textContent || '',
       card.querySelector('.plan-product-title strong')?.textContent || '',
       card.querySelector('.plan-product-title span')?.textContent || '',
       ...Array.from(card.querySelectorAll('select')).map(selectedOptionText),
-      card.textContent || ''
+      ...Array.from(card.querySelectorAll('input,textarea')).map(el => el.value || ''),
+      textWithoutSelectOptions(card)
     ];
     return normalizeText(values.join(' '));
+  }
+  function planSearchScore(card, term, tokens){
+    const hay = planSearchHaystack(card);
+    if(!hay) return 0;
+    let score = 0;
+    const selected = normalizeText(selectedOptionText(card.querySelector('[data-plan-resource-field="productId"]')) || card.querySelector('.plan-product-title strong')?.textContent || '');
+    if(selected === term) score += 1000;
+    if(selected.startsWith(term)) score += 450;
+    if(hay.includes(term)) score += 240;
+    const ok = tokens.every(tok => hay.includes(tok));
+    if(ok) score += 90 + tokens.length * 12;
+    tokens.forEach(tok => { if(selected.includes(tok)) score += 35; });
+    return ok || hay.includes(term) ? score : 0;
   }
   function searchPlanProductIn(inputId, selector, sectionLabel){
     const input = document.getElementById(inputId);
@@ -997,23 +1027,25 @@
     const term = normalizeText(raw);
     if(!term){ input?.focus(); return; }
     const tokens = term.split(/\s+/).filter(Boolean);
-    const cards = Array.from(document.querySelectorAll(selector));
-    const found = cards.find(card => {
-      const hay = planSearchHaystack(card);
-      return hay.includes(term) || tokens.every(tok => hay.includes(tok));
-    });
+    const cards = Array.from(new Set(Array.from(document.querySelectorAll(selector))));
+    const matches = cards.map((card, pos) => ({card, pos, score:planSearchScore(card, term, tokens)})).filter(x => x.score > 0).sort((a,b)=>b.score-a.score || a.pos-b.pos);
     document.querySelectorAll('.plan-product-card.plan-found, .plan-resource-edit-row.plan-found').forEach(el => el.classList.remove('plan-found'));
-    if(found){
+    if(matches.length){
+      const lastTerm = input?.dataset?.lastTerm || '';
+      const lastIndex = Number(input?.dataset?.lastIndex || '-1');
+      const nextIndex = lastTerm === term ? (lastIndex + 1) % matches.length : 0;
+      if(input){ input.dataset.lastTerm = term; input.dataset.lastIndex = String(nextIndex); }
+      const found = matches[nextIndex].card;
       found.classList.add('plan-found');
       found.scrollIntoView({behavior:'smooth', block:'center'});
       setTimeout(() => found.classList.remove('plan-found'), 2600);
-      if(input) input.value = '';
+      input?.focus();
     }else{
       try{ alert('No se ha encontrado en ' + (sectionLabel || 'este apartado') + ': ' + raw); }catch(_){ }
       input?.focus();
     }
   }
-  function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row, .plan-resource-edit-row', 'Propuesta editable tipo Mapa de recursos'); }
+  function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row', 'Propuesta editable tipo Mapa de recursos'); }
   function searchProposalAdvanced(){ searchPlanProductIn('planBuscarDetalleAvanzado', '#planProposalList .plan-product-card', 'Detalle avanzado de líneas'); }
   function showPlanFactoryIndicator(message){
     const box = document.getElementById('planificacionResultado');
@@ -1136,6 +1168,15 @@
     }
     return res.json();
   }
+  function syncProposalFromResourceEditor(){
+    const rows = Array.from(document.querySelectorAll('#planResourceEditor .plan-resource-edit-row'));
+    rows.forEach(tr => {
+      const key = tr.dataset?.planResourceKey || '';
+      if(key) updateResourceEditorRow(key, tr, '__sync');
+    });
+    refreshAdvancedProposalDetails();
+  }
+
   async function applyReplicaToRealEvent(){
     if(!isGD()) return;
     const source = lastSourceEvent || sourceEvent();
@@ -1146,6 +1187,7 @@
       return;
     }
     if(!lastProposal.length && !lastIncomeProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
+    try{ syncProposalFromResourceEditor(); }catch(e){ console.warn('[Planificación] No se pudo sincronizar la propuesta editable antes de crear evento', e); }
     const st = state();
     if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
     const title = proposedEventTitle();

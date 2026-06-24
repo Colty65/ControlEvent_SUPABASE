@@ -141,6 +141,11 @@
       .ce-receipt-modal-card-v463 img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:12px;background:#f8fafc;}
       @keyframes ceV46Destroy{0%{opacity:1;transform:scale(1) rotate(0);filter:none;max-height:420px;}18%{transform:scale(1.012) rotate(.35deg);filter:contrast(1.1);}42%{transform:scale(.985) rotate(-.35deg);background:#111827;color:#fff;}72%{opacity:.38;transform:scale(.94) rotate(.65deg);max-height:420px;}100%{opacity:0;transform:scale(.82) rotate(-1.3deg);max-height:0;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;border-width:0;}}
       .ce-v46-pies{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .ce-v434-pie-svg{touch-action:manipulation;}
+      .ce-v434-pie-slice{cursor:pointer;}
+      .ce-v434-pie-hit{fill:none!important;stroke:rgba(255,255,255,0)!important;stroke-width:12!important;pointer-events:stroke!important;cursor:pointer;}
+      .ce-v434-legend-row{min-height:34px;display:flex;align-items:center;}
+      @media(pointer:coarse){.ce-v434-legend-row{min-height:44px}.ce-v434-pie-hit{stroke-width:18!important;}}
       @media(min-width:1180px){.ce-v46-pies{grid-template-columns:repeat(3,minmax(0,1fr));}}
       #ceTooltipV21.ce-v21-layout-metricv460,#ceTooltipV21.ce-v21-layout-metricv460 *{color:#fff!important;}
       #ceTooltipV21.ce-v21-layout-metricv460{border-color:rgba(255,255,255,.38)!important;box-shadow:0 18px 50px rgba(0,0,0,.32)!important;}
@@ -676,14 +681,29 @@
   function detailHeaderFor(label){
     return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Tienda | Ticket | Producto | Cant. | Precio | Total';
   }
+  function pieDisplayAngles(nonzero){
+    if(nonzero.length <= 1) return nonzero.map(() => 360);
+    const denom = Math.max(0.0001, nonzero.reduce((a,b) => a + Math.abs(Number(b.value || 0)),0));
+    const raw = nonzero.map(it => (Math.abs(Number(it.value || 0)) / denom) * 360);
+    const minAngle = Math.max(12, Math.min(30, 330 / nonzero.length));
+    const fixed = raw.map(v => v < minAngle);
+    const fixedTotal = fixed.reduce((sum, yes) => sum + (yes ? minAngle : 0), 0);
+    const flexibleRaw = raw.reduce((sum, v, i) => sum + (fixed[i] ? 0 : v), 0);
+    const remaining = Math.max(1, 360 - fixedTotal);
+    let out = raw.map((v, i) => fixed[i] ? minAngle : (flexibleRaw > 0 ? v / flexibleRaw * remaining : remaining / raw.length));
+    const diff = 360 - out.reduce((a,b)=>a+b,0);
+    if(out.length) out[out.length - 1] += diff;
+    return out;
+  }
   function pieCard(title, total, items){
     const nonzero = items.filter(it => Math.abs(Number(it.value || 0)) > 0);
     let angle = 0;
-    const denom = Math.max(0.0001, nonzero.reduce((a,b) => a + Math.abs(Number(b.value || 0)),0));
-    const slices = nonzero.length ? nonzero.map(it => {
-      const start = angle; const inc = (Math.abs(Number(it.value || 0)) / denom) * 360; angle += inc;
-      if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></circle>`;
-      return `<path class="ce-v434-pie-slice" d="${arcPath(50,50,42,start,angle)}" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></path>`;
+    const angles = pieDisplayAngles(nonzero);
+    const slices = nonzero.length ? nonzero.map((it, idx) => {
+      const start = angle; const inc = angles[idx] || 0; angle += inc;
+      if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></circle><circle class="ce-v434-pie-hit" cx="50" cy="50" r="42" ${tipAttrs(it, it.color)}></circle>`;
+      const d = arcPath(50,50,42,start,angle);
+      return `<path class="ce-v434-pie-slice" d="${d}" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></path><path class="ce-v434-pie-hit" d="${d}" ${tipAttrs(it, it.color)}></path>`;
     }).join('') : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`;
     const legend = (nonzero.length ? nonzero : [{label:'Sin datos', value:0, color:'#e5e7eb', lines:['Sin registros']}]).map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
     return `<div class="ce-v434-pie-card"><div class="ce-v434-pie-title"><span>${esc(title)}</span><strong>${esc(moneyF(total))}</strong></div><svg class="ce-v434-pie-svg" viewBox="0 0 100 100" role="img" aria-label="${esc(title)}">${slices}<circle cx="50" cy="50" r="21" fill="#fff"></circle></svg><div class="ce-v434-legend">${legend}</div></div>`;
