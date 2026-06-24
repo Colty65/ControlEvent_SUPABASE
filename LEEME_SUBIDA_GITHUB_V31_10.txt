@@ -1,5 +1,0 @@
-ControlEvent v15_prod
-
-Subir todos los archivos de este paquete a GitHub/Vercel.
-
-Corrección: en Mapa de recursos, tras cambiar de evento desde el desplegable, los botones de marcar/desmarcar comprado vuelven a responder correctamente.
