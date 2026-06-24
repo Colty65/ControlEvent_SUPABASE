@@ -465,7 +465,10 @@
       map.set(key, row);
     });
     const list = [...map.values()].map(row => {
-      const baseNeed = row.necesidad > 0 ? row.necesidad : row.donado + row.compra;
+      const hasExplicitDonation = (row.donationDetails || []).some(d => lastProposal[d.idx]?.explicitPromptDonation === true);
+      // Si la donación viene explícita del prompt, una compra previa de Zuzu se toma como necesidad total
+      // calculada, no como compra extra encima de lo donado. Anchoas donadas 1 + necesidad 2 => comprar 1.
+      const baseNeed = row.necesidad > 0 ? row.necesidad : (hasExplicitDonation ? Math.max(row.donado, row.compra) : row.donado + row.compra);
       const displayNeed = planDisplayNeedAfterRounding(row.producto, baseNeed);
       const nextCompra = planBuyAfterDonation(row.producto, displayNeed, row.donado);
       return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || row.donado > 0};

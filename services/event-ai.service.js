@@ -1577,7 +1577,13 @@ function planPostProcessPlanningRows(rows, form, state) {
   for (const g of grouped.values()) {
     const prod = g.productId ? maps.products.get(trim(g.productId)) : planFindProductLoose(g.productName, maps);
     const pname = trim(prod?.nombre || g.productName);
-    const currentNeed = g.needHint > 0 ? g.needHint : (g.donation + g.purchase);
+    const hasExplicitDonation = g.rows.some(i => out[i]?.explicitPromptDonation === true);
+    // Si hay una donación explícita del prompt y no viene necesidadTotal fiable, la compra existente
+    // se interpreta como necesidad total calculada, NO como compra adicional sobre lo donado.
+    // Ej.: Anchoas donadas 1 y Zuzu calcula 2 => necesidad 2, compra 1; no compra 2.
+    const currentNeed = hasExplicitDonation
+      ? (g.needHint > 0 ? Math.max(g.needHint, g.donation) : Math.max(g.donation, g.purchase))
+      : (g.needHint > 0 ? g.needHint : (g.donation + g.purchase));
     const rawNeed = planMinimumNeed(pname, form, currentNeed);
     const need = planDisplayNeedAfterRounding(pname, rawNeed);
     // Compra solo del déficit real. En packs: redondea la necesidad total y DESPUÉS resta lo donado.
@@ -1899,19 +1905,33 @@ function planExplicitDonationMatch(row, ex, exactUnits = false) {
   return true;
 }
 function planMergeExplicitDonations(rows, explicitRows) {
-  const explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION' && num(r.unidades) > 0);
+  let explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION' && num(r.unidades) > 0);
   if (!explicit.length) return arr(rows).slice();
+  // Deduplicación defensiva: el mismo producto/donante/tipo puede detectarse dos veces si el usuario
+  // lo escribe dentro de un bloque de donaciones y además como línea suelta. En ese caso manda la
+  // cantidad menor/primera escrita, para evitar barbaridades como 20 + 48 de la misma cerveza.
+  const byExplicitKey = new Map();
+  explicit.forEach(ex => {
+    const k = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase()].join('|');
+    const prev = byExplicitKey.get(k);
+    if (!prev) { byExplicitKey.set(k, ex); return; }
+    const a = num(prev.unidades), b = num(ex.unidades);
+    // Si una detección trae más unidades por haber leído una frase larga o contexto, se conserva la cantidad más prudente.
+    byExplicitKey.set(k, b > 0 && (a <= 0 || b < a) ? ex : prev);
+  });
+  explicit = [...byExplicitKey.values()];
   // Si el prompt trae una donación explícita, esa cantidad manda. Eliminamos cualquier DONACION de Zuzu
   // o histórica del mismo producto, aunque traiga otro donante o más unidades, para que no se duplique ni se infle.
   const explicitKeys = new Set(explicit.map(planDonationProductKey).filter(Boolean));
   const out = arr(rows).filter(row => !(row?.tipo === 'DONACION' && explicitKeys.has(planDonationProductKey(row))));
   const seen = new Set();
   explicit.forEach(ex => {
-    const key = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase(), round(ex.unidades, 2)].join('|');
+    const key = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase()].join('|');
     if (seen.has(key)) return;
     seen.add(key);
     out.unshift({
       ...ex,
+      explicitPromptDonation: true,
       unidades: Math.max(0, round(ex.unidades, 2)),
       include: ex.include !== false,
       confidence: trim(ex.confidence || 'Prompt explícito'),
@@ -1956,6 +1976,38 @@ function planSanitizeInventedDonations(rows, baseRows, explicitRows, mode = '') 
   });
 }
 
+
+
+function planCoalesceDonationsAfterSanitize(rows, explicitRows, mode = '') {
+  const explicitKeys = new Set(arr(explicitRows).map(planDonationProductKey).filter(Boolean));
+  const seenDonation = new Map();
+  const out = [];
+  arr(rows).forEach(row => {
+    if (row?.tipo !== 'DONACION') { out.push(row); return; }
+    const key = [planDonationProductKey(row), trim(row.donorRef), trim(row.ticketDonacion).toUpperCase()].join('|');
+    const isExplicit = row.explicitPromptDonation === true || explicitKeys.has(planDonationProductKey(row));
+    const prevIndex = seenDonation.get(key);
+    if (prevIndex == null) {
+      seenDonation.set(key, out.length);
+      out.push({...row, explicitPromptDonation:isExplicit || row.explicitPromptDonation === true});
+      return;
+    }
+    const prev = out[prevIndex];
+    if (isExplicit || prev?.explicitPromptDonation) {
+      // Para donaciones del prompt no se suman duplicados: se conserva la cantidad menor/confirmada.
+      const prevUnits = num(prev.unidades), rowUnits = num(row.unidades);
+      if (rowUnits > 0 && (prevUnits <= 0 || rowUnits < prevUnits)) {
+        out[prevIndex] = {...prev, ...row, unidades:round(rowUnits,2), explicitPromptDonation:true, include:row.include !== false};
+      }
+      return;
+    }
+    // Histórico puro: si de verdad hay varias líneas iguales, se agrupan para no enseñar duplicados.
+    prev.unidades = round(num(prev.unidades) + num(row.unidades), 2);
+    prev.precio = num(prev.precio) || num(row.precio);
+    prev.reason = trim(prev.reason || '') + ' Línea de donación equivalente agrupada para evitar duplicados visuales.';
+  });
+  return out;
+}
 
 function planInfoDonationRules(info, maps) {
   const raw = trim(info || '');
@@ -2290,6 +2342,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   const explicitDonationRows = planExplicitDonationRowsFromPrompt(form, state);
   rowsOut = planMergeExplicitDonations(rowsOut, explicitDonationRows);
   rowsOut = planSanitizeInventedDonations(rowsOut, baseRows, explicitDonationRows, m);
+  rowsOut = planCoalesceDonationsAfterSanitize(rowsOut, explicitDonationRows, m);
   rowsOut = arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}`, tiendaId: trim(row.tiendaId || defaultStoreId), responsableId: trim(row.responsableId || defaultResponsibleId) }));
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
