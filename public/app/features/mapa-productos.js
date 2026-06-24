@@ -828,6 +828,7 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('VALORACION DEL EVENTO (estimada)', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
+        ${renderMetric('DONACIONES DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${qtyFmt(eventSummary.productsWithDonations || 0)} producto(s) con donación`, 'ok donation')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;

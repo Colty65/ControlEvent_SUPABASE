@@ -74,11 +74,39 @@
         '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
-          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult">⬇️</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
         '</div>'+
         '<div class="ce-ai-result" id="ceAiResult"></div>'+ 
       '</div></div>';
   }
+
+  function zuzuPrintableCss(){
+    return '<style>'+
+      '@page{size:A4;margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#fff;margin:0}.ce-print-wrap{padding:0}.ce-print-head{border:2px solid #f59e0b;border-radius:18px;padding:12px 16px;margin:0 0 14px;background:linear-gradient(90deg,#fff7ed,#fff)}.ce-print-head h1{font-size:22px;margin:0 0 8px;color:#7c2d12}.ce-print-meta{font-size:13px;font-weight:800;color:#475569}.ce-print-prompt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px}.ce-ai-card{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:12px;margin:0 0 12px;box-shadow:none}.ce-ai-card h3{margin:0 0 10px;color:#075985}.ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:650}.ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ce-ai-table-wrap{overflow:visible}.ce-ai-table{border-collapse:collapse;width:100%;font-size:12px}.ce-ai-table th,.ce-ai-table td{border:1px solid #dbeafe;padding:6px;text-align:left;vertical-align:top}.ce-ai-table th{background:#eff6ff;color:#075985}.ce-ai-bars{display:grid;gap:7px}.ce-ai-bar-row{display:grid;grid-template-columns:190px 1fr 82px;align-items:center;gap:8px}.ce-ai-bar-label{font-weight:800;overflow:hidden;text-overflow:ellipsis}.ce-ai-bar-track{height:20px;background:#e2e8f0;border-radius:999px;overflow:hidden}.ce-ai-bar-fill{height:100%;border-radius:999px}.ce-ai-bar-value{font-weight:900;color:#075985;text-align:right}.ce-ai-vbars{height:260px;display:flex;align-items:flex-end;gap:10px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:30px 10px 48px;overflow:visible}.ce-ai-vbar{height:100%;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;flex:1}.ce-ai-vbar-col{width:34px;border-radius:10px 10px 0 0}.ce-ai-vbar-value{position:absolute;bottom:calc(100% + 6px);font-size:10px;font-weight:900;color:#075985;white-space:nowrap;transform:rotate(-90deg);transform-origin:center}.ce-ai-vbar-label{position:absolute;bottom:-38px;max-width:90px;text-align:center;font-size:10px;font-weight:900;color:#334155;line-height:1.1}.ce-ai-pie-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.ce-ai-pie{width:190px;height:190px;border-radius:50%;box-shadow:inset 0 0 0 36px rgba(255,255,255,.82),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie.donut{box-shadow:inset 0 0 0 56px rgba(255,255,255,.88),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie-list{display:grid;gap:7px;min-width:220px}.ce-ai-pie-legend{font-weight:850}.ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}.ce-ai-line-svg{width:100%;height:260px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}.ce-ai-stacked-wrap{display:grid;gap:10px}.ce-ai-stack-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}.ce-ai-stack-label{font-weight:900;overflow:hidden;text-overflow:ellipsis}.ce-ai-stack-track{height:28px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}.ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:900;min-width:3px}.ce-ai-stack-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-weight:900;color:#334155}.ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}.ce-ai-files,.ce-ai-file-btn,.ce-ai-preview{display:none!important}@media print{button{display:none!important}.ce-ai-card{box-shadow:none!important}}'+
+      '</style>';
+  }
+  function printZuzuPdf(){
+    var result=$('ceAiResult');
+    if(!result || !trim(result.innerText||'')){
+      setStatus('No hay respuesta para imprimir.', 'err');
+      return;
+    }
+    var ev=currentEvent();
+    var prompt=trim(($('ceAiPrompt')||{}).value||'');
+    var title='ControlEvent - Respuesta de Zuzu';
+    var win=null;
+    try{ win=window.open('', '_blank'); }catch(_){ win=null; }
+    if(!win){
+      setStatus('El navegador ha bloqueado la ventana de impresión.', 'err');
+      return;
+    }
+    var meta=[trim(ev&&ev.titulo)||'Evento', trim(ev&&ev.situacion)||'', new Date().toLocaleString('es-ES')].filter(Boolean).join(' · ');
+    win.document.open();
+    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><h1>✨ Soy Zuzu, respuesta completa</h1><div class="ce-print-meta">'+esc(meta)+'</div>'+(prompt?'<div class="ce-print-prompt"><strong>Pregunta:</strong> '+esc(prompt)+'</div>':'')+'</header>'+result.innerHTML+'</main><script>window.onload=function(){setTimeout(function(){try{window.focus();window.print();}catch(e){}},250)}<\/script></body></html>');
+    win.document.close();
+    setStatus('Abierta impresión: elige Guardar como PDF.', 'ok');
+  }
+
   function clearZuzu(ev){
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
@@ -96,7 +124,7 @@
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
-    $('ceAiDownloadResult').onclick=function(){ downloadText(($('ceAiResult')||{}).innerText||'', 'ControlEvent_Analitica_libre_'+Date.now()+'.txt', 'text/plain;charset=utf-8'); };
+    $('ceAiDownloadResult').onclick=printZuzuPdf;
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
   function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }

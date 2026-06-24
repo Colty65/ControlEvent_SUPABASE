@@ -1,0 +1,35 @@
+ControlEvent v15_prod - HOTFIX3 SIN CAMBIO DE VERSION
+======================================================
+
+Este paquete NO cambia la version funcional de la app ni package.json.
+Solo cambia cache-busting de los scripts afectados para que el navegador cargue el hotfix.
+
+Cambios incluidos:
+
+1) Zuzu - respuesta imprimible en PDF
+   - En la ventana "Soy Zuzu, preguntame lo que quieras..." el boton de descarga pasa a "Imprimir / guardar en PDF".
+   - Abre una vista imprimible con toda la respuesta completa, tablas y graficas en color.
+   - Desde el cuadro de impresion del navegador elegir "Guardar como PDF".
+
+2) Planificacion inicial / Propuesta editable tipo Mapa de recursos
+   - En cada linea queda solo el desplegable del producto, con el producto actual preseleccionado.
+   - Cualquier cambio en la propuesta editable refresca el "Detalle avanzado de lineas que se crearan".
+   - Si el detalle avanzado estaba abierto, se mantiene actualizado; si se abre despues, sale recalculado.
+   - Se mantiene la ordenacion por Producto, Segmento/Destino y Tienda/Producto.
+   - Buscador de productos afinado: busca tambien dentro del desplegable seleccionado y por palabras sueltas.
+
+3) Mapa de recursos
+   - Recuperada la ficha "DONACIONES DE PRODUCTO (estimado)".
+   - Queda colocada entre "VALORACION DEL EVENTO (estimada)" y "COMPRAS".
+
+4) Mantenimientos y CE_BLOQUEO_FINALIZADO
+   - PERSONAS, TIENDAS y PRODUCTOS existentes se guardan mediante RPC controlada para no chocar con eventos Finalizados.
+   - Las bajas siguen protegidas si hay uso historico, porque borrar si podria romper trazabilidad.
+
+IMPORTANTE SUPABASE
+===================
+Para que el punto 4 funcione en la base de datos real, ejecutar una vez en Supabase SQL Editor:
+
+  ControlEvent_SQL_FIX_MAESTROS_CATALOGO_LIBRE.sql
+
+Si no se ejecuta, la app cargara, pero los mantenimientos podrian seguir mostrando el error de RPC no disponible o CE_BLOQUEO_FINALIZADO al guardar registros usados en eventos finalizados.

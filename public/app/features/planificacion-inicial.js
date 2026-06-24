@@ -316,10 +316,15 @@
     return n;
   }
   function planGroupKey(product){ return planProductAliasKey(product || ''); }
-  function planProductOptions(selected){
+  function planProductOptions(selected, fallbackName){
     const current = String(selected || '');
-    const opts = rows('productos').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(p => `<option value="${esc(p.id)}" ${String(p.id)===current?'selected':''}>${esc(p.nombre || 'Producto')}</option>`).join('');
-    return `<option value="" ${!current?'selected':''}>-- producto sin catálogo --</option>${opts}`;
+    const cleanFallback = String(fallbackName || '').trim();
+    const products = rows('productos').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+    const hasCurrent = current && products.some(p => String(p.id) === current);
+    const emptyLabel = cleanFallback || '-- producto sin catálogo --';
+    const extraCurrent = current && !hasCurrent ? `<option value="${esc(current)}" selected>${esc(emptyLabel)}</option>` : '';
+    const opts = products.map(p => `<option value="${esc(p.id)}" ${String(p.id)===current?'selected':''}>${esc(p.nombre || 'Producto')}</option>`).join('');
+    return `<option value="" ${!current?'selected':''}>${esc(emptyLabel)}</option>${extraCurrent}${opts}`;
   }
   function sortPlanResourceRows(list){
     const mode = String(planResourceOrderMode || 'PRODUCTO').toUpperCase();
@@ -497,15 +502,13 @@
             <label class="plan-include plan-include-icon"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/><span aria-hidden="true">✓</span></label>
             <label class="plan-need-large"><span>Necesidad calculada</span><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/></label>
           </div>
-          <strong class="plan-resource-product-label">${esc(r.producto)}</strong>
-          <select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select>
-          <em class="plan-resource-excluded-label">${esc(badgeText)}</em>
+          <select class="plan-resource-product-select" data-plan-resource-field="productId" aria-label="Producto">${planProductOptions(r.productId, r.producto)}</select>
         </td>
         <td class="plan-resource-flow">${donations}${purchase}${empty}</td>
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card" id="planResourceEditor">
-      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: a la izquierda la necesidad y el producto; a la derecha, las donaciones exactas y la compra del déficit. Las unidades donadas son informativas y no se recalculan solas.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar recurso..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
         <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -520,7 +523,7 @@
     st.textContent = `
       .plan-resource-edit-row.plan-row-changed{outline:4px solid rgba(245,158,11,.75)!important;box-shadow:0 0 0 6px rgba(245,158,11,.18)!important;background:#fffbeb!important;scroll-margin:120px!important}
       .plan-resource-edit-row.plan-found{outline:4px solid rgba(37,99,235,.75)!important;box-shadow:0 0 0 6px rgba(37,99,235,.16)!important}
-      .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:120px!important;max-width:100%!important}
+      .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:120px!important;max-width:100%!important;font-weight:950!important;font-size:15px!important;background:#fff!important;color:#111827!important}
       .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
       .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.plan-resource-order-actions input{min-width:190px!important;max-width:260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-resource-order-actions button{white-space:nowrap}
@@ -755,8 +758,7 @@
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const ingresosInfo = incomeSummary(lastIncomeProposal);
-    const detailCards = sortPlanProposalDetailCards(proposals.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
-    const cards = detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
+    const cards = advancedDetailCardsHtml();
     box.classList.remove('hidden');
     box.innerHTML = `
       <div class="plan-summary-grid">
@@ -805,6 +807,30 @@
         <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Donante: ${esc(donorLabel(p.donorRef))}.` : ''}</div>
       </div>
     `;
+  }
+  function bindAdvancedProposalControls(root){
+    const scope = root || document.getElementById('planProposalList') || document;
+    scope.querySelectorAll('[data-plan-index]').forEach(card => {
+      if(card.__cePlanAdvancedBound) return;
+      card.__cePlanAdvancedBound = true;
+      const idx = Number(card.dataset.planIndex);
+      card.querySelectorAll('[data-plan-field]').forEach(input => {
+        input.addEventListener('change', () => updateProposalFromCard(idx, card));
+        input.addEventListener('input', () => {
+          if(input.dataset.planField === 'unidades' || input.dataset.planField === 'precio') updateProposalFromCard(idx, card, true);
+        });
+      });
+    });
+  }
+  function advancedDetailCardsHtml(){
+    const detailCards = sortPlanProposalDetailCards(lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
+    return detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
+  }
+  function refreshAdvancedProposalDetails(){
+    const list = document.getElementById('planProposalList');
+    if(!list) return;
+    list.innerHTML = advancedDetailCardsHtml();
+    bindAdvancedProposalControls(list);
   }
   function productGroupFromKey(key){ return planResourceRows(lastProposal).find(r => String(r.key) === String(key)) || null; }
   function createPurchaseForGroup(group, units, price, tiendaId, responsableId){
@@ -926,18 +952,20 @@
     if(purchaseTotal) purchaseTotal.textContent = money(buy * (price || 0));
     const nowNeedsPurchaseRow = buy > 0;
     if(nowNeedsPurchaseRow !== hadPurchaseRow){
+      const detailWasOpen = !!document.querySelector('.plan-advanced-lines')?.open;
       renderProposal();
+      if(detailWasOpen) document.querySelector('.plan-advanced-lines')?.setAttribute('open','');
       return;
     }
+    refreshAdvancedProposalDetails();
     tr.classList.toggle('excluded', !(include && (buy > 0 || Number(group.donado || 0) > 0)));
     tr.dataset.planProductName = normalizeText(newName);
     tr.dataset.planResourceKey = planGroupKey(newName);
-    const label = tr.querySelector('.plan-resource-product-label');
-    if(label) label.textContent = newName;
-    const meta = tr.querySelector('.plan-resource-meta span');
-    if(meta) meta.textContent = `${newSegment} - ${newDestino}`;
-    const badge = tr.querySelector('.plan-resource-excluded-label');
-    if(badge) badge.textContent = planResourceBadgeText({segmento:newSegment, destino:newDestino, necesidad:need, compra:buy});
+    const productSelect = tr.querySelector('[data-plan-resource-field="productId"]');
+    if(productSelect && !selectedProductId){
+      const opt = productSelect.options && productSelect.options[productSelect.selectedIndex];
+      if(opt) opt.textContent = newName;
+    }
     tr.classList.remove('plan-sd-comida-aperitivo','plan-sd-comida-comida','plan-sd-comida-cena','plan-sd-bebida-aperitivo','plan-sd-bebida-comida','plan-sd-bebida-cena','plan-sd-bebida-cubatas','plan-sd-infra-aperitivo','plan-sd-infra-comida','plan-sd-infra-cubatas','plan-sd-infra-cena','plan-sd-infra-infra','plan-sd-rara');
     const sdClass = planSegDestClass({segmento:newSegment,destino:newDestino});
     if(sdClass) tr.classList.add(sdClass);
@@ -946,21 +974,44 @@
 
 
 
+  function selectedOptionText(select){
+    try{ return select && select.options && select.selectedIndex >= 0 ? String(select.options[select.selectedIndex]?.textContent || '') : ''; }catch(_){ return ''; }
+  }
+  function planSearchHaystack(card){
+    if(!card) return '';
+    const values = [
+      card.dataset?.planProductName || '',
+      card.dataset?.productText || '',
+      card.querySelector('.plan-resource-product-label')?.textContent || '',
+      selectedOptionText(card.querySelector('[data-plan-resource-field="productId"]')),
+      card.querySelector('.plan-product-title strong')?.textContent || '',
+      card.querySelector('.plan-product-title span')?.textContent || '',
+      ...Array.from(card.querySelectorAll('select')).map(selectedOptionText),
+      card.textContent || ''
+    ];
+    return normalizeText(values.join(' '));
+  }
   function searchPlanProductIn(inputId, selector, sectionLabel){
     const input = document.getElementById(inputId);
-    const term = normalizeText(input?.value || '');
+    const raw = String(input?.value || '').trim();
+    const term = normalizeText(raw);
     if(!term){ input?.focus(); return; }
+    const tokens = term.split(/\s+/).filter(Boolean);
     const cards = Array.from(document.querySelectorAll(selector));
-    const found = cards.find(card => String(card.dataset.planProductName || card.querySelector('.plan-resource-product-label')?.textContent || card.querySelector('strong')?.textContent || card.textContent || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().includes(term));
+    const found = cards.find(card => {
+      const hay = planSearchHaystack(card);
+      return hay.includes(term) || tokens.every(tok => hay.includes(tok));
+    });
     document.querySelectorAll('.plan-product-card.plan-found, .plan-resource-edit-row.plan-found').forEach(el => el.classList.remove('plan-found'));
     if(found){
       found.classList.add('plan-found');
       found.scrollIntoView({behavior:'smooth', block:'center'});
       setTimeout(() => found.classList.remove('plan-found'), 2600);
+      if(input) input.value = '';
     }else{
-      try{ alert('No se ha encontrado en ' + (sectionLabel || 'este apartado') + ': ' + (input?.value || '')); }catch(_){ }
+      try{ alert('No se ha encontrado en ' + (sectionLabel || 'este apartado') + ': ' + raw); }catch(_){ }
+      input?.focus();
     }
-    if(input) input.value = '';
   }
   function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row, .plan-resource-edit-row', 'Propuesta editable tipo Mapa de recursos'); }
   function searchProposalAdvanced(){ searchPlanProductIn('planBuscarDetalleAvanzado', '#planProposalList .plan-product-card', 'Detalle avanzado de líneas'); }
@@ -983,15 +1034,7 @@
   function bindProposalControls(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
-    box.querySelectorAll('[data-plan-index]').forEach(card => {
-      const idx = Number(card.dataset.planIndex);
-      card.querySelectorAll('[data-plan-field]').forEach(input => {
-        input.addEventListener('change', () => updateProposalFromCard(idx, card));
-        input.addEventListener('input', () => {
-          if(input.dataset.planField === 'unidades' || input.dataset.planField === 'precio') updateProposalFromCard(idx, card, true);
-        });
-      });
-    });
+    bindAdvancedProposalControls(box);
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
