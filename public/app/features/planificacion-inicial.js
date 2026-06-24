@@ -298,7 +298,24 @@
     if(isPackRoundedProduct(productName)) return Math.ceil(u / 24) * 24;
     return Math.ceil(u * 100) / 100;
   }
-  function planGroupKey(product){ return normalizeText(product || '') || 'producto'; }
+  function planProductAliasKey(value){
+    const n = normalizeText(value || '');
+    if(!n) return 'producto';
+    const has = (...parts) => parts.every(part => n.includes(String(part).toUpperCase()));
+    const hasTok = (tok) => new RegExp('(^|\\s)'+tok+'(\\s|$)').test(n);
+    if(has('RON','BARCELO')) return 'alias:ron-barcelo';
+    if(has('RON','BRUGAL')) return 'alias:ron-brugal';
+    if((hasTok('WISKI') || hasTok('WHISKY') || hasTok('WHISKI')) && (hasTok('JB') || /J\s*B/.test(n))) return 'alias:whisky-jb';
+    if((hasTok('WISKI') || hasTok('WHISKY') || hasTok('WHISKI')) && hasTok('DYC')) return 'alias:whisky-dyc';
+    if((hasTok('WISKI') || hasTok('WHISKY') || hasTok('WHISKI')) && (has('JOHNNIE') || has('JONIE') || has('WALKER'))) return 'alias:whisky-walker';
+    if((hasTok('GINEBRA') || hasTok('GIN')) && has('PUERTO','INDIAS')) return 'alias:ginebra-puerto-indias';
+    if((hasTok('GINEBRA') || hasTok('GIN')) && hasTok('LARIOS')) return 'alias:ginebra-larios';
+    if((hasTok('GINEBRA') || hasTok('GIN')) && (hasTok('BEEFEATER') || hasTok('BEEFETAER'))) return 'alias:ginebra-beefeater';
+    // Fuera de alias conocidos no se agrupa agresivamente, para no unir variantes reales
+    // como Coca-Cola normal/zero/00, vinos distintos, tamaños distintos, etc.
+    return n;
+  }
+  function planGroupKey(product){ return planProductAliasKey(product || ''); }
   function planProductOptions(selected){
     const current = String(selected || '');
     const opts = rows('productos').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(p => `<option value="${esc(p.id)}" ${String(p.id)===current?'selected':''}>${esc(p.nombre || 'Producto')}</option>`).join('');
@@ -360,6 +377,16 @@
         donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
         tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:''
       };
+      // Si Zuzu o el catálogo traen el mismo artículo con nombres ligeramente distintos
+      // (RON Barcelo / Ron BARCELÓ Añejo 0.7 L, WISKI JB / Whisky 5 Años J.B...),
+      // se agrupa en una sola ficha y se conserva el nombre/código de catálogo más completo.
+      const incomingName = String(p.productName || '').trim();
+      if(incomingName && normalizeText(incomingName).length > normalizeText(row.producto).length){
+        row.producto = incomingName;
+        row.segmento = p.segmento || row.segmento;
+        row.destino = p.destino || row.destino;
+      }
+      if(p.productId && (!row.productId || p.tipo === 'COMPRA')) row.productId = p.productId;
       row.allIndices.push(idx);
       if(p.include) row.include = true;
       const units = Number(p.unidades || 0);
@@ -451,6 +478,7 @@
       .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
       .plan-donation-cell{min-width:260px}.plan-donation-controls{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}.plan-donation-controls label{font-size:11px;font-weight:900;color:#334155}.plan-donation-controls select{width:100%;margin-top:2px;padding:8px 10px;border-radius:10px}
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.plan-resource-order-actions button{white-space:nowrap}
+      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 2px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
       .plan-resource-edit-row.plan-sd-comida-aperitivo>td{background:#f5ead8!important}.plan-resource-edit-row.plan-sd-comida-comida>td{background:#e7d1b4!important}.plan-resource-edit-row.plan-sd-comida-cena>td{background:#c99a68!important}
       .plan-resource-edit-row.plan-sd-bebida-aperitivo>td{background:#ffedd5!important}.plan-resource-edit-row.plan-sd-bebida-comida>td{background:#fed7aa!important}.plan-resource-edit-row.plan-sd-bebida-cena>td{background:#fdba74!important}.plan-resource-edit-row.plan-sd-bebida-cubatas>td{background:#fecaca!important}

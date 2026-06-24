@@ -1280,13 +1280,33 @@ function planContentModules(content) {
   return ['INGRESOS','COMPRAS','DONACIONES'];
 }
 function normPlanKey(value) { return norm(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function planProductAliasKey(value) {
+  const n = normPlanKey(value || '');
+  if (!n) return '';
+  const has = (...parts) => parts.every(part => n.includes(normPlanKey(part)));
+  const hasTok = (tok) => new RegExp('(^|\\s)' + normPlanKey(tok) + '(\\s|$)').test(n);
+  if (has('ron','barcelo')) return 'alias ron barcelo';
+  if (has('ron','brugal')) return 'alias ron brugal';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (hasTok('jb') || /j\s*b/.test(n))) return 'alias whisky jb';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && hasTok('dyc')) return 'alias whisky dyc';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (has('johnnie') || has('jonie') || has('walker'))) return 'alias whisky walker';
+  if ((hasTok('ginebra') || hasTok('gin')) && has('puerto','indias')) return 'alias ginebra puerto indias';
+  if ((hasTok('ginebra') || hasTok('gin')) && hasTok('larios')) return 'alias ginebra larios';
+  if ((hasTok('ginebra') || hasTok('gin')) && (hasTok('beefeater') || hasTok('beefetaer'))) return 'alias ginebra beefeater';
+  // Fuera de alias conocidos no se agrupa agresivamente, para no unir variantes reales
+  // como Coca-Cola normal/zero/00, vinos distintos, tamaños distintos, etc.
+  return n;
+}
 function planBuildMaps(state) {
   const events = arr(state?.eventos);
   const people = byId(state?.personas);
   const stores = byId(state?.tiendas);
   const products = byId(state?.productos);
   const productByName = new Map();
-  arr(state?.productos).forEach(p => { const k = normPlanKey(p?.nombre); if(k && !productByName.has(k)) productByName.set(k, p); });
+  arr(state?.productos).forEach(p => {
+    const k = normPlanKey(p?.nombre); if(k && !productByName.has(k)) productByName.set(k, p);
+    const ak = planProductAliasKey(p?.nombre); if(ak && !productByName.has(ak)) productByName.set(ak, p);
+  });
   const storeByName = new Map();
   arr(state?.tiendas).forEach(t => { const k = normPlanKey(t?.nombre); if(k && !storeByName.has(k)) storeByName.set(k, t); });
   const personByName = new Map();
@@ -1332,6 +1352,8 @@ function planFindProductLoose(label, maps) {
   const key = normPlanKey(label);
   if (!key) return null;
   if (maps.productByName.has(key)) return maps.productByName.get(key);
+  const aliasKey = planProductAliasKey(label);
+  if (aliasKey && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
   const toks = key.split(' ').filter(t => t.length >= 3);
   let best = null;
   let bestScore = 0;
@@ -1502,12 +1524,14 @@ function planPostProcessPlanningRows(rows, form, state) {
   const grouped = new Map();
   const out = arr(rows).map((r, idx) => ({...r, key:r.key || `plan:${idx}`}));
   out.forEach((r, idx) => {
-    const k = normPlanKey(r.productName || r.producto || r.productId || `p${idx}`);
+    const k = planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || r.productId || `p${idx}`);
     const g = grouped.get(k) || {key:k, rows:[], donation:0, purchase:0, productName:r.productName || r.producto || '', productId:r.productId || '', segment:r.segmento, destino:r.destino};
     g.rows.push(idx);
     const units = num(r.unidades);
     if (r.tipo === 'DONACION') g.donation += units; else g.purchase += units;
+    if ((r.productName || '').length > (g.productName || '').length) { g.productName = r.productName || g.productName; g.segment = r.segmento || g.segment; g.destino = r.destino || g.destino; }
     if (!g.productId && r.productId) g.productId = r.productId;
+    if (r.tipo === 'COMPRA' && r.productId) g.productId = r.productId;
     grouped.set(k, g);
   });
   for (const g of grouped.values()) {
