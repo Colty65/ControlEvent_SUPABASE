@@ -164,9 +164,29 @@
       const aa = accessor ? accessor(a) : a;
       const bb = accessor ? accessor(b) : b;
       if(mode === 'SEGMENTO_DESTINO'){
-        return String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || String(aa.producto||'').localeCompare(String(bb.producto||''),'es');
+        return String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es');
       }
-      return String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es');
+      if(mode === 'TIENDA'){
+        return String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es') || String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es');
+      }
+      return String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es');
+    });
+  }
+  function sortMapaDisplayItems(items){
+    const mode = String(mapaSortMode || 'PRODUCTO').toUpperCase();
+    const arrRows = Array.isArray(items) ? items.slice() : [];
+    const dataOf = item => item?.data || item || {};
+    const kindOrder = item => item?.kind === 'donationOnly' ? 1 : 0;
+    return arrRows.sort((a,b) => {
+      const aa = dataOf(a), bb = dataOf(b);
+      const ka = kindOrder(a), kb = kindOrder(b);
+      if(mode === 'SEGMENTO_DESTINO'){
+        return String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || (ka-kb) || String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es');
+      }
+      if(mode === 'TIENDA'){
+        return (ka-kb) || String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es') || String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es');
+      }
+      return String(aa.producto||'').localeCompare(String(bb.producto||''),'es') || (ka-kb) || String(aa.segmento||'').localeCompare(String(bb.segmento||''),'es') || String(aa.destino||'').localeCompare(String(bb.destino||''),'es') || String(aa.tienda||'').localeCompare(String(bb.tienda||''),'es');
     });
   }
 
@@ -372,6 +392,7 @@
           producto: productName(first),
           segmento: segmentName(first),
           destino: destinoName(first),
+          tienda: 'Producto donado',
           unidadesDonadas,
           valorDonado,
           precioDonado: unitPriceFrom(unidadesDonadas, valorDonado),
@@ -521,8 +542,8 @@
     return `<div class="mapa-product-search" id="mapaProductoSearchBox">
       <div class="field"><label>Buscar producto</label><input id="${SEARCH_ID}" class="ce-mapa-readonly-allowed mobile-menu-action" value="${esc(productSearchText)}" placeholder="Teclea parte del producto..." autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
       <button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}Btn">Buscar</button>
-      <div class="mapa-order-actions"><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortProduct">Orden producto</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortSegDest">Orden segmento/destino</button></div>
-      <span class="mapa-search-help">Busca el primer registro que contenga el texto y ordena toda la información por producto o por segmento-destino.</span>
+      <div class="mapa-order-actions"><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortProduct">Orden producto</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortSegDest">Orden segmento/destino</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortStore">Orden tienda/producto</button></div>
+      <span class="mapa-search-help">Busca el primer registro que contenga el texto y ordena toda la información por producto, por segmento-destino o por tienda y producto.</span>
     </div>`;
   }
   function productSearchTextOfCard(card){ return up(card?.dataset?.productText || card?.textContent || ''); }
@@ -564,7 +585,8 @@
     const input = $(SEARCH_ID), btn = $(SEARCH_ID + 'Btn');
     const sortProduct = $(SEARCH_ID + 'SortProduct');
     const sortSegDest = $(SEARCH_ID + 'SortSegDest');
-    [input, btn, sortProduct, sortSegDest].forEach(markSearchControl);
+    const sortStore = $(SEARCH_ID + 'SortStore');
+    [input, btn, sortProduct, sortSegDest, sortStore].forEach(markSearchControl);
     if(sortProduct && !sortProduct.__ceMapaSortBound){
       sortProduct.__ceMapaSortBound = true;
       sortProduct.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } mapaSortMode = 'PRODUCTO'; renderMapaProductos(); }, true);
@@ -572,6 +594,10 @@
     if(sortSegDest && !sortSegDest.__ceMapaSortBound){
       sortSegDest.__ceMapaSortBound = true;
       sortSegDest.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } mapaSortMode = 'SEGMENTO_DESTINO'; renderMapaProductos(); }, true);
+    }
+    if(sortStore && !sortStore.__ceMapaSortBound){
+      sortStore.__ceMapaSortBound = true;
+      sortStore.addEventListener('click', event => { try{ event.preventDefault(); event.stopPropagation(); }catch(_){ } mapaSortMode = 'TIENDA'; renderMapaProductos(); }, true);
     }
     if(!input || input.__ceMapaSearchBound){
       if(input) restoreProductSearchFocus();
@@ -731,6 +757,56 @@
     }, true);
   }
 
+  function renderMapaCompraCard(group, shoppingChecked){
+    const checkedNow = !group.isResolvedTk && shoppingChecked.has(group.key);
+    const responsablesTxt = Array.from(group.responsables.values()).join(', ') || '—';
+    const donorTxt = group.donationRows.map(item => item.donor).join(', ');
+    const searchText = dataProductText([group.tienda, group.ticket, group.producto, group.segmento, group.destino, responsablesTxt, donorTxt]);
+    const donationBlock = group.donationRows.length ? `
+        <div class="mapa-donation-block compact">
+          <div class="mapa-subtitle">Donantes</div>
+          ${renderDonationRows(group.donationRows)}
+        </div>` : '';
+    const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" aria-label="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleShop&&window.ControlEventMapaProductos.toggleShop(this,event)}catch(_e){};return false;">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>`;
+    return `
+      <article class="mapa-product-card mapa-product-card-compact compra-card ${group.isResolvedTk ? 'resolved-tk purchased-locked' : 'pending-buy'} ${checkedNow ? 'shop-checked' : ''}" data-product-text="${searchText}" data-shop-key="${esc(group.key)}">
+        <div class="mapa-product-head compact">
+          <div class="mapa-product-title"><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
+          <div class="mapa-product-actions">
+            <div class="mapa-tags compact"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
+            ${shopButton}
+          </div>
+        </div>
+        <div class="mapa-product-resp"><b>Responsable:</b> ${esc(responsablesTxt)}</div>
+        <div class="mapa-product-compact-line" role="list">
+          <div class="buy" role="listitem"><span>Compra</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. · ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))} · ${esc(moneyFmt(group.importeCompra))}</strong></div>
+          <div class="don" role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} · ${esc(moneyFmt(group.valorDonado))}</strong></div>
+          <div class="need" role="listitem"><span>Necesidad</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. · ${esc(moneyFmt(group.necesidadValor))}</strong></div>
+        </div>
+        ${donationBlock}
+      </article>`;
+  }
+  function renderMapaDonationOnlyCard(item){
+    const donorTxt = item.donationRows.map(row => row.donor).join(', ');
+    const searchText = dataProductText([item.producto, item.segmento, item.destino, donorTxt]);
+    return `
+      <article class="mapa-product-card mapa-product-card-compact donation-only donation-only-compact" data-product-text="${searchText}">
+        <div class="mapa-product-head compact donation-head-compact">
+          <div class="mapa-product-title"><h3>${esc(item.producto)}</h3></div>
+          <div class="mapa-tags compact"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div>
+        </div>
+        <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
+        <div class="mapa-donation-block compact donation-only-block">${renderDonationRowsCompact(item.donationRows)}</div>
+      </article>`;
+  }
+  function renderMapaCombinedCards(data, shoppingChecked){
+    const displayItems = sortMapaDisplayItems([
+      ...data.groups.map(group => ({kind:'compra', data:group})),
+      ...data.onlyDonations.map(item => ({kind:'donationOnly', data:item}))
+    ]);
+    return displayItems.map(item => item.kind === 'donationOnly' ? renderMapaDonationOnlyCard(item.data) : renderMapaCompraCard(item.data, shoppingChecked)).join('');
+  }
+
   function renderMapaProductos(){
     const wrap = $('mapaProductosList');
     const summary = $('mapaProductosSummary');
@@ -751,7 +827,7 @@
       ${renderResponsableFilter(data.responsableOptions)}
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
-        ${renderMetric('VALORACION DEL EVENTO', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
+        ${renderMetric('VALORACION DEL EVENTO (estimada)', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;
@@ -766,57 +842,7 @@
     }
 
     const shoppingChecked = readShoppingChecked();
-    const cards = data.groups.map(group => {
-      const checkedNow = !group.isResolvedTk && shoppingChecked.has(group.key);
-      const responsablesTxt = Array.from(group.responsables.values()).join(', ') || '—';
-      const donorTxt = group.donationRows.map(item => item.donor).join(', ');
-      const searchText = dataProductText([group.tienda, group.ticket, group.producto, group.segmento, group.destino, responsablesTxt, donorTxt]);
-      const donationBlock = group.donationRows.length ? `
-        <div class="mapa-donation-block compact">
-          <div class="mapa-subtitle">Donantes</div>
-          ${renderDonationRows(group.donationRows)}
-        </div>` : '';
-      const shopButton = group.isResolvedTk ? '' : `<button type="button" class="mapa-shop-toggle ${checkedNow ? 'is-checked' : ''}" data-mapa-shop-toggle="1" data-shop-key="${esc(group.key)}" aria-pressed="${checkedNow ? 'true' : 'false'}" aria-label="${checkedNow ? 'Quitar marca de comprado ahora' : 'Marcar este producto como comprado ahora'}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleShop&&window.ControlEventMapaProductos.toggleShop(this,event)}catch(_e){};return false;">${checkedNow ? '<span>✓</span> Comprado ahora' : '<span>○</span> Marcar comprado'}</button>`;
-      return `
-      <article class="mapa-product-card mapa-product-card-compact compra-card ${group.isResolvedTk ? 'resolved-tk purchased-locked' : 'pending-buy'} ${checkedNow ? 'shop-checked' : ''}" data-product-text="${searchText}" data-shop-key="${esc(group.key)}">
-        <div class="mapa-product-head compact">
-          <div class="mapa-product-title"><span class="mapa-store">${esc(group.tienda)}</span><h3>${esc(group.producto)}</h3></div>
-          <div class="mapa-product-actions">
-            <div class="mapa-tags compact"><span class="ticket ${group.isResolvedTk ? 'tk' : 'pending'}">${esc(group.ticket)}</span><span>${esc(group.segmento)}</span><span>${esc(group.destino)}</span></div>
-            ${shopButton}
-          </div>
-        </div>
-        <div class="mapa-product-resp"><b>Responsable:</b> ${esc(responsablesTxt)}</div>
-        <div class="mapa-product-compact-line" role="list">
-          <div class="buy" role="listitem"><span>Compra</span><strong>${esc(qtyFmt(group.unidadesCompra))} uds. · ${esc(unitPriceFmtFrom(group.unidadesCompra, group.importeCompra))} · ${esc(moneyFmt(group.importeCompra))}</strong></div>
-          <div class="don" role="listitem"><span>Donado</span><strong>${esc(qtyFmt(group.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(group.unidadesDonadas, group.valorDonado))} · ${esc(moneyFmt(group.valorDonado))}</strong></div>
-          <div class="need" role="listitem"><span>Necesidad</span><strong>${esc(qtyFmt(group.necesidadUnidades))} uds. · ${esc(moneyFmt(group.necesidadValor))}</strong></div>
-        </div>
-        ${donationBlock}
-      </article>`;
-    }).join('');
-
-    // V31.5: la cabecera inferior de productos donados debe respetar el filtro actual de responsables.
-    // La ficha superior DONACION DE PRODUCTO mantiene el total global del evento; esta cabecera resume solo lo listado.
-    const onlyDonationBlock = data.onlyDonations.length ? `
-      <section class="mapa-only-donations" id="mapaOnlyDonationsSection">
-        <div class="mapa-only-donations-head" id="mapaOnlyDonationsHead"><strong>MAS PRODUCTO DONADO FUERA DE NECESIDAD DE COMPRA</strong></div>
-        ${data.onlyDonations.map(item => {
-          const donorTxt = item.donationRows.map(row => row.donor).join(', ');
-          const searchText = dataProductText([item.producto, item.segmento, item.destino, donorTxt]);
-          return `
-          <article class="mapa-product-card mapa-product-card-compact donation-only donation-only-compact" data-product-text="${searchText}">
-            <div class="mapa-product-head compact donation-head-compact">
-              <div class="mapa-product-title"><h3>${esc(item.producto)}</h3></div>
-              <div class="mapa-tags compact"><span>${esc(item.segmento)}</span><span>${esc(item.destino)}</span></div>
-            </div>
-            <div class="mapa-product-compact-line donation-only-line"><div class="don"><span>Donado</span><strong>${esc(qtyFmt(item.unidadesDonadas))} uds. · ${esc(unitPriceFmtFrom(item.unidadesDonadas, item.valorDonado))} · ${esc(moneyFmt(item.valorDonado))}</strong></div></div>
-            <div class="mapa-donation-block compact donation-only-block">${renderDonationRowsCompact(item.donationRows)}</div>
-          </article>`;
-        }).join('')}
-      </section>` : '';
-
-    wrap.innerHTML = cards + onlyDonationBlock;
+    wrap.innerHTML = renderMapaCombinedCards(data, shoppingChecked);
     normalizeMapaLabelsV3013();
     bindShoppingButtonsDirect();
     // V31.4: no repetir automáticamente la búsqueda anterior tras renderizar.
