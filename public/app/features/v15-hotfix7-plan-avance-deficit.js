@@ -37,7 +37,7 @@
   }
   function applyProgressFallback(){
     try{ window.ControlEventV15Hotfix6?.applyAll?.(); }catch(_){}
-    const panel=document.querySelector('#budgetLayout .budget-panel.donantes');
+    const panel=document.querySelector('#budgetLayout .budget-panel.donantes') || Array.from(document.querySelectorAll('#budgetLayout .budget-panel')).find(p=>/DONACI[OÓ]N\s+DE\s+PRODUCTO/i.test(p.querySelector('h3')?.textContent||''));
     if(!panel) return;
     let box=panel.querySelector('.ce-v15hf6-avance-box,.ce-v15hf7-avance-box');
     if(box && box.children.length) return;
@@ -57,11 +57,32 @@
   function injectStyle(){
     if($('ceV15Hotfix7Style')) return;
     const st=document.createElement('style'); st.id='ceV15Hotfix7Style';
-    st.textContent=`#budgetLayout .budget-panel.donantes .ce-v15hf7-avance-box{margin-top:14px;padding:14px;border:3px solid #0f172a;border-radius:16px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.12)}#budgetLayout .budget-panel.donantes .ce-v15hf7-title{font-size:18px;font-weight:950;margin-bottom:10px}.ce-v15hf7-progress-row{padding:7px 0;border-top:1px dashed rgba(15,23,42,.16);display:flex;flex-direction:column;gap:5px}.ce-v15hf7-progress-head{display:flex;justify-content:space-between;gap:10px}.ce-v15hf7-track{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden}.ce-v15hf7-track i{display:block;height:100%;border-radius:999px}.ce-v15hf7-progress-row small{font-weight:700;color:#334155}.ce-v15hf7-progress-row em{font-style:normal;color:#c2410c;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:6px 8px;font-weight:800}`;
+    st.textContent=`#summaryTiendaTicket .summary-item.ce-v15hf7-summary-collapsed{cursor:pointer;min-height:44px;align-items:center}#summaryTiendaTicket .summary-item.ce-v15hf7-summary-collapsed>span:first-child{display:block;max-width:calc(100% - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#summaryTiendaTicket .summary-item.ce-v15hf7-summary-collapsed>span:first-child:after{content:'  ⓘ';font-weight:900;color:#2563eb}#summaryTiendaTicket .summary-item.ce-v15hf7-summary-pending>span:first-child{font-weight:950;color:#dc2626}#budgetLayout .budget-panel.donantes .ce-v15hf7-avance-box{margin-top:14px;padding:14px;border:3px solid #0f172a;border-radius:16px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.12)}#budgetLayout .budget-panel.donantes .ce-v15hf7-title{font-size:18px;font-weight:950;margin-bottom:10px}.ce-v15hf7-progress-row{padding:7px 0;border-top:1px dashed rgba(15,23,42,.16);display:flex;flex-direction:column;gap:5px}.ce-v15hf7-progress-head{display:flex;justify-content:space-between;gap:10px}.ce-v15hf7-track{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden}.ce-v15hf7-track i{display:block;height:100%;border-radius:999px}.ce-v15hf7-progress-row small{font-weight:700;color:#334155}.ce-v15hf7-progress-row em{font-style:normal;color:#c2410c;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:6px 8px;font-weight:800}`;
     document.head.appendChild(st);
   }
-  function apply(){ injectStyle(); applyProgressFallback(); collapseSummaryRows(); }
+  function collapseTiendaTicketRows(){
+    const root=$('summaryTiendaTicket');
+    if(!root) return;
+    Array.from(root.querySelectorAll(':scope > .summary-item')).forEach(row=>{
+      const amount=row.querySelector('.pill');
+      const label=row.querySelector(':scope > span:first-child') || row.querySelector('span');
+      if(!amount || !label) return;
+      const full=norm(label.textContent||'');
+      if(!full || /^TOTAL(\s+EVENTO)?$/i.test(full)) return;
+      const parts=full.split(' · ').map(norm).filter(Boolean);
+      if(parts.length<=1) return;
+      const head=parts.shift();
+      const detail=parts.join(' · ');
+      const tip=head+'\n\n'+detail;
+      row.setAttribute('data-ce-tip',tip); row.setAttribute('data-tip-bg','#ffffff');
+      label.setAttribute('data-ce-tip',tip); label.setAttribute('data-tip-bg','#ffffff');
+      label.textContent=head;
+      row.classList.add('ce-v15hf7-summary-collapsed');
+      if(/PTE\.?\s*COMPRA|OTROS\s*GASTOS/i.test(head)) row.classList.add('ce-v15hf7-summary-pending');
+    });
+  }
+  function apply(){ injectStyle(); applyProgressFallback(); collapseSummaryRows(); collapseTiendaTicketRows(); }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed'].forEach(e=>window.addEventListener(e,()=>setTimeout(apply,60),true));
   [0,200,700,1500,3000].forEach(ms=>setTimeout(apply,ms));
-  setInterval(apply,10000);
+  setInterval(apply,2500);
 })();

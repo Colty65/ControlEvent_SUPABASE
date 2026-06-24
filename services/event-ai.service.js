@@ -1433,6 +1433,22 @@ function planBuyAfterDonation(productName, totalNeed, donatedUnits) {
   if (planPackRoundedProduct(productName)) return Math.max(0, round(planRoundBuyUnits(productName, need) - donated, 2));
   return planRoundBuyUnits(productName, Math.max(0, need - donated));
 }
+
+function planCanonicalProductForRow(row, maps) {
+  const byIdProd = trim(row?.productId || row?.productoId || row?.producto_id) ? maps.products.get(trim(row?.productId || row?.productoId || row?.producto_id)) : null;
+  return byIdProd || planFindProductLoose(row?.productName || row?.producto || '', maps) || null;
+}
+function planCanonicalizeRowProduct(row, maps) {
+  const prod = planCanonicalProductForRow(row, maps);
+  if (!prod?.id) return row;
+  return {
+    ...row,
+    productId: trim(prod.id),
+    productName: trim(prod.nombre || row.productName || row.producto || 'Producto'),
+    segmento: trim(prod.segmento || row.segmento || 'Sin segmento'),
+    destino: trim(prod.destino || row.destino || 'Sin destino')
+  };
+}
 function planDisplayNeedAfterRounding(productName, totalNeed) {
   const need = Math.max(0, num(totalNeed));
   if (!need) return 0;
@@ -1525,9 +1541,12 @@ function planBudgetGuard(rows, form) {
       if (r?.tipo !== 'COMPRA' || r.include === false) return r;
       const before = num(r.unidades);
       const productName = trim(r.productName || r.producto || '');
+      if (num(r.donadoTotal) > 0 || r.explicitPromptDonation === true) {
+        return { ...r, unidades: before, aComprarCalculado: before, reason: trim(r.reason || '') + ' Línea con donación/existencia confirmada: no se reduce automáticamente para no descuadrar el déficit.' };
+      }
       const rawScaled = before * factor;
-      const scaled = (num(r.donadoTotal) > 0 && planPackRoundedProduct(productName)) ? Math.max(0, Math.ceil(rawScaled)) : planRoundBuyUnits(productName, rawScaled);
-      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial estaba por encima de 35 €/persona y se ha reducido para acercarla a coste real de evento. Redondeo final aplicado sin volver a sumar lo ya donado.` };
+      const scaled = planRoundBuyUnits(productName, rawScaled);
+      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial estaba por encima de 35 €/persona y se ha reducido para acercarla a coste real de evento.` };
     });
     total = planCompraTotal(out);
     per = total / people;
@@ -1561,9 +1580,9 @@ function planReadableNotes(rawNotes, rows, form, budgetNotes) {
 function planPostProcessPlanningRows(rows, form, state) {
   const maps = planBuildMaps(state);
   const grouped = new Map();
-  const out = arr(rows).map((r, idx) => ({...r, key:r.key || `plan:${idx}`}));
+  const out = arr(rows).map((r, idx) => planCanonicalizeRowProduct({...r, key:r.key || `plan:${idx}`}, maps));
   out.forEach((r, idx) => {
-    const k = planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || r.productId || `p${idx}`);
+    const k = trim(r.productId) ? `id:${trim(r.productId)}` : (planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || r.productId || `p${idx}`));
     const g = grouped.get(k) || {key:k, rows:[], donation:0, purchase:0, needHint:0, productName:r.productName || r.producto || '', productId:r.productId || '', segment:r.segmento, destino:r.destino};
     g.rows.push(idx);
     const units = num(r.unidades);
@@ -1582,7 +1601,7 @@ function planPostProcessPlanningRows(rows, form, state) {
     // se interpreta como necesidad total calculada, NO como compra adicional sobre lo donado.
     // Ej.: Anchoas donadas 1 y Zuzu calcula 2 => necesidad 2, compra 1; no compra 2.
     const currentNeed = hasExplicitDonation
-      ? (g.needHint > 0 ? Math.max(g.needHint, g.donation) : Math.max(g.donation, g.purchase))
+      ? (g.needHint > 0 ? Math.max(g.needHint, g.donation) : Math.max(g.donation, g.purchase || g.donation))
       : (g.needHint > 0 ? g.needHint : (g.donation + g.purchase));
     const rawNeed = planMinimumNeed(pname, form, currentNeed);
     const need = planDisplayNeedAfterRounding(pname, rawNeed);
@@ -1738,8 +1757,11 @@ function planExplicitItemLines(block) {
     if (/\b(responsable|donante|tienda|tipo\s+donaci[oó]n)\b\s*:/i.test(s) && !/\d/.test(s)) return;
     const m = s.match(/^\s*[•\-]\s*(.+)$/);
     if (m) { out.push(m[1]); return; }
-    // Soporta líneas sin guion: "Anchoas: 1", "Rollo papel secamanos: 1", "1 kg de chorizo".
-    if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,100}:\s*\d+(?:[,.]\d+)?\b/i.test(s) || /^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(s)) out.push(s);
+    // Soporta líneas sin guion: "Anchoas: 1", "Rollo papel secamanos: 1", "1 kg de chorizo"
+    // y líneas con donante delante: "Pocholo y Celes: Anchoas: 1".
+    if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,100}:\s*\d+(?:[,.]\d+)?\b/i.test(s)
+      || /^[^:\n]{2,90}:\s*[^:\n]{2,140}:\s*\d+(?:[,.]\d+)?\b/i.test(s)
+      || /^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(s)) out.push(s);
   });
   // También soporta una línea tipo "Productos: 1 queso, 1 lata, barril..."
   const prodLine = block.match(/Productos?\s*:\s*([\s\S]+)/i);
@@ -1779,11 +1801,38 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     const donorRef = planRefFromLooseLabel(donorLabel, maps, defaults.preferredDonorKind || 'P') || planRefFromLooseLabel(storeLabel, maps, 'T') || trim(donorLabel);
     const resp = planFindPersonLoose(responsableLabel, maps);
     const store = planFindStoreLoose(storeLabel, maps);
-    for (const item of planExplicitItemLines(block)) {
+    for (const itemRaw of planExplicitItemLines(block)) {
+      let item = itemRaw;
+      let lineDonorLabel = donorLabel;
+      let lineRespLabel = responsableLabel;
+      let lineStoreLabel = storeLabel;
+      let lineTicket = defaults.ticketDonacion || 'DONADO SOCIO';
+      const donorPrefix = trim(itemRaw).match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,160}:\s*\d+(?:[,.]\d+)?\b.*)$/i);
+      if (donorPrefix) {
+        const prefix = trim(donorPrefix[1]);
+        const mentionedStore = planFindStoreLoose(prefix, maps);
+        const mentionedPerson = planFindPersonLoose(prefix, maps);
+        if (mentionedStore?.id || mentionedPerson?.id || /pe[nñ]a|despensa|tienda|almacen|almac[eé]n/i.test(prefix)) {
+          item = donorPrefix[2];
+          if (mentionedStore?.id || /tienda|despensa/i.test(prefix)) {
+            lineTicket = 'DONADO TIENDA';
+            lineStoreLabel = mentionedStore?.nombre || prefix;
+            lineDonorLabel = mentionedStore?.nombre || prefix;
+            lineRespLabel = trim(form.defaultResponsibleName || responsableLabel || '');
+          } else {
+            lineTicket = 'DONADO SOCIO';
+            lineDonorLabel = mentionedPerson?.nombre || prefix;
+            lineRespLabel = mentionedPerson?.nombre || prefix;
+          }
+        }
+      }
       const productoTexto = planCleanExplicitProductText(item);
       const prod = planFindProductLoose(productoTexto, maps);
       if (!prod?.id) continue;
       const unidades = Math.max(0.01, planExplicitUnits(item));
+      const rowDonorRef = planRefFromLooseLabel(lineDonorLabel, maps, lineTicket === 'DONADO TIENDA' ? 'T' : 'P') || planRefFromLooseLabel(lineStoreLabel, maps, 'T') || trim(lineDonorLabel);
+      const rowResp = planFindPersonLoose(lineRespLabel, maps);
+      const rowStore = planFindStoreLoose(lineStoreLabel, maps);
       rowsOut.push({
         key:`prompt-don:${rowsOut.length}:${prod.id}`,
         include:true,
@@ -1794,12 +1843,13 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         destino:trim(prod.destino || 'Sin destino'),
         unidades:round(unidades, 2),
         precio:planReasonablePlanPrice(prod.nombre || productoTexto, prod.defaultPrecio ?? prod.precio ?? 0),
-        tiendaId:trim(store?.id || form.defaultStoreId || ''),
-        responsableId:trim(resp?.id || form.defaultResponsibleId || ''),
-        ticketDonacion:defaults.ticketDonacion || 'DONADO SOCIO',
-        donorRef,
+        tiendaId:trim(rowStore?.id || store?.id || form.defaultStoreId || ''),
+        responsableId:trim(rowResp?.id || resp?.id || form.defaultResponsibleId || ''),
+        ticketDonacion:lineTicket,
+        donorRef:rowDonorRef,
         confidence:'Prompt explícito',
-        reason:`Existencia/donación indicada literalmente por el usuario (${donorLabel}).`
+        explicitPromptDonation:true,
+        reason:`Existencia/donación indicada literalmente por el usuario (${lineDonorLabel}).`
       });
     }
   }

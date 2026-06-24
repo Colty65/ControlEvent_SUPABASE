@@ -406,9 +406,13 @@
   function planResourceRows(proposals){
     const map = new Map();
     (Array.isArray(proposals) ? proposals : []).forEach((p, idx) => {
-      const key = planGroupKey(p.productName || p.productId || `producto-${idx}`);
+      const key = p.productId ? `id:${String(p.productId)}` : planGroupKey(p.productName || `producto-${idx}`);
+      const catalogProduct = p.productId ? byId('productos', p.productId) : null;
+      const canonicalName = catalogProduct?.nombre || p.productName || 'Producto';
+      const canonicalSegmento = catalogProduct?.segmento || p.segmento || '';
+      const canonicalDestino = catalogProduct?.destino || p.destino || '';
       const row = map.get(key) || {
-        key, producto: p.productName || 'Producto', productId:p.productId || '', segmento: p.segmento || '', destino: p.destino || '', necesidad:0,
+        key, producto: canonicalName, productId:p.productId || '', segmento: canonicalSegmento, destino: canonicalDestino, necesidad:0,
         compra:0, donado:0, importeCompra:0, importeDonado:0, precioCompra:0, precioDonado:0,
         donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
         tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:'', donationDetails:[], purchaseDetails:[]
@@ -416,13 +420,13 @@
       // Si Zuzu o el catálogo traen el mismo artículo con nombres ligeramente distintos
       // (RON Barcelo / Ron BARCELÓ Añejo 0.7 L, WISKI JB / Whisky 5 Años J.B...),
       // se agrupa en una sola ficha y se conserva el nombre/código de catálogo más completo.
-      const incomingName = String(p.productName || '').trim();
-      if(incomingName && normalizeText(incomingName).length > normalizeText(row.producto).length){
+      const incomingName = String(canonicalName || p.productName || '').trim();
+      if(incomingName && (p.productId || normalizeText(incomingName).length > normalizeText(row.producto).length)){
         row.producto = incomingName;
-        row.segmento = p.segmento || row.segmento;
-        row.destino = p.destino || row.destino;
+        row.segmento = canonicalSegmento || row.segmento;
+        row.destino = canonicalDestino || row.destino;
       }
-      if(p.productId && (!row.productId || p.tipo === 'COMPRA')) row.productId = p.productId;
+      if(p.productId && (!row.productId || p.tipo === 'COMPRA' || String(row.productId) === String(p.productId))) row.productId = p.productId;
       row.allIndices.push(idx);
       if(p.include) row.include = true;
       const units = Number(p.unidades || 0);
@@ -490,7 +494,7 @@
     const donationRows = (r) => (Array.isArray(r.donationDetails) ? r.donationDetails : []).map((d, n) => {
       const imp = Number(d.unidades || 0) * Number(d.precio || 0);
       return `<div class="plan-resource-subrow plan-resource-donation-subrow" data-plan-donation-index="${esc(d.idx)}">
-        <span class="plan-resource-mini"><b>Unidades</b><strong>${qty(d.unidades)}</strong></span>
+        <label>Unidades<input type="number" min="0" step="0.01" value="${esc(d.unidades || 0)}" data-plan-resource-field="donationUnits" data-plan-proposal-index="${esc(d.idx)}"/></label>
         <label>Precio<input type="number" min="0" step="0.01" value="${esc(d.precio || 0)}" data-plan-resource-field="donationPrecio" data-plan-proposal-index="${esc(d.idx)}"/></label>
         <span class="plan-resource-mini"><b>Importe</b><strong data-plan-donation-total="${esc(d.idx)}">${money(imp)}</strong></span>
         <span class="plan-resource-donation-badge">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}</span>
@@ -930,20 +934,23 @@
         }
       }
     });
+    let editedDonatedTotal = 0;
     group.donationIndices.forEach(idx => {
       const row = lastProposal[idx];
       if(!row) return;
       const donorInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donorRef"]`);
       const respInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationResponsableId"]`);
+      const donationUnitsInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationUnits"]`);
       const donationPriceInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationPrecio"]`);
-      // Las unidades donadas no se tocan aquí: proceden del prompt/histórico y son invariables salvo edición manual directa en el detalle avanzado.
+      if(donationUnitsInput) row.unidades = Math.max(0, Number(donationUnitsInput.value || 0));
+      editedDonatedTotal += Number(row.unidades || 0);
       if(donorInput) row.donorRef = donorInput.value;
       if(respInput) row.responsableId = respInput.value;
       if(donationPriceInput){
         row.precio = Math.max(0, Number(donationPriceInput.value || 0));
-        const out = tr.querySelector(`[data-plan-donation-total="${String(idx)}"]`);
-        if(out) out.textContent = money(Number(row.unidades || 0) * Number(row.precio || 0));
       }
+      const out = tr.querySelector(`[data-plan-donation-total="${String(idx)}"]`);
+      if(out) out.textContent = money(Number(row.unidades || 0) * Number(row.precio || 0));
       if(selectedProductId){
         row.productId = selectedProductId;
         row.productName = newName;
@@ -952,6 +959,10 @@
         row.manualProduct = true;
       }
     });
+    if((changedField === 'donationUnits' || changedField === 'necesidad' || changedField === '__sync') && buyInput){
+      buy = planBuyAfterDonation(newName, need || group.necesidad || 0, editedDonatedTotal || Number(group.donado || 0));
+      buyInput.value = String(buy);
+    }
     let pidx = group.purchaseIndices[0];
     if((pidx === undefined || pidx < 0) && buy > 0) pidx = createPurchaseForGroup(group, buy, price, tiendaId, responsableId);
     const purchase = pidx !== undefined ? lastProposal[pidx] : null;

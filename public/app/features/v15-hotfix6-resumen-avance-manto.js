@@ -153,7 +153,7 @@
   }
 
   function applyBudgetProgress(){
-    const panel = document.querySelector('#budgetLayout .budget-panel.donantes');
+    const panel = document.querySelector('#budgetLayout .budget-panel.donantes') || Array.from(document.querySelectorAll('#budgetLayout .budget-panel')).find(p => /DONACI[OÓ]N\s+DE\s+PRODUCTO/i.test(p.querySelector('h3')?.textContent || ''));
     if(!panel) return;
     const p = computeProgress();
     let box = panel.querySelector('.ce-v15hf6-avance-box');
@@ -193,9 +193,15 @@
         row.setAttribute('data-ce-tip-v21', tip);
         row.setAttribute('data-tip-bg-v21', '#ffffff');
         row.setAttribute('data-ce-tip-layout-v21', 'default');
+        row.setAttribute('data-ce-tip', tip);
+        row.setAttribute('data-tip-bg', '#ffffff');
+        row.setAttribute('data-ce-tip-layout', 'default');
         labelNode.setAttribute('data-ce-tip-v21', tip);
         labelNode.setAttribute('data-tip-bg-v21', '#ffffff');
         labelNode.setAttribute('data-ce-tip-layout-v21', 'default');
+        labelNode.setAttribute('data-ce-tip', tip);
+        labelNode.setAttribute('data-tip-bg', '#ffffff');
+        labelNode.setAttribute('data-ce-tip-layout', 'default');
         labelNode.textContent = head;
         row.classList.add('ce-v15hf6-summary-collapsed');
       }else{
@@ -291,6 +297,8 @@
       #summaryTiendaTicket .summary-item.ce-v15hf6-summary-collapsed{cursor:pointer;}
       #summaryTiendaTicket .summary-item.ce-v15hf6-summary-collapsed > span:first-child{text-decoration:none;}
       #summaryTiendaTicket .summary-item.ce-v15hf6-summary-collapsed > span:first-child::after{content:'  ⓘ';font-weight:900;color:#2563eb;}
+      #summaryTiendaTicket .summary-item.ce-v15hf6-summary-collapsed{min-height:44px;align-items:center;}
+      #summaryTiendaTicket .summary-item.ce-v15hf6-summary-collapsed > span:first-child{display:block;max-width:calc(100% - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       #summaryTiendaTicket .summary-item.ce-v15hf6-summary-pending > span:first-child{font-weight:900;}
       @media (max-width:760px){
         #budgetLayout .budget-panel.donantes .ce-v15hf6-avance-box{padding:12px 10px;}
@@ -350,6 +358,6 @@
 
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
   [0,120,500,1400,2600].forEach(ms => setTimeout(install, ms));
-  setInterval(applyAll, 12000);
+  setInterval(applyAll, 2500);
   window.ControlEventV15Hotfix6 = {version: VERSION, versionFile: VERSION_FILE, applyAll, computeProgress};
 })();

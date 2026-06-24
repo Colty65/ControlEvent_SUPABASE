@@ -1,0 +1,33 @@
+ControlEvent v15_prod - HOTFIX8 SIN CAMBIO DE VERSION
+
+Objetivo:
+- Rescate de la lógica de planificación inicial para volver a separar correctamente donaciones confirmadas y compras por déficit.
+- No cambia la versión visible de la app.
+
+Cambios:
+1) Donaciones explícitas del prompt:
+   - Se detectan mejor líneas tipo "Anchoas: 1", "Rollo papel secamanos: 1" y también "Pocholo y Celes: Anchoas: 1".
+   - Si el prompt fija una donación, esa cantidad queda bloqueada como DONACION.
+   - Cualquier necesidad adicional se crea como COMPRA por déficit.
+
+2) Compras por déficit:
+   - La agrupación interna usa productId cuando existe, para no mezclar variantes ni nombres inventados.
+   - Los productos se canonizan con el nombre real de PRODUCTOS cuando hay coincidencia de catálogo.
+   - El ajuste de presupuesto no reduce ni recalcula por detrás las líneas que dependen de una donación explícita.
+
+3) Sincronización propuesta editable / detalle avanzado:
+   - Cambios en la parte superior recalculan y refrescan el detalle.
+   - Las unidades de donación también son editables arriba.
+   - Cambios en detalle avanzado re-renderizan la propuesta completa.
+
+4) Resumen presupuestario:
+   - Refuerzo para insertar siempre AVANCE del evento debajo de Valor producto donado.
+   - Búsqueda del panel DONACION DE PRODUCTO por clase y por título para evitar que no aparezca.
+
+5) Por tienda y Ticket:
+   - Las filas largas quedan resumidas.
+   - El detalle completo pasa al globo/tooltip usando también atributos data-ce-tip estándar.
+
+SQL:
+- No hay SQL nuevo.
+- Sigue valiendo el SQL anterior de maestros si ya se ejecutó.
