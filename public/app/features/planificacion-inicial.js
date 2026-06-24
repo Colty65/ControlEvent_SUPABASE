@@ -375,7 +375,7 @@
         key, producto: p.productName || 'Producto', productId:p.productId || '', segmento: p.segmento || '', destino: p.destino || '', necesidad:0,
         compra:0, donado:0, importeCompra:0, importeDonado:0, precioCompra:0, precioDonado:0,
         donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
-        tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:''
+        tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:'', donationDetails:[], purchaseDetails:[]
       };
       // Si Zuzu o el catálogo traen el mismo artículo con nombres ligeramente distintos
       // (RON Barcelo / Ron BARCELÓ Añejo 0.7 L, WISKI JB / Whisky 5 Años J.B...),
@@ -403,6 +403,17 @@
         row.donationTicket = row.donationTicket || p.ticketDonacion || 'DONADO';
         const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(p.donorRef)} · Resp. ${personaName(p.responsableId)}`;
         row.donantes.set(label, (row.donantes.get(label) || 0) + units);
+        row.donationDetails.push({
+          idx,
+          unidades:units,
+          precio:Number(p.precio || 0),
+          importe,
+          ticketDonacion:p.ticketDonacion || 'DONADO',
+          donorRef:p.donorRef || '',
+          responsableId:p.responsableId || '',
+          donorLabel:donorLabel(p.donorRef),
+          responsableLabel:personaName(p.responsableId)
+        });
       }else{
         row.compra += units;
         row.importeCompra += importe;
@@ -412,6 +423,7 @@
         row.responsableId = row.responsableId || p.responsableId || '';
         const label = `${tiendaName(p.tiendaId)} · Resp. ${personaName(p.responsableId)}`;
         row.compras.set(label, (row.compras.get(label) || 0) + units);
+        row.purchaseDetails.push({ idx, unidades:units, precio:Number(p.precio || 0), importe, tiendaId:p.tiendaId || '', responsableId:p.responsableId || '' });
       }
       if(!row.productId && p.productId) row.productId = p.productId;
       map.set(key, row);
@@ -420,7 +432,7 @@
       const baseNeed = row.necesidad > 0 ? row.necesidad : row.donado + row.compra;
       const roundedDeficit = planDeficitUnits(row.producto, Math.max(0, baseNeed - row.donado));
       const nextCompra = roundedDeficit;
-      return {...row, necesidad: baseNeed, compra: nextCompra, include: row.include || nextCompra > 0};
+      return {...row, necesidad: baseNeed, compra: nextCompra, include: row.include || nextCompra > 0 || row.donado > 0};
     });
     return sortPlanResourceRows(list);
   }
@@ -436,31 +448,50 @@
       const extra = value && !has ? `<option value="${esc(value)}" selected>${esc(donorLabel(value))}</option>` : '';
       return `<option value="" ${!value?'selected':''}>-- donante --</option>` + extra + list.map(d => `<option value="${esc(d.value)}" ${String(d.value)===value?'selected':''}>${esc(d.label)}</option>`).join('');
     };
+    const donationRows = (r) => (Array.isArray(r.donationDetails) ? r.donationDetails : []).map((d, n) => {
+      const imp = Number(d.unidades || 0) * Number(d.precio || 0);
+      return `<div class="plan-resource-subrow plan-resource-donation-subrow" data-plan-donation-index="${esc(d.idx)}">
+        <span class="plan-resource-mini"><b>Unidades</b><strong>${qty(d.unidades)}</strong></span>
+        <label>Precio<input type="number" min="0" step="0.01" value="${esc(d.precio || 0)}" data-plan-resource-field="donationPrecio" data-plan-proposal-index="${esc(d.idx)}"/></label>
+        <span class="plan-resource-mini"><b>Importe</b><strong data-plan-donation-total="${esc(d.idx)}">${money(imp)}</strong></span>
+        <span class="plan-resource-donation-badge">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}</span>
+        <label>Donante<select data-plan-resource-field="donorRef" data-plan-proposal-index="${esc(d.idx)}">${donorOpts(d.donorRef)}</select></label>
+        <label>Responsable<select data-plan-resource-field="donationResponsableId" data-plan-proposal-index="${esc(d.idx)}">${respOpts(d.responsableId, '-- responsable donación --')}</select></label>
+      </div>`;
+    }).join('');
+    const purchaseRow = (r, buyBase, price) => buyBase > 0 ? `<div class="plan-resource-subrow plan-resource-purchase-subrow">
+        <label>A comprar<input type="number" min="0" step="0.01" value="${esc(buyBase)}" data-plan-resource-field="compra"/></label>
+        <label>Precio<input type="number" min="0" step="0.01" value="${esc(price)}" data-plan-resource-field="precio"/></label>
+        <span class="plan-resource-mini"><b>Importe</b><strong data-plan-purchase-total>${money(buyBase * price)}</strong></span>
+        <label>Tienda<select data-plan-resource-field="tiendaId">${tiendaOpts(r.tiendaId) || '<option value="">Sin tiendas</option>'}</select></label>
+        <label>Responsable<select data-plan-resource-field="responsableId">${respOpts(r.responsableId) || '<option value="">Sin socios</option>'}</select></label>
+      </div>` : '';
     const tr = rows.map(r => {
-      const hasDonation = Number(r.donado || 0) > 0 || (Array.isArray(r.donationIndices) && r.donationIndices.length > 0);
-      const don = [...r.donantes.entries()].map(([k,v]) => `<span class="plan-donation-line"><b>Origen:</b> ${esc(k)} · <b>Cantidad:</b> ${qty(v)} ud.</span>`).join('<br>') || '<span class="plan-muted">Sin donación/existencia</span>';
-      const donationControls = hasDonation ? `<div class="plan-donation-controls">
-          <label>Donante donación<select data-plan-resource-field="donorRef">${donorOpts(r.donorRef)}</select></label>
-          <label>Resp. donación<select data-plan-resource-field="donationResponsableId">${respOpts(r.donationResponsableId, '-- responsable donación --')}</select></label>
-        </div>` : '';
       const buyBase = Math.max(0, Number(r.compra || 0));
       const price = Number(r.precioCompra || r.precioDonado || 0);
       const rowClass = ['plan-resource-edit-row', r.include ? '' : 'excluded', planSegDestClass(r)].filter(Boolean).join(' ');
       const badgeText = planResourceBadgeText({...r, compra:buyBase});
+      const donations = donationRows(r);
+      const purchase = purchaseRow(r, buyBase, price);
+      const empty = (!donations && !purchase) ? '<div class="plan-resource-empty-flow">Sin donación ni compra prevista.</div>' : '';
       return `<tr class="${rowClass}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
-        <td class="plan-resource-main"><label class="plan-include"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/> Incluir</label><strong class="plan-resource-product-label">${esc(r.producto)}</strong><small class="plan-resource-meta">${esc(r.segmento)} · ${esc(r.destino)}</small><select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select><em class="plan-resource-excluded-label">${esc(badgeText)}</em></td>
-        <td><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/><small>Necesidad total calculada</small></td>
-        <td class="plan-donation-cell"><strong>${qty(r.donado)} ud.</strong><small>${don}</small>${donationControls}</td>
-        <td><input type="number" min="0" step="0.01" value="${esc(buyBase)}" data-plan-resource-field="compra"/><small>Déficit a comprar editable</small></td>
-        <td><input type="number" min="0" step="0.01" value="${esc(price)}" data-plan-resource-field="precio"/><small>${esc(money(buyBase * price))}</small></td>
-        <td><select data-plan-resource-field="tiendaId">${tiendaOpts(buyBase > 0 ? r.tiendaId : '') || '<option value="">Sin tiendas</option>'}</select><small>Tienda de compra</small></td>
-        <td><select data-plan-resource-field="responsableId">${respOpts(buyBase > 0 ? r.responsableId : '') || '<option value="">Sin socios</option>'}</select><small>Responsable de compra</small></td>
+        <td class="plan-resource-general">
+          <div class="plan-resource-general-top">
+            <label class="plan-include plan-include-icon"><input type="checkbox" data-plan-resource-field="include" ${r.include ? 'checked' : ''}/><span aria-hidden="true">✓</span></label>
+            <label class="plan-need-large"><span>Necesidad calculada</span><input type="number" min="0" step="0.01" value="${esc(r.necesidad)}" data-plan-resource-field="necesidad"/></label>
+          </div>
+          <strong class="plan-resource-product-label">${esc(r.producto)}</strong>
+          <select class="plan-resource-product-select" data-plan-resource-field="productId">${planProductOptions(r.productId)}</select>
+          <small class="plan-resource-meta"><b>SEGMENTO - DESTINO</b><span>${esc(r.segmento || 'Sin segmento')} - ${esc(r.destino || 'Sin destino')}</span></small>
+          <em class="plan-resource-excluded-label">${esc(badgeText)}</em>
+        </td>
+        <td class="plan-resource-flow">${donations}${purchase}${empty}</td>
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card">
-      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: necesidad total, donación/existencia con su donante y responsable, y compra pendiente con su tienda y responsable. Las filas con déficit 0 siguen visibles como excluidas.</p></div><div class="plan-resource-order-actions"><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button></div></div>
-      <div class="table-scroll"><table class="ce-table plan-resource-edit-table">
-        <thead><tr><th>Producto</th><th>Necesidad</th><th>Donación / existencia</th><th>A comprar</th><th>Precio / importe</th><th>Tienda compra</th><th>Resp. compra</th></tr></thead>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa producto a producto: a la izquierda la necesidad y el producto; a la derecha, las donaciones exactas y la compra del déficit. Las unidades donadas son informativas y no se recalculan solas.</p></div><div class="plan-resource-order-actions"><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button></div></div>
+      <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
+        <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
       </table></div>
     </div>`;
@@ -476,9 +507,13 @@
       .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:180px!important}
       .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
       .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
-      .plan-donation-cell{min-width:260px}.plan-donation-controls{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}.plan-donation-controls label{font-size:11px;font-weight:900;color:#334155}.plan-donation-controls select{width:100%;margin-top:2px;padding:8px 10px;border-radius:10px}
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.plan-resource-order-actions button{white-space:nowrap}
-      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 2px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}
+      .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:50%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:50%!important}
+      .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(160px,260px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:22px!important;font-weight:950!important;text-align:center!important;padding:8px 10px!important;border-radius:12px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
+      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:74px 90px 96px minmax(96px,128px) 1fr 1fr!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#f7e7a7!important;border-color:#d4af37!important}.plan-resource-purchase-subrow{background:#fee2e2!important;border-color:#ef4444!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#b8860b!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
+      .plan-product-card.plan-donation-card{background:#d4af37!important;border-color:#b8860b!important;color:#fff!important}.plan-product-card.plan-purchase-card{background:#dc2626!important;border-color:#991b1b!important;color:#fff!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason,.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#fff!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence,.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.20)!important;color:#fff!important;border-color:rgba(255,255,255,.55)!important}
+      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}
+      @media (max-width: 900px){.plan-resource-split-table{table-layout:auto!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child,.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:auto!important}.plan-resource-subrow{grid-template-columns:1fr 1fr!important}.plan-resource-general-top{grid-template-columns:auto 1fr!important}.plan-resource-split-table thead{display:none!important}.plan-resource-split-table tr,.plan-resource-split-table td{display:block!important;width:100%!important;border-radius:10px!important}}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
       .plan-resource-edit-row.plan-sd-comida-aperitivo>td{background:#f5ead8!important}.plan-resource-edit-row.plan-sd-comida-comida>td{background:#e7d1b4!important}.plan-resource-edit-row.plan-sd-comida-cena>td{background:#c99a68!important}
       .plan-resource-edit-row.plan-sd-bebida-aperitivo>td{background:#ffedd5!important}.plan-resource-edit-row.plan-sd-bebida-comida>td{background:#fed7aa!important}.plan-resource-edit-row.plan-sd-bebida-cena>td{background:#fdba74!important}.plan-resource-edit-row.plan-sd-bebida-cubatas>td{background:#fecaca!important}
@@ -703,7 +738,8 @@
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const ingresosInfo = incomeSummary(lastIncomeProposal);
-    const cards = proposals.length ? proposals.map((p, index) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones en la propuesta generada.</div>';
+    const detailCards = proposals.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0)));
+    const cards = detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
     box.classList.remove('hidden');
     box.innerHTML = `
       <div class="plan-summary-grid">
@@ -790,27 +826,26 @@
   function updateResourceEditorRow(key, tr, changedField){
     const group = productGroupFromKey(key);
     if(!group) return;
+    const hadPurchaseRow = !!tr.querySelector('.plan-resource-purchase-subrow');
     let include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
-    const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || 0));
-    let buy = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="compra"]')?.value || 0));
-    const price = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="precio"]')?.value || 0));
-    const tiendaId = tr.querySelector('[data-plan-resource-field="tiendaId"]')?.value || '';
-    const responsableId = tr.querySelector('[data-plan-resource-field="responsableId"]')?.value || '';
+    const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
+    const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
+    let buy = Math.max(0, Number(buyInput?.value || group.compra || 0));
+    const priceInput = tr.querySelector('[data-plan-resource-field="precio"]');
+    const price = Math.max(0, Number(priceInput?.value || group.precioCompra || group.precioDonado || 0));
+    const tiendaId = tr.querySelector('[data-plan-resource-field="tiendaId"]')?.value || group.tiendaId || document.getElementById('planTienda')?.value || '';
+    const responsableId = tr.querySelector('[data-plan-resource-field="responsableId"]')?.value || group.responsableId || document.getElementById('planResponsable')?.value || '';
     const selectedProductId = tr.querySelector('[data-plan-resource-field="productId"]')?.value || '';
-    const donationDonorRef = tr.querySelector('[data-plan-resource-field="donorRef"]')?.value || '';
-    const donationResponsableId = tr.querySelector('[data-plan-resource-field="donationResponsableId"]')?.value || '';
     const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
 
     if(changedField === 'necesidad'){
       buy = planDeficitUnits(selectedProduct?.nombre || group.producto, Math.max(0, need - Number(group.donado || 0)));
-      const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
       if(buyInput) buyInput.value = String(buy);
     }else if(changedField === 'compra'){
       buy = planDeficitUnits(selectedProduct?.nombre || group.producto, buy);
-      const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
       if(buyInput) buyInput.value = String(buy);
     }
-    if(changedField !== 'include' && buy > 0){
+    if(changedField !== 'include' && (buy > 0 || Number(group.donado || 0) > 0)){
       include = true;
       const chk = tr.querySelector('[data-plan-resource-field="include"]');
       if(chk) chk.checked = true;
@@ -833,16 +868,25 @@
       }
     });
     group.donationIndices.forEach(idx => {
-      if(lastProposal[idx]){
-        if(donationDonorRef) lastProposal[idx].donorRef = donationDonorRef;
-        if(donationResponsableId) lastProposal[idx].responsableId = donationResponsableId;
-        if(selectedProductId){
-          lastProposal[idx].productId = selectedProductId;
-          lastProposal[idx].productName = newName;
-          lastProposal[idx].segmento = newSegment;
-          lastProposal[idx].destino = newDestino;
-          lastProposal[idx].manualProduct = true;
-        }
+      const row = lastProposal[idx];
+      if(!row) return;
+      const donorInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donorRef"]`);
+      const respInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationResponsableId"]`);
+      const donationPriceInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationPrecio"]`);
+      // Las unidades donadas no se tocan aquí: proceden del prompt/histórico y son invariables salvo edición manual directa en el detalle avanzado.
+      if(donorInput) row.donorRef = donorInput.value;
+      if(respInput) row.responsableId = respInput.value;
+      if(donationPriceInput){
+        row.precio = Math.max(0, Number(donationPriceInput.value || 0));
+        const out = tr.querySelector(`[data-plan-donation-total="${String(idx)}"]`);
+        if(out) out.textContent = money(Number(row.unidades || 0) * Number(row.precio || 0));
+      }
+      if(selectedProductId){
+        row.productId = selectedProductId;
+        row.productName = newName;
+        row.segmento = newSegment;
+        row.destino = newDestino;
+        row.manualProduct = true;
       }
     });
     let pidx = group.purchaseIndices[0];
@@ -865,15 +909,20 @@
       purchase.manualStore = changedField === 'tiendaId' || purchase.manualStore;
       purchase.manualResponsible = changedField === 'responsableId' || purchase.manualResponsible;
     }
-    const priceSmall = tr.querySelector('[data-plan-resource-field="precio"]')?.closest('td')?.querySelector('small');
-    if(priceSmall) priceSmall.textContent = money(buy * (price || 0));
-    tr.classList.toggle('excluded', !(include && buy > 0));
+    const purchaseTotal = tr.querySelector('[data-plan-purchase-total]');
+    if(purchaseTotal) purchaseTotal.textContent = money(buy * (price || 0));
+    const nowNeedsPurchaseRow = buy > 0;
+    if(nowNeedsPurchaseRow !== hadPurchaseRow){
+      renderProposal();
+      return;
+    }
+    tr.classList.toggle('excluded', !(include && (buy > 0 || Number(group.donado || 0) > 0)));
     tr.dataset.planProductName = normalizeText(newName);
     tr.dataset.planResourceKey = planGroupKey(newName);
     const label = tr.querySelector('.plan-resource-product-label');
     if(label) label.textContent = newName;
-    const meta = tr.querySelector('.plan-resource-meta');
-    if(meta) meta.textContent = `${newSegment} · ${newDestino}`;
+    const meta = tr.querySelector('.plan-resource-meta span') || tr.querySelector('.plan-resource-meta');
+    if(meta) meta.textContent = `${newSegment} - ${newDestino}`;
     const badge = tr.querySelector('.plan-resource-excluded-label');
     if(badge) badge.textContent = planResourceBadgeText({segmento:newSegment, destino:newDestino, necesidad:need, compra:buy});
     tr.classList.remove('plan-sd-comida-aperitivo','plan-sd-comida-comida','plan-sd-comida-cena','plan-sd-bebida-aperitivo','plan-sd-bebida-comida','plan-sd-bebida-cena','plan-sd-bebida-cubatas','plan-sd-infra-aperitivo','plan-sd-infra-comida','plan-sd-infra-cubatas','plan-sd-infra-cena','plan-sd-infra-infra','plan-sd-rara');
@@ -881,6 +930,7 @@
     if(sdClass) tr.classList.add(sdClass);
     markPlanRowChanged(tr);
   }
+
 
 
   function searchProposalProduct(){
@@ -968,7 +1018,7 @@
     return 'Copia de ' + base;
   }
   function confirmReplicaCreation(){
-    const included = lastProposal.filter(p => p.include);
+    const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
     const purchases = included.filter(p => p.tipo === 'COMPRA').length;
     const donations = included.filter(p => p.tipo === 'DONACION').length;
     const inc = incomeSummary(lastIncomeProposal);
@@ -1034,7 +1084,7 @@
         (source ? 'Propuesta inicial creada desde evento modelo: ' + (source.titulo || 'sin título') + '.' : 'Propuesta inicial creada por Zuzu sin evento modelo.'),
         infoUser ? 'Información de planificación: ' + infoUser : ''
       ].filter(Boolean).join('\n');
-      const included = lastProposal.filter(p => p.include);
+      const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
       const totalCompras = included.filter(p => p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
       const eventPrice = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) : parseNum(source?.precio || planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) || 0);
       const newEvent = { id:newEventId, titulo:title, precio:eventPrice, fechaIni, fechaFin, situacion:'En curso', descripcion };

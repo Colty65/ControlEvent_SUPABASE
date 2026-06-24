@@ -1444,13 +1444,15 @@ function planMinimumNeed(productName, form, currentNeed) {
     min = Math.max(num(currentNeed), 1);
   } else if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n)) {
     if (planProductLooksTwoLiter(n)) {
-      // Botellas de 2 l: mezcla de cubatas + algo de consumo directo, sin tratar cada persona como botella individual.
-      const mixerBottles = p.cubatas ? Math.ceil(p.cubatasTotal / 8) : 0;
-      const directBottles = Math.ceil((p.directSoftPeople * (p.calor ? 0.7 : 0.45) * p.days) / 6);
-      min = mixerBottles + directBottles;
+      // Botellas de 2 l: mezcla de cubatas + algo de consumo directo, con margen extra si hay calor y tardeo.
+      const mixerBottles = p.cubatas ? Math.ceil(p.cubatasTotal / 7) : 0;
+      const directBottles = Math.ceil((p.directSoftPeople * (p.calor ? 0.85 : 0.50) * p.days) / 6);
+      min = mixerBottles + directBottles + (p.calor && p.cubatas ? 1 : 0);
     } else {
-      // Latas/botes directos: consumo parcial, no todos los asistentes al máximo.
-      min = p.directSoftPeople * (p.calor ? 1.5 : 1.0) * p.days;
+      // Latas/botes directos: en día caluroso + aperitivo + cubatas, Coca-Colas y refrescos se quedan cortos con 2-3 packs.
+      const cubataMixUnits = p.cubatas ? Math.ceil(p.cubatasTotal * (/coca/.test(n) ? 0.55 : (/tonica|sprite|fanta/.test(n) ? 0.22 : 0.12))) : 0;
+      min = p.directSoftPeople * (p.calor ? 1.75 : 1.10) * p.days + cubataMixUnits;
+      if (p.calor && p.cubatas && /coca|fanta|sprite|tonica/.test(n)) min += 24; // un pack extra de margen por tipo principal.
     }
   } else if (/agua/.test(n) && /bot/.test(n)) {
     min = p.people * (p.calor ? 2.0 : 1.25) * p.days;
@@ -1765,6 +1767,17 @@ function planExplicitDonationRowsFromPrompt(form, state) {
       preferredDonorKind:'P'
     });
   }
+  info.split(/\n+/).forEach(line => {
+    const s = trim(line);
+    if (!s || !/\d/.test(s) || !/(dona|donar|donad|aport|regala|cede|existenc)/i.test(s)) return;
+    let m = s.match(/^\s*(?:[•\-]\s*)?(.{2,80}?)\s+(?:dona|donar[áa]?|aporta|regala|cede)\s+(.+)$/i);
+    if (m) {
+      addRows('- ' + trim(m[2]), { ticketDonacion:'DONADO SOCIO', donor:trim(m[1]), responsable:trim(m[1]) || trim(form.defaultResponsibleName || ''), preferredDonorKind:'P' });
+      return;
+    }
+    m = s.match(/^\s*(?:[•\-]\s*)?(.+?)\s+(?:donad[oa]s?|aportad[oa]s?|cedid[oa]s?)\s+(?:por|de)\s+(.+)$/i);
+    if (m) addRows('- ' + trim(m[1]), { ticketDonacion:'DONADO SOCIO', donor:trim(m[2]), responsable:trim(m[2]) || trim(form.defaultResponsibleName || ''), preferredDonorKind:'P' });
+  });
   const seen = new Set();
   return rowsOut.filter(r => {
     const k = [r.productId, r.donorRef, r.ticketDonacion, r.unidades].join('|');
@@ -1772,22 +1785,67 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     seen.add(k); return true;
   });
 }
+function planDonationProductKey(row) {
+  return trim(row?.productId) || planProductAliasKey(row?.productName || row?.producto || '') || normPlanKey(row?.productName || row?.producto || '');
+}
+function planExplicitDonationMatch(row, ex, exactUnits = false) {
+  if (!row || row.tipo !== 'DONACION' || !ex) return false;
+  const rowKey = planDonationProductKey(row);
+  const exKey = planDonationProductKey(ex);
+  if (!rowKey || !exKey || rowKey !== exKey) return false;
+  const rowDonor = trim(row.donorRef);
+  const exDonor = trim(ex.donorRef);
+  if (rowDonor && exDonor && rowDonor !== exDonor) return false;
+  const rowTicket = trim(row.ticketDonacion).toUpperCase();
+  const exTicket = trim(ex.ticketDonacion).toUpperCase();
+  if (rowTicket && exTicket && rowTicket !== exTicket) return false;
+  if (exactUnits && Math.abs(num(row.unidades) - num(ex.unidades)) >= 0.01) return false;
+  return true;
+}
 function planMergeExplicitDonations(rows, explicitRows) {
-  const out = arr(rows).slice();
-  for (const ex of arr(explicitRows)) {
-    const found = out.some(r => r.tipo === 'DONACION' && trim(r.productId) === trim(ex.productId) && trim(r.donorRef) === trim(ex.donorRef) && Math.abs(num(r.unidades) - num(ex.unidades)) < 0.01);
-    if (!found) out.unshift(ex);
-  }
+  const explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION' && num(r.unidades) > 0);
+  if (!explicit.length) return arr(rows).slice();
+  // Si el prompt trae una donación explícita, esa cantidad manda. Eliminamos cualquier DONACION de Zuzu
+  // o histórica del mismo producto, aunque traiga otro donante o más unidades, para que no se duplique ni se infle.
+  const explicitKeys = new Set(explicit.map(planDonationProductKey).filter(Boolean));
+  const out = arr(rows).filter(row => !(row?.tipo === 'DONACION' && explicitKeys.has(planDonationProductKey(row))));
+  const seen = new Set();
+  explicit.forEach(ex => {
+    const key = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase(), round(ex.unidades, 2)].join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.unshift({
+      ...ex,
+      unidades: Math.max(0, round(ex.unidades, 2)),
+      include: ex.include !== false,
+      confidence: trim(ex.confidence || 'Prompt explícito'),
+      reason: trim(ex.reason || 'Donación indicada por el usuario.') + ' Cantidad de donación bloqueada por prompt: cualquier necesidad adicional debe ir a compra por déficit.'
+    });
+  });
   return out;
 }
 function planSanitizeInventedDonations(rows, baseRows, explicitRows) {
-  const allowed = new Set();
-  arr(baseRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowed.add(trim(r.productId) || normPlanKey(r.productName)));
-  arr(explicitRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowed.add(trim(r.productId) || normPlanKey(r.productName)));
+  const allowedHistoric = new Set();
+  arr(baseRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowedHistoric.add(planDonationProductKey(r)));
+  const explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION');
+  const allowedExplicit = new Set(explicit.map(planDonationProductKey).filter(Boolean));
   return arr(rows).map(row => {
     if (row?.tipo !== 'DONACION') return row;
-    const key = trim(row.productId) || normPlanKey(row.productName);
-    if (allowed.has(key) || /^prompt|histor/i.test(trim(row.confidence)) || /^prompt|histor/i.test(trim(row.key))) return row;
+    const key = planDonationProductKey(row);
+    const exactExplicit = explicit.some(ex => planExplicitDonationMatch(row, ex, true));
+    if (exactExplicit) return row;
+    if (allowedExplicit.has(key)) {
+      return {
+        ...row,
+        tipo: 'COMPRA',
+        ticketDonacion: '',
+        donorRef: '',
+        include: row.include !== false,
+        confidence: 'Compra por déficit',
+        reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' El prompt ya fija una donación exacta para este producto; esta cantidad adicional no se acepta como donación y queda como compra pendiente.'
+      };
+    }
+    if (allowedHistoric.has(key) || /^histor/i.test(trim(row.confidence)) || /^histor/i.test(trim(row.key))) return row;
     return {
       ...row,
       tipo: 'COMPRA',
@@ -1799,6 +1857,7 @@ function planSanitizeInventedDonations(rows, baseRows, explicitRows) {
     };
   });
 }
+
 
 function planInfoDonationRules(info, maps) {
   const raw = trim(info || '');
@@ -1912,16 +1971,20 @@ function planIncomeRowsForEvent(state, eventId) {
 function planScaleRows(rows, factor, defaultStoreId, defaultRespId) {
   const f = Number.isFinite(factor) && factor > 0 ? factor : 1;
   return arr(rows).map(row => {
-    const unidades = Math.max(0, round(num(row.unidades) * f, 2));
+    const isDonation = trim(row?.tipo).toUpperCase() === 'DONACION';
+    const unidades = isDonation ? Math.max(0, round(row.unidades, 2)) : Math.max(0, round(num(row.unidades) * f, 2));
     return {
       ...row,
       unidades,
       tiendaId: trim(row.tiendaId || defaultStoreId),
       responsableId: trim(row.responsableId || defaultRespId),
-      reason: `${row.reason || 'Línea histórica.'} Ajuste inicial aplicado por planificación (${round(f, 3)}x).`
+      reason: isDonation
+        ? `${row.reason || 'Línea histórica.'} Donación conservada sin escalado: las unidades donadas son exactas.`
+        : `${row.reason || 'Línea histórica.'} Ajuste inicial aplicado por planificación (${round(f, 3)}x).`
     };
   });
 }
+
 function planAttendeesForEvent(state, eventId) {
   return arr(state?.colaboradores).filter(c => trim(c?.eventId || c?.event_id) === trim(eventId)).reduce((sum, c) => sum + num(c.numero), 0);
 }
@@ -1966,6 +2029,7 @@ Reglas:
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
 - Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
+- La cantidad de una DONACION indicada en la descripción/informaciónConstruccion queda BLOQUEADA: no aumentes nunca esa línea para cubrir necesidad calculada. Si falta más producto, crea o deja que la app cree una COMPRA por el déficit.
 - Para bebidas en lata/botellín, si propones compra y el usuario pide múltiplos de 24, redondea las unidades de compra al alza al múltiplo de 24.
 - No agrupes productos bajo conceptos genéricos tipo "cosas de paella" si el usuario pide desglose: usa líneas concretas de arroz, carne, verduras, aceite, platos, vasos, hielo, agua, refrescos, pan, etc.
 - Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.

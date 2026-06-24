@@ -8,6 +8,7 @@
   const VERSION_FILE = 'ControlEvent_v14_prod';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
+  const FRESH_LOGIN_KEY = 'controlevent_v447_fresh_login';
   const OLD_CHOSEN_KEY = 'ControlEvent_v14_prod_event_chosen';
   const LEGACY_CHOSEN_KEYS = ['ce_v250_event_chosen','ControlEvent_v14_prod_event_chosen','ControlEvent_v14_prod_event_chosen','controlevent_v5022_user_picked_event'];
   const STORAGE_FALLBACK = 'controlevent_v6_4';
@@ -211,6 +212,29 @@
     transition.lastRenderAt = Date.now();
     setSwitching(false);
   }
+  function recoverReloadInterlocks(){
+    if(!auth()) return;
+    if(transition.active && Date.now() - Number(transition.startedAt || 0) > 2500) finishTransition();
+    try{ document.body.classList.remove('ce-v447-login-loading','ce-v447-switching','auth-locked','ce-v5019-logged-out','ce-v5022-logged-out'); }catch(_){ }
+    unlockMenuShell();
+    const sel = $('selectedEvent');
+    if(sel){
+      sel.disabled = false;
+      sel.removeAttribute('disabled');
+      sel.style.pointerEvents = 'auto';
+    }
+    Object.values(BUTTON_BY_TAB).forEach(id => {
+      const btn = $(id);
+      if(btn){ btn.disabled = false; btn.removeAttribute('disabled'); btn.style.pointerEvents = 'auto'; }
+    });
+    document.querySelectorAll('.mobile-menu-action').forEach(btn => { try{ btn.disabled = false; btn.removeAttribute('disabled'); btn.style.pointerEvents = 'auto'; }catch(_){ } });
+    const freshLogin = safe(() => sessionStorage.getItem(FRESH_LOGIN_KEY) === '1', false);
+    if(hasValidEvent() && !freshLogin){
+      markChosen();
+      rememberEvent(currentEventId());
+      markEventReadyForTips('reload-recovery');
+    }
+  }
   function clearContainer(id){ const el = $(id); if(!el) return 0; const n = el.getElementsByTagName ? el.getElementsByTagName('*').length : el.childNodes.length; if(el.childNodes.length) el.replaceChildren(); return n; }
   function clearDynamic(activeTab, options = {}){
     const includeActive = options.includeActive === true;
@@ -380,6 +404,7 @@
       window.authUser = data.user;
       try{ localStorage.removeItem('ControlEvent_v14_prod_session'); }catch(_){ } // v50.27: no persistir sesion ligera
       const c = $('loginClave'); if(c) c.value = '';
+      try{ sessionStorage.setItem(FRESH_LOGIN_KEY, '1'); }catch(_){ }
       try{ st().selectedEventId = ''; }catch(_){ }
       clearChosen();
       setTab('graficas');
@@ -596,6 +621,7 @@
     if(previousId === id && hasValidEvent(id) && !options.force){
       // Evita dobles disparos del selector o del listener antiguo.
       markChosen();
+      try{ sessionStorage.removeItem(FRESH_LOGIN_KEY); }catch(_){ }
       rememberEvent(id);
       shell();
       return false;
@@ -616,6 +642,7 @@
     armWatchdog(token);
     unlockMenuShell();
     markChosen();
+    try{ sessionStorage.removeItem(FRESH_LOGIN_KEY); }catch(_){ }
     rememberEvent(id);
     if(s) s.selectedEventId = id;
     setTab(targetTab);
@@ -756,7 +783,17 @@
     modules.__ceV4472Patched = true;
   }
   function install(){
+    const now = Date.now();
+    const lastInstall = Number(window.__ceV447LastInstallAt || 0);
+    window.__ceV447LastInstallAt = now;
     try{ window.__ceEventSwitcherOwnsRender = VERSION; clearTimeout(window.__ceV447EventSaveTimer); }catch(_){ }
+    if(window.__ceV447InstalledOnce && now - lastInstall < 180){
+      patchModules();
+      unlockMenuShell();
+      recoverReloadInterlocks();
+      return;
+    }
+    window.__ceV447InstalledOnce = true;
     injectStyle();
     applyVersion();
     patchBudget();
@@ -766,6 +803,7 @@
     patchAppActions();
     patchModules();
     unlockMenuShell();
+    recoverReloadInterlocks();
     if(auth() && !roleAllowsTab(currentTab())) setTab(defaultTabForRole(currentTab()));
     try{ window.__ceDisableLegacyBarGraficas = true; window.__ceStableGraficasV435 = true; }catch(_){ }
     if(!window.__ceV447Capture){
@@ -780,15 +818,22 @@
       document.addEventListener('click', handleTabClick, true);
       document.addEventListener('change', handleSelectedChange, true);
     }
-    if(auth() && !chosen() && events().length && hasValidEvent()){
-      // Si venimos justo del login con un selectedEventId restaurado por parches antiguos, volver al selector.
+    const freshLogin = safe(() => sessionStorage.getItem(FRESH_LOGIN_KEY) === '1', false);
+    if(auth() && freshLogin && !chosen() && events().length && hasValidEvent()){
+      // Solo venimos del login real: se obliga a elegir evento. En Ctrl+F5 no se debe borrar el evento válido restaurado.
       const s = st();
       s.__ceV447PreviousEventId = s.selectedEventId;
       s.selectedEventId = '';
+      try{ sessionStorage.removeItem(FRESH_LOGIN_KEY); }catch(_){ }
       clearDynamic('', {includeActive:true});
+    }else if(auth() && hasValidEvent()){
+      markChosen();
+      rememberEvent(currentEventId());
     }
     shell();
+    recoverReloadInterlocks();
   }
+
 
   window.ControlEventV447 = {
     version: VERSION,
