@@ -1849,6 +1849,7 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         donorRef:rowDonorRef,
         confidence:'Prompt explícito',
         explicitPromptDonation:true,
+        explicitPromptStrictHf12: defaults.strictHf12 === true,
         reason:`Existencia/donación indicada literalmente por el usuario (${lineDonorLabel}).`
       });
     }
@@ -1930,8 +1931,57 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     m = s.match(/^\s*(?:[•\-]\s*)?(.+?)\s+(?:donad[oa]s?|aportad[oa]s?|cedid[oa]s?)\s+(?:por|de)\s+(.+)$/i);
     if (m) addRows('- ' + trim(m[1]), { ticketDonacion:'DONADO SOCIO', donor:trim(m[2]), responsable:trim(m[2]) || trim(form.defaultResponsibleName || ''), preferredDonorKind:'P' });
   });
+
+  // HOTFIX12: lectura estricta de bloques simples de donaciones:
+  // Donaciones:
+  // Pocholo y Celes:
+  // - Cerveza AMSTEL (Barril 30l): 1
+  // DESPENSA:
+  // - Cerveza CON SKOL (Lata 33cl): 24
+  // En este formato cada cabecera intermedia manda sobre las líneas siguientes.
+  (function parseSimpleDonationBlockHf12(){
+    const lines = info.replace(/\r/g, '').split(/\n/);
+    let inDonBlock = false;
+    let currentDonor = '';
+    let currentKind = 'P';
+    const stopRe = /^\s*(?:COMPRA|COMPRAS|A\s+COMPRAR|CRITERIO|RESULTADO|OBJETIVO|MEN[ÚU]|MENU|COMIDAS?|BEBIDAS?)\s*:/i;
+    lines.forEach(rawLine => {
+      const line = trim(rawLine);
+      if(!line) return;
+      if(/^\s*DONACIONES?\s*:/i.test(line)){ inDonBlock = true; currentDonor = ''; currentKind = 'P'; return; }
+      if(!inDonBlock) return;
+      if(stopRe.test(line)){ inDonBlock = false; return; }
+      const header = line.match(/^\s*([A-Za-zÁÉÍÓÚÜÑ0-9][^:\n]{1,80})\s*:\s*$/);
+      if(header){
+        const label = trim(header[1]);
+        if(!/^(donaciones?|productos?|compras?|responsable|donante|tienda)$/i.test(label)){
+          const store = planFindStoreLoose(label, maps);
+          const person = planFindPersonLoose(label, maps);
+          currentDonor = trim(store?.nombre || person?.nombre || label);
+          currentKind = (store?.id || /^(DESPENSA|TIENDA|SUPERMERCADO|ALMAC[EÉ]N)$/i.test(label)) ? 'T' : 'P';
+        }
+        return;
+      }
+      if(!currentDonor) return;
+      if(!/^\s*[-•]/.test(line) && !/^[^:\n]{2,160}:\s*\d+(?:[,.]\d+)?\b/i.test(line)) return;
+      const donorIsStore = currentKind === 'T';
+      addRows(line, {
+        ticketDonacion: donorIsStore ? 'DONADO TIENDA' : 'DONADO SOCIO',
+        donor: currentDonor,
+        store: donorIsStore ? currentDonor : '',
+        responsable: donorIsStore ? trim(form.defaultResponsibleName || '') : currentDonor,
+        preferredDonorKind: donorIsStore ? 'T' : 'P',
+        strictHf12:true
+      });
+    });
+  })();
+
+  const strictProductKeysHf12 = new Set(rowsOut.filter(r => r.explicitPromptStrictHf12 === true).map(r => trim(r.productId)).filter(Boolean));
+  const finalRowsHf12 = strictProductKeysHf12.size
+    ? rowsOut.filter(r => !strictProductKeysHf12.has(trim(r.productId)) || r.explicitPromptStrictHf12 === true)
+    : rowsOut;
   const seen = new Set();
-  return rowsOut.filter(r => {
+  return finalRowsHf12.filter(r => {
     const k = [r.productId, r.donorRef, r.ticketDonacion, r.unidades].join('|');
     if (seen.has(k)) return false;
     seen.add(k); return true;

@@ -80,7 +80,7 @@
       .ce-hf9-av-row small{display:block;font-size:10px;font-weight:750;color:#334155}
       .ce-hf9-av-row em{display:block;margin-top:4px;padding:4px 6px;border:1px solid #fdba74;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:10px;font-style:normal;font-weight:850}
 
-      #summaryTiendaTicket{visibility:hidden}
+      #summaryTiendaTicket{visibility:visible}
       #summaryTiendaTicket.ce-hf9-ready{visibility:visible}
       #summaryTiendaTicket .summary-item.ce-hf9-collapsed{cursor:pointer;min-height:46px;align-items:center}
       #summaryTiendaTicket .summary-item.ce-hf9-collapsed>span:first-child{display:block;max-width:calc(100% - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800;color:#0f172a}
@@ -164,46 +164,12 @@
     document.body.appendChild(modal);
   }
 
-  function collapseTiendaTicket(){
-    const root=$('summaryTiendaTicket'); if(!root) return;
-    Array.from(root.querySelectorAll('.summary-item')).forEach(row=>{
-      const label=row.querySelector(':scope > span:first-child') || row.querySelector('span');
-      if(!label) return;
-      const raw=rawTipOf(row);
-      const parsed=parseTip(raw);
-      const amount=row.querySelector('.pill')?.textContent || row.querySelector('span:last-child')?.textContent || '';
-      const head=friendlyHead(parsed.key || label.textContent || '');
-      if(!head || /^TOTAL(\s+EVENTO)?$/i.test(head)) return;
-      row.dataset.ceHf9Full=raw;
-      row.dataset.ceHf9Head=head;
-      row.dataset.ceHf9Amount=amount;
-      cleanTipAttrs(row); cleanTipAttrs(label);
-      label.textContent=head;
-      row.classList.add('ce-hf9-collapsed');
-      if(!row.__ceHf9Click){
-        row.__ceHf9Click=true;
-        row.addEventListener('click',ev=>{
-          if(ev.target.closest('button,input,select,a,img')) return;
-          showModal(parseTip(row.dataset.ceHf9Full || ''));
-        },true);
-      }
-    });
-    root.classList.add('ce-hf9-ready');
-  }
+  function collapseTiendaTicket(){ /* HF12: resumen lo gobierna HF10/HF12; no tocar para evitar retemblores */ }
 
   let applyTimer=0;
-  function scheduleApply(delay){
-    clearTimeout(applyTimer);
-    applyTimer=setTimeout(()=>{ try{ injectStyle(); applyAvance(); collapseTiendaTicket(); }catch(_){ } }, delay||0);
-  }
-  function hideTiendaTicketUntilReady(){ $('summaryTiendaTicket')?.classList.remove('ce-hf9-ready'); }
-  function installObserver(){
-    const root=$('summaryTiendaTicket');
-    if(!root || root.__ceHf9Obs) return;
-    root.__ceHf9Obs=true;
-    const obs=new MutationObserver(()=>{ hideTiendaTicketUntilReady(); scheduleApply(40); });
-    obs.observe(root,{childList:true,subtree:true});
-  }
+  function scheduleApply(delay){ clearTimeout(applyTimer); applyTimer=setTimeout(()=>{ try{ injectStyle(); applyAvance(); }catch(_){} }, delay||0); }
+  function hideTiendaTicketUntilReady(){ /* HF12 no-op */ }
+  function installObserver(){ /* HF12 no observer: evita refrescos/retemblores */ }
 
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded'].forEach(e=>window.addEventListener(e,()=>{ hideTiendaTicketUntilReady(); scheduleApply(40); installObserver(); },true));
   ['controlevent:event-changed'].forEach(e=>window.addEventListener(e,()=>{ hideTiendaTicketUntilReady(); scheduleApply(80); setTimeout(installObserver,120); },true));

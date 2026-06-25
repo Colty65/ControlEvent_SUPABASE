@@ -281,6 +281,14 @@
     if(!img) return undefined;
     const src = img.currentSrc || img.src || '';
     if(!src) return undefined;
+    try{
+      const tkRaw = (img.dataset && (img.dataset.ceHf12Tk || img.dataset.ceHf10Tk)) || (img.closest && img.closest('.ce-hf10-row,[data-ce-hf12-tk]')?.dataset?.ceHf12Tk) || '';
+      const tk = String(tkRaw || '').toUpperCase().match(/TK\d{1,3}/)?.[0] || '';
+      if(tk && window.ControlEventV104 && typeof window.ControlEventV104.openTicketDetail === 'function'){
+        stop(ev);
+        return window.ControlEventV104.openTicketDetail(tk, src);
+      }
+    }catch(_){}
     const now = Date.now();
     const sig = src + '|' + (img.closest('.summary-item,.budget-row,.itemcard')?.innerText || '');
     if(sig === lastClickSig && now - lastClickAt < 700) return stop(ev);

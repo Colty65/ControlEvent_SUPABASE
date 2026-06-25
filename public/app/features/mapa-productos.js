@@ -20,7 +20,7 @@
   let lastRenderedEventId = null;
   let lastShopActivationAt = 0;
   let lastShopActivationKey = '';
-  let mapaSortMode = 'PRODUCTO';
+  let mapaSortMode = 'SEGMENTO_DESTINO';
   const $ = id => document.getElementById(id);
 
   function st(){
@@ -538,11 +538,12 @@
     </div>`;
   }
 
+  function mapaSortClass(mode){ return String(mapaSortMode || 'SEGMENTO_DESTINO').toUpperCase() === mode ? ' active ce-mapa-sort-active' : ''; }
   function renderProductSearch(){
     return `<div class="mapa-product-search" id="mapaProductoSearchBox">
       <div class="field"><label>Buscar producto</label><input id="${SEARCH_ID}" class="ce-mapa-readonly-allowed mobile-menu-action" value="${esc(productSearchText)}" placeholder="Teclea parte del producto..." autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
       <button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}Btn">Buscar</button>
-      <div class="mapa-order-actions"><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortProduct">Orden producto</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortSegDest">Orden segmento/destino</button><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action" id="${SEARCH_ID}SortStore">Orden tienda/producto</button></div>
+      <div class="mapa-order-actions"><button type="button" class="outline small ce-mapa-readonly-allowed mobile-menu-action${mapaSortClass('PRODUCTO')}" id="${SEARCH_ID}SortProduct">Orden producto</button><button type="button" id="${SEARCH_ID}SortSegDest" class="outline small ce-mapa-readonly-allowed mobile-menu-action${mapaSortClass('SEGMENTO_DESTINO')}">Orden segmento/destino</button><button type="button" id="${SEARCH_ID}SortStore" class="outline small ce-mapa-readonly-allowed mobile-menu-action${mapaSortClass('TIENDA')}">Orden tienda/producto</button></div>
       <span class="mapa-search-help">Busca el primer registro que contenga el texto y ordena toda la información por producto, por segmento-destino o por tienda y producto.</span>
     </div>`;
   }
