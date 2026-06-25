@@ -1362,7 +1362,7 @@ function planFindProductLoose(label, maps) {
       .replace(/\bBEETER\b/g, 'BITTER')
       .replace(/\bWISKI\b/g, 'WHISKY')
       .replace(/\bJONIE\b/g, 'JHONY')
-      .replace(/\bJOHNY\b/g, 'JHONY').replace(/J\s*\.?\s*B\b/g, 'JB')
+      .replace(/\bJOHNY\b/g, 'JHONY')
       .replace(/\bLAVAMANOS\b/g, 'MANOS')
       .replace(/\bAOVE\b/g, 'AOVE ACEITE')
       .replace(/\s+/g, ' ')
@@ -1391,7 +1391,7 @@ function planFindProductLoose(label, maps) {
     // y penaliza que no coincida ninguna palabra de producto real.
     if (!matched.length) return false;
     // Si el usuario escribió marca/tipo muy específico, debe aparecer.
-    const hard = sourceTokens.filter(t => /^(COCA|COLA|ZERO|SKOL|AMBAR|MAHOU|FANTA|SPRITE|SCHWEPPES|LARIOS|BEEFEATER|BRUGAL|BARCELO|DYC|JHONY|WALKER|PUERTO|INDIAS|AOVE|BOLSAS|BASURA|FAIRY|BITTER|KAS|JABON|JB|PAPEL|HIGIENICO|SECAMANOS|VELADORES|ANCHOAS|MEJILLONES|CAFE|DESCAFEINADO|ACEITE|VINAGRE)$/.test(t));
+    const hard = sourceTokens.filter(t => /^(COCA|COLA|ZERO|SKOL|AMBAR|MAHOU|FANTA|SPRITE|SCHWEPPES|LARIOS|BEEFEATER|BRUGAL|BARCELO|DYC|JHONY|WALKER|PUERTO|INDIAS|AOVE|BOLSAS|BASURA|FAIRY|BITTER|KAS|JABON|PAPEL|HIGIENICO|SECAMANOS|VELADORES|ANCHOAS|MEJILLONES|CAFE|DESCAFEINADO|ACEITE|VINAGRE)$/.test(t));
     return !hard.length || hard.some(t => prodSimple.includes(t));
   }
 
@@ -1410,7 +1410,6 @@ function planFindProductLoose(label, maps) {
     if (key.includes(pk)) score += 120;
     if (ps.includes(sourceSimple) && sourceSimple) score += 220;
     if (sourceSimple.includes(ps) && ps) score += 120;
-    if (/\bJB\b/.test(sourceSimple) && /\bJB\b/.test(ps)) score += 90;
     sourceTokens.forEach(t => {
       if (ps.split(' ').includes(t)) score += 42;
       else if (ps.includes(t)) score += 22;
@@ -1643,13 +1642,10 @@ function planPostProcessPlanningRows(rows, form, state) {
     const currentNeed = hasExplicitDonation
       ? (g.needHint > 0 ? Math.max(g.needHint, g.donation) : Math.max(g.donation, g.purchase || g.donation))
       : (g.needHint > 0 ? g.needHint : (g.donation + g.purchase));
-    const rawNeed = (hasExplicitDonation && g.purchase <= 0 && g.needHint <= 0)
-      ? currentNeed
-      : planMinimumNeed(pname, form, currentNeed);
+    const rawNeed = planMinimumNeed(pname, form, currentNeed);
     const need = planDisplayNeedAfterRounding(pname, rawNeed);
-    // HOTFIX20: si solo hay donación/existencia explícita y no hay cálculo externo de necesidad,
-    // no se inventa compra por déficit para esa misma línea.
-    let buy = (hasExplicitDonation && g.purchase <= 0 && g.needHint <= 0) ? 0 : planBuyAfterDonation(pname, need, g.donation);
+    // Compra solo del déficit real. En packs: redondea la necesidad total y DESPUÉS resta lo donado.
+    let buy = planBuyAfterDonation(pname, need, g.donation);
     const price = planReasonablePlanPrice(pname, prod?.defaultPrecio ?? prod?.precio ?? 0);
     let firstPurchase = g.rows.find(i => out[i]?.tipo === 'COMPRA');
     if (buy > 0 && firstPurchase === undefined) {
