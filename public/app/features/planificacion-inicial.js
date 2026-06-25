@@ -758,7 +758,7 @@
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card" id="planResourceEditor">
-      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline ${String(planResourceOrderMode || 'PRODUCTO').toUpperCase()==='PRODUCTO'?'active':''}" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='SEGMENTO_DESTINO'?'active':''}" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='TIENDA'?'active':''}" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>PROPUESTA DETALLADA DEL EVENTO</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline ${String(planResourceOrderMode || 'PRODUCTO').toUpperCase()==='PRODUCTO'?'active':''}" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='SEGMENTO_DESTINO'?'active':''}" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='TIENDA'?'active':''}" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
         <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -1315,7 +1315,7 @@
       input?.focus();
     }
   }
-  function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row', 'Propuesta editable tipo Mapa de recursos'); }
+  function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row', 'PROPUESTA DETALLADA DEL EVENTO'); }
   function searchProposalAdvanced(){ searchPlanProductIn('planBuscarDetalleAvanzado', '#planProposalList .plan-product-card', 'Detalle avanzado de líneas'); }
   function showPlanFactoryIndicator(message){
     const box = document.getElementById('planificacionResultado');

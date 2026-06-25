@@ -460,6 +460,7 @@ function directModuleResultIfApplicable(prompt, context) {
     return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v);
   }));
   const extra = rows.length > tableRows.length ? ` Se muestran ${tableRows.length} en pantalla; el CSV descargable incluye las ${rows.length}.` : '';
+  rowsOut = planApplyFinalDefaultsHf14(rowsOut, form, state);
   return {
     ok: true,
     rejected: false,
@@ -1695,9 +1696,13 @@ function planFindStoreLoose(label, maps) {
 function planExtractBracket(text, names) {
   const raw = trim(text || '');
   for (const name of names) {
-    const re = new RegExp(name + '\\s*[:=]?\\s*(?:\\[([^\\]]+)\\]|["“]([^"”]+)["”]|([^,;\\n]+))', 'i');
-    const m = raw.match(re);
-    if (m) return trim(m[1] || m[2] || m[3] || '').replace(/[.。]+$/,'').trim();
+    const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let m = raw.match(new RegExp('\\[\\s*' + safe + '\\s*[:=]\\s*([^\\]\\n]+)\\]', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
+    m = raw.match(new RegExp(safe + '\\s*[:=]\\s*["“]([^"”]+)["”]', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
+    m = raw.match(new RegExp(safe + '\\s*[:=]\\s*([^\\]\\);,\\n]+)', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
   }
   return '';
 }
@@ -2438,6 +2443,31 @@ function buildTotalBaseRows(state, modules, form) {
     };
   });
 }
+function planApplyFinalDefaultsHf14(rows, form, state) {
+  const maps = planBuildMaps(state);
+  return arr(rows).map(row => {
+    const out = {...row};
+    if (out.tipo === 'COMPRA') {
+      out.tiendaId = trim(out.tiendaId || form.defaultStoreId || '');
+      out.responsableId = trim(out.responsableId || form.defaultResponsibleId || '');
+      out.ticketDonacion = '';
+      out.donorRef = '';
+      return out;
+    }
+    if (out.tipo === 'DONACION') {
+      const donor = trim(out.donorRef || '');
+      if (!out.responsableId) {
+        if (donor.startsWith('P:')) out.responsableId = donor.slice(2);
+        else out.responsableId = trim(form.defaultResponsibleId || '');
+      }
+      if (/DONADO\s+TIENDA/i.test(out.ticketDonacion || '') && !out.tiendaId && donor.startsWith('T:')) {
+        out.tiendaId = donor.slice(2);
+      }
+    }
+    return out;
+  });
+}
+
 export async function planificacionInicialZuzu({ mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info } = {}) {
   const state = await getState();
   const maps = planBuildMaps(state);

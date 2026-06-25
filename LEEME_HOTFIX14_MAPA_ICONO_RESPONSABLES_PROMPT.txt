@@ -1,0 +1,32 @@
+ControlEvent v15_prod - HOTFIX14 sin cambio de versión
+
+Cambios incluidos:
+
+1. Planificación inicial
+- El campo "Información para la construcción" se amplía de verdad:
+  ocupa desde la columna derecha de "Breve descripción" hasta el final de la ficha.
+- Más alto y preparado para prompts largos.
+- La sección "Propuesta editable tipo Mapa de recursos" pasa a llamarse:
+  "PROPUESTA DETALLADA DEL EVENTO".
+
+2. Mapa de recursos
+- Se sustituye el botón anterior de avance por un botón limpio y pequeño.
+- Usa el icono aportado por el usuario: hitos-evento.jpg.
+- El botón pliega/despliega la ficha AVANCE DEL EVENTO.
+- Se eliminan los restos del botón anterior y se mantiene fuera de Resumen presupuestario.
+
+3. Planificación / Zuzu / responsables y donantes explícitos
+- Mejorada la lectura de etiquetas del prompt:
+  [Donante: ...]
+  [Responsable: ...]
+- Corregida extracción de textos entre corchetes para evitar arrastrar símbolos como ] o ).
+- Las compras que queden sin tienda o responsable toman la tienda/responsable por defecto de pantalla.
+- En donaciones de socio, si el donante es una persona y falta responsable, se usa ese mismo responsable.
+- En donaciones de tienda, si el donante es una tienda y falta tienda, se vincula a esa tienda.
+- Se mantiene el respeto a cantidades explícitas y a packs tipo "1 pack de 24 ud.".
+
+4. Resumen presupuestario
+- Se mantiene limpia la ventana: la ficha de AVANCE no se inserta aquí.
+
+No cambia versión visible.
+No hay SQL nuevo.
