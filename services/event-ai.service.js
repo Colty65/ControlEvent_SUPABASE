@@ -1353,33 +1353,54 @@ function planImportantProductTokens(key) {
   return String(key || '').split(' ').filter(t => /\d/.test(t) || /^(cl|ml|l|kg|gr|ud|uds|unidad|unidades|lata|latas|botellin|botellines|botella|botellas|pack|packs)$/.test(t));
 }
 function planFindProductLoose(label, maps) {
-  const key = normPlanKey(label);
+  const rawLabel = trim(label || '');
+  const key = normPlanKey(rawLabel);
   if (!key) return null;
-  // En donaciones/existencias no se debe inventar ni perder variantes reales:
-  // primero coincidencia exacta normalizada, incluyendo tamaños como "(2l)".
   if (maps.productByName.has(key)) return maps.productByName.get(key);
-  const aliasKey = planProductAliasKey(label);
-  if (aliasKey && aliasKey !== key && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
-  const toks = key.split(' ').filter(t => t.length >= 2);
-  const important = planImportantProductTokens(key);
-  let best = null;
-  let bestScore = 0;
-  for (const p of maps.products.values()) {
-    const pk = normPlanKey(p?.nombre);
-    if (!pk) continue;
-    let score = 0;
-    if (pk === key) score += 1000;
-    const missingImportant = important.filter(t => !pk.includes(t)).length;
-    if (missingImportant) score -= 120 * missingImportant;
-    if (pk.includes(key) && !missingImportant) score += 120;
-    if (key.includes(pk) && !missingImportant) score += 45;
-    toks.forEach(t => { if (pk.split(' ').includes(t)) score += Math.min(16, t.length + 8); else if (pk.includes(t)) score += Math.min(8, t.length); });
-    const ptoks = pk.split(' ').filter(t => t.length >= 2);
-    ptoks.forEach(t => { if (key.split(' ').includes(t)) score += Math.min(8, t.length + 3); });
-    score -= Math.abs(pk.length - key.length) * 0.15;
-    if (score > bestScore) { best = p; bestScore = score; }
+
+  function simplifyProductKey(value) {
+    return normPlanKey(value || '')
+      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS)\b/g, ' ')
+      .replace(/\b\d+(?:[,.]\d+)?\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
-  return bestScore >= 18 ? best : null;
+  function scoreProduct(product, sourceKey) {
+    const pk = normPlanKey(product?.nombre);
+    if (!pk) return -9999;
+    const simpleSource = simplifyProductKey(sourceKey);
+    const simpleProd = simplifyProductKey(pk);
+    let score = 0;
+    if (pk === sourceKey) score += 2000;
+    if (simpleProd === simpleSource && simpleSource) score += 900;
+    if (pk.includes(sourceKey)) score += 180;
+    if (sourceKey.includes(pk)) score += 70;
+    if (simpleProd.includes(simpleSource) && simpleSource) score += 150;
+    if (simpleSource.includes(simpleProd) && simpleProd) score += 80;
+
+    const sourceTokens = sourceKey.split(' ').filter(t => t.length >= 2);
+    const simpleTokens = simpleSource.split(' ').filter(t => t.length >= 3);
+    sourceTokens.forEach(t => { if (pk.split(' ').includes(t)) score += Math.min(18, t.length + 8); else if (pk.includes(t)) score += Math.min(9, t.length); });
+    simpleTokens.forEach(t => { if (simpleProd.split(' ').includes(t)) score += Math.min(22, t.length + 9); else if (simpleProd.includes(t)) score += Math.min(12, t.length); });
+
+    // Tokens muy característicos: café/descafeinado, AOVE, SKOL, ZERO, etc.
+    const important = simpleTokens.filter(t => !/^(NORMAL|ENTERO|GRANDE|MEDIANA|PEQUEÑO|PEQUENO|MEZCLA|BOLSA)$/.test(t));
+    const missing = important.filter(t => !simpleProd.includes(t)).length;
+    score -= missing * 35;
+    score -= Math.abs(simpleProd.length - simpleSource.length) * 0.08;
+    return score;
+  }
+
+  const aliasKey = planProductAliasKey(rawLabel);
+  if (aliasKey && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
+
+  let best = null, bestScore = -9999;
+  const candidates = [key, aliasKey, simplifyProductKey(key)].filter(Boolean);
+  for (const p of maps.products.values()) {
+    let s = Math.max(...candidates.map(k => scoreProduct(p, k)));
+    if (s > bestScore) { best = p; bestScore = s; }
+  }
+  return bestScore >= 34 ? best : null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');
@@ -1724,11 +1745,21 @@ function planMentionedPerson(textBlock, maps) {
 }
 function planCleanExplicitProductText(text) {
   let s = trim(text || '').replace(/^\s*[•\-]\s*/, '');
-  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,180}:\s*.+)$/i);
+  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,220}:\s*.+)$/i);
   if (donorPrefix) s = trim(donorPrefix[2]);
   if (s.includes(':')) s = s.slice(0, s.lastIndexOf(':'));
   s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+(?:de\s+)?/i, '');
-  s = s.replace(/\b(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?\b/ig, '');
+  s = s.replace(/\(([^)]*)\)/g, (m, inner) => {
+    const t = trim(inner || '');
+    if (!t) return ' ';
+    // Conserva aclaraciones útiles como "gorritas", "lata 33cl", "botella 0,7l";
+    // elimina solo envoltorios puramente cuantitativos si no aportan nombre.
+    if (/^(?:bolsa|pack|paquete|caja)\s+\d/i.test(t)) return ' ';
+    return ' ' + t + ' ';
+  });
+  s = s.replace(/\b(?:bolsa|pack|packs|paquete|paquetes)\s*(?:de|x)?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?\b/ig, ' ');
+  s = s.replace(/\bpieza\s+\d+(?:[,.]\d+)?\s*kg\b/ig, ' ');
+  s = s.replace(/\s+/g, ' ');
   return trim(s.replace(/[.;]+$/,''));
 }
 function planExplicitUnits(text) {
@@ -1855,6 +1886,7 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         donorRef:rowDonorRef,
         confidence:'Prompt explícito',
         explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
         explicitPromptStrictHf12: defaults.strictHf12 === true,
         reason:`Existencia/donación indicada literalmente por el usuario (${lineDonorLabel}).`
       });
@@ -2072,6 +2104,7 @@ function planMergeExplicitDonations(rows, explicitRows) {
     out.unshift({
       ...ex,
       explicitPromptDonation: true,
+      explicitConfirmedDonation: true,
       unidades: Math.max(0, round(ex.unidades, 2)),
       include: ex.include !== false,
       confidence: trim(ex.confidence || 'Prompt explícito'),
@@ -2089,6 +2122,7 @@ function planSanitizeInventedDonations(rows, baseRows, explicitRows, mode = '') 
   const allowedExplicit = new Set(explicit.map(planDonationProductKey).filter(Boolean));
   return arr(rows).map(row => {
     if (row?.tipo !== 'DONACION') return row;
+    if (row?.explicitPromptDonation === true || row?.explicitPromptStrictHf12 === true || row?.explicitConfirmedDonation === true) return row;
     const key = planDonationProductKey(row);
     const exactExplicit = explicit.some(ex => planExplicitDonationMatch(row, ex, true));
     if (exactExplicit) return row;
@@ -2455,6 +2489,7 @@ function planApplyFinalDefaultsHf14(rows, form, state) {
       return out;
     }
     if (out.tipo === 'DONACION') {
+      out.explicitConfirmedDonation = out.explicitConfirmedDonation || out.explicitPromptDonation === true || out.explicitPromptStrictHf12 === true;
       const donor = trim(out.donorRef || '');
       if (!out.responsableId) {
         if (donor.startsWith('P:')) out.responsableId = donor.slice(2);
