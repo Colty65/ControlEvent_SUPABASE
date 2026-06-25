@@ -428,6 +428,35 @@
             item.row.destino = group.destino || item.row.destino;
           }
         });
+        const donationSeen = new Map();
+        group.donationIndices.forEach(idx => {
+          const row = base[idx]; if(!row) return;
+          const donor = normalizeDonorRef(row.donorRef || '');
+          const ticket = String(row.ticketDonacion || '').toUpperCase();
+          const key = `${group.productId || group.key}|${donor}|${ticket}`;
+          const weight = String(row.key || '').includes('hf19') ? 10000 : (row.explicitPromptStrictHf12 ? 1000 : 0);
+          const prev = donationSeen.get(key);
+          if(!prev || weight > prev.weight || (weight === prev.weight && idx > prev.idx)){
+            donationSeen.set(key, {idx, weight});
+          }
+        });
+        const keepDonationIdx = new Set([...donationSeen.values()].map(x => x.idx));
+        group.donationIndices.forEach(idx => {
+          const row = base[idx]; if(!row) return;
+          if(!keepDonationIdx.has(idx)){
+            row.include = false;
+            row.__ceSuppressedDonation = true;
+            return;
+          }
+          row.include = includeGroup;
+          row.necesidadTotal = Number(group.necesidad || 0) || row.necesidadTotal;
+          if(group.productId){
+            row.productId = group.productId;
+            row.productName = group.producto || row.productName;
+            row.segmento = group.segmento || row.segmento;
+            row.destino = group.destino || row.destino;
+          }
+        });
       });
     }finally{
       lastProposal = prev;
@@ -699,7 +728,7 @@
       // calculada, no como compra extra encima de lo donado. Anchoas donadas 1 + necesidad 2 => comprar 1.
       const baseNeed = row.necesidad > 0 ? row.necesidad : (hasExplicitDonation ? Math.max(row.donado, row.compra) : row.donado + row.compra);
       const displayNeed = planDisplayNeedAfterRounding(row.producto, baseNeed);
-      const nextCompra = planBuyAfterDonation(row.producto, displayNeed, row.donado);
+      const nextCompra = (hasExplicitDonation && row.compra <= 0 && row.necesidad <= 0) ? 0 : planBuyAfterDonation(row.producto, displayNeed, row.donado);
       return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || row.donado > 0};
     });
     return sortPlanResourceRows(list);
@@ -1004,8 +1033,9 @@
     lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
-    const compras = proposals.filter(p => p.tipo === 'COMPRA' && p.include);
-    const donaciones = proposals.filter(p => p.tipo === 'DONACION' && p.include);
+    const detailItems = includedPlanDetailItems();
+    const compras = detailItems.map(x=>x.p).filter(p => p.tipo === 'COMPRA' && p.include);
+    const donaciones = detailItems.map(x=>x.p).filter(p => p.tipo === 'DONACION' && p.include);
     const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
     const ingresosInfo = incomeSummary(lastIncomeProposal);
@@ -1076,8 +1106,24 @@
       });
     });
   }
+  function includedPlanDetailItems(){
+    const raw = lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && !isTinyGhostDonation(p) && !isSuppressedAutoDonation(p) && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0)));
+    const best = new Map();
+    raw.forEach(item => {
+      const p = item.p || {};
+      const prodKey = String(p.productId || planGroupKey(p.productName || p.producto || ''));
+      const discriminator = p.tipo === 'DONACION'
+        ? `${normalizeDonorRef(p.donorRef || '')}|${String(p.ticketDonacion || '').toUpperCase()}`
+        : 'COMPRA';
+      const k = `${p.tipo}|${prodKey}|${discriminator}`;
+      const weight = String(p.key || '').includes('hf19') ? 10000 : (p.explicitPromptStrictHf12 ? 1000 : 0);
+      const prev = best.get(k);
+      if(!prev || weight > prev.weight || (weight === prev.weight && item.index > prev.index)) best.set(k, {...item, weight});
+    });
+    return sortPlanProposalDetailCards([...best.values()]);
+  }
   function advancedDetailCardsHtml(){
-    const detailCards = sortPlanProposalDetailCards(lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && !isTinyGhostDonation(p) && !isSuppressedAutoDonation(p) && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
+    const detailCards = includedPlanDetailItems();
     return detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
   }
   function refreshAdvancedProposalDetails(){

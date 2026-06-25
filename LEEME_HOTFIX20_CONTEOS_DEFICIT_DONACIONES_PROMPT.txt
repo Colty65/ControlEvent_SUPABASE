@@ -1,0 +1,27 @@
+ControlEvent v15_prod - HOTFIX20 sin cambio de versión
+
+Cambios incluidos:
+
+1. Arriba y abajo vuelven a contar lo mismo
+- La cabecera de "Detalle avanzado de líneas que se crearán" usa las mismas filas visibles/reales que la propuesta.
+- Las tarjetas superiores "Compras propuestas" y "Donaciones propuestas" también usan esa misma lista.
+- Se deduplican donaciones repetidas del mismo producto/donante/tipo, dando prioridad a la lectura línea a línea HF19.
+
+2. Donaciones duplicadas
+- Cuando varias pasadas del parser leen la misma línea del prompt, solo queda una fila activa.
+- La generación del evento no debería crear duplicados ocultos.
+
+3. Compra por déficit
+- Si un producto viene solo como donación/existencia explícita del prompt y no hay una necesidad calculada externa fiable, no se inventa compra por déficit para esa línea.
+- Esto evita casos disparados como Sprite botella 2l donado 2 y compra 70.
+- Se mantiene la regla cuando sí exista necesidad calculada:
+  A COMPRAR = NECESIDAD CALCULADA - TOTAL DONADO DEL PRODUCTO.
+
+4. Whisky J.B / DYC / Walker
+- Se refuerza la detección de J.B/JB para no perder esos productos del prompt.
+
+5. Detalle avanzado
+- El número de compras y donaciones del summary se alinea con el listado real visible.
+
+No cambia versión visible.
+No hay SQL nuevo.
