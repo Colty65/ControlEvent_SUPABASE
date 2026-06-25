@@ -1,0 +1,40 @@
+ControlEvent v15_prod - HOTFIX18 sin cambio de versión
+
+Cambios incluidos:
+
+1. Donaciones del prompt
+- Ahora también se reconocen líneas de producto que empiezan por asterisco (*), además de guion y viñeta.
+- Esto corrige prompts pegados desde texto/Word donde los productos aparecían como:
+  * Aceite AOVE (2l): 1
+  * Vinagre (botella): 1
+- Las líneas dentro de PRODUCTO EN LA PEÑA / DONACIONES / DONACION / EXISTENCIAS siguen siendo DONACIÓN confirmada.
+- Si el producto no se localiza en catálogo, se mantiene como donación revisable, no como compra.
+- Se refuerza la búsqueda intuitiva de productos:
+  * ignora envases, unidades, litros, cl, packs y cantidades internas.
+  * evita emparejar solo por 33cl/32cl.
+  * añade equivalencias tipo Beeter/Bitter, Wiski/Whisky, lavamanos/manos.
+
+2. Cálculo de A COMPRAR
+- Se cambia la regla a:
+  A COMPRAR = NECESIDAD CALCULADA - SUMA DE TODAS LAS DONACIONES DEL PRODUCTO
+- Ya no se redondea otra vez en ese punto.
+- Al modificar necesidad calculada, se recalcula contra el total donado real del producto.
+- La cifra A COMPRAR se muestra con tamaño algo menor que NECESIDAD CALCULADA.
+
+3. Tienda y responsable por defecto
+- Las compras propuestas sin tienda/responsable toman la tienda y responsable por defecto de pantalla.
+- Se refuerza tanto en backend como en la ventana de propuesta.
+
+4. Detalle avanzado
+- La cabecera muestra el número de compras y donaciones que se crearán:
+  Detalle avanzado de líneas que se crearán · X compras · Y donaciones
+
+5. Ficha AVANCE DEL EVENTO
+- Se centra mejor en Mapa de recursos.
+
+6. Filas negras
+- Se elimina el fondo negro de productos sin segmento/destino.
+- Quedan en color claro para no parecer errores graves de pantalla.
+
+No cambia versión visible.
+No hay SQL nuevo.

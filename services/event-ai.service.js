@@ -1354,53 +1354,73 @@ function planImportantProductTokens(key) {
 }
 function planFindProductLoose(label, maps) {
   const rawLabel = trim(label || '');
-  const key = normPlanKey(rawLabel);
+  let key = normPlanKey(rawLabel);
   if (!key) return null;
+
+  function aliasText(value) {
+    return normPlanKey(value || '')
+      .replace(/\bBEETER\b/g, 'BITTER')
+      .replace(/\bWISKI\b/g, 'WHISKY')
+      .replace(/\bJONIE\b/g, 'JHONY')
+      .replace(/\bJOHNY\b/g, 'JHONY')
+      .replace(/\bLAVAMANOS\b/g, 'MANOS')
+      .replace(/\bAOVE\b/g, 'AOVE ACEITE')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  key = aliasText(rawLabel);
   if (maps.productByName.has(key)) return maps.productByName.get(key);
 
-  function simplifyProductKey(value) {
-    return normPlanKey(value || '')
-      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS)\b/g, ' ')
+  function simplify(value) {
+    return aliasText(value || '')
+      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS|NORMAL|GRANDE|MEDIANA|PEQUENA|PEQUEÑA|ENTERO)\b/g, ' ')
       .replace(/\b\d+(?:[,.]\d+)?\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
-  function scoreProduct(product, sourceKey) {
-    const pk = normPlanKey(product?.nombre);
-    if (!pk) return -9999;
-    const simpleSource = simplifyProductKey(sourceKey);
-    const simpleProd = simplifyProductKey(pk);
-    let score = 0;
-    if (pk === sourceKey) score += 2000;
-    if (simpleProd === simpleSource && simpleSource) score += 900;
-    if (pk.includes(sourceKey)) score += 180;
-    if (sourceKey.includes(pk)) score += 70;
-    if (simpleProd.includes(simpleSource) && simpleSource) score += 150;
-    if (simpleSource.includes(simpleProd) && simpleProd) score += 80;
+  const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS LATA LATAS BOTE BOTES BOTELLA BOTELLAS BOLSA PACK PAQUETE PIEZA KG GR L CL ML NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA UNIDADES'.split(' '));
+  function toks(value) { return simplify(value).split(' ').filter(t => t.length >= 3 && !generic.has(t)); }
+  const sourceTokens = toks(key);
+  const sourceSimple = simplify(key);
+  const sourceHasSpecific = sourceTokens.length > 0;
 
-    const sourceTokens = sourceKey.split(' ').filter(t => t.length >= 2);
-    const simpleTokens = simpleSource.split(' ').filter(t => t.length >= 3);
-    sourceTokens.forEach(t => { if (pk.split(' ').includes(t)) score += Math.min(18, t.length + 8); else if (pk.includes(t)) score += Math.min(9, t.length); });
-    simpleTokens.forEach(t => { if (simpleProd.split(' ').includes(t)) score += Math.min(22, t.length + 9); else if (simpleProd.includes(t)) score += Math.min(12, t.length); });
-
-    // Tokens muy característicos: café/descafeinado, AOVE, SKOL, ZERO, etc.
-    const important = simpleTokens.filter(t => !/^(NORMAL|ENTERO|GRANDE|MEDIANA|PEQUEÑO|PEQUENO|MEZCLA|BOLSA)$/.test(t));
-    const missing = important.filter(t => !simpleProd.includes(t)).length;
-    score -= missing * 35;
-    score -= Math.abs(simpleProd.length - simpleSource.length) * 0.08;
-    return score;
+  function mandatoryOk(prodSimple) {
+    if (!sourceHasSpecific) return false;
+    const matched = sourceTokens.filter(t => prodSimple.includes(t));
+    // Para etiquetas con varias palabras específicas, exige al menos una coincidencia fuerte
+    // y penaliza que no coincida ninguna palabra de producto real.
+    if (!matched.length) return false;
+    // Si el usuario escribió marca/tipo muy específico, debe aparecer.
+    const hard = sourceTokens.filter(t => /^(COCA|COLA|ZERO|SKOL|AMBAR|MAHOU|FANTA|SPRITE|SCHWEPPES|LARIOS|BEEFEATER|BRUGAL|BARCELO|DYC|JHONY|WALKER|PUERTO|INDIAS|AOVE|BOLSAS|BASURA|FAIRY|BITTER|KAS|JABON|PAPEL|HIGIENICO|SECAMANOS|VELADORES|ANCHOAS|MEJILLONES|CAFE|DESCAFEINADO|ACEITE|VINAGRE)$/.test(t));
+    return !hard.length || hard.some(t => prodSimple.includes(t));
   }
 
   const aliasKey = planProductAliasKey(rawLabel);
   if (aliasKey && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
 
   let best = null, bestScore = -9999;
-  const candidates = [key, aliasKey, simplifyProductKey(key)].filter(Boolean);
   for (const p of maps.products.values()) {
-    let s = Math.max(...candidates.map(k => scoreProduct(p, k)));
-    if (s > bestScore) { best = p; bestScore = s; }
+    const pk = aliasText(p?.nombre);
+    const ps = simplify(pk);
+    if (!mandatoryOk(ps)) continue;
+    let score = 0;
+    if (pk === key) score += 2000;
+    if (ps === sourceSimple && sourceSimple) score += 1000;
+    if (pk.includes(key)) score += 240;
+    if (key.includes(pk)) score += 120;
+    if (ps.includes(sourceSimple) && sourceSimple) score += 220;
+    if (sourceSimple.includes(ps) && ps) score += 120;
+    sourceTokens.forEach(t => {
+      if (ps.split(' ').includes(t)) score += 42;
+      else if (ps.includes(t)) score += 22;
+      else score -= 18;
+    });
+    const prodTokens = toks(pk);
+    prodTokens.forEach(t => { if (sourceSimple.includes(t)) score += 10; });
+    score -= Math.abs(ps.length - sourceSimple.length) * 0.06;
+    if (score > bestScore) { best = p; bestScore = score; }
   }
-  return bestScore >= 18 ? best : null;
+  return bestScore >= 35 ? best : null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');
@@ -1449,13 +1469,10 @@ function planRoundBuyUnits(productName, units) {
 function planBuyAfterDonation(productName, totalNeed, donatedUnits) {
   const need = Math.max(0, num(totalNeed));
   const donated = Math.max(0, num(donatedUnits));
-  if (!need) return 0;
-  // Para packs de 24, se redondea la NECESIDAD total y después se resta lo donado.
-  // Así si hacen falta 72 latas y ya hay 18 donadas, A COMPRAR queda 54, no vuelve a 72.
-  if (planPackRoundedProduct(productName)) return Math.max(0, round(planRoundBuyUnits(productName, need) - donated, 2));
-  return planRoundBuyUnits(productName, Math.max(0, need - donated));
+  // HOTFIX18: A COMPRAR es exactamente necesidad calculada - suma de donaciones del producto.
+  // No se vuelve a redondear aquí, porque la necesidad calculada ya es la cifra que revisa el usuario.
+  return Math.max(0, round(need - donated, 2));
 }
-
 function planCanonicalProductForRow(row, maps) {
   const byIdProd = trim(row?.productId || row?.productoId || row?.producto_id) ? maps.products.get(trim(row?.productId || row?.productoId || row?.producto_id)) : null;
   return byIdProd || planFindProductLoose(row?.productName || row?.producto || '', maps) || null;
@@ -1744,21 +1761,23 @@ function planMentionedPerson(textBlock, maps) {
     .find(pe => hay.includes(normPlanKey(pe?.nombre))) || null;
 }
 function planCleanExplicitProductText(text) {
-  let s = trim(text || '').replace(/^\s*[•\-]\s*/, '');
-  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,220}:\s*.+)$/i);
+  let s = trim(text || '').replace(/^\s*[•\-\*]\s*/, '');
+  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,240}:\s*.+)$/i);
   if (donorPrefix) s = trim(donorPrefix[2]);
   if (s.includes(':')) s = s.slice(0, s.lastIndexOf(':'));
   s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+(?:de\s+)?/i, '');
   s = s.replace(/\(([^)]*)\)/g, (m, inner) => {
     const t = trim(inner || '');
     if (!t) return ' ';
-    // Conserva aclaraciones útiles como "gorritas", "lata 33cl", "botella 0,7l";
-    // elimina solo envoltorios puramente cuantitativos si no aportan nombre.
     if (/^(?:bolsa|pack|paquete|caja)\s+\d/i.test(t)) return ' ';
     return ' ' + t + ' ';
   });
   s = s.replace(/\b(?:bolsa|pack|packs|paquete|paquetes)\s*(?:de|x)?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?\b/ig, ' ');
   s = s.replace(/\bpieza\s+\d+(?:[,.]\d+)?\s*kg\b/ig, ' ');
+  s = s.replace(/\bBEETER\b/ig, 'Bitter');
+  s = s.replace(/\bWISKI\b/ig, 'Whisky');
+  s = s.replace(/\bJHONY\b/ig, 'Jhony');
+  s = s.replace(/\bLAVAMANOS\b/ig, 'manos');
   s = s.replace(/\s+/g, ' ');
   return trim(s.replace(/[.;]+$/,''));
 }
@@ -1790,22 +1809,17 @@ function planExplicitItemLines(block) {
   const out = [];
   trim(block).split(/\n+/).forEach(line => {
     const s = trim(line);
-    if (!s || /^\s*[•\-]?\s*COMPRA\s*:/i.test(s)) return;
+    if (!s || /^\s*[•\-\*]?\s*COMPRA\s*:/i.test(s)) return;
     if (/\b(responsable|donante|tienda|tipo\s+donaci[oó]n)\b\s*:/i.test(s) && !/\d/.test(s)) return;
-    const m = s.match(/^\s*[•\-]\s*(.+)$/);
+    const m = s.match(/^\s*[•\-\*]\s*(.+)$/);
     if (m) { out.push(m[1]); return; }
     // Soporta líneas sin guion: "Anchoas: 1", "Rollo papel secamanos: 1", "1 kg de chorizo"
     // y líneas con donante delante: "Pocholo y Celes: Anchoas: 1".
-    if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,100}:\s*\d+(?:[,.]\d+)?\b/i.test(s)
-      || /^[^:\n]{2,90}:\s*[^:\n]{2,140}:\s*\d+(?:[,.]\d+)?\b/i.test(s)
+    if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,140}:\s*(?:\d|un|una|uno)/i.test(s)
+      || /^[^:\n]{2,90}:\s*[^:\n]{2,160}:\s*(?:\d|un|una|uno)/i.test(s)
       || /^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(s)) out.push(s);
   });
-  // También soporta una línea tipo "Productos: 1 queso, 1 lata, barril..."
-  const prodLine = block.match(/Productos?\s*:\s*([\s\S]+)/i);
-  if (prodLine) {
-    prodLine[1].split(/[,;]+|\s+y\s+/i).forEach(part => { const p = trim(part); if (p) out.push(p); });
-  }
-  return out.map(x => trim(x)).filter(Boolean);
+  return out.map(x => trim(x).replace(/^\s*[•\-\*]\s*/, '')).filter(Boolean);
 }
 function planExplicitDonationSections(info) {
   const raw = trim(info || '').replace(/\r/g, '');
@@ -2001,7 +2015,7 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         return;
       }
       if(!currentDonor) return;
-      if(!/^\s*[-•]/.test(line) && !/^[^:\n]{2,160}:\s*\d+(?:[,.]\d+)?\b/i.test(line)) return;
+      if(!/^\s*[-•*]/.test(line) && !/^[^:\n]{2,160}:\s*(?:\d|un|una|uno)\b/i.test(line)) return;
       const donorIsStore = currentKind === 'T';
       addRows(line, {
         ticketDonacion: donorIsStore ? 'DONADO TIENDA' : 'DONADO SOCIO',
@@ -2575,11 +2589,17 @@ function buildTotalBaseRows(state, modules, form) {
 }
 function planApplyFinalDefaultsHf14(rows, form, state) {
   const maps = planBuildMaps(state);
+  const defStoreByName = planFindStoreLoose(form?.defaultStoreName || '', maps);
+  const defRespByName = planFindPersonLoose(form?.defaultResponsibleName || '', maps);
+  const firstStore = arr(state?.tiendas)[0] || {};
+  const firstResp = arr(state?.personas)[0] || {};
+  const defStoreId = trim(form?.defaultStoreId || defStoreByName?.id || firstStore?.id || '');
+  const defRespId = trim(form?.defaultResponsibleId || defRespByName?.id || firstResp?.id || '');
   return arr(rows).map(row => {
     const out = {...row};
     if (out.tipo === 'COMPRA') {
-      out.tiendaId = trim(out.tiendaId || form.defaultStoreId || '');
-      out.responsableId = trim(out.responsableId || form.defaultResponsibleId || '');
+      out.tiendaId = trim(out.tiendaId || defStoreId);
+      out.responsableId = trim(out.responsableId || defRespId);
       out.ticketDonacion = '';
       out.donorRef = '';
       return out;
@@ -2589,7 +2609,7 @@ function planApplyFinalDefaultsHf14(rows, form, state) {
       const donor = trim(out.donorRef || '');
       if (!out.responsableId) {
         if (donor.startsWith('P:')) out.responsableId = donor.slice(2);
-        else out.responsableId = trim(form.defaultResponsibleId || '');
+        else out.responsableId = defRespId;
       }
       if (/DONADO\s+TIENDA/i.test(out.ticketDonacion || '') && !out.tiendaId && donor.startsWith('T:')) {
         out.tiendaId = donor.slice(2);
@@ -2598,7 +2618,6 @@ function planApplyFinalDefaultsHf14(rows, form, state) {
     return out;
   });
 }
-
 
 function planHasConfirmedDonationBlocksHf17(form) {
   const info = trim(form?.info || '');
@@ -2691,11 +2710,11 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   rowsOut = planMergeExplicitDonations(rowsOut, explicitDonationRows);
   rowsOut = planSanitizeInventedDonations(rowsOut, baseRows, explicitDonationRows, m);
   rowsOut = planCoalesceDonationsAfterSanitize(rowsOut, explicitDonationRows, m);
-  rowsOut = arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}`, tiendaId: trim(row.tiendaId || defaultStoreId), responsableId: trim(row.responsableId || defaultResponsibleId) }));
+  rowsOut = planApplyFinalDefaultsHf14(arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}` })), form, state);
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
     const budget = planBudgetGuard(rowsOut, form);
-    rowsOut = budget.rows;
+    rowsOut = planApplyFinalDefaultsHf14(budget.rows, form, state);
     aiNotes = planReadableNotes(aiNotes, rowsOut, form, budget.notes);
   } else {
     aiNotes = planReadableNotes(aiNotes, rowsOut, form, []);
