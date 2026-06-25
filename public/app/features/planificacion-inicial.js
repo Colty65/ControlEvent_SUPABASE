@@ -208,13 +208,39 @@
     });
     return out.sort((a,b)=>a.label.localeCompare(b.label,'es'));
   }
+  function isKnownDonorRef(ref){
+    const raw = String(ref || '').trim();
+    if(!raw) return false;
+    const [kind, ...rest] = raw.split(':');
+    const id = rest.join(':');
+    if(kind === 'P') return !!personaOf(id);
+    if(kind === 'T') return !!tiendaOf(id);
+    return false;
+  }
+  function normalizeDonorRef(ref){
+    const raw = String(ref || '').trim();
+    if(!raw) return '';
+    if(isKnownDonorRef(raw)) return raw;
+    const labelText = normalizeText(raw.replace(/^[PT]:/i,''));
+    if(!labelText) return '';
+    if(['DONACION','DONACIONES','CIONES','DONACIONES PRODUCTO','DONACION PRODUCTO'].includes(labelText)) return '';
+    const opts = donorOptions();
+    const exact = opts.find(d => normalizeText(d.label) === labelText);
+    if(exact) return exact.value;
+    const close = opts.find(d => {
+      const n = normalizeText(d.label);
+      return n && (n.includes(labelText) || labelText.includes(n));
+    });
+    return close ? close.value : '';
+  }
   function donorLabel(ref){
-    if(!ref) return 'Sin donante';
-    const parts = String(ref).split(':');
+    const normalized = normalizeDonorRef(ref);
+    if(!normalized) return 'Sin donante';
+    const parts = String(normalized).split(':');
     const kind = parts[0], id = parts.slice(1).join(':');
     if(kind === 'P') return personaOf(id)?.nombre || 'Persona sin nombre';
     if(kind === 'T') return tiendaOf(id)?.nombre || 'Tienda sin nombre';
-    return ref;
+    return normalized;
   }
   function incomeRowsForEvent(eventId){
     const id = String(eventId || '');
@@ -584,6 +610,7 @@
     if(String(row?.tipo || '').toUpperCase() !== 'DONACION') return false;
     if(isTinyGhostDonation(row)) return true;
     if(!isZuzuPlanningMode()) return false;
+    if(!normalizeDonorRef(row?.donorRef || '')) return true;
     return !donorNearProductInPrompt(row);
   }
   function planResourceRows(proposals){
@@ -634,14 +661,15 @@
         return;
       }
       if(p.tipo === 'DONACION'){
+        const donorRef = normalizeDonorRef(p.donorRef || '');
         row.donado += units;
         row.importeDonado += importe;
         row.precioDonado = row.precioDonado || Number(p.precio || 0);
         row.donationIndices.push(idx);
-        row.donorRef = row.donorRef || p.donorRef || '';
+        row.donorRef = row.donorRef || donorRef || '';
         row.donationResponsableId = row.donationResponsableId || p.responsableId || '';
         row.donationTicket = row.donationTicket || p.ticketDonacion || 'DONADO';
-        const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(p.donorRef)} · Resp. ${personaName(p.responsableId)}`;
+        const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(donorRef)} · Resp. ${personaName(p.responsableId)}`;
         row.donantes.set(label, (row.donantes.get(label) || 0) + units);
         row.donationDetails.push({
           idx,
@@ -649,9 +677,9 @@
           precio:Number(p.precio || 0),
           importe,
           ticketDonacion:p.ticketDonacion || 'DONADO',
-          donorRef:p.donorRef || '',
+          donorRef:donorRef || '',
           responsableId:p.responsableId || '',
-          donorLabel:donorLabel(p.donorRef),
+          donorLabel:donorLabel(donorRef),
           responsableLabel:personaName(p.responsableId)
         });
       }else{
@@ -730,7 +758,7 @@
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card" id="planResourceEditor">
-      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
+      <div class="section-title tiny-title plan-resource-title"><div><h3>Propuesta editable tipo Mapa de recursos</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline ${String(planResourceOrderMode || 'PRODUCTO').toUpperCase()==='PRODUCTO'?'active':''}" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='SEGMENTO_DESTINO'?'active':''}" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='TIENDA'?'active':''}" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
         <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -748,7 +776,7 @@
       .plan-resource-product-select{margin-top:6px!important;width:100%!important;min-width:120px!important;max-width:100%!important;font-weight:950!important;font-size:15px!important;background:#fff!important;color:#111827!important}
       .plan-resource-excluded-label{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-style:normal;font-weight:800;font-size:11px}
       .plan-donation-line{display:block;line-height:1.25}.plan-muted{color:#64748b;font-weight:700}
-      .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.plan-resource-order-actions input{min-width:190px!important;max-width:260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-resource-order-actions button{white-space:nowrap}
+      .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.plan-resource-order-actions input{min-width:190px!important;max-width:260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-resource-order-actions button{white-space:nowrap}.plan-resource-order-actions button.active,.plan-resource-order-actions button.plan-order-active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;box-shadow:0 0 0 3px rgba(15,23,42,.16)!important}.plan-resource-order-actions button.active{background:#dbeafe!important;border-color:#2563eb!important;color:#0f172a!important;box-shadow:0 0 0 2px rgba(37,99,235,.16) inset!important}
       .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:30%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:70%!important}
       .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(82px,105px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:105px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
       .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
@@ -973,6 +1001,9 @@
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
+    const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
+    const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
+    const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
@@ -1004,6 +1035,9 @@
       <details class="plan-advanced-lines"><summary>Detalle avanzado de líneas que se crearán</summary><div class="plan-advanced-toolbar"><input id="planBuscarDetalleAvanzado" type="search" placeholder="Buscar producto en detalle avanzado..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarDetalleAvanzado">Buscar</button></div><div class="plan-proposal-list" id="planProposalList">${cards}</div></details>
     `;
     bindProposalControls();
+    if(wasOpen) box.querySelector('.plan-advanced-lines')?.setAttribute('open','');
+    const adv = box.querySelector('#planBuscarDetalleAvanzado'); if(adv) adv.value = prevAdvancedSearch;
+    const res = box.querySelector('#planBuscarRecurso'); if(res) res.value = prevResourceSearch;
   }
   function renderProposalRow(p, index){
     const tiendasOpts = tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(p.tiendaId)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
@@ -1090,7 +1124,7 @@
     if(!group) return;
     const hadPurchaseRow = !!tr.querySelector('.plan-resource-purchase-subrow');
     let include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
-    const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
+    let need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
     const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
     let buy = Math.max(0, Number(buyInput?.value || group.compra || 0));
     const priceInput = tr.querySelector('[data-plan-resource-field="precio"]');
@@ -1106,6 +1140,11 @@
     }else if(changedField === 'compra'){
       // Prioridad absoluta al panel editable: si el usuario escribe A COMPRAR, se respeta.
       buy = Math.max(0, Number(buyInput?.value || 0));
+      const donatedBase = Math.max(0, Number(group.donado || 0));
+      const impliedNeed = donatedBase + buy;
+      need = impliedNeed;
+      const needInput = tr.querySelector('[data-plan-resource-field="necesidad"]');
+      if(needInput) needInput.value = String(impliedNeed);
     }
     if(changedField !== 'include' && (buy > 0 || Number(group.donado || 0) > 0)){
       include = true;
@@ -1145,7 +1184,7 @@
       const donationPriceInput = tr.querySelector(`[data-plan-proposal-index="${String(idx)}"][data-plan-resource-field="donationPrecio"]`);
       if(donationUnitsInput) row.unidades = Math.max(0, Number(donationUnitsInput.value || 0));
       editedDonatedTotal += Number(row.unidades || 0);
-      if(donorInput) row.donorRef = donorInput.value;
+      if(donorInput) row.donorRef = normalizeDonorRef(donorInput.value);
       if(respInput) row.responsableId = respInput.value;
       if(donationPriceInput){
         row.precio = Math.max(0, Number(donationPriceInput.value || 0));
@@ -1340,7 +1379,15 @@
     card.classList.toggle('excluded', !p.include);
     const out = card.querySelector('[data-plan-output="importe"]');
     if(out) out.value = money(Number(p.unidades || 0) * Number(p.precio || 0));
-    if(!light) setTimeout(renderProposal, 0);
+    if(String(p.tipo || '').toUpperCase() === 'COMPRA'){
+      try{
+        const pid = String(p.productId || '');
+        const pname = normalizeText(p.productName || '');
+        const donated = lastProposal.filter(x => x && x.include !== false && String(x.tipo || '').toUpperCase() === 'DONACION' && ((pid && String(x.productId || '') === pid) || (!pid && normalizeText(x.productName || '') === pname))).reduce((sum,x)=>sum+Number(x.unidades||0),0);
+        p.necesidadTotal = Math.max(0, donated + Number(p.unidades || 0));
+      }catch(_){}
+    }
+    if(!light){ const d=card.closest?.('.plan-advanced-lines'); setTimeout(()=>{ renderProposal(); try{ if(d) document.querySelector('.plan-advanced-lines')?.setAttribute('open',''); }catch(_){} }, 0); }
   }
 
   function makeId(){
@@ -1413,7 +1460,7 @@
       const productName = selectedProduct?.nombre || group.producto || 'Producto';
       const segmento = selectedProduct?.segmento || group.segmento || '';
       const destino = selectedProduct?.destino || group.destino || '';
-      const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
+      let need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
       (group.donationDetails || []).forEach((detail, detailPos) => {
         const base = {...(lastProposal[detail.idx] || {})};
         const donorInput = tr.querySelector(`[data-plan-proposal-index="${String(detail.idx)}"][data-plan-resource-field="donorRef"]`);
@@ -1434,7 +1481,7 @@
           unidades:units,
           precio:price,
           ticketDonacion: base.ticketDonacion || detail.ticketDonacion || 'DONADO SOCIO',
-          donorRef: donorInput?.value || detail.donorRef || base.donorRef || '',
+          donorRef: normalizeDonorRef(donorInput?.value || detail.donorRef || base.donorRef || ''),
           responsableId: respInput?.value || detail.responsableId || base.responsableId || '',
           necesidadTotal: need || undefined
         });
