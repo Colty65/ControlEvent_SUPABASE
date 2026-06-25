@@ -337,6 +337,80 @@
     return n;
   }
   function planGroupKey(product){ return planProductAliasKey(product || ''); }
+
+  function resolveCatalogProductByName(name){
+    const target = normalizeText(name || '');
+    if(!target) return null;
+    const products = rows('productos');
+    const exact = products.filter(p => normalizeText(p?.nombre || '') === target);
+    if(exact.length === 1) return exact[0];
+    const close = products.filter(p => {
+      const n = normalizeText(p?.nombre || '');
+      if(!n) return false;
+      return n === target || n.startsWith(target) || target.startsWith(n);
+    });
+    if(close.length === 1) return close[0];
+    return null;
+  }
+  function canonicalProposalProductId(row){
+    return String(row?.productId || resolveCatalogProductByName(row?.productName || '')?.id || '');
+  }
+  function isTinyGhostDonation(row){
+    if(String(row?.tipo || '').toUpperCase() !== 'DONACION') return false;
+    if(row?.explicitPromptDonation === true) return false;
+    return Number(row?.unidades || 0) > 0 && Number(row?.unidades || 0) <= 0.05;
+  }
+  function normalizeProposalRowsForGroups(list){
+    const base = (Array.isArray(list) ? list : []).map(row => ({...row}));
+    base.forEach(row => {
+      const resolvedId = canonicalProposalProductId(row);
+      if(resolvedId && !row.productId){
+        const p = byId('productos', resolvedId) || resolveCatalogProductByName(row.productName || '');
+        row.productId = resolvedId;
+        if(p){
+          row.productName = p.nombre || row.productName;
+          row.segmento = p.segmento || row.segmento;
+          row.destino = p.destino || row.destino;
+        }
+      }
+      if(isTinyGhostDonation(row) || isSuppressedAutoDonation(row)){ row.include = false; row.__ceSuppressedDonation = true; }
+    });
+    const prev = lastProposal;
+    try{
+      lastProposal = base;
+      const groups = planResourceRows(base);
+      groups.forEach(group => {
+        const includeGroup = !!group.include;
+        group.allIndices.forEach(idx => {
+          const row = base[idx];
+          if(!row) return;
+          row.include = includeGroup && !(isTinyGhostDonation(row));
+          if(group.productId){
+            row.productId = group.productId;
+            row.productName = group.producto || row.productName;
+            row.segmento = group.segmento || row.segmento;
+            row.destino = group.destino || row.destino;
+          }
+        });
+        const purchases = group.purchaseIndices.map(idx => ({idx, row:base[idx]})).filter(x => x.row);
+        purchases.sort((a,b)=>a.idx-b.idx);
+        purchases.forEach((item, pos) => {
+          item.row.unidades = pos === 0 ? Math.max(0, Number(group.compra || 0)) : 0;
+          item.row.include = pos === 0 ? (includeGroup && Number(group.compra || 0) > 0) : false;
+          item.row.necesidadTotal = Number(group.necesidad || 0) || item.row.necesidadTotal;
+          if(group.productId){
+            item.row.productId = group.productId;
+            item.row.productName = group.producto || item.row.productName;
+            item.row.segmento = group.segmento || item.row.segmento;
+            item.row.destino = group.destino || item.row.destino;
+          }
+        });
+      });
+    }finally{
+      lastProposal = prev;
+    }
+    return base;
+  }
   function planProductOptions(selected, fallbackName){
     const current = String(selected || '');
     const cleanFallback = String(fallbackName || '').trim();
@@ -403,16 +477,129 @@
     if(need <= 0 && buy <= 0) return 'Excluido inicialmente de compra';
     return `${row?.segmento || 'Sin segmento'} - ${row?.destino || 'Sin destino'}`;
   }
+
+
+  // HOTFIX9: rescate de donaciones. En Zuzu no se aceptan donaciones inventadas.
+  // Regla: donación fija del prompt + compra solo por déficit.
+  function currentPromptText(){
+    try{ return String(document.getElementById('planInfo')?.value || ''); }catch(_){ return ''; }
+  }
+  function isZuzuPlanningMode(){
+    const m = String(planMode() || '').toUpperCase();
+    return m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL';
+  }
+  function tokenList(value){ return normalizeText(value || '').split(/\s+/).filter(Boolean); }
+  function meaningfulTokens(value, kind){
+    const generic = new Set(['DONADO','SOCIO','SOCIOS','TIENDA','TIENDAS','OTROS','GASTOS','PTE','COMPRA','COMPRAS','CERVEZA','CERVEZAS','COCA','COLA','FANTA','SPRITE','TONICA','AQUARIUS','ACUARIUS','REFRESCO','REFRESCOS','LATA','LATAS','BOTE','BOTES','BOTELLA','BOTELLAS','BOTELLIN','BOTELLINES','PACK','PAQUETE','UNIDAD','UNIDADES','UD','UDS','LITRO','LITROS','KILO','KILOS','GRAMO','GRAMOS','CL','ML','KG','GR','CON','SIN','NORMAL','GRANDE','GRANDES','PEQUENO','PEQUENOS','EL','LA','LOS','LAS','DE','DEL','Y','E','EN','POR','PARA','UN','UNA','UNO','DOS','TRES']);
+    const toks = tokenList(value).filter(t => t.length >= 2 && !generic.has(t));
+    return kind === 'donor' ? toks.filter(t => t.length >= 3) : toks;
+  }
+  function productMentionInText(productName, textNorm){
+    const pn = normalizeText(productName || '');
+    if(!pn || !textNorm) return false;
+    if(textNorm.includes(pn)) return true;
+    const has = (...parts) => parts.every(part => pn.includes(part));
+    const txtHas = (...parts) => parts.every(part => textNorm.includes(part));
+    if(has('PAPEL','HIGIENICO') && txtHas('PAPEL','HIGIENICO')) return true;
+    if(has('PAPEL') && (pn.includes('SECAMANOS') || pn.includes('SECAMAN')) && txtHas('PAPEL') && (textNorm.includes('SECAMANOS') || textNorm.includes('SECAMAN'))) return true;
+    if(has('BOLSAS','BASURA') && txtHas('BOLSAS','BASURA')) return true;
+    if(pn.includes('ANCHOA') && textNorm.includes('ANCHOA')) return true;
+    if(pn.includes('BARRIL') && textNorm.includes('BARRIL')){
+      const brands = meaningfulTokens(productName).filter(t => t !== 'BARRIL');
+      if(!brands.length || brands.some(t => textNorm.includes(t))) return true;
+    }
+    const sig = meaningfulTokens(productName);
+    if(!sig.length) return false;
+    const hits = sig.filter(t => textNorm.includes(t)).length;
+    if(sig.length <= 2) return hits === sig.length;
+    return hits >= Math.min(3, sig.length);
+  }
+  function productAnchorTokens(productName){
+    const pn = normalizeText(productName || '');
+    const sig = meaningfulTokens(productName);
+    const preferred = sig.filter(t => /SKOL|AMSTEL|MAHOU|ALHAMBRA|CRUZCAMPO|ZERO|ANCHOA|HIGIENICO|SECAMANOS|SECAMAN|BASURA|BARRIL|AOVE|WHISKY|WISKI|RON|GIN|GINEBRA|JABON|HIELO/.test(t));
+    if(preferred.length) return preferred;
+    if(pn.includes('PAPEL') && pn.includes('HIGIENICO')) return ['PAPEL','HIGIENICO'];
+    if(pn.includes('BOLSAS') && pn.includes('BASURA')) return ['BOLSAS','BASURA'];
+    return sig.slice(0,3);
+  }
+  function donorNearProductInPrompt(row){
+    const prompt = normalizeText(currentPromptText());
+    if(!prompt) return false;
+    const product = row?.productName || productName(row) || '';
+    if(!productMentionInText(product, prompt)) return false;
+    const donor = donorLabel(row?.donorRef || '');
+    const donorTokens = meaningfulTokens(donor, 'donor');
+    if(!donorTokens.length) return true;
+    const allDonorTokenSets = donorOptions().map(d => meaningfulTokens(d.label, 'donor')).filter(toks => toks.length);
+    const anchors = productAnchorTokens(product).filter(Boolean);
+    if(!anchors.length) return donorTokens.some(t => prompt.includes(t));
+    const lastBefore = (tokens, pos) => Math.max(...tokens.map(t => prompt.lastIndexOf(t, pos)).filter(i => i >= 0), -1);
+    for(const anchor of anchors){
+      let pos = prompt.indexOf(anchor);
+      while(pos >= 0){
+        const ownLast = lastBefore(donorTokens, pos);
+        const otherLast = Math.max(...allDonorTokenSets.filter(toks => toks.join('|') !== donorTokens.join('|')).map(toks => lastBefore(toks, pos)), -1);
+        if(ownLast >= 0 && ownLast >= otherLast && (pos - ownLast) <= 1200) return true;
+        const chunk = prompt.slice(Math.max(0, pos - 260), Math.min(prompt.length, pos + 260));
+        if(donorTokens.some(t => chunk.includes(t))) return true;
+        pos = prompt.indexOf(anchor, pos + anchor.length);
+      }
+    }
+    return false;
+  }
+  function promptDonationQuantity(row){
+    const prompt = normalizeText(currentPromptText());
+    if(!prompt) return null;
+    const product = row?.productName || productName(row) || '';
+    const donor = donorLabel(row?.donorRef || '');
+    const donorTokens = meaningfulTokens(donor, 'donor');
+    const anchors = productAnchorTokens(product).filter(Boolean);
+    const numsFromChunk = chunk => {
+      const nums = [];
+      const re = /(?:^|\s)(\d+(?:[,.]\d+)?)(?=\s|$)/g;
+      let m;
+      while((m = re.exec(chunk))){
+        const n = parseNum(m[1]);
+        if(Number.isFinite(n) && n > 0) nums.push(n);
+      }
+      return nums;
+    };
+    let best = null;
+    for(const anchor of anchors){
+      let pos = prompt.indexOf(anchor);
+      while(pos >= 0){
+        const chunk = prompt.slice(Math.max(0, pos - 170), Math.min(prompt.length, pos + 170));
+        if(!donorTokens.length || donorTokens.some(t => chunk.includes(t))){
+          const after = prompt.slice(pos, Math.min(prompt.length, pos + 120));
+          const nums = numsFromChunk(after);
+          if(nums.length) best = nums[nums.length - 1];
+        }
+        pos = prompt.indexOf(anchor, pos + anchor.length);
+      }
+    }
+    return best;
+  }
+  function isSuppressedAutoDonation(row){
+    if(String(row?.tipo || '').toUpperCase() !== 'DONACION') return false;
+    if(isTinyGhostDonation(row)) return true;
+    if(!isZuzuPlanningMode()) return false;
+    return !donorNearProductInPrompt(row);
+  }
   function planResourceRows(proposals){
     const map = new Map();
+    const donationQuotaUsed = new Map();
     (Array.isArray(proposals) ? proposals : []).forEach((p, idx) => {
-      const key = p.productId ? `id:${String(p.productId)}` : planGroupKey(p.productName || `producto-${idx}`);
-      const catalogProduct = p.productId ? byId('productos', p.productId) : null;
+      if(!p || isTinyGhostDonation(p)) return;
+      const suppressedDonation = isSuppressedAutoDonation(p);
+      const resolvedProductId = canonicalProposalProductId(p);
+      const catalogProduct = resolvedProductId ? byId('productos', resolvedProductId) || resolveCatalogProductByName(p.productName || '') : null;
       const canonicalName = catalogProduct?.nombre || p.productName || 'Producto';
       const canonicalSegmento = catalogProduct?.segmento || p.segmento || '';
       const canonicalDestino = catalogProduct?.destino || p.destino || '';
+      const key = resolvedProductId ? `id:${String(resolvedProductId)}` : `nm:${planGroupKey(canonicalName || `producto-${idx}`)}::${up(canonicalSegmento)}::${up(canonicalDestino)}`;
       const row = map.get(key) || {
-        key, producto: canonicalName, productId:p.productId || '', segmento: canonicalSegmento, destino: canonicalDestino, necesidad:0,
+        key, producto: canonicalName, productId:resolvedProductId || p.productId || '', segmento: canonicalSegmento, destino: canonicalDestino, necesidad:0,
         compra:0, donado:0, importeCompra:0, importeDonado:0, precioCompra:0, precioDonado:0,
         donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
         tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:'', donationDetails:[], purchaseDetails:[]
@@ -426,13 +613,26 @@
         row.segmento = canonicalSegmento || row.segmento;
         row.destino = canonicalDestino || row.destino;
       }
-      if(p.productId && (!row.productId || p.tipo === 'COMPRA' || String(row.productId) === String(p.productId))) row.productId = p.productId;
+      if(resolvedProductId && (!row.productId || p.tipo === 'COMPRA' || String(row.productId) === String(resolvedProductId))) row.productId = resolvedProductId;
       row.allIndices.push(idx);
-      if(p.include) row.include = true;
-      const units = Number(p.unidades || 0);
+      if(p.include && !suppressedDonation) row.include = true;
+      let units = Number(p.unidades || 0);
+      const quotaKey = `${key}|${String(p.donorRef || '')}|${String(p.ticketDonacion || '')}`;
+      const quota = suppressedDonation ? null : promptDonationQuantity(p);
+      if(String(p.tipo || '').toUpperCase() === 'DONACION' && quota !== null){
+        const used = donationQuotaUsed.get(quotaKey) || 0;
+        const available = Math.max(0, Number(quota || 0) - used);
+        units = Math.min(Math.max(0, units), available);
+        donationQuotaUsed.set(quotaKey, used + units);
+        if(units <= 0){ p = {...p, include:false, __ceSuppressedDonation:true}; }
+      }
       const importe = units * Number(p.precio || 0);
       const needHint = Number(p.necesidadTotal || p.necesidad || p.necesidadCalculada || 0);
       if(needHint > row.necesidad) row.necesidad = needHint;
+      if(suppressedDonation || (p.tipo === 'DONACION' && units <= 0)){
+        map.set(key, row);
+        return;
+      }
       if(p.tipo === 'DONACION'){
         row.donado += units;
         row.importeDonado += importe;
@@ -465,7 +665,7 @@
         row.compras.set(label, (row.compras.get(label) || 0) + units);
         row.purchaseDetails.push({ idx, unidades:units, precio:Number(p.precio || 0), importe, tiendaId:p.tiendaId || '', responsableId:p.responsableId || '' });
       }
-      if(!row.productId && p.productId) row.productId = p.productId;
+      if(!row.productId && resolvedProductId) row.productId = resolvedProductId;
       map.set(key, row);
     });
     const list = [...map.values()].map(row => {
@@ -773,6 +973,7 @@
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
+    lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const compras = proposals.filter(p => p.tipo === 'COMPRA' && p.include);
@@ -845,7 +1046,7 @@
     });
   }
   function advancedDetailCardsHtml(){
-    const detailCards = sortPlanProposalDetailCards(lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
+    const detailCards = sortPlanProposalDetailCards(lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && !isTinyGhostDonation(p) && !isSuppressedAutoDonation(p) && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))));
     return detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
   }
   function refreshAdvancedProposalDetails(){
@@ -995,7 +1196,7 @@
     refreshAdvancedProposalDetails();
     tr.classList.toggle('excluded', !(include && (buy > 0 || Number(group.donado || 0) > 0)));
     tr.dataset.planProductName = normalizeText(newName);
-    tr.dataset.planResourceKey = planGroupKey(newName);
+    tr.dataset.planResourceKey = selectedProductId ? `id:${String(selectedProductId)}` : planGroupKey(newName);
     const meta = tr.querySelector('[data-plan-resource-meta]');
     if(meta) meta.textContent = `${newSegment || 'Sin segmento'} · ${newDestino || 'Sin destino'}`;
     const productSelect = tr.querySelector('[data-plan-resource-field="productId"]');
@@ -1198,12 +1399,82 @@
     }
     return res.json();
   }
+  function rebuildProposalFromResourceEditor(){
+    const rowsDom = Array.from(document.querySelectorAll('#planResourceEditor .plan-resource-edit-row'));
+    if(!rowsDom.length) return normalizeProposalRowsForGroups(lastProposal);
+    const rebuilt = [];
+    rowsDom.forEach((tr, pos) => {
+      const key = tr.dataset?.planResourceKey || '';
+      const group = productGroupFromKey(key);
+      if(!group) return;
+      const include = !!tr.querySelector('[data-plan-resource-field="include"]')?.checked;
+      const selectedProductId = tr.querySelector('[data-plan-resource-field="productId"]')?.value || group.productId || '';
+      const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
+      const productName = selectedProduct?.nombre || group.producto || 'Producto';
+      const segmento = selectedProduct?.segmento || group.segmento || '';
+      const destino = selectedProduct?.destino || group.destino || '';
+      const need = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="necesidad"]')?.value || group.necesidad || 0));
+      (group.donationDetails || []).forEach((detail, detailPos) => {
+        const base = {...(lastProposal[detail.idx] || {})};
+        const donorInput = tr.querySelector(`[data-plan-proposal-index="${String(detail.idx)}"][data-plan-resource-field="donorRef"]`);
+        const respInput = tr.querySelector(`[data-plan-proposal-index="${String(detail.idx)}"][data-plan-resource-field="donationResponsableId"]`);
+        const donationUnitsInput = tr.querySelector(`[data-plan-proposal-index="${String(detail.idx)}"][data-plan-resource-field="donationUnits"]`);
+        const donationPriceInput = tr.querySelector(`[data-plan-proposal-index="${String(detail.idx)}"][data-plan-resource-field="donationPrecio"]`);
+        const units = Math.max(0, Number(donationUnitsInput?.value || detail.unidades || 0));
+        const price = Math.max(0, Number(donationPriceInput?.value || detail.precio || 0));
+        rebuilt.push({
+          ...base,
+          key: base.key || `plan-donation:${pos}:${detailPos}`,
+          include: include && units > 0 && !isTinyGhostDonation({tipo:'DONACION', unidades:units, explicitPromptDonation:base.explicitPromptDonation}),
+          tipo:'DONACION',
+          productId:selectedProductId,
+          productName,
+          segmento,
+          destino,
+          unidades:units,
+          precio:price,
+          ticketDonacion: base.ticketDonacion || detail.ticketDonacion || 'DONADO SOCIO',
+          donorRef: donorInput?.value || detail.donorRef || base.donorRef || '',
+          responsableId: respInput?.value || detail.responsableId || base.responsableId || '',
+          necesidadTotal: need || undefined
+        });
+      });
+      const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
+      if(buyInput){
+        const units = Math.max(0, Number(buyInput.value || 0));
+        const price = Math.max(0, Number(tr.querySelector('[data-plan-resource-field="precio"]')?.value || group.precioCompra || group.precioDonado || 0));
+        const tiendaId = tr.querySelector('[data-plan-resource-field="tiendaId"]')?.value || group.tiendaId || document.getElementById('planTienda')?.value || '';
+        const responsableId = tr.querySelector('[data-plan-resource-field="responsableId"]')?.value || group.responsableId || document.getElementById('planResponsable')?.value || '';
+        const basePurchaseIndex = (group.purchaseDetails?.[0]?.idx ?? group.purchaseIndices?.[0]);
+        const basePurchase = {...(lastProposal[basePurchaseIndex] || group.allIndices.map(i=>lastProposal[i]).find(r => r && String(r.tipo).toUpperCase()==='COMPRA') || {})};
+        rebuilt.push({
+          ...basePurchase,
+          key: basePurchase.key || `plan-buy:${pos}`,
+          include: include && units > 0,
+          tipo:'COMPRA',
+          productId:selectedProductId,
+          productName,
+          segmento,
+          destino,
+          unidades:units,
+          precio:price,
+          tiendaId,
+          responsableId,
+          ticketDonacion:'',
+          donorRef:'',
+          necesidadTotal: need || undefined
+        });
+      }
+    });
+    return normalizeProposalRowsForGroups(rebuilt);
+  }
   function syncProposalFromResourceEditor(){
     const rows = Array.from(document.querySelectorAll('#planResourceEditor .plan-resource-edit-row'));
     rows.forEach(tr => {
       const key = tr.dataset?.planResourceKey || '';
       if(key) updateResourceEditorRow(key, tr, '__sync');
     });
+    lastProposal = rebuildProposalFromResourceEditor();
     refreshAdvancedProposalDetails();
   }
 
