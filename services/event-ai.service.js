@@ -1400,7 +1400,7 @@ function planFindProductLoose(label, maps) {
     let s = Math.max(...candidates.map(k => scoreProduct(p, k)));
     if (s > bestScore) { best = p; bestScore = s; }
   }
-  return bestScore >= 34 ? best : null;
+  return bestScore >= 18 ? best : null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');
@@ -2048,6 +2048,101 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     });
   })();
 
+
+  // HOTFIX16: parser directo y determinista de donaciones/existencias confirmadas.
+  // Cualquier producto listado dentro de PRODUCTO EN LA PEÑA / DONACIONES / DONACION se acepta como DONACION.
+  // Si no encuentra producto exacto en catálogo, conserva el nombre textual como donación revisable, pero NO lo convierte en compra.
+  (function parseConfirmedPromptDonationsHf16(){
+    const lines = info.replace(/\r/g, '').split(/\n/);
+    let active = null;
+
+    function kindFrom(text){
+      const h = trim(text || '');
+      if (/DONADO\s+TIENDA|DONACION\s+DE\s+TIENDA/i.test(h)) return 'DONADO TIENDA';
+      if (/DONADO\s+OTROS|DONACION\s+DE\s+OTROS/i.test(h)) return 'DONADO OTROS';
+      return 'DONADO SOCIO';
+    }
+    function updateMetaFromText(meta, text){
+      const h = trim(text || '');
+      if (!meta) meta = {};
+      if (/DONADO\s+TIENDA|DONACION\s+DE\s+TIENDA/i.test(h)) meta.ticketDonacion = 'DONADO TIENDA';
+      if (/DONADO\s+OTROS|DONACION\s+DE\s+OTROS/i.test(h)) meta.ticketDonacion = 'DONADO OTROS';
+      if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?/i.test(h)) meta.ticketDonacion = 'DONADO SOCIO';
+      const donor = planExtractBracket(h, ['Donante']) || planExtractBracket(h, ['Dona']) || '';
+      const resp = planExtractBracket(h, ['Responsable']) || '';
+      if (donor) meta.donor = donor;
+      if (resp) meta.responsable = resp;
+      if (!meta.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) meta.donor = 'Peña El Arrastre';
+      if (!meta.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) meta.responsable = trim(form.defaultResponsibleName || 'Colty');
+      if (!meta.ticketDonacion) meta.ticketDonacion = kindFrom(h);
+      return meta;
+    }
+    function isSectionStart(line){
+      return /^(?:\s*)(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACION\b|DONACI[ÓO]N\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i.test(line)
+        || (/Tratar\s+como\s+DONADO\s+(?:SOCIO|TIENDA|OTROS)/i.test(line) && /\[Donante:/i.test(line));
+    }
+    function isHardStop(line){
+      return /^(?:\s*)(PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR|OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N\s+CONCEPTUAL|CRITERIOS?\s+DE|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS)\s*:/i.test(line);
+    }
+    function looksItem(line){
+      const s = trim(line || '');
+      if (!s) return false;
+      if (/^(PRODUCTOS?|Tratar\s+como)\b/i.test(s)) return false;
+      if (/^\s*[•\-]\s*/.test(s)) return true;
+      return /^[^:\n]{2,180}:\s*(?:\d|un|una|uno)/i.test(s);
+    }
+    function addDirect(itemRaw, meta){
+      const item = trim(itemRaw).replace(/^\s*[•\-]\s*/, '');
+      const productText = planCleanExplicitProductText(item);
+      if (!productText || /^(PRODUCTOS?|Tratar\s+como)$/i.test(productText)) return;
+      const prod = planFindProductLoose(productText, maps);
+      const unidades = Math.max(0.01, planExplicitUnits(item));
+      const ticket = meta.ticketDonacion || 'DONADO SOCIO';
+      const donorLabel = trim(meta.donor || (ticket === 'DONADO TIENDA' ? meta.store : '') || 'Donante indicado');
+      const respLabel = trim(meta.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
+      const storeLabel = ticket === 'DONADO TIENDA' ? donorLabel : '';
+      const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || trim(donorLabel);
+      const resp = planFindPersonLoose(respLabel, maps);
+      const store = planFindStoreLoose(storeLabel || donorLabel, maps);
+      rowsOut.push({
+        key:`prompt-confirmed-hf16:${rowsOut.length}:${trim(prod?.id || productText)}`,
+        include:true,
+        tipo:'DONACION',
+        productId:trim(prod?.id || ''),
+        productName:trim(prod?.nombre || productText),
+        segmento:trim(prod?.segmento || 'Sin segmento'),
+        destino:trim(prod?.destino || 'Sin destino'),
+        unidades:round(unidades, 2),
+        precio:planReasonablePlanPrice(prod?.nombre || productText, prod?.defaultPrecio ?? prod?.precio ?? 0),
+        tiendaId:trim((ticket === 'DONADO TIENDA' ? (store?.id || form.defaultStoreId || '') : (store?.id || form.defaultStoreId || ''))),
+        responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
+        ticketDonacion:ticket,
+        donorRef,
+        confidence:'Prompt explícito confirmado',
+        explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
+        explicitPromptStrictHf12:true,
+        reason:`Donación/existencia confirmada por el prompt (${donorLabel}). No requiere histórico.`
+      });
+    }
+
+    lines.forEach(raw => {
+      const line = trim(raw);
+      if (!line) return;
+      if (isHardStop(line)) { active = null; return; }
+      if (isSectionStart(line)) {
+        active = updateMetaFromText({}, line);
+        return;
+      }
+      if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) {
+        active = updateMetaFromText(active, line);
+        return;
+      }
+      if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+      if (active && looksItem(line)) addDirect(line, active);
+    });
+  })();
+
   const strictProductKeysHf12 = new Set(rowsOut.filter(r => r.explicitPromptStrictHf12 === true).map(r => trim(r.productId)).filter(Boolean));
   const finalRowsHf12 = strictProductKeysHf12.size
     ? rowsOut.filter(r => !strictProductKeysHf12.has(trim(r.productId)) || r.explicitPromptStrictHf12 === true)
@@ -2122,8 +2217,9 @@ function planSanitizeInventedDonations(rows, baseRows, explicitRows, mode = '') 
   const allowedExplicit = new Set(explicit.map(planDonationProductKey).filter(Boolean));
   return arr(rows).map(row => {
     if (row?.tipo !== 'DONACION') return row;
-    if (row?.explicitPromptDonation === true || row?.explicitPromptStrictHf12 === true || row?.explicitConfirmedDonation === true) return row;
     const key = planDonationProductKey(row);
+    if (row?.explicitPromptDonation === true || row?.explicitPromptStrictHf12 === true || row?.explicitConfirmedDonation === true) return row;
+    if (allowedExplicit.has(key) && /Prompt|expl[ií]cito|confirmad/i.test(trim(row?.confidence || '') + ' ' + trim(row?.reason || ''))) return {...row, explicitPromptDonation:true, explicitConfirmedDonation:true};
     const exactExplicit = explicit.some(ex => planExplicitDonationMatch(row, ex, true));
     if (exactExplicit) return row;
     if (allowedExplicit.has(key)) {
@@ -2145,7 +2241,7 @@ function planSanitizeInventedDonations(rows, baseRows, explicitRows, mode = '') 
       donorRef: '',
       include: row.include !== false,
       confidence: 'Posible donación pendiente',
-      reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' No se acepta como donación porque no está confirmada por histórico real ni por el prompt; se mantiene como compra pendiente para no descontarla.'
+      reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' No se acepta como donación porque no está indicada de forma explícita en el prompt; se mantiene como compra pendiente para no descontarla.'
     };
   });
 }
