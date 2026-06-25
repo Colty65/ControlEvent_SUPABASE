@@ -2599,6 +2599,34 @@ function planApplyFinalDefaultsHf14(rows, form, state) {
   });
 }
 
+
+function planHasConfirmedDonationBlocksHf17(form) {
+  const info = trim(form?.info || '');
+  return /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s*:|DONACION\s*:|DONACI[ÓO]N\s*:|EXISTENCIAS?\s*:|YA\s+TENEMOS)/i.test(info)
+    && /\[Donante:|Tratar\s+como\s+DONADO|PRODUCTOS?\s*:/i.test(info);
+}
+function planRowsFromExplicitPromptOnlyHf17(form, state) {
+  const explicit = planExplicitDonationRowsFromPrompt(form, state);
+  return arr(explicit).map((r, idx) => ({
+    ...r,
+    key: r.key || `prompt-direct:${idx}`,
+    include: r.include !== false,
+    explicitPromptDonation: true,
+    explicitConfirmedDonation: true,
+    confidence: trim(r.confidence || 'Prompt explícito confirmado'),
+    reason: trim(r.reason || 'Donación/existencia confirmada por el prompt.')
+  }));
+}
+function planWithTimeoutHf17(promise, ms, label = 'Zuzu') {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} tardó demasiado y se ha usado cálculo directo del prompt.`)), Math.max(1000, ms || 18000));
+    })
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 export async function planificacionInicialZuzu({ mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info } = {}) {
   const state = await getState();
   const maps = planBuildMaps(state);
@@ -2617,13 +2645,36 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   const targetDays = Math.max(1, num(dias) || 1);
   if (m === 'ZUZU_PARCIAL' && sourceAtt > 0) baseRows = planScaleRows(baseRows, Math.max(0.1, (targetAtt / sourceAtt) * Math.sqrt(targetDays / sourceDays)), defaultStoreId, defaultResponsibleId);
   let incomeRows = modules.includes('INGRESOS') && sourceEvent ? planIncomeRowsForEvent(state, sourceEvent.id) : [];
+  const explicitDonationRows = planExplicitDonationRowsFromPrompt(form, state);
   let rowsOut = baseRows;
   let aiNotes = [];
   let aiProvider = 'control-event-historico';
   let aiModel = '';
-  if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
+  const hasConfirmedPromptBlocks = planHasConfirmedDonationBlocksHf17(form);
+  const largePrompt = trim(form.info || '').length > 6000;
+
+  if (m === 'ZUZU_TOTAL' && hasConfirmedPromptBlocks) {
+    // Para prompts largos con donaciones/existencias confirmadas, primero se construye de forma directa.
+    // Así evitamos 504 y garantizamos que las donaciones del usuario no dependan de Gemini.
+    rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
+    aiProvider = 'control-event-prompt-directo';
+    aiNotes.push('Encargo total a Zuzu: se han cargado directamente las donaciones/existencias confirmadas del prompt para evitar esperas y errores 504.');
+    if (!largePrompt) {
+      try {
+        const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), 12000, 'Gemini planificación');
+        const matched = matchPlanRows(ai?.rows, [], state, form);
+        if (matched.length) {
+          rowsOut = planMergeExplicitDonations(matched, explicitDonationRows);
+          aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean).concat(aiNotes);
+          aiProvider = 'gemini-planificacion+prompt-confirmado'; aiModel = ai.__model || '';
+        }
+      } catch (error) {
+        aiNotes.push('Gemini no se usa en esta propuesta directa: ' + trim(error?.message || error));
+      }
+    }
+  } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     try {
-      const ai = await callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules);
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, baseRows, state, form);
       if (matched.length) {
         rowsOut = matched;
@@ -2631,13 +2682,12 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
         aiProvider = 'gemini-planificacion'; aiModel = ai.__model || '';
       } else aiNotes.push('Zuzu no devolvió filas utilizables; se mantiene la propuesta histórica base.');
     } catch (error) {
-      aiNotes.push('Gemini no pudo ajustar la propuesta; se mantiene la propuesta histórica base: ' + trim(error?.message || error));
-      aiProvider = 'control-event-historico-fallback';
+      aiNotes.push('Gemini no pudo ajustar la propuesta a tiempo; se mantiene propuesta base y donaciones del prompt: ' + trim(error?.message || error));
+      aiProvider = 'control-event-timeout-fallback';
     }
   } else {
     aiNotes.push('Modo réplica: se conserva el evento modelo sin ajuste de IA.');
   }
-  const explicitDonationRows = planExplicitDonationRowsFromPrompt(form, state);
   rowsOut = planMergeExplicitDonations(rowsOut, explicitDonationRows);
   rowsOut = planSanitizeInventedDonations(rowsOut, baseRows, explicitDonationRows, m);
   rowsOut = planCoalesceDonationsAfterSanitize(rowsOut, explicitDonationRows, m);
