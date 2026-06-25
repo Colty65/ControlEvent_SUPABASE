@@ -1,0 +1,34 @@
+ControlEvent v15_prod - HOTFIX19 sin cambio de versión
+
+Cambios incluidos:
+
+1. Donaciones del prompt: barrido final línea a línea
+- Se añade un parser final muy directo para bloques confirmados:
+  PRODUCTO EN LA PEÑA / DONACIONES / DONACION / EXISTENCIAS.
+- Cada línea con:
+  * Producto: cantidad
+  - Producto: cantidad
+  • Producto: cantidad
+  se acepta como DONACIÓN confirmada.
+- La cantidad se toma siempre de lo que hay después del último ":".
+- Esto corrige casos como:
+  * FANTA Limon Bote 32 CL: 25
+  donde no debe coger 3, 32 ni otro número interno del nombre.
+
+2. Dedupe con prioridad al barrido final
+- Si el producto/donante/tipo se había leído antes mal, manda la lectura final línea a línea.
+- Evita que prevalezca una cantidad incorrecta detectada en una pasada previa.
+
+3. Búsqueda más parecida a Ticket Auto
+- Refuerzo de búsqueda por tokens útiles.
+- Mayor importancia a tokens fuertes de marca/producto.
+- Ignora envases, unidades y cantidades internas.
+- Mantiene equivalencias de andar por casa:
+  Beeter/Bitter, Wiski/Whisky, Jhony/Johny, lavamanos/manos.
+
+4. Objetivo funcional
+- Mejorar la detección del 100% de donaciones/existencias escritas en el prompt.
+- Mantener la regla: donación confirmada + compra solo por déficit.
+
+No cambia versión visible.
+No hay SQL nuevo.

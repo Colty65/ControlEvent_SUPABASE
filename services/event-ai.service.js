@@ -2157,13 +2157,107 @@ function planExplicitDonationRowsFromPrompt(form, state) {
     });
   })();
 
+
+  // HOTFIX19: barrido final simple y fiable de todas las líneas de productos de bloques confirmados.
+  // Es deliberadamente menos "inteligente" y más contable: si está bajo un bloque de donación,
+  // cada línea con "* producto: cantidad" / "- producto: cantidad" / "• producto: cantidad" entra.
+  (function parseEveryConfirmedDonationLineHf19(){
+    const lines = info.replace(/\r/g, '').split(/\n/);
+    let active = null;
+    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES|COMIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
+    const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
+    function metaFrom(line, prev){
+      const h = trim(line || '');
+      const m = {...(prev || {})};
+      if (/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
+      else if (/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
+      else if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+      if (!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
+      const donor = planExtractBracket(h, ['Donante']) || '';
+      const resp = planExtractBracket(h, ['Responsable']) || '';
+      if (donor) m.donor = donor;
+      if (resp) m.responsable = resp;
+      if (!m.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donor = 'Peña El Arrastre';
+      if (!m.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsable = trim(form.defaultResponsibleName || 'Colty');
+      return m;
+    }
+    function lineQty(raw){
+      const s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+      const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
+      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
+      m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if (m) return Math.max(0, round(num(m[1]), 2));
+      m = tail.match(/(\d+(?:[,.]\d+)?)/);
+      if (m) return Math.max(0, num(m[1]));
+      return 1;
+    }
+    function lineProduct(raw){
+      let s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+      if (!s.includes(':')) return '';
+      s = s.slice(0, s.lastIndexOf(':'));
+      return planCleanExplicitProductText(s);
+    }
+    function add(raw, meta){
+      const productText = lineProduct(raw);
+      if (!productText || /^(PRODUCTOS?|Tratar\s+como)$/i.test(productText)) return;
+      const qty = lineQty(raw);
+      const prod = planFindProductLoose(productText, maps);
+      const ticket = meta.ticketDonacion || 'DONADO SOCIO';
+      const donorLabel = trim(meta.donor || 'Donante indicado');
+      const respLabel = trim(meta.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
+      const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || donorLabel;
+      const resp = planFindPersonLoose(respLabel, maps);
+      const store = ticket === 'DONADO TIENDA' ? planFindStoreLoose(donorLabel, maps) : null;
+      rowsOut.push({
+        key:`prompt-line-hf19:${rowsOut.length}:${trim(prod?.id || productText)}`,
+        include:true,
+        tipo:'DONACION',
+        productId:trim(prod?.id || ''),
+        productName:trim(prod?.nombre || productText),
+        segmento:trim(prod?.segmento || 'Sin segmento'),
+        destino:trim(prod?.destino || 'Sin destino'),
+        unidades:round(qty, 2),
+        precio:planReasonablePlanPrice(prod?.nombre || productText, prod?.defaultPrecio ?? prod?.precio ?? 0),
+        tiendaId:trim(store?.id || form.defaultStoreId || ''),
+        responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
+        ticketDonacion:ticket,
+        donorRef,
+        confidence:'Prompt confirmado línea a línea',
+        explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
+        explicitPromptStrictHf12:true,
+        reason:`Donación/existencia confirmada por línea del prompt (${donorLabel}).`
+      });
+    }
+    lines.forEach(rawLine => {
+      const line = trim(rawLine);
+      if (!line) return;
+      if (stop.test(line)) { active = null; return; }
+      if (start.test(line)) { active = metaFrom(line, {}); return; }
+      if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) { active = metaFrom(line, active); return; }
+      if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+      if (active && /^\s*[•\-\*]\s*[^:\n]{2,220}:\s*(?:\d|un|una|uno|pack|paquete)/i.test(rawLine)) add(rawLine, active);
+    });
+  })();
+
   const strictProductKeysHf12 = new Set(rowsOut.filter(r => r.explicitPromptStrictHf12 === true).map(r => trim(r.productId)).filter(Boolean));
   const finalRowsHf12 = strictProductKeysHf12.size
     ? rowsOut.filter(r => !strictProductKeysHf12.has(trim(r.productId)) || r.explicitPromptStrictHf12 === true)
     : rowsOut;
+  // HOTFIX19: si hay varias lecturas de la misma línea/producto/donante, manda el barrido final línea a línea.
+  const best = new Map();
+  finalRowsHf12.forEach((r, pos) => {
+    const productKey = trim(r.productId) || planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || '');
+    const k = [productKey, trim(r.donorRef), trim(r.ticketDonacion).toUpperCase()].join('|');
+    const weight = String(r.key || '').includes('prompt-line-hf19') ? 10000 : (r.explicitPromptStrictHf12 ? 1000 : 0);
+    const prev = best.get(k);
+    if (!prev || weight + pos > prev.weight + prev.pos) best.set(k, {r, weight, pos});
+  });
   const seen = new Set();
-  return finalRowsHf12.filter(r => {
-    const k = [r.productId, r.donorRef, r.ticketDonacion, r.unidades].join('|');
+  return Array.from(best.values()).map(x => x.r).filter(r => {
+    const productKey = trim(r.productId) || planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || '');
+    const k = [productKey, trim(r.donorRef), trim(r.ticketDonacion).toUpperCase(), num(r.unidades)].join('|');
     if (seen.has(k)) return false;
     seen.add(k); return true;
   });
