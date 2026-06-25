@@ -1024,6 +1024,27 @@
     return {event:ev, rows:mapped, incomes: incomeRowsForEvent(ev.id)};
   }
 
+  function planVisibleResourceStats(){
+    const groups = planResourceRows(lastProposal);
+    const compras = [];
+    const donaciones = [];
+    let totalCompras = 0, totalDonaciones = 0;
+    groups.forEach(g => {
+      if (Number(g.compra || 0) > 0) {
+        compras.push(g);
+        totalCompras += Number(g.compra || 0) * Number(g.precioCompra || g.precioDonado || 0);
+      }
+      if (Number(g.donado || 0) > 0) {
+        (g.donationDetails || []).forEach(d => {
+          if (Number(d.unidades || 0) > 0) {
+            donaciones.push(d);
+            totalDonaciones += Number(d.unidades || 0) * Number(d.precio || 0);
+          }
+        });
+      }
+    });
+    return {groups, compras, donaciones, totalCompras, totalDonaciones};
+  }
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
@@ -1033,11 +1054,11 @@
     lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
-    const detailItems = includedPlanDetailItems();
-    const compras = detailItems.map(x=>x.p).filter(p => p.tipo === 'COMPRA' && p.include);
-    const donaciones = detailItems.map(x=>x.p).filter(p => p.tipo === 'DONACION' && p.include);
-    const totalCompras = compras.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
-    const totalDonaciones = donaciones.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+    const visibleStats = planVisibleResourceStats();
+    const compras = visibleStats.compras;
+    const donaciones = visibleStats.donaciones;
+    const totalCompras = visibleStats.totalCompras;
+    const totalDonaciones = visibleStats.totalDonaciones;
     const ingresosInfo = incomeSummary(lastIncomeProposal);
     const cards = advancedDetailCardsHtml();
     box.classList.remove('hidden');
@@ -1107,20 +1128,17 @@
     });
   }
   function includedPlanDetailItems(){
-    const raw = lastProposal.map((p, index) => ({p, index})).filter(({p}) => p && p.include !== false && !isTinyGhostDonation(p) && !isSuppressedAutoDonation(p) && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0)));
-    const best = new Map();
-    raw.forEach(item => {
-      const p = item.p || {};
-      const prodKey = String(p.productId || planGroupKey(p.productName || p.producto || ''));
-      const discriminator = p.tipo === 'DONACION'
-        ? `${normalizeDonorRef(p.donorRef || '')}|${String(p.ticketDonacion || '').toUpperCase()}`
-        : 'COMPRA';
-      const k = `${p.tipo}|${prodKey}|${discriminator}`;
-      const weight = String(p.key || '').includes('hf19') ? 10000 : (p.explicitPromptStrictHf12 ? 1000 : 0);
-      const prev = best.get(k);
-      if(!prev || weight > prev.weight || (weight === prev.weight && item.index > prev.index)) best.set(k, {...item, weight});
+    const groups = planResourceRows(lastProposal);
+    const visibleIdx = new Set();
+    groups.forEach(g => {
+      (g.donationDetails || []).forEach(d => { if(Number(d.unidades || 0) > 0) visibleIdx.add(Number(d.idx)); });
+      (g.purchaseDetails || []).forEach(d => { if(Number(d.unidades || 0) > 0) visibleIdx.add(Number(d.idx)); });
     });
-    return sortPlanProposalDetailCards([...best.values()]);
+    const raw = lastProposal.map((p, index) => ({p, index})).filter(({p,index}) =>
+      p && visibleIdx.has(index) && p.include !== false && !isTinyGhostDonation(p) && !isSuppressedAutoDonation(p)
+      && (p.tipo === 'DONACION' || (p.tipo === 'COMPRA' && Number(p.unidades || 0) > 0))
+    );
+    return sortPlanProposalDetailCards(raw);
   }
   function advancedDetailCardsHtml(){
     const detailCards = includedPlanDetailItems();

@@ -1619,8 +1619,60 @@ function planReadableNotes(rawNotes, rows, form, budgetNotes) {
 }
 function planPostProcessPlanningRows(rows, form, state) {
   const maps = planBuildMaps(state);
+  const promptHintsHf21 = planConfirmedPromptDonationHintsHf21(form, state);
+  const hintMapHf21 = new Map(promptHintsHf21.map(h => [h.key, h]));
   const grouped = new Map();
   const out = arr(rows).map((r, idx) => planCanonicalizeRowProduct({...r, key:r.key || `plan:${idx}`}, maps));
+  // HOTFIX21: si una línea del prompt confirmado quedó como compra, se reconvierte a DONACION.
+  out.forEach(row => {
+    const prod = row.productId ? maps.products.get(trim(row.productId)) : planFindProductLoose(row.productName || row.producto || '', maps);
+    const k = trim(prod?.id || row.productId) ? `id:${trim(prod?.id || row.productId)}` : (planProductAliasKey(row.productName || row.producto || '') || normPlanKey(row.productName || row.producto || ''));
+    const h = hintMapHf21.get(k);
+    if (h && row.tipo !== 'DONACION') {
+      row.tipo = 'DONACION';
+      row.productId = h.productId || row.productId || '';
+      row.productName = h.productName || row.productName;
+      row.segmento = h.segmento || row.segmento;
+      row.destino = h.destino || row.destino;
+      row.unidades = h.unidades;
+      row.precio = h.precio || row.precio;
+      row.ticketDonacion = h.ticketDonacion;
+      row.donorRef = h.donorRef;
+      row.tiendaId = h.tiendaId;
+      row.responsableId = h.responsableId;
+      row.explicitPromptDonation = true;
+      row.explicitConfirmedDonation = true;
+      row.explicitPromptStrictHf12 = true;
+      row.reason = `Donación/existencia confirmada por prompt (${h.donorLabel}).`;
+    }
+  });
+  // Añade cualquier donación del prompt que todavía no exista en rows.
+  promptHintsHf21.forEach((h, pos) => {
+    const already = out.some(row => {
+      const prod = row.productId ? maps.products.get(trim(row.productId)) : planFindProductLoose(row.productName || row.producto || '', maps);
+      const k = trim(prod?.id || row.productId) ? `id:${trim(prod?.id || row.productId)}` : (planProductAliasKey(row.productName || row.producto || '') || normPlanKey(row.productName || row.producto || ''));
+      return k === h.key && row.tipo === 'DONACION';
+    });
+    if (!already) out.push({
+      key:`prompt-hf21-missing:${pos}:${h.key}`,
+      include:true,
+      tipo:'DONACION',
+      productId:h.productId,
+      productName:h.productName,
+      segmento:h.segmento,
+      destino:h.destino,
+      unidades:h.unidades,
+      precio:h.precio,
+      tiendaId:h.tiendaId,
+      responsableId:h.responsableId,
+      ticketDonacion:h.ticketDonacion,
+      donorRef:h.donorRef,
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      reason:`Donación/existencia confirmada por prompt (${h.donorLabel}).`
+    });
+  });
   out.forEach((r, idx) => {
     const k = trim(r.productId) ? `id:${trim(r.productId)}` : (planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || r.productId || `p${idx}`));
     const g = grouped.get(k) || {key:k, rows:[], donation:0, purchase:0, needHint:0, productName:r.productName || r.producto || '', productId:r.productId || '', segment:r.segmento, destino:r.destino};
@@ -2715,6 +2767,86 @@ function planApplyFinalDefaultsHf14(rows, form, state) {
     }
     return out;
   });
+}
+
+
+function planConfirmedPromptDonationHintsHf21(form, state) {
+  const info = trim(form?.info || '');
+  if (!info) return [];
+  const maps = planBuildMaps(state || {});
+  const hints = [];
+  const lines = info.replace(/\r/g, '').split(/\n/);
+  let active = null;
+  const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES|COMIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
+  const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
+  function meta(line, prev) {
+    const h = trim(line || '');
+    const m = {...(prev || {})};
+    if (/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
+    else if (/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
+    else if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+    if (!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
+    const donor = planExtractBracket(h, ['Donante']) || '';
+    const resp = planExtractBracket(h, ['Responsable']) || '';
+    if (donor) m.donor = donor;
+    if (resp) m.responsable = resp;
+    if (!m.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donor = 'Peña El Arrastre';
+    if (!m.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsable = trim(form.defaultResponsibleName || 'Colty');
+    return m;
+  }
+  function qty(raw) {
+    const s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+    const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
+    let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+    if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
+    m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+    if (m) return Math.max(0, round(num(m[1]), 2));
+    m = tail.match(/(\d+(?:[,.]\d+)?)/);
+    return m ? Math.max(0, num(m[1])) : 1;
+  }
+  function prodText(raw) {
+    let s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+    if (!s.includes(':')) return '';
+    s = s.slice(0, s.lastIndexOf(':'));
+    return planCleanExplicitProductText(s);
+  }
+  function keyOf(name, prod) {
+    return trim(prod?.id) ? `id:${trim(prod.id)}` : (planProductAliasKey(name || '') || normPlanKey(name || ''));
+  }
+  lines.forEach(raw => {
+    const line = trim(raw);
+    if (!line) return;
+    if (stop.test(line)) { active = null; return; }
+    if (start.test(line)) { active = meta(line, {}); return; }
+    if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) { active = meta(line, active); return; }
+    if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+    if (!active || !/^\s*[•\-\*]\s*[^:\n]{2,220}:\s*(?:\d|un|una|uno|pack|paquete)/i.test(raw)) return;
+    const text = prodText(raw);
+    if (!text) return;
+    const prod = planFindProductLoose(text, maps);
+    const ticket = active.ticketDonacion || 'DONADO SOCIO';
+    const donorLabel = trim(active.donor || 'Donante indicado');
+    const respLabel = trim(active.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
+    const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || donorLabel;
+    const resp = planFindPersonLoose(respLabel, maps);
+    const store = ticket === 'DONADO TIENDA' ? planFindStoreLoose(donorLabel, maps) : null;
+    hints.push({
+      productText:text,
+      productId:trim(prod?.id || ''),
+      productName:trim(prod?.nombre || text),
+      key:keyOf(text, prod),
+      unidades:qty(raw),
+      precio:planReasonablePlanPrice(prod?.nombre || text, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      ticketDonacion:ticket,
+      donorRef,
+      tiendaId:trim(store?.id || form.defaultStoreId || ''),
+      responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
+      donorLabel
+    });
+  });
+  return hints;
 }
 
 function planHasConfirmedDonationBlocksHf17(form) {
