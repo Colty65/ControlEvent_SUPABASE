@@ -1286,16 +1286,46 @@ function planProductAliasKey(value) {
   if (!n) return '';
   const has = (...parts) => parts.every(part => n.includes(normPlanKey(part)));
   const hasTok = (tok) => new RegExp('(^|\\s)' + normPlanKey(tok) + '(\\s|$)').test(n);
+
+  if (has('COCA','COLA','ZERO') && (has('ZERO','ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias coca cola zero zero';
+  if (has('COCA','COLA','ZERO')) return 'alias coca cola zero';
+  if (has('COCA','COLA')) return 'alias coca cola normal';
+  if (has('FANTA','NARANJA')) return 'alias fanta naranja';
+  if (has('FANTA','LIMON')) return 'alias fanta limon';
+  if (hasTok('SPRITE')) return 'alias sprite';
+  if (has('CERVEZA','SKOL')) return 'alias cerveza skol';
+  if (has('TONICA','SCHWEPPES')) return 'alias tonica schweppes';
+  if ((hasTok('BITTER') || hasTok('BEETER')) && hasTok('KAS')) return 'alias bitter kas';
+
   if (has('ron','barcelo')) return 'alias ron barcelo';
   if (has('ron','brugal')) return 'alias ron brugal';
-  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (hasTok('jb') || /j\s*b/.test(n))) return 'alias whisky jb';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (hasTok('jb') || /j\s*b/.test(n) || has('5','anos') || has('5','años'))) return 'alias whisky jb';
   if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && hasTok('dyc')) return 'alias whisky dyc';
-  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (has('johnnie') || has('jonie') || has('walker'))) return 'alias whisky walker';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (has('johnnie') || has('jonie') || has('jhony') || has('johny') || has('walker'))) return 'alias whisky walker';
   if ((hasTok('ginebra') || hasTok('gin')) && has('puerto','indias')) return 'alias ginebra puerto indias';
   if ((hasTok('ginebra') || hasTok('gin')) && hasTok('larios')) return 'alias ginebra larios';
   if ((hasTok('ginebra') || hasTok('gin')) && (hasTok('beefeater') || hasTok('beefetaer'))) return 'alias ginebra beefeater';
-  // Fuera de alias conocidos no se agrupa agresivamente, para no unir variantes reales
-  // como Coca-Cola normal/zero/00, vinos distintos, tamaños distintos, etc.
+
+  if (has('aceite','aove') || hasTok('aove')) return 'alias aceite aove';
+  if (hasTok('vinagre')) return 'alias vinagre';
+  if (hasTok('agua') && (has('1l') || has('1','l') || hasTok('cristal'))) return 'alias agua 1l cristal';
+  if (hasTok('baicon') || hasTok('bacon')) return 'alias baicon';
+  if (has('chuleta','cerdo')) return 'alias chuleta cerdo';
+  if (hasTok('fairy')) return 'alias fairy';
+  if (has('papel','higienico')) return 'alias papel higienico';
+  if (has('rollo','secamanos') || has('papel','secamanos')) return 'alias rollo secamanos';
+  if (has('bolsas','basura') || has('bolsa','basura')) return 'alias bolsas basura grandes';
+  if (has('jabon','manos') || has('jabon','lavamanos')) return 'alias jabon manos';
+  if (hasTok('ambientador')) return 'alias ambientador';
+
+  if (has('cafe','descafeinado')) return 'alias cafe descafeinado gorritas';
+  if (has('cafe','normal')) return 'alias cafe normal gorritas';
+  if (has('vino','blanco')) return 'alias vino blanco';
+  if (has('vino','frizzante')) return 'alias vino frizzante';
+  if (has('vino','tinto','rioja')) return 'alias vino tinto rioja';
+  if (has('vino','tinto')) return 'alias vino tinto';
+  if (has('oreja','salsa')) return 'alias oreja en salsa';
+
   return n;
 }
 function planBuildMaps(state) {

@@ -363,60 +363,137 @@
 
   function resolveCatalogProductByName(name){
     const raw = String(name || '').trim();
-    const target = normalizeProductSearchKeyHf23(raw);
+    const target = normalizeProductSearchKeyHf24(raw);
     if(!target) return null;
     const products = rows('productos');
-    const exact = products.filter(p => normalizeProductSearchKeyHf23(p?.nombre || '') === target);
+
+    const alias = planProductAliasKeyHf24(raw);
+    if(alias && alias !== target){
+      const aliasMatches = products.filter(p => planProductAliasKeyHf24(p?.nombre || '') === alias);
+      if(aliasMatches.length === 1) return aliasMatches[0];
+      if(aliasMatches.length > 1){
+        const exactAlias = aliasMatches.find(p => normalizeProductSearchKeyHf24(p?.nombre || '') === target);
+        if(exactAlias) return exactAlias;
+      }
+    }
+
+    const exact = products.filter(p => normalizeProductSearchKeyHf24(p?.nombre || '') === target);
     if(exact.length === 1) return exact[0];
 
+    const simplifiedTarget = simplifyProductSearchKeyHf24(raw);
+    const simplifiedExact = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '') === simplifiedTarget);
+    if(simplifiedExact.length === 1) return simplifiedExact[0];
+
     const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS UNIDAD UNIDADES BOTELLA BOTELLAS LATA LATAS BOTE BOTES BOLSA BOLSAS PACK PAQUETE PAQUETES CAJA PIEZA KG GR L CL ML LITRO LITROS NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA'.split(' '));
-    const tokens = s => normalizeProductSearchKeyHf23(s).split(' ').filter(t => t.length >= 2 && !generic.has(t));
+    const tokens = s => simplifyProductSearchKeyHf24(s).split(' ').filter(t => t.length >= 2 && !generic.has(t));
     const wanted = tokens(raw);
     if(!wanted.length) return null;
 
     let best = null, bestScore = -9999, second = -9999;
     products.forEach(p => {
       const nRaw = p?.nombre || '';
-      const n = normalizeProductSearchKeyHf23(nRaw);
+      const n = normalizeProductSearchKeyHf24(nRaw);
+      const simple = simplifyProductSearchKeyHf24(nRaw);
       const ptoks = tokens(nRaw);
       let score = 0;
       if(n === target) score += 10000;
+      if(simple === simplifiedTarget) score += 5000;
       if(n.includes(target)) score += 650;
       if(target.includes(n)) score += 450;
+      if(simple.includes(simplifiedTarget)) score += 420;
+      if(simplifiedTarget.includes(simple)) score += 320;
 
       let matched = 0;
       wanted.forEach(t => {
         if(ptoks.includes(t)){ score += 120 + Math.min(t.length, 12); matched++; }
-        else if(n.includes(t)){ score += 65 + Math.min(t.length, 12); matched++; }
+        else if(simple.includes(t)){ score += 65 + Math.min(t.length, 12); matched++; }
         else score -= 35;
       });
-      ptoks.forEach(t => { if(target.includes(t)) score += 12; });
+      ptoks.forEach(t => { if(simplifiedTarget.includes(t)) score += 12; });
 
-      const strong = wanted.filter(t => /^(RON|BRUGAL|BARCELO|BARCELO|WHISKY|WISKI|DYC|JHONY|JOHNY|WALKER|JB|BEEFEATER|LARIOS|PUERTO|INDIAS|GINEBRA|GIN|SPRITE|FANTA|COCA|COLA|ZERO|SKOL|MAHOU|AMBAR|SCHWEPPES|KAS|BITTER|BEETER|AOVE|ACEITE|VINAGRE|PAPEL|HIGIENICO|SECAMANOS|JABON|FAIRY|AMBIENTADOR|VELADORES|ANCHOAS|MEJILLONES|QUESO|JAMON|SALMON|CAFE)$/.test(t));
-      if(strong.length && !strong.some(t => n.includes(t))) score -= 500;
+      const strong = wanted.filter(t => /^(RON|BRUGAL|BARCELO|BARCELO|WHISKY|WISKI|DYC|JHONY|JOHNY|WALKER|JB|BEEFEATER|LARIOS|PUERTO|INDIAS|GINEBRA|GIN|SPRITE|FANTA|COCA|COLA|ZERO|SKOL|MAHOU|AMBAR|SCHWEPPES|KAS|BITTER|BEETER|AOVE|ACEITE|VINAGRE|PAPEL|HIGIENICO|SECAMANOS|JABON|FAIRY|AMBIENTADOR|VELADORES|ANCHOAS|MEJILLONES|QUESO|JAMON|SALMON|CAFE|DESCAFEINADO|AGUA|BAICON|CHULETA|OREJA)$/.test(t));
+      if(strong.length && !strong.some(t => simple.includes(t))) score -= 700;
       if(matched === 0) score -= 1000;
-      score -= Math.abs(n.length - target.length) * 0.12;
+      score -= Math.abs(simple.length - simplifiedTarget.length) * 0.12;
 
       if(score > bestScore){ second = bestScore; bestScore = score; best = p; }
       else if(score > second){ second = score; }
     });
-    // umbral bajo pero con margen; si empata mucho, no inventa.
-    if(best && bestScore >= 120 && bestScore - second >= 18) return best;
-    if(best && bestScore >= 220) return best;
+    if(best && bestScore >= 180 && bestScore - second >= 24) return best;
+    if(best && bestScore >= 360) return best;
     return null;
   }
-  function normalizeProductSearchKeyHf23(value){
+  function normalizeProductSearchKeyHf24(value){
     return normalizeText(value || '')
       .replace(/\bWISKI\b/g,'WHISKY')
+      .replace(/\bWHISKI\b/g,'WHISKY')
       .replace(/\bJOHNY\b/g,'JHONY')
+      .replace(/\bJOHNNY\b/g,'JHONY')
+      .replace(/\bJOHNNIE\b/g,'JHONY')
       .replace(/\bJONIE\b/g,'JHONY')
       .replace(/\bJ\s*B\b/g,'JB')
       .replace(/\bBEETER\b/g,'BITTER')
       .replace(/\bLAVAMANOS\b/g,'MANOS')
-      .replace(/\bBOT\s+1\s+5\b/g,'BOTELLA 1 5')
       .replace(/\bBTLLA\b/g,'BOTELLA')
+      .replace(/\bBTELLA\b/g,'BOTELLA')
+      .replace(/\bBOT\s+1\s+5\b/g,'BOTELLA 1 5')
+      .replace(/\bAÑEJO\b/g,'ANEJO')
       .replace(/\s+/g,' ')
       .trim();
+  }
+  function simplifyProductSearchKeyHf24(value){
+    return normalizeProductSearchKeyHf24(value)
+      .replace(/\b(?:BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BOLSA|BOLSAS|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS)\b/g,' ')
+      .replace(/\b\d+(?:[,.]\d+)?\b/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  function planProductAliasKeyHf24(value){
+    const n = normalizeProductSearchKeyHf24(value || '');
+    const s = simplifyProductSearchKeyHf24(value || '');
+    const has = (...parts) => parts.every(part => n.includes(normalizeProductSearchKeyHf24(part)));
+    const hasS = (...parts) => parts.every(part => s.includes(normalizeProductSearchKeyHf24(part)));
+    const tok = t => new RegExp('(^|\\s)' + normalizeProductSearchKeyHf24(t) + '(\\s|$)').test(n);
+
+    if(has('COCA','COLA','ZERO') && (has('ZERO ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias coca cola zero zero';
+    if(has('COCA','COLA','ZERO')) return 'alias coca cola zero';
+    if(has('COCA','COLA')) return 'alias coca cola normal';
+    if(has('FANTA','NARANJA')) return 'alias fanta naranja';
+    if(has('FANTA','LIMON')) return 'alias fanta limon';
+    if(has('SPRITE')) return 'alias sprite';
+    if(has('CERVEZA','SKOL')) return 'alias cerveza skol';
+    if(has('TONICA','SCHWEPPES')) return 'alias tonica schweppes';
+    if(has('BITTER','KAS')) return 'alias bitter kas';
+
+    if(has('RON','BARCELO')) return 'alias ron barcelo';
+    if(has('RON','BRUGAL')) return 'alias ron brugal';
+    if(hasS('WHISKY') && (tok('JB') || has('5','AÑOS') || has('5','ANOS'))) return 'alias whisky jb';
+    if(hasS('WHISKY') && hasS('DYC')) return 'alias whisky dyc';
+    if(hasS('WHISKY') && (hasS('JHONY') || hasS('WALKER'))) return 'alias whisky walker';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('PUERTO','INDIAS')) return 'alias ginebra puerto indias';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('LARIOS')) return 'alias ginebra larios';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('BEEFEATER')) return 'alias ginebra beefeater';
+
+    if(hasS('ACEITE','AOVE') || hasS('AOVE')) return 'alias aceite aove';
+    if(hasS('VINAGRE')) return 'alias vinagre';
+    if(hasS('AGUA') && (has('1L') || has('1 L') || hasS('CRISTAL'))) return 'alias agua 1l cristal';
+    if(hasS('BAICON') || hasS('BACON')) return 'alias baicon';
+    if(hasS('CHULETA','CERDO')) return 'alias chuleta cerdo';
+    if(hasS('FAIRY')) return 'alias fairy';
+    if(hasS('PAPEL','HIGIENICO')) return 'alias papel higienico';
+    if(hasS('ROLLO','SECAMANOS') || hasS('PAPEL','SECAMANOS')) return 'alias rollo secamanos';
+    if(hasS('BOLSAS','BASURA') || hasS('BOLSA','BASURA')) return 'alias bolsas basura grandes';
+    if(hasS('JABON','MANOS') || hasS('JABON','LAVAMANOS')) return 'alias jabon manos';
+    if(hasS('AMBIENTADOR')) return 'alias ambientador';
+
+    if(hasS('CAFE','DESCAFEINADO')) return 'alias cafe descafeinado gorritas';
+    if(hasS('CAFE','NORMAL')) return 'alias cafe normal gorritas';
+    if(hasS('VINO','BLANCO')) return 'alias vino blanco';
+    if(hasS('VINO','FRIZZANTE')) return 'alias vino frizzante';
+    if(hasS('VINO','TINTO','RIOJA')) return 'alias vino tinto rioja';
+    if(hasS('VINO','TINTO')) return 'alias vino tinto';
+    if(hasS('OREJA','SALSA')) return 'alias oreja en salsa';
+    return n;
   }
   function canonicalProposalProductId(row){
     return String(row?.productId || resolveCatalogProductByName(row?.productName || '')?.id || '');
@@ -1162,7 +1239,7 @@
         productName,
         productKey: productId ? `id:${productId}` : `nm:${planGroupKey(productName)}`,
         unidades: qty(raw),
-        precio: Number(prod?.defaultPrecio ?? prod?.precio ?? 0) || 0,
+        precio: Number(prod?.defaultPrecio ?? prod?.precio ?? prod?.precioReferencia ?? prod?.precio_ref ?? prod?.pvp ?? prod?.importe ?? 0) || 0,
         segmento: prod?.segmento || 'Sin segmento',
         destino: prod?.destino || 'Sin destino',
         ticketDonacion,
@@ -1256,13 +1333,108 @@
     });
     return base;
   }
+  function applyPromptDonationTruthHf24(list){
+    const base = forcePromptDonationsHf22(Array.isArray(list) ? list : []).map(r => ({...r}));
+    const hints = promptDonationHintsHf22();
+    if(!hints.length) return base;
+
+    const keyOf = row => {
+      const id = canonicalProposalProductId(row) || row.productId || '';
+      if(id) return `id:${id}`;
+      return `nm:${planGroupKey(row.productName || row.producto || '')}`;
+    };
+    const hintKey = h => h.productId ? `id:${h.productId}` : `nm:${planGroupKey(h.productName || '')}`;
+
+    hints.forEach((hint, hidx) => {
+      const hk = hintKey(hint);
+      let donationIdx = base.findIndex(row => row && row.tipo === 'DONACION' && keyOf(row) === hk && normalizeDonorRef(row.donorRef || '') === normalizeDonorRef(hint.donorRef || '') && String(row.ticketDonacion || '').toUpperCase() === String(hint.ticketDonacion || '').toUpperCase());
+      if(donationIdx < 0) donationIdx = base.findIndex(row => row && row.tipo === 'DONACION' && keyOf(row) === hk);
+      const donationRow = {
+        key:`prompt-hf24-truth:${hidx}:${hk}:${normalizeDonorRef(hint.donorRef || '')}`,
+        include:true,
+        tipo:'DONACION',
+        productId:hint.productId || '',
+        productName:hint.productName || 'Producto',
+        segmento:hint.segmento || 'Sin segmento',
+        destino:hint.destino || 'Sin destino',
+        unidades:Number(hint.unidades || 0) || 1,
+        precio:Number(hint.precio || 0),
+        tiendaId:hint.tiendaId || document.getElementById('planTienda')?.value || '',
+        responsableId:hint.responsableId || document.getElementById('planResponsable')?.value || '',
+        ticketDonacion:hint.ticketDonacion || 'DONADO SOCIO',
+        donorRef:hint.donorRef || '',
+        explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
+        explicitPromptStrictHf12:true,
+        reason:`Donación/existencia confirmada por prompt (${hint.donorLabelText || donorLabel(hint.donorRef)}).`
+      };
+      if(donationIdx >= 0) base[donationIdx] = {...base[donationIdx], ...donationRow};
+      else base.push(donationRow);
+
+      base.forEach(row => {
+        if(!row || row.tipo !== 'COMPRA' || keyOf(row) !== hk) return;
+        const currentUnits = Number(row.unidades || 0);
+        const donated = Number(hint.unidades || 0);
+        if(currentUnits <= donated + 0.001){
+          row.include = false;
+          row.unidades = 0;
+          row.__ceSuppressedDonation = true;
+          row.reason = 'Compra anulada porque el prompt confirma el producto como donación/existencia.';
+        }else{
+          row.include = true;
+          row.unidades = Math.max(0, Math.round((currentUnits - donated) * 100) / 100);
+          row.precio = Number(row.precio || hint.precio || 0);
+          row.tiendaId = row.tiendaId || document.getElementById('planTienda')?.value || '';
+          row.responsableId = row.responsableId || document.getElementById('planResponsable')?.value || '';
+          row.reason = 'Compra por déficit real tras restar donación/existencia explícita del prompt.';
+        }
+      });
+    });
+    return base;
+  }
+
+  let __ceHf24EnsuringPurchases = false;
+  function ensurePurchaseRowsForVisibleDeficitsHf24(){
+    if(__ceHf24EnsuringPurchases) return;
+    __ceHf24EnsuringPurchases = true;
+    try{
+      const groups = planResourceRows(lastProposal);
+      groups.forEach(group => {
+        const buy = Math.max(0, Number(group.compra || 0));
+        if(buy <= 0) return;
+        const existingIdx = lastProposal.findIndex(row => row && row.tipo === 'COMPRA' && !row.__ceSuppressedDonation && (canonicalProposalProductId(row) || row.productId || '') === (group.productId || '') && Number(row.unidades || 0) > 0);
+        const price = Number(group.precioCompra || group.precioDonado || resolveCatalogProductByName(group.producto)?.defaultPrecio || resolveCatalogProductByName(group.producto)?.precio || resolveCatalogProductByName(group.producto)?.precioReferencia || 0);
+        const payload = {
+          include:true,
+          tipo:'COMPRA',
+          productId:group.productId || '',
+          productName:group.producto || 'Producto',
+          segmento:group.segmento || '',
+          destino:group.destino || '',
+          unidades:buy,
+          precio:price || 0,
+          tiendaId:group.tiendaId || document.getElementById('planTienda')?.value || '',
+          responsableId:group.responsableId || document.getElementById('planResponsable')?.value || '',
+          ticketDonacion:'',
+          donorRef:'',
+          reason:'Compra por déficit visible en PROPUESTA DETALLADA DEL EVENTO.'
+        };
+        if(existingIdx >= 0) lastProposal[existingIdx] = {...lastProposal[existingIdx], ...payload};
+        else lastProposal.push({...payload, key:`prompt-hf24-deficit:${Date.now()}:${Math.random().toString(36).slice(2)}`});
+      });
+    }finally{
+      __ceHf24EnsuringPurchases = false;
+    }
+  }
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
     const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
-    lastProposal = normalizeProposalRowsForGroups(forcePromptDonationsHf22(lastProposal));
+    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf24(lastProposal));
+    ensurePurchaseRowsForVisibleDeficitsHf24();
+    lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -1316,9 +1488,10 @@
           <div class="field"><label>Precio</label><input type="number" min="0" step="0.01" value="${esc(p.precio)}" data-plan-field="precio" /></div>
           <div class="field"><label>Importe</label><input readonly class="soft-readonly" value="${esc(money(importe))}" data-plan-output="importe" /></div>
           <div class="field"><label>${p.tipo === 'DONACION' ? 'Tipo donación' : 'Ticket / estado'}</label><select data-plan-field="ticketDonacion">${ticketOpts}</select></div>
-          <div class="field"><label>Tienda</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>
+          ${p.tipo === 'DONACION'
+            ? `<div class="field"><label>Donante</label><select data-plan-field="donorRef"><option value="" ${!p.donorRef?'selected':''}>-- sin donante --</option>${donorOpts}</select></div>`
+            : `<div class="field"><label>Tienda</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>`}
           <div class="field"><label>Responsable</label><select data-plan-field="responsableId">${sociosOpts || '<option value="">Sin socios</option>'}</select></div>
-          ${p.tipo === 'DONACION' ? `<div class="field"><label>Donante</label><select data-plan-field="donorRef"><option value="" ${!p.donorRef?'selected':''}>-- sin donante --</option>${donorOpts}</select></div>` : ''}
         </div>
         <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Donante: ${esc(donorLabel(p.donorRef))}.` : ''}</div>
       </div>
@@ -1916,7 +2089,7 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = forcePromptDonationsHf22(Array.isArray(data.rows) ? data.rows : []);
+      lastProposal = applyPromptDonationTruthHf24(Array.isArray(data.rows) ? data.rows : []);
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
@@ -1932,7 +2105,7 @@
         try{
           const replica = buildReplicaProposal();
           lastSourceEvent = replica.event;
-          lastProposal = forcePromptDonationsHf22(replica.rows);
+          lastProposal = applyPromptDonationTruthHf24(replica.rows);
           lastIncomeProposal = replica.incomes || [];
           if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
             const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
