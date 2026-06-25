@@ -1359,12 +1359,13 @@ function planFindProductLoose(label, maps) {
 
   function aliasText(value) {
     return normPlanKey(value || '')
-      .replace(/\bBEETER\b/g, 'BITTER')
       .replace(/\bWISKI\b/g, 'WHISKY')
+      .replace(/\bJOHNY\b/g, 'JHONY')
       .replace(/\bJONIE\b/g, 'JHONY')
-      .replace(/\bJOHNY\b/g, 'JHONY').replace(/J\s*\.?\s*B\b/g, 'JB')
+      .replace(/\bJ\s*B\b/g, 'JB')
+      .replace(/\bBEETER\b/g, 'BITTER')
       .replace(/\bLAVAMANOS\b/g, 'MANOS')
-      .replace(/\bAOVE\b/g, 'AOVE ACEITE')
+      .replace(/\bBTLLA\b/g, 'BOTELLA')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -1373,55 +1374,45 @@ function planFindProductLoose(label, maps) {
 
   function simplify(value) {
     return aliasText(value || '')
-      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS|NORMAL|GRANDE|MEDIANA|PEQUENA|PEQUEÑA|ENTERO)\b/g, ' ')
+      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS|NORMAL|GRANDE|MEDIANA|PEQUENA|PEQUEÑA|ENTERO|MEZCLA)\b/g, ' ')
       .replace(/\b\d+(?:[,.]\d+)?\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
   const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS LATA LATAS BOTE BOTES BOTELLA BOTELLAS BOLSA PACK PAQUETE PIEZA KG GR L CL ML NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA UNIDADES'.split(' '));
-  function toks(value) { return simplify(value).split(' ').filter(t => t.length >= 3 && !generic.has(t)); }
+  function toks(value) { return simplify(value).split(' ').filter(t => t.length >= 2 && !generic.has(t)); }
   const sourceTokens = toks(key);
   const sourceSimple = simplify(key);
-  const sourceHasSpecific = sourceTokens.length > 0;
+  if (!sourceTokens.length) return null;
 
-  function mandatoryOk(prodSimple) {
-    if (!sourceHasSpecific) return false;
-    const matched = sourceTokens.filter(t => prodSimple.includes(t));
-    // Para etiquetas con varias palabras específicas, exige al menos una coincidencia fuerte
-    // y penaliza que no coincida ninguna palabra de producto real.
-    if (!matched.length) return false;
-    // Si el usuario escribió marca/tipo muy específico, debe aparecer.
-    const hard = sourceTokens.filter(t => /^(COCA|COLA|ZERO|SKOL|AMBAR|MAHOU|FANTA|SPRITE|SCHWEPPES|LARIOS|BEEFEATER|BRUGAL|BARCELO|DYC|JHONY|WALKER|PUERTO|INDIAS|AOVE|BOLSAS|BASURA|FAIRY|BITTER|KAS|JABON|JB|PAPEL|HIGIENICO|SECAMANOS|VELADORES|ANCHOAS|MEJILLONES|CAFE|DESCAFEINADO|ACEITE|VINAGRE)$/.test(t));
-    return !hard.length || hard.some(t => prodSimple.includes(t));
-  }
+  const strongRegex = /^(RON|BRUGAL|BARCELO|WHISKY|DYC|JHONY|WALKER|JB|BEEFEATER|LARIOS|PUERTO|INDIAS|GINEBRA|GIN|SPRITE|FANTA|COCA|COLA|ZERO|SKOL|MAHOU|AMBAR|SCHWEPPES|KAS|BITTER|AOVE|ACEITE|VINAGRE|PAPEL|HIGIENICO|SECAMANOS|JABON|FAIRY|AMBIENTADOR|VELADORES|ANCHOAS|MEJILLONES|QUESO|JAMON|SALMON|CAFE|DESCAFEINADO)$/;
 
-  const aliasKey = planProductAliasKey(rawLabel);
-  if (aliasKey && maps.productByName.has(aliasKey)) return maps.productByName.get(aliasKey);
-
-  let best = null, bestScore = -9999;
+  let best = null, bestScore = -9999, second = -9999;
   for (const p of maps.products.values()) {
     const pk = aliasText(p?.nombre);
     const ps = simplify(pk);
-    if (!mandatoryOk(ps)) continue;
-    let score = 0;
-    if (pk === key) score += 2000;
-    if (ps === sourceSimple && sourceSimple) score += 1000;
-    if (pk.includes(key)) score += 240;
-    if (key.includes(pk)) score += 120;
-    if (ps.includes(sourceSimple) && sourceSimple) score += 220;
-    if (sourceSimple.includes(ps) && ps) score += 120;
-    if (/\bJB\b/.test(sourceSimple) && /\bJB\b/.test(ps)) score += 90;
-    sourceTokens.forEach(t => {
-      if (ps.split(' ').includes(t)) score += 42;
-      else if (ps.includes(t)) score += 22;
-      else score -= 18;
-    });
     const prodTokens = toks(pk);
-    prodTokens.forEach(t => { if (sourceSimple.includes(t)) score += 10; });
-    score -= Math.abs(ps.length - sourceSimple.length) * 0.06;
-    if (score > bestScore) { best = p; bestScore = score; }
+    let matched = 0, score = 0;
+    if (pk === key) score += 10000;
+    if (ps === sourceSimple && sourceSimple) score += 1200;
+    if (pk.includes(key)) score += 650;
+    if (key.includes(pk)) score += 450;
+    sourceTokens.forEach(t => {
+      if (prodTokens.includes(t)) { score += 120 + Math.min(t.length, 12); matched++; }
+      else if (ps.includes(t)) { score += 60 + Math.min(t.length, 10); matched++; }
+      else score -= 35;
+    });
+    const strong = sourceTokens.filter(t => strongRegex.test(t));
+    if (strong.length && !strong.some(t => ps.includes(t))) score -= 500;
+    if (!matched) score -= 1000;
+    prodTokens.forEach(t => { if (sourceSimple.includes(t)) score += 12; });
+    score -= Math.abs(ps.length - sourceSimple.length) * 0.1;
+    if (score > bestScore) { second = bestScore; bestScore = score; best = p; }
+    else if (score > second) second = score;
   }
-  return bestScore >= 35 ? best : null;
+  if (best && bestScore >= 120 && bestScore - second >= 18) return best;
+  if (best && bestScore >= 220) return best;
+  return null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');

@@ -1,0 +1,36 @@
+ControlEvent v15_prod - HOTFIX23 sin cambio de versión
+
+Cambios incluidos:
+
+1. Las donaciones del prompt mandan sobre Zuzu
+- Todo producto leído dentro de bloques de donación/existencia se fuerza como DONACION.
+- Si Zuzu había creado una COMPRA del mismo producto y esa compra no supera lo donado, se anula.
+- Si el producto estaba como compra por error y coincide con el prompt, pasa a donación.
+- Las compras por déficit real solo deben quedar cuando la necesidad sea superior a lo donado.
+
+2. Buscador de PRODUCTOS más fuerte
+- Se sustituye el buscador simple exacto/inicio por un buscador por tokens útiles.
+- Se ignoran envases, litros, cl, botellas, latas, packs, piezas, kg, etc.
+- Se añaden equivalencias:
+  WISKI -> WHISKY
+  JOHNY/JONIE -> JHONY
+  J B / J.B -> JB
+  BEETER -> BITTER
+  LAVAMANOS -> MANOS
+  BTLLA -> BOTELLA
+- Pensado para detectar productos como:
+  Ron BARCELO Añejo 0.7 L
+  Ron BRUGAL Añejo 0.7L
+  Whisky 5 Años J.B Botella 0.7 L
+  Whisky DYC 1L. 40°
+  Whisky JHONY WALKER 0.7 L. 40°
+
+3. Fuera fichas vacías
+- Se ocultan grupos sin donación ni compra prevista para que no aparezcan tarjetas inútiles.
+- Esto elimina mensajes tipo "Sin donación ni compra prevista" provocados por restos de agrupación.
+
+4. Precio, segmento y destino
+- Si el producto se localiza en PRODUCTOS, se arrastra nombre oficial, segmento, destino y precio.
+
+No cambia versión visible.
+No hay SQL nuevo.
