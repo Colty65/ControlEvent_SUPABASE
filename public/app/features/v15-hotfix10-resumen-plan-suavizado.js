@@ -50,14 +50,27 @@
     rows.sort((a,b)=>{ const [a1='',a2='']=String(a.key).split(' | '); const [b1='',b2='']=String(b.key).split(' | '); return mode==='ticket' ? (a2.localeCompare(b2,'es')||a1.localeCompare(b1,'es')) : (a1.localeCompare(b1,'es')||a2.localeCompare(b2,'es')); });
     return rows.map(r=>({...r,image:r.attachable?imageRefFor(r.key):''}));
   }
+
+  function tipForRow(row){
+    const heads = row.headers || [];
+    const lines = Array.isArray(row.lines) ? row.lines : [];
+    const out = [];
+    out.push(row.donated ? 'CÁLCULOS POR DONANTE Y DONACIÓN' : (row.pending ? 'PENDIENTE DE COMPRA U OTROS GASTOS' : 'CÁLCULOS POR TIENDA Y TICKET'));
+    out.push(row.key || '');
+    out.push('TOTAL | ' + money(row.v || 0));
+    out.push('');
+    if(heads.length) out.push(heads.join(' | '));
+    lines.forEach(line => out.push((line || []).join(' | ')));
+    return out.join('\n');
+  }
   function showTable(row){
     document.querySelectorAll('.ce-hf10-modal').forEach(x=>x.remove());
     const title=row.donated?'CÁLCULOS POR DONANTE Y DONACIÓN':(row.pending?'PENDIENTE DE COMPRA U OTROS GASTOS':'CÁLCULOS POR TIENDA Y TICKET');
     const heads=row.headers||[];
     const htmlRows=(row.lines||[]).map(line=>`<tr>${line.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${heads.length||1}">Sin detalle</td></tr>`;
     const modal=document.createElement('div'); modal.className='ce-hf10-modal';
-    modal.innerHTML=`<div class="ce-hf10-card" role="dialog" aria-modal="true"><div class="ce-hf10-head"><div><h3>${esc(title)}</h3><p>${esc(row.key)}</p></div><button type="button" aria-label="Cerrar">×</button></div><div class="ce-hf10-total"><span>${esc(row.donated?'TOTAL ESTIMADO':'TOTAL')}</span><strong>${esc(money(row.v))}</strong></div><div class="ce-hf10-table-wrap"><table class="ce-hf10-table"><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></div></div>`;
-    modal.addEventListener('click',e=>{ if(e.target===modal || e.target.closest('button')) modal.remove(); });
+    modal.innerHTML=`<div class="ce-hf10-card" role="dialog" aria-modal="true"><div class="ce-hf10-head"><div><h3>${esc(title)}</h3><p>${esc(row.key)}</p></div><button type="button" class="ce-hf10-close" data-ce-hf10-close="1" aria-label="Cerrar">×</button></div><div class="ce-hf10-total"><span>${esc(row.donated?'TOTAL ESTIMADO':'TOTAL')}</span><strong>${esc(money(row.v))}</strong></div><div class="ce-hf10-table-wrap"><table class="ce-hf10-table"><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></div></div>`;
+    modal.addEventListener('click',e=>{ if(e.target===modal || e.target.closest('[data-ce-hf10-close],.ce-hf10-close')){ e.preventDefault(); e.stopPropagation(); modal.remove(); } }, true);
     document.body.appendChild(modal);
   }
   function renderSummaryTiendaTicket(){
@@ -73,7 +86,10 @@
     rows.forEach(r=>{ total+=Number(r.v||0); const div=document.createElement('div'); div.className='summary-item ce-hf10-row'+(r.pending?' red-row':'')+(r.donated?' ce-hf10-donation':'');
       const amountStyle=r.pending?' style="background:#fef2f2;color:#b91c1c"':(r.donated?' style="text-decoration:line-through"':'');
       const encoded=encodeURIComponent(r.key||'');
-      const actions=r.attachable?`<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImage('${encoded}'); return false;">📎</button>${r.image?`<img class="ticket-thumb" src="${esc(r.image)}" alt="ticket" />`:'<span class="hint">Sin imagen</span>'}${r.image?`<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">🗑️</button>`:''}</span>`:'';
+      const rowTip=tipForRow(r);
+      div.setAttribute('data-ce-tip-v21', rowTip);
+      div.setAttribute('data-ce-tip', rowTip);
+      const actions=r.attachable?`<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImage('${encoded}'); return false;">📎</button>${r.image?`<img class="ticket-thumb" src="${esc(r.image)}" alt="ticket" data-ce-tip-v21="${esc(rowTip)}" />`:'<span class="hint">Sin imagen</span>'}${r.image?`<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">🗑️</button>`:''}</span>`:'';
       div.innerHTML=`<span class="ce-hf10-label">${esc(r.key)} <i>ⓘ</i></span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"><span class="pill"${amountStyle}>${esc(money(r.v))}</span>${actions}</span>`;
       div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img')) return; showTable(r); });
       root.appendChild(div);
@@ -110,9 +126,24 @@
   document.addEventListener('click',e=>{ const b=e.target.closest?.('#btnPlanOrdenProducto,#btnPlanOrdenSegmentoDestino,#btnPlanOrdenTienda'); if(b){ orderMode=b.id==='btnPlanOrdenSegmentoDestino'?'SEGMENTO_DESTINO':(b.id==='btnPlanOrdenTienda'?'TIENDA':'PRODUCTO'); setTimeout(updateOrderButtons,30); } },true);
   document.addEventListener('mousedown',e=>{ const sum=e.target.closest?.('.plan-advanced-lines > summary'); if(sum) sum.parentElement.dataset.allowCloseUntil=String(Date.now()+700); },true);
   document.addEventListener('toggle',e=>{ const d=e.target; if(!d?.matches?.('.plan-advanced-lines')) return; if(d.open) return; const until=Number(d.dataset.allowCloseUntil||0); if(Date.now()>until) setTimeout(()=>{ try{ d.open=true; }catch(_){} },0); },true);
+
+  document.addEventListener('click', function(ev){
+    const close = ev.target?.closest?.('[data-ce-hf10-close],.ce-hf10-close');
+    if(close){ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.(); document.querySelectorAll('.ce-hf10-modal').forEach(m=>m.remove()); return false; }
+    const modal = ev.target?.closest?.('.ce-hf10-modal');
+    if(modal && ev.target === modal){ ev.preventDefault(); ev.stopPropagation(); document.querySelectorAll('.ce-hf10-modal').forEach(m=>m.remove()); return false; }
+    const img = ev.target?.closest?.('#summaryTiendaTicket img.ticket-thumb');
+    if(img){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.();
+      try{ if(window.ControlEventV40ProdPhotos?.openTicket) return window.ControlEventV40ProdPhotos.openTicket(img, ev); }catch(_){}
+      return false;
+    }
+  }, true);
+  document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape') document.querySelectorAll('.ce-hf10-modal').forEach(m=>m.remove()); }, true);
+  let ceHf10ApplyTimer=0;
   function apply(){ injectStyle(); patchGlobals(); renderSummaryTiendaTicket(); updateOrderButtons(); }
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(apply,20),true));
-  [0,80,220,600,1200].forEach(ms=>setTimeout(apply,ms));
-  setInterval(apply,900);
-  try{ new MutationObserver(()=>{ clearTimeout(window.__ceHf10MoT); window.__ceHf10MoT=setTimeout(apply,35); }).observe(document.body,{childList:true,subtree:true}); }catch(_){ }
+  function scheduleApply(delay){ clearTimeout(ceHf10ApplyTimer); ceHf10ApplyTimer=setTimeout(apply, delay||80); }
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed'].forEach(ev=>window.addEventListener(ev,()=>scheduleApply(ev==='controlevent:event-changed'?180:80),true));
+  [0,220,900].forEach(ms=>setTimeout(apply,ms));
+  try{ new MutationObserver(()=>scheduleApply(180)).observe(document.body,{childList:true,subtree:true}); }catch(_){ }
 })();

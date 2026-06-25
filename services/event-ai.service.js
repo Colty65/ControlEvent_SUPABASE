@@ -2188,9 +2188,10 @@ function planScaleRows(rows, factor, defaultStoreId, defaultRespId) {
 function planAttendeesForEvent(state, eventId) {
   return arr(state?.colaboradores).filter(c => trim(c?.eventId || c?.event_id) === trim(eventId)).reduce((sum, c) => sum + num(c.numero), 0);
 }
-function planCatalogForGemini(state) {
+function planCatalogForGemini(state, form = {}) {
   const maps = planBuildMaps(state);
-  const finalizados = arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion)));
+  const totalMode = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL';
+  const finalizados = totalMode ? [] : arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion)));
   return {
     eventosFinalizados: finalizados.map(e => ({ id: trim(e.id), titulo: planEventTitle(e), fechaIni: trim(e.fechaIni), fechaFin: trim(e.fechaFin), precio: round(e.precio, 2), asistentes: planAttendeesForEvent(state, e.id) })).slice(0, 60),
     productos: arr(state?.productos).map(p => ({ id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precio: round(p.defaultPrecio ?? p.precio, 4), tienda: planStoreName(p.defaultTiendaId || p.tiendaId, maps) })).slice(0, 1000),
@@ -2202,6 +2203,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
   const compactRows = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
   const ctx = {
     modo: planModeLabel(form.mode),
+    aislamientoEncargoTotal: trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo catálogo, prompt y donaciones explícitas.' : 'NO ACTIVO',
     modulosSolicitados: modules,
     eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), dias: num(form.dias), personasEstimadas: num(form.personas), descripcion: trim(form.descripcion), informacionConstruccion: trim(form.info) },
     eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null,
@@ -2211,7 +2213,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
     ingresosHistoricosBase: arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })),
     reglasDonacionesDetectadas: planInfoDonationRules(form.info, planBuildMaps(state)).map(r => ({producto:r.productText, donante:r.donorLabel, responsable:r.responsableLabel, tipo:r.ticketDonacion})),
     existenciasYDonacionesExplicitas: planExplicitDonationRowsFromPrompt(form, state).map(r => ({producto:r.productName, unidades:r.unidades, precio:r.precio, tipoDonacion:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId, tienda:r.tiendaId})),
-    catalogos: planCatalogForGemini(state)
+    catalogos: planCatalogForGemini(state, form)
   };
   return `Eres Zuzu dentro de ControlEvent, módulo de PLANIFICACIÓN INICIAL. Debes crear una propuesta revisable para un evento nuevo, usando históricos y las instrucciones del usuario.
 
@@ -2225,7 +2227,7 @@ Reglas:
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
-- Para modo "Encargo total a Zuzu", NO copies listas históricas de otros eventos ni repitas una lista vieja: diseña el evento desde cero con el prompt del usuario. Usa el catálogo/precios solo como referencia de productos y precio, y respeta exactamente las existencias/donaciones explícitas que haya escrito.
+- Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas o patrones de un evento anterior. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala. Diseña desde cero con el prompt del usuario, personas/días y catálogo/precios solo como referencia. Respeta exactamente las existencias/donaciones explícitas que haya escrito.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
 - Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
