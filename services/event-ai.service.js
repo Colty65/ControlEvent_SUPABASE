@@ -1718,23 +1718,24 @@ function planMentionedPerson(textBlock, maps) {
     .find(pe => hay.includes(normPlanKey(pe?.nombre))) || null;
 }
 function planCleanExplicitProductText(text) {
-  let s = trim(text || '').replace(/^[•\-]+\s*/, '').replace(/[.。]+$/,'').trim();
-  if (!s) return '';
-  if (s.includes(':')) s = s.split(':')[0].trim();
-  s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\s+(?:de\s+)?/i, '');
-  s = s.replace(/^\d+(?:[,.]\d+)?\s+(?=\D)/i, '');
-  // No se eliminan medidas internas del nombre: "Aceite AOVE (2l): 1" debe seguir buscando "Aceite AOVE (2l)",
-  // no "Aceite AOVE". Solo quitamos una cantidad final explícita si viene como coletilla separada.
-  s = s.replace(/\s+[-–—]?\s*x?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)\s*$/i, '').trim();
-  return s.replace(/\s+/g,' ').trim();
+  let s = trim(text || '').replace(/^\s*[•\-]\s*/, '');
+  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,180}:\s*.+)$/i);
+  if (donorPrefix) s = trim(donorPrefix[2]);
+  if (s.includes(':')) s = s.slice(0, s.lastIndexOf(':'));
+  s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+(?:de\s+)?/i, '');
+  s = s.replace(/\b(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?\b/ig, '');
+  return trim(s.replace(/[.;]+$/,''));
 }
 function planExplicitUnits(text) {
-  const raw = trim(text || '').replace(',', '.');
-  let m = raw.match(/(\d+(?:\.\d+)?)\s*pack[s]?\s+de\s+(\d+(?:\.\d+)?)\s*(?:ud\.?|unidades|latas|botellines|botellas|botes)/i);
-  if (m) return Math.max(0, num(m[1]) * num(m[2]));
-  m = raw.match(/^\s*[•\-]?\s*(\d+(?:\.\d+)?)/);
+  const raw = trim(text || '');
+  const tail = raw.includes(':') ? raw.slice(raw.lastIndexOf(':') + 1) : raw;
+  let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?/i);
+  if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
+  m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+  if (m) return Math.max(0, round(num(m[1]), 2));
+  m = tail.match(/(\d+(?:[,.]\d+)?)/);
   if (m) return Math.max(0, num(m[1]));
-  m = raw.match(/:\s*(\d+(?:\.\d+)?)/);
+  m = raw.match(/^\s*[•\-]?\s*(\d+(?:[,.]\d+)?)/);
   if (m) return Math.max(0, num(m[1]));
   return 1;
 }
@@ -1973,6 +1974,40 @@ function planExplicitDonationRowsFromPrompt(form, state) {
         preferredDonorKind: donorIsStore ? 'T' : 'P',
         strictHf12:true
       });
+    });
+  })();
+
+
+  // HOTFIX13: parser estricto de bloques largos tipo:
+  // PRODUCTO EN LA PEÑA (...) / DONACIONES: / DONACION:
+  //   PRODUCTOS
+  //   • Producto: cantidad
+  // Respeta cantidades exactas escritas, incluidos "1 pack de 24 ud.".
+  (function parseStructuredDonationBlocksHf13(){
+    const lines = info.replace(/\r/g, '').split(/\n/);
+    let active = null;
+    const headerRe = /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?|DONACION|EXISTENCIAS?|YA\s+TENEMOS|PRODUCTOS?\s+DONADOS?)/i;
+    const stopRe = /^\s*(?:COMPRA|COMPRAS|A\s+COMPRAR|CRITERIO|RESULTADO|OBJETIVO|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS)\s*:/i;
+    function sectionDefaults(header){
+      const h = trim(header || '');
+      const tipo = /DONADO\s+TIENDA/i.test(h) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(h) ? 'DONADO OTROS' : 'DONADO SOCIO');
+      const donor = planExtractBracket(h, ['Donante']) || planExtractBracket(h, ['Dona','De']) || (/PE[NÑ]A/i.test(h) ? 'Peña El Arrastre' : '');
+      const resp = planExtractBracket(h, ['Responsable']) || donor || trim(form.defaultResponsibleName || '');
+      const store = tipo === 'DONADO TIENDA' ? (donor || planExtractBracket(h, ['Tienda']) || '') : '';
+      return { ticketDonacion:tipo, donor:donor || store || 'Donante indicado', store, responsable:resp, preferredDonorKind:tipo==='DONADO TIENDA'?'T':'P', strictHf12:true };
+    }
+    lines.forEach(rawLine => {
+      const line = trim(rawLine);
+      if(!line) return;
+      if(stopRe.test(line)){ if(!/^COMPRA/i.test(line)) active = null; else active = null; return; }
+      if(headerRe.test(line) && /DONADO\s+(SOCIO|TIENDA|OTROS)|Donante:|Responsable:|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACION/i.test(line)){
+        active = sectionDefaults(line);
+        return;
+      }
+      if(active && /^PRODUCTOS?\s*$/i.test(line)) return;
+      if(active && (/^\s*[•\-]/.test(line) || /^[^:\n]{2,180}:\s*.+\d/.test(line))){
+        addRows(line, active);
+      }
     });
   })();
 

@@ -106,13 +106,7 @@
   function findDonacionPanel(){
     return document.querySelector('#budgetLayout .budget-panel.donantes') || Array.from(document.querySelectorAll('#budgetLayout .budget-panel')).find(p=>/DONACI[OÓ]N\s+DE\s+PRODUCTO/i.test(p.querySelector('h3')?.textContent||''));
   }
-  function applyAvance(){
-    const panel=findDonacionPanel(); if(!panel) return;
-    panel.querySelectorAll('.ce-v15hf6-avance-box,.ce-v15hf7-avance-box').forEach(el=>{ el.style.display='none'; });
-    let box=panel.querySelector('.ce-hf9-av-box');
-    if(!box){ box=document.createElement('div'); box.className='ce-hf9-av-box'; panel.appendChild(box); }
-    box.innerHTML=renderAvanceHtml();
-  }
+  function applyAvance(){ document.querySelectorAll('.ce-v15hf6-avance-box,.ce-v15hf7-avance-box,.ce-hf9-av-box').forEach(el=>el.remove()); }
 
   function cleanTipAttrs(el){
     if(!el) return;
