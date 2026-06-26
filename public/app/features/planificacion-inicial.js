@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX29_DIAGNOSTICO_MANDA_46_DONACIONES_ACTIVO');
+  console.log('HOTFIX30_NECESIDAD_COMPRAS_PACKS_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -328,20 +328,33 @@
   function roundPurchaseUnits(productName, units){
     const u = Math.max(0, Number(units || 0));
     if(!u) return 0;
-    if(isPackRoundedProduct(productName)) return Math.max(24, Math.ceil(u / 24) * 24);
+    if(isPackRoundedProduct(productName)) return roundPack24PurchaseHf30(u);
     if(productAllowsDecimalUnits(productName)) return Math.ceil(u * 100) / 100;
     return Math.max(1, Math.ceil(u));
+  }
+  function roundPack24PurchaseHf30(units){
+    const u = Math.max(0, Number(units || 0));
+    if(!u) return 0;
+    const lower = Math.floor(u / 24) * 24;
+    const upper = Math.ceil(u / 24) * 24;
+    if(lower <= 0) return 24;
+    const dLower = Math.abs(u - lower);
+    const dUpper = Math.abs(upper - u);
+    // Si está justo a mitad, se redondea al alza. Si no, al múltiplo más cercano.
+    return dUpper <= dLower ? upper : lower;
   }
   function planBuyAfterDonation(productName, totalNeed, donatedUnits){
     const need = Math.max(0, Number(totalNeed || 0));
     const donated = Math.max(0, Number(donatedUnits || 0));
-    // HOTFIX18: A COMPRAR = NECESIDAD CALCULADA - total donado de ese producto.
-    return Math.max(0, Math.round((need - donated) * 100) / 100);
+    const deficit = Math.max(0, Math.round((need - donated) * 100) / 100);
+    if(!deficit) return 0;
+    return isPackRoundedProduct(productName) ? roundPack24PurchaseHf30(deficit) : deficit;
   }
   function planDisplayNeedAfterRounding(productName, totalNeed){
     const need = Math.max(0, Number(totalNeed || 0));
     if(!need) return 0;
-    return isPackRoundedProduct(productName) ? roundPurchaseUnits(productName, need) : Math.round(need * 100) / 100;
+    // HOTFIX30: NECESIDAD CALCULADA no se redondea sola. Se calcula como donado + compra redondeada.
+    return Math.round(need * 100) / 100;
   }
   function planProductAliasKey(value){
     const n = normalizeText(value || '');
@@ -851,10 +864,15 @@
       const hasExplicitDonation = (row.donationDetails || []).some(d => lastProposal[d.idx]?.explicitPromptDonation === true);
       // Si la donación viene explícita del prompt, una compra previa de Zuzu se toma como necesidad total
       // calculada, no como compra extra encima de lo donado. Anchoas donadas 1 + necesidad 2 => comprar 1.
-      const baseNeed = row.necesidad > 0 ? row.necesidad : (hasExplicitDonation ? Math.max(row.donado, row.compra) : row.donado + row.compra);
-      const displayNeed = planDisplayNeedAfterRounding(row.producto, baseNeed);
-      const nextCompra = (hasExplicitDonation && row.compra <= 0 && row.necesidad <= 0) ? 0 : planBuyAfterDonation(row.producto, displayNeed, row.donado);
-      return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || row.donado > 0};
+      // HOTFIX30: la necesidad visible nunca puede ser menor que lo ya donado.
+      // Se calcula como unidades donadas + unidades de compra real que queden.
+      const donated = Math.max(0, Number(row.donado || 0));
+      const zuzuBuy = Math.max(0, Number(row.compra || 0));
+      const hintedNeed = Math.max(0, Number(row.necesidad || 0));
+      const rawNeed = Math.max(hintedNeed, donated + zuzuBuy, donated);
+      const nextCompra = planBuyAfterDonation(row.producto, rawNeed, donated);
+      const displayNeed = Math.round((donated + nextCompra) * 100) / 100;
+      return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || donated > 0};
     });
     return sortPlanResourceRows(list);
   }
@@ -1984,7 +2002,7 @@
         __ceHf27DiagnosticTruth:true,
         __ceHf29DiagnosticTruth:true,
         __ceDiagnosticStatus: d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO',
-        reason:`Diagnóstico HF27: ${d.match.productId ? 'producto localizado' : 'producto no localizado'} desde prompt. Método: ${d.match.method}. Donante: ${d.donorLabel || donorLabel(d.donorRef)}.`
+        reason:`Diagnóstico HF30: ${d.match.productId ? 'producto localizado' : 'producto no localizado'} desde prompt. Método: ${d.match.method}. Donante: ${d.donorLabel || donorLabel(d.donorRef)}.`
       };
     });
   }
@@ -2092,7 +2110,9 @@
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     ensurePurchaseRowsForVisibleDeficitsHf24();
-    lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
+    // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
+    // porque estaba eliminando las compras que sí aparecen arriba.
+    lastProposal = normalizeProposalRowsForGroups(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -2152,7 +2172,7 @@
             : `<div class="field"><label>Tienda</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>`}
           <div class="field"><label>Responsable</label><select data-plan-field="responsableId">${sociosOpts || '<option value="">Sin socios</option>'}</select></div>
         </div>
-        <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Donante: ${esc(donorLabel(p.donorRef))}.` : ''}</div>
+        <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Responsable: ${esc(personaName(p.responsableId))}.` : ''}</div>
       </div>
     `;
   }
@@ -2239,7 +2259,13 @@
     const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
 
     if(changedField === 'necesidad'){
-      buy = planBuyAfterDonation(selectedProduct?.nombre || group.producto, need, Number(group.donado || 0));
+      const donatedBase = Math.max(0, Number(group.donado || 0));
+      if(need < donatedBase){
+        need = donatedBase;
+        const needInput = tr.querySelector('[data-plan-resource-field="necesidad"]');
+        if(needInput) needInput.value = String(need);
+      }
+      buy = planBuyAfterDonation(selectedProduct?.nombre || group.producto, need, donatedBase);
       if(buyInput) buyInput.value = String(buy);
     }else if(changedField === 'compra'){
       // Prioridad absoluta al panel editable: si el usuario escribe A COMPRAR, se respeta.
