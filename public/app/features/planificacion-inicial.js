@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX27_DIAGNOSTICO_PROMPT_ACTIVO');
+  console.log('HOTFIX28_BOTON_DIAGNOSTICO_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -2035,11 +2035,18 @@
   }
   function ceHf27RenderDiagnosticsOnly(){
     const box = document.getElementById('planificacionResultado');
-    if(!box) return;
-    box.classList.remove('hidden');
-    box.innerHTML = ceHf27DiagnosticsHtml();
-    ceHf27BindDiagnostics(box);
-    box.scrollIntoView({behavior:'smooth', block:'start'});
+    if(!box) { try{ alert('No encuentro el contenedor planificacionResultado.'); }catch(_){} return; }
+    try{
+      box.classList.remove('hidden');
+      box.innerHTML = ceHf27DiagnosticsHtml();
+      ceHf27BindDiagnostics(box);
+      try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
+    }catch(error){
+      console.error('[ControlEvent v15_prod] Diagnóstico HF28 falló', error);
+      box.classList.remove('hidden');
+      box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>Diagnóstico no disponible:</strong> '+esc(error?.message || error)+'</div>';
+      try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
+    }
   }
   function ceHf27BindDiagnostics(root){
     const scope = root || document;
@@ -2926,15 +2933,42 @@
   }
   function ensureHf27DiagnosticButton(){
     const gen = document.getElementById('btnGenerarPlanificacion');
-    if(!gen || document.getElementById('btnHf27DiagnosticarPrompt')) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'btnHf27DiagnosticarPrompt';
-    btn.className = 'secondary ce-hf27-diag-btn';
-    btn.textContent = 'Diagnosticar prompt';
-    btn.title = 'Lee las donaciones/existencias del prompt y muestra qué producto encuentra en PRODUCTOS antes de generar';
-    gen.insertAdjacentElement('afterend', btn);
-    bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); ceHf27RenderDiagnosticsOnly(); });
+    if(!gen) return;
+    let btn = document.getElementById('btnHf27DiagnosticarPrompt');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'btnHf27DiagnosticarPrompt';
+      btn.className = 'secondary ce-hf27-diag-btn';
+      btn.textContent = 'Diagnosticar prompt';
+      btn.title = 'Lee las donaciones/existencias del prompt y muestra qué producto encuentra en PRODUCTOS antes de generar';
+      gen.insertAdjacentElement('afterend', btn);
+    }
+    btn.disabled = false;
+    btn.onclick = function(event){
+      if(event){ event.preventDefault(); event.stopPropagation(); }
+      try{ ceHf27RenderDiagnosticsOnly(); }
+      catch(error){
+        console.error('[ControlEvent v15_prod] Error abriendo diagnóstico HF27/HF28', error);
+        const box = document.getElementById('planificacionResultado');
+        if(box){
+          box.classList.remove('hidden');
+          box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo abrir el diagnóstico:</strong> '+esc(error?.message || error)+'</div>';
+          try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
+        }else{
+          try{ alert('No se pudo abrir el diagnóstico: ' + (error?.message || error)); }catch(_){}
+        }
+      }
+      return false;
+    };
+    if(!btn.__ceHf28DirectBound){
+      btn.__ceHf28DirectBound = true;
+      btn.addEventListener('click', btn.onclick, true);
+      btn.addEventListener('pointerup', function(event){
+        if(event && event.button !== undefined && event.button !== 0) return;
+        btn.onclick(event);
+      }, true);
+    }
   }
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
@@ -2944,6 +2978,26 @@
       if(el.dataset?.target && el.dataset.target !== TAB_BUTTON_ID) bindOnce(el, 'click', () => { clearPlanificacionRuntimeFlag(); setTimeout(hidePlanificacion, 0); });
     });
     bindOnce(document.getElementById('btnGenerarPlanificacion'), 'click', generateProposal);
+    if(!document.__ceHf28DiagnosticGlobalClick){
+      document.__ceHf28DiagnosticGlobalClick = true;
+      document.addEventListener('click', event => {
+        const diag = event.target?.closest?.('#btnHf27DiagnosticarPrompt');
+        if(!diag) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        try{ ceHf27RenderDiagnosticsOnly(); }
+        catch(error){
+          console.error('[ControlEvent v15_prod] Error diagnóstico HF28', error);
+          const box = document.getElementById('planificacionResultado');
+          if(box){
+            box.classList.remove('hidden');
+            box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo abrir el diagnóstico:</strong> '+esc(error?.message || error)+'</div>';
+            try{ box.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){}
+          }
+        }
+      }, true);
+    }
     bindOnce(document.getElementById('planFuenteHistorica'), 'change', updatePlanModeUI);
     bindOnce(document.getElementById('planFechaIni'), 'change', updateDaysFromDates);
     bindOnce(document.getElementById('planFechaFin'), 'change', updateDaysFromDates);
