@@ -16,7 +16,26 @@
   function isDonationTicket(v){ return /^DONADO/i.test(norm(v)); }
   function isAssignedPurchase(v){ const t=up(v); return /^TK\d+/.test(t)||t.includes('GASTOS CORRIENTES'); }
   function srcOf(v){ if(!v) return ''; if(typeof v==='string') return v; if(typeof v==='object') return v.url||v.public_url||v.publicUrl||v.pathname||v.path||v.storage_path||v.dataUrl||v.base64||''; return ''; }
-  function imageExists(keys){ const s=st(); const stores=[s.ticketImages||{},s.ticketImageRefs||{},s.images||{}]; return keys.some(k=>stores.some(store=>!!srcOf(store[k]))); }
+  function imageExists(keys){
+    const s=st();
+    const stores=[s.ticketImages||{},s.ticketImageRefs||{},s.images||{}];
+    const wanted=(keys||[]).map(k=>up(k)).filter(Boolean);
+    if(keys.some(k=>stores.some(store=>!!srcOf(store[k])))) return true;
+    // HOTFIX40: búsqueda amplia por clave. Evita que el punto 6 tarde o quede a 0 cuando la foto existe con otra variante de key.
+    return stores.some(store=>Object.keys(store||{}).some(k=>{
+      if(!srcOf(store[k])) return false;
+      const uk=up(k);
+      return wanted.some(w=>uk===w || uk.includes(w) || w.includes(uk) || (w.includes('|') && uk.includes(w.split('|').pop())));
+    }));
+  }
+
+  function ticketImageExistsHf40(eventId, ticket){
+    const t=up(ticket);
+    if(!t) return false;
+    const id=String(eventId||'');
+    return imageExists([`${id}|${ticket}`,`${id}|TICKET:${ticket}`,`${id}|TICKET|${ticket}`,`${id}|TK:${ticket}`,ticket]);
+  }
+
   function ingresoTotal(r){
     const ev=arr('eventos').find(e=>String(e.id)===evId())||{};
     const per=byId('personas',r?.personaId)||{};
@@ -39,7 +58,7 @@
     const buy=compras.filter(r=>!isDonationTicket(r?.ticketDonacion));
     const assigned=buy.filter(r=>isAssignedPurchase(r?.ticketDonacion));
     const tickets=[...new Set(compras.map(r=>norm(r?.ticketDonacion)).filter(t=>/^TK\d+/i.test(t)))];
-    const ticketPhotos=tickets.filter(t=>imageExists([`${id}|${t}`,`${id}|TICKET:${t}`,t])).length;
+    const ticketPhotos=tickets.filter(t=>ticketImageExistsHf40(id,t)).length;
     return {totalIng,doneIng,doneIngRows,ingPhotos,don,buy,assigned,docs,tickets,ticketPhotos};
   }
   function avRow(n,label,pct,color,detail,warn){
@@ -113,7 +132,8 @@
     const btn=ev.target?.closest?.('#ceHf16AvanceBtn');
     if(btn) return window.ceHf16ToggleAvance(ev);
   }, true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed'].forEach(ev=>window.addEventListener(ev,()=>schedule(ev==='controlevent:event-changed'?160:60),true));
-  document.addEventListener('click',ev=>{ if(ev.target?.closest?.('#tabMapaBtn,#selectedEvent,#refreshBtn')) schedule(180); },true);
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed','controlevent:images-updated','controlevent:state-saved'].forEach(ev=>window.addEventListener(ev,()=>schedule(ev==='controlevent:event-changed'?90:50),true));
+  document.addEventListener('click',ev=>{ if(ev.target?.closest?.('#tabMapaBtn,#selectedEvent,#refreshBtn,[data-ticket-upload],[data-receipt-upload]')) schedule(100); },true);
   [0,200,800,1600,2600].forEach(ms=>setTimeout(apply,ms));
+  window.__ceHf16Hotfix40AvancePunto6='HOTFIX40_AVANCE_PUNTO6_ACTIVO';
 })();

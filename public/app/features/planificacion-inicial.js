@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX39_INFRA_PACK_BEBIDA_IMAGINACION_ACTIVO');
+  console.log('HOTFIX40_MANUAL_NEED_DOCS_AVANCE_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -2220,6 +2220,8 @@
     });
     families.forEach((info, fam) => {
       if(Math.max(0, Number(info.units || 0)) >= 2) return;
+      const manualOverride = rows.some(r => r && r.__ceHf40ManualNeedOverride && ceHf38InfrastructureFamilyKey(r.productName || r.producto || '') === fam);
+      if(manualOverride) return;
       const already = rows.some(r => String(r.tipo || '').toUpperCase() === 'COMPRA' && ceHf38InfrastructureFamilyKey(r.productName || r.producto || '') === fam);
       if(already) return;
       const prod = info.prod || resolveCatalogProductByNameHf25(info.sample?.productName || info.sample?.producto || '');
@@ -2517,6 +2519,7 @@
     group.allIndices.forEach(idx => {
       if(lastProposal[idx]){
         lastProposal[idx].include = include;
+        if(changedField === 'necesidad') lastProposal[idx].__ceHf40ManualNeedOverride = true;
         lastProposal[idx].necesidadTotal = need || undefined;
         if(selectedProductId){
           lastProposal[idx].productId = selectedProductId;
@@ -3292,6 +3295,8 @@
     const fams = ceHf38InfrastructureStockByFamily(rows);
     fams.forEach((info, fam) => {
       if(!fam || Math.max(0, Number(info.units || 0)) >= 2) return;
+      const manualOverride = rows.some(r => r && r.__ceHf40ManualNeedOverride && ceHf38InfrastructureFamilyKey(r.productName || r.producto || '') === fam);
+      if(manualOverride) return;
       const sample = info.product || resolveCatalogProductByNameHf25(info.name || '');
       const productName = sample?.nombre || info.name || '';
       if(!productName) return;

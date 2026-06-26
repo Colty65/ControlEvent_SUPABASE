@@ -56,6 +56,8 @@
     const s = st();
     if(!Array.isArray(s.eventDocuments)) s.eventDocuments = [];
     if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
+    // HOTFIX40: metadatos auxiliares para que una foto DOC recuperada no pierda fecha/texto.
+    if(!s.eventDocumentMeta || typeof s.eventDocumentMeta !== 'object') s.eventDocumentMeta = {};
     return s;
   }
 
@@ -71,12 +73,13 @@
       const code = docCode(key.split('|').slice(1).join('|'));
       if(!code || seen.has(code)) return;
       seen.add(code);
+      const meta = (s.eventDocumentMeta && s.eventDocumentMeta[`${id}|${code}`]) || {};
       docs.push({
         id: `${id}|${code}`,
         eventId: id,
         codigo: code,
-        fecha: '',
-        descripcion: 'Documento recuperado desde fotos del evento',
+        fecha: meta.fecha || '',
+        descripcion: meta.descripcion || 'Documento recuperado desde fotos del evento',
         imageKey: code,
         imageUrl: s.ticketImages[key] || '',
         recovered: true
@@ -101,7 +104,31 @@
 
   function findDoc(docId){
     const s = ensureStateShape();
-    return s.eventDocuments.find(doc => String(doc.id || '') === String(docId || '')) || null;
+    let found = s.eventDocuments.find(doc => String(doc.id || '') === String(docId || '')) || null;
+    if(found) return found;
+    // HOTFIX40: si es un DOC recuperado desde ticketImages, lo convertimos en documento real editable.
+    const recovered = docsForEvent().find(doc => String(doc.id || '') === String(docId || '')) || null;
+    if(recovered){
+      found = {
+        id: recovered.id,
+        eventId: recovered.eventId,
+        codigo: recovered.codigo,
+        imageKey: recovered.imageKey || recovered.codigo,
+        imageUrl: recovered.imageUrl || '',
+        fecha: recovered.fecha || '',
+        descripcion: recovered.descripcion || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        recovered: false,
+        materializedHf40: true
+      };
+      s.eventDocuments.push(found);
+      if(!s.eventDocumentMeta) s.eventDocumentMeta = {};
+      s.eventDocumentMeta[found.id] = {fecha: found.fecha, descripcion: found.descripcion};
+      saveNow();
+      return found;
+    }
+    return null;
   }
 
   function imageFor(doc){
@@ -385,8 +412,8 @@
     const editable = canMaintainDocs();
     list.innerHTML = docs.map(doc => {
       const img = imageFor(doc);
-      const disabled = editable && !doc.recovered ? '' : 'disabled';
-      const readonlyText = editable && !doc.recovered ? '' : 'readonly';
+      const disabled = editable ? '' : 'disabled';
+      const readonlyText = editable ? '' : 'readonly';
       const code = esc(doc.codigo || 'DOC');
       const id = esc(doc.id || `${doc.eventId}|${doc.codigo}`);
       const targetId = 'ceDocViewV85_' + safeDomId(`${doc.eventId}_${doc.codigo || doc.imageKey || doc.id}`);
@@ -401,17 +428,17 @@
             <div class="ce-doc-target-imgwrap-v85"><img src="${esc(img)}" alt="Documento del evento" loading="lazy" /></div>
           </div>
         </div>` : '';
-      const actions = editable && !doc.recovered ? `
+      const actions = editable ? `
           <button type="button" class="outline small" data-doc-replace="${id}">📎 Reemplazar foto</button>
           ${img ? `<button type="button" class="outline small" data-doc-remove-image="${id}">🗑️ Eliminar foto</button>` : ''}
           <button type="button" class="modify small" data-doc-save="${id}">Modificar</button>
           <button type="button" class="danger small" data-doc-delete="${id}">Eliminar</button>
           <input class="ce-doc-file-input" type="file" accept="image/*" data-doc-upload-input="${id}" />`
         : (doc.recovered ? '<span class="readonly-note">Recuperado desde foto.</span>' : '');
-      const dateHtml = editable && !doc.recovered
+      const dateHtml = editable
         ? `<input class="ce-doc-date-input" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" value="${esc(formatDate(doc.fecha || ''))}" data-doc-field="fecha" data-doc-id="${id}" />`
         : `<div class="ce-doc-date-view">${esc(formatDate(doc.fecha || ''))}</div>`;
-      const descHtml = editable && !doc.recovered
+      const descHtml = editable
         ? `<textarea class="ce-doc-desc-input" rows="2" data-doc-field="descripcion" data-doc-id="${id}">${esc(doc.descripcion || '')}</textarea>`
         : `<div class="ce-doc-desc-view">${esc(doc.descripcion || '')}</div>`;
       return `
@@ -555,6 +582,8 @@
     const s = ensureStateShape();
     const id = `${eventId}|${code}`;
     s.ticketImages[docKey(eventId, code)] = dataUrl;
+    s.eventDocumentMeta[`${eventId}|${code}`] = {fecha, descripcion};
+    s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== id);
     s.eventDocuments.push({
       id,
       eventId,
@@ -592,6 +621,7 @@
     doc.imageUrl = imageUrl;
     doc.imageKey = code;
     doc.updatedAt = new Date().toISOString();
+    s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${doc.codigo || doc.imageKey}`)] = {fecha: doc.fecha || '', descripcion: doc.descripcion || ''};
     saveNow();
     renderEventDocuments();
     status('Foto del documento actualizada.', 'ok');
@@ -624,12 +654,13 @@
     status('Eliminando documento...', 'working');
     if(imageFor(doc)){
       await deleteDocumentImage(doc.eventId, code).catch(error => {
-        console.warn('[ControlEvent v15_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
-        throw error;
+        // HOTFIX40: si el servidor no borra la imagen, no dejamos bloqueado el documento.
+        console.warn('[ControlEvent v15_prod] No se pudo eliminar imagen en servidor; se elimina localmente:', error?.message || error);
       });
     }
     const s = ensureStateShape();
     delete s.ticketImages[docKey(doc.eventId, code)];
+    delete s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${code}`)];
     s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== String(docId));
     saveNow();
     renderEventDocuments();
@@ -647,6 +678,8 @@
     });
     if(!doc.descripcion){ alert('El texto descriptivo no puede quedar vacío.'); return; }
     doc.updatedAt = new Date().toISOString();
+    const s = ensureStateShape();
+    s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${doc.codigo || doc.imageKey}`)] = {fecha: doc.fecha || '', descripcion: doc.descripcion || ''};
     saveNow();
     renderEventDocuments();
     status('Documento modificado.', 'ok');
@@ -1047,4 +1080,5 @@
     closeModal,
     releaseExclusive: () => setDocumentsExclusive(false)
   };
+  window.__ceDocsHotfix40DocumentosAvance = 'HOTFIX40_DOCUMENTOS_AVANCE_ACTIVO';
 })();
