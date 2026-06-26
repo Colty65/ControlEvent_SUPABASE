@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX33_PRECIO_PRODUCTO_CUBATAS_ACTIVO');
+  console.log('HOTFIX34_PRECIO_VISIBLE_CALOR_IMAGINACION_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -2262,7 +2262,7 @@
     if(changedField === 'productId' && selectedProduct){
       const catalogPrice = ceHf27CatalogPrice(selectedProduct);
       price = Math.max(0, Number(catalogPrice || 0));
-      if(priceInput) priceInput.value = String(price).replace('.', ',');
+      if(priceInput) priceInput.value = String(price);
     }
 
     if(changedField === 'necesidad'){
@@ -2326,7 +2326,7 @@
       if(donationPriceInput){
         if(changedField === 'productId' && selectedProduct){
           row.precio = price;
-          donationPriceInput.value = String(price).replace('.', ',');
+          donationPriceInput.value = String(price);
         }else{
           row.precio = Math.max(0, Number(String(donationPriceInput.value || 0).replace(',','.')));
         }
@@ -2945,6 +2945,41 @@
     ceHf32AddPurchase(list, label, target, reason, {...opts, noRound:true});
   }
 
+
+  function ceHf34IsHotContext(desc){
+    return /CALOR|VERANO|TEMPERATURA\s+ALTA|MUCHO\s+CALOR|DIA\s+CALUROSO|DÍA\s+CALUROSO|JULIO|AGOSTO/.test(String(desc || ''));
+  }
+  function ceHf34BoostHot(value, desc){
+    const v = Math.max(0, Number(value || 0));
+    return ceHf34IsHotContext(desc) ? Math.ceil(v * 4 / 3) : v;
+  }
+  function ceHf34AddCreativePurchase(list, desc){
+    if(planMode() !== 'ZUZU_TOTAL') return;
+    const already = (Array.isArray(list) ? list : []).some(r => r && String(r.tipo || '').toUpperCase() === 'COMPRA' && String(r.__ceCreativeIdeaHf34 || '') === '1');
+    if(already) return;
+    const eventish = /TARDEO|MUSICA|MÚSICA|BARBACOA|PAELLA|APERITIVO|PEÑA|FIESTA|EVENTO|CUBATA|COMIDA|CENA/.test(String(desc || ''));
+    if(!eventish) return;
+    list.push({
+      key:`hf34-idea-sorpresa:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      include:true,
+      tipo:'COMPRA',
+      productId:'',
+      productName:'Kit ambiente tardeo peña (luces led, cartel menú y detalle mesa)',
+      segmento:'INFRAESTRUCTURA',
+      destino:'INFRAESTRUCTURA',
+      unidades:1,
+      necesidadTotal:1,
+      precio:25,
+      tiendaId:document.getElementById('planTienda')?.value || '',
+      responsableId:document.getElementById('planResponsable')?.value || '',
+      ticketDonacion:'',
+      donorRef:'',
+      __ceZuzuFallbackPurchaseHf32:true,
+      __ceCreativeIdeaHf34:'1',
+      reason:'Idea sorpresa HF34: compra imaginativa de organización/ambiente para mejorar el evento, aunque no exista todavía en PRODUCTOS.'
+    });
+  }
+
   function ceHf32EnsureImaginedPurchases(list){
     const rows = Array.isArray(list) ? list.slice() : [];
     if(planMode() !== 'ZUZU_TOTAL') return rows;
@@ -2960,26 +2995,26 @@
     const donationAliases = new Set(rows.filter(r => String(r.tipo || '').toUpperCase() === 'DONACION').map(r => productAliasKeyHf25(r.productName || r.producto || '')));
 
     // Bebida: se calcula en equivalentes de lata 1/3, con máximos razonables.
-    const beerTarget = Math.min(cervezaPeople * 5, personas * 6);
+    const beerTarget = ceHf34BoostHot(Math.min(cervezaPeople * 5, personas * 6), desc);
     const beerDeficit = Math.max(0, beerTarget - donations.beer);
     if(beerDeficit >= 12) ceHf32AddPurchase(rows, 'Cerveza MAHOU Lata 33 CL', beerDeficit, `cerveza: objetivo ${Math.round(beerTarget)} ud equivalentes 1/3, donado ${Math.round(donations.beer)}.`);
 
-    const beerSinTarget = Math.max(0, Math.round(nonAlcohol * 2));
+    const beerSinTarget = ceHf34BoostHot(Math.max(0, Math.round(nonAlcohol * 2)), desc);
     const beerSinDeficit = Math.max(0, beerSinTarget - donations.beerSin);
     if(beerSinDeficit >= 8) ceHf32AddPurchase(rows, 'Cerveza SIN tostada', beerSinDeficit, `cerveza sin alcohol: objetivo ${beerSinTarget}, donado ${Math.round(donations.beerSin)}.`);
 
     const colaDonated = donations.colaNormal + donations.colaZero + donations.colaZeroZero;
-    const colaTarget = Math.max(24, Math.round(cubataPeople * 6));
+    const colaTarget = ceHf34BoostHot(Math.max(24, Math.round(cubataPeople * 6)), desc);
     const colaDeficit = Math.max(0, colaTarget - colaDonated);
     if(colaDeficit >= 12) ceHf32AddPurchase(rows, 'COCA COLA Bote 32 Cl', colaDeficit, `coca cola para cubatas/mezcla: objetivo ${colaTarget}, donado ${Math.round(colaDonated)}. Preferencia normal, zero, zero-zero.`);
 
-    const fantaTarget = Math.max(12, Math.round((personas / 4) * 4));
+    const fantaTarget = ceHf34BoostHot(Math.max(12, Math.round((personas / 4) * 4)), desc);
     const fantaDeficit = Math.max(0, fantaTarget - donations.fanta);
     if(fantaDeficit >= 12) ceHf32AddPurchase(rows, 'FANTA Limon Bote 32 CL', fantaDeficit, `fantas: objetivo ${Math.round(fantaTarget)}, donado ${Math.round(donations.fanta)}.`);
 
     const ginDrinkersHf33 = Math.max(0, Math.round(cubataPeople / 2.5 + 4));
     const ginTonicTargetHf33 = Math.round(ginDrinkersHf33 * (/VERANO|CALOR|GIN\s*TONIC|TARDEO/.test(desc) ? 4 : 3));
-    const tonicaTarget = Math.max(6, Math.round((personas / 6) * 3), ginTonicTargetHf33);
+    const tonicaTarget = ceHf34BoostHot(Math.max(6, Math.round((personas / 6) * 3), ginTonicTargetHf33), desc);
     const tonicaDeficit = Math.max(0, tonicaTarget - donations.tonica);
     if(tonicaDeficit >= 8) ceHf32AddPurchase(rows, 'Tonica normal', tonicaDeficit, `tónicas/gin tonic: objetivo ${Math.round(tonicaTarget)}, donado ${Math.round(donations.tonica)}.`);
 
@@ -3006,22 +3041,23 @@
     }
     if(/CUBATA|TARDEO|HIELO|REFRESCO|BEBIDA|CALOR|RON|WHISKY|GINEBRA|GIN/.test(desc)){
       const cubataEffective = Math.max(0, cubataPeople + cubataFriends);
-      const iceTarget = Math.max(20, Math.ceil(cubataEffective * 0.80));
+      const iceTarget = ceHf34BoostHot(Math.max(20, Math.ceil(cubataEffective * 0.80)), desc);
       ceHf33EnsurePurchaseMinimum(rows, 'HIELO', iceTarget, `hielo para cubatas/tardeo: ${cubataPeople} asistentes de cubata + ${cubataFriends} amigos aprox. => mínimo ${iceTarget}.`, {noRound:true});
       ceHf33EnsurePurchaseMinimum(rows, 'Vasos cubata', Math.max(24, Math.ceil(cubataEffective * 2)), 'menaje de cubatas contando amigos del tardeo.');
-      const rumTarget = Math.round((cubataPeople / 2 + cubataFriends) * 3.5);
+      const rumTarget = ceHf34BoostHot(Math.round((cubataPeople / 2 + cubataFriends) * 3.5), desc);
       const rumDeficit = Math.max(0, rumTarget - donations.ronTotal);
       if(rumDeficit >= 10) ceHf32AddPurchase(rows, 'Ron BARCELO Añejo 0.7 L', Math.ceil(rumDeficit / 14), `ron: Barceló se consume aprox. 3 veces más que Brugal. Objetivo ${rumTarget} cubatas, donados ${Math.round(donations.ronTotal)}.`, {noRound:true});
-      const whiskyTarget = Math.round((personas / 4 + 4) * 3);
+      const whiskyTarget = ceHf34BoostHot(Math.round((personas / 4 + 4) * 3), desc);
       const whiskyDeficit = Math.max(0, whiskyTarget - donations.whiskyTotal);
       if(whiskyDeficit >= 10) ceHf32AddPurchase(rows, 'Whisky 5 Años J.B Botella 0.7 L', Math.ceil(whiskyDeficit / 14), `whisky: sobre todo JB. Objetivo ${whiskyTarget} cubatas, donados ${Math.round(donations.whiskyTotal)}.`, {noRound:true});
-      const ginTarget = Math.round((personas / 5 + 4) * (/VERANO|CALOR|GIN\s*TONIC/.test(desc) ? 4 : 3));
+      const ginTarget = ceHf34BoostHot(Math.round((personas / 5 + 4) * (/VERANO|CALOR|GIN\s*TONIC/.test(desc) ? 4 : 3)), desc);
       const ginDeficit = Math.max(0, ginTarget - donations.ginTotal);
       if(ginDeficit >= 10) ceHf32AddPurchase(rows, 'Gin BEEFEATER 0.7 L. 43°', Math.ceil(ginDeficit / 14), `ginebra/gin tonic: Beefeater preferente. Objetivo ${ginTarget}, donado ${Math.round(donations.ginTotal)}.`, {noRound:true});
     }
     if(/SERVILLETA|MENAJE|LIMPIEZA|HIGIENE|INFRAESTRUCTURA/.test(desc)){
       ceHf32AddPurchase(rows, 'Servilletas', 1, 'menaje básico.');
     }
+    ceHf34AddCreativePurchase(rows, desc);
     return rows;
   }
 
