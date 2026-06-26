@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX34_PRECIO_VISIBLE_CALOR_IMAGINACION_ACTIVO');
+  console.log('HOTFIX35_PRODUCTO_DIAGNOSTICO_REPARTO_COMPRAS_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -1474,6 +1474,7 @@
     if(has('FANTA','NARANJA')) return 'alias:fanta-naranja';
     if(has('FANTA','LIMON')) return 'alias:fanta-limon';
     if(has('SPRITE')) return 'alias:sprite';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL')) return 'alias:cerveza-ambar-barril';
     if(has('CERVEZA','SKOL')) return 'alias:cerveza-skol';
     if(has('TONICA','SCHWEPPES')) return 'alias:tonica-schweppes';
     if((has('BITTER') || has('BEETER')) && has('KAS')) return 'alias:bitter-kas';
@@ -2903,13 +2904,33 @@
       unidades:u,
       necesidadTotal:u,
       precio:ceHf27CatalogPrice(prod),
-      tiendaId:document.getElementById('planTienda')?.value || '',
-      responsableId:document.getElementById('planResponsable')?.value || '',
+      tiendaId:ceHf35DefaultStoreId(),
+      responsableId:ceHf35DefaultResponsibleId(),
       ticketDonacion:'',
       donorRef:'',
       __ceZuzuFallbackPurchaseHf32:true,
       reason:'Compra inteligente HF32: ' + reason
     });
+  }
+
+
+  function ceHf35DefaultStoreId(){
+    return document.getElementById('planTienda')?.value || document.getElementById('planDefaultStore')?.value || '';
+  }
+  function ceHf35DefaultResponsibleId(){
+    return document.getElementById('planResponsable')?.value || '';
+  }
+  function ceHf35RoundIceUnits(value){
+    const v = Math.max(0, Number(value || 0));
+    if(!v) return 0;
+    // Hielo: se compra por sacos/lotes de 5 bolsas, siempre al alza.
+    return Math.ceil(v / 5) * 5;
+  }
+  function ceHf35PurchaseTotal(list){
+    return (Array.isArray(list) ? list : []).reduce((sum, row) => {
+      if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA' || row.include === false) return sum;
+      return sum + Math.max(0, Number(row.unidades || 0)) * Math.max(0, Number(row.precio || 0));
+    }, 0);
   }
 
   function ceHf33SpiritShotsFromDonation(name, units){
@@ -2938,7 +2959,11 @@
         row.unidades = target;
         row.necesidadTotal = target;
         if(!Number(row.precio || 0)) row.precio = ceHf27CatalogPrice(prod);
-        row.reason = (row.reason || 'Compra propuesta.') + ' · Ajuste HF33 mínimo: ' + reason;
+        row.reason = (row.reason || 'Compra propuesta.') + ' · Ajuste HF35 mínimo: ' + reason;
+      }
+      if(row.__ceZuzuFallbackPurchaseHf32 || row.__ceZuzuFallbackPurchaseHf35){
+        row.tiendaId = ceHf35DefaultStoreId() || row.tiendaId || '';
+        row.responsableId = ceHf35DefaultResponsibleId() || row.responsableId || '';
       }
       return;
     }
@@ -2959,24 +2984,26 @@
     if(already) return;
     const eventish = /TARDEO|MUSICA|MÚSICA|BARBACOA|PAELLA|APERITIVO|PEÑA|FIESTA|EVENTO|CUBATA|COMIDA|CENA/.test(String(desc || ''));
     if(!eventish) return;
+    const base = ceHf35PurchaseTotal(list);
+    const reserva = Math.max(10, Math.round(base * 0.10 * 100) / 100);
     list.push({
-      key:`hf34-idea-sorpresa:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      key:`hf35-otras-compras-imprevistas:${Date.now()}:${Math.random().toString(36).slice(2)}`,
       include:true,
       tipo:'COMPRA',
       productId:'',
-      productName:'Kit ambiente tardeo peña (luces led, cartel menú y detalle mesa)',
+      productName:'Otras compras imprevistas',
       segmento:'INFRAESTRUCTURA',
       destino:'INFRAESTRUCTURA',
       unidades:1,
       necesidadTotal:1,
-      precio:25,
-      tiendaId:document.getElementById('planTienda')?.value || '',
-      responsableId:document.getElementById('planResponsable')?.value || '',
+      precio:reserva,
+      tiendaId:ceHf35DefaultStoreId(),
+      responsableId:ceHf35DefaultResponsibleId(),
       ticketDonacion:'',
       donorRef:'',
       __ceZuzuFallbackPurchaseHf32:true,
       __ceCreativeIdeaHf34:'1',
-      reason:'Idea sorpresa HF34: compra imaginativa de organización/ambiente para mejorar el evento, aunque no exista todavía en PRODUCTOS.'
+      reason:'Reserva HF35: 10% de la compra prevista para imprevistos del evento.'
     });
   }
 
@@ -3006,11 +3033,26 @@
     const colaDonated = donations.colaNormal + donations.colaZero + donations.colaZeroZero;
     const colaTarget = ceHf34BoostHot(Math.max(24, Math.round(cubataPeople * 6)), desc);
     const colaDeficit = Math.max(0, colaTarget - colaDonated);
-    if(colaDeficit >= 12) ceHf32AddPurchase(rows, 'COCA COLA Bote 32 Cl', colaDeficit, `coca cola para cubatas/mezcla: objetivo ${colaTarget}, donado ${Math.round(colaDonated)}. Preferencia normal, zero, zero-zero.`);
+    if(colaDeficit >= 12){
+      const totalPacks = Math.max(1, Math.ceil(colaDeficit / 24));
+      // HOTFIX35: reparto con sentido común. Si salen 3 packs, se sube a 4:
+      // 2 normal, 1 zero, 1 zero-zero.
+      const packs = totalPacks === 3 ? 4 : totalPacks;
+      const normalPacks = Math.max(1, Math.ceil(packs * 0.50));
+      const zeroPacks = packs >= 2 ? Math.max(1, Math.floor(packs * 0.25)) : 0;
+      const zeroZeroPacks = Math.max(0, packs - normalPacks - zeroPacks);
+      ceHf32AddPurchase(rows, 'COCA COLA Bote 32 Cl', normalPacks * 24, `coca cola normal: reparto proporcional. Objetivo ${colaTarget}, donado ${Math.round(colaDonated)}.`);
+      if(zeroPacks > 0) ceHf32AddPurchase(rows, 'COCA COLA ZERO Bote 32 Cl', zeroPacks * 24, `coca cola zero: reparto proporcional de ${packs} packs.`);
+      if(zeroZeroPacks > 0) ceHf32AddPurchase(rows, 'COCA COLA ZERO -ZERO 33 cl', zeroZeroPacks * 24, `coca cola zero-zero: reparto proporcional de ${packs} packs.`);
+    }
 
     const fantaTarget = ceHf34BoostHot(Math.max(12, Math.round((personas / 4) * 4)), desc);
     const fantaDeficit = Math.max(0, fantaTarget - donations.fanta);
-    if(fantaDeficit >= 12) ceHf32AddPurchase(rows, 'FANTA Limon Bote 32 CL', fantaDeficit, `fantas: objetivo ${Math.round(fantaTarget)}, donado ${Math.round(donations.fanta)}.`);
+    // HOTFIX35: Fanta naranja y limón, algo más generosas: 1 pack de cada tipo si hay evento/tardeo.
+    if(fantaDeficit >= 1 || /TARDEO|CUBATA|REFRESCO|BEBIDA|CALOR|VERANO/.test(desc)){
+      ceHf32AddPurchase(rows, 'FANTA Limon Bote 32 CL', 24, `fanta limón: pack mínimo recomendado para refresco/cubatas. Objetivo ${Math.round(fantaTarget)}, donado ${Math.round(donations.fanta)}.`);
+      ceHf32AddPurchase(rows, 'FANTA Naranja Bote 32 C.L', 24, `fanta naranja: pack mínimo recomendado para refresco/cubatas. Objetivo ${Math.round(fantaTarget)}, donado ${Math.round(donations.fanta)}.`);
+    }
 
     const ginDrinkersHf33 = Math.max(0, Math.round(cubataPeople / 2.5 + 4));
     const ginTonicTargetHf33 = Math.round(ginDrinkersHf33 * (/VERANO|CALOR|GIN\s*TONIC|TARDEO/.test(desc) ? 4 : 3));
@@ -3036,13 +3078,14 @@
       ceHf32AddPurchase(rows, 'Pan', Math.max(4, Math.ceil(personas / 4)), 'acompañamiento de comida/cena.');
     }
     if(/APERITIVO|PATATAS|ENCURTIDOS|TORTILLA/.test(desc)){
-      ceHf32AddPurchase(rows, 'Patatas fritas', Math.max(3, Math.ceil(personas / 8)), 'aperitivo.');
+      ceHf32AddPurchase(rows, 'patatas fritas (bolsa grande)', personas >= 25 ? 1 : 2, 'aperitivo: bolsa grande de 2 kg; con unas 30 personas normalmente basta 1. Si son menos, pueden ser 2 medianas/pequeñas.', {noRound:true});
       ceHf32AddPurchase(rows, 'Encurtidos', Math.max(2, Math.ceil(personas / 12)), 'aperitivo.');
     }
     if(/CUBATA|TARDEO|HIELO|REFRESCO|BEBIDA|CALOR|RON|WHISKY|GINEBRA|GIN/.test(desc)){
       const cubataEffective = Math.max(0, cubataPeople + cubataFriends);
-      const iceTarget = ceHf34BoostHot(Math.max(20, Math.ceil(cubataEffective * 0.80)), desc);
-      ceHf33EnsurePurchaseMinimum(rows, 'HIELO', iceTarget, `hielo para cubatas/tardeo: ${cubataPeople} asistentes de cubata + ${cubataFriends} amigos aprox. => mínimo ${iceTarget}.`, {noRound:true});
+      const iceBase = ceHf34BoostHot(Math.max(20, Math.ceil(cubataEffective * 0.80)), desc);
+      const iceTarget = ceHf35RoundIceUnits(Math.ceil(iceBase * 1.50));
+      ceHf33EnsurePurchaseMinimum(rows, 'HIELO', iceTarget, `hielo para cubatas/tardeo: ${cubataPeople} asistentes de cubata + ${cubataFriends} amigos aprox.; +50% y redondeo a múltiplos de 5 => ${iceTarget}.`, {noRound:true});
       ceHf33EnsurePurchaseMinimum(rows, 'Vasos cubata', Math.max(24, Math.ceil(cubataEffective * 2)), 'menaje de cubatas contando amigos del tardeo.');
       const rumTarget = ceHf34BoostHot(Math.round((cubataPeople / 2 + cubataFriends) * 3.5), desc);
       const rumDeficit = Math.max(0, rumTarget - donations.ronTotal);
@@ -3050,9 +3093,9 @@
       const whiskyTarget = ceHf34BoostHot(Math.round((personas / 4 + 4) * 3), desc);
       const whiskyDeficit = Math.max(0, whiskyTarget - donations.whiskyTotal);
       if(whiskyDeficit >= 10) ceHf32AddPurchase(rows, 'Whisky 5 Años J.B Botella 0.7 L', Math.ceil(whiskyDeficit / 14), `whisky: sobre todo JB. Objetivo ${whiskyTarget} cubatas, donados ${Math.round(donations.whiskyTotal)}.`, {noRound:true});
-      const ginTarget = ceHf34BoostHot(Math.round((personas / 5 + 4) * (/VERANO|CALOR|GIN\s*TONIC/.test(desc) ? 4 : 3)), desc);
+      const ginTarget = ceHf34BoostHot(Math.round((personas / 5 + 4) * (/VERANO|CALOR|GIN\s*TONIC|TARDEO/.test(desc) ? 4 : 3)), desc);
       const ginDeficit = Math.max(0, ginTarget - donations.ginTotal);
-      if(ginDeficit >= 10) ceHf32AddPurchase(rows, 'Gin BEEFEATER 0.7 L. 43°', Math.ceil(ginDeficit / 14), `ginebra/gin tonic: Beefeater preferente. Objetivo ${ginTarget}, donado ${Math.round(donations.ginTotal)}.`, {noRound:true});
+      if(ginDeficit >= 6 || /VERANO|CALOR|GIN\s*TONIC|TARDEO/.test(desc)) ceHf32AddPurchase(rows, 'Gin BEEFEATER 0.7 L. 43°', Math.max(1, Math.ceil(ginDeficit / 14)), `ginebra/gin tonic: Beefeater preferente, previsión más alegre. Objetivo ${ginTarget}, donado ${Math.round(donations.ginTotal)}.`, {noRound:true});
     }
     if(/SERVILLETA|MENAJE|LIMPIEZA|HIGIENE|INFRAESTRUCTURA/.test(desc)){
       ceHf32AddPurchase(rows, 'Servilletas', 1, 'menaje básico.');
