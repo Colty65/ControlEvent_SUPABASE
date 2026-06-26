@@ -1,0 +1,40 @@
+ControlEvent v15_prod - HOTFIX29 sin cambio de versión
+
+Corrección sobre HOTFIX28.
+
+Objetivo:
+- La detección ya encuentra 46 líneas del prompt. Ahora esa tabla debe mandar de verdad.
+- Evitar que el sistema antiguo vuelva a perder donaciones o cambie unidades al construir la propuesta.
+- Mostrar el valor económico real del diagnóstico como unidades x precio.
+
+Cambios incluidos:
+
+1. Donaciones de diagnóstico no se suprimen
+- Las filas procedentes del diagnóstico/prompt ya no pasan por donorNearProductInPrompt.
+- Esto evita que se queden solo 16/17 donaciones después de haber detectado 46.
+
+2. Unidades exactas del prompt
+- Las filas del diagnóstico no se vuelven a recortar con promptDonationQuantity.
+- Se conserva la unidad detectada en el diagnóstico:
+  ejemplo: COCA COLA ZERO Bote 32 Cl: 15 mantiene 15.
+
+3. Valor estimado del diagnóstico
+- La cabecera del diagnóstico añade KPI "Valor".
+- El cálculo es:
+  unidades * precio
+- Esto evita valorar solo sumando precios unitarios.
+
+4. Usar diagnóstico como propuesta
+- Ahora usa la tabla de diagnóstico corregida como fuente de verdad.
+- La propuesta debe partir de las 46 donaciones detectadas, no de las filas filtradas por Zuzu.
+
+5. Compras de hotfixes anteriores
+- Se descartan compras residuales creadas por hotfixes previos tipo prompt-hf24-deficit/prompt-hf25-deficit si contaminaban la propuesta.
+
+6. Cache bust
+- planificacion-inicial.js?v=v15_prod_planificacion_hf29_diagnostico_manda
+- Marcador consola:
+  HOTFIX29_DIAGNOSTICO_MANDA_46_DONACIONES_ACTIVO
+
+No hay SQL nuevo.
+No cambia versión visible.

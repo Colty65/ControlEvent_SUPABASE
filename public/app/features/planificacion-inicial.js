@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX28_BOTON_DIAGNOSTICO_ACTIVO');
+  console.log('HOTFIX29_DIAGNOSTICO_MANDA_46_DONACIONES_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -755,6 +755,9 @@
   }
   function isSuppressedAutoDonation(row){
     if(String(row?.tipo || '').toUpperCase() !== 'DONACION') return false;
+    // HOTFIX29: lo que viene del diagnóstico/prompt ya está confirmado; no lo vuelve a filtrar
+    // el sistema antiguo donorNearProductInPrompt, que era el que perdía muchas donaciones.
+    if(row?.explicitPromptDonation === true || row?.__ceHf27DiagnosticTruth === true || row?.__ceHf29DiagnosticTruth === true) return false;
     if(isTinyGhostDonation(row)) return true;
     if(!isZuzuPlanningMode()) return false;
     if(!normalizeDonorRef(row?.donorRef || '')) return true;
@@ -792,7 +795,8 @@
       if(p.include && !suppressedDonation) row.include = true;
       let units = Number(p.unidades || 0);
       const quotaKey = `${key}|${String(p.donorRef || '')}|${String(p.ticketDonacion || '')}`;
-      const quota = suppressedDonation ? null : promptDonationQuantity(p);
+      const isDiagnosticTruth = p?.explicitPromptDonation === true || p?.__ceHf27DiagnosticTruth === true || p?.__ceHf29DiagnosticTruth === true;
+      const quota = (suppressedDonation || isDiagnosticTruth) ? null : promptDonationQuantity(p);
       if(String(p.tipo || '').toUpperCase() === 'DONACION' && quota !== null){
         const used = donationQuotaUsed.get(quotaKey) || 0;
         const available = Math.max(0, Number(quota || 0) - used);
@@ -1967,6 +1971,8 @@
         segmento:d.match.segmento || 'Sin segmento',
         destino:d.match.destino || 'Sin destino',
         unidades:Number(d.unidades || 0) || 1,
+        necesidadTotal:Number(d.unidades || 0) || 1,
+        necesidadCalculada:Number(d.unidades || 0) || 1,
         precio:Number(d.match.precio || 0),
         tiendaId:d.ticketDonacion === 'DONADO TIENDA' ? String(d.donorRef || '').replace(/^T:/,'') : (document.getElementById('planTienda')?.value || ''),
         responsableId:d.responsableId || document.getElementById('planResponsable')?.value || '',
@@ -1976,6 +1982,7 @@
         explicitConfirmedDonation:true,
         explicitPromptStrictHf12:true,
         __ceHf27DiagnosticTruth:true,
+        __ceHf29DiagnosticTruth:true,
         __ceDiagnosticStatus: d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO',
         reason:`Diagnóstico HF27: ${d.match.productId ? 'producto localizado' : 'producto no localizado'} desde prompt. Método: ${d.match.method}. Donante: ${d.donorLabel || donorLabel(d.donorRef)}.`
       };
@@ -2002,6 +2009,11 @@
         }
         return;
       }
+      // Mantener compras de Zuzu que no están en el prompt, pero no arrastrar compras creadas por
+      // hotfixes anteriores con "déficit visible" si proceden de un cálculo contaminado.
+      if(String(row.key || '').startsWith('prompt-hf24-deficit:') || String(row.key || '').startsWith('prompt-hf25-deficit:')){
+        return;
+      }
       out.push({...row, __ceZuzuPurchaseNoPrompt:true, reason: (row.reason || 'Compra propuesta por Zuzu') + ' · No procede de bloque de donación del prompt.'});
     });
     return out;
@@ -2011,6 +2023,7 @@
     const ok = rowsDiag.filter(x => x.match.productId && !x.match.review).length;
     const revisar = rowsDiag.filter(x => x.match.productId && x.match.review).length;
     const no = rowsDiag.filter(x => !x.match.productId).length;
+    const valorDiagnostico = rowsDiag.reduce((sum, x) => sum + Number(x.unidades || 0) * Number(x.match?.precio || 0), 0);
     const body = rowsDiag.map((d, i) => {
       const status = d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO';
       const cls = status === 'OK' ? 'ok' : status === 'REVISAR' ? 'warn' : 'bad';
@@ -2027,7 +2040,7 @@
     return `<section id="ceHf27DiagnosticoPrompt" class="ce-hf27-diagnostic">
       <div class="ce-hf27-head">
         <div><h3>Diagnóstico verificable del prompt</h3><p>Esto es la caja negra abierta: cada producto leído, cómo se ha buscado en PRODUCTOS y qué se va a crear como donación.</p></div>
-        <div class="ce-hf27-kpis"><span>OK <b>${ok}</b></span><span>Revisar <b>${revisar}</b></span><span>No encontrados <b>${no}</b></span><span>Total <b>${rowsDiag.length}</b></span></div>
+        <div class="ce-hf27-kpis"><span>OK <b>${ok}</b></span><span>Revisar <b>${revisar}</b></span><span>No encontrados <b>${no}</b></span><span>Total <b>${rowsDiag.length}</b></span><span>Valor <b>${money(valorDiagnostico)}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnHf27AplicarDiagnostico">Usar diagnóstico como propuesta</button><button type="button" id="btnHf27CopiarDiagnostico">Copiar diagnóstico</button></div>
       <div class="ce-hf27-tablewrap"><table><thead><tr><th>#</th><th>Producto escrito</th><th>Uds</th><th>Donación</th><th>Producto encontrado</th><th>Precio</th><th>Diagnóstico</th></tr></thead><tbody>${body || '<tr><td colspan="7">No se han detectado bloques de donación/existencia en el prompt.</td></tr>'}</tbody></table></div>
@@ -2054,7 +2067,7 @@
     if(apply && !apply.__ceHf27Bound){
       apply.__ceHf27Bound = true;
       apply.addEventListener('click', () => {
-        lastProposal = normalizeProposalRowsForGroups(ceHf27TruthRowsFromDiagnostics());
+        lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(ceHf27TruthRowsFromDiagnostics()));
         renderProposal();
       });
     }
