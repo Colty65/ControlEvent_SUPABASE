@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX36_NO_PERDER_COMPRAS_ACTIVO');
+  console.log('HOTFIX37_AMBAR_IMPREVISTOS_STOCK_MINIMO_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -866,6 +866,9 @@
       // calculada, no como compra extra encima de lo donado. Anchoas donadas 1 + necesidad 2 => comprar 1.
       // HOTFIX30: la necesidad visible nunca puede ser menor que lo ya donado.
       // Se calcula como unidades donadas + unidades de compra real que queden.
+      if(productAliasKeyHf25(row.producto || '') === 'alias:otras-compras-imprevistas'){
+        return {...row, necesidad:1, compra:1, include:true};
+      }
       const donated = Math.max(0, Number(row.donado || 0));
       const zuzuBuy = Math.max(0, Number(row.compra || 0));
       const hintedNeed = Math.max(0, Number(row.necesidad || 0));
@@ -1516,10 +1519,40 @@
     return Number(prod.defaultPrecio ?? prod.precio ?? prod.precioReferencia ?? prod.precio_ref ?? prod.pvp ?? prod.importe ?? prod.importeReferencia ?? 0) || 0;
   }
 
+
+  function ceHf37StrictCatalogProductOverride(name){
+    const raw = String(name || '');
+    const n = normalizeProductSearchKeyHf24(raw);
+    const s = simplifyProductSearchKeyHf24(raw);
+    const products = rows('productos');
+    const has = (...parts) => parts.every(part => n.includes(normalizeProductSearchKeyHf24(part)) || s.includes(normalizeProductSearchKeyHf24(part)));
+    if(has('CERVEZA') && has('AMBAR') && (has('BARRIL') || n.includes('30') || s.includes('30'))){
+      const candidates = products.filter(p => {
+        const pn = normalizeProductSearchKeyHf24(p?.nombre || '');
+        const ps = simplifyProductSearchKeyHf24(p?.nombre || '');
+        return (pn.includes('CERVEZA') || ps.includes('CERVEZA')) &&
+               (pn.includes('AMBAR') || ps.includes('AMBAR')) &&
+               (pn.includes('BARRIL') || ps.includes('BARRIL') || pn.includes('30') || ps.includes('30'));
+      });
+      if(candidates.length){
+        return candidates.sort((a,b) => {
+          const an = normalizeProductSearchKeyHf24(a?.nombre || '');
+          const bn = normalizeProductSearchKeyHf24(b?.nombre || '');
+          const ascore = (an.includes('BARRIL') ? 100 : 0) + (an.includes('30') ? 30 : 0) - String(a.nombre||'').length/100;
+          const bscore = (bn.includes('BARRIL') ? 100 : 0) + (bn.includes('30') ? 30 : 0) - String(b.nombre||'').length/100;
+          return bscore - ascore;
+        })[0];
+      }
+    }
+    return null;
+  }
+
   function resolveCatalogProductByNameHf25(name){
     const raw = String(name || '').trim();
     if(!raw) return null;
     const products = rows('productos');
+    const strictHf37 = ceHf37StrictCatalogProductOverride(raw);
+    if(strictHf37) return strictHf37;
     const direct = resolveCatalogProductByName(raw);
     if(direct) return direct;
 
@@ -2113,7 +2146,7 @@
     ensurePurchaseRowsForVisibleDeficitsHf24();
     // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
     // porque estaba eliminando las compras que sí aparecen arriba.
-    lastProposal = normalizeProposalRowsForGroups(ceHf36ForcePurchasesIfZero(lastProposal));
+    lastProposal = normalizeProposalRowsForGroups(ceHf37NormalizeReservePurchase(ceHf36ForcePurchasesIfZero(lastProposal), normalizeText(String(fieldValue('planInfo') || '') + ' ' + String(fieldValue('planDescripcion') || ''))));
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -2978,16 +3011,29 @@
     const v = Math.max(0, Number(value || 0));
     return ceHf34IsHotContext(desc) ? Math.ceil(v * 4 / 3) : v;
   }
-  function ceHf34AddCreativePurchase(list, desc){
-    if(planMode() !== 'ZUZU_TOTAL') return;
-    const already = (Array.isArray(list) ? list : []).some(r => r && String(r.tipo || '').toUpperCase() === 'COMPRA' && String(r.__ceCreativeIdeaHf34 || '') === '1');
-    if(already) return;
-    const eventish = /TARDEO|MUSICA|MÚSICA|BARBACOA|PAELLA|APERITIVO|PEÑA|FIESTA|EVENTO|CUBATA|COMIDA|CENA/.test(String(desc || ''));
-    if(!eventish) return;
-    const base = ceHf35PurchaseTotal(list);
-    const reserva = Math.max(10, Math.round(base * 0.10 * 100) / 100);
-    list.push({
-      key:`hf35-otras-compras-imprevistas:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+
+  function ceHf37RoundUpTens(value){
+    const v = Math.max(0, Number(value || 0));
+    if(!v) return 0;
+    return Math.ceil(v / 10) * 10;
+  }
+  function ceHf37IsReserveRow(row){
+    return row && String(row.tipo || '').toUpperCase() === 'COMPRA' &&
+      (String(row.__ceCreativeIdeaHf34 || '') === '1' ||
+       productAliasKeyHf25(row.productName || row.producto || '') === 'alias:otras-compras-imprevistas' ||
+       normalizeText(row.productName || row.producto || '').includes('OTRAS COMPRAS IMPREVISTAS'));
+  }
+  function ceHf37NormalizeReservePurchase(list, desc){
+    if(planMode() !== 'ZUZU_TOTAL') return Array.isArray(list) ? list : [];
+    const rowsIn = Array.isArray(list) ? list : [];
+    const eventish = /TARDEO|MUSICA|MÚSICA|BARBACOA|PAELLA|APERITIVO|PEÑA|FIESTA|EVENTO|CUBATA|COMIDA|CENA|GUISO|ENSALADA/.test(String(desc || ''));
+    if(!eventish) return rowsIn;
+    const without = rowsIn.filter(r => !ceHf37IsReserveRow(r));
+    const base = ceHf35PurchaseTotal(without);
+    if(base <= 0) return without;
+    const reserva = Math.max(10, ceHf37RoundUpTens(base * 0.10));
+    without.push({
+      key:`hf37-otras-compras-imprevistas:${Date.now()}:${Math.random().toString(36).slice(2)}`,
       include:true,
       tipo:'COMPRA',
       productId:'',
@@ -2996,6 +3042,7 @@
       destino:'INFRAESTRUCTURA',
       unidades:1,
       necesidadTotal:1,
+      necesidadCalculada:1,
       precio:reserva,
       tiendaId:ceHf35DefaultStoreId(),
       responsableId:ceHf35DefaultResponsibleId(),
@@ -3003,10 +3050,50 @@
       donorRef:'',
       __ceZuzuFallbackPurchaseHf32:true,
       __ceCreativeIdeaHf34:'1',
-      reason:'Reserva HF35: 10% de la compra prevista para imprevistos del evento.'
+      __ceReserveHf37:true,
+      reason:`Reserva HF37: 10% de la compra prevista (${money(base)}), redondeado a decena superior.`
     });
+    return without;
+  }
+  function ceHf37DonationUnitsByAlias(list, alias){
+    return (Array.isArray(list) ? list : []).reduce((sum, r) => {
+      if(!r || String(r.tipo || '').toUpperCase() !== 'DONACION' || r.include === false) return sum;
+      return productAliasKeyHf25(r.productName || r.producto || '') === alias ? sum + Math.max(0, Number(r.unidades || 0)) : sum;
+    }, 0);
+  }
+  function ceHf37PurchaseUnitsByAlias(list, alias){
+    return (Array.isArray(list) ? list : []).reduce((sum, r) => {
+      if(!r || String(r.tipo || '').toUpperCase() !== 'COMPRA' || r.include === false) return sum;
+      return productAliasKeyHf25(r.productName || r.producto || '') === alias ? sum + Math.max(0, Number(r.unidades || 0)) : sum;
+    }, 0);
+  }
+  function ceHf37EnsureStockMinimums(list, desc){
+    const rows = Array.isArray(list) ? list : [];
+    const d = String(desc || '');
+    const dnAove = ceHf37DonationUnitsByAlias(rows, 'alias:aceite-aove');
+    const dnVinagre = ceHf37DonationUnitsByAlias(rows, 'alias:vinagre');
+    const needsKitchen = /PAELLA|ENSALADA|GUISO|COMIDA|CENA|APERITIVO|BARBACOA|ALIÑO|ALINO|COCINA/.test(d);
+    if(dnAove === 1 && ceHf37PurchaseUnitsByAlias(rows, 'alias:aceite-aove') <= 0){
+      ceHf32AddPurchase(rows, 'Aceite AOVE (2l)', 1, 'HF37 stock mínimo: solo hay 1 AOVE disponible; se compra 1 de reserva.', {noRound:true});
+    }else if(dnAove <= 0 && needsKitchen && /AOVE|ACEITE|PAELLA|ENSALADA|GUISO/.test(d) && ceHf37PurchaseUnitsByAlias(rows, 'alias:aceite-aove') <= 0){
+      ceHf32AddPurchase(rows, 'Aceite AOVE (2l)', 1, 'HF37 cocina: no consta AOVE disponible y el evento lo puede necesitar.', {noRound:true});
+    }
+    if(dnVinagre === 1 && ceHf37PurchaseUnitsByAlias(rows, 'alias:vinagre') <= 0){
+      ceHf32AddPurchase(rows, 'Vinagre', 1, 'HF37 stock mínimo: solo hay 1 vinagre disponible; se compra 1 de reserva.', {noRound:true});
+    }else if(dnVinagre <= 0 && needsKitchen && /VINAGRE|ENSALADA|ALIÑO|ALINO|GUISO/.test(d) && ceHf37PurchaseUnitsByAlias(rows, 'alias:vinagre') <= 0){
+      ceHf32AddPurchase(rows, 'Vinagre', 1, 'HF37 cocina: el prompt menciona vinagre/ensalada/aliño/guiso y no consta donado.', {noRound:true});
+    }
+    return rows;
   }
 
+  function ceHf34AddCreativePurchase(list, desc){
+    const normalized = ceHf37NormalizeReservePurchase(list, desc);
+    if(Array.isArray(list)){
+      list.splice(0, list.length, ...normalized);
+      return;
+    }
+    return normalized;
+  }
 
   function ceHf36HasMeaningfulPrompt(){
     const txt = String(fieldValue('planInfo') || '') + ' ' + String(fieldValue('planDescripcion') || '');
@@ -3075,7 +3162,8 @@
       ceHf32AddPurchase(rows, 'Gin BEEFEATER 0.7 L. 43°', 1, 'HF36 compra de seguridad: ginebra Beefeater para gin tonic/tardeo.', {noRound:true});
     }
 
-    // Reserva al final: 10% del total de compras ya calculado.
+    // Stock mínimo y reserva al final: 10% del total de compras ya calculado.
+    ceHf37EnsureStockMinimums(rows, desc);
     ceHf34AddCreativePurchase(rows, desc);
 
     rows.forEach(r => {
@@ -3182,6 +3270,7 @@
     if(/SERVILLETA|MENAJE|LIMPIEZA|HIGIENE|INFRAESTRUCTURA/.test(desc)){
       ceHf32AddPurchase(rows, 'Servilletas', 1, 'menaje básico.');
     }
+    ceHf37EnsureStockMinimums(rows, desc);
     ceHf34AddCreativePurchase(rows, desc);
     return rows;
   }
