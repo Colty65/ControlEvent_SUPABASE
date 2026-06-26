@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX35_PRODUCTO_DIAGNOSTICO_REPARTO_COMPRAS_ACTIVO');
+  console.log('HOTFIX36_NO_PERDER_COMPRAS_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -2086,7 +2086,7 @@
     if(apply && !apply.__ceHf27Bound){
       apply.__ceHf27Bound = true;
       apply.addEventListener('click', () => {
-        lastProposal = normalizeProposalRowsForGroups(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf27TruthRowsFromDiagnostics())));
+        lastProposal = normalizeProposalRowsForGroups(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf27TruthRowsFromDiagnostics()))));
         renderProposal();
       });
     }
@@ -2109,11 +2109,11 @@
     const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
-    lastProposal = normalizeProposalRowsForGroups(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(lastProposal)));
+    lastProposal = normalizeProposalRowsForGroups(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(lastProposal))));
     ensurePurchaseRowsForVisibleDeficitsHf24();
     // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
     // porque estaba eliminando las compras que sí aparecen arriba.
-    lastProposal = normalizeProposalRowsForGroups(lastProposal);
+    lastProposal = normalizeProposalRowsForGroups(ceHf36ForcePurchasesIfZero(lastProposal));
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -3007,6 +3007,88 @@
     });
   }
 
+
+  function ceHf36HasMeaningfulPrompt(){
+    const txt = String(fieldValue('planInfo') || '') + ' ' + String(fieldValue('planDescripcion') || '');
+    return normalizeText(txt).length > 80 || ceHf27PromptBlocks().length > 0;
+  }
+  function ceHf36ForcePurchasesIfZero(list){
+    const rows = Array.isArray(list) ? list.slice() : [];
+    const compras = rows.filter(ceHf32IsPurchaseRow);
+    if(compras.length > 0) return rows;
+    if(!ceHf36HasMeaningfulPrompt()) return rows;
+
+    const prompt = String(fieldValue('planInfo') || '') + '\n' + String(fieldValue('planDescripcion') || '');
+    const desc = normalizeText(prompt);
+    const personas = Math.max(1, Number(fieldValue('planPersonas') || 0) || ceHf32NumberFromPrompt(/Personas\s+Asistentes\s*:\s*(\d+(?:[,.]\d+)?)/i, 25) || 25);
+    const cubataPeople = ceHf32NumberFromPrompt(/Personas\s+que\s+tomar[aá]n\s+cubatas\s*:\s*(\d+(?:[,.]\d+)?)/i, Math.round(personas * 0.50));
+    const cubataFriends = ceHf32NumberFromPrompt(/(?:amigos|acompa[nñ]an|acompañan|acompanan).*?(\d+(?:[,.]\d+)?)/i, 7);
+    const donations = ceHf32DonationEquivalents(rows);
+    const hot = ceHf34IsHotContext(desc);
+
+    // Bebidas por déficit real cuando proceda.
+    const colaDonated = donations.colaNormal + donations.colaZero + donations.colaZeroZero;
+    const colaTarget = ceHf34BoostHot(Math.max(96, Math.round(cubataPeople * 6)), desc);
+    const colaDeficit = Math.max(0, colaTarget - colaDonated);
+    if(colaDeficit >= 12){
+      const packs = Math.max(4, Math.ceil(colaDeficit / 24));
+      const normalPacks = Math.max(2, Math.ceil(packs * 0.50));
+      const zeroPacks = Math.max(1, Math.floor(packs * 0.25));
+      const zeroZeroPacks = Math.max(1, packs - normalPacks - zeroPacks);
+      ceHf32AddPurchase(rows, 'COCA COLA Bote 32 Cl', normalPacks * 24, `HF36 compra de seguridad: reparto Coca-Cola normal. Donado ${Math.round(colaDonated)}, objetivo ${Math.round(colaTarget)}.`);
+      ceHf32AddPurchase(rows, 'COCA COLA ZERO Bote 32 Cl', zeroPacks * 24, `HF36 compra de seguridad: reparto Coca-Cola Zero.`);
+      ceHf32AddPurchase(rows, 'COCA COLA ZERO -ZERO 33 cl', zeroZeroPacks * 24, `HF36 compra de seguridad: reparto Coca-Cola Zero-Zero.`);
+    }
+
+    ceHf32AddPurchase(rows, 'FANTA Limon Bote 32 CL', 24, 'HF36 compra de seguridad: 1 pack Fanta limón.');
+    ceHf32AddPurchase(rows, 'FANTA Naranja Bote 32 C.L', 24, 'HF36 compra de seguridad: 1 pack Fanta naranja.');
+
+    const tonicaTarget = ceHf34BoostHot(Math.max(24, Math.round((personas / 5 + 4) * (hot ? 4 : 3))), desc);
+    if(Math.max(0, tonicaTarget - donations.tonica) >= 8){
+      ceHf32AddPurchase(rows, 'Tonica normal', 24, `HF36 compra de seguridad: tónica/gin tonic, objetivo ${tonicaTarget}, donado ${Math.round(donations.tonica)}.`);
+    }
+
+    // Comida y organización por concepto. Siempre algo de compra, aunque todo lo donado esté perfecto.
+    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ|COMIDA/.test(desc)){
+      ceHf32AddPurchase(rows, 'Arroz', Math.max(2, Math.round(personas * 0.10 * 100) / 100), 'HF36 compra de seguridad: base de paella/comida.', {noRound:true});
+      ceHf32AddPurchase(rows, 'Gambon plancha (caja 2kg)', 1, 'HF36 compra de seguridad: paella, 1 caja/unidad de gambón 2 kg.', {noRound:true});
+      ceHf32AddPurchase(rows, 'Almejas', 1, 'HF36 compra de seguridad: paella, 1 unidad/kg de almejas.', {noRound:true});
+    }
+    if(/BARBACOA|CENA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
+      ceHf32AddPurchase(rows, 'Lomo fresco', Math.max(2, Math.round(personas * 0.06 * 100) / 100), 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
+      ceHf32AddPurchase(rows, 'Morcilla', 1, 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
+      ceHf32AddPurchase(rows, 'Panceta', 1, 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
+      ceHf32AddPurchase(rows, 'Pan', Math.max(4, Math.ceil(personas / 4)), 'HF36 compra de seguridad: pan para comida/cena.', {noRound:true});
+    }
+    if(/APERITIVO|PATATAS|ENCURTIDOS|TORTILLA/.test(desc)){
+      ceHf32AddPurchase(rows, 'patatas fritas (bolsa grande)', personas >= 25 ? 1 : 2, 'HF36 compra de seguridad: aperitivo, patatas moderadas.', {noRound:true});
+      ceHf32AddPurchase(rows, 'berenjenas', 1, 'HF36 compra de seguridad: encurtido/aperitivo.', {noRound:true});
+    }
+
+    const cubataEffective = Math.max(0, cubataPeople + cubataFriends);
+    const iceTarget = ceHf35RoundIceUnits(Math.ceil(ceHf34BoostHot(Math.max(20, Math.ceil(cubataEffective * 0.80)), desc) * 1.50));
+    ceHf32AddPurchase(rows, 'HIELO', iceTarget, `HF36 compra de seguridad: hielo +50%, múltiplo de 5 => ${iceTarget}.`, {noRound:true});
+    ceHf32AddPurchase(rows, 'Vasos cubata', Math.max(24, Math.ceil(cubataEffective * 2)), 'HF36 compra de seguridad: vasos cubata.', {noRound:false});
+
+    // Ginebra adicional si hay tardeo/calor/gin tonic.
+    if(/GIN|GINEBRA|TARDEO|CUBATA|CALOR|VERANO/.test(desc)){
+      ceHf32AddPurchase(rows, 'Gin BEEFEATER 0.7 L. 43°', 1, 'HF36 compra de seguridad: ginebra Beefeater para gin tonic/tardeo.', {noRound:true});
+    }
+
+    // Reserva al final: 10% del total de compras ya calculado.
+    ceHf34AddCreativePurchase(rows, desc);
+
+    rows.forEach(r => {
+      if(r && String(r.tipo || '').toUpperCase() === 'COMPRA' && r.__ceZuzuFallbackPurchaseHf32){
+        r.__ceHf36ForcedPurchase = true;
+        r.include = true;
+        r.tiendaId = ceHf35DefaultStoreId() || r.tiendaId || '';
+        r.responsableId = ceHf35DefaultResponsibleId() || r.responsableId || '';
+      }
+    });
+    return rows;
+  }
+
   function ceHf32EnsureImaginedPurchases(list){
     const rows = Array.isArray(list) ? list.slice() : [];
     if(planMode() !== 'ZUZU_TOTAL') return rows;
@@ -3145,7 +3227,7 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(Array.isArray(data.rows) ? data.rows : [])));
+      lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(Array.isArray(data.rows) ? data.rows : []))));
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
