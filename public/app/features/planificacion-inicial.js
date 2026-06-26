@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX37_AMBAR_IMPREVISTOS_STOCK_MINIMO_ACTIVO');
+  console.log('HOTFIX38_CANDIDATO_INFRA_COMPACTO_ORDEN_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -952,7 +952,7 @@
       .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:30%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:70%!important}
       .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(82px,105px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:105px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
       .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
-      .plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
+      .plan-product-card{padding:7px 8px!important;border-radius:12px!important}.plan-product-head{margin-bottom:4px!important;gap:7px!important}.plan-product-title strong{font-size:14px!important;line-height:1.05!important}.plan-product-title span{font-size:11px!important;line-height:1.05!important}.plan-confidence{padding:2px 6px!important;font-size:11px!important}.plan-include{font-size:12px!important}.plan-product-grid.replica-grid{display:grid!important;grid-template-columns:repeat(6,minmax(95px,1fr))!important;gap:6px!important}.plan-product-grid.replica-grid .field{gap:2px!important}.plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}.plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}.plan-reason{display:none!important}.plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
       .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}
       .plan-resource-purchase-subrow input[data-plan-resource-field="compra"]{font-size:15px!important;font-weight:850!important}.plan-advanced-toolbar{display:flex!important;gap:8px!important;flex-wrap:wrap!important;align-items:center!important;margin:10px 0!important;padding:8px!important;border-radius:14px!important;background:#f8fafc!important;border:1px solid #e2e8f0!important}.plan-advanced-toolbar input{min-width:220px!important;flex:1 1 260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-advanced-toolbar button{white-space:nowrap!important}
       .plan-resource-edit-row.plan-sd-rara>td{background:#f8fafc!important;color:#111827!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}/*ce-hf18-no-black*/@media (max-width: 900px){.plan-resource-split-table{table-layout:auto!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child,.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:auto!important}.plan-resource-subrow{grid-template-columns:1fr 1fr!important}.plan-resource-general-top{grid-template-columns:auto 1fr!important}.plan-resource-split-table thead{display:none!important}.plan-resource-split-table tr,.plan-resource-split-table td{display:block!important;width:100%!important;border-radius:10px!important}}
@@ -1836,6 +1836,42 @@
   function ceHf27CatalogPrice(prod){
     return Number(prod?.defaultPrecio ?? prod?.precio ?? prod?.precioReferencia ?? prod?.precio_ref ?? prod?.pvp ?? prod?.importe ?? prod?.importeReferencia ?? prod?.precioCompra ?? 0) || 0;
   }
+
+  function ceHf38BestCatalogCandidate(inputName, candidates){
+    const arr = (Array.isArray(candidates) ? candidates : []).filter(Boolean);
+    if(arr.length <= 1) return arr[0] || null;
+    const raw = String(inputName || '');
+    const n = normalizeProductSearchKeyHf24(raw);
+    const s = simplifyProductSearchKeyHf24(raw);
+    const wanted = ceHf27ProductTokens(raw);
+    const alias = productAliasKeyHf25(raw);
+    const has = (...parts) => parts.every(part => n.includes(normalizeProductSearchKeyHf24(part)) || s.includes(normalizeProductSearchKeyHf24(part)));
+    const scoreOne = p => {
+      const name = String(p?.nombre || '');
+      const pn = normalizeProductSearchKeyHf24(name);
+      const ps = simplifyProductSearchKeyHf24(name);
+      const ptoks = ceHf27ProductTokens(name);
+      let score = 0;
+      wanted.forEach(t => {
+        if(ptoks.includes(t)) score += 120 + Math.min(30, t.length * 2);
+        else if(ps.includes(t)) score += 70 + Math.min(20, t.length);
+        else score -= 55;
+      });
+      if(productAliasKeyHf25(name) === alias && !String(alias || '').startsWith('norm:')) score += 360;
+      if(has('AMBAR') && (pn.includes('AMBAR') || ps.includes('AMBAR'))) score += 500;
+      if(has('BARRIL') && (pn.includes('BARRIL') || ps.includes('BARRIL'))) score += 420;
+      if((n.includes('30') || s.includes('30')) && (pn.includes('30') || ps.includes('30'))) score += 90;
+      if(has('AMBAR') && !(pn.includes('AMBAR') || ps.includes('AMBAR'))) score -= 650;
+      if(has('BARRIL') && !(pn.includes('BARRIL') || ps.includes('BARRIL'))) score -= 520;
+      if(has('CERVEZA') && has('AMBAR') && has('BARRIL') && (pn.includes('0 0') || ps.includes('0 0') || pn.includes('00') || ps.includes('00'))) score -= 900;
+      if(pn === n) score += 1000;
+      if(ps === s) score += 650;
+      score -= Math.abs(ps.length - s.length) * 0.35;
+      return score;
+    };
+    return arr.slice().sort((a,b) => scoreOne(b) - scoreOne(a))[0] || arr[0] || null;
+  }
+
   function ceHf27ResolveProductDiagnostic(name){
     const raw = String(name || '').trim();
     const products = rows('productos');
@@ -1859,28 +1895,30 @@
       };
     };
     if(!cleanName) return pack(null, 'VACÍO', 0, true);
+    const strictHf37 = ceHf37StrictCatalogProductOverride(cleanName);
+    if(strictHf37) return pack(strictHf37, 'ESTRICTO HF38', 1200, false);
 
     const exactNorm = products.filter(p => normalizeProductSearchKeyHf24(p?.nombre || '') === norm);
     if(exactNorm.length === 1) return pack(exactNorm[0], 'EXACTO NORMALIZADO', 1000, false);
-    if(exactNorm.length > 1) return pack(exactNorm[0], 'EXACTO MÚLTIPLE', 990, true, exactNorm);
+    if(exactNorm.length > 1) return pack(ceHf38BestCatalogCandidate(cleanName, exactNorm), 'EXACTO MÚLTIPLE', 990, true, exactNorm);
 
     const exactSimp = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '') === simp);
     if(exactSimp.length === 1) return pack(exactSimp[0], 'EXACTO SIN ENVASES', 930, false);
-    if(exactSimp.length > 1) return pack(exactSimp[0], 'EXACTO SIN ENVASES MÚLTIPLE', 900, true, exactSimp);
+    if(exactSimp.length > 1) return pack(ceHf38BestCatalogCandidate(cleanName, exactSimp), 'EXACTO SIN ENVASES MÚLTIPLE', 900, true, exactSimp);
 
     const aliasMatches = products.filter(p => productAliasKeyHf25(p?.nombre || '') === alias && !String(alias || '').startsWith('norm:'));
     if(aliasMatches.length === 1) return pack(aliasMatches[0], 'ALIAS CATÁLOGO', 850, false);
     if(aliasMatches.length > 1){
-      const byShort = aliasMatches.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
-      return pack(byShort[0], 'ALIAS CATÁLOGO MÚLTIPLE', 820, true, byShort);
+      const byBest = aliasMatches.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+      return pack(ceHf38BestCatalogCandidate(cleanName, aliasMatches), 'ALIAS CATÁLOGO MÚLTIPLE', 820, true, byBest);
     }
 
     // %cadena% completo
     const containsFull = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '').includes(simp) || simp.includes(simplifyProductSearchKeyHf24(p?.nombre || '')));
     if(containsFull.length === 1) return pack(containsFull[0], '%CADENA%', 760, false);
     if(containsFull.length > 1){
-      const byShort = containsFull.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
-      return pack(byShort[0], '%CADENA% MÚLTIPLE', 720, true, byShort);
+      const byBest = containsFull.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+      return pack(ceHf38BestCatalogCandidate(cleanName, containsFull), '%CADENA% MÚLTIPLE', 720, true, byBest);
     }
 
     // Recorte progresivo por palabras y por caracteres, pero con mínimo para no capturar disparates.
@@ -1901,8 +1939,8 @@
       const hits = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '').includes(q));
       if(hits.length === 1) return pack(hits[0], 'RECORTE PROGRESIVO: ' + q, 650, false);
       if(hits.length > 1){
-        const byShort = hits.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
-        return pack(byShort[0], 'RECORTE MÚLTIPLE: ' + q, 620, true, byShort);
+        const byBest = hits.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+        return pack(ceHf38BestCatalogCandidate(cleanName, hits), 'RECORTE MÚLTIPLE: ' + q, 620, true, byBest);
       }
     }
 
@@ -2206,7 +2244,6 @@
             : `<div class="field"><label>Tienda</label><select data-plan-field="tiendaId">${tiendasOpts || '<option value="">Sin tiendas</option>'}</select></div>`}
           <div class="field"><label>Responsable</label><select data-plan-field="responsableId">${sociosOpts || '<option value="">Sin socios</option>'}</select></div>
         </div>
-        <div class="plan-reason">${esc(p.reason)}${p.tipo === 'DONACION' ? ` Responsable: ${esc(personaName(p.responsableId))}.` : ''}</div>
       </div>
     `;
   }
@@ -2238,7 +2275,7 @@
     return sortPlanProposalDetailCards(raw);
   }
   function advancedDetailCardsHtml(){
-    const detailCards = includedPlanDetailItems();
+    const detailCards = sortPlanProposalDetailCards(includedPlanDetailItems());
     return detailCards.length ? detailCards.map(({p, index}) => renderProposalRow(p, index)).join('') : '<div class="empty">No hay líneas de compras/donaciones incluidas en la propuesta generada.</div>';
   }
   function refreshAdvancedProposalDetails(){
@@ -3037,7 +3074,7 @@
       include:true,
       tipo:'COMPRA',
       productId:'',
-      productName:'Otras compras imprevistas',
+      productName:'z_Otras compras imprevistas',
       segmento:'INFRAESTRUCTURA',
       destino:'INFRAESTRUCTURA',
       unidades:1,
@@ -3067,6 +3104,59 @@
       return productAliasKeyHf25(r.productName || r.producto || '') === alias ? sum + Math.max(0, Number(r.unidades || 0)) : sum;
     }, 0);
   }
+
+  function ceHf38InfrastructureFamilyKey(name){
+    const s = simplifyProductSearchKeyHf24(name || '');
+    const n = normalizeProductSearchKeyHf24(name || '');
+    const excluded = /(CUCHARA|TENEDOR|CUCHILLO|PLATO|VASO|VASOS|SERVILLETA|SERVILLETAS|COPA|COPAS|PAJITA|PAJITAS|MENAJE)\b/.test(n);
+    if(excluded) return '';
+    if(n.includes('BUTANO')) return 'infra:butano';
+    if(n.includes('BOMBONA')) return 'infra:butano';
+    if(n.includes('PAPEL') && n.includes('HIGIENICO')) return 'infra:papel-higienico';
+    if(n.includes('SECAMANOS')) return 'infra:secamanos';
+    if(n.includes('BOLSA') && n.includes('BASURA')) return 'infra:bolsas-basura';
+    if(n.includes('FAIRY') || n.includes('LAVAVAJILLAS')) return 'infra:lavavajillas';
+    if(n.includes('JABON') && (n.includes('MANOS') || n.includes('LAVAMANOS'))) return 'infra:jabon-manos';
+    if(n.includes('AMBIENTADOR')) return 'infra:ambientador';
+    if(n.includes('ABRILLANTADOR')) return 'infra:abrillantador';
+    if(n.includes('DETERGENTE')) return 'infra:detergente';
+    if(n.includes('LEJIA')) return 'infra:lejia';
+    if(n.includes('BOLITAS') && n.includes('WC')) return 'infra:bolitas-wc';
+    if(n.includes('GAS')) return 'infra:gas';
+    return 'infra:' + productAliasKeyHf25(name || s);
+  }
+  function ceHf38InfrastructureStockByFamily(list){
+    const out = new Map();
+    (Array.isArray(list) ? list : []).forEach(r => {
+      if(!r || String(r.tipo || '').toUpperCase() !== 'DONACION' || r.include === false) return;
+      const prod = r.productId ? byId('productos', r.productId) : resolveCatalogProductByNameHf25(r.productName || r.producto || '');
+      const seg = up(prod?.segmento || r.segmento || '');
+      if(seg !== 'INFRAESTRUCTURA') return;
+      const fam = ceHf38InfrastructureFamilyKey(prod?.nombre || r.productName || r.producto || '');
+      if(!fam) return;
+      const current = out.get(fam) || {units:0, rows:[], product:prod || null, name:prod?.nombre || r.productName || r.producto || ''};
+      current.units += Math.max(0, Number(r.unidades || 0));
+      current.rows.push(r);
+      if(!current.product && prod) current.product = prod;
+      out.set(fam, current);
+    });
+    return out;
+  }
+  function ceHf38EnsureInfrastructureMinimums(list){
+    const rows = Array.isArray(list) ? list : [];
+    const fams = ceHf38InfrastructureStockByFamily(rows);
+    fams.forEach((info, fam) => {
+      if(!fam || Math.max(0, Number(info.units || 0)) >= 2) return;
+      const sample = info.product || resolveCatalogProductByNameHf25(info.name || '');
+      const productName = sample?.nombre || info.name || '';
+      if(!productName) return;
+      const alreadyBuy = rows.some(r => String(r.tipo || '').toUpperCase() === 'COMPRA' && ceHf38InfrastructureFamilyKey(r.productName || r.producto || '') === fam);
+      if(alreadyBuy) return;
+      ceHf32AddPurchase(rows, productName, 1, `HF38 infraestructura: solo consta 1 unidad disponible de ${productName}; se propone comprar 1 más para stock mínimo de peña.`, {noRound:true});
+    });
+    return rows;
+  }
+
   function ceHf37EnsureStockMinimums(list, desc){
     const rows = Array.isArray(list) ? list : [];
     const d = String(desc || '');
@@ -3174,6 +3264,7 @@
         r.responsableId = ceHf35DefaultResponsibleId() || r.responsableId || '';
       }
     });
+    ceHf38EnsureInfrastructureMinimums(rows);
     return rows;
   }
 
