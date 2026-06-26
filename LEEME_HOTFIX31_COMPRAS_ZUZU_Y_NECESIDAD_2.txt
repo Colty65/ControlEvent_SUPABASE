@@ -1,0 +1,37 @@
+ControlEvent v15_prod - HOTFIX31 sin cambio de versión
+
+Correcciones sobre HOTFIX30:
+
+1. Compra por déficit 1 no desaparece
+- Se corrige el caso:
+  donado 1 + necesidad calculada 2 => compra 1.
+- El sistema ya no vuelve a restar la donación a una fila COMPRA.
+- Una fila COMPRA representa A COMPRAR.
+
+2. NECESIDAD CALCULADA mínima
+- La necesidad calculada sigue sin poder ser inferior a lo donado.
+- Si hay 48 donadas, no se puede dejar necesidad por debajo de 48.
+- Si se sube la necesidad por encima de lo donado, se crea compra por déficit.
+
+3. Compras visibles abajo
+- Las compras creadas desde la tabla tipo mapa de recursos se marcan como compra real de déficit.
+- No se eliminan al refrescar/renderizar.
+- El Detalle avanzado debe mostrar las compras si la cabecera las anuncia.
+
+4. Compras de Zuzu no se cepillan
+- Las compras que devuelva Zuzu se conservan como A COMPRAR.
+- Si coinciden con productos donados, ya no se interpretan como necesidad total para volver a restar donaciones.
+
+5. Fallback moderado si Zuzu devuelve cero compras en Encargo total
+- Si en Encargo total a Zuzu el backend devuelve cero compras, la app añade una propuesta mínima/moderada según el texto:
+  paella/comida, barbacoa/cena, aperitivo, tardeo/cubatas, limpieza/menaje.
+- No compra un producto si ese mismo producto ya está explícitamente donado en el prompt.
+- Es una red de seguridad para no quedarse en 0 compras cuando el prompt pide organizar un evento completo.
+
+6. Cache bust
+- planificacion-inicial.js?v=v15_prod_planificacion_hf31_compras_zuzu_necesidad2
+- Marcador consola:
+  HOTFIX31_COMPRAS_ZUZU_Y_NECESIDAD_2_ACTIVO
+
+No hay SQL nuevo.
+No cambia versión visible.

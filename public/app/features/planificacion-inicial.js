@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX30_NECESIDAD_COMPRAS_PACKS_ACTIVO');
+  console.log('HOTFIX31_COMPRAS_ZUZU_Y_NECESIDAD_2_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -1444,11 +1444,13 @@
           segmento:group.segmento || '',
           destino:group.destino || '',
           unidades:buy,
+          necesidadTotal: Math.max(0, Number(group.donado || 0)) + Math.max(0, Number(buy || 0)),
           precio:price || 0,
           tiendaId:group.tiendaId || document.getElementById('planTienda')?.value || '',
           responsableId:group.responsableId || document.getElementById('planResponsable')?.value || '',
           ticketDonacion:'',
           donorRef:'',
+          __ceVisibleDeficitPurchaseHf31:true,
           reason:'Compra por déficit visible en PROPUESTA DETALLADA DEL EVENTO.'
         };
         if(existingIdx >= 0) lastProposal[existingIdx] = {...lastProposal[existingIdx], ...payload};
@@ -2010,29 +2012,26 @@
     const truth = ceHf27TruthRowsFromDiagnostics();
     if(!truth.length) return Array.isArray(list) ? list : [];
     const out = truth.slice();
-    const truthKeys = truth.map(t => ({
-      id:t.productId || '',
-      alias:productAliasKeyHf25(t.productName || ''),
-      donated:Number(t.unidades || 0)
-    }));
+    const seenPurchases = new Set();
     (Array.isArray(list) ? list : []).forEach(row => {
-      if(!row || row.tipo !== 'COMPRA' || Number(row.unidades || 0) <= 0) return;
+      if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA' || Number(row.unidades || 0) <= 0) return;
+      // HOTFIX31: una fila COMPRA ya representa "A COMPRAR".
+      // No se le vuelve a restar la donación, porque eso era lo que hacía desaparecer:
+      // donado 1 + necesidad 2 => compra 1, y después se convertía erróneamente en 0.
       const rid = canonicalProposalProductId(row) || row.productId || '';
       const ralias = productAliasKeyHf25(row.productName || row.producto || '');
-      const hit = truthKeys.find(t => (rid && t.id && rid === t.id) || (ralias && t.alias && ralias === t.alias));
-      if(hit){
-        const deficit = Math.max(0, Math.round((Number(row.unidades || 0) - Number(hit.donated || 0)) * 100) / 100);
-        if(deficit > 0){
-          out.push({...row, include:true, unidades:deficit, reason:'Compra por déficit propuesta por Zuzu tras restar donación explícita del diagnóstico.'});
-        }
-        return;
-      }
-      // Mantener compras de Zuzu que no están en el prompt, pero no arrastrar compras creadas por
-      // hotfixes anteriores con "déficit visible" si proceden de un cálculo contaminado.
-      if(String(row.key || '').startsWith('prompt-hf24-deficit:') || String(row.key || '').startsWith('prompt-hf25-deficit:')){
-        return;
-      }
-      out.push({...row, __ceZuzuPurchaseNoPrompt:true, reason: (row.reason || 'Compra propuesta por Zuzu') + ' · No procede de bloque de donación del prompt.'});
+      const uniq = `${rid || ralias}|${Number(row.unidades || 0)}|${Number(row.precio || 0)}|${row.tiendaId || ''}|${row.responsableId || ''}|${row.key || ''}`;
+      if(seenPurchases.has(uniq)) return;
+      seenPurchases.add(uniq);
+      out.push({
+        ...row,
+        include:true,
+        tipo:'COMPRA',
+        ticketDonacion:'',
+        donorRef:'',
+        __ceZuzuPurchaseNoPrompt: !(row.key || '').startsWith('plan-buy-extra:') && !(row.key || '').startsWith('prompt-hf24-deficit:'),
+        reason: row.reason || 'Compra propuesta por Zuzu o creada por déficit real.'
+      });
     });
     return out;
   }
@@ -2227,12 +2226,14 @@
       segmento: group.segmento || base.segmento || '',
       destino: group.destino || base.destino || '',
       unidades: Math.max(0, Number(units || 0)),
+      necesidadTotal: Math.max(0, Number(group.donado || 0)) + Math.max(0, Number(units || 0)),
       precio: Math.max(0, Number(price || base.precio || 0)),
       tiendaId: tiendaId || document.getElementById('planTienda')?.value || '',
       responsableId: responsableId || document.getElementById('planResponsable')?.value || '',
       ticketDonacion:'',
       donorRef:'',
-      reason:'Compra creada desde la visión global de planificación.'
+      __ceManualDeficitPurchaseHf31:true,
+      reason:'Compra creada desde la visión global de planificación por déficit real.'
     };
     lastProposal.push(row);
     return lastProposal.length - 1;
@@ -2335,7 +2336,7 @@
     }
     let pidx = group.purchaseIndices[0];
     if((pidx === undefined || pidx < 0) && buy > 0) pidx = createPurchaseForGroup(group, buy, price, tiendaId, responsableId);
-    const purchase = pidx !== undefined ? lastProposal[pidx] : null;
+    const purchase = (pidx !== undefined && pidx !== null && pidx >= 0) ? lastProposal[pidx] : null;
     if(purchase){
       purchase.include = include && buy > 0;
       purchase.unidades = buy;
@@ -2351,8 +2352,13 @@
         purchase.manualProduct = true;
       }
       purchase.manualStore = changedField === 'tiendaId' || purchase.manualStore;
+      purchase.necesidadTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+      purchase.__ceManualDeficitPurchaseHf31 = purchase.__ceManualDeficitPurchaseHf31 || changedField === 'necesidad' || changedField === 'compra';
       purchase.manualResponsible = changedField === 'responsableId' || purchase.manualResponsible;
     }
+    group.allIndices.forEach(idx => {
+      if(lastProposal[idx]) lastProposal[idx].necesidadTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+    });
     const purchaseTotal = tr.querySelector('[data-plan-purchase-total]');
     if(purchaseTotal) purchaseTotal.textContent = money(buy * (price || 0));
     const nowNeedsPurchaseRow = buy > 0;
@@ -2734,6 +2740,71 @@
     }
   }
 
+
+  function ceHf31MaybeAddFallbackPurchases(rows){
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    const hasPurchase = list.some(r => r && String(r.tipo || '').toUpperCase() === 'COMPRA' && Number(r.unidades || 0) > 0);
+    if(hasPurchase || planMode() !== 'ZUZU_TOTAL') return list;
+    const info = String(fieldValue('planInfo') || '');
+    const desc = normalizeText(info + ' ' + fieldValue('planDescripcion'));
+    if(!desc) return list;
+    const personas = Math.max(1, Number(fieldValue('planPersonas') || 0) || 25);
+    const defaultStoreId = document.getElementById('planTienda')?.value || '';
+    const defaultRespId = document.getElementById('planResponsable')?.value || '';
+    const truthAliases = new Set(ceHf27TruthRowsFromDiagnostics().map(r => productAliasKeyHf25(r.productName || '')));
+    const add = (label, units, reason) => {
+      const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+      const name = prod?.nombre || label;
+      const alias = productAliasKeyHf25(name);
+      // Si el producto ya está donado, no se compra aquí; el déficit de esa misma ficha lo controla la necesidad calculada.
+      if(truthAliases.has(alias)) return;
+      const u = roundPurchaseUnits(name, units);
+      if(u <= 0) return;
+      list.push({
+        key:`hf31-zuzu-fallback:${alias}:${Math.random().toString(36).slice(2)}`,
+        include:true,
+        tipo:'COMPRA',
+        productId:prod?.id || '',
+        productName:name,
+        segmento:prod?.segmento || 'Sin segmento',
+        destino:prod?.destino || 'Sin destino',
+        unidades:u,
+        necesidadTotal:u,
+        precio:ceHf27CatalogPrice(prod),
+        tiendaId:defaultStoreId,
+        responsableId:defaultRespId,
+        ticketDonacion:'',
+        donorRef:'',
+        __ceZuzuFallbackPurchaseHf31:true,
+        reason:'Compra sugerida por planificación HF31 al no recibir compras de Zuzu: ' + reason
+      });
+    };
+    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ|COMIDA/.test(desc)){
+      add('Arroz', Math.max(2, Math.round(personas * 0.10 * 100) / 100), 'paella/comida para asistentes');
+      add('Gambones', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'paella de marisco');
+      add('Almejas', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'paella de marisco');
+    }
+    if(/BARBACOA|CENA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
+      add('Lomo fresco', Math.max(2, Math.round(personas * 0.06 * 100) / 100), 'cena/barbacoa');
+      add('Chorizos', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'cena/barbacoa');
+      add('Morcilla', Math.max(1, Math.round(personas * 0.03 * 100) / 100), 'cena/barbacoa');
+      add('Panceta', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'cena/barbacoa');
+      add('Pan', Math.max(4, Math.ceil(personas / 4)), 'acompañamiento de comida/cena');
+    }
+    if(/APERITIVO|PATATAS|ENCURTIDOS|TORTILLA/.test(desc)){
+      add('Patatas fritas', Math.max(3, Math.ceil(personas / 8)), 'aperitivo');
+      add('Encurtidos', Math.max(2, Math.ceil(personas / 12)), 'aperitivo');
+    }
+    if(/CUBATA|TARDEO|HIELO|REFRESCO|BEBIDA|CALOR/.test(desc)){
+      add('HIELO', Math.max(8, Math.ceil(personas * 0.35)), 'bebida/tardeo/hielo');
+      add('Vasos cubata', Math.max(24, Math.ceil(personas * 2)), 'menaje para cubatas');
+    }
+    if(/SERVILLETA|MENAJE|LIMPIEZA|HIGIENE|INFRAESTRUCTURA/.test(desc)){
+      add('Servilletas', 1, 'menaje/limpieza');
+    }
+    return list;
+  }
+
   async function generateProposal(){
     if(!isGD()) return;
     const mode = planMode();
@@ -2775,7 +2846,7 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = ceHf27ApplyDiagnosticTruth(Array.isArray(data.rows) ? data.rows : []);
+      lastProposal = ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(Array.isArray(data.rows) ? data.rows : []));
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
