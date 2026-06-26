@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX26_CACHE_BUST_PLANIFICACION_ACTIVO');
+  console.log('HOTFIX27_DIAGNOSTICO_PROMPT_ACTIVO');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -936,6 +936,15 @@
       .plan-resource-edit-row.plan-sd-bebida-aperitivo>td{background:#ffedd5!important}.plan-resource-edit-row.plan-sd-bebida-comida>td{background:#fed7aa!important}.plan-resource-edit-row.plan-sd-bebida-cena>td{background:#fdba74!important}.plan-resource-edit-row.plan-sd-bebida-cubatas>td{background:#fecaca!important}
       .plan-resource-edit-row.plan-sd-infra-aperitivo>td{background:#dbeafe!important}.plan-resource-edit-row.plan-sd-infra-comida>td{background:#bfdbfe!important}.plan-resource-edit-row.plan-sd-infra-cubatas>td{background:#93c5fd!important}.plan-resource-edit-row.plan-sd-infra-cena>td{background:#60a5fa!important}.plan-resource-edit-row.plan-sd-infra-infra>td{background:#86efac!important}
       .plan-resource-edit-row.plan-sd-rara>td{background:#f8fafc!important;color:#111827!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}.plan-resource-edit-row.plan-sd-rara small,.plan-resource-edit-row.plan-sd-rara strong{color:inherit!important}
+
+      .ce-hf27-diag-btn{margin-left:10px!important;background:#fff!important;color:#0f172a!important;border:2px solid #0f172a!important;border-radius:14px!important;padding:10px 14px!important;font-weight:950!important}
+      .ce-hf27-diagnostic{margin:14px 0!important;border:3px solid #0f172a!important;border-radius:18px!important;background:#f8fafc!important;box-shadow:0 8px 22px rgba(15,23,42,.10)!important;overflow:hidden!important}
+      .ce-hf27-head{display:flex!important;gap:12px!important;justify-content:space-between!important;align-items:flex-start!important;padding:12px 14px!important;background:#e0f2fe!important;border-bottom:2px solid #bae6fd!important}
+      .ce-hf27-head h3{margin:0 0 4px!important;font-size:20px!important;font-weight:950!important;color:#082f49!important}.ce-hf27-head p{margin:0!important;color:#334155!important;font-weight:750!important}
+      .ce-hf27-kpis{display:flex!important;gap:8px!important;flex-wrap:wrap!important;justify-content:flex-end!important}.ce-hf27-kpis span{display:grid!important;gap:2px!important;text-align:center!important;padding:6px 10px!important;background:#fff!important;border:1px solid #cbd5e1!important;border-radius:12px!important;font-weight:850!important}.ce-hf27-kpis b{font-size:18px!important}
+      .ce-hf27-actions{display:flex!important;gap:8px!important;padding:10px 14px!important;background:#fff!important;border-bottom:1px solid #e2e8f0!important}.ce-hf27-actions button{border-radius:12px!important;border:1px solid #0f172a!important;background:#0f172a!important;color:#fff!important;font-weight:950!important;padding:8px 12px!important}.ce-hf27-actions button+button{background:#fff!important;color:#0f172a!important}
+      .ce-hf27-tablewrap{max-height:420px!important;overflow:auto!important;background:#fff!important}.ce-hf27-diagnostic table{width:100%!important;border-collapse:collapse!important;font-size:12px!important}.ce-hf27-diagnostic th{position:sticky!important;top:0!important;background:#0f172a!important;color:#fff!important;padding:8px!important;text-align:left!important;z-index:1!important}.ce-hf27-diagnostic td{padding:8px!important;border-bottom:1px solid #e5e7eb!important;vertical-align:top!important}.ce-hf27-diagnostic tr.ok{background:#ecfdf5!important}.ce-hf27-diagnostic tr.warn{background:#fffbeb!important}.ce-hf27-diagnostic tr.bad{background:#fef2f2!important}.ce-hf27-diagnostic small{display:block!important;color:#475569!important;font-weight:700!important;margin-top:3px!important}.ce-hf27-status{display:inline-flex!important;padding:3px 7px!important;border-radius:999px!important;background:#fff!important;border:1px solid #cbd5e1!important;font-weight:950!important}
+
     `;
     document.head.appendChild(st);
   }
@@ -1760,15 +1769,310 @@
     return out;
   }
 
+
+  // HOTFIX27: método nuevo, diagnóstico verificable del prompt antes de fiarse de Zuzu.
+  function ceHf27ProductTokens(value){
+    const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS UNIDAD UNIDADES BOTELLA BOTELLAS LATA LATAS BOTE BOTES BOLSA BOLSAS PACK PAQUETE PAQUETES CAJA PIEZA KG GR L CL ML LITRO LITROS NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA DIA DIAS'.split(' '));
+    return simplifyProductSearchKeyHf24(value || '').split(' ').filter(t => t.length >= 2 && !generic.has(t));
+  }
+  function ceHf27CatalogPrice(prod){
+    return Number(prod?.defaultPrecio ?? prod?.precio ?? prod?.precioReferencia ?? prod?.precio_ref ?? prod?.pvp ?? prod?.importe ?? prod?.importeReferencia ?? prod?.precioCompra ?? 0) || 0;
+  }
+  function ceHf27ResolveProductDiagnostic(name){
+    const raw = String(name || '').trim();
+    const products = rows('productos');
+    const cleanName = cleanPromptProductNameHf25(raw);
+    const norm = normalizeProductSearchKeyHf24(cleanName);
+    const simp = simplifyProductSearchKeyHf24(cleanName);
+    const alias = productAliasKeyHf25(cleanName);
+    const pack = (product, method, score, review, candidates) => {
+      const p = product || null;
+      return {
+        product:p,
+        method,
+        score:Number(score || 0),
+        review:!!review,
+        candidates:Array.isArray(candidates) ? candidates.slice(0, 5).map(x => x?.nombre || '').filter(Boolean) : [],
+        productId:p?.id || '',
+        productName:p?.nombre || cleanName,
+        segmento:p?.segmento || '',
+        destino:p?.destino || '',
+        precio:ceHf27CatalogPrice(p)
+      };
+    };
+    if(!cleanName) return pack(null, 'VACÍO', 0, true);
+
+    const exactNorm = products.filter(p => normalizeProductSearchKeyHf24(p?.nombre || '') === norm);
+    if(exactNorm.length === 1) return pack(exactNorm[0], 'EXACTO NORMALIZADO', 1000, false);
+    if(exactNorm.length > 1) return pack(exactNorm[0], 'EXACTO MÚLTIPLE', 990, true, exactNorm);
+
+    const exactSimp = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '') === simp);
+    if(exactSimp.length === 1) return pack(exactSimp[0], 'EXACTO SIN ENVASES', 930, false);
+    if(exactSimp.length > 1) return pack(exactSimp[0], 'EXACTO SIN ENVASES MÚLTIPLE', 900, true, exactSimp);
+
+    const aliasMatches = products.filter(p => productAliasKeyHf25(p?.nombre || '') === alias && !String(alias || '').startsWith('norm:'));
+    if(aliasMatches.length === 1) return pack(aliasMatches[0], 'ALIAS CATÁLOGO', 850, false);
+    if(aliasMatches.length > 1){
+      const byShort = aliasMatches.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+      return pack(byShort[0], 'ALIAS CATÁLOGO MÚLTIPLE', 820, true, byShort);
+    }
+
+    // %cadena% completo
+    const containsFull = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '').includes(simp) || simp.includes(simplifyProductSearchKeyHf24(p?.nombre || '')));
+    if(containsFull.length === 1) return pack(containsFull[0], '%CADENA%', 760, false);
+    if(containsFull.length > 1){
+      const byShort = containsFull.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+      return pack(byShort[0], '%CADENA% MÚLTIPLE', 720, true, byShort);
+    }
+
+    // Recorte progresivo por palabras y por caracteres, pero con mínimo para no capturar disparates.
+    const queries = [];
+    const words = simp.split(' ').filter(w => w.length >= 3);
+    for(let i=0;i<words.length;i++){
+      const q = words.slice(i).join(' ');
+      if(q.length >= 5) queries.push(q);
+    }
+    for(const q0 of [...queries]){
+      let q = q0;
+      while(q.length >= 6){
+        queries.push(q);
+        q = q.slice(0, -1).trim();
+      }
+    }
+    for(const q of [...new Set(queries)]){
+      const hits = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '').includes(q));
+      if(hits.length === 1) return pack(hits[0], 'RECORTE PROGRESIVO: ' + q, 650, false);
+      if(hits.length > 1){
+        const byShort = hits.slice().sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length);
+        return pack(byShort[0], 'RECORTE MÚLTIPLE: ' + q, 620, true, byShort);
+      }
+    }
+
+    const wanted = ceHf27ProductTokens(cleanName);
+    let best = null, bestScore = -9999, second = -9999, bestMatched = 0;
+    products.forEach(p => {
+      const name = p?.nombre || '';
+      const ps = simplifyProductSearchKeyHf24(name);
+      const pt = ceHf27ProductTokens(name);
+      let score = 0, matched = 0;
+      wanted.forEach(t => {
+        if(pt.includes(t)){ score += 90 + Math.min(14, t.length); matched++; }
+        else if(ps.includes(t)){ score += 48 + Math.min(12, t.length); matched++; }
+        else score -= 22;
+      });
+      if(productAliasKeyHf25(name) === alias && !String(alias||'').startsWith('norm:')) score += 420;
+      if(!matched) score -= 450;
+      score -= Math.abs(ps.length - simp.length) * 0.08;
+      if(score > bestScore){ second = bestScore; bestScore = score; best = p; bestMatched = matched; }
+      else if(score > second) second = score;
+    });
+    if(best && bestScore >= 110 && bestMatched >= Math.min(2, wanted.length) && bestScore - second >= 25) return pack(best, 'TOKEN SCORE', bestScore, false);
+    if(best && bestScore >= 210 && bestMatched >= 1) return pack(best, 'TOKEN SCORE REVISAR', bestScore, true);
+    return pack(null, 'NO ENCONTRADO', 0, true);
+  }
+  function ceHf27FindDonorRef(kind, label){
+    const txt = normalizeText(label || '');
+    if(!txt) return '';
+    const opts = donorOptions();
+    const exact = opts.find(o => normalizeText(o.label) === txt);
+    if(exact) return exact.value;
+    const candidates = opts
+      .map(o => ({...o, n:normalizeText(o.label)}))
+      .filter(o => o.n && (o.n.includes(txt) || txt.includes(o.n)))
+      .sort((a,b) => b.n.length - a.n.length);
+    if(kind === 'DONADO TIENDA'){
+      const store = candidates.find(c => String(c.value || '').startsWith('T:'));
+      if(store) return store.value;
+    }else{
+      const person = candidates.find(c => String(c.value || '').startsWith('P:'));
+      if(person) return person.value;
+    }
+    return candidates[0]?.value || label || '';
+  }
+  function ceHf27PromptBlocks(){
+    const info = fieldValue('planInfo');
+    const lines = String(info || '').replace(/\r/g,'').split(/\n/);
+    const out = [];
+    let active = null;
+    const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
+    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
+    const extract = (line, name) => {
+      const m = String(line || '').match(new RegExp('\\[\\s*' + name + '\\s*[:=]\\s*([^\\]\\n]+)\\]', 'i'));
+      return m ? String(m[1] || '').trim().replace(/[\]\)\.]+$/,'') : '';
+    };
+    const meta = (line, prev={}) => {
+      const h = String(line || '');
+      const m = {...prev};
+      if(/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
+      else if(/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
+      else if(/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+      if(!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
+      const d = extract(h, 'Donante'), r = extract(h, 'Responsable');
+      if(d) m.donorLabel = d;
+      if(r) m.responsableLabel = r;
+      if(!m.donorLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donorLabel = 'Peña El Arrastre';
+      if(!m.responsableLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsableLabel = document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent || 'Colty';
+      return m;
+    };
+    const qtyFromLine = raw => {
+      const s = String(raw || '').replace(/^\s*[•\-\*]\s*/,'');
+      const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
+      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if(m) return Math.max(0, Math.round(Number(String(m[1]).replace(',','.')) * Number(String(m[2]).replace(',','.')) * 100) / 100);
+      m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if(m) return Math.max(0, Number(String(m[1]).replace(',','.')));
+      m = tail.match(/(\d+(?:[,.]\d+)?)/);
+      return m ? Math.max(0, Number(String(m[1]).replace(',','.'))) : 1;
+    };
+    lines.forEach((rawLine, idx) => {
+      const line = String(rawLine || '').trim();
+      if(!line) return;
+      if(stop.test(line)){ active = null; return; }
+      if(start.test(line)){ active = meta(line, {section:line}); return; }
+      if(active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))){ active = meta(line, active); return; }
+      if(active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+      if(!active || !/^\s*[•\-\*]\s*[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|;|$)/i.test(rawLine)) return;
+      let productText = String(rawLine).replace(/^\s*[•\-\*]\s*/,'');
+      productText = productText.includes(':') ? productText.slice(0, productText.lastIndexOf(':')) : productText;
+      productText = cleanPromptProductNameHf25(productText);
+      const ticketDonacion = active.ticketDonacion || 'DONADO SOCIO';
+      const donorRef = ceHf27FindDonorRef(ticketDonacion, active.donorLabel || 'Donante indicado');
+      const respRef = ceHf27FindDonorRef('DONADO SOCIO', active.responsableLabel || active.donorLabel || document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent || '');
+      const match = ceHf27ResolveProductDiagnostic(productText);
+      out.push({
+        line:idx+1,
+        raw:String(rawLine || '').trim(),
+        section:active.section || '',
+        productText,
+        unidades:qtyFromLine(rawLine),
+        ticketDonacion,
+        donorLabel:active.donorLabel || '',
+        donorRef,
+        responsableLabel:active.responsableLabel || '',
+        responsableId:String(respRef || '').startsWith('P:') ? String(respRef).slice(2) : (document.getElementById('planResponsable')?.value || ''),
+        match
+      });
+    });
+    return out;
+  }
+  function ceHf27TruthRowsFromDiagnostics(){
+    return ceHf27PromptBlocks().map((d, pos) => {
+      const p = d.match.product || {};
+      return {
+        key:`diag-hf27-truth:${pos}:${d.match.productId || productAliasKeyHf25(d.productText)}:${normalizeDonorRef(d.donorRef || '')}`,
+        include:true,
+        tipo:'DONACION',
+        productId:d.match.productId || '',
+        productName:d.match.productName || d.productText,
+        segmento:d.match.segmento || 'Sin segmento',
+        destino:d.match.destino || 'Sin destino',
+        unidades:Number(d.unidades || 0) || 1,
+        precio:Number(d.match.precio || 0),
+        tiendaId:d.ticketDonacion === 'DONADO TIENDA' ? String(d.donorRef || '').replace(/^T:/,'') : (document.getElementById('planTienda')?.value || ''),
+        responsableId:d.responsableId || document.getElementById('planResponsable')?.value || '',
+        ticketDonacion:d.ticketDonacion,
+        donorRef:d.donorRef,
+        explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
+        explicitPromptStrictHf12:true,
+        __ceHf27DiagnosticTruth:true,
+        __ceDiagnosticStatus: d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO',
+        reason:`Diagnóstico HF27: ${d.match.productId ? 'producto localizado' : 'producto no localizado'} desde prompt. Método: ${d.match.method}. Donante: ${d.donorLabel || donorLabel(d.donorRef)}.`
+      };
+    });
+  }
+  function ceHf27ApplyDiagnosticTruth(list){
+    const truth = ceHf27TruthRowsFromDiagnostics();
+    if(!truth.length) return Array.isArray(list) ? list : [];
+    const out = truth.slice();
+    const truthKeys = truth.map(t => ({
+      id:t.productId || '',
+      alias:productAliasKeyHf25(t.productName || ''),
+      donated:Number(t.unidades || 0)
+    }));
+    (Array.isArray(list) ? list : []).forEach(row => {
+      if(!row || row.tipo !== 'COMPRA' || Number(row.unidades || 0) <= 0) return;
+      const rid = canonicalProposalProductId(row) || row.productId || '';
+      const ralias = productAliasKeyHf25(row.productName || row.producto || '');
+      const hit = truthKeys.find(t => (rid && t.id && rid === t.id) || (ralias && t.alias && ralias === t.alias));
+      if(hit){
+        const deficit = Math.max(0, Math.round((Number(row.unidades || 0) - Number(hit.donated || 0)) * 100) / 100);
+        if(deficit > 0){
+          out.push({...row, include:true, unidades:deficit, reason:'Compra por déficit propuesta por Zuzu tras restar donación explícita del diagnóstico.'});
+        }
+        return;
+      }
+      out.push({...row, __ceZuzuPurchaseNoPrompt:true, reason: (row.reason || 'Compra propuesta por Zuzu') + ' · No procede de bloque de donación del prompt.'});
+    });
+    return out;
+  }
+  function ceHf27DiagnosticsHtml(){
+    const rowsDiag = ceHf27PromptBlocks();
+    const ok = rowsDiag.filter(x => x.match.productId && !x.match.review).length;
+    const revisar = rowsDiag.filter(x => x.match.productId && x.match.review).length;
+    const no = rowsDiag.filter(x => !x.match.productId).length;
+    const body = rowsDiag.map((d, i) => {
+      const status = d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO';
+      const cls = status === 'OK' ? 'ok' : status === 'REVISAR' ? 'warn' : 'bad';
+      return `<tr class="${cls}">
+        <td>${i+1}</td>
+        <td><b>${esc(d.productText)}</b><small>Línea ${d.line}: ${esc(d.raw)}</small></td>
+        <td>${qty(d.unidades)}</td>
+        <td>${esc(d.ticketDonacion)}<small>${esc(d.donorLabel || donorLabel(d.donorRef))} / ${esc(d.responsableLabel || personaOf(d.responsableId)?.nombre || '')}</small></td>
+        <td><b>${esc(d.match.productName || '—')}</b><small>${esc(d.match.segmento || 'Sin segmento')} · ${esc(d.match.destino || 'Sin destino')}</small></td>
+        <td>${money(d.match.precio || 0)}</td>
+        <td><span class="ce-hf27-status">${esc(status)}</span><small>${esc(d.match.method)}${d.match.candidates?.length ? ' · Candidatos: ' + esc(d.match.candidates.join(' | ')) : ''}</small></td>
+      </tr>`;
+    }).join('');
+    return `<section id="ceHf27DiagnosticoPrompt" class="ce-hf27-diagnostic">
+      <div class="ce-hf27-head">
+        <div><h3>Diagnóstico verificable del prompt</h3><p>Esto es la caja negra abierta: cada producto leído, cómo se ha buscado en PRODUCTOS y qué se va a crear como donación.</p></div>
+        <div class="ce-hf27-kpis"><span>OK <b>${ok}</b></span><span>Revisar <b>${revisar}</b></span><span>No encontrados <b>${no}</b></span><span>Total <b>${rowsDiag.length}</b></span></div>
+      </div>
+      <div class="ce-hf27-actions"><button type="button" id="btnHf27AplicarDiagnostico">Usar diagnóstico como propuesta</button><button type="button" id="btnHf27CopiarDiagnostico">Copiar diagnóstico</button></div>
+      <div class="ce-hf27-tablewrap"><table><thead><tr><th>#</th><th>Producto escrito</th><th>Uds</th><th>Donación</th><th>Producto encontrado</th><th>Precio</th><th>Diagnóstico</th></tr></thead><tbody>${body || '<tr><td colspan="7">No se han detectado bloques de donación/existencia en el prompt.</td></tr>'}</tbody></table></div>
+    </section>`;
+  }
+  function ceHf27RenderDiagnosticsOnly(){
+    const box = document.getElementById('planificacionResultado');
+    if(!box) return;
+    box.classList.remove('hidden');
+    box.innerHTML = ceHf27DiagnosticsHtml();
+    ceHf27BindDiagnostics(box);
+    box.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  function ceHf27BindDiagnostics(root){
+    const scope = root || document;
+    const apply = scope.querySelector?.('#btnHf27AplicarDiagnostico');
+    if(apply && !apply.__ceHf27Bound){
+      apply.__ceHf27Bound = true;
+      apply.addEventListener('click', () => {
+        lastProposal = normalizeProposalRowsForGroups(ceHf27TruthRowsFromDiagnostics());
+        renderProposal();
+      });
+    }
+    const copy = scope.querySelector?.('#btnHf27CopiarDiagnostico');
+    if(copy && !copy.__ceHf27Bound){
+      copy.__ceHf27Bound = true;
+      copy.addEventListener('click', async () => {
+        const lines = ceHf27PromptBlocks().map((d,i)=>[
+          i+1, d.productText, d.unidades, d.ticketDonacion, d.donorLabel || donorLabel(d.donorRef),
+          d.match.productName || '', d.match.segmento || '', d.match.destino || '', d.match.precio || 0, d.match.productId ? (d.match.review ? 'REVISAR' : 'OK') : 'NO ENCONTRADO', d.match.method
+        ].join('\t')).join('\n');
+        try{ await navigator.clipboard.writeText(lines); alert('Diagnóstico copiado al portapapeles.'); }catch(_){ alert(lines); }
+      });
+    }
+  }
+
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
     const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
-    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf25(lastProposal));
+    lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     ensurePurchaseRowsForVisibleDeficitsHf24();
-    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf25(lastProposal));
+    lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -1787,6 +2091,7 @@
         <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
+      ${ceHf27DiagnosticsHtml()}
       ${renderPlanResourceVision(proposals)}
       ${renderIngresosReplica(lastIncomeProposal)}
       <div class="planificacion-note compact-note">
@@ -2116,6 +2421,7 @@
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
     bindAdvancedProposalControls(box);
+    ceHf27BindDiagnostics(box);
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
@@ -2423,7 +2729,7 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = applyPromptDonationTruthHf25(Array.isArray(data.rows) ? data.rows : []);
+      lastProposal = ceHf27ApplyDiagnosticTruth(Array.isArray(data.rows) ? data.rows : []);
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
@@ -2439,7 +2745,7 @@
         try{
           const replica = buildReplicaProposal();
           lastSourceEvent = replica.event;
-          lastProposal = applyPromptDonationTruthHf25(replica.rows);
+          lastProposal = ceHf27ApplyDiagnosticTruth(replica.rows);
           lastIncomeProposal = replica.incomes || [];
           if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
             const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
@@ -2618,6 +2924,18 @@
     element[key] = true;
     element.addEventListener(eventName, handler, options);
   }
+  function ensureHf27DiagnosticButton(){
+    const gen = document.getElementById('btnGenerarPlanificacion');
+    if(!gen || document.getElementById('btnHf27DiagnosticarPrompt')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'btnHf27DiagnosticarPrompt';
+    btn.className = 'secondary ce-hf27-diag-btn';
+    btn.textContent = 'Diagnosticar prompt';
+    btn.title = 'Lee las donaciones/existencias del prompt y muestra qué producto encuentra en PRODUCTOS antes de generar';
+    gen.insertAdjacentElement('afterend', btn);
+    bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); ceHf27RenderDiagnosticsOnly(); });
+  }
   function bindEvents(){
     const btn = document.getElementById(TAB_BUTTON_ID);
     bindOnce(btn, 'click', event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); showPlanificacion(); }, true);
@@ -2654,6 +2972,7 @@
     hideByRole();
     syncPlanTopButton();
     unlockPlanControls();
+    ensureHf27DiagnosticButton();
   }
   function install(){
     if(initialized) return;
