@@ -1426,15 +1426,348 @@
       __ceHf24EnsuringPurchases = false;
     }
   }
+
+  function productAliasKeyHf25(value){
+    const n = normalizeProductSearchKeyHf24(value || '');
+    const s = simplifyProductSearchKeyHf24(value || '');
+    const has = (...parts) => parts.every(part => n.includes(normalizeProductSearchKeyHf24(part)));
+    const hasS = (...parts) => parts.every(part => s.includes(normalizeProductSearchKeyHf24(part)));
+    const tok = t => new RegExp('(^|\\s)' + normalizeProductSearchKeyHf24(t) + '(\\s|$)').test(n);
+
+    if(has('COCA','COLA','ZERO') && (has('ZERO ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias:coca-cola-zero-zero';
+    if(has('COCA','COLA','ZERO')) return 'alias:coca-cola-zero';
+    if(has('COCA','COLA')) return 'alias:coca-cola';
+    if(has('FANTA','NARANJA')) return 'alias:fanta-naranja';
+    if(has('FANTA','LIMON')) return 'alias:fanta-limon';
+    if(has('SPRITE')) return 'alias:sprite';
+    if(has('CERVEZA','SKOL')) return 'alias:cerveza-skol';
+    if(has('TONICA','SCHWEPPES')) return 'alias:tonica-schweppes';
+    if((has('BITTER') || has('BEETER')) && has('KAS')) return 'alias:bitter-kas';
+
+    if(has('RON','BARCELO')) return 'alias:ron-barcelo';
+    if(has('RON','BRUGAL')) return 'alias:ron-brugal';
+    if((hasS('WHISKY') || hasS('WISKI')) && (tok('JB') || has('J B') || has('5 ANOS') || has('5 AÑOS'))) return 'alias:whisky-jb';
+    if((hasS('WHISKY') || hasS('WISKI')) && hasS('DYC')) return 'alias:whisky-dyc';
+    if((hasS('WHISKY') || hasS('WISKI')) && (hasS('JHONY') || hasS('JOHNY') || hasS('JONIE') || hasS('WALKER'))) return 'alias:whisky-walker';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('PUERTO','INDIAS')) return 'alias:ginebra-puerto-indias';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('LARIOS')) return 'alias:ginebra-larios';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('BEEFEATER')) return 'alias:ginebra-beefeater';
+
+    if(hasS('ACEITE','AOVE') || hasS('AOVE')) return 'alias:aceite-aove';
+    if(hasS('VINAGRE')) return 'alias:vinagre';
+    if(hasS('AGUA') && (has('1L') || has('1 L') || hasS('CRISTAL'))) return 'alias:agua-1l-cristal';
+    if(hasS('BAICON') || hasS('BACON')) return 'alias:baicon';
+    if(hasS('CHULETA','CERDO')) return 'alias:chuleta-cerdo';
+    if(hasS('FAIRY')) return 'alias:fairy';
+    if(hasS('PAPEL','HIGIENICO')) return 'alias:papel-higienico';
+    if(hasS('ROLLO','SECAMANOS') || hasS('PAPEL','SECAMANOS')) return 'alias:rollo-secamanos';
+    if(hasS('BOLSAS','BASURA') || hasS('BOLSA','BASURA')) return 'alias:bolsas-basura';
+    if(hasS('JABON','MANOS') || hasS('JABON','LAVAMANOS')) return 'alias:jabon-manos';
+    if(hasS('AMBIENTADOR')) return 'alias:ambientador';
+
+    if(hasS('CAFE','DESCAFEINADO')) return 'alias:cafe-descafeinado-gorritas';
+    if(hasS('CAFE','NORMAL') || (hasS('CAFE') && hasS('GORRITAS') && !hasS('DESCAFEINADO'))) return 'alias:cafe-normal-gorritas';
+    if(hasS('VINO','BLANCO')) return 'alias:vino-blanco';
+    if(hasS('VINO','FRIZZANTE')) return 'alias:vino-frizzante';
+    if(hasS('VINO','TINTO','RIOJA')) return 'alias:vino-tinto-rioja';
+    if(hasS('VINO','TINTO')) return 'alias:vino-tinto';
+    if(hasS('OREJA','SALSA')) return 'alias:oreja-salsa';
+    if(hasS('MEJILLONES')) return 'alias:mejillones';
+    return 'norm:' + simplifyProductSearchKeyHf24(value || '');
+  }
+
+  function catalogPriceHf25(prod){
+    if(!prod) return 0;
+    return Number(prod.defaultPrecio ?? prod.precio ?? prod.precioReferencia ?? prod.precio_ref ?? prod.pvp ?? prod.importe ?? prod.importeReferencia ?? 0) || 0;
+  }
+
+  function resolveCatalogProductByNameHf25(name){
+    const raw = String(name || '').trim();
+    if(!raw) return null;
+    const products = rows('productos');
+    const direct = resolveCatalogProductByName(raw);
+    if(direct) return direct;
+
+    const target = normalizeProductSearchKeyHf24(raw);
+    const simple = simplifyProductSearchKeyHf24(raw);
+    const alias = productAliasKeyHf25(raw);
+
+    const aliasMatches = products.filter(p => productAliasKeyHf25(p?.nombre || '') === alias);
+    if(aliasMatches.length === 1) return aliasMatches[0];
+    if(aliasMatches.length > 1){
+      const exact = aliasMatches.find(p => normalizeProductSearchKeyHf24(p?.nombre || '') === target)
+        || aliasMatches.find(p => simplifyProductSearchKeyHf24(p?.nombre || '') === simple)
+        || aliasMatches.sort((a,b)=>String(a.nombre||'').length-String(b.nombre||'').length)[0];
+      if(exact) return exact;
+    }
+
+    const nExact = products.find(p => normalizeProductSearchKeyHf24(p?.nombre || '') === target);
+    if(nExact) return nExact;
+    const sExact = products.find(p => simplifyProductSearchKeyHf24(p?.nombre || '') === simple);
+    if(sExact) return sExact;
+
+    // Búsqueda tipo "%cadena%" y luego recorte progresivo del final.
+    const queries = [];
+    if(simple) queries.push(simple);
+    if(target && target !== simple) queries.push(target);
+    const words = simple.split(' ').filter(w => w.length >= 3);
+    for(let i=0;i<words.length;i++){
+      const q = words.slice(i).join(' ');
+      if(q.length >= 4) queries.push(q);
+    }
+    queries.forEach(q => {
+      let cur = String(q || '').trim();
+      while(cur.length >= 5){
+        queries.push(cur);
+        cur = cur.slice(0, -1).trim();
+      }
+    });
+
+    const uniqueQueries = [...new Set(queries.filter(Boolean))];
+    for(const q of uniqueQueries){
+      const contains = products.filter(p => simplifyProductSearchKeyHf24(p?.nombre || '').includes(q));
+      if(contains.length === 1) return contains[0];
+      if(contains.length > 1){
+        const sorted = contains.sort((a,b)=>String(a.nombre||'').length-String(b.nombre||'').length);
+        return sorted[0];
+      }
+    }
+
+    // Último intento: puntuación por tokens, castigando menos los nombres escritos "de andar por casa".
+    const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS UNIDAD UNIDADES BOTELLA BOTELLAS LATA LATAS BOTE BOTES BOLSA BOLSAS PACK PAQUETE PAQUETES CAJA PIEZA KG GR L CL ML LITRO LITROS NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA'.split(' '));
+    const toks = value => simplifyProductSearchKeyHf24(value).split(' ').filter(t => t.length >= 2 && !generic.has(t));
+    const wanted = toks(raw);
+    let best = null, bestScore = -9999;
+    products.forEach(p => {
+      const pn = p?.nombre || '';
+      const ps = simplifyProductSearchKeyHf24(pn);
+      const pt = toks(pn);
+      let score = 0, matched = 0;
+      wanted.forEach(t => {
+        if(pt.includes(t)){ score += 80 + t.length; matched++; }
+        else if(ps.includes(t)){ score += 40 + t.length; matched++; }
+        else score -= 18;
+      });
+      if(productAliasKeyHf25(pn) === alias) score += 400;
+      if(!matched) score -= 300;
+      score -= Math.abs(ps.length - simple.length) * 0.05;
+      if(score > bestScore){ bestScore = score; best = p; }
+    });
+    return bestScore >= 80 ? best : null;
+  }
+
+  function cleanPromptProductNameHf25(raw){
+    return String(raw || '')
+      .replace(/^\s*[•\-\*]\s*/,'')
+      .replace(/[()]/g,' ')
+      .replace(/\b(?:bolsa|pack|packs|paquete|paquetes|caja|pieza)\s*(?:de|x)?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes|kg)?\b/ig,' ')
+      .replace(/\b\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades)\b/ig,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  function promptDonationTruthRowsHf25(){
+    const info = fieldValue('planInfo');
+    const lines = String(info || '').replace(/\r/g,'').split(/\n/);
+    const out = [];
+    let active = null;
+    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
+    const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
+    const extract = (line, name) => {
+      const m = String(line || '').match(new RegExp('\\[\\s*' + name + '\\s*[:=]\\s*([^\\]\\n]+)\\]', 'i'));
+      return m ? String(m[1] || '').trim().replace(/[\]\)\.]+$/,'') : '';
+    };
+    const meta = (line, prev={}) => {
+      const h = String(line || '');
+      const m = {...prev};
+      if(/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
+      else if(/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
+      else if(/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+      if(!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
+      const d = extract(h, 'Donante'), r = extract(h, 'Responsable');
+      if(d) m.donor = d;
+      if(r) m.responsable = r;
+      if(!m.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donor = 'Peña El Arrastre';
+      if(!m.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsable = document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent || 'Colty';
+      return m;
+    };
+    const qty = raw => {
+      const s = String(raw || '').replace(/^\s*[•\-\*]\s*/,'');
+      const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
+      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if(m) return Math.max(0, Math.round(Number(String(m[1]).replace(',','.')) * Number(String(m[2]).replace(',','.')) * 100) / 100);
+      m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      if(m) return Math.max(0, Number(String(m[1]).replace(',','.')));
+      m = tail.match(/(\d+(?:[,.]\d+)?)/);
+      return m ? Math.max(0, Number(String(m[1]).replace(',','.'))) : 1;
+    };
+    const donorRefFrom = (ticket, label) => {
+      const txt = String(label || '').trim();
+      if(ticket === 'DONADO TIENDA'){
+        const store = tiendas().find(t => normalizeText(t.nombre || '') === normalizeText(txt) || normalizeText(t.nombre || '').includes(normalizeText(txt)) || normalizeText(txt).includes(normalizeText(t.nombre || '')));
+        return store ? 'T:' + store.id : txt;
+      }
+      const person = socios().find(s => normalizeText(s.nombre || '') === normalizeText(txt) || normalizeText(s.nombre || '').includes(normalizeText(txt)) || normalizeText(txt).includes(normalizeText(s.nombre || '')));
+      return person ? 'P:' + person.id : txt;
+    };
+    const personIdFrom = label => {
+      const txt = String(label || '').trim();
+      const person = socios().find(s => normalizeText(s.nombre || '') === normalizeText(txt) || normalizeText(s.nombre || '').includes(normalizeText(txt)) || normalizeText(txt).includes(normalizeText(s.nombre || '')));
+      return person?.id || document.getElementById('planResponsable')?.value || '';
+    };
+    const storeIdFrom = label => {
+      const txt = String(label || '').trim();
+      const store = tiendas().find(t => normalizeText(t.nombre || '') === normalizeText(txt) || normalizeText(t.nombre || '').includes(normalizeText(txt)) || normalizeText(txt).includes(normalizeText(t.nombre || '')));
+      return store?.id || document.getElementById('planTienda')?.value || '';
+    };
+
+    lines.forEach(rawLine => {
+      const line = String(rawLine || '').trim();
+      if(!line) return;
+      if(stop.test(line)){ active = null; return; }
+      if(start.test(line)){ active = meta(line, {}); return; }
+      if(active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))){ active = meta(line, active); return; }
+      if(active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+      if(!active || !/^\s*[•\-\*]\s*[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|;|$)/i.test(rawLine)) return;
+
+      let productText = String(rawLine).replace(/^\s*[•\-\*]\s*/,'');
+      productText = productText.includes(':') ? productText.slice(0, productText.lastIndexOf(':')) : productText;
+      productText = cleanPromptProductNameHf25(productText);
+      if(!productText) return;
+
+      const prod = resolveCatalogProductByNameHf25(productText);
+      const ticketDonacion = active.ticketDonacion || 'DONADO SOCIO';
+      const donorLabelText = active.donor || 'Donante indicado';
+      const respLabel = active.responsable || (ticketDonacion === 'DONADO TIENDA' ? document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent : donorLabelText) || '';
+      const donorRef = donorRefFrom(ticketDonacion, donorLabelText);
+      const productName = prod?.nombre || productText;
+      out.push({
+        key:`prompt-hf25-truth:${out.length}:${productAliasKeyHf25(productName)}:${normalizeDonorRef(donorRef)}`,
+        include:true,
+        tipo:'DONACION',
+        productId:prod?.id || '',
+        productName,
+        segmento:prod?.segmento || 'Sin segmento',
+        destino:prod?.destino || 'Sin destino',
+        unidades:qty(rawLine),
+        precio:catalogPriceHf25(prod),
+        tiendaId:ticketDonacion === 'DONADO TIENDA' ? storeIdFrom(donorLabelText) : (document.getElementById('planTienda')?.value || ''),
+        responsableId:personIdFrom(respLabel),
+        ticketDonacion,
+        donorRef,
+        explicitPromptDonation:true,
+        explicitConfirmedDonation:true,
+        explicitPromptStrictHf12:true,
+        __ceHf25PromptTruth:true,
+        reason:`Donación/existencia confirmada por prompt (${donorLabelText}).`
+      });
+    });
+
+    // Deduplicación de verdad: mismo producto + donante + tipo, acumulando si se repite.
+    const map = new Map();
+    out.forEach(row => {
+      const k = `${row.productId ? 'id:'+row.productId : productAliasKeyHf25(row.productName)}|${normalizeDonorRef(row.donorRef||'')}|${String(row.ticketDonacion||'').toUpperCase()}`;
+      if(!map.has(k)) map.set(k, row);
+      else{
+        const prev = map.get(k);
+        prev.unidades = Math.round((Number(prev.unidades||0) + Number(row.unidades||0)) * 100) / 100;
+      }
+    });
+    return [...map.values()];
+  }
+
+  function promptProductMatchKeyHf25(row){
+    const id = canonicalProposalProductId(row) || row?.productId || '';
+    if(id) return 'id:' + id;
+    return productAliasKeyHf25(row?.productName || row?.producto || '');
+  }
+
+  function samePromptProductHf25(row, truth){
+    if(!row || !truth) return false;
+    const rid = canonicalProposalProductId(row) || row.productId || '';
+    if(rid && truth.productId && String(rid) === String(truth.productId)) return true;
+    const ra = productAliasKeyHf25(row.productName || row.producto || '');
+    const ta = productAliasKeyHf25(truth.productName || '');
+    if(ra && ta && ra === ta) return true;
+    const r = simplifyProductSearchKeyHf24(row.productName || row.producto || '');
+    const t = simplifyProductSearchKeyHf24(truth.productName || '');
+    if(!r || !t) return false;
+    if(r === t || r.includes(t) || t.includes(r)) return true;
+    const toks = t.split(' ').filter(x => x.length >= 3);
+    return toks.length >= 2 && toks.filter(x => r.includes(x)).length >= Math.min(3, toks.length);
+  }
+
+  function applyPromptDonationTruthHf25(list){
+    const truth = promptDonationTruthRowsHf25();
+    if(!truth.length) return Array.isArray(list) ? list : [];
+    const base = (Array.isArray(list) ? list : []).map(r => ({...r})).filter(r => !r.__ceHf25PromptTruth && !String(r.key || '').startsWith('prompt-hf25-truth:'));
+    const out = [];
+    const purchaseAgg = new Map();
+
+    base.forEach(row => {
+      if(!row) return;
+      const hit = truth.find(t => samePromptProductHf25(row, t));
+      if(!hit){
+        out.push(row);
+        return;
+      }
+      if(row.tipo === 'COMPRA'){
+        const k = hit.productId ? 'id:' + hit.productId : productAliasKeyHf25(hit.productName);
+        const prev = purchaseAgg.get(k) || {units:0, row:null};
+        prev.units += Math.max(0, Number(row.unidades || 0));
+        prev.row = prev.row || row;
+        purchaseAgg.set(k, prev);
+        return;
+      }
+      // Se descartan donaciones antiguas del mismo producto: manda la tabla verdad del prompt.
+    });
+
+    truth.forEach(row => out.push({...row}));
+
+    // Si Zuzu había calculado más compra que lo donado, se conserva solo el déficit real.
+    const donatedByProduct = new Map();
+    truth.forEach(t => {
+      const k = t.productId ? 'id:' + t.productId : productAliasKeyHf25(t.productName);
+      donatedByProduct.set(k, (donatedByProduct.get(k) || 0) + Number(t.unidades || 0));
+    });
+    purchaseAgg.forEach((agg, k) => {
+      const deficit = Math.max(0, Math.round((Number(agg.units || 0) - Number(donatedByProduct.get(k) || 0)) * 100) / 100);
+      if(deficit <= 0) return;
+      const baseRow = agg.row || {};
+      const truthRow = truth.find(t => (t.productId ? 'id:'+t.productId : productAliasKeyHf25(t.productName)) === k);
+      const prod = truthRow?.productId ? byId('productos', truthRow.productId) : resolveCatalogProductByNameHf25(truthRow?.productName || baseRow.productName || '');
+      out.push({
+        ...baseRow,
+        key:`prompt-hf25-deficit:${k}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        include:true,
+        tipo:'COMPRA',
+        productId:truthRow?.productId || prod?.id || baseRow.productId || '',
+        productName:truthRow?.productName || prod?.nombre || baseRow.productName || 'Producto',
+        segmento:truthRow?.segmento || prod?.segmento || baseRow.segmento || '',
+        destino:truthRow?.destino || prod?.destino || baseRow.destino || '',
+        unidades:deficit,
+        precio:Number(baseRow.precio || truthRow?.precio || catalogPriceHf25(prod) || 0),
+        tiendaId:baseRow.tiendaId || document.getElementById('planTienda')?.value || '',
+        responsableId:baseRow.responsableId || document.getElementById('planResponsable')?.value || '',
+        ticketDonacion:'',
+        donorRef:'',
+        explicitPromptDonation:false,
+        explicitConfirmedDonation:false,
+        reason:'Compra por déficit real tras restar donación/existencia explícita del prompt.'
+      });
+    });
+    return out;
+  }
+
   function renderProposal(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
     const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
-    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf24(lastProposal));
+    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf25(lastProposal));
     ensurePurchaseRowsForVisibleDeficitsHf24();
-    lastProposal = normalizeProposalRowsForGroups(lastProposal);
+    lastProposal = normalizeProposalRowsForGroups(applyPromptDonationTruthHf25(lastProposal));
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -2089,7 +2422,7 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = applyPromptDonationTruthHf24(Array.isArray(data.rows) ? data.rows : []);
+      lastProposal = applyPromptDonationTruthHf25(Array.isArray(data.rows) ? data.rows : []);
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
@@ -2105,7 +2438,7 @@
         try{
           const replica = buildReplicaProposal();
           lastSourceEvent = replica.event;
-          lastProposal = applyPromptDonationTruthHf24(replica.rows);
+          lastProposal = applyPromptDonationTruthHf25(replica.rows);
           lastIncomeProposal = replica.incomes || [];
           if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
             const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);

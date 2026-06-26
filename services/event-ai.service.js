@@ -1384,24 +1384,26 @@ function planImportantProductTokens(key) {
 }
 function planFindProductLoose(label, maps) {
   const rawLabel = trim(label || '');
-  let key = normPlanKey(rawLabel);
+  const key = normPlanKey(rawLabel);
   if (!key) return null;
 
   function aliasText(value) {
     return normPlanKey(value || '')
       .replace(/\bWISKI\b/g, 'WHISKY')
+      .replace(/\bWHISKI\b/g, 'WHISKY')
       .replace(/\bJOHNY\b/g, 'JHONY')
+      .replace(/\bJOHNNY\b/g, 'JHONY')
+      .replace(/\bJOHNNIE\b/g, 'JHONY')
       .replace(/\bJONIE\b/g, 'JHONY')
       .replace(/\bJ\s*B\b/g, 'JB')
       .replace(/\bBEETER\b/g, 'BITTER')
       .replace(/\bLAVAMANOS\b/g, 'MANOS')
       .replace(/\bBTLLA\b/g, 'BOTELLA')
+      .replace(/\bBTELLA\b/g, 'BOTELLA')
+      .replace(/\bAÑEJO\b/g,'ANEJO')
       .replace(/\s+/g, ' ')
       .trim();
   }
-  key = aliasText(rawLabel);
-  if (maps.productByName.has(key)) return maps.productByName.get(key);
-
   function simplify(value) {
     return aliasText(value || '')
       .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS|NORMAL|GRANDE|MEDIANA|PEQUENA|PEQUEÑA|ENTERO|MEZCLA)\b/g, ' ')
@@ -1409,40 +1411,103 @@ function planFindProductLoose(label, maps) {
       .replace(/\s+/g, ' ')
       .trim();
   }
-  const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS LATA LATAS BOTE BOTES BOTELLA BOTELLAS BOLSA PACK PAQUETE PIEZA KG GR L CL ML NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA UNIDADES'.split(' '));
-  function toks(value) { return simplify(value).split(' ').filter(t => t.length >= 2 && !generic.has(t)); }
-  const sourceTokens = toks(key);
-  const sourceSimple = simplify(key);
-  if (!sourceTokens.length) return null;
+  function aliasKey(value) {
+    const n = aliasText(value || '');
+    const s = simplify(value || '');
+    const has = (...parts) => parts.every(part => n.includes(aliasText(part)));
+    const hasS = (...parts) => parts.every(part => s.includes(aliasText(part)));
+    const tok = t => new RegExp('(^|\\s)' + aliasText(t) + '(\\s|$)').test(n);
 
-  const strongRegex = /^(RON|BRUGAL|BARCELO|WHISKY|DYC|JHONY|WALKER|JB|BEEFEATER|LARIOS|PUERTO|INDIAS|GINEBRA|GIN|SPRITE|FANTA|COCA|COLA|ZERO|SKOL|MAHOU|AMBAR|SCHWEPPES|KAS|BITTER|AOVE|ACEITE|VINAGRE|PAPEL|HIGIENICO|SECAMANOS|JABON|FAIRY|AMBIENTADOR|VELADORES|ANCHOAS|MEJILLONES|QUESO|JAMON|SALMON|CAFE|DESCAFEINADO)$/;
-
-  let best = null, bestScore = -9999, second = -9999;
-  for (const p of maps.products.values()) {
-    const pk = aliasText(p?.nombre);
-    const ps = simplify(pk);
-    const prodTokens = toks(pk);
-    let matched = 0, score = 0;
-    if (pk === key) score += 10000;
-    if (ps === sourceSimple && sourceSimple) score += 1200;
-    if (pk.includes(key)) score += 650;
-    if (key.includes(pk)) score += 450;
-    sourceTokens.forEach(t => {
-      if (prodTokens.includes(t)) { score += 120 + Math.min(t.length, 12); matched++; }
-      else if (ps.includes(t)) { score += 60 + Math.min(t.length, 10); matched++; }
-      else score -= 35;
-    });
-    const strong = sourceTokens.filter(t => strongRegex.test(t));
-    if (strong.length && !strong.some(t => ps.includes(t))) score -= 500;
-    if (!matched) score -= 1000;
-    prodTokens.forEach(t => { if (sourceSimple.includes(t)) score += 12; });
-    score -= Math.abs(ps.length - sourceSimple.length) * 0.1;
-    if (score > bestScore) { second = bestScore; bestScore = score; best = p; }
-    else if (score > second) second = score;
+    if(has('COCA','COLA','ZERO') && (has('ZERO ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias:coca-cola-zero-zero';
+    if(has('COCA','COLA','ZERO')) return 'alias:coca-cola-zero';
+    if(has('COCA','COLA')) return 'alias:coca-cola';
+    if(has('FANTA','NARANJA')) return 'alias:fanta-naranja';
+    if(has('FANTA','LIMON')) return 'alias:fanta-limon';
+    if(has('SPRITE')) return 'alias:sprite';
+    if(has('CERVEZA','SKOL')) return 'alias:cerveza-skol';
+    if(has('TONICA','SCHWEPPES')) return 'alias:tonica-schweppes';
+    if((has('BITTER') || has('BEETER')) && has('KAS')) return 'alias:bitter-kas';
+    if(has('RON','BARCELO')) return 'alias:ron-barcelo';
+    if(has('RON','BRUGAL')) return 'alias:ron-brugal';
+    if((hasS('WHISKY') || hasS('WISKI')) && (tok('JB') || has('J B') || has('5 ANOS') || has('5 AÑOS'))) return 'alias:whisky-jb';
+    if((hasS('WHISKY') || hasS('WISKI')) && hasS('DYC')) return 'alias:whisky-dyc';
+    if((hasS('WHISKY') || hasS('WISKI')) && (hasS('JHONY') || hasS('JOHNY') || hasS('JONIE') || hasS('WALKER'))) return 'alias:whisky-walker';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('PUERTO','INDIAS')) return 'alias:ginebra-puerto-indias';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('LARIOS')) return 'alias:ginebra-larios';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('BEEFEATER')) return 'alias:ginebra-beefeater';
+    if(hasS('ACEITE','AOVE') || hasS('AOVE')) return 'alias:aceite-aove';
+    if(hasS('VINAGRE')) return 'alias:vinagre';
+    if(hasS('AGUA') && (has('1L') || has('1 L') || hasS('CRISTAL'))) return 'alias:agua-1l-cristal';
+    if(hasS('BAICON') || hasS('BACON')) return 'alias:baicon';
+    if(hasS('CHULETA','CERDO')) return 'alias:chuleta-cerdo';
+    if(hasS('FAIRY')) return 'alias:fairy';
+    if(hasS('PAPEL','HIGIENICO')) return 'alias:papel-higienico';
+    if(hasS('ROLLO','SECAMANOS') || hasS('PAPEL','SECAMANOS')) return 'alias:rollo-secamanos';
+    if(hasS('BOLSAS','BASURA') || hasS('BOLSA','BASURA')) return 'alias:bolsas-basura';
+    if(hasS('JABON','MANOS') || hasS('JABON','LAVAMANOS')) return 'alias:jabon-manos';
+    if(hasS('AMBIENTADOR')) return 'alias:ambientador';
+    if(hasS('CAFE','DESCAFEINADO')) return 'alias:cafe-descafeinado-gorritas';
+    if(hasS('CAFE','NORMAL') || (hasS('CAFE') && hasS('GORRITAS') && !hasS('DESCAFEINADO'))) return 'alias:cafe-normal-gorritas';
+    if(hasS('VINO','BLANCO')) return 'alias:vino-blanco';
+    if(hasS('VINO','FRIZZANTE')) return 'alias:vino-frizzante';
+    if(hasS('VINO','TINTO','RIOJA')) return 'alias:vino-tinto-rioja';
+    if(hasS('VINO','TINTO')) return 'alias:vino-tinto';
+    if(hasS('OREJA','SALSA')) return 'alias:oreja-salsa';
+    if(hasS('MEJILLONES')) return 'alias:mejillones';
+    return 'norm:' + simplify(value || '');
   }
-  if (best && bestScore >= 120 && bestScore - second >= 18) return best;
-  if (best && bestScore >= 220) return best;
-  return null;
+
+  const norm = aliasText(rawLabel);
+  if (maps.productByName.has(norm)) return maps.productByName.get(norm);
+
+  const wantedAlias = aliasKey(rawLabel);
+  const aliasMatches = Array.from(maps.products.values()).filter(p => aliasKey(p?.nombre || '') === wantedAlias);
+  if (aliasMatches.length === 1) return aliasMatches[0];
+  if (aliasMatches.length > 1) return aliasMatches.sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length)[0];
+
+  const target = simplify(rawLabel);
+  const exactSimple = Array.from(maps.products.values()).find(p => simplify(p?.nombre || '') === target);
+  if (exactSimple) return exactSimple;
+
+  const queries = [];
+  if(target) queries.push(target);
+  const words = target.split(' ').filter(w => w.length >= 3);
+  for(let i=0;i<words.length;i++){
+    const q = words.slice(i).join(' ');
+    if(q.length >= 4) queries.push(q);
+  }
+  for(const q0 of [...queries]){
+    let q = trim(q0);
+    while(q.length >= 5){
+      queries.push(q);
+      q = trim(q.slice(0, -1));
+    }
+  }
+  for(const q of [...new Set(queries.filter(Boolean))]){
+    const contains = Array.from(maps.products.values()).filter(p => simplify(p?.nombre || '').includes(q));
+    if(contains.length === 1) return contains[0];
+    if(contains.length > 1) return contains.sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length)[0];
+  }
+
+  const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS UNIDAD UNIDADES BOTELLA BOTELLAS LATA LATAS BOTE BOTES BOLSA BOLSAS PACK PAQUETE PAQUETES CAJA PIEZA KG GR L CL ML LITRO LITROS NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA'.split(' '));
+  const toks = value => simplify(value).split(' ').filter(t => t.length >= 2 && !generic.has(t));
+  const wanted = toks(rawLabel);
+  let best = null, bestScore = -9999;
+  for (const p of maps.products.values()) {
+    const ps = simplify(p?.nombre || '');
+    const pt = toks(p?.nombre || '');
+    let score = 0, matched = 0;
+    wanted.forEach(t => {
+      if (pt.includes(t)) { score += 80 + t.length; matched++; }
+      else if (ps.includes(t)) { score += 40 + t.length; matched++; }
+      else score -= 18;
+    });
+    if(aliasKey(p?.nombre || '') === wantedAlias) score += 400;
+    if(!matched) score -= 300;
+    score -= Math.abs(ps.length - target.length) * 0.05;
+    if(score > bestScore){ bestScore = score; best = p; }
+  }
+  return bestScore >= 80 ? best : null;
 }
 function planReasonablePlanPrice(productName, catalogPrice = 0) {
   const n = normPlanKey(productName || '');
