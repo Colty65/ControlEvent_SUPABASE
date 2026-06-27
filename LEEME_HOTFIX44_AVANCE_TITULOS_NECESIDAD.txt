@@ -1,0 +1,25 @@
+ControlEvent v15_prod - HOTFIX44
+
+Cambios quirúrgicos sobre HOTFIX43:
+
+1) Mapa de recursos / Avance del evento
+   - Se crea un único botón nuevo de Avance del evento.
+   - Se ocultan los botones/paneles anteriores que estaban interfiriendo.
+   - El panel abre/cierra con click normal y usa un panel propio HOTFIX44.
+
+2) Visores de fotos de tickets
+   - La cabecera deja de mostrar "Foto de ticket".
+   - Muestra el título del evento centrado, en verde si está En curso y rojo si está Finalizado.
+   - Se eliminan los textos "CALCULOS POR AGRUPACION..." del bloque contable.
+   - Las líneas de productos se ordenan por Producto A-Z en el detalle visible.
+
+3) Visores de justificantes de ingreso
+   - Mantiene el texto "Justificante de ingreso".
+   - Añade el título del evento centrado en la misma cabecera, en verde/rojo según estado.
+
+4) Planificación / necesidad calculada
+   - Si el usuario baja la necesidad hasta igualar lo donado, se fuerza la compra a 0.
+   - Se retira visualmente la fila A COMPRAR para que al crear el evento solo se genere la donación.
+   - Antes de crear el evento se vuelve a aplicar esta regla sobre el editor visible.
+
+Versión visible mantenida: v15_prod.
