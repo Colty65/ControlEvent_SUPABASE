@@ -3132,6 +3132,7 @@
     }
     if(!lastProposal.length && !lastIncomeProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
     try{ syncProposalFromResourceEditor(); }catch(e){ console.warn('[Planificación] No se pudo sincronizar la propuesta editable antes de crear evento', e); }
+    try{ lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal); }catch(e){ console.warn('[Planificación] No se pudo reajustar saldo antes de crear evento', e); }
     if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' && !lastIncomeProposal.length){
       const includedNow = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0 && p.tipo === 'COMPRA');
       const totalComprasNow = includedNow.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
@@ -3398,13 +3399,35 @@
     const alias = productAliasKeyHf25(prod?.nombre || label);
     return (Array.isArray(list) ? list : []).some(row => row && row.include !== false && productAliasKeyHf25(row.productName || row.producto || '') === alias);
   }
+  function ceHf50SaldoFindProduct(label){
+    const raw = String(label || '');
+    const products = rows('productos') || [];
+    const nRaw = normalizeText(raw);
+    const hasRaw = (...parts) => parts.every(part => nRaw.includes(normalizeText(part)));
+    const scoreAndPick = (predicate, scorer) => {
+      const found = products.filter(p => p && p.id && predicate(normalizeText(p.nombre || ''), p));
+      if(!found.length) return null;
+      return found.sort((a,b) => (scorer ? scorer(normalizeText(b.nombre || ''), b) - scorer(normalizeText(a.nombre || ''), a) : 0) || String(a.nombre||'').length - String(b.nombre||'').length)[0];
+    };
+    const direct = resolveCatalogProductByNameHf25(raw) || resolveCatalogProductByName(raw);
+    if(direct && direct.id) return direct;
+    if(hasRaw('RON','BARCELO')) return scoreAndPick(n => n.includes('RON') && n.includes('BARCELO'), n => (n.includes('ANEJO')?20:0) + (n.includes('0.7')||n.includes('70')?10:0));
+    if((nRaw.includes('WHISKY') || nRaw.includes('WISKI')) && (nRaw.includes('JB') || /J\s*B/.test(nRaw))) return scoreAndPick(n => (n.includes('WHISKY') || n.includes('WISKI')) && (n.includes('JB') || /J\s*B/.test(n)), n => (n.includes('5')?10:0));
+    if(hasRaw('COCA','COLA') && (nRaw.includes('ZERO -ZERO') || nRaw.includes('ZERO ZERO') || nRaw.includes('00'))) return scoreAndPick(n => n.includes('COCA') && n.includes('COLA') && (n.includes('ZERO ZERO') || n.includes('ZERO-ZERO') || n.includes('00') || n.includes('0 0')), n => (n.includes('33')||n.includes('32')?10:0));
+    if(hasRaw('COCA','COLA') && nRaw.includes('ZERO')) return scoreAndPick(n => n.includes('COCA') && n.includes('COLA') && n.includes('ZERO') && !(n.includes('ZERO ZERO') || n.includes('ZERO-ZERO') || n.includes('00') || n.includes('0 0')), n => (n.includes('33')||n.includes('32')?10:0));
+    if(hasRaw('COCA','COLA')) return scoreAndPick(n => n.includes('COCA') && n.includes('COLA') && !n.includes('ZERO') && !n.includes('LIGHT'), n => (n.includes('NORMAL')?20:0) + (n.includes('33')||n.includes('32')?10:0));
+    if((nRaw.includes('GINEBRA') || nRaw.includes('GIN')) && nRaw.includes('BEEFEATER')) return scoreAndPick(n => (n.includes('GINEBRA') || n.includes('GIN')) && n.includes('BEEFEATER'), n => (n.includes('0.7')||n.includes('70')?10:0));
+    if(nRaw.includes('CERVEZA')) return scoreAndPick(n => n.includes('CERVEZA') && (n.includes('LATA') || n.includes('PACK') || n.includes('MAHOU') || n.includes('BOTELLIN')), n => (n.includes('MAHOU')?20:0) + (n.includes('LATA')?15:0) + (n.includes('33')?10:0));
+    if(nRaw.includes('HIELO')) return scoreAndPick(n => n.includes('HIELO'), n => (n.includes('BOLSA')?10:0));
+    return null;
+  }
   function ceHf46ProductPrice(label, fallback){
-    const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    const prod = ceHf50SaldoFindProduct(label);
     const price = ceHf27CatalogPrice(prod);
     return Math.max(0, Number(price || fallback || 0));
   }
   function ceHf46AddOrIncreasePurchase(list, label, units, reason, opts={}){
-    const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    const prod = ceHf50SaldoFindProduct(label);
     if(!prod || !prod.id) return 0;
     const name = prod.nombre || label;
     const alias = productAliasKeyHf25(name);
