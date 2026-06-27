@@ -1,0 +1,20 @@
+{
+  "version_visible": "v15_prod",
+  "hotfix": "46",
+  "files_changed": [
+    "index.html",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v8-5-event-documents.js",
+    "public/app/features/v15-hotfix21-saldo-avance-rendimiento.js"
+  ],
+  "disabled_legacy_hotfixes_in_index": [
+    "v15-hotfix13",
+    "v15-hotfix14",
+    "v15-hotfix15",
+    "v15-hotfix16",
+    "v15-hotfix17",
+    "v15-hotfix18",
+    "v15-hotfix19",
+    "v15-hotfix20"
+  ]
+}

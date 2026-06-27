@@ -1523,8 +1523,14 @@
       const groups = planResourceRows(lastProposal);
       groups.forEach(group => {
         const buy = Math.max(0, Number(group.compra || 0));
+        const manualSuppressed = (group.allIndices || []).some(idx => {
+          const row = lastProposal[idx];
+          return row && row.__ceHf40ManualNeedOverride === true && row.__ceSuppressedManualPurchase === true;
+        });
+        // Si el usuario ya ha bajado la necesidad y ha anulado la compra, no la volvemos a recrear.
+        if(manualSuppressed) return;
         if(buy <= 0) return;
-        const existingIdx = lastProposal.findIndex(row => row && row.tipo === 'COMPRA' && !row.__ceSuppressedDonation && (canonicalProposalProductId(row) || row.productId || '') === (group.productId || '') && Number(row.unidades || 0) > 0);
+        const existingIdx = lastProposal.findIndex(row => row && row.tipo === 'COMPRA' && !row.__ceSuppressedDonation && !row.__ceSuppressedManualPurchase && (canonicalProposalProductId(row) || row.productId || '') === (group.productId || '') && Number(row.unidades || 0) > 0);
         const price = Number(group.precioCompra || group.precioDonado || resolveCatalogProductByName(group.producto)?.defaultPrecio || resolveCatalogProductByName(group.producto)?.precio || resolveCatalogProductByName(group.producto)?.precioReferencia || 0);
         const payload = {
           include:true,
@@ -2438,6 +2444,7 @@
         <div class="plan-metric"><span>${planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? 'Ingresos obligatorios' : 'Ingresos del modelo'}</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
+      ${renderHf46SaldoNote()}
       ${ceHf27DiagnosticsHtml()}
       ${renderPlanResourceVision(proposals)}
       ${renderIngresosReplica(lastIncomeProposal)}
@@ -2662,7 +2669,11 @@
       }
     });
     if((changedField === 'donationUnits' || changedField === 'necesidad' || changedField === '__sync') && buyInput){
-      buy = planBuyAfterDonation(newName, need || group.necesidad || 0, editedDonatedTotal || Number(group.donado || 0));
+      const donatedForBuy = Math.max(0, Number(editedDonatedTotal || group.donado || 0));
+      const needForBuy = (changedField === 'necesidad' || changedField === '__sync')
+        ? Math.max(0, Number(need || 0))
+        : Math.max(0, Number(need || group.necesidad || 0));
+      buy = planBuyAfterDonation(newName, needForBuy, donatedForBuy);
       buyInput.value = String(buy);
       if(buy <= 0){
         group.purchaseIndices.forEach(idx => {
@@ -2683,6 +2694,10 @@
       purchase.include = include && buy > 0;
       purchase.unidades = buy;
       purchase.__ceSuppressedManualPurchase = buy <= 0;
+      if(buy <= 0){
+        purchase.__ceHf40ManualNeedOverride = true;
+        purchase.__ceManualDeficitPurchaseHf31 = true;
+      }
       purchase.precio = price || purchase.precio || 0;
       purchase.tiendaId = tiendaId;
       purchase.responsableId = responsableId;
@@ -2946,6 +2961,16 @@
     const base = lastSourceEvent?.titulo || sourceEvent()?.titulo || 'Evento replicado';
     return ('Copia de ' + base).slice(0, 140);
   }
+  function eventPriceFromIncomeProposal(fallbackTotalCompras){
+    const people = Math.max(1, Number(fieldValue('planPersonas') || 0));
+    const fallback = planEstimatedEventPrice(fallbackTotalCompras, people);
+    const list = (Array.isArray(lastIncomeProposal) ? lastIncomeProposal : []).filter(item => item && item.include !== false && String(item.rango || '').toUpperCase() === 'SOCIO' && Number(item.numero || 0) > 0);
+    const prices = list.map(item => Number(item.importeObligatorio || 0) / Math.max(1, Number(item.numero || 0))).filter(v => Number.isFinite(v) && v > 0).sort((a,b)=>a-b);
+    if(!prices.length) return fallback;
+    const mid = Math.floor(prices.length / 2);
+    const price = prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+    return Math.max(0, Math.round(price * 100) / 100);
+  }
   function confirmReplicaCreation(){
     const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
     const purchases = included.filter(p => p.tipo === 'COMPRA').length;
@@ -3104,7 +3129,7 @@
       ].filter(Boolean).join('\n');
       const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
       const totalCompras = included.filter(p => p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
-      const eventPrice = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) : parseNum(source?.precio || planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) || 0);
+      const eventPrice = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? eventPriceFromIncomeProposal(totalCompras) : parseNum(source?.precio || planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) || 0);
       const newEvent = { id:newEventId, titulo:title, precio:eventPrice, fechaIni, fechaFin, situacion:'En curso', descripcion };
 
       await crudUpsert('eventos', newEvent);
@@ -3325,6 +3350,117 @@
       if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA' || row.include === false) return sum;
       return sum + Math.max(0, Number(row.unidades || 0)) * Math.max(0, Number(row.precio || 0));
     }, 0);
+  }
+
+  function ceHf46IncludedPurchaseTotal(list){
+    return (Array.isArray(list) ? list : []).reduce((sum, row) => {
+      if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA' || row.include === false) return sum;
+      return sum + Math.max(0, Number(row.unidades || 0)) * Math.max(0, Number(row.precio || 0));
+    }, 0);
+  }
+  function ceHf46EstimatedVisibleIncome(totalCompras){
+    const income = incomeSummary(lastIncomeProposal || []).importe;
+    if(Number(income || 0) > 0) return Number(income || 0);
+    const people = Math.max(1, Number(fieldValue('planPersonas') || 0));
+    return planEstimatedEventPrice(totalCompras, people) * people;
+  }
+  function ceHf46HasAliasInRows(list, label){
+    const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    const alias = productAliasKeyHf25(prod?.nombre || label);
+    return (Array.isArray(list) ? list : []).some(row => row && row.include !== false && productAliasKeyHf25(row.productName || row.producto || '') === alias);
+  }
+  function ceHf46ProductPrice(label, fallback){
+    const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    const price = ceHf27CatalogPrice(prod);
+    return Math.max(0, Number(price || fallback || 0));
+  }
+  function ceHf46AddOrIncreasePurchase(list, label, units, reason, opts={}){
+    const prod = resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    if(!prod || !prod.id) return 0;
+    const name = prod.nombre || label;
+    const alias = productAliasKeyHf25(name);
+    const u = opts.noRound ? Math.max(0, Number(units || 0)) : roundPurchaseUnits(name, units);
+    if(u <= 0) return 0;
+    const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || opts.fallbackPrice || 0));
+    if(price <= 0) return 0;
+    const existing = (Array.isArray(list) ? list : []).find(row => row && String(row.tipo || '').toUpperCase() === 'COMPRA' && row.__ceSuppressedManualPurchase !== true && productAliasKeyHf25(row.productName || row.producto || '') === alias);
+    if(existing){
+      existing.include = true;
+      existing.unidades = Math.max(0, Number(existing.unidades || 0)) + u;
+      existing.precio = Math.max(0, Number(existing.precio || price || 0));
+      existing.necesidadTotal = Math.max(0, Number(existing.necesidadTotal || 0)) + u;
+      existing.reason = String(existing.reason || '') + (existing.reason ? ' · ' : '') + 'Ajuste saldo HF46: ' + reason;
+      existing.__ceHf46SaldoBalancer = true;
+      return u * price;
+    }
+    list.push({
+      key:`hf46-saldo:${alias}:${Math.random().toString(36).slice(2)}`,
+      include:true,
+      tipo:'COMPRA',
+      productId:prod.id || '',
+      productName:name,
+      segmento:prod.segmento || 'Sin segmento',
+      destino:prod.destino || 'Sin destino',
+      unidades:u,
+      necesidadTotal:u,
+      precio:price,
+      tiendaId:ceHf35DefaultStoreId(),
+      responsableId:ceHf35DefaultResponsibleId(),
+      ticketDonacion:'',
+      donorRef:'',
+      __ceHf46SaldoBalancer:true,
+      reason:'Ajuste saldo HF46: ' + reason
+    });
+    return u * price;
+  }
+  function ceHf46BalancePositiveSurplusOnce(list){
+    let rows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true);
+    const totalBefore = ceHf46IncludedPurchaseTotal(rows);
+    const income = ceHf46EstimatedVisibleIncome(totalBefore);
+    if(totalBefore <= 0 || income <= 0) return rows;
+    const saldo = income - totalBefore;
+    if(saldo <= totalBefore * 0.35) return rows;
+    let remaining = Math.max(0, (income - (1.15 * totalBefore)) / 1.15);
+    if(remaining <= 1) return rows;
+    const context = normalizeText(String(fieldValue('planInfo') || '') + ' ' + String(fieldValue('planDescripcion') || '') + ' ' + rows.map(r => r.productName || r.producto || '').join(' '));
+    const eventish = /FIESTA|PEÑA|TARDEO|CUBATA|COPA|BARRA|BARBACOA|CENA|COMIDA|APERITIVO|BEBIDA|CALOR|VERANO|JORNADA|EVENTO/.test(context);
+    const priority = [
+      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35, tags:/RON|CUBATA|COPA|TARDEO|FIESTA|PEÑA|BARRA|BARBACOA|CENA/},
+      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69, tags:/WHISKY|WISKI|JB|CUBATA|COPA|TARDEO|FIESTA|PEÑA|BARRA/},
+      {label:'COCA COLA Bote 32 Cl', step:24, fallback:0.75, tags:/COCA|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
+      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75, tags:/COCA|ZERO|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
+      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75, tags:/COCA|ZERO|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
+      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29, tags:/GIN|GINEBRA|TONIC|TARDEO|CUBATA|COPA|FIESTA|PEÑA|BARRA/},
+      {label:'Cerveza MAHOU Lata 33 CL', step:24, fallback:0.45, tags:/CERVEZA|APERITIVO|COMIDA|CENA|TARDEO|FIESTA|PEÑA|BARRA|CALOR/},
+      {label:'HIELO', step:5, fallback:0.90, tags:/HIELO|CALOR|VERANO|BEBIDA|CUBATA|TARDEO|FIESTA|PEÑA|BARRA/}
+    ];
+    const cheapest = priority.reduce((min,item) => {
+      const cost = ceHf46ProductPrice(item.label, item.fallback) * item.step;
+      return cost > 0 ? Math.min(min, cost) : min;
+    }, Infinity);
+    let guard = 0;
+    while(remaining >= Math.min(cheapest, 1) && guard < 80){
+      let addedCycle = false;
+      for(const item of priority){
+        const price = ceHf46ProductPrice(item.label, item.fallback);
+        const cost = price * item.step;
+        if(cost <= 0 || cost > remaining) continue;
+        const alreadyRelevant = ceHf46HasAliasInRows(rows, item.label);
+        if(!alreadyRelevant && !eventish && !(item.tags && item.tags.test(context))) continue;
+        const added = ceHf46AddOrIncreasePurchase(rows, item.label, item.step, `saldo positivo ${money(saldo)}; se refuerza ${item.label} sin bajar del 15% de colchón.`, {noRound:true, fallbackPrice:item.fallback});
+        if(added > 0){ remaining -= added; addedCycle = true; }
+        if(remaining < Math.min(cheapest, 1)) break;
+      }
+      if(!addedCycle) break;
+      guard += 1;
+    }
+    return normalizeProposalRowsForGroups(rows);
+  }
+  function renderHf46SaldoNote(){
+    const rows = (Array.isArray(lastProposal) ? lastProposal : []).filter(row => row && row.__ceHf46SaldoBalancer === true && row.include !== false && Number(row.unidades || 0) > 0);
+    if(!rows.length) return '';
+    const total = rows.reduce((sum,row)=>sum + Number(row.unidades || 0) * Number(row.precio || 0), 0);
+    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} compra(s) por ${esc(money(total))} para aprovechar el saldo positivo sin dejar el colchón por debajo del 15%.</div>`;
   }
 
   function ceHf33SpiritShotsFromDonation(name, units){
@@ -3740,6 +3876,7 @@
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
         lastIncomeProposal = buildMandatorySocioIncomeProposal(baseCompra);
       }
+      lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
       renderProposal();
       const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
       if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
@@ -3757,6 +3894,7 @@
             const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
             lastIncomeProposal = buildMandatorySocioIncomeProposal(baseCompra);
           }
+          lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
           renderProposal();
           document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se muestra réplica local del evento modelo.</div>');
           document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});

@@ -1,0 +1,32 @@
+ControlEvent v15_prod - HOTFIX46
+
+Objetivo: consolidar los parches recientes que estaban interfiriendo en Mapa de recursos y Planificación inicial.
+
+Cambios principales:
+1. Planificación inicial:
+   - Si hay saldo positivo importante (ingresos - compras > 35% del total de compras), se añaden/refuerzan compras siguiendo prioridad: Ron Barceló, Whisky JB, Coca Cola normal, Coca Cola Zero, Coca Cola Zero-Zero, Beefeater, cerveza en pack y hielo.
+   - El ajuste se detiene antes de dejar el saldo por debajo del 15%.
+   - Se muestra nota de ajuste automático de saldo en la propuesta.
+   - El título del evento nuevo sigue saliendo de Breve descripción.
+   - El precio del evento al crear ingresos obligatorios sale de los ingresos propuestos, no recalculado después del ajuste de compras.
+
+2. Rendimiento / interferencias:
+   - Se dejan de cargar los hotfix 13 a 20 porque se pisaban entre sí, añadían escuchas globales y estaban afectando a Mapa y al desplegable de eventos.
+   - Se sustituyen por un único hotfix 21.
+
+3. Mapa de recursos:
+   - Un solo botón AVANCE DEL EVENTO.
+   - Abrir/cerrar con click normal.
+   - Sin captura global de clicks que cierre desplegables.
+
+4. Necesidad calculada:
+   - Si el usuario baja la necesidad y con ello anula la compra, no se vuelve a recrear automáticamente esa compra.
+
+5. Documentos:
+   - El guardado de fecha/texto de DOC usa el endpoint específico de documentos y ya no llama al guardado masivo durante esa operación.
+
+6. Modales:
+   - Foto de ticket: se cambia la cabecera por título del evento, se elimina el texto de cálculos y se ordenan líneas por producto.
+   - Justificante de ingreso: añade título del evento tras el encabezado.
+
+Versión visible: v15_prod.

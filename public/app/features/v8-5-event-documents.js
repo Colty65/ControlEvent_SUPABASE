@@ -125,7 +125,8 @@
       s.eventDocuments.push(found);
       if(!s.eventDocumentMeta) s.eventDocumentMeta = {};
       s.eventDocumentMeta[found.id] = {fecha: found.fecha, descripcion: found.descripcion};
-      saveNow();
+      saveNow({skipDocumentPersist:true});
+      persistDocumentsForEvent(found.eventId).catch(error => console.warn('[ControlEvent v15_prod] No se pudo materializar DOC recuperado:', error?.message || error));
       return found;
     }
     return null;
@@ -205,7 +206,9 @@
     const s = ensureStateShape();
     safe(() => localStorage.setItem(getLexical('STORAGE_KEY') || 'controlevent_v6_4', JSON.stringify(s)), null);
     const fn = getLexical('saveState') || window.saveState || app()?.actions?.saveState;
-    if(typeof fn === 'function') safe(() => fn(), null);
+    // En Documentos no llamamos al guardado masivo cuando se está usando el endpoint DOC.
+    // Ese guardado completo podía reconstruir el evento desde imágenes y borrar fecha/texto.
+    if(typeof fn === 'function' && !options.skipDocumentPersist) safe(() => fn(), null);
     if(!options.skipDocumentPersist){
       persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v15_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
     }
