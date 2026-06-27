@@ -3443,42 +3443,43 @@
     return u * price;
   }
   function ceHf46BalancePositiveSurplusOnce(list){
+    // HOTFIX49: balance real de saldo positivo.
+    // Regla de negocio actual: si saldo/compras > 35%, añadir/reforzar compras en el
+    // orden acordado y parar antes de dejar el saldo por debajo del 20% de las compras iniciales.
     let rows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true);
     const totalBefore = ceHf46IncludedPurchaseTotal(rows);
     const income = ceHf46EstimatedVisibleIncome(totalBefore);
     if(totalBefore <= 0 || income <= 0) return rows;
     const saldo = income - totalBefore;
-    if(saldo <= totalBefore * 0.35) return rows;
-    let remaining = Math.max(0, (income - (1.15 * totalBefore)) / 1.15);
+    const partida = totalBefore * 0.35;
+    const sueloSaldo = totalBefore * 0.20;
+    if(saldo <= partida) return rows;
+
+    let remaining = Math.max(0, saldo - sueloSaldo);
     if(remaining <= 1) return rows;
-    const context = normalizeText(String(fieldValue('planInfo') || '') + ' ' + String(fieldValue('planDescripcion') || '') + ' ' + rows.map(r => r.productName || r.producto || '').join(' '));
-    const eventish = /FIESTA|PEÑA|TARDEO|CUBATA|COPA|BARRA|BARBACOA|CENA|COMIDA|APERITIVO|BEBIDA|CALOR|VERANO|JORNADA|EVENTO/.test(context);
+
     const priority = [
-      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35, tags:/RON|CUBATA|COPA|TARDEO|FIESTA|PEÑA|BARRA|BARBACOA|CENA/},
-      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69, tags:/WHISKY|WISKI|JB|CUBATA|COPA|TARDEO|FIESTA|PEÑA|BARRA/},
-      {label:'COCA COLA Bote 32 Cl', step:24, fallback:0.75, tags:/COCA|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
-      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75, tags:/COCA|ZERO|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
-      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75, tags:/COCA|ZERO|REFRESCO|CUBATA|COMIDA|CENA|TARDEO|BEBIDA|FIESTA|PEÑA/},
-      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29, tags:/GIN|GINEBRA|TONIC|TARDEO|CUBATA|COPA|FIESTA|PEÑA|BARRA/},
-      {label:'Cerveza MAHOU Lata 33 CL', step:24, fallback:0.45, tags:/CERVEZA|APERITIVO|COMIDA|CENA|TARDEO|FIESTA|PEÑA|BARRA|CALOR/},
-      {label:'HIELO', step:5, fallback:0.90, tags:/HIELO|CALOR|VERANO|BEBIDA|CUBATA|TARDEO|FIESTA|PEÑA|BARRA/}
+      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
+      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
+      {label:'COCA COLA Bote 32 Cl', step:24, fallback:0.75},
+      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75},
+      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
+      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29},
+      {label:'Cerveza MAHOU Lata 33 CL', step:24, fallback:0.45},
+      {label:'HIELO', step:5, fallback:0.90}
     ];
-    const cheapest = priority.reduce((min,item) => {
-      const cost = ceHf46ProductPrice(item.label, item.fallback) * item.step;
-      return cost > 0 ? Math.min(min, cost) : min;
-    }, Infinity);
+
+    // No se filtra por contexto: si el usuario pide ajuste por saldo, se respeta el orden fijado.
     let guard = 0;
-    while(remaining >= Math.min(cheapest, 1) && guard < 80){
+    while(remaining > 1 && guard < 140){
       let addedCycle = false;
       for(const item of priority){
-        const price = ceHf46ProductPrice(item.label, item.fallback);
+        const price = ceHf46ProductPrice(item.label, item.fallback) || Number(item.fallback || 0);
         const cost = price * item.step;
         if(cost <= 0 || cost > remaining) continue;
-        const alreadyRelevant = ceHf46HasAliasInRows(rows, item.label);
-        if(!alreadyRelevant && !eventish && !(item.tags && item.tags.test(context))) continue;
-        const added = ceHf46AddOrIncreasePurchase(rows, item.label, item.step, `saldo positivo ${money(saldo)}; se refuerza ${item.label} sin bajar del 15% de colchón.`, {noRound:true, fallbackPrice:item.fallback});
+        const added = ceHf46AddOrIncreasePurchase(rows, item.label, item.step, `saldo positivo ${money(saldo)}; se refuerza ${item.label} sin bajar del 20% de colchón.`, {noRound:true, fallbackPrice:item.fallback});
         if(added > 0){ remaining -= added; addedCycle = true; }
-        if(remaining < Math.min(cheapest, 1)) break;
+        if(remaining <= 1) break;
       }
       if(!addedCycle) break;
       guard += 1;
@@ -3489,7 +3490,7 @@
     const rows = (Array.isArray(lastProposal) ? lastProposal : []).filter(row => row && row.__ceHf46SaldoBalancer === true && row.include !== false && Number(row.unidades || 0) > 0);
     if(!rows.length) return '';
     const total = rows.reduce((sum,row)=>sum + Number(row.unidades || 0) * Number(row.precio || 0), 0);
-    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} compra(s) por ${esc(money(total))} para aprovechar el saldo positivo sin dejar el colchón por debajo del 15%.</div>`;
+    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} compra(s) por ${esc(money(total))} para aprovechar el saldo positivo sin dejar el colchón por debajo del 20%.</div>`;
   }
 
   function ceHf33SpiritShotsFromDonation(name, units){
