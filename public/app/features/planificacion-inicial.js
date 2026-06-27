@@ -3509,6 +3509,8 @@
     if(n.includes('COCA') && n.includes('ZERO') && (n.includes('ZERO ZERO') || n.includes('ZEROZERO') || /\b0\s*0\b/.test(n) || n.includes(' 00 '))) return 'coca-zero-zero';
     if(n.includes('COCA') && n.includes('ZERO')) return 'coca-zero';
     if(n.includes('COCA')) return 'coca-normal';
+    if(n.includes('FANTA') && n.includes('NARANJA')) return 'fanta-naranja';
+    if(n.includes('FANTA') && (n.includes('LIMON') || n.includes('LIMÓN'))) return 'fanta-limon';
     if(n.includes('FANTA')) return 'fanta';
     if(n.includes('TONICA') || n.includes('TÓNICA') || n.includes('SCHWEPPES')) return 'tonica';
     if(n.includes('GASEOSA')) return 'gaseosa';
@@ -3525,6 +3527,8 @@
     if(n.includes('COCA') && n.includes('ZERO') && (n.includes('ZERO ZERO') || n.includes('ZEROZERO') || /\b0\s*0\b/.test(n) || n.includes(' 00 '))) return 'coca-zero-zero';
     if(n.includes('COCA') && n.includes('ZERO')) return 'coca-zero';
     if(n.includes('COCA') && !n.includes('ZERO')) return 'coca-normal';
+    if(n.includes('FANTA') && n.includes('NARANJA')) return 'fanta-naranja';
+    if(n.includes('FANTA') && (n.includes('LIMON') || n.includes('LIMÓN'))) return 'fanta-limon';
     if(n.includes('FANTA')) return 'fanta';
     if(n.includes('TONICA') || n.includes('TÓNICA') || n.includes('SCHWEPPES')) return 'tonica';
     if(n.includes('GASEOSA')) return 'gaseosa';
@@ -3593,140 +3597,94 @@
   }
 
   function ceHf46BalancePositiveSurplusOnce(list){
-    // v16 HOTFIX2: equilibrio lógico del saldo.
-    // No se trata de llenar el sobrante solo con packs de refrescos: cuando se añade un pack
-    // de mezcla (coca/fanta/tónica/gaseosa), se intenta acompañar con una botella de ron/whisky/gin.
-    // Además el colchón mínimo se calcula sobre la compra FINAL prevista, no sobre la compra inicial.
+    // v16 HOTFIX3: reparto equitativo del saldo.
+    // Si el saldo sobre compras supera el 35%, añadimos de uno en uno siguiendo la prioridad indicada.
+    // Se detiene cuando el saldo ya queda en zona correcta (<=35%) o cuando el siguiente añadido bajaría
+    // el colchón por debajo del 20% de las compras finales.
     let baseRows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true && row.__ceHf52SaldoBalancer !== true);
     let rows = baseRows.slice();
     const totalBefore = ceHf46IncludedPurchaseTotal(rows);
     const income = ceHf46EstimatedVisibleIncome(totalBefore);
     if(totalBefore <= 0 || income <= 0) return normalizeProposalRowsForGroups(rows);
-    const saldo = income - totalBefore;
-    if(saldo <= 0) return normalizeProposalRowsForGroups(rows);
-    const ratio = saldo / totalBefore;
-    if(ratio <= 0.35) return normalizeProposalRowsForGroups(rows);
 
-    // Saldo final >= 20% de compras finales:
-    // income - (base + extra) >= 0.20 * (base + extra)
-    // extra <= (income - 1.20 * base) / 1.20
-    let remaining = Math.max(0, (income - (totalBefore * 1.20)) / 1.20);
-    remaining = Math.min(remaining, saldo);
-    if(remaining <= 1) return normalizeProposalRowsForGroups(rows);
+    const initialSaldo = income - totalBefore;
+    const initialRatio = initialSaldo / totalBefore;
+    if(initialSaldo <= 0 || initialRatio <= 0.35) return normalizeProposalRowsForGroups(rows);
 
-    const spiritsPriority = [
-      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
-      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
-      {label:'RON Brugal Añejo 0.7 L', step:1, fallback:11.95},
-      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29}
-    ];
-    const companionPriority = [
-      {label:'RON Brugal Añejo 0.7 L', step:1, fallback:11.95},
-      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
-      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
-      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29}
-    ];
-    const mixerPriority = [
+    const priority = [
       {label:'COCA COLA Bote 32 Cl', step:24, fallback:0.75},
-      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75},
-      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
-      {label:'FANTA Naranja lata', step:24, fallback:0.75},
+      {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
+      {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
       {label:'Tónica lata', step:24, fallback:0.75},
-      {label:'Gaseosa (botella 1 l)', step:6, fallback:0.91}
-    ];
-    const finalFillPriority = [
-      {label:'Cerveza MAHOU Lata 33 CL', step:24, fallback:0.45},
-      {label:'HIELO', step:5, fallback:0.90}
+      {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29},
+      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
+      {label:'FANTA Naranja Bote 32 C.L', step:24, fallback:0.75},
+      {label:'FANTA Limon Bote 32 CL', step:24, fallback:0.75},
+      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75},
+      {label:'RON Brugal Añejo 0.7 L', step:1, fallback:11.95}
     ];
 
-    let totalAdded = 0;
-    let spiritCursor = 0;
-    let mixerCursor = 0;
-    let companionCursor = 0;
     const EPS = 0.005;
+    let totalAdded = 0;
+    let cursor = 0;
+    let guard = 0;
 
+    function currentTotal(){ return ceHf46IncludedPurchaseTotal(rows); }
+    function currentRatio(){
+      const t = currentTotal();
+      return t > 0 ? (income - t) / t : 0;
+    }
+    function canAddCost(cost){
+      const nextTotal = currentTotal() + Number(cost || 0);
+      if(nextTotal <= 0) return false;
+      const nextSaldo = income - nextTotal;
+      const nextRatio = nextSaldo / nextTotal;
+      return nextSaldo >= -EPS && nextRatio >= 0.20 - EPS;
+    }
     function add(info, reason){
-      if(!info || info.cost > remaining + EPS) return false;
+      if(!info || !canAddCost(info.cost)) return false;
       const beforeLen = rows.length;
       const added = ceHf46AddOrIncreasePurchase(rows, info.prod.nombre || info.item.label, info.units, reason, {noRound:true, fallbackPrice:info.price, basePrice:info.price, product:info.prod});
       if(added > 0){
-        remaining -= added;
         totalAdded += added;
-        for(let i=beforeLen; i<rows.length; i++) if(rows[i]) rows[i].__ceHf52SaldoBalancer = true;
-        rows.forEach(r=>{ if(r && r.__ceHf46SaldoBalancer) r.__ceHf52SaldoBalancer = true; });
+        for(let i=beforeLen; i<rows.length; i++){
+          if(rows[i]){
+            rows[i].__ceHf46SaldoBalancer = true;
+            rows[i].__ceHf52SaldoBalancer = true;
+          }
+        }
+        rows.forEach(r=>{ if(r && (r.__ceHf46SaldoBalancer || r.__ceHf52SaldoBalancer)) { r.__ceHf46SaldoBalancer = true; r.__ceHf52SaldoBalancer = true; } });
         return true;
       }
       return false;
     }
 
-    function nextAffordable(items, start, maxCost){
-      const arr = Array.isArray(items) ? items : [];
-      if(!arr.length) return null;
-      for(let offset=0; offset<arr.length; offset++){
-        const idx = (start + offset) % arr.length;
-        const info = ceHf53SaldoItemInfo(rows, arr[idx]);
-        if(info && info.cost <= maxCost + EPS) return {idx, info};
-      }
-      return null;
-    }
-
-    // 1) Una base inicial de bebida fuerte, siguiendo la prioridad original, si cabe.
-    const firstSpirit = nextAffordable(spiritsPriority, spiritCursor, remaining);
-    if(firstSpirit){
-      add(firstSpirit.info, `saldo positivo ${money(saldo)} (${Math.round(ratio*100)}% sobre compras); se refuerza bebida principal sin bajar del 20% de colchón final.`);
-      spiritCursor = firstSpirit.idx + 1;
-    }
-
-    // 2) Rondas lógicas: pack de mezcla + botella acompañante. Evita llenar todo con Coca Cola.
-    let guard = 0;
-    while(remaining > 1 && guard < 80){
+    while(currentRatio() > 0.35 + EPS && guard < 120){
       guard += 1;
       let did = false;
-      let bestPair = null;
-      for(let mOff=0; mOff<mixerPriority.length && !bestPair; mOff++){
-        const mIdx = (mixerCursor + mOff) % mixerPriority.length;
-        const mix = ceHf53SaldoItemInfo(rows, mixerPriority[mIdx]);
-        if(!mix || mix.cost > remaining + EPS) continue;
-        for(let cOff=0; cOff<companionPriority.length; cOff++){
-          const cIdx = (companionCursor + cOff) % companionPriority.length;
-          const comp = ceHf53SaldoItemInfo(rows, companionPriority[cIdx]);
-          if(!comp) continue;
-          if((mix.cost + comp.cost) <= remaining + EPS){
-            bestPair = {mIdx, cIdx, mix, comp};
-            break;
-          }
-        }
-      }
-      if(bestPair){
-        add(bestPair.comp, `saldo positivo ${money(saldo)}: botella de acompañamiento por pack de refresco/mezcla añadido.`);
-        add(bestPair.mix, `saldo positivo ${money(saldo)}: pack de refresco/mezcla añadido de forma equilibrada con bebida fuerte.`);
-        mixerCursor = bestPair.mIdx + 1;
-        companionCursor = bestPair.cIdx + 1;
-        did = true;
-      }
-
-      // 3) Si ya no cabe un pack completo con botella, remata con producto pequeño útil.
-      if(!did){
-        const nextSingle = nextAffordable(spiritsPriority.concat(finalFillPriority), spiritCursor, remaining);
-        if(nextSingle){
-          add(nextSingle.info, `saldo positivo ${money(saldo)}: ajuste final útil sin bajar del 20% de colchón final.`);
-          spiritCursor = nextSingle.idx + 1;
+      for(let offset=0; offset<priority.length; offset++){
+        const idx = (cursor + offset) % priority.length;
+        const info = ceHf53SaldoItemInfo(rows, priority[idx]);
+        if(!info || !canAddCost(info.cost)) continue;
+        if(add(info, `saldo positivo ${money(initialSaldo)} (${Math.round(initialRatio*100)}% sobre compras); ajuste por prioridad equilibrada, unidad a unidad, sin bajar del 20% de colchón final.`)){
+          cursor = (idx + 1) % priority.length;
           did = true;
+          break;
         }
       }
       if(!did) break;
     }
 
     if(totalAdded > 0){
-      rows.forEach(r=>{ if(r && r.__ceHf46SaldoBalancer) r.__ceHf52SaldoBalancer = true; });
+      rows.forEach(r=>{ if(r && (r.__ceHf46SaldoBalancer || r.__ceHf52SaldoBalancer)) { r.__ceHf46SaldoBalancer = true; r.__ceHf52SaldoBalancer = true; } });
     }
     return normalizeProposalRowsForGroups(rows);
   }
   function renderHf46SaldoNote(){
-    const rows = (Array.isArray(lastProposal) ? lastProposal : []).filter(row => row && row.__ceHf46SaldoBalancer === true && row.include !== false && Number(row.unidades || 0) > 0);
+    const rows = (Array.isArray(lastProposal) ? lastProposal : []).filter(row => row && (row.__ceHf46SaldoBalancer === true || row.__ceHf52SaldoBalancer === true) && row.include !== false && Number(row.unidades || 0) > 0);
     if(!rows.length) return '';
     const total = rows.reduce((sum,row)=>sum + Number(row.unidades || 0) * Number(row.precio || 0), 0);
-    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} compra(s) por ${esc(money(total))} para aprovechar el saldo positivo sin dejar el colchón por debajo del 20%.</div>`;
+    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} línea(s) por ${esc(money(total))}, siguiendo la prioridad equilibrada indicada y sin dejar el colchón por debajo del 20%.</div>`;
   }
 
   function ceHf33SpiritShotsFromDonation(name, units){
