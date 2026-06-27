@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX2 sin cambio de versión
+ControlEvent v16_prod - HOTFIX2 sin cambio de versión
 
 Cambios aplicados:
 - Mapa de recursos: vuelve la ficha/indicador "VALORACION DEL EVENTO (estimada)".
@@ -11,7 +11,7 @@ Cambios aplicados:
 - Planificación inicial: nueva ordenación tienda/producto.
 - Planificación inicial: quitado el texto redundante "SEGMENTO - DESTINO" de la ficha izquierda.
 - Mantenimiento de tablas generales: altas/modificaciones de PERSONAS, TIENDAS y PRODUCTOS no se bloquean por el evento seleccionado Finalizado; las bajas siguen protegidas si afectan a históricos.
-- Se mantienen los textos de versión como v15_prod.
+- Se mantienen los textos de versión como v16_prod.
 
 Validación:
 - node --check OK en planificacion-inicial.js, mapa-productos.js, v8-5-crud-root-fix28.js y lib/supabase-normalized.js.

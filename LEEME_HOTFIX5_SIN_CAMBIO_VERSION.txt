@@ -1,7 +1,7 @@
-ControlEvent v15_prod - HOTFIX5 sin cambio visible de versión
+ControlEvent v16_prod - HOTFIX5 sin cambio visible de versión
 =============================================================
 
-Este paquete mantiene la versión visible v15_prod y no cambia package.json.
+Este paquete mantiene la versión visible v16_prod y no cambia package.json.
 Solo se han cambiado scripts/código para corregir comportamiento.
 
 Cambios incluidos:

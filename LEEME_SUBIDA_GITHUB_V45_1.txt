@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 ==================
 
 Versión basada en v45.0.
@@ -11,7 +11,7 @@ Cambios realizados:
 - Añadido parche ligero final: public/app/features/v45-1-budget-labels.js
   - Solo actúa sobre #budgetLayout.
   - No toca el selector de evento ni el flujo de carga v44.7.x/v45.0.
-- Versión actualizada a ControlEvent v15_prod / ControlEvent_v15_prod.
+- Versión actualizada a ControlEvent v16_prod / ControlEvent_v16_prod.
 - Cache/service worker actualizado a controlevent-shell-v50-24.
 
 No se ha tocado:

@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX37 sin cambio de versión
+ControlEvent v16_prod - HOTFIX37 sin cambio de versión
 
 Correcciones sobre HOTFIX36:
 
@@ -27,7 +27,7 @@ Correcciones sobre HOTFIX36:
 - Si venía una reserva duplicada de una versión anterior, se eliminan duplicados y se reconstruye una sola línea correcta.
 
 5. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf37_ambar_imprevistos_stock_minimo
+- planificacion-inicial.js?v=v16_prod_planificacion_hf37_ambar_imprevistos_stock_minimo
 - Marcador consola:
   HOTFIX37_AMBAR_IMPREVISTOS_STOCK_MINIMO_ACTIVO
 

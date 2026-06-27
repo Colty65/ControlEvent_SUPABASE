@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "from": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "from": "ControlEvent v16_prod",
   "description": "Corrección de guardado en compras/donaciones, buscadores y rediseño de gráficas.",
   "changes": [
     "COMPRAS y DONACIONES guardan modificaciones a la primera.",
@@ -8,7 +8,7 @@
     "Se ocultan Por segmento y Por destino en Cálculos por agrupación del Resumen.",
     "Gráficas principales en diagrama de queso con globos al pulsar.",
     "Por destino se muestra en Gráficas con barras estrechas y globos.",
-    "Versión actualizada a ControlEvent v15_prod."
+    "Versión actualizada a ControlEvent v16_prod."
   ],
   "new_files": [
     "public/app/features/v41-3-fixes.js",

@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX34 sin cambio de versión
+ControlEvent v16_prod - HOTFIX34 sin cambio de versión
 
 Cambios sobre HOTFIX33:
 
@@ -26,7 +26,7 @@ Cambios sobre HOTFIX33:
 - Queda marcada como idea sorpresa HF34 para poder verla y quitarla si no procede.
 
 4. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf34_precio_visible_calor_imaginacion
+- planificacion-inicial.js?v=v16_prod_planificacion_hf34_precio_visible_calor_imaginacion
 - Marcador consola:
   HOTFIX34_PRECIO_VISIBLE_CALOR_IMAGINACION_ACTIVO
 

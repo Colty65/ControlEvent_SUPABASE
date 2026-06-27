@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX43 sin cambio de versión visible
+ControlEvent v16_prod - HOTFIX43 sin cambio de versión visible
 
 Correcciones aplicadas sobre HOTFIX42:
 
@@ -26,4 +26,4 @@ Correcciones aplicadas sobre HOTFIX42:
 - Se aplica Inter como fuente principal de interfaz, con fallback moderno del sistema.
 - Se ajusta el suavizado y pesos para legibilidad en pantallas.
 
-Versión visible mantenida: v15_prod.
+Versión visible mantenida: v16_prod.

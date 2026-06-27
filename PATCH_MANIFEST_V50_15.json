@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "generatedAt": "2026-05-28",
   "changes": [
     "Tras login, el primer /api/state fuerza selectedEventId vacio para mostrar pantalla CE y selector Selecciona evento.",

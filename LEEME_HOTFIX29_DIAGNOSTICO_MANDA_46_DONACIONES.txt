@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX29 sin cambio de versión
+ControlEvent v16_prod - HOTFIX29 sin cambio de versión
 
 Corrección sobre HOTFIX28.
 
@@ -32,7 +32,7 @@ Cambios incluidos:
 - Se descartan compras residuales creadas por hotfixes previos tipo prompt-hf24-deficit/prompt-hf25-deficit si contaminaban la propuesta.
 
 6. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf29_diagnostico_manda
+- planificacion-inicial.js?v=v16_prod_planificacion_hf29_diagnostico_manda
 - Marcador consola:
   HOTFIX29_DIAGNOSTICO_MANDA_46_DONACIONES_ACTIVO
 

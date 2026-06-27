@@ -1,5 +1,5 @@
 ControlEvent v7.2_prod
-Base: ControlEvent v15_prod + fix iOS GRAFICAS que ya funcionaba en iPhone/iPad/Android/PC.
+Base: ControlEvent v16_prod + fix iOS GRAFICAS que ya funcionaba en iPhone/iPad/Android/PC.
 
 Cambios:
 - iPhone/iPadOS + evento Finalizado: visor de fotos de INGRESOS con información textual a la izquierda.

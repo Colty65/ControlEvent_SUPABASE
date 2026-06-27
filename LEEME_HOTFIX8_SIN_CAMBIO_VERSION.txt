@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX8 SIN CAMBIO DE VERSION
+ControlEvent v16_prod - HOTFIX8 SIN CAMBIO DE VERSION
 
 Objetivo:
 - Rescate de la lógica de planificación inicial para volver a separar correctamente donaciones confirmadas y compras por déficit.

@@ -1,4 +1,4 @@
--- ControlEvent v15_prod - FIX PRODUCTOS CATALOGO LIBRE
+-- ControlEvent v16_prod - FIX PRODUCTOS CATALOGO LIBRE
 -- Ejecutar UNA VEZ en Supabase SQL Editor.
 -- Objetivo: permitir actualizar el precio/tienda/segmento/destino general del CATALOGO de PRODUCTOS
 -- aunque el producto ya haya sido usado en compras/donaciones de eventos finalizados.

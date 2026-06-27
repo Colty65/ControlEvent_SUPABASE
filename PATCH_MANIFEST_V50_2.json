@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "files": [
     "package.json",
     "package-lock.json",

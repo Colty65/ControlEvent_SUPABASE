@@ -1,6 +1,6 @@
 {
   "hotfix": "HOTFIX45_DOCUMENTOS_ESPERA_TITULO_PLAN",
-  "visible_version": "v15_prod",
+  "visible_version": "v16_prod",
   "date": "2026-06-27",
   "files": [
     "public/app/features/v8-5-event-documents.js",

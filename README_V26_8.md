@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Mapa de funciones legacy y duplicados
+# ControlEvent v16_prod - Mapa de funciones legacy y duplicados
 
 Versión de análisis seguro posterior a v26.7.
 

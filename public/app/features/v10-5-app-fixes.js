@@ -1,10 +1,10 @@
-/* ControlEvent v15_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
+/* ControlEvent v16_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
 (function(){
   'use strict';
   if(window.__ceV105ProdFixes) return; window.__ceV105ProdFixes=true;
-  var VERSION='v15_prod';
-  var VERSION_TEXT='ControlEvent v15_prod';
-  var VERSION_FILE='ControlEvent_v15_prod';
+  var VERSION='v16_prod';
+  var VERSION_TEXT='ControlEvent v16_prod';
+  var VERSION_FILE='ControlEvent_v16_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -28,7 +28,7 @@
   function normalizeDownloadName(name){
     var n=text(name);
     n=n.replace(/ControlEvent_v10_4(?:_\d+)?_prod/ig, VERSION_FILE)
-       .replace(/ControlEvent_v15_prod/ig, VERSION_FILE)
+       .replace(/ControlEvent_v16_prod/ig, VERSION_FILE)
        .replace(/ControlEvent_v\d+(?:_\d+){1,4}_prod/ig, VERSION_FILE)
        .replace(/ControlEvent\s+v10\.4(?:\.\d+)?_prod/ig, VERSION_TEXT)
        .replace(/ControlEvent\s+v\d+(?:\.\d+){1,4}_prod/ig, VERSION_TEXT);

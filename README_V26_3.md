@@ -1,6 +1,6 @@
-# ControlEvent v15_prod - Modularización de backend
+# ControlEvent v16_prod - Modularización de backend
 
-Versión generada sobre `ControlEvent v15_prod`.
+Versión generada sobre `ControlEvent v16_prod`.
 
 ## Objetivo
 

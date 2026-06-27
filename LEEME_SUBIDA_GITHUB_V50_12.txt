@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 ===================
 
 Base: v50.11.
@@ -8,10 +8,10 @@ Cambios limitados:
 - RESUMEN PRESUPUESTARIO: en globos de INGRESADO SOCIOS / INGRESADO NO SOCIOS se refuerza el cierre tactil y se permite ampliar las fotos anexas sin cerrar el globo.
 - Moviles: se recuperan los botoncitos inferiores Salir y Refrescar en un dock independiente, fuera del selector de evento.
 - Mantenimiento de PRODUCTOS: se elimina la negrita/parpadeo visual al pulsar Modificar. El guardado no se modifica.
-- Version/cache: unificado a ControlEvent v15_prod y cache PWA controlevent-shell-v50-24.
+- Version/cache: unificado a ControlEvent v16_prod y cache PWA controlevent-shell-v50-24.
 
 Pruebas recomendadas:
 1. iPhone/Android: abrir Resumen Presupuestario > Ingresado socios/no socios > ampliar foto > cerrar foto > cerrar globo con aspa y tocando fuera.
 2. iPhone/Android: comprobar que abajo aparecen Salir y Refrescar y no tapan el selector de evento.
 3. Mantenimiento > Productos: pulsar Modificar y comprobar que guarda sin negrita multiple ni parpadeo visible.
-4. Cabecera: verificar que solo muestra ControlEvent v15_prod.
+4. Cabecera: verificar que solo muestra ControlEvent v16_prod.

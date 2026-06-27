@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX31 sin cambio de versión
+ControlEvent v16_prod - HOTFIX31 sin cambio de versión
 
 Correcciones sobre HOTFIX30:
 
@@ -29,7 +29,7 @@ Correcciones sobre HOTFIX30:
 - Es una red de seguridad para no quedarse en 0 compras cuando el prompt pide organizar un evento completo.
 
 6. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf31_compras_zuzu_necesidad2
+- planificacion-inicial.js?v=v16_prod_planificacion_hf31_compras_zuzu_necesidad2
 - Marcador consola:
   HOTFIX31_COMPRAS_ZUZU_Y_NECESIDAD_2_ACTIVO
 

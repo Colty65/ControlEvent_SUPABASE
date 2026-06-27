@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Bundle legacy y reducción de peticiones
+# ControlEvent v16_prod - Bundle legacy y reducción de peticiones
 
 Versión de optimización posterior a v26.6.
 

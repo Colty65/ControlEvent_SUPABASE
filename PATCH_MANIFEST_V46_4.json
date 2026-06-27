@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v15_prod",
-  "versionFile": "ControlEvent_v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "versionFile": "ControlEvent_v16_prod",
+  "base": "ControlEvent v16_prod",
   "changes": [
     "INGRESOS: justificante fotográfico por ingreso, con adjuntar/ver/cambiar/eliminar.",
     "Marca de modificación en negrita para todos los mantenimientos indicados.",

@@ -1,12 +1,12 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
-Base: ControlEvent v15_prod.
+Base: ControlEvent v16_prod.
 
 Cambios principales:
 - En GRAFICAS / Por destino, los globos de Comprado y Pte.Compra muestran cabecera y datos en el orden correcto: Ticket, Tienda, Producto, Cant., Precio, Total.
 - Los globos de GRAFICAS y de RESUMEN PRESUPUESTARIO no se cierran al mover la ruleta del ratón ni el ascensor interno; se cierran al pulsar fuera, perder foco o Escape.
 - En INGRESOS se añade opción de Adjuntar justificante, Ver justificante, Cambiar justificante y Eliminar justificante.
 - Los justificantes de ingreso se guardan dentro de las imágenes del evento con clave INGRESO, para que queden persistidos con el estado y entren en la descarga de datos.
-- Versión actualizada a ControlEvent v15_prod / ControlEvent_v15_prod.
+- Versión actualizada a ControlEvent v16_prod / ControlEvent_v16_prod.
 
 Subir la carpeta completa o aplicar el parche sobre v46.2 y hacer recarga fuerte para renovar service worker/cache.

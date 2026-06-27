@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX12 sin cambio de versión
+ControlEvent v16_prod - HOTFIX12 sin cambio de versión
 
 Cambios:
 - Resumen presupuestario / Cálculos por tienda y ticket:

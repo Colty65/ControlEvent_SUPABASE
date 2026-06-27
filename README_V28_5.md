@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Hotpath cache legacy para móvil
+# ControlEvent v16_prod - Hotpath cache legacy para móvil
 
 Versión conservadora de rendimiento. No toca INFOEVENTO, BACKUP ni la carga de datos.
 

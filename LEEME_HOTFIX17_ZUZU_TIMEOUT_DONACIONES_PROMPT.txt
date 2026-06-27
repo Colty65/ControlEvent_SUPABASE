@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX17 sin cambio de versión
+ControlEvent v16_prod - HOTFIX17 sin cambio de versión
 
 Cambios incluidos:
 

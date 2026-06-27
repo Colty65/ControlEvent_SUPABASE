@@ -1,4 +1,4 @@
-ControlEvent v15_prod - Limpieza opcional
+ControlEvent v16_prod - Limpieza opcional
 
 La app v30.5 usa:
 - public/app/legacy/legacy-bundle-before-modules-v30.5.js

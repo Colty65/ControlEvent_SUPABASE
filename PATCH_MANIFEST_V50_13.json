@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "date": "2026-05-28",
   "changes": [
     "No se toca la gestion de justificantes dentro del listado INGRESOS, que queda como en v50.12/v50.11 funcionando en iPad y moviles.",

@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
   "strategy": "Agrupar 63 scripts legacy en 2 bundles, manteniendo module-loader en la misma posición relativa.",
   "beforeModules": [
     {

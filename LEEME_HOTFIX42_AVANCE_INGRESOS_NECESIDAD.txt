@@ -1,7 +1,7 @@
-ControlEvent v15_prod - HOTFIX42_AVANCE_INGRESOS_NECESIDAD
+ControlEvent v16_prod - HOTFIX42_AVANCE_INGRESOS_NECESIDAD
 Fecha: 27/06/2026
 
-Objetivo: corregir los tres puntos indicados en pruebas de HOTFIX41 sin cambiar la versión visible v15_prod.
+Objetivo: corregir los tres puntos indicados en pruebas de HOTFIX41 sin cambiar la versión visible v16_prod.
 
 Cambios incluidos:
 1) Mapa de recursos / Avance del evento
@@ -31,5 +31,5 @@ Archivos modificados:
 - index.html
 
 Notas de despliegue:
-- Mantiene v15_prod como versión visible.
+- Mantiene v16_prod como versión visible.
 - Se han cambiado los querystring de carga JS a HF42 para evitar caché del navegador.

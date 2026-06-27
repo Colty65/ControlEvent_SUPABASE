@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "from": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "from": "ControlEvent v16_prod",
   "type": "event-switcher-rethink",
   "files": [
     "public/index.html",

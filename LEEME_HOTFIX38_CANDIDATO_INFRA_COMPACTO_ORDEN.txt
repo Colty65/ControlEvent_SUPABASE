@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX38 sin cambio de versión
+ControlEvent v16_prod - HOTFIX38 sin cambio de versión
 
 Cambios sobre HOTFIX37:
 
@@ -33,7 +33,7 @@ Cambios sobre HOTFIX37:
 - Se ordena con sortPlanProposalDetailCards() usando el mismo planResourceOrderMode.
 
 6. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf38_candidato_infra_compacto_orden
+- planificacion-inicial.js?v=v16_prod_planificacion_hf38_candidato_infra_compacto_orden
 - Marcador consola:
   HOTFIX38_CANDIDATO_INFRA_COMPACTO_ORDEN_ACTIVO
 

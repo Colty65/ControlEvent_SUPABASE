@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "from": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "from": "ControlEvent v16_prod",
   "changes": [
     "DONACIONES: guardado y refresco visual usando campos edit-donacion-* en lugar de edit-compra-*",
     "Desactivada sustitución de INFOEVENTO/BACKUP introducida en v43.7",

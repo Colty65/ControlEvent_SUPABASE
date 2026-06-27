@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX27 sin cambio de versión
+ControlEvent v16_prod - HOTFIX27 sin cambio de versión
 
 Cambio de método: diagnóstico verificable de Planificación inicial.
 
@@ -53,8 +53,8 @@ El diagnóstico prueba:
 - Copia una tabla tabulada al portapapeles para poder revisar los fallos concretos sin capturas.
 
 6. Se mantiene la versión visible
-- No cambia v15_prod.
+- No cambia v16_prod.
 - Se cambia el cache-bust del script:
-  planificacion-inicial.js?v=v15_prod_planificacion_hf27_diagnostico_prompt
+  planificacion-inicial.js?v=v16_prod_planificacion_hf27_diagnostico_prompt
 
 No hay SQL nuevo.

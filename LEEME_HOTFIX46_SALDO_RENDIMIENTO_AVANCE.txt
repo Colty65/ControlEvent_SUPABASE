@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX46
+ControlEvent v16_prod - HOTFIX46
 
 Objetivo: consolidar los parches recientes que estaban interfiriendo en Mapa de recursos y Planificación inicial.
 
@@ -29,4 +29,4 @@ Cambios principales:
    - Foto de ticket: se cambia la cabecera por título del evento, se elimina el texto de cálculos y se ordenan líneas por producto.
    - Justificante de ingreso: añade título del evento tras el encabezado.
 
-Versión visible: v15_prod.
+Versión visible: v16_prod.

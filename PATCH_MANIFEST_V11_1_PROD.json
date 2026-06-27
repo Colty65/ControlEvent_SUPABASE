@@ -1,5 +1,5 @@
 {
-  "version": "v15_prod",
+  "version": "v16_prod",
   "base": "v11.0_prod + hotfixes Gemini",
   "date": "2026-06-19",
   "summary": "Gemini libre del evento con motor seguro de contexto calculado, cierre reforzado y situacion del evento centrada.",

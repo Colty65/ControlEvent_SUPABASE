@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX33 sin cambio de versión
+ControlEvent v16_prod - HOTFIX33 sin cambio de versión
 
 Cambios sobre HOTFIX32:
 
@@ -39,7 +39,7 @@ Cambios sobre HOTFIX32:
 
 5. No cambia versión visible
 - Cache bust:
-  planificacion-inicial.js?v=v15_prod_planificacion_hf33_precio_producto_cubatas
+  planificacion-inicial.js?v=v16_prod_planificacion_hf33_precio_producto_cubatas
 - Marcador consola:
   HOTFIX33_PRECIO_PRODUCTO_CUBATAS_ACTIVO
 

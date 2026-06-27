@@ -1,4 +1,4 @@
-# ControlEvent v15_prod
+# ControlEvent v16_prod
 
 Parche correctivo sobre v40.0.
 
@@ -8,7 +8,7 @@ Parche correctivo sobre v40.0.
 - Mantenimiento de tablas generales: botón flotante de volver arriba como casita (`⌂`) y con scroll reforzado, solo para PERSONAS, PRODUCTOS y TIENDAS.
 - Gastos corrientes: pasan a considerarse gasto ya realizado, igual que un TKXX, no pendiente de compra.
 - INFOEVENTO: se deja de sustituir por el exportador simplificado de v40.0 y se restaura el motor legacy protegido con hojas, totales, gráficos y protección.
-- Versión actualizada a `ControlEvent v15_prod` en cabecera, `version.js`, service worker, exportaciones y backup.
+- Versión actualizada a `ControlEvent v16_prod` en cabecera, `version.js`, service worker, exportaciones y backup.
 - Backup: se conserva la corrección de v40.0 para el alcance TODOS.
 
 ## Aplicación del parche

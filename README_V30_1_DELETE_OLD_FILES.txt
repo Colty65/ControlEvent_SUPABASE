@@ -1,4 +1,4 @@
-ControlEvent v15_prod - limpieza recomendada en GitHub
+ControlEvent v16_prod - limpieza recomendada en GitHub
 
 Si vienes de v30.0, elimina o deja sin usar estos ficheros antiguos para evitar cache o cargas cruzadas:
 

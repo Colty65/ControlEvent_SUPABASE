@@ -1,9 +1,9 @@
-ControlEvent v15_prod - HOTFIX7 sin cambio de versión visible
+ControlEvent v16_prod - HOTFIX7 sin cambio de versión visible
 
 Objetivo:
 - Corregir el desmadre de planificación inicial con donaciones explícitas del prompt.
 - Mostrar la ficha AVANCE del evento en Resumen presupuestario.
-- Mantener v15_prod sin cambiar versión de app, INFOEVENTO ni BACKUP.
+- Mantener v16_prod sin cambiar versión de app, INFOEVENTO ni BACKUP.
 
 Cambios principales:
 1) Planificación inicial / Zuzu

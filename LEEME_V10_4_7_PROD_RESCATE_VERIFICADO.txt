@@ -1,17 +1,17 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
-Base: CE_v15_prod_RESCATE_AFINADO.zip
+Base: CE_v16_prod_RESCATE_AFINADO.zip
 
 Cambios aplicados:
 
 1) Versionado
-- index.html y public/index.html muestran v15_prod.
-- public/app/version.js actualizado a ControlEvent v15_prod.
+- index.html y public/index.html muestran v16_prod.
+- public/app/version.js actualizado a ControlEvent v16_prod.
 - package.json y package-lock.json actualizados a 10.4.7-prod.
 - routes/export.routes.js actualizado a:
-  * ControlEvent v15_prod
-  * ControlEvent_v15_prod
-- Parcheados los módulos activos que podían normalizar nombres de INFOEVENTO/BACKUP con ControlEvent_v15_prod:
+  * ControlEvent v16_prod
+  * ControlEvent_v16_prod
+- Parcheados los módulos activos que podían normalizar nombres de INFOEVENTO/BACKUP con ControlEvent_v16_prod:
   * v40-fixes.js
   * v7-3-prod-final-fix.js
   * v50-24-final-fixes.js
@@ -49,5 +49,5 @@ Validaciones realizadas:
 - node --check en los JS modificados principales.
 - node --check en routes/export.routes.js.
 - JSON válido en package.json y package-lock.json.
-- Revisión con grep de los ficheros activos de versión para evitar v10.4.6/v15_prod en los módulos tocados.
+- Revisión con grep de los ficheros activos de versión para evitar v10.4.6/v16_prod en los módulos tocados.
 - ZIP comprobado con unzip -t.

@@ -1,4 +1,4 @@
-HOTFIX 9 SIN CAMBIO DE VERSION (sigue v15_prod)
+HOTFIX 9 SIN CAMBIO DE VERSION (sigue v16_prod)
 
 Objetivo de este rescate:
 1) Hacer más vistosa y compacta la caja AVANCE del evento.
@@ -19,5 +19,5 @@ Cambios aplicados:
   - Caja AVANCE del evento rediseñada: tipografía más pequeña, tarjetas más claras y visuales.
 
 Notas:
-- No cambia la versión visible de la app: permanece v15_prod.
+- No cambia la versión visible de la app: permanece v16_prod.
 - Este hotfix intenta eliminar incoherencias entre la vista global y el detalle avanzado.

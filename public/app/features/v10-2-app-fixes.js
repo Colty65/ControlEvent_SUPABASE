@@ -1,8 +1,8 @@
-/* ControlEvent v15_prod - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
+/* ControlEvent v16_prod - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
 (function(){
   'use strict';
   if(window.__ceV102AppFixes) return; window.__ceV102AppFixes=true;
-  var VERSION='v15_prod';
+  var VERSION='v16_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

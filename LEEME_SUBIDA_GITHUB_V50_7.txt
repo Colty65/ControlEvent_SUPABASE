@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 Esta version se ha hecho para recuperar el comportamiento de fotos que funcionaba antes de v50.5/v50.6:
 - No se cargan v50-5-final-fixes.js ni v50-6-final-fixes.js desde index.html.

@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - RESUMEN modular integrado en INFOEVENTO en modo auditoría
+# ControlEvent v16_prod - RESUMEN modular integrado en INFOEVENTO en modo auditoría
 
 Versión progresiva sobre v27.2.2.
 

@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX36 sin cambio de versión
+ControlEvent v16_prod - HOTFIX36 sin cambio de versión
 
 Corrección sobre HOTFIX35.
 
@@ -31,7 +31,7 @@ Cambios:
 - Este hotfix solo impide que la parte de compras quede vacía.
 
 4. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf36_no_perder_compras
+- planificacion-inicial.js?v=v16_prod_planificacion_hf36_no_perder_compras
 - Marcador consola:
   HOTFIX36_NO_PERDER_COMPRAS_ACTIVO
 

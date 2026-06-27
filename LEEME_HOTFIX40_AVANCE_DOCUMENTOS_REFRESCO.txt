@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX40 sin cambio de versión
+ControlEvent v16_prod - HOTFIX40 sin cambio de versión
 
 Cambios sobre HOTFIX39:
 
@@ -25,9 +25,9 @@ Cambios sobre HOTFIX39:
 - Se evita dejar el punto 6 antiguo cuando se han adjuntado fotos.
 
 5. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf40_manual_need_docs_avance
-- v8-5-event-documents.js?v=v15_prod_hf40_docs_meta_delete
-- v15-hotfix16-avance-donaciones-prompt.js?v=v15_prod_hf40_avance_punto6
+- planificacion-inicial.js?v=v16_prod_planificacion_hf40_manual_need_docs_avance
+- v8-5-event-documents.js?v=v16_prod_hf40_docs_meta_delete
+- v15-hotfix16-avance-donaciones-prompt.js?v=v16_prod_hf40_avance_punto6
 
 No hay SQL nuevo.
 No cambia versión visible.

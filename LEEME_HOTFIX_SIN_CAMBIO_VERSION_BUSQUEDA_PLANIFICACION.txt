@@ -1,4 +1,4 @@
-HOTFIX SIN CAMBIO DE VERSIÓN - ControlEvent v15_prod
+HOTFIX SIN CAMBIO DE VERSIÓN - ControlEvent v16_prod
 
 No se ha cambiado el número de versión visible, ni INFOEVENTO, ni BACKUP.
 

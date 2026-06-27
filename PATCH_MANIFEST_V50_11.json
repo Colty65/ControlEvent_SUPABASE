@@ -1,10 +1,10 @@
 {
-  "version": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
   "source": "ControlEvent_SUPABASE-main_V50_10.zip",
   "summary": [
     "Se fuerza logout limpio: al pulsar Salir se borra la sesion ligera y aparece el overlay de login.",
     "Se deja de cargar v50-8-final-fixes.js para eliminar la alternancia v50.8/v50.10 en cabecera.",
-    "Se unifican constantes visibles a ControlEvent v15_prod y se cambia cache PWA a controlevent-shell-v50-24.",
+    "Se unifican constantes visibles a ControlEvent v16_prod y se cambia cache PWA a controlevent-shell-v50-24.",
     "Se colorean en rojo los registros pendientes en INGRESOS y COMPRAS.",
     "No se modifica el sistema de fotos de INGRESOS/tickets que ya funcionaba en iPad y moviles."
   ],

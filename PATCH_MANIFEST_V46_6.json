@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "files": [
     "public/app/features/v46-6-final-fixes.js",
     "public/app/features/v46-4-final-fixes.js",

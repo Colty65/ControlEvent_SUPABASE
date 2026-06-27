@@ -1,7 +1,7 @@
 # HOTFIX51 - Rebase sobre HOTFIX49
 
 Base: CE_v15_PROD_HOTFIX49_MODAL_AVANCE_SALDO.zip
-Versión visible mantenida: v15_prod
+Versión visible mantenida: v16_prod
 
 Correcciones:
 

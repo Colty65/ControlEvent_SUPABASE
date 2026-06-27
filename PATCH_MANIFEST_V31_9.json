@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "changes": [
     "Mapa de recursos: no se puede marcar/desmarcar una ficha de compra ya comprada con TKxx",
     "Mapa de recursos: fichas de producto donado más compactas y sin origen redundante"

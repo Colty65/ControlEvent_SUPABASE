@@ -1,9 +1,9 @@
-/* ControlEvent v15_prod - Planificación inicial con Zuzu.
+/* ControlEvent v16_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   console.log('HOTFIX47_LOGO_AVANCE_EVENT_SWITCH_PLAN_DOCS');
   'use strict';
-  const VERSION = 'ControlEvent v15_prod';
+  const VERSION = 'ControlEvent v16_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -30,7 +30,7 @@
       if(data && Array.isArray(data.tiendas) && data.tiendas.length > rows('tiendas').length) st.tiendas = data.tiendas;
       if(data && Array.isArray(data.eventos) && data.eventos.length > rows('eventos').length) st.eventos = data.eventos;
       if(window.ControlEventApp && window.ControlEventApp.state) window.ControlEventApp.state = st;
-    }catch(error){ console.warn('[ControlEvent v15_prod] No se pudo fusionar maestros para planificación:', error); }
+    }catch(error){ console.warn('[ControlEvent v16_prod] No se pudo fusionar maestros para planificación:', error); }
   }
   async function ensureMasterRowsForMandatoryIncomes(){
     if(planContent() !== 'INGRESOS_SOCIOS_OBLIGATORIOS') return;
@@ -45,7 +45,7 @@
       const data = await res.json().catch(() => ({}));
       mergeMasterRowsForPlanning(data);
     }catch(error){
-      console.warn('[ControlEvent v15_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
+      console.warn('[ControlEvent v16_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
     }
   }
   function byId(name, id){ const sid = String(id || ''); return rows(name).find(item => String(item.id || '') === sid) || null; }
@@ -2243,7 +2243,7 @@
       ceHf27BindDiagnostics(box);
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
     }catch(error){
-      console.error('[ControlEvent v15_prod] Diagnóstico HF28 falló', error);
+      console.error('[ControlEvent v16_prod] Diagnóstico HF28 falló', error);
       box.classList.remove('hidden');
       box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>Diagnóstico no disponible:</strong> '+esc(error?.message || error)+'</div>';
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
@@ -2428,7 +2428,16 @@
     // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
     // porque estaba eliminando las compras que sí aparecen arriba.
     lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(lastProposal)));
+
+    // HOTFIX53 / v16: los ingresos obligatorios deben existir ANTES de equilibrar el saldo.
+    // En HF52 se calculaba el saldo con lastIncomeProposal vacío y por eso no añadía compra extra
+    // aunque después se vieran 660/740 € de ingresos previstos.
+    const totalComprasBaseSaldo = ceHf46IncludedPurchaseTotal(lastProposal);
+    if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' && !lastIncomeProposal.length){
+      lastIncomeProposal = buildMandatorySocioIncomeProposal(totalComprasBaseSaldo);
+    }
     lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
+
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -2436,9 +2445,6 @@
     const donaciones = visibleStats.donaciones;
     const totalCompras = visibleStats.totalCompras;
     const totalDonaciones = visibleStats.totalDonaciones;
-    if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' && !lastIncomeProposal.length){
-      lastIncomeProposal = buildMandatorySocioIncomeProposal(totalCompras);
-    }
     const ingresosInfo = incomeSummary(lastIncomeProposal);
     const cards = advancedDetailCardsHtml();
     box.classList.remove('hidden');
@@ -3193,7 +3199,7 @@
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
       activateCreatedEventAndOpenGraficas(newEventId);
     }catch(error){
-      console.error('[ControlEvent v15_prod] Error generando evento real desde planificación:', error);
+      console.error('[ControlEvent v16_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText; }
@@ -3444,15 +3450,18 @@
     return Math.max(0, Number(price || fallback || 0));
   }
   function ceHf46AddOrIncreasePurchase(list, label, units, reason, opts={}){
-    const prod = ceHf51ResolveSaldoProduct(label);
+    const prod = opts.product || (typeof ceHf52ResolveSaldoProduct === 'function' ? ceHf52ResolveSaldoProduct(label) : null) || ceHf51ResolveSaldoProduct(label);
     if(!prod || !prod.id) return 0;
     const name = prod.nombre || label;
     const alias = productAliasKeyHf25(name);
     const u = opts.noRound ? Math.max(0, Number(units || 0)) : roundPurchaseUnits(name, units);
     if(u <= 0) return 0;
-    const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || opts.fallbackPrice || 0));
+    const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || opts.basePrice || opts.fallbackPrice || 0));
     if(price <= 0) return 0;
-    const existing = (Array.isArray(list) ? list : []).find(row => row && String(row.tipo || '').toUpperCase() === 'COMPRA' && row.__ceSuppressedManualPurchase !== true && productAliasKeyHf25(row.productName || row.producto || '') === alias);
+    // v16: un ajuste de saldo no debe modificar ni marcar una compra base, porque después
+    // el recalculo elimina las filas __ceHf46SaldoBalancer y se perdería también la compra original.
+    // Solo se acumula sobre filas creadas por el propio equilibrador; si no existen, crea otra línea.
+    const existing = (Array.isArray(list) ? list : []).find(row => row && String(row.tipo || '').toUpperCase() === 'COMPRA' && row.__ceHf46SaldoBalancer === true && row.__ceSuppressedManualPurchase !== true && productAliasKeyHf25(row.productName || row.producto || '') === alias);
     if(existing){
       existing.include = true;
       existing.unidades = Math.max(0, Number(existing.unidades || 0)) + u;
@@ -3536,6 +3545,33 @@
     });
     return score >= 35 ? best : null;
   }
+
+  function ceHf53ResolveSaldoProductFromProposal(list, label){
+    const family = ceHf52FamilyWanted(label);
+    if(!family) return null;
+    const rowsList = Array.isArray(list) ? list : [];
+    const candidates = rowsList.filter(row => {
+      if(!row || row.include === false) return false;
+      const name = row.productName || row.producto || '';
+      return ceHf52ProductFamilyName(name) === family;
+    });
+    if(!candidates.length) return null;
+    // Preferimos una donación/existencia ya planificada, porque el usuario pidió reforzar compra
+    // de productos que ya vengan a cuento en el evento.
+    const chosen = candidates.find(r => String(r.tipo || '').toUpperCase() === 'DONACION') || candidates[0];
+    const productId = chosen.productId || chosen.productoId || chosen.producto_id || '';
+    const name = chosen.productName || chosen.producto || label;
+    if(!productId && !name) return null;
+    return {
+      product: {
+        id: productId,
+        nombre: name,
+        segmento: chosen.segmento || 'Sin segmento',
+        destino: chosen.destino || 'Sin destino'
+      },
+      price: Number(chosen.precio || chosen.precioEstimado || chosen.valorUnitario || 0) || 0
+    };
+  }
   function ceHf46BalancePositiveSurplusOnce(list){
     // HOTFIX52: balance real y repetible del saldo positivo.
     // Se recalcula siempre desde las compras base, quitando ajustes anteriores, para que no desaparezca al repintar.
@@ -3567,13 +3603,14 @@
     while(remaining > 1 && guard < 160){
       let addedCycle = false;
       for(const item of priority){
-        const prod = ceHf52ResolveSaldoProduct(item.label);
+        const fromProposal = ceHf53ResolveSaldoProductFromProposal(rows, item.label);
+        const prod = (fromProposal && fromProposal.product) || ceHf52ResolveSaldoProduct(item.label);
         if(!prod || !prod.id) continue;
-        const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || item.fallback || 0));
+        const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || (fromProposal && fromProposal.price) || item.fallback || 0));
         const cost = price * item.step;
         if(cost <= 0 || cost > remaining) continue;
         const beforeLen = rows.length;
-        const added = ceHf46AddOrIncreasePurchase(rows, prod.nombre || item.label, item.step, `saldo positivo ${money(saldo)} (${Math.round(ratio*100)}% sobre compras); se refuerza ${prod.nombre || item.label} sin bajar del 20% de colchón.`, {noRound:true, fallbackPrice:price});
+        const added = ceHf46AddOrIncreasePurchase(rows, prod.nombre || item.label, item.step, `saldo positivo ${money(saldo)} (${Math.round(ratio*100)}% sobre compras); se refuerza ${prod.nombre || item.label} sin bajar del 20% de colchón.`, {noRound:true, fallbackPrice:price, basePrice:price, product:prod});
         if(added > 0){
           remaining -= added; addedCycle = true;
           for(let i=beforeLen; i<rows.length; i++) if(rows[i]) rows[i].__ceHf52SaldoBalancer = true;
@@ -4012,7 +4049,7 @@
       if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
-      console.warn('[ControlEvent v15_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      console.warn('[ControlEvent v16_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
       await ensureMasterRowsForMandatoryIncomes();
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
@@ -4148,7 +4185,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v15_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v16_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {
@@ -4223,7 +4260,7 @@
       if(event){ event.preventDefault(); event.stopPropagation(); }
       try{ ceHf27RenderDiagnosticsOnly(); }
       catch(error){
-        console.error('[ControlEvent v15_prod] Error abriendo diagnóstico HF27/HF28', error);
+        console.error('[ControlEvent v16_prod] Error abriendo diagnóstico HF27/HF28', error);
         const box = document.getElementById('planificacionResultado');
         if(box){
           box.classList.remove('hidden');
@@ -4262,7 +4299,7 @@
         event.stopImmediatePropagation();
         try{ ceHf27RenderDiagnosticsOnly(); }
         catch(error){
-          console.error('[ControlEvent v15_prod] Error diagnóstico HF28', error);
+          console.error('[ControlEvent v16_prod] Error diagnóstico HF28', error);
           const box = document.getElementById('planificacionResultado');
           if(box){
             box.classList.remove('hidden');

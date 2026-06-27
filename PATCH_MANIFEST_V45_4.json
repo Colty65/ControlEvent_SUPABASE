@@ -1,7 +1,7 @@
 {
-  "version": "ControlEvent v15_prod",
-  "versionFile": "ControlEvent_v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "versionFile": "ControlEvent_v16_prod",
+  "base": "ControlEvent v16_prod",
   "focus": "Corrección de INFOEVENTO y descarga de datos sin modificar el modelo de generación de Excel",
   "files": [
     "public/modules/excel/_excel-runtime.js",

@@ -1,4 +1,4 @@
-HOTFIX48 v15_prod
+HOTFIX48 v16_prod
 - AVANCE DEL EVENTO queda solo en el logo ColtyLAB: elimina restos de Resumen y Mapa.
 - Globo centrado efímero, sin desplazar ventanas.
 - Refuerzo de mantenimiento desde Documentos.

@@ -1,7 +1,7 @@
 {
   "version": "44.7.3",
-  "versionLabel": "ControlEvent v15_prod",
-  "versionFile": "ControlEvent_v15_prod",
+  "versionLabel": "ControlEvent v16_prod",
+  "versionFile": "ControlEvent_v16_prod",
   "base": "44.7.2",
   "goal": "Cambios esteticos y de acceso manteniendo el flujo rapido de cambio de evento de v44.7.x.",
   "changes": [

@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Integridad de datos y estabilización post-Excel
+# ControlEvent v16_prod - Integridad de datos y estabilización post-Excel
 
 Versión conservadora posterior a v27.4.8.
 

@@ -1,9 +1,9 @@
-# ControlEvent v15_prod
+# ControlEvent v16_prod
 
 Base: V30.10_RESCATE estable (bundles legacy v30.7 que recuperaron login y datos).
 
 Cambios:
-- Versión visible corregida a ControlEvent v15_prod en ventana, version.js y textos Excel del legacy.
+- Versión visible corregida a ControlEvent v16_prod en ventana, version.js y textos Excel del legacy.
 - Mapa de productos pasa a Mapa de recursos.
 - Añadido filtro desplegable por responsables SOCIO: todos, uno o varios.
 - El filtro aplica a compras y donaciones cuyo responsable sea uno de los socios seleccionados.

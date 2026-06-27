@@ -1,6 +1,6 @@
-# HOTFIX49 - v15_prod
+# HOTFIX49 - v16_prod
 
-Mantiene versión visible: v15_prod.
+Mantiene versión visible: v16_prod.
 
 Cambios:
 

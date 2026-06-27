@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 Base: v50.12.
 
@@ -8,7 +8,7 @@ Objetivo de esta version:
 - Recuperar los botones pequenos de movil: Refres y Salir, apilados abajo a la derecha, pegados al margen.
 - Eliminar el parpadeo/negrita aleatoria de PRODUCTOS retirando de la carga v50-12-final-fixes.js.
 - Al entrar por login, obligar a elegir evento en el desplegable en vez de recuperar automaticamente el ultimo evento.
-- Unificar version/cache a ControlEvent v15_prod.
+- Unificar version/cache a ControlEvent v16_prod.
 
 Pruebas recomendadas:
 1. Entrar por login y comprobar que no carga automaticamente el ultimo evento; debe pedir seleccionar evento.

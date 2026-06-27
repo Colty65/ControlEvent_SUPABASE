@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 ===================
 
 Corrección conservadora sobre v50.16.
@@ -14,7 +14,7 @@ Cambios principales:
 4. Botón Refres móvil: refresca en sitio, conservando evento y pestaña actual.
 5. Globos de RESUMEN PRESUPUESTARIO: las miniaturas "Just." se retagian para usar un visor ligero propio y evitar bloqueos en iPad/iPhone.
 6. No se modifica el sistema de justificantes dentro de INGRESOS, que ya estaba funcionando en PC, iPad y móviles.
-7. Versión y caché unificadas a ControlEvent v15_prod.
+7. Versión y caché unificadas a ControlEvent v16_prod.
 
 Pruebas recomendadas:
 - Entrar con GD, RW y RO: debe aparecer CE grande y selector "Selecciona evento...".

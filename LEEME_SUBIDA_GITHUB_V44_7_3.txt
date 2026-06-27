@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 Base: v44.7.2 estable.
 Objetivo: cambios estéticos y de acceso sin alterar el flujo rápido de cambio de evento introducido en v44.7.x.

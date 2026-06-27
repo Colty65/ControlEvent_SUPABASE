@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX32 sin cambio de versión
+ControlEvent v16_prod - HOTFIX32 sin cambio de versión
 
 Cambios sobre HOTFIX31:
 
@@ -34,7 +34,7 @@ Cambios sobre HOTFIX31:
 - El KPI Valor sigue sumando esos importes.
 
 6. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf32_compras_inteligentes_bebidas
+- planificacion-inicial.js?v=v16_prod_planificacion_hf32_compras_inteligentes_bebidas
 - Marcador consola:
   HOTFIX32_COMPRAS_INTELIGENTES_BEBIDAS_ACTIVO
 

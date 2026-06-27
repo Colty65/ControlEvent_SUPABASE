@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "changes": [
     "Mapa de recursos: Donado producto y cabecera de productos donados comparten la misma base de datos.",
     "Mapa de recursos: la lista inferior de productos donados incluye todos los productos con donación del filtro actual.",

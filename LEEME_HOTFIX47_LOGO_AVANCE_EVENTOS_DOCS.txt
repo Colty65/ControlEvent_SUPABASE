@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX47
+ControlEvent v16_prod - HOTFIX47
 
 Cambios principales:
 1) Se elimina el botón de AVANCE DEL EVENTO de Mapa de recursos.

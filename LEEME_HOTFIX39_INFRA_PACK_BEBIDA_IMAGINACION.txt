@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX39 sin cambio de versión
+ControlEvent v16_prod - HOTFIX39 sin cambio de versión
 
 Cambios sobre HOTFIX38:
 
@@ -36,7 +36,7 @@ Cambios sobre HOTFIX38:
 - z_Otras compras imprevistas se mantiene como una sola línea y no entra en stock mínimo de infraestructura.
 
 8. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf39_infra_pack_bebida_imaginacion
+- planificacion-inicial.js?v=v16_prod_planificacion_hf39_infra_pack_bebida_imaginacion
 - Marcador consola:
   HOTFIX39_INFRA_PACK_BEBIDA_IMAGINACION_ACTIVO
 

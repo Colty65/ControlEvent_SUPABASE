@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 ===================
 
 Base: v50.19.
@@ -8,7 +8,7 @@ Cambios funcionales concentrados:
 2) Android/iPad: al cargar un evento, la pantalla de bienvenida CE se oculta de forma real antes de mostrar la pestaña activa.
 3) GRAFICAS/Resumen: el visor de justificantes de los globos queda visible por encima en iPad/iPhone y se evita trabajo periódico mientras hay foto abierta.
 4) No se toca la gestión de justificantes dentro de INGRESOS, que ya funcionaba.
-5) Versión y caché unificadas a ControlEvent v15_prod / controlevent-shell-v50-24.
+5) Versión y caché unificadas a ControlEvent v16_prod / controlevent-shell-v50-24.
 
 Pruebas recomendadas:
 - Login -> Seleccionar evento -> debe mostrar Gráficas sin quedarse debajo de la pantalla CE.

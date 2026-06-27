@@ -1,4 +1,4 @@
-# ControlEvent v15_prod
+# ControlEvent v16_prod
 
 Versión preparada a partir de `ControlEvent_SUPABASE-main_V33_7.zip`, que es la versión real actualmente desplegada.
 

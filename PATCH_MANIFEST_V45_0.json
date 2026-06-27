@@ -1,8 +1,8 @@
 {
   "version": "45.0",
-  "versionLabel": "ControlEvent v15_prod",
-  "versionFile": "ControlEvent_v15_prod",
-  "base": "ControlEvent v15_prod",
+  "versionLabel": "ControlEvent v16_prod",
+  "versionFile": "ControlEvent_v16_prod",
+  "base": "ControlEvent v16_prod",
   "changes": [
     "Fix mantenimiento PRODUCTOS para GD/RW",
     "Bloqueo real de borrado con dependencias para PRODUCTOS/PERSONAS/TIENDAS",

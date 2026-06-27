@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 Mejora central: Gemini libre recibe ahora un contexto seguro y calculado mediante services/event-context.service.js.
 

@@ -1,13 +1,13 @@
 {
-  "version": "ControlEvent v15_prod",
-  "from": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "from": "ControlEvent v16_prod",
   "changes": [
     "Corrección de buscadores en COMPRAS y DONACIONES para no coincidir siempre con el primer registro por culpa de las opciones internas de los desplegables.",
     "Refuerzo de GRAFICAS para mantener diagramas de queso y Por destino sin que se superponga la gráfica anterior.",
     "Barras de Por destino más anchas y pulsables.",
     "Eliminación de la línea y botón de plegar/desplegar en RESUMEN PRESUPUESTARIO.",
     "Renombrado de fichas en MAPA DE RECURSOS.",
-    "Actualización de versión a ControlEvent v15_prod."
+    "Actualización de versión a ControlEvent v16_prod."
   ],
   "files": [
     "public/index.html",

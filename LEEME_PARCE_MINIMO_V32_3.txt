@@ -1,4 +1,4 @@
-ControlEvent v15_prod - Parche mínimo
+ControlEvent v16_prod - Parche mínimo
 
 Aplicar encima de la versión actual V32.x.
 

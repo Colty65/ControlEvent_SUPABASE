@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX9 RESCATE DONACIONES / AVANCE / GLOBOS
+ControlEvent v16_prod - HOTFIX9 RESCATE DONACIONES / AVANCE / GLOBOS
 Sin cambio de versión visible.
 
 Cambios principales:

@@ -1,6 +1,6 @@
 {
-  "version": "ControlEvent v15_prod",
-  "base": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
   "changes": [
     "Mapa de recursos: cabecera de productos donados alineada con DONADO PRODUCTO",
     "Mapa de recursos: salto reforzado a productos donados",

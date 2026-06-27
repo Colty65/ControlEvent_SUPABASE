@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - ActiveRender desactivado por defecto
+# ControlEvent v16_prod - ActiveRender desactivado por defecto
 
 Versión correctiva sobre v28.6.
 

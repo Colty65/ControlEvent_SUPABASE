@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX30 sin cambio de versión
+ControlEvent v16_prod - HOTFIX30 sin cambio de versión
 
 Cambios sobre HOTFIX29:
 
@@ -31,7 +31,7 @@ Cambios sobre HOTFIX29:
 - Ahora el texto añade Responsable.
 
 6. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf30_necesidad_compras_packs
+- planificacion-inicial.js?v=v16_prod_planificacion_hf30_necesidad_compras_packs
 - Marcador consola:
   HOTFIX30_NECESIDAD_COMPRAS_PACKS_ACTIVO
 

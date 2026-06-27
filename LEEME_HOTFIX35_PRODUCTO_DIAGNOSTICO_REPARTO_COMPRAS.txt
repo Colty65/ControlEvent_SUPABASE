@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX35 sin cambio de versión
+ControlEvent v16_prod - HOTFIX35 sin cambio de versión
 
 Cambios sobre HOTFIX34:
 
@@ -44,7 +44,7 @@ Cambios sobre HOTFIX34:
 - Importe: 10% de la compra prevista, mínimo 10 €.
 
 9. Cache bust
-- planificacion-inicial.js?v=v15_prod_planificacion_hf35_producto_diagnostico_reparto
+- planificacion-inicial.js?v=v16_prod_planificacion_hf35_producto_diagnostico_reparto
 - Marcador consola:
   HOTFIX35_PRODUCTO_DIAGNOSTICO_REPARTO_COMPRAS_ACTIVO
 

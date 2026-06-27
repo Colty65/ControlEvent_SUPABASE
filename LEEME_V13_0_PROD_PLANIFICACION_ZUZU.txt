@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 Cambios principales:
 - Planificación inicial incorpora Zuzu con tres modos: replicar evento finalizado, encargo total y encargo parcial.
@@ -7,7 +7,7 @@ Cambios principales:
 - Botones renombrados: Generar propuesta y Generar nuevo evento.
 - Responsable inicial pasa a Responsable por defecto.
 - Evento finalizado ya no debe bloquear Planificación inicial ni sus controles generales.
-- Versión actualizada a v15_prod / ControlEvent_v15_prod / 15.0.0.
+- Versión actualizada a v16_prod / ControlEvent_v16_prod / 15.0.0.
 
 Validaciones locales:
 - node --check services/event-ai.service.js

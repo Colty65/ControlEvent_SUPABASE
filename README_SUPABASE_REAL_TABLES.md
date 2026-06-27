@@ -1,6 +1,6 @@
-# ControlEvent v15_prod como base Supabase
+# ControlEvent v16_prod como base Supabase
 
-Esta carpeta parte de la version funcional `ControlEvent_v15_prod_localhost`.
+Esta carpeta parte de la version funcional `ControlEvent_v16_prod_localhost`.
 
 Se mantiene el modo local original:
 

@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX45
+ControlEvent v16_prod - HOTFIX45
 
 Cambios incluidos:
 
@@ -25,4 +25,4 @@ Cambios incluidos:
 - Ticket: las líneas de producto se ordenan alfabéticamente cuando la tabla lleva columna Producto.
 - Ingreso: mantiene “Justificante de ingreso” y añade título del evento centrado en verde/rojo.
 
-Versión visible: v15_prod.
+Versión visible: v16_prod.

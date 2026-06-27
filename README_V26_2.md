@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Modularización Excel y tickets/fotos
+# ControlEvent v16_prod - Modularización Excel y tickets/fotos
 
 Esta versión continúa el plan de modularización sobre v26.1.
 
@@ -76,7 +76,7 @@ Comprobar:
 ## Versión
 
 ```text
-ControlEvent v15_prod
-ControlEvent_v15_prod
+ControlEvent v16_prod
+ControlEvent_v16_prod
 controlevent-shell-v50-24
 ```

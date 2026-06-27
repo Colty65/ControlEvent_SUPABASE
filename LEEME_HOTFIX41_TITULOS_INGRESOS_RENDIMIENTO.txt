@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX41 sin cambio de versión visible
+ControlEvent v16_prod - HOTFIX41 sin cambio de versión visible
 
 Cambios aplicados sobre CE_v15_PROD_HOTFIX40_AVANCE_DOCUMENTOS_REFRESCO_SIN_CAMBIO_VERSION:
 

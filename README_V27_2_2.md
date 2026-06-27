@@ -1,4 +1,4 @@
-# ControlEvent v15_prod - Corrección definitiva Precio referencia en carga BACKUP
+# ControlEvent v16_prod - Corrección definitiva Precio referencia en carga BACKUP
 
 Versión correctiva sobre v27.2.1.
 

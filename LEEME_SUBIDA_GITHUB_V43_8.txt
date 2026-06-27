@@ -1,4 +1,4 @@
-ControlEvent v15_prod
+ControlEvent v16_prod
 
 - Corrige DONACIONES: al modificar responsable/donante/producto/precio/unidades/tipo, la pantalla refresca a la primera.
 - No toca COMPRAS, que ya funcionaba correctamente.

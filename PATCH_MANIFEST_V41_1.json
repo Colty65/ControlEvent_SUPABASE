@@ -1,5 +1,5 @@
 {
-  "version": "ControlEvent v15_prod",
+  "version": "ControlEvent v16_prod",
   "base": "ControlEvent_SUPABASE-main_V41_0.zip",
   "type": "corrective_patch",
   "date": "2026-05-24",

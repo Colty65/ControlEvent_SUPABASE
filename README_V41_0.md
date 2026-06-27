@@ -1,4 +1,4 @@
-# ControlEvent v15_prod
+# ControlEvent v16_prod
 
 Versión generada sobre v40.1.
 
@@ -10,6 +10,6 @@ Cambios principales:
 - El salto al registro se mantiene solo cuando antes de insertar se detecta que ya existía un duplicado.
 - Casitas flotantes reforzadas: en PC/iPad quedan centradas en la derecha; en Android/iPhone quedan encima del botón Menú, ligeramente separadas.
 - Botón casita de mantenimiento reforzado para PERSONAS, PRODUCTOS y TIENDAS.
-- Versión actualizada a ControlEvent v15_prod en cabecera, backup, service worker y metadatos.
+- Versión actualizada a ControlEvent v16_prod en cabecera, backup, service worker y metadatos.
 
 - Se han actualizado también las cadenas internas de versión en los bundles legacy cargados por `index.html` para que INFOEVENTO, backup y cabecera no arrastren v40.1.

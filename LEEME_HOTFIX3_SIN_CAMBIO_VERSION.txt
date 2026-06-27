@@ -1,4 +1,4 @@
-ControlEvent v15_prod - HOTFIX3 SIN CAMBIO DE VERSION
+ControlEvent v16_prod - HOTFIX3 SIN CAMBIO DE VERSION
 ======================================================
 
 Este paquete NO cambia la version funcional de la app ni package.json.
