@@ -936,6 +936,12 @@
       const donated = Math.max(0, Number(row.donado || 0));
       const zuzuBuy = Math.max(0, Number(row.compra || 0));
       const hintedNeed = Math.max(0, Number(row.necesidad || 0));
+      const manualNeed = (row.allIndices || []).some(idx => lastProposal[idx]?.__ceHf40ManualNeedOverride === true);
+      if(manualNeed){
+        const displayNeed = Math.round(Math.max(donated, hintedNeed) * 100) / 100;
+        const nextCompra = planBuyAfterDonation(row.producto, displayNeed, donated);
+        return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || donated > 0};
+      }
       const rawNeed = Math.max(hintedNeed, donated + zuzuBuy, donated);
       const nextCompra = planBuyAfterDonation(row.producto, rawNeed, donated);
       const displayNeed = Math.round((donated + nextCompra) * 100) / 100;
@@ -1119,23 +1125,20 @@
       if(covered) return;
       selected.set(id, {...p, numeroIngreso:1});
     });
-    let out = [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
-    const totalPersonas = arr => arr.reduce((sum,p) => sum + Number(p.numeroIngreso || 1), 0);
-    // En la operativa real de la peña, los socios se controlan por parejas/grupos
-    // y unos pocos solteros. Si aparecen demasiados individuales por estar también
-    // dados de alta como persona suelta, se conserva parejas/grupos y los solteros
-    // conocidos, evitando que se duplique la asistencia inicial.
-    if(totalPersonas(out) > 33){
-      const solterosPreferentes = ['JAVIER','VICENTE','JOSE MANUEL','MIGUEL ANGEL','ERNESTO'];
-      out = out.filter(p => Number(p.numeroIngreso || 1) >= 2 || solterosPreferentes.some(name => normalizeText(p.nombre || '') === name || normalizeText(p.nombre || '').startsWith(name + ' ')));
-    }
-    return out.sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+    // HF42: cuando el usuario pide “Ingresos obligatorios de todos los socios”,
+    // no se aplica ningún recorte por número estimado de asistentes. Ese recorte
+    // era útil para evitar duplicados en algunos históricos, pero podía dejar la
+    // propuesta a 0 SOCIOS si el maestro venía con muchos socios individuales.
+    return [...selected.values()].sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
   }
 
   function buildMandatorySocioIncomeProposal(totalCompras){
     const estimatedPeople = Math.max(1, Number(fieldValue('planPersonas') || 0));
     const price = planEstimatedEventPrice(totalCompras || 0, estimatedPeople);
-    const selected = sociosParaIngresosIniciales();
+    let selected = sociosParaIngresosIniciales();
+    // HF42: defensa adicional. Si por cualquier limpieza de duplicados quedara vacío,
+    // se usan todos los registros SOCIO disponibles para no crear nunca 0 ingresos.
+    if(!selected.length) selected = socios().map(p => ({...p, numeroIngreso: Math.max(1, Number(p.numero || 1))}));
     return selected.map((p, index) => {
       const numero = Math.max(1, Number(p.numeroIngreso || p.numero || 1));
       return {
@@ -2305,7 +2308,7 @@
       const after = roundPack24PurchaseHf30(before);
       if(after && Math.abs(after - before) > 0.0001){
         r.unidades = after;
-        r.necesidadTotal = after;
+        if(!r.__ceHf40ManualNeedOverride) r.necesidadTotal = after;
         r.reason = (r.reason || 'Compra propuesta.') + ` · HF39 pack 24: ${before} => ${after}.`;
       }
     });
@@ -2402,6 +2405,9 @@
     const donaciones = visibleStats.donaciones;
     const totalCompras = visibleStats.totalCompras;
     const totalDonaciones = visibleStats.totalDonaciones;
+    if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' && !lastIncomeProposal.length){
+      lastIncomeProposal = buildMandatorySocioIncomeProposal(totalCompras);
+    }
     const ingresosInfo = incomeSummary(lastIncomeProposal);
     const cards = advancedDetailCardsHtml();
     box.classList.remove('hidden');
@@ -2410,7 +2416,7 @@
         <div class="plan-metric"><span>Evento modelo</span><strong>${esc(source?.titulo || (planMode()==='ZUZU_TOTAL' ? 'No procede: encargo total a Zuzu' : 'Sin evento'))}</strong><small>${esc(source?.fechaIni || '')}${source?.fechaFin ? ' · ' + esc(source.fechaFin) : ''}</small></div>
         <div class="plan-metric"><span>Compras propuestas</span><strong>${compras.length}</strong><small>${money(totalCompras)} previstos</small></div>
         <div class="plan-metric"><span>Donaciones propuestas</span><strong>${donaciones.length}</strong><small>${money(totalDonaciones)} valor estimado</small></div>
-        <div class="plan-metric"><span>Ingresos del modelo</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
+        <div class="plan-metric"><span>${planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? 'Ingresos obligatorios' : 'Ingresos del modelo'}</span><strong>${qty(ingresosInfo.sociosPersonas)} SOCIOS · ${qty(ingresosInfo.noSociosPersonas)} NO SOCIOS</strong><small>${ingresosInfo.registros} registros · ${qty(ingresosInfo.totalPersonas)} personas</small></div>
       </div>
       ${renderPlanningNarrative(proposals, totalCompras, totalDonaciones)}
       ${ceHf27DiagnosticsHtml()}
@@ -2579,6 +2585,8 @@
         : planDeficitUnits(newName, buy);
       if(Math.abs(roundedBuy - buy) > 0.0001){ buy = roundedBuy; buyInput.value = String(buy); }
     }
+    const hasManualNeedBefore = group.allIndices.some(idx => lastProposal[idx]?.__ceHf40ManualNeedOverride === true);
+    const preserveManualNeed = changedField === 'necesidad' || (changedField === '__sync' && hasManualNeedBefore);
     group.allIndices.forEach(idx => {
       if(lastProposal[idx]){
         lastProposal[idx].include = include;
@@ -2645,12 +2653,20 @@
         purchase.manualProduct = true;
       }
       purchase.manualStore = changedField === 'tiendaId' || purchase.manualStore;
-      purchase.necesidadTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+      const impliedNeedTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+      const finalNeedTotal = preserveManualNeed ? Math.max(0, Number(need || 0)) : impliedNeedTotal;
+      purchase.necesidadTotal = finalNeedTotal || undefined;
+      if(preserveManualNeed) purchase.__ceHf40ManualNeedOverride = true;
       purchase.__ceManualDeficitPurchaseHf31 = purchase.__ceManualDeficitPurchaseHf31 || changedField === 'necesidad' || changedField === 'compra';
       purchase.manualResponsible = changedField === 'responsableId' || purchase.manualResponsible;
     }
+    const impliedNeedTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+    const finalNeedTotal = preserveManualNeed ? Math.max(0, Number(need || 0)) : impliedNeedTotal;
     group.allIndices.forEach(idx => {
-      if(lastProposal[idx]) lastProposal[idx].necesidadTotal = Math.max(0, Number(editedDonatedTotal || group.donado || 0)) + Math.max(0, Number(buy || 0));
+      if(lastProposal[idx]){
+        lastProposal[idx].necesidadTotal = finalNeedTotal || undefined;
+        if(preserveManualNeed) lastProposal[idx].__ceHf40ManualNeedOverride = true;
+      }
     });
     const purchaseTotal = tr.querySelector('[data-plan-purchase-total]');
     if(purchaseTotal) purchaseTotal.textContent = money(buy * (price || 0));
@@ -3000,6 +3016,11 @@
     }
     if(!lastProposal.length && !lastIncomeProposal.length){ try{ alert('No hay propuesta generada. Pulsa primero Generar propuesta.'); }catch(_){} return; }
     try{ syncProposalFromResourceEditor(); }catch(e){ console.warn('[Planificación] No se pudo sincronizar la propuesta editable antes de crear evento', e); }
+    if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' && !lastIncomeProposal.length){
+      const includedNow = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0 && p.tipo === 'COMPRA');
+      const totalComprasNow = includedNow.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+      lastIncomeProposal = buildMandatorySocioIncomeProposal(totalComprasNow);
+    }
     const st = state();
     if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
     const title = proposedEventTitle();

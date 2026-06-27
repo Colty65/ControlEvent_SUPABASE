@@ -78,7 +78,8 @@
     </div>`;
   }
   function clearOld(){
-    document.querySelectorAll('#budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box,#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,#ceHf16AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,.ce-hf16-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel').forEach(el=>el.remove());
+    document.querySelectorAll('#budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box,#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel').forEach(el=>el.remove());
+    // HF42: si algún hotfix anterior vuelve a pintar el botón con retraso, se eliminará por el observador de abajo.
   }
   function panelContainer(){
     const tab=$('tabMapaProductos');
@@ -105,14 +106,14 @@
     if(!title || $('ceHf16AvanceBtn')) return;
     const actions=document.createElement('div');
     actions.className='ce-hf16-mapa-actions';
-    actions.innerHTML='<button type="button" id="ceHf16AvanceBtn" class="ce-hf16-av-btn" title="Avance del evento" aria-label="Avance del evento" onpointerdown="return window.ceHf16ToggleAvance(event)" onclick="return window.ceHf16ToggleAvance(event)"><img src="./hitos-evento.jpg" alt=""></button>';
+    actions.innerHTML='<button type="button" id="ceHf16AvanceBtn" class="ce-hf16-av-btn" title="Avance del evento" aria-label="Avance del evento"><img src="./hitos-evento.jpg" alt=""></button>';
     title.appendChild(actions);
   }
   function refreshPanel(){ const p=$('ceHf16MapaAvancePanel'); if(p) p.innerHTML=avanceHtml(); }
   function injectStyle(){
     if($('ceHf16Style')) return;
     const css=`
-      #budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box{display:none!important}
+      #budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel{display:none!important}
       .mapa-productos-card>.section-title{display:flex!important;align-items:flex-start!important;gap:12px!important}
       .ce-hf16-mapa-actions{margin-left:auto!important;margin-right:24%!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;padding-top:2px!important}
       @media(max-width:900px){.ce-hf16-mapa-actions{margin-right:0!important}}
@@ -127,14 +128,25 @@
     `;
     const style=document.createElement('style'); style.id='ceHf16Style'; style.textContent=css; document.head.appendChild(style);
   }
-  function apply(){ injectStyle(); ensureButton(); refreshPanel(); }
+  function apply(){ injectStyle(); clearOld(); ensureButton(); refreshPanel(); }
   let timer=0; function schedule(d){ clearTimeout(timer); timer=setTimeout(apply,d||60); }
+  try{
+    const oldSelectors = '#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel';
+    new MutationObserver(muts => {
+      for(const m of muts){
+        for(const n of Array.from(m.addedNodes || [])){
+          if(n?.nodeType !== 1) continue;
+          if(n.matches?.(oldSelectors) || n.querySelector?.(oldSelectors) || document.querySelectorAll('#ceHf16AvanceBtn').length > 1){ schedule(80); return; }
+        }
+      }
+    }).observe(document.documentElement, {childList:true, subtree:true});
+  }catch(_){ }
   document.addEventListener('click',ev=>{
     const btn=ev.target?.closest?.('#ceHf16AvanceBtn');
     if(btn) return window.ceHf16ToggleAvance(ev);
   }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed','controlevent:images-updated','controlevent:state-saved'].forEach(ev=>window.addEventListener(ev,()=>schedule(ev==='controlevent:event-changed'?90:50),true));
-  document.addEventListener('click',ev=>{ if(ev.target?.closest?.('#tabMapaBtn,#selectedEvent,#refreshBtn,[data-ticket-upload],[data-receipt-upload]')) schedule(100); },true);
-  [0,200,800,1600,2600].forEach(ms=>setTimeout(apply,ms));
+  document.addEventListener('click',ev=>{ if(ev.target?.closest?.('#tabMapaBtn,#selectedEvent,#refreshBtn,[data-ticket-upload],[data-receipt-upload]')) [100,260,520].forEach(ms=>schedule(ms)); },true);
+  [0,200,800,1600,2600,4200].forEach(ms=>setTimeout(apply,ms));
   window.__ceHf16Hotfix40AvancePunto6='HOTFIX40_AVANCE_PUNTO6_ACTIVO';
 })();

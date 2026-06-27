@@ -63,6 +63,10 @@
     document.querySelectorAll('#budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box').forEach(el=>el.remove());
   }
   function ensureMapaAvance(){
+    if(window.__ceV15Hotfix16AvanceDonacionesPrompt){
+      document.querySelectorAll('#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel').forEach(el=>el.remove());
+      return;
+    }
     removeBudgetAvance();
     const tab=$('tabMapaProductos'); if(!tab) return;
     const title=tab.querySelector('.mapa-productos-card > .section-title'); if(!title) return;
