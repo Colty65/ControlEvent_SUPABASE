@@ -176,12 +176,24 @@
   function run(){ injectStyle(); patchModals(); colorAvance(); }
   function schedule(){ clearTimeout(timer); timer=setTimeout(run,50); }
 
+  function isLikelyModalTarget(ev){
+    const t=ev?.target;
+    if(!t) return false;
+    return !!(t.closest?.('button,[role=button],img,[class*=photo],[class*=ticket],[class*=justificante],[class*=receipt],[class*=modal]'));
+  }
+  function mutationIsRelevant(muts){
+    return (muts||[]).some(m=>Array.from(m.addedNodes||[]).some(n=>{
+      if(!n || n.nodeType!==1) return false;
+      const id=n.id||'', cls=n.className||'';
+      return /modal|ticket|receipt|justificante|ceHf48AvanceLayer/i.test(id+' '+cls) || !!n.querySelector?.('[class*=modal],[class*=ticket],[class*=receipt],#ceHf48AvanceLayer');
+    }));
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run,{once:true}); else run();
-  document.addEventListener('click',()=>setTimeout(run,60),true);
-  document.addEventListener('mouseover',()=>setTimeout(()=>{document.querySelectorAll('#ceBudgetLiteTooltipV307 table,#ceTooltipV21 table,[id*="Tooltip"] table').forEach(sortTableByProduct);},100),true);
+  document.addEventListener('click',(ev)=>{ if(isLikelyModalTarget(ev)) setTimeout(run,80); },true);
+  document.addEventListener('mouseover',(ev)=>{ const tt=ev.target?.closest?.('#ceBudgetLiteTooltipV307,#ceTooltipV21,[id*="Tooltip"]'); if(tt) setTimeout(()=>tt.querySelectorAll('table').forEach(sortTableByProduct),80); },true);
   window.addEventListener('controlevent:event-loaded',()=>setTimeout(run,80));
   window.addEventListener('controlevent:event-ready',()=>setTimeout(run,80));
-  try{ new MutationObserver(schedule).observe(document.body||document.documentElement,{childList:true,subtree:true}); }catch(_){ }
-  [100,350,900,1800].forEach(ms=>setTimeout(run,ms));
+  try{ new MutationObserver((muts)=>{ if(mutationIsRelevant(muts)) schedule(); }).observe(document.body||document.documentElement,{childList:true,subtree:true}); }catch(_){ }
+  [100,350,900].forEach(ms=>setTimeout(run,ms));
   window.ControlEventHf51=Object.assign(window.ControlEventHf51||{}, {run, patchModals, colorAvance});
 })();

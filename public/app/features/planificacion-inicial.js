@@ -2428,6 +2428,7 @@
     // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
     // porque estaba eliminando las compras que sí aparecen arriba.
     lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(lastProposal)));
+    lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
     const proposals = lastProposal;
     const source = lastSourceEvent;
     const visibleStats = planVisibleResourceStats();
@@ -3137,6 +3138,7 @@
       const totalComprasNow = includedNow.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
       lastIncomeProposal = buildMandatorySocioIncomeProposal(totalComprasNow);
     }
+    lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
     const st = state();
     if(!st.eventos || !st.colaboradores || !st.compras){ try{ alert('No se ha podido acceder al estado de la app.'); }catch(_){} return; }
     const title = proposedEventTitle();
@@ -3480,21 +3482,75 @@
     });
     return u * price;
   }
+  function ceHf52NormalizeSearch(value){
+    return String(value || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/Ñ/g,'N').replace(/ñ/g,'n')
+      .replace(/[^A-Za-z0-9]+/g,' ')
+      .replace(/\bWISKI\b/gi,'WHISKY')
+      .replace(/\bWHISKI\b/gi,'WHISKY')
+      .replace(/\s+/g,' ')
+      .trim().toUpperCase();
+  }
+  function ceHf52FamilyWanted(label){
+    const n = ceHf52NormalizeSearch(label);
+    if(n.includes('RON') && n.includes('BARCELO')) return 'ron-barcelo';
+    if((n.includes('WHISKY') || n.includes('WISKI')) && (/\bJ\s*B\b/.test(n) || /\bJB\b/.test(n) || n.includes('5 ANOS'))) return 'whisky-jb';
+    if(n.includes('COCA') && n.includes('ZERO') && (n.includes('ZERO ZERO') || n.includes('ZEROZERO') || /\b0\s*0\b/.test(n) || n.includes(' 00 '))) return 'coca-zero-zero';
+    if(n.includes('COCA') && n.includes('ZERO')) return 'coca-zero';
+    if(n.includes('COCA')) return 'coca-normal';
+    if(n.includes('BEEFEATER')) return 'beefeater';
+    if(n.includes('CERVEZA') || n.includes('MAHOU')) return 'cerveza';
+    if(n.includes('HIELO')) return 'hielo';
+    return '';
+  }
+  function ceHf52ProductFamilyName(name){
+    const n = ceHf52NormalizeSearch(name);
+    if(n.includes('RON') && n.includes('BARCELO')) return 'ron-barcelo';
+    if((n.includes('WHISKY') || n.includes('WISKI')) && (/\bJ\s*B\b/.test(n) || /\bJB\b/.test(n) || n.includes('5 ANOS'))) return 'whisky-jb';
+    if(n.includes('COCA') && n.includes('ZERO') && (n.includes('ZERO ZERO') || n.includes('ZEROZERO') || /\b0\s*0\b/.test(n) || n.includes(' 00 '))) return 'coca-zero-zero';
+    if(n.includes('COCA') && n.includes('ZERO')) return 'coca-zero';
+    if(n.includes('COCA') && !n.includes('ZERO')) return 'coca-normal';
+    if(n.includes('BEEFEATER')) return 'beefeater';
+    if(n.includes('CERVEZA') || n.includes('MAHOU')) return 'cerveza';
+    if(n.includes('HIELO')) return 'hielo';
+    return '';
+  }
+  function ceHf52ResolveSaldoProduct(label){
+    const family = ceHf52FamilyWanted(label);
+    const products = rows('productos');
+    if(family){
+      const exact = products.find(p => ceHf52ProductFamilyName(p?.nombre || '') === family);
+      if(exact) return exact;
+    }
+    const direct = ceHf51ResolveSaldoProduct(label) || resolveCatalogProductByNameHf25(label) || resolveCatalogProductByName(label);
+    if(direct && direct.id) return direct;
+    const wanted = ceHf52NormalizeSearch(label).split(' ').filter(Boolean);
+    let best=null, score=-9999;
+    products.forEach(p=>{
+      const name = ceHf52NormalizeSearch(p?.nombre || '');
+      if(!name) return;
+      let s=0;
+      wanted.forEach(tok=>{ if(name.includes(tok)) s += tok.length >= 5 ? 60 : 35; else s -= 20; });
+      if(s > score){ score=s; best=p; }
+    });
+    return score >= 35 ? best : null;
+  }
   function ceHf46BalancePositiveSurplusOnce(list){
-    // HOTFIX49: balance real de saldo positivo.
-    // Regla de negocio actual: si saldo/compras > 35%, añadir/reforzar compras en el
-    // orden acordado y parar antes de dejar el saldo por debajo del 20% de las compras iniciales.
-    let rows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true);
+    // HOTFIX52: balance real y repetible del saldo positivo.
+    // Se recalcula siempre desde las compras base, quitando ajustes anteriores, para que no desaparezca al repintar.
+    let baseRows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true && row.__ceHf52SaldoBalancer !== true);
+    let rows = baseRows.slice();
     const totalBefore = ceHf46IncludedPurchaseTotal(rows);
     const income = ceHf46EstimatedVisibleIncome(totalBefore);
-    if(totalBefore <= 0 || income <= 0) return rows;
+    if(totalBefore <= 0 || income <= 0) return normalizeProposalRowsForGroups(rows);
     const saldo = income - totalBefore;
-    const partida = totalBefore * 0.35;
-    const sueloSaldo = totalBefore * 0.20;
-    if(saldo <= partida) return rows;
-
-    let remaining = Math.max(0, saldo - sueloSaldo);
-    if(remaining <= 1) return rows;
+    if(saldo <= 0) return normalizeProposalRowsForGroups(rows);
+    const ratio = saldo / totalBefore;
+    if(ratio <= 0.35) return normalizeProposalRowsForGroups(rows);
+    const minSaldoFinal = totalBefore * 0.20;
+    let remaining = Math.max(0, saldo - minSaldoFinal);
+    if(remaining <= 1) return normalizeProposalRowsForGroups(rows);
 
     const priority = [
       {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
@@ -3507,16 +3563,22 @@
       {label:'HIELO', step:5, fallback:0.90}
     ];
 
-    // No se filtra por contexto: si el usuario pide ajuste por saldo, se respeta el orden fijado.
     let guard = 0;
-    while(remaining > 1 && guard < 140){
+    while(remaining > 1 && guard < 160){
       let addedCycle = false;
       for(const item of priority){
-        const price = ceHf46ProductPrice(item.label, item.fallback) || Number(item.fallback || 0);
+        const prod = ceHf52ResolveSaldoProduct(item.label);
+        if(!prod || !prod.id) continue;
+        const price = Math.max(0, Number(ceHf27CatalogPrice(prod) || item.fallback || 0));
         const cost = price * item.step;
         if(cost <= 0 || cost > remaining) continue;
-        const added = ceHf46AddOrIncreasePurchase(rows, item.label, item.step, `saldo positivo ${money(saldo)}; se refuerza ${item.label} sin bajar del 20% de colchón.`, {noRound:true, fallbackPrice:item.fallback});
-        if(added > 0){ remaining -= added; addedCycle = true; }
+        const beforeLen = rows.length;
+        const added = ceHf46AddOrIncreasePurchase(rows, prod.nombre || item.label, item.step, `saldo positivo ${money(saldo)} (${Math.round(ratio*100)}% sobre compras); se refuerza ${prod.nombre || item.label} sin bajar del 20% de colchón.`, {noRound:true, fallbackPrice:price});
+        if(added > 0){
+          remaining -= added; addedCycle = true;
+          for(let i=beforeLen; i<rows.length; i++) if(rows[i]) rows[i].__ceHf52SaldoBalancer = true;
+          rows.forEach(r=>{ if(r && r.__ceHf46SaldoBalancer) r.__ceHf52SaldoBalancer = true; });
+        }
         if(remaining <= 1) break;
       }
       if(!addedCycle) break;
