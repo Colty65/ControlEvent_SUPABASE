@@ -1,7 +1,7 @@
 /* ControlEvent v15_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
-  console.log('HOTFIX40_MANUAL_NEED_DOCS_AVANCE_ACTIVO');
+  console.log('HOTFIX47_LOGO_AVANCE_EVENT_SWITCH_PLAN_DOCS');
   'use strict';
   const VERSION = 'ControlEvent v15_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
@@ -1072,6 +1072,10 @@
       ? `<p class="plan-budget-warning"><strong>Aviso de realidad:</strong> ${esc(money(costePersona))} por persona supera el límite caro de referencia (${esc(money(35))}). Revisa cantidades antes de generar el evento.</p>`
       : (people > 0 && costePersona > 25 ? `<p class="plan-budget-warning"><strong>Aviso:</strong> ${esc(money(costePersona))} por persona está por encima del coste habitual de referencia (${esc(money(25))}).</p>` : '');
     const prompt = fieldValue('planInfo');
+    const inc = incomeSummary(Array.isArray(lastIncomeProposal) ? lastIncomeProposal : []);
+    const incomeLine = inc.registros > 0
+      ? `<p><strong>Ingresos previstos:</strong> ${qty(inc.registros)} registro(s) · ${qty(inc.totalPersonas)} persona(s) representadas · ${money(inc.importe)}${planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? ' · generados automáticamente desde socios obligatorios' : ''}.</p>`
+      : '';
     const conditions = [];
     const dias = Number(fieldValue('planDias') || 0); if(dias) conditions.push(`${qty(dias)} día(s)`);
     if(people) conditions.push(`${qty(people)} personas estimadas`);
@@ -1085,6 +1089,7 @@
         <strong>Lectura de Zuzu para ${esc(title)}:</strong>
         <p>He preparado una propuesta revisable atendiendo a las condiciones principales${conditions.length ? ': ' + esc(conditions.join(' · ')) : ''}. La lógica es: necesidad total prevista, menos donaciones/existencias, y compra solo del déficit revisable.</p>
         <p><strong>Total compras previstas:</strong> ${money(totalCompras)} · <strong>Donaciones/existencias estimadas:</strong> ${money(totalDonaciones)} · <strong>Valoración del evento:</strong> ${money(valuation)}.</p>
+        ${incomeLine}
         <p><strong>Coste real de compra:</strong> ${people > 0 ? money(costePersona) + ' por persona' : 'sin personas estimadas'} · <strong>Precio orientativo de entrada:</strong> ${money(price)} por persona, redondeado al alza para facilitar el cobro.</p>
         ${realism}
         <p><strong>Para afinar más a Zuzu:</strong> indica personas, comidas incluidas, nivel de bebida, niños/no bebedores, presupuesto objetivo y si hay donaciones/existencias confirmadas.</p>
@@ -2845,6 +2850,35 @@
     try{ document.getElementById('planFactoryIndicator')?.remove(); }catch(_){ }
     try{ document.getElementById('planFactoryOverlay')?.remove(); }catch(_){ }
   }
+  function activateCreatedEventAndOpenGraficas(newEventId){
+    const id = String(newEventId || '').trim();
+    if(!id) return;
+    const s = state();
+    try{ s.selectedEventId = id; }catch(_){ }
+    try{ if(window.ControlEventApp?.state) window.ControlEventApp.state.selectedEventId = id; }catch(_){ }
+    const sel = document.getElementById('selectedEvent');
+    if(sel){
+      const ev = rows('eventos').find(e => String(e.id || '') === id);
+      if(ev && !Array.from(sel.options || []).some(o => String(o.value) === id)){
+        const opt = document.createElement('option'); opt.value = id; opt.textContent = ev.titulo || 'Evento nuevo'; sel.appendChild(opt);
+      }
+      sel.value = id;
+    }
+    const setTab = () => {
+      try{ currentMainTab = 'graficas'; }catch(_){ }
+      try{ window.__ceCurrentMainTab = 'graficas'; }catch(_){ }
+      try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = 'graficas'; }catch(_){ }
+    };
+    const open = () => {
+      setTab();
+      try{ if(window.ControlEventV447?.selectEvent){ window.ControlEventV447.selectEvent(id, {force:true, tab:'graficas', delay:80}); return; } }catch(_){ }
+      try{ if(typeof window.changeSelectedEvent === 'function') window.changeSelectedEvent(id); }catch(_){ }
+      try{ document.getElementById('tabGraficasBtn')?.click(); }catch(_){ }
+      try{ if(typeof window.renderGraficas === 'function') window.renderGraficas({force:true, reason:'plan-created'}); }catch(_){ }
+    };
+    setTimeout(open, 60);
+    setTimeout(() => { setTab(); try{ if(typeof window.renderGraficas === 'function') window.renderGraficas({force:true, reason:'plan-created-late'}); }catch(_){ } }, 900);
+  }
 
   function bindIncomeProposalControls(box){
     if(!box) return;
@@ -3121,12 +3155,7 @@
       const fechaIni = fieldValue('planFechaIni') || source?.fechaIni || '';
       const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source?.fechaFin || source?.fechaIni || '';
       const descUser = fieldValue('planDescripcion');
-      const infoUser = fieldValue('planInfo');
-      const descripcion = [
-        descUser || source?.descripcion || '',
-        (source ? 'Propuesta inicial creada desde evento modelo: ' + (source.titulo || 'sin título') + '.' : 'Propuesta inicial creada por Zuzu sin evento modelo.'),
-        infoUser ? 'Información de planificación: ' + infoUser : ''
-      ].filter(Boolean).join('\n');
+      const descripcion = descUser || '';
       const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
       const totalCompras = included.filter(p => p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
       const eventPrice = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS' ? eventPriceFromIncomeProposal(totalCompras) : parseNum(source?.precio || planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1)) || 0);
@@ -3160,7 +3189,7 @@
       callRender();
       try{ if(typeof window.fetchState === 'function') setTimeout(() => window.fetchState().catch?.(()=>{}), 300); }catch(_){ }
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
-      try{ if(typeof window.renderMapaProductos === 'function') window.renderMapaProductos(); }catch(_){ }
+      activateCreatedEventAndOpenGraficas(newEventId);
     }catch(error){
       console.error('[ControlEvent v15_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }

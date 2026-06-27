@@ -386,6 +386,14 @@
     const serverState = await fresh.json();
     return mergeStateFromServer(serverState);
   }
+  async function loadEventScopedForSwitchV47(id, token){
+    try{
+      if(window.ControlEventHf47 && typeof window.ControlEventHf47.loadScopedEventForSwitch === 'function'){
+        return await window.ControlEventHf47.loadScopedEventForSwitch(id, token);
+      }
+    }catch(error){ console.warn('[v47] carga scoped helper falló', error); }
+    return false;
+  }
   async function doLoginFast(){
     if(loginBusyV447) return false;
     const ident = String($('loginIdentificacion')?.value || '').trim();
@@ -654,6 +662,8 @@
     ensureEventPlaceholder();
     showLoading(targetTab, wasEvent ? 'Cargando nuevo evento...' : 'Cargando evento seleccionado...');
     notice(wasEvent ? 'Cargando nuevo evento… preparando ventana activa' : 'Cargando evento seleccionado… preparando Gráficas');
+    await loadEventScopedForSwitchV47(id, token);
+    if(token !== transition.token || String($('selectedEvent')?.value || currentEventId()) !== id) return false;
     queueActive(targetTab, token, {delay: options.delay});
     return false;
   }

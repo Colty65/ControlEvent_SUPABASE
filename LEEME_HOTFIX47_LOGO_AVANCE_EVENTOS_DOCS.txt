@@ -1,0 +1,12 @@
+ControlEvent v15_prod - HOTFIX47
+
+Cambios principales:
+1) Se elimina el botón de AVANCE DEL EVENTO de Mapa de recursos.
+2) El AVANCE DEL EVENTO se muestra al pulsar el logo ColtyLAB de cabecera, como globo centrado efímero y compatible con móvil.
+3) Cambio rápido de evento: se carga el estado scoped del evento antes de pintar la pestaña activa para evitar compras/donaciones vacías por respuestas antiguas o parciales.
+4) Planificación inicial: al terminar de crear un evento, queda como evento activo y se abre GRAFICAS automáticamente.
+5) Tabla eventos.descripcion: al crear desde planificación solo se guarda Breve descripción, no se concatena la información de construcción.
+6) Documentos del evento: desde la vista de documentos se permite abrir mantenimiento de tablas con las ruletas.
+7) Lectura de Zuzu: si se han generado ingresos automáticamente, se muestra el dato de ingresos previstos.
+
+Recomendación tras despliegue: Ctrl+F5 para limpiar scripts antiguos en el navegador.
