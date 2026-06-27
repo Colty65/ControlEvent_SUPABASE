@@ -230,14 +230,9 @@
     }catch(_){ }
   }
   function patchModals(){
-    const nodes=Array.from(document.querySelectorAll('.ce-v468-modal,.ce-v465-modal,.ce-v464-modal,.ce-receipt-modal-v463,.ce-v40-modal,.ce-v401-pc-modal,#ceV401PcPhotoModal,#ceV40TicketPhotoModal,#ceV104TicketDetail,#ceV103TicketDetail,#ceTicketModalV234,#ceTicketImageModalV225,.modal,.dialog,[role="dialog"]'));
-    nodes.forEach(root=>{
-      const tx=root.textContent||'';
-      if(/Foto de ticket|CALCULOS\s+POR\s+AGRUPACION|Ticket\/Otros|TK\d/i.test(tx)){
-        replaceTicketHeading(root); removeCalcHeading(root); sortTablesByProduct(root);
-      }
-      if(/Justificante de ingreso/i.test(tx)) addReceiptTitle(root);
-    });
+    // HOTFIX51: desactivado aquí. La normalización real de visores se hace en v15-hotfix25-rebase49-correcciones.js
+    // para evitar que este hotfix y el 49 creen títulos duplicados en cascada.
+    return;
   }
 
   function patchTooltipTables(){

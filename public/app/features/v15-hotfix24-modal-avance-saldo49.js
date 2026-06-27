@@ -140,16 +140,10 @@
   }
 
   function patchModals(){
-    const roots=Array.from(document.querySelectorAll('.ce-v468-modal,.ce-v465-modal,.ce-v464-modal,.ce-receipt-modal-v463,.ce-receipt-modal,.ce-v40-modal,.ce-v401-pc-modal,#ceV401PcPhotoModal,#ceV40TicketPhotoModal,#ceV104TicketDetail,#ceV103TicketDetail,#ceTicketModalV234,#ceTicketImageModalV225,.modal,.dialog,[role="dialog"]'));
-    roots.forEach(root=>{
-      const t=root.textContent||'';
-      if(/Justificante de ingreso/i.test(t)) normalizeReceiptModal(root);
-      if(/Foto de ticket|Ticket\/Otros|TK\d|CALCULOS\s+POR\s+AGRUPACION/i.test(t)){
-        normalizeTicketModal(root);
-        root.querySelectorAll('table').forEach(sortTableByProduct);
-      }
-    });
+    // HOTFIX51: no tocar visores aquí; se corrigen de forma específica y segura en v15-hotfix25.
+    return;
   }
+
 
   function patchTooltipTables(){
     document.querySelectorAll('#ceBudgetLiteTooltipV307 table,#ceTooltipV21 table,.ce-budget-lite-tooltip-v306 table,[id*="Tooltip"] table').forEach(sortTableByProduct);
