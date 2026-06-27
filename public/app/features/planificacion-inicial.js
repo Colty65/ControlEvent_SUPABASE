@@ -936,9 +936,17 @@
       const donated = Math.max(0, Number(row.donado || 0));
       const zuzuBuy = Math.max(0, Number(row.compra || 0));
       const hintedNeed = Math.max(0, Number(row.necesidad || 0));
-      const manualNeed = (row.allIndices || []).some(idx => lastProposal[idx]?.__ceHf40ManualNeedOverride === true);
+      const manualNeedValues = (row.allIndices || [])
+        .map(idx => lastProposal[idx])
+        .filter(x => x && x.__ceHf40ManualNeedOverride === true)
+        .map(x => Number(x.necesidadTotal ?? x.necesidad ?? x.necesidadCalculada ?? 0))
+        .filter(v => Number.isFinite(v) && v >= 0);
+      const manualNeed = manualNeedValues.length > 0;
       if(manualNeed){
-        const displayNeed = Math.round(Math.max(donated, hintedNeed) * 100) / 100;
+        // HOTFIX43: la caja visible NECESIDAD CALCULADA manda. Si el usuario baja de 2 a 1
+        // con 1 donado y 1 a comprar, no debe volver a 2 por arrastre de la línea de compra antigua.
+        const chosenNeed = manualNeedValues.length ? Math.min(...manualNeedValues) : hintedNeed;
+        const displayNeed = Math.round(Math.max(donated, chosenNeed) * 100) / 100;
         const nextCompra = planBuyAfterDonation(row.producto, displayNeed, donated);
         return {...row, necesidad: displayNeed, compra: nextCompra, include: row.include || nextCompra > 0 || donated > 0};
       }
@@ -2963,7 +2971,8 @@
           ticketDonacion: base.ticketDonacion || detail.ticketDonacion || 'DONADO SOCIO',
           donorRef: normalizeDonorRef(donorInput?.value || detail.donorRef || base.donorRef || ''),
           responsableId: respInput?.value || detail.responsableId || base.responsableId || '',
-          necesidadTotal: need || undefined
+          necesidadTotal: need || undefined,
+          __ceHf40ManualNeedOverride: true
         });
       });
       const buyInput = tr.querySelector('[data-plan-resource-field="compra"]');
@@ -2989,7 +2998,8 @@
           responsableId,
           ticketDonacion:'',
           donorRef:'',
-          necesidadTotal: need || undefined
+          necesidadTotal: need || undefined,
+          __ceHf40ManualNeedOverride: true
         });
       }
     });
