@@ -23,6 +23,31 @@
   function auth(){ return app()?.authUser || window.authUser || null; }
   function isGD(){ return String(auth()?.nivel || '').toUpperCase() === 'GD'; }
   function rows(name){ const value = state()[name]; return Array.isArray(value) ? value : []; }
+  function mergeMasterRowsForPlanning(data){
+    try{
+      const st = state();
+      if(data && Array.isArray(data.personas) && data.personas.length > rows('personas').length) st.personas = data.personas;
+      if(data && Array.isArray(data.tiendas) && data.tiendas.length > rows('tiendas').length) st.tiendas = data.tiendas;
+      if(data && Array.isArray(data.eventos) && data.eventos.length > rows('eventos').length) st.eventos = data.eventos;
+      if(window.ControlEventApp && window.ControlEventApp.state) window.ControlEventApp.state = st;
+    }catch(error){ console.warn('[ControlEvent v15_prod] No se pudo fusionar maestros para planificación:', error); }
+  }
+  async function ensureMasterRowsForMandatoryIncomes(){
+    if(planContent() !== 'INGRESOS_SOCIOS_OBLIGATORIOS') return;
+    // En carga por evento puede haber pocos/ningún socio disponible en memoria. Para generar
+    // los ingresos obligatorios siempre se traen los maestros completos, sin compras/ingresos.
+    const nativeFetch = window.__ceFix48NativeFetch || window.fetch;
+    try{
+      const res = await nativeFetch('/api/state?eventId=__CE_MASTER_ROWS__&v15hf17=mandatory_incomes&_=' + Date.now(), {
+        cache:'no-store', headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}
+      });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json().catch(() => ({}));
+      mergeMasterRowsForPlanning(data);
+    }catch(error){
+      console.warn('[ControlEvent v15_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
+    }
+  }
   function byId(name, id){ const sid = String(id || ''); return rows(name).find(item => String(item.id || '') === sid) || null; }
   function esc(value){ return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
   function up(value){ return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase(); }
@@ -255,6 +280,7 @@
       return {
         key: `ingreso:${c.id || index}`,
         sourceId: c.id || '',
+        include: c.include !== false,
         personaId: c.personaId || '',
         personaName: persona.nombre || 'Persona sin nombre',
         rango: rango || 'SIN RANGO',
@@ -266,7 +292,7 @@
     });
   }
   function incomeSummary(incomes){
-    const list = Array.isArray(incomes) ? incomes : [];
+    const list = (Array.isArray(incomes) ? incomes : []).filter(x => x && x.include !== false);
     const sociosRows = list.filter(x => x.rango === 'SOCIO');
     const noSociosRows = list.filter(x => x.rango !== 'SOCIO');
     const sumNumero = arr => arr.reduce((sum,x)=>sum + Number(x.numero || 0), 0);
@@ -277,18 +303,54 @@
     return {sociosRows, noSociosRows, sociosPersonas, noSociosPersonas, totalPersonas, registros:list.length, importe};
   }
   function renderIngresosReplica(incomes){
-    const info = incomeSummary(incomes);
-    if(!info.registros){
-      return '<div class="planificacion-note compact-note"><strong>Ingresos del evento modelo:</strong> no hay ingresos registrados para replicar.</div>';
+    const list = Array.isArray(incomes) ? incomes : [];
+    const info = incomeSummary(list);
+    const mandatory = planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS';
+    if(!list.length){
+      const label = mandatory ? 'Ingresos obligatorios de todos los socios' : 'Ingresos del evento modelo';
+      return '<div class="planificacion-note compact-note"><strong>'+esc(label)+':</strong> no hay registros de ingresos para presentar.</div>';
     }
+    const totalRows = list.length;
+    const excludedRows = list.filter(x => x && x.include === false).length;
+    const rowsHtml = list.map((item, index) => {
+      const include = item?.include !== false;
+      const total = Number(item?.importeObligatorio || 0) + Number(item?.importeVoluntario || 0);
+      return `
+        <tr class="${include ? '' : 'excluded'}" data-plan-income-index="${index}">
+          <td class="plan-income-include"><label><input type="checkbox" data-plan-income-field="include" ${include ? 'checked' : ''}> Incluir</label></td>
+          <td><strong>${esc(item?.personaName || 'Persona sin nombre')}</strong><small>${esc(item?.rango || '')}</small></td>
+          <td><input type="number" min="0" step="1" value="${esc(item?.numero ?? 0)}" data-plan-income-field="numero"></td>
+          <td>${esc(item?.situacion || 'Pendiente')}</td>
+          <td>${esc(money(item?.importeObligatorio || 0))}</td>
+          <td><input type="number" min="0" step="0.01" value="${esc(item?.importeVoluntario ?? 0)}" data-plan-income-field="importeVoluntario"></td>
+          <td><strong>${esc(money(total))}</strong></td>
+          <td><button type="button" class="outline small" data-plan-income-delete="1">Eliminar</button></td>
+        </tr>`;
+    }).join('');
+    const title = mandatory ? 'Ingresos obligatorios de socios que se crearán' : 'Ingresos que se crearán';
+    const lead = mandatory
+      ? 'Estos son los registros de colaboradores/ingresos que van a entrar al sistema. Puedes excluir o eliminar cualquiera antes de generar el evento.'
+      : 'Revisa los ingresos que se replicarán antes de generar el evento.';
     return `
-      <div class="planificacion-note compact-note plan-income-replica">
-        <strong>Ingresos a replicar tal cual:</strong>
+      <div class="planificacion-note compact-note plan-income-replica ce-plan-income-manager">
+        <strong>${esc(title)}:</strong>
         ${qty(info.sociosPersonas)} SOCIOS · ${qty(info.noSociosPersonas)} NO SOCIOS
-        <span>(${info.registros} registros de ingresos · ${qty(info.totalPersonas)} personas representadas · ${money(info.importe)})</span>
+        <span>(${info.registros} incluidos de ${totalRows} registros · ${excludedRows} excluidos · ${qty(info.totalPersonas)} personas representadas · ${money(info.importe)})</span>
+        <p>${esc(lead)}</p>
+        <div class="ce-plan-income-toolbar">
+          <button type="button" class="outline small" id="btnPlanIncomeAll">Incluir todos los ingresos</button>
+          <button type="button" class="outline small" id="btnPlanIncomeNone">Excluir todos los ingresos</button>
+        </div>
+        <div class="ce-plan-income-scroll">
+          <table id="planIncomeProposalList" class="ce-plan-income-table">
+            <thead><tr><th>Gestión</th><th>Colaborador/a</th><th>Nº</th><th>Situación</th><th>Obligatorio</th><th>Voluntario</th><th>Total</th><th></th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
       </div>
     `;
   }
+
 
   function planEstimatedEventPrice(totalCompras, estimatedPeople){
     const people = Math.max(1, Number(estimatedPeople || fieldValue('planPersonas') || 0));
@@ -955,7 +1017,7 @@
       .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(82px,105px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:105px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
       .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
       .plan-product-card{padding:7px 8px!important;border-radius:12px!important}.plan-product-head{margin-bottom:4px!important;gap:7px!important}.plan-product-title strong{font-size:14px!important;line-height:1.05!important}.plan-product-title span{font-size:11px!important;line-height:1.05!important}.plan-confidence{padding:2px 6px!important;font-size:11px!important}.plan-include{font-size:12px!important}.plan-product-grid.replica-grid{display:grid!important;grid-template-columns:repeat(6,minmax(95px,1fr))!important;gap:6px!important}.plan-product-grid.replica-grid .field{gap:2px!important}.plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}.plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}.plan-reason{display:none!important}.plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
-      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}
+      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}.ce-plan-income-manager p{margin:8px 0 10px;color:#475569;font-weight:700}.ce-plan-income-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ce-plan-income-scroll{overflow:auto;max-height:360px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}.ce-plan-income-table{width:100%;border-collapse:collapse;font-size:13px}.ce-plan-income-table th,.ce-plan-income-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}.ce-plan-income-table th{position:sticky;top:0;background:#eef6ff;z-index:1;font-weight:950}.ce-plan-income-table small{display:block;color:#64748b;font-weight:800}.ce-plan-income-table input[type=number]{width:86px;max-width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:10px}.ce-plan-income-table tr.excluded{opacity:.48;background:#f8fafc}.ce-plan-income-include{white-space:nowrap}.ce-plan-income-table button.small,.ce-plan-income-toolbar button.small{padding:7px 10px!important;border-radius:10px!important;font-weight:900!important}
       .plan-resource-purchase-subrow input[data-plan-resource-field="compra"]{font-size:15px!important;font-weight:850!important}.plan-advanced-toolbar{display:flex!important;gap:8px!important;flex-wrap:wrap!important;align-items:center!important;margin:10px 0!important;padding:8px!important;border-radius:14px!important;background:#f8fafc!important;border:1px solid #e2e8f0!important}.plan-advanced-toolbar input{min-width:220px!important;flex:1 1 260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-advanced-toolbar button{white-space:nowrap!important}
       .plan-resource-edit-row.plan-sd-rara>td{background:#f8fafc!important;color:#111827!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}/*ce-hf18-no-black*/@media (max-width: 900px){.plan-resource-split-table{table-layout:auto!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child,.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:auto!important}.plan-resource-subrow{grid-template-columns:1fr 1fr!important}.plan-resource-general-top{grid-template-columns:auto 1fr!important}.plan-resource-split-table thead{display:none!important}.plan-resource-split-table tr,.plan-resource-split-table td{display:block!important;width:100%!important;border-radius:10px!important}}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
@@ -1079,6 +1141,7 @@
       return {
         key: `socio-obligatorio:${p.id || index}`,
         sourceId: '',
+        include: true,
         personaId: p.id || '',
         personaName: p.nombre || 'Socio sin nombre',
         rango: 'SOCIO',
@@ -2699,11 +2762,45 @@
     try{ document.getElementById('planFactoryIndicator')?.remove(); }catch(_){ }
   }
 
+  function bindIncomeProposalControls(box){
+    if(!box) return;
+    const refresh = () => { renderProposal(); };
+    box.querySelectorAll('#planIncomeProposalList tr[data-plan-income-index]').forEach(tr => {
+      const idx = Number(tr.dataset.planIncomeIndex);
+      const item = lastIncomeProposal[idx];
+      if(!item) return;
+      tr.querySelectorAll('[data-plan-income-field]').forEach(input => {
+        input.addEventListener('change', () => {
+          const field = input.dataset.planIncomeField;
+          if(field === 'include') item.include = !!input.checked;
+          else if(field === 'numero'){
+            item.numero = Math.max(0, Number(input.value || 0));
+            if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
+              const includedPurchases = lastProposal.filter(p => p.include && p.tipo === 'COMPRA');
+              const totalCompras = includedPurchases.reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
+              const price = planEstimatedEventPrice(totalCompras, Number(fieldValue('planPersonas') || 1));
+              item.importeObligatorio = Math.round(Number(item.numero || 0) * price * 100) / 100;
+            }
+          }else if(field === 'importeVoluntario') item.importeVoluntario = Math.max(0, parseNum(input.value || 0));
+          refresh();
+        });
+        if(input.matches('input[type=number]')) input.addEventListener('keydown', event => { if(event.key === 'Enter'){ event.preventDefault(); input.blur(); } });
+      });
+      tr.querySelector('[data-plan-income-delete]')?.addEventListener('click', event => {
+        event.preventDefault();
+        lastIncomeProposal.splice(idx, 1);
+        refresh();
+      });
+    });
+    box.querySelector('#btnPlanIncomeAll')?.addEventListener('click', () => { lastIncomeProposal = lastIncomeProposal.map(x => ({...x, include:true})); refresh(); });
+    box.querySelector('#btnPlanIncomeNone')?.addEventListener('click', () => { lastIncomeProposal = lastIncomeProposal.map(x => ({...x, include:false})); refresh(); });
+  }
   function bindProposalControls(){
     const box = document.getElementById('planificacionResultado');
     if(!box) return;
     bindAdvancedProposalControls(box);
     ceHf27BindDiagnostics(box);
+    bindIncomeProposalControls(box);
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
@@ -2933,7 +3030,7 @@
 
       await crudUpsert('eventos', newEvent);
       const savedCollabs = [];
-      for(const item of lastIncomeProposal){
+      for(const item of lastIncomeProposal.filter(item => item && item.include !== false)){
         if(!item.personaId) continue;
         const row = { id: makeId(), eventId:newEventId, personaId:item.personaId, numero:Number(item.numero || 0), situacion:'Pendiente', importe:Number(item.importeVoluntario || 0) };
         await crudUpsert('colaboradores', row);
@@ -3529,6 +3626,7 @@
     const box = document.getElementById('planificacionResultado');
     try{
       if(btn){ btn.disabled = true; btn.textContent = 'Zuzu está pensando...'; }
+      await ensureMasterRowsForMandatoryIncomes();
       if(box){
         box.classList.remove('hidden');
         box.innerHTML = planProgressHtml({ mode, content: planContent(), title: fieldValue('planEventoTitulo') });
@@ -3569,6 +3667,7 @@
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
       console.warn('[ControlEvent v15_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      await ensureMasterRowsForMandatoryIncomes();
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
           const replica = buildReplicaProposal();
@@ -3584,7 +3683,14 @@
           document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
         }catch(_){ try{ alert(error?.message || error); }catch(__){} }
       }else{
-        if(box){ box.classList.remove('hidden'); box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo generar la propuesta:</strong> '+esc(error?.message || error)+'</div>'; }
+        if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
+          lastSourceEvent = null;
+          lastProposal = [];
+          lastIncomeProposal = buildMandatorySocioIncomeProposal(0);
+          renderProposal();
+          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se presenta la propuesta local de ingresos obligatorios de socios.</div>');
+          document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
+        }else if(box){ box.classList.remove('hidden'); box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo generar la propuesta:</strong> '+esc(error?.message || error)+'</div>'; }
       }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText || 'Generar propuesta'; }

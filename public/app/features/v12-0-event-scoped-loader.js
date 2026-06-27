@@ -5,6 +5,18 @@
   if (window.__ceV120EventScopedLoader) return;
   window.__ceV120EventScopedLoader = true;
 
+  // HOTFIX41: FIX48 ya realiza la carga scoped robusta al cambiar de evento.
+  // Evita una segunda lectura /api/state y un segundo render que estaba estresando PC/móvil.
+  if(window.__ceFix48FetchInstalled || window.__ceLoadSelectedEventStateFix48){
+    window.ControlEventV120EventScopedLoader = {
+      load: function(){ return Promise.resolve(false); },
+      schedule: function(){ return false; },
+      renderActive: function(){ try{ if(typeof window.render === 'function') window.render(); }catch(_){} }
+    };
+    try{ document.body.classList.remove('ce-v120-event-loading'); }catch(_){}
+    return;
+  }
+
   function $(id){ return document.getElementById(id); }
   function text(v){ return v == null ? '' : String(v); }
   function st(){ try{ return window.state || window.ControlEventApp?.state || window.appState || {}; }catch(_){ return {}; } }

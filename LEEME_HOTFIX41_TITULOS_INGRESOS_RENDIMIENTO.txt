@@ -1,0 +1,32 @@
+ControlEvent v15_prod - HOTFIX41 sin cambio de versión visible
+
+Cambios aplicados sobre CE_v15_PROD_HOTFIX40_AVANCE_DOCUMENTOS_REFRESCO_SIN_CAMBIO_VERSION:
+
+1) Mapa de recursos / botón AVANCE
+- Se evita la duplicidad de botones de avance en Mapa de recursos.
+- Se conserva un único botón con el icono hitos-evento, desplazado hacia una posición más centrada en la cabecera.
+
+2) Planificación inicial / Ingresos obligatorios de todos los socios
+- Al seleccionar "Ingresos obligatorios de todos los socios" se fuerza la lectura de maestros de PERSONAS/TIENDAS aunque el evento actual esté cargado en modo event-scoped.
+- Se vuelve a generar lastIncomeProposal con los socios obligatorios, evitando que quede a 0 registros.
+- La propuesta muestra una tabla de ingresos/colaboradores antes de generar el evento.
+- Desde la tabla se puede incluir/excluir o eliminar ingresos antes de que entren en el sistema.
+- Al generar el evento real solo se graban los ingresos incluidos.
+
+3) Rendimiento al cambiar de evento
+- Se desactiva la doble lectura event-scoped v12 cuando FIX48 ya está activo.
+- Esto evita una segunda llamada /api/state y un segundo render completo, reduciendo los tirones/estrés al cambiar a eventos con muchos datos.
+
+4) Fotos de tickets e ingresos
+- En los modales de ticket y justificante se sustituye el título genérico "Foto de ticket" / "Justificante de ingreso" por el título del evento.
+- El título se pinta en rojo si el evento está Finalizado y en verde si está En curso.
+- Se elimina el encabezado "CALCULOS POR AGRUPACION / ..." dentro de la información contable del ticket.
+- Las líneas de producto del ticket se ordenan alfabéticamente A-Z cuando se abre el detalle.
+
+Ficheros modificados:
+- public/app/features/planificacion-inicial.js
+- public/app/features/v12-0-event-scoped-loader.js
+- public/app/features/v15-hotfix16-avance-donaciones-prompt.js
+- public/app/features/v15-hotfix17-titulos-rendimiento-ingresos.js
+- public/index.html
+- index.html

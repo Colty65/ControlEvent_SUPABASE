@@ -78,7 +78,7 @@
     </div>`;
   }
   function clearOld(){
-    document.querySelectorAll('#budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box,#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel').forEach(el=>el.remove());
+    document.querySelectorAll('#budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box,#ceHf13AvanceBtn,#ceHf14AvanceBtn,#ceHf15AvanceBtn,#ceHf16AvanceBtn,.ce-hf13-mapa-actions,.ce-hf14-mapa-actions,.ce-hf15-mapa-actions,.ce-hf16-mapa-actions,#ceHf13MapaAvancePanel,#ceHf14MapaAvancePanel,#ceHf15MapaAvancePanel').forEach(el=>el.remove());
   }
   function panelContainer(){
     const tab=$('tabMapaProductos');
@@ -114,7 +114,8 @@
     const css=`
       #budgetLayout .ce-v15hf6-avance-box,#budgetLayout .ce-v15hf7-avance-box,#budgetLayout .ce-hf9-av-box{display:none!important}
       .mapa-productos-card>.section-title{display:flex!important;align-items:flex-start!important;gap:12px!important}
-      .ce-hf16-mapa-actions{margin-left:auto!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;padding-top:2px!important}
+      .ce-hf16-mapa-actions{margin-left:auto!important;margin-right:24%!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;padding-top:2px!important}
+      @media(max-width:900px){.ce-hf16-mapa-actions{margin-right:0!important}}
       .ce-hf16-av-btn{width:38px!important;height:38px!important;border:1px solid #cbd5e1!important;background:#fff!important;border-radius:10px!important;padding:2px!important;cursor:pointer!important;box-shadow:0 4px 12px rgba(15,23,42,.14)!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important}
       .ce-hf16-av-btn:hover{border-color:#217346!important;box-shadow:0 0 0 3px rgba(33,115,70,.13)!important}.ce-hf16-av-btn img{width:32px!important;height:32px!important;object-fit:cover!important;border-radius:8px!important;display:block!important;pointer-events:none!important}
       #ceHf16MapaAvancePanel{margin:10px 0 12px!important;display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:3!important}
