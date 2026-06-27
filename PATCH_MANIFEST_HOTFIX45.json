@@ -1,0 +1,17 @@
+{
+  "hotfix": "HOTFIX45_DOCUMENTOS_ESPERA_TITULO_PLAN",
+  "visible_version": "v15_prod",
+  "date": "2026-06-27",
+  "files": [
+    "public/app/features/v8-5-event-documents.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v4-0-1-pc-photo-fix.js",
+    "public/app/features/v4-0-prod-photo-sync.js",
+    "public/app/features/v15-hotfix20-documentos-espera-titulos-avance.js",
+    "routes/event-documents.routes.js",
+    "server/app.js",
+    "lib/supabase-normalized.js",
+    "public/index.html",
+    "index.html"
+  ]
+}

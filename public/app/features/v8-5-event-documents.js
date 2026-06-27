@@ -179,11 +179,36 @@
     if(message) window.setTimeout(() => { if(box.textContent === message){ box.textContent=''; box.className='ce-docs-status hidden'; } }, 4200);
   }
 
-  function saveNow(){
+  async function persistDocumentsForEvent(eventId = selectedEventId()){
+    const ev = String(eventId || '').trim();
+    if(!ev) return {ok:false, skipped:true};
+    const s = ensureStateShape();
+    const docs = (Array.isArray(s.eventDocuments) ? s.eventDocuments : []).filter(doc => String(doc?.eventId || '') === ev);
+    const meta = {};
+    Object.entries(s.eventDocumentMeta || {}).forEach(([key, value]) => {
+      if(String(key || '').startsWith(ev + '|')) meta[key] = value || {};
+    });
+    const res = await fetch('/api/event-documents/state', {
+      method:'PUT',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':'event-documents-v8-5-hf45'},
+      body:JSON.stringify({eventId:ev, eventDocuments:docs, eventDocumentMeta:meta})
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(() => '');
+      throw new Error(txt || ('HTTP ' + res.status + ' guardando metadatos DOC'));
+    }
+    return res.json().catch(() => ({ok:true}));
+  }
+
+  function saveNow(options = {}){
     const s = ensureStateShape();
     safe(() => localStorage.setItem(getLexical('STORAGE_KEY') || 'controlevent_v6_4', JSON.stringify(s)), null);
     const fn = getLexical('saveState') || window.saveState || app()?.actions?.saveState;
     if(typeof fn === 'function') safe(() => fn(), null);
+    if(!options.skipDocumentPersist){
+      persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v15_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
+    }
   }
 
   function ensureDocumentPanelPlacement(){
@@ -595,7 +620,8 @@
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-    saveNow();
+    saveNow({skipDocumentPersist:true});
+    await persistDocumentsForEvent(eventId);
     renderEventDocuments();
     status('Documento añadido correctamente.', 'ok');
   }
@@ -622,7 +648,8 @@
     doc.imageKey = code;
     doc.updatedAt = new Date().toISOString();
     s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${doc.codigo || doc.imageKey}`)] = {fecha: doc.fecha || '', descripcion: doc.descripcion || ''};
-    saveNow();
+    saveNow({skipDocumentPersist:true});
+    await persistDocumentsForEvent(doc.eventId);
     renderEventDocuments();
     status('Foto del documento actualizada.', 'ok');
   }
@@ -641,7 +668,8 @@
     delete s.ticketImages[docKey(doc.eventId, code)];
     doc.imageUrl = '';
     doc.updatedAt = new Date().toISOString();
-    saveNow();
+    saveNow({skipDocumentPersist:true});
+    await persistDocumentsForEvent(doc.eventId);
     renderEventDocuments();
     status('Foto del documento eliminada.', 'ok');
   }
@@ -662,12 +690,13 @@
     delete s.ticketImages[docKey(doc.eventId, code)];
     delete s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${code}`)];
     s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== String(docId));
-    saveNow();
+    saveNow({skipDocumentPersist:true});
+    await persistDocumentsForEvent(doc.eventId);
     renderEventDocuments();
     status('Documento eliminado.', 'ok');
   }
 
-  function saveDoc(docId){
+  async function saveDoc(docId){
     const doc = findDoc(docId);
     if(!doc || !canMaintainDocs()) return;
     const fields = document.querySelectorAll(`[data-doc-id="${cssEscape(docId)}"][data-doc-field]`);
@@ -680,7 +709,8 @@
     doc.updatedAt = new Date().toISOString();
     const s = ensureStateShape();
     s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${doc.codigo || doc.imageKey}`)] = {fecha: doc.fecha || '', descripcion: doc.descripcion || ''};
-    saveNow();
+    saveNow({skipDocumentPersist:true});
+    await persistDocumentsForEvent(doc.eventId);
     renderEventDocuments();
     status('Documento modificado.', 'ok');
   }
@@ -832,7 +862,7 @@
     const remImg = target.closest('[data-doc-remove-image]');
     if(remImg){ event.preventDefault(); event.stopPropagation(); removeImage(remImg.dataset.docRemoveImage).catch(error => { alert('No se pudo eliminar la foto: ' + (error?.message || error)); status('Error eliminando foto.', 'bad'); }); return false; }
     const save = target.closest('[data-doc-save]');
-    if(save){ event.preventDefault(); event.stopPropagation(); saveDoc(save.dataset.docSave); return false; }
+    if(save){ event.preventDefault(); event.stopPropagation(); saveDoc(save.dataset.docSave).catch(error => { alert('No se pudo guardar el documento: ' + (error?.message || error)); status('Error guardando documento.', 'bad'); }); return false; }
     const del = target.closest('[data-doc-delete]');
     if(del){ event.preventDefault(); event.stopPropagation(); deleteDoc(del.dataset.docDelete).catch(error => { alert('No se pudo eliminar el documento: ' + (error?.message || error)); status('Error eliminando documento.', 'bad'); }); return false; }
     const otherTab = target.closest('#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabMapaBtn,#tabResumenBtn,#tabGraficasBtn,.mobile-menu-action[data-target="tabIngresosBtn"],.mobile-menu-action[data-target="tabDonacionesBtn"],.mobile-menu-action[data-target="tabComprasBtn"],.mobile-menu-action[data-target="tabMapaBtn"],.mobile-menu-action[data-target="tabResumenBtn"],.mobile-menu-action[data-target="tabGraficasBtn"]');

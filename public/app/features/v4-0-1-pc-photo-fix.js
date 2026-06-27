@@ -99,6 +99,13 @@
     return arr('eventos').find(item => String(item.id || '') === id) || {};
   }
   function isFinalizado(){ return up(selectedEventObj().situacion || '') === 'FINALIZADO'; }
+  function eventTitleInfo(){
+    const ev = selectedEventObj() || {};
+    const select = $('selectedEvent');
+    const fallback = select?.selectedOptions?.[0]?.textContent || select?.options?.[select.selectedIndex]?.textContent || 'Evento';
+    const titulo = norm(ev.titulo || fallback || 'Evento');
+    return {titulo, finalizado:isFinalizado()};
+  }
   function active(){ return isPcLike() && isFinalizado(); }
 
   function srcOf(value){
@@ -177,16 +184,25 @@
   function money(value){
     return safe(() => new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(Number(value || 0)), `${Number(value || 0).toFixed(2)} €`);
   }
-  function renderInfoHtml(text){
+  function renderInfoHtml(text, options = {}){
     const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
     const rows = [];
     const blocks = [];
+    const productIndex = (row) => row.findIndex(cell => /producto/i.test(String(cell || '')));
     const flush = () => {
       if(!rows.length) return;
-      blocks.push('<table><tbody>' + rows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table>');
+      let tableRows = rows.slice();
+      const idx = productIndex(tableRows[0] || []);
+      if(options.ticket && idx >= 0 && tableRows.length > 2){
+        const head = tableRows[0];
+        const body = tableRows.slice(1).sort((a,b) => String(a[idx] || '').localeCompare(String(b[idx] || ''), 'es', {sensitivity:'base'}));
+        tableRows = [head, ...body];
+      }
+      blocks.push('<table><tbody>' + tableRows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table>');
       rows.length = 0;
     };
     lines.forEach(line => {
+      if(options.ticket && (/^\s*foto\s+de\s+ticket\s*$/i.test(line) || /CALCULOS\s+POR\s+AGRUPACION/i.test(line))) return;
       if(line.includes('|')) rows.push(line.split('|').map(x => x.trim()));
       else { flush(); blocks.push('<div class="ce-v401-pc-info-title">' + esc(line) + '</div>'); }
     });
@@ -211,6 +227,10 @@
     closeAll();
     const isTicket = kind === 'ticket';
     const title = isTicket ? 'Foto de ticket' : 'Justificante de ingreso';
+    const evTitle = eventTitleInfo();
+    const headHtml = isTicket
+      ? `<span class="ce-v401-event-title ${evTitle.finalizado ? 'is-finalizado' : 'is-curso'}">${esc(evTitle.titulo)}</span>`
+      : `<span class="ce-v401-receipt-label">Justificante de ingreso</span><span class="ce-v401-event-title ${evTitle.finalizado ? 'is-finalizado' : 'is-curso'}">${esc(evTitle.titulo)}</span>`;
     const info = isTicket ? rowTextFor(trigger) : ingresoInfo(trigger);
     const modal = document.createElement('div');
     modal.id = MODAL_ID;
@@ -218,8 +238,8 @@
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('data-ce-v401-kind', kind);
     modal.innerHTML = `<div class="ce-v401-pc-modal-box">
-      <div class="ce-v401-pc-modal-head"><span>${esc(title)}</span></div>
-      <div class="ce-v401-pc-modal-info">${renderInfoHtml(info)}</div>
+      <div class="ce-v401-pc-modal-head ${isTicket ? 'ce-v401-ticket-head' : 'ce-v401-receipt-head'}">${headHtml}</div>
+      <div class="ce-v401-pc-modal-info">${renderInfoHtml(info, {ticket:isTicket})}</div>
       <img class="ce-v401-pc-modal-img" alt="${esc(title)}" src="${esc(src)}">
       <button type="button" class="ce-v401-pc-modal-close" data-close="1" aria-label="Cerrar visor">✕ Cerrar</button>
     </div>`;
@@ -358,6 +378,12 @@
       #${MODAL_ID}{position:fixed!important;inset:0!important;z-index:10000080!important;background:rgba(2,6,23,.84)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
       #${MODAL_ID} .ce-v401-pc-modal-box{width:min(1420px,98vw)!important;max-height:96vh!important;background:#fff!important;color:#0f172a!important;border-radius:18px!important;box-shadow:0 24px 90px rgba(0,0,0,.50)!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(380px,520px) minmax(420px,1fr)!important;gap:12px!important;overflow:auto!important;position:relative!important;}
       #${MODAL_ID} .ce-v401-pc-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;background:#fff!important;padding-bottom:8px!important;}
+      #${MODAL_ID} .ce-v401-ticket-head{justify-content:center!important;text-align:center!important;}
+      #${MODAL_ID} .ce-v401-receipt-head{display:grid!important;grid-template-columns:1fr auto 1fr!important;align-items:center!important;text-align:center!important;}
+      #${MODAL_ID} .ce-v401-receipt-label{justify-self:start!important;color:#0f172a!important;font-size:18px!important;}
+      #${MODAL_ID} .ce-v401-event-title{justify-self:center!important;font-size:21px!important;font-weight:950!important;line-height:1.15!important;}
+      #${MODAL_ID} .ce-v401-event-title.is-finalizado{color:#991b1b!important;}
+      #${MODAL_ID} .ce-v401-event-title.is-curso{color:#15803d!important;}
       #${MODAL_ID} .ce-v401-pc-modal-close{appearance:none!important;-webkit-appearance:none!important;grid-column:2!important;justify-self:end!important;position:sticky!important;bottom:0!important;z-index:4!important;border:1px solid #0f172a!important;background:#fff!important;color:#000!important;border-radius:10px!important;padding:9px 16px!important;font-weight:950!important;cursor:pointer!important;pointer-events:auto!important;min-width:104px!important;min-height:42px!important;box-shadow:0 1px 5px rgba(15,23,42,.18)!important;}
       #${MODAL_ID} .ce-v401-pc-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:84vh!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:14px!important;padding:10px!important;align-self:start!important;}
       #${MODAL_ID} .ce-v401-pc-info-title{font-weight:950!important;margin:5px 0 8px!important;color:#0f172a!important;}

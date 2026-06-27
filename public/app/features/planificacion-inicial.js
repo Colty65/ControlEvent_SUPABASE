@@ -364,7 +364,7 @@
     (Array.isArray(proposals) ? proposals : []).filter(p => p.include).forEach(p => {
       const key = normalizeText(p.productName || '') || p.productId || 'producto';
       const old = map.get(key) || {producto:p.productName || 'Producto', segmento:p.segmento || '', destino:p.destino || '', compra:0, donado:0, importeCompra:0, importeDonado:0};
-      if(p.tipo === 'DONACION'){
+      if(String(p.tipo || '').toUpperCase() === 'DONACION'){
         old.donado += Number(p.unidades || 0);
         old.importeDonado += Number(p.unidades || 0) * Number(p.precio || 0);
       }else{
@@ -616,6 +616,12 @@
         const purchases = group.purchaseIndices.map(idx => ({idx, row:base[idx]})).filter(x => x.row);
         purchases.sort((a,b)=>a.idx-b.idx);
         purchases.forEach((item, pos) => {
+          if(item.row.__ceSuppressedManualPurchase && Number(item.row.unidades || 0) <= 0){
+            item.row.unidades = 0;
+            item.row.include = false;
+            item.row.necesidadTotal = Number(group.necesidad || 0) || item.row.necesidadTotal;
+            return;
+          }
           item.row.unidades = pos === 0 ? Math.max(0, Number(group.compra || 0)) : 0;
           item.row.include = pos === 0 ? (includeGroup && Number(group.compra || 0) > 0) : false;
           item.row.necesidadTotal = Number(group.necesidad || 0) || item.row.necesidadTotal;
@@ -870,11 +876,15 @@
       if(resolvedProductId && (!row.productId || p.tipo === 'COMPRA' || String(row.productId) === String(resolvedProductId))) row.productId = resolvedProductId;
       row.allIndices.push(idx);
       if(p.include && !suppressedDonation) row.include = true;
+      const tipoRow = String(p.tipo || '').toUpperCase();
       let units = Number(p.unidades || 0);
+      if(tipoRow === 'COMPRA' && p.include === false && !p.__ceForceKeepPurchase){
+        units = 0;
+      }
       const quotaKey = `${key}|${String(p.donorRef || '')}|${String(p.ticketDonacion || '')}`;
       const isDiagnosticTruth = p?.explicitPromptDonation === true || p?.__ceHf27DiagnosticTruth === true || p?.__ceHf29DiagnosticTruth === true;
       const quota = (suppressedDonation || isDiagnosticTruth) ? null : promptDonationQuantity(p);
-      if(String(p.tipo || '').toUpperCase() === 'DONACION' && quota !== null){
+      if(tipoRow === 'DONACION' && quota !== null){
         const used = donationQuotaUsed.get(quotaKey) || 0;
         const available = Math.max(0, Number(quota || 0) - used);
         units = Math.min(Math.max(0, units), available);
@@ -884,11 +894,11 @@
       const importe = units * Number(p.precio || 0);
       const needHint = Number(p.necesidadTotal || p.necesidad || p.necesidadCalculada || 0);
       if(needHint > row.necesidad) row.necesidad = needHint;
-      if(suppressedDonation || (p.tipo === 'DONACION' && units <= 0)){
+      if(suppressedDonation || (tipoRow === 'DONACION' && units <= 0)){
         map.set(key, row);
         return;
       }
-      if(p.tipo === 'DONACION'){
+      if(tipoRow === 'DONACION'){
         const donorRef = normalizeDonorRef(p.donorRef || '');
         row.donado += units;
         row.importeDonado += importe;
@@ -1040,6 +1050,7 @@
       .plan-resource-edit-row.plan-sd-infra-aperitivo>td{background:#dbeafe!important}.plan-resource-edit-row.plan-sd-infra-comida>td{background:#bfdbfe!important}.plan-resource-edit-row.plan-sd-infra-cubatas>td{background:#93c5fd!important}.plan-resource-edit-row.plan-sd-infra-cena>td{background:#60a5fa!important}.plan-resource-edit-row.plan-sd-infra-infra>td{background:#86efac!important}
       .plan-resource-edit-row.plan-sd-rara>td{background:#f8fafc!important;color:#111827!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}.plan-resource-edit-row.plan-sd-rara small,.plan-resource-edit-row.plan-sd-rara strong{color:inherit!important}
 
+      .plan-factory-overlay{position:fixed!important;inset:0!important;z-index:10000120!important;display:flex!important;align-items:center!important;justify-content:center!important;background:rgba(15,23,42,.42)!important;backdrop-filter:blur(2px)!important;padding:18px!important}.plan-factory-overlay-card{width:min(460px,92vw)!important;display:grid!important;justify-items:center!important;text-align:center!important;gap:10px!important;background:#fff!important;border:2px solid #fdba74!important;border-radius:24px!important;padding:24px 28px!important;box-shadow:0 30px 90px rgba(0,0,0,.35)!important;color:#7c2d12!important}.plan-factory-overlay-card strong{font-size:24px!important;font-weight:950!important;color:#111827!important}.plan-factory-overlay-card small{font-size:14px!important;line-height:1.45!important;font-weight:800!important;color:#9a3412!important}.plan-factory-spinner{font-size:44px!important;animation:cePlanFactorySpin 1.2s linear infinite}.plan-factory-overlay .plan-factory-dots{margin:4px 0 0!important}@keyframes cePlanFactorySpin{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.08)}100%{transform:rotate(360deg) scale(1)}}
       .ce-hf27-diag-btn{margin-left:10px!important;background:#fff!important;color:#0f172a!important;border:2px solid #0f172a!important;border-radius:14px!important;padding:10px 14px!important;font-weight:950!important}
       .ce-hf27-diagnostic{margin:14px 0!important;border:3px solid #0f172a!important;border-radius:18px!important;background:#f8fafc!important;box-shadow:0 8px 22px rgba(15,23,42,.10)!important;overflow:hidden!important}
       .ce-hf27-head{display:flex!important;gap:12px!important;justify-content:space-between!important;align-items:flex-start!important;padding:12px 14px!important;background:#e0f2fe!important;border-bottom:2px solid #bae6fd!important}
@@ -2569,6 +2580,17 @@
       }
       buy = planBuyAfterDonation(selectedProduct?.nombre || group.producto, need, donatedBase);
       if(buyInput) buyInput.value = String(buy);
+      if(buy <= 0){
+        group.purchaseIndices.forEach(idx => {
+          const purchaseRow = lastProposal[idx];
+          if(!purchaseRow) return;
+          purchaseRow.include = false;
+          purchaseRow.unidades = 0;
+          purchaseRow.necesidadTotal = need || undefined;
+          purchaseRow.__ceHf40ManualNeedOverride = true;
+          purchaseRow.__ceSuppressedManualPurchase = true;
+        });
+      }
     }else if(changedField === 'compra'){
       // Prioridad absoluta al panel editable: si el usuario escribe A COMPRAR, se respeta.
       buy = Math.max(0, Number(buyInput?.value || 0));
@@ -2642,6 +2664,17 @@
     if((changedField === 'donationUnits' || changedField === 'necesidad' || changedField === '__sync') && buyInput){
       buy = planBuyAfterDonation(newName, need || group.necesidad || 0, editedDonatedTotal || Number(group.donado || 0));
       buyInput.value = String(buy);
+      if(buy <= 0){
+        group.purchaseIndices.forEach(idx => {
+          const purchaseRow = lastProposal[idx];
+          if(!purchaseRow) return;
+          purchaseRow.include = false;
+          purchaseRow.unidades = 0;
+          purchaseRow.necesidadTotal = need || undefined;
+          purchaseRow.__ceHf40ManualNeedOverride = true;
+          purchaseRow.__ceSuppressedManualPurchase = true;
+        });
+      }
     }
     let pidx = group.purchaseIndices[0];
     if((pidx === undefined || pidx < 0) && buy > 0) pidx = createPurchaseForGroup(group, buy, price, tiendaId, responsableId);
@@ -2649,6 +2682,7 @@
     if(purchase){
       purchase.include = include && buy > 0;
       purchase.unidades = buy;
+      purchase.__ceSuppressedManualPurchase = buy <= 0;
       purchase.precio = price || purchase.precio || 0;
       purchase.tiendaId = tiendaId;
       purchase.responsableId = responsableId;
@@ -2771,19 +2805,30 @@
   function searchProposalResource(){ searchPlanProductIn('planBuscarRecurso', '#planResourceEditor .plan-resource-edit-row', 'PROPUESTA DETALLADA DEL EVENTO'); }
   function searchProposalAdvanced(){ searchPlanProductIn('planBuscarDetalleAvanzado', '#planProposalList .plan-product-card', 'Detalle avanzado de líneas'); }
   function showPlanFactoryIndicator(message){
+    const msg = message || 'Creando el evento real y guardando compras, donaciones e ingresos.';
     const box = document.getElementById('planificacionResultado');
-    if(!box) return;
-    let card = document.getElementById('planFactoryIndicator');
-    if(!card){
-      card = document.createElement('div');
-      card.id = 'planFactoryIndicator';
-      card.className = 'plan-factory-indicator';
-      box.prepend(card);
+    if(box){
+      let card = document.getElementById('planFactoryIndicator');
+      if(!card){
+        card = document.createElement('div');
+        card.id = 'planFactoryIndicator';
+        card.className = 'plan-factory-indicator';
+        box.prepend(card);
+      }
+      card.innerHTML = `<span class="plan-factory-icon" aria-hidden="true">🎉</span><div><strong>Zuzu está fabricando la fiesta…</strong><small>${esc(msg)}</small></div><span class="plan-factory-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
     }
-    card.innerHTML = `<span class="plan-factory-icon" aria-hidden="true">🎉</span><div><strong>Zuzu está fabricando la fiesta…</strong><small>${esc(message || 'Creando el evento real y guardando compras, donaciones e ingresos.')}</small></div><span class="plan-factory-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
+    let overlay = document.getElementById('planFactoryOverlay');
+    if(!overlay){
+      overlay = document.createElement('div');
+      overlay.id = 'planFactoryOverlay';
+      overlay.className = 'plan-factory-overlay';
+      document.body?.appendChild(overlay);
+    }
+    overlay.innerHTML = `<div class="plan-factory-overlay-card" role="status" aria-live="polite"><span class="plan-factory-spinner" aria-hidden="true">⚙️</span><strong>Creando evento real</strong><small>${esc(msg)}<br>Compras, donaciones e ingresos se están guardando en base de datos.</small><span class="plan-factory-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>`;
   }
   function hidePlanFactoryIndicator(){
     try{ document.getElementById('planFactoryIndicator')?.remove(); }catch(_){ }
+    try{ document.getElementById('planFactoryOverlay')?.remove(); }catch(_){ }
   }
 
   function bindIncomeProposalControls(box){
@@ -2894,10 +2939,12 @@
   }
   function fieldValue(id){ return String(document.getElementById(id)?.value || '').trim(); }
   function proposedEventTitle(){
-    const raw = fieldValue('planEventoTitulo');
-    if(raw) return raw;
+    const brief = fieldValue('planDescripcion').replace(/\s+/g, ' ').trim();
+    if(brief) return brief.slice(0, 140);
+    const raw = fieldValue('planEventoTitulo').replace(/\s+/g, ' ').trim();
+    if(raw) return raw.slice(0, 140);
     const base = lastSourceEvent?.titulo || sourceEvent()?.titulo || 'Evento replicado';
-    return 'Copia de ' + base;
+    return ('Copia de ' + base).slice(0, 140);
   }
   function confirmReplicaCreation(){
     const included = lastProposal.filter(p => p.include && Number(p.unidades || 0) > 0);
@@ -3044,6 +3091,7 @@
     if(btn){ btn.disabled = true; btn.textContent = 'Generando evento...'; }
     try{
       showPlanFactoryIndicator('Zuzu está fabricando el evento y guardándolo en la base de datos.');
+      await new Promise(resolve => setTimeout(resolve, 80));
       const newEventId = makeId();
       const fechaIni = fieldValue('planFechaIni') || source?.fechaIni || '';
       const fechaFin = fieldValue('planFechaFin') || fieldValue('planFechaIni') || source?.fechaFin || source?.fechaIni || '';

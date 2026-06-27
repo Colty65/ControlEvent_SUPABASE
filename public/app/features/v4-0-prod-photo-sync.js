@@ -45,6 +45,13 @@
     return norm(ev.id || st().selectedEventId || '');
   }
   function isFinalizado(){ return up(currentEvent().situacion || '') === 'FINALIZADO'; }
+  function eventTitleInfo(){
+    const ev = currentEvent() || {};
+    const select = $('selectedEvent');
+    const fallback = select?.selectedOptions?.[0]?.textContent || select?.options?.[select.selectedIndex]?.textContent || 'Evento';
+    const titulo = norm(ev.titulo || fallback || 'Evento');
+    return {titulo, finalizado:isFinalizado()};
+  }
   function srcOf(value){
     if(!value) return '';
     if(typeof value === 'string') return norm(value);
@@ -232,6 +239,10 @@
         grid-template-columns:minmax(260px,380px) minmax(300px,1fr)!important;gap:12px!important;overflow:auto!important;
       }
       #${MODAL_ID} .ce-v40-modal-head{grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;font-weight:950!important;}
+      #${MODAL_ID} .ce-v40-modal-head.ce-v40-ticket-head{justify-content:center!important;text-align:center!important;}
+      #${MODAL_ID} .ce-v40-event-title{font-size:21px!important;font-weight:950!important;line-height:1.15!important;}
+      #${MODAL_ID} .ce-v40-event-title.is-finalizado{color:#991b1b!important;}
+      #${MODAL_ID} .ce-v40-event-title.is-curso{color:#15803d!important;}
       #${MODAL_ID} .ce-v40-modal-close{appearance:none!important;border:1px solid #cbd5e1!important;background:#fff!important;border-radius:10px!important;padding:8px 14px!important;font-weight:900!important;cursor:pointer!important;}
       #${MODAL_ID} .ce-v40-modal-info{font-size:13px!important;line-height:1.35!important;overflow:auto!important;max-height:82vh!important;}
       #${MODAL_ID} .ce-v40-modal-info table{width:100%!important;border-collapse:collapse!important;margin:8px 0!important;}
@@ -248,19 +259,27 @@
     document.head.appendChild(style);
   }
 
-  function renderInfoHtml(text){
-    const lines = String(text || '').split('\n');
+  function renderInfoHtml(text, options = {}){
+    const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
     const html = [];
     let rows = [];
+    const productIndex = (row) => row.findIndex(cell => /producto/i.test(String(cell || '')));
     const flush = () => {
       if(!rows.length) return;
-      html.push('<table><tbody>' + rows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table>');
+      let tableRows = rows.slice();
+      const idx = productIndex(tableRows[0] || []);
+      if(options.ticket && idx >= 0 && tableRows.length > 2){
+        const head = tableRows[0];
+        const body = tableRows.slice(1).sort((a,b) => String(a[idx] || '').localeCompare(String(b[idx] || ''), 'es', {sensitivity:'base'}));
+        tableRows = [head, ...body];
+      }
+      html.push('<table><tbody>' + tableRows.map(row => '<tr>' + row.map(cell => '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table>');
       rows = [];
     };
     lines.forEach(line => {
-      if(!line.trim()){ flush(); html.push('<div style="height:7px"></div>'); return; }
+      if(options.ticket && (/^\s*foto\s+de\s+ticket\s*$/i.test(line) || /CALCULOS\s+POR\s+AGRUPACION/i.test(line))) return;
       if(line.includes('|')) rows.push(line.split('|').map(x => x.trim()));
-      else { flush(); html.push('<div class="ce-v40-title">' + esc(line.trim()) + '</div>'); }
+      else { flush(); html.push('<div class="ce-v40-title">' + esc(line) + '</div>'); }
     });
     flush();
     return html.join('') || '<div class="ce-v40-title">Sin detalle asociado</div>';
@@ -301,7 +320,9 @@
     modal.id = MODAL_ID;
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
-    modal.innerHTML = `<div class="ce-v40-modal-box"><div class="ce-v40-modal-head"><span>Foto de ticket</span><button type="button" class="ce-v40-modal-close">Cerrar</button></div><div class="ce-v40-modal-info">${renderInfoHtml(infoForThumb(img))}</div><img alt="Foto de ticket" src="${esc(src)}"></div>`;
+    const evTitle = eventTitleInfo();
+    const titleHtml = `<span class="ce-v40-event-title ${evTitle.finalizado ? 'is-finalizado' : 'is-curso'}">${esc(evTitle.titulo)}</span>`;
+    modal.innerHTML = `<div class="ce-v40-modal-box"><div class="ce-v40-modal-head ce-v40-ticket-head">${titleHtml}<button type="button" class="ce-v40-modal-close">Cerrar</button></div><div class="ce-v40-modal-info">${renderInfoHtml(infoForThumb(img), {ticket:true})}</div><img alt="Foto de ticket" src="${esc(src)}"></div>`;
     document.body.appendChild(modal);
     try{ modal.querySelector('.ce-v40-modal-close')?.focus({preventScroll:true}); }catch(_){ }
     return false;
