@@ -7,6 +7,81 @@
   const VERSION_FILE='ControlEvent_v16_prod';
   const $=id=>document.getElementById(id);
   const isLayerVisible=layer=>!!(layer && layer.classList.contains('visible'));
+  const num=value=>{
+    if(typeof value==='number') return Number.isFinite(value)?value:0;
+    let s=String(value??'').replace(/[^0-9,.-]/g,'');
+    if(s.includes(',') && s.includes('.')) s=s.replace(/\./g,'').replace(',','.');
+    else if(s.includes(',')) s=s.replace(',','.');
+    const n=Number(s); return Number.isFinite(n)?n:0;
+  };
+  const money=value=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(num(value)||0));
+  const safe=(fn,fb)=>{try{const v=fn(); return v===undefined?fb:v;}catch(_){return fb;}};
+  function getBudgetSummary(){
+    const app=window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
+    const candidates=[
+      ()=>app?.calculations?.budgetSummary?.(),
+      ()=>window.ControlEventDomain?.api?.budgetSummary?.(),
+      ()=>window.budgetSummary?.()
+    ];
+    for(const fn of candidates){
+      const v=safe(fn,null);
+      if(v && typeof v==='object') return v;
+    }
+    return null;
+  }
+  function getBudgetIncomeFromSummary(){
+    const b=getBudgetSummary();
+    if(b){
+      const id=b.ingresosDinero || {};
+      const op=b.operativa || {};
+      const socios=id.socios || {};
+      const noSocios=id.noSocios || id.donantes || {};
+      let previsto=num(id.totalComprometido ?? op.ingresos);
+      if(!previsto) previsto=num(socios.importe)+num(noSocios.importe);
+      let ingresado=num(id.totalIngresado ?? op.ingresoDinero);
+      if(!ingresado && (socios.ingresado!=null || noSocios.ingresado!=null)) ingresado=num(socios.ingresado)+num(noSocios.ingresado);
+      // Si el resumen no devuelve totalIngresado pero todo está ingresado, usa el total comprometido.
+      if(!ingresado && previsto && num(id.pendiente ?? 0)===0) ingresado=previsto;
+      if(previsto || ingresado) return {ingresado, previsto:previsto || ingresado};
+    }
+    return null;
+  }
+  function getBudgetIncomeFromDom(){
+    const roots=[document.getElementById('budgetLayout'), document.getElementById('tabResumen'), document.body].filter(Boolean);
+    for(const root of roots){
+      const nodes=Array.from(root.querySelectorAll('div,span,strong,b,td,th')).filter(el=>/INGRESO\s+TOTAL/i.test(el.textContent||''));
+      for(const el of nodes){
+        const parent=el.parentElement;
+        const area=(parent?.textContent || el.textContent || '');
+        const m=area.match(/INGRESO\s+TOTAL[^0-9-]*([0-9.]+,[0-9]{2})/i);
+        if(m){ const v=num(m[1]); if(v>0) return {ingresado:v, previsto:v}; }
+        const next=parent?.querySelectorAll?.('strong,b,span,div') || [];
+        for(const n of next){
+          const v=num(n.textContent||'');
+          if(v>0 && /€/.test(n.textContent||'')) return {ingresado:v, previsto:v};
+        }
+      }
+    }
+    return null;
+  }
+  function patchAvanceIncome(){
+    const income=getBudgetIncomeFromSummary() || getBudgetIncomeFromDom();
+    if(!income || !income.previsto) return;
+    const update=(row)=>{
+      if(!row) return;
+      const pct=Math.max(0, Math.min(100, income.previsto ? income.ingresado / income.previsto * 100 : 0));
+      const small=row.querySelector('small');
+      if(small) small.textContent=`${money(income.ingresado)} de ${money(income.previsto)} ingresados`;
+      const pctNode=row.querySelector(':scope > strong') || Array.from(row.querySelectorAll('strong')).find(el=>/%/.test(el.textContent||''));
+      if(pctNode) pctNode.textContent=pct.toLocaleString('es-ES',{maximumFractionDigits:2})+'%';
+      const bar=row.querySelector('.ce-hf48-bar i,.ce-hf47-bar i');
+      if(bar) bar.style.setProperty('width', pct+'%', 'important');
+    };
+    const layer48=document.getElementById('ceHf48AvanceLayer');
+    update(layer48?.querySelector?.('.ce-hf48-row'));
+    const layer47=document.getElementById('ceHf47AvanceBubbleLayer');
+    update(layer47?.querySelector?.('.ce-hf47-bubble-row'));
+  }
 
   function injectStyle(){
     if($('ceV16Hotfix1Style')) return;
@@ -46,6 +121,7 @@
   }
 
   function colorAvanceBars(){
+    patchAvanceIncome();
     const colors=['#2563eb','#16a34a','#f59e0b','#ef4444','#16a34a','#8b5cf6'];
     const bgs=['#eff6ff','#ecfdf5','#fff7ed','#fef2f2','#ecfdf5','#faf5ff'];
     const layer=$('ceHf48AvanceLayer'); if(!layer) return;
@@ -94,7 +170,7 @@
     const orig=api.showAvance;
     api.showAvance=function(){
       const out=orig.apply(this, arguments);
-      [0,50,180,500].forEach(ms=>setTimeout(colorAvanceBars,ms));
+      [0,50,180,500].forEach(ms=>setTimeout(()=>{patchAvanceIncome(); colorAvanceBars();},ms));
       setTimeout(()=>{
         const layer=$('ceHf48AvanceLayer');
         if(layer){ try{ layer.removeAttribute('aria-hidden'); }catch(_){ } }

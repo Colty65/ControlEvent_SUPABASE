@@ -3515,6 +3515,7 @@
     if(n.includes('TONICA') || n.includes('TÓNICA') || n.includes('SCHWEPPES')) return 'tonica';
     if(n.includes('GASEOSA')) return 'gaseosa';
     if(n.includes('BEEFEATER')) return 'beefeater';
+    if(n.includes('SKOL')) return 'cerveza-skol';
     if(n.includes('CERVEZA') || n.includes('MAHOU')) return 'cerveza';
     if(n.includes('HIELO')) return 'hielo';
     return '';
@@ -3533,6 +3534,7 @@
     if(n.includes('TONICA') || n.includes('TÓNICA') || n.includes('SCHWEPPES')) return 'tonica';
     if(n.includes('GASEOSA')) return 'gaseosa';
     if(n.includes('BEEFEATER')) return 'beefeater';
+    if(n.includes('SKOL')) return 'cerveza-skol';
     if(n.includes('CERVEZA') || n.includes('MAHOU')) return 'cerveza';
     if(n.includes('HIELO')) return 'hielo';
     return '';
@@ -3597,7 +3599,7 @@
   }
 
   function ceHf46BalancePositiveSurplusOnce(list){
-    // v16 HOTFIX3: reparto equitativo del saldo.
+    // v16 HOTFIX4: reparto equitativo del saldo, añadiendo cerveza SKOL en la prioridad.
     // Si el saldo sobre compras supera el 35%, añadimos de uno en uno siguiendo la prioridad indicada.
     // Se detiene cuando el saldo ya queda en zona correcta (<=35%) o cuando el siguiente añadido bajaría
     // el colchón por debajo del 20% de las compras finales.
@@ -3617,6 +3619,7 @@
       {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
       {label:'Tónica lata', step:24, fallback:0.75},
       {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29},
+      {label:'CERVEZA SKOL Lata 33cl', step:24, fallback:0.45},
       {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
       {label:'FANTA Naranja Bote 32 C.L', step:24, fallback:0.75},
       {label:'FANTA Limon Bote 32 CL', step:24, fallback:0.75},
