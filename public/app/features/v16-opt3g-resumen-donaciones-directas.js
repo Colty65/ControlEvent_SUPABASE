@@ -1,17 +1,16 @@
-/* ControlEvent v16_prod OPT3G - Clic directo en donaciones de Resumen.
+/* ControlEvent v16_prod OPT3G - Clic directo en donaciones de Resumen, suavizado en OPT3H.
    No repinta Resumen. No toca login, selector, /api/state, graficas, tickets ni avance.
-   Objetivo: las filas DONADO TIENDA/SOCIO/OTROS abren detalle desde el primer momento,
-   igual que las filas TKxx, aunque entren renders antiguos o tardios. */
+   OPT3H quita el marcado agresivo de tooltips que hacía pelearse a las capas y subir CPU. */
 (function(){
   'use strict';
   if(window.__ceV16Opt3GDonacionesDirectas) return;
   window.__ceV16Opt3GDonacionesDirectas = true;
 
-  const VERSION = 'v16_opt_3g';
+  const VERSION = 'v16_opt_3h_click';
   const ROOT_ID = 'summaryTiendaTicket';
   const MODAL_CLASS = 'ce-opt3g-modal';
   const DON_CODES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
-  const LEGACY_TIP_ATTRS = ['data-ce-tip','data-ce-tip-v21','data-tooltip','data-tooltip-html','title'];
+  const LEGACY_TIP_ATTRS = ['data-tooltip','data-tooltip-html','title'];
 
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -42,6 +41,8 @@
     rowsTagged: 0,
     legacyAttrsRemoved: 0,
     noMatch: 0,
+    markSkips: 0,
+    lastMarkedSig: '',
     lastKey: '',
     lastEventId: ''
   };
@@ -167,8 +168,12 @@
     try{ el.querySelectorAll?.('[data-ce-tip],[data-ce-tip-v21],[data-tooltip],[data-tooltip-html],[title]').forEach(child => LEGACY_TIP_ATTRS.forEach(attr => { if(child.hasAttribute(attr)){ child.removeAttribute(attr); metrics.legacyAttrsRemoved++; } })); }catch(_){}
   }
   function markRows(){
-    const root = $(ROOT_ID); if(!root) return;
-    root.querySelectorAll('.summary-item,.ce-opt3e-row,.rowline,[data-ce-opt3e-key]').forEach(row => {
+    const root = $(ROOT_ID); if(!root || !ready()) return;
+    const rows = Array.from(root.querySelectorAll('.summary-item,.ce-opt3e-row,.rowline,[data-ce-opt3e-key]'));
+    const sig = evId() + '|' + rows.length + '|' + (root.dataset.ceOpt3eSig || '') + '|' + rows.map(r => norm(r.dataset.ceOpt3gDonationKey || r.dataset.ceOpt3eKey || labelFromRow(r)).slice(0,80)).join('¬');
+    if(metrics.lastMarkedSig === sig){ metrics.markSkips++; return; }
+    metrics.lastMarkedSig = sig;
+    rows.forEach(row => {
       const info = donationInfoFromLabel(labelFromRow(row));
       if(!info) return;
       row.classList.add('ce-opt3g-donation-direct');
@@ -177,23 +182,24 @@
       metrics.rowsTagged++;
     });
   }
-  function scheduleMark(){ clearTimeout(markTimer); markTimer = setTimeout(markRows, 0); }
+  function scheduleMark(){ clearTimeout(markTimer); markTimer = setTimeout(markRows, 160); }
 
   function installObserver(){
     try{
       const root = $(ROOT_ID); if(!root || root.__ceOpt3GObserved) return;
       root.__ceOpt3GObserved = true;
       const obs = new MutationObserver(scheduleMark);
-      obs.observe(root, {childList:true, subtree:true});
+      obs.observe(root, {childList:true});
       scheduleMark();
     }catch(_){ }
   }
   function install(){ injectStyle(); installObserver(); markRows(); }
 
-  // Ventana en captura: se ejecuta antes que los listeners antiguos colocados en document.
-  ['pointerup','click','touchend'].forEach(type => window.addEventListener(type, handleEvent, {capture:true, passive:false}));
+  // OPT3H: no usamos pointerup+click+touchend a la vez para evitar doble trabajo.
+  window.addEventListener('click', handleEvent, {capture:true, passive:false});
+  window.addEventListener('touchend', handleEvent, {capture:true, passive:false});
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeModals(); }, true);
-  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:module-mounted','controlevent:event-changed','controlevent:opt1-event-stable'].forEach(type => window.addEventListener(type, () => setTimeout(install, 40), true));
+  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:module-mounted','controlevent:event-changed','controlevent:opt1-event-stable'].forEach(type => window.addEventListener(type, () => setTimeout(install, 180), true));
   document.addEventListener('DOMContentLoaded', () => setTimeout(install, 120), {once:true});
   window.addEventListener('load', () => setTimeout(install, 160), {once:true});
   setTimeout(install, 100);

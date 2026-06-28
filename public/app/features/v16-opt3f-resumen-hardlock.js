@@ -1,12 +1,12 @@
-/* ControlEvent v16_prod OPT3F - Resumen hardlock controlado.
+/* ControlEvent v16_prod OPT3F - Resumen hardlock controlado, suavizado en OPT3H.
    Rebase sobre OPT3E seguro. No toca login, /api/state ni selector de eventos.
-   Objetivo: #summaryTiendaTicket tiene un único dueño visual y sus filas siempre abren detalle. */
+   OPT3H elimina el bucle de repintados: conserva la lista estable y no fuerza renders repetidos. */
 (function(){
   'use strict';
   if(window.__ceV16Opt3FResumenHardlock) return;
   window.__ceV16Opt3FResumenHardlock = true;
 
-  const VERSION = 'v16_opt_3f';
+  const VERSION = 'v16_opt_3h_core';
   const ROOT_ID = 'summaryTiendaTicket';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -32,6 +32,7 @@
     installedAt: new Date().toISOString(),
     renders: 0,
     skips: 0,
+    skipsForcedSame: 0,
     blockedBeforeLogin: 0,
     observerFixes: 0,
     blockedLegacySummaryRenders: 0,
@@ -182,8 +183,22 @@
     const rows = rowsForSummary();
     const sig = signature(rows);
     const now = Date.now();
-    if(!force && root.dataset.ceOpt3eSig === sig && root.querySelector('.ce-opt3e-row')){ metrics.skips++; return true; }
-    if(!force && root.dataset.ceOpt3eSig === sig && (now - lastRenderAt) < 1200){ metrics.skips++; return true; }
+    const hasRows = !!root.querySelector('.ce-opt3e-row,.summary-item:not(.ce-tt-total-evento)');
+    const sameSig = root.dataset.ceOpt3eSig === sig;
+    const ownedEnough = rootLooksOwned(root);
+    // OPT3H: aunque una llamada venga como force=true, si la lista ya corresponde
+    // al evento/datos actuales no se vuelve a pintar. Esto corta el segundo/tercer
+    // repintado que dejaba el PC trabajando después de que la ventana ya estaba bien.
+    if(sameSig && hasRows && ownedEnough){
+      metrics.skips++;
+      if(force) metrics.skipsForcedSame++;
+      return true;
+    }
+    if(sameSig && hasRows && (now - lastRenderAt) < 2500){
+      metrics.skips++;
+      if(force) metrics.skipsForcedSame++;
+      return true;
+    }
     rendering = true;
     root.dataset.ceOpt3eSig = sig;
     root.dataset.ceOpt3eEventId = evId();
@@ -226,12 +241,15 @@
   function schedule(reason, delay, force){
     if(!readyToWork()){ metrics.blockedBeforeLogin++; return; }
     clearTimeout(timer);
-    timer = setTimeout(() => { try{ patchRenderSummaryList(); patchRenderBudget(); renderNow(!!force); }catch(err){ console.warn('[v16_opt_3f]', reason, err); } }, delay == null ? 80 : delay);
+    timer = setTimeout(() => { try{ patchRenderSummaryList(); patchRenderBudget(); renderNow(!!force); }catch(err){ console.warn('[v16_opt_3f]', reason, err); } }, delay == null ? 140 : delay);
   }
 
   let observer = null;
   function rootLooksOwned(root){
-    return !!(root && root.dataset.ceOpt3eSig && root.querySelector('.ce-opt3e-row[data-ce-tip-v21]'));
+    // OPT3H: no dependemos de data-ce-tip-v21, porque la capa de click directo
+    // puede limpiar atributos de tooltip. Basta con que exista una lista ce-opt3e
+    // del evento actual para considerarla estable y no forzar otro render.
+    return !!(root && root.dataset.ceOpt3eSig && root.dataset.ceOpt3eEventId === evId() && root.querySelector('.ce-opt3e-row,.summary-item:not(.ce-tt-total-evento)'));
   }
   function ensureObserver(){
     const root = $(ROOT_ID);
@@ -242,7 +260,7 @@
       const ok = rootLooksOwned(root);
       if(!ok){ metrics.observerFixes++; schedule('mutation-hardlock', 0, true); }
     });
-    observer.observe(root, {childList:true, subtree:true, characterData:true});
+    observer.observe(root, {childList:true});
   }
 
   function patchRenderSummaryList(){
@@ -268,7 +286,10 @@
     if(!old || old.__ceOpt3FBudgetWrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      if(readyToWork()) schedule('renderBudget-tail', 0, true);
+      // OPT3H: renderBudget puede ejecutarse varias veces al cambiar de ventana/evento.
+      // Solo pedimos estabilizar Cálculos si Resumen está visible; además schedule+renderNow
+      // ya descartan el mismo contenido.
+      if(isResumenVisible()) schedule('renderBudget-tail', 180, true);
       return ret;
     };
     wrapped.__ceOpt3FBudgetWrapped = true;
@@ -316,8 +337,8 @@
   injectStyle();
   patchRenderSummaryList();
   patchRenderBudget();
-  ['controlevent:app-ready','controlevent:runtime-ready','controlevent:data-loaded','controlevent:event-ready','controlevent:opt1-event-stable','controlevent:event-changed','controlevent:module-mounted'].forEach(e => window.addEventListener(e, () => setTimeout(install, 40), true));
-  document.addEventListener('click', ev => { if(ev.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(install, 40); }, true);
+  ['controlevent:app-ready','controlevent:runtime-ready','controlevent:data-loaded','controlevent:event-ready','controlevent:opt1-event-stable','controlevent:event-changed','controlevent:module-mounted'].forEach(e => window.addEventListener(e, () => setTimeout(install, 140), true));
+  document.addEventListener('click', ev => { if(ev.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(install, 120); }, true);
   document.addEventListener('DOMContentLoaded', () => setTimeout(install, 120), {once:true});
   window.addEventListener('load', () => setTimeout(install, 160), {once:true});
 })();
