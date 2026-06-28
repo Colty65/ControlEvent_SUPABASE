@@ -369,6 +369,7 @@
     return !!(window.__ceStableGraficasV435 || window.ControlEventV434 || window.ControlEventV435);
   }
   function renderGraficasV413(){
+    if(window.__ceDisableLegacyBarGraficas || window.__ceV16Opt2HGraphHardLock) return;
     if(graficasV413Superseded()){
       try{ return (window.ControlEventV435?.renderGraficas || window.ControlEventV434?.renderGraficas)?.({reason:'v413-superseded'}); }catch(_){ return; }
     }
@@ -377,6 +378,7 @@
     wrap.innerHTML = `<div class="chart-shell ce-v413-chart-layout"><div class="ce-v413-chart-panel"><div class="ce-v413-panel-title"><span>Distribución general</span></div><div class="ce-v413-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoItems)}</div></div>${destinoBars()}</div>`;
   }
   function patchGraficas(){
+    if(window.__ceDisableLegacyBarGraficas || window.__ceV16Opt2HGraphHardLock) return;
     if(graficasV413Superseded()) return;
     if(renderGraficasV413.__installed) return;
     renderGraficasV413.__installed = true;
@@ -388,7 +390,7 @@
     if(!old || old.__ceV413Wrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 30);
+      setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!window.__ceDisableLegacyBarGraficas && !window.__ceV16Opt2HGraphHardLock && !$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 30);
       return ret;
     };
     wrapped.__ceV413Wrapped = true;
@@ -422,7 +424,7 @@
   }
   function install(){
     injectStyle(); applyVersion(); patchSearchRenderers(); patchGraficas(); patchRenderForPostProcessing(); eventInterceptors();
-    setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 40);
+    setTimeout(() => { try{ injectSearch('comprasList','comprasSearchInput','Buscar compra'); injectSearch('donacionesList','donacionesSearchInput','Buscar donación'); hideOldGrouping(); if(!window.__ceDisableLegacyBarGraficas && !window.__ceV16Opt2HGraphHardLock && !$('tabGraficas')?.classList.contains('hidden')) renderGraficasV413(); }catch(_){} }, 40);
   }
   window.ControlEventV413 = {version:VERSION, install, renderGraficas:renderGraficasV413, saveCompraOrDonation};
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 25)));

@@ -328,6 +328,7 @@
     }catch(_){ return `${selectedEventId()}::${Date.now()}`; }
   }
   function renderGraficasV434(options = {}){
+    if(window.__ceDisableLegacyBarGraficas || window.__ceV16Opt2HGraphHardLock) return;
     const wrap = $('eventChartWrap'); if(!wrap) return;
     window.__ceStableGraficasV435 = true;
     const g = chartParts();
@@ -343,12 +344,14 @@
   }
   function graficasVisible(){ const tab=$('tabGraficas'); return !!tab && !tab.classList.contains('hidden'); }
   function ensureGraficas(){
+    if(window.__ceDisableLegacyBarGraficas || window.__ceV16Opt2HGraphHardLock) return;
     if(!graficasVisible()) return;
     const wrap = $('eventChartWrap'); if(!wrap || chartRendering) return;
     const own = wrap.firstElementChild?.classList?.contains('ce-v434-chart-layout-shell') && wrap.children.length === 1;
     if(!own) renderGraficasV434();
   }
   function patchGraficas(){
+    if(window.__ceDisableLegacyBarGraficas || window.__ceV16Opt2HGraphHardLock) return;
     window.__ceStableGraficasV435 = true;
     try{ renderGraficas = renderGraficasV434; }catch(_){ }
     window.renderGraficas = renderGraficasV434;
@@ -391,7 +394,7 @@
     if(!old || old.__ceV434Wrapped) return;
     const wrapped = function(){
       const ret = old.apply(this, arguments);
-      setTimeout(() => { applyVersion(); forceResumenOpen(); syncSearches(); normalizeMapaLabels(); patchGraficas(); installChartObserver(); if(graficasVisible()) renderGraficasV434(); }, 60);
+      setTimeout(() => { applyVersion(); forceResumenOpen(); syncSearches(); normalizeMapaLabels(); patchGraficas(); installChartObserver(); if(!window.__ceDisableLegacyBarGraficas && !window.__ceV16Opt2HGraphHardLock && graficasVisible()) renderGraficasV434(); }, 60);
       return ret;
     };
     wrapped.__ceV434Wrapped = true;
