@@ -60,7 +60,7 @@
     style.textContent = `
       body.ce-opt1-switching #selectedEvent{outline:2px solid rgba(245,158,11,.75)!important;box-shadow:0 0 0 4px rgba(245,158,11,.17)!important;}
       body.ce-opt1-switching .ce-opt1-pending-hide{opacity:.35;pointer-events:none;}
-      #ceOpt1Notice{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%) translateY(-4px);z-index:7000;max-width:min(560px,92vw);padding:9px 13px;border-radius:999px;background:rgba(15,23,42,.92);color:white;font:800 13px/1.25 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(15,23,42,.22);pointer-events:none;opacity:0;transition:opacity .14s ease,transform .14s ease;text-align:center;}
+      #ceOpt1Notice{display:none!important;visibility:hidden!important;position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%) translateY(-4px);z-index:7000;max-width:min(560px,92vw);padding:9px 13px;border-radius:999px;background:rgba(15,23,42,.92);color:white;font:800 13px/1.25 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(15,23,42,.22);pointer-events:none;opacity:0;transition:opacity .14s ease,transform .14s ease;text-align:center;}
       #ceOpt1Notice.visible{opacity:1;transform:translateX(-50%) translateY(0);}
       #selectedEvent.ce-opt1-open{position:relative;z-index:7100;}
     `;
@@ -68,13 +68,8 @@
   }
 
   function notice(msg, ms){
-    injectStyle();
-    let box = $('ceOpt1Notice');
-    if(!box){ box = document.createElement('div'); box.id = 'ceOpt1Notice'; document.body.appendChild(box); }
-    box.textContent = msg || 'Cargando evento...';
-    box.classList.add('visible');
-    clearTimeout(box.__ceOpt1Timer);
-    box.__ceOpt1Timer = setTimeout(() => box.classList.remove('visible'), Number(ms || 1200));
+    // v16_opt_2D: sin avisos negros de carga. El cambio de evento debe ser silencioso.
+    try{ const box = $('ceOpt1Notice'); if(box) box.remove(); }catch(_){ }
   }
 
   function setBusy(on){
@@ -152,7 +147,7 @@
     rememberEvent(id);
     const sel = $('selectedEvent');
     if(sel && sel.value !== id) sel.value = id;
-    notice('Cargando evento… una sola vez');
+    notice('');
 
     try{
       if(window.ControlEventV447 && typeof window.ControlEventV447.selectEvent === 'function'){

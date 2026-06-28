@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod OPT2C - Gráficas sin quesos blancos ni retemblores.
+/* ControlEvent v16_prod OPT2D - Gráficas sin avisos negros y con repintado estabilizado.
    Alcance cerrado: GRAFICAS + hidratación de justificantes al cambiar evento.
    Estrategia:
    - No pinta estados intermedios vacíos durante el cambio de evento.
@@ -8,10 +8,10 @@
 */
 (function(){
   'use strict';
-  if(window.__ceV16Opt2CInstalled) return;
-  window.__ceV16Opt2CInstalled = true;
+  if(window.__ceV16Opt2DInstalled) return;
+  window.__ceV16Opt2DInstalled = true;
 
-  const VERSION = 'v16_opt_2c';
+  const VERSION = 'v16_opt_2d';
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -38,7 +38,7 @@
   const moneyValDonacion = d => num(d?.valorEstimado ?? d?.valor ?? d?.importe ?? d?.total ?? (num(d?.precio ?? d?.precioReferencia) * Math.max(1, num(d?.unidades ?? d?.uds ?? d?.cantidad))));
   const moneyValIngreso = i => num(i?.total ?? i?.totalIngreso ?? i?.importeTotal ?? (num(i?.importeObligatorio ?? i?.obligatorio) + num(i?.importeVoluntario ?? i?.voluntario)));
 
-  const metrics = window.ControlEventOpt2 = window.ControlEventOpt2C = {
+  const metrics = window.ControlEventOpt2 = window.ControlEventOpt2D = {
     version: VERSION,
     installedAt: new Date().toISOString(),
     blockedBlankWrites: 0,
@@ -52,7 +52,9 @@
     lastRenderMs: 0,
     lastHydratedEventId: '',
     lastSwitchEventId: '',
-    lastReason: ''
+    lastReason: '',
+    dedupedRenderAfterStable: 0,
+    suppressedLoadNotices: 0
   };
 
   let cachedChartHtml = '';
@@ -69,6 +71,9 @@
   let switchEventId = '';
   let observer = null;
   let rawInnerHTMLDesc = null;
+  let finalRenderTimer = 0;
+  let lastFinalRenderKey = '';
+  let lastFinalRenderAt = 0;
 
   function injectStyle(){
     if($('ceV16Opt2CStyle')) return;
@@ -76,6 +81,8 @@
     style.id = 'ceV16Opt2CStyle';
     style.textContent = `
       #eventChartWrap .ce-v447-loading{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #ceOpt1Notice,#ceEventSwitchNotice{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;}
+      body.ce-opt2c-switching #eventChartWrap, body.ce-opt2d-switching #eventChartWrap{contain:layout paint;}
       #eventChartWrap.ce-opt2c-holding{contain:layout paint;min-height:var(--ce-opt2c-hold-height,420px);}
       #eventChartWrap.ce-opt2c-stable{contain:layout paint;}
       #eventChartWrap.ce-opt2c-rendering{pointer-events:none;}
@@ -153,15 +160,15 @@
   function startSwitch(reason){
     const ev = currentEventId();
     cacheCurrentChart();
-    switchUntil = Date.now() + 3200;
+    switchUntil = Date.now() + 2100;
     switchEventId = ev;
     metrics.lastSwitchEventId = ev;
     metrics.lastReason = reason || 'switch';
-    try{ document.body.classList.add('ce-opt2c-switching'); }catch(_){ }
+    try{ document.body.classList.add('ce-opt2c-switching','ce-opt2d-switching'); }catch(_){ }
     const wrap = $('eventChartWrap');
     if(wrap && cachedChartHtml) holdPreviousChart(wrap, reason || 'switch-start');
     clearTimeout(startSwitch._t);
-    startSwitch._t = setTimeout(() => { try{ document.body.classList.remove('ce-opt2c-switching'); }catch(_){ } }, 3400);
+    startSwitch._t = setTimeout(() => { try{ document.body.classList.remove('ce-opt2c-switching','ce-opt2d-switching'); }catch(_){ } }, 3400);
   }
   function clearPending(){
     clearTimeout(pendingTimer);
@@ -266,11 +273,12 @@
     metrics.graphRenderRequests++;
     const key = chartKey();
     const now = Date.now();
-    if(key && key === lastRenderKey && hasStableChart(wrap) && !htmlLooksBlankChart(rawGetInnerHTML(wrap)) && (now - lastRenderAt) < 2200 && options?.force !== 'hard'){
+    if(key && key === lastRenderKey && hasStableChart(wrap) && !htmlLooksBlankChart(rawGetInnerHTML(wrap)) && (now - lastRenderAt) < 2200){
+      if(options?.force === 'hard') metrics.dedupedRenderAfterStable++;
       return undefined;
     }
     clearTimeout(renderTimer);
-    const wait = isSwitching() ? (eventHasLoadedData(currentEventId()) ? 120 : 260) : 80;
+    const wait = isSwitching() ? (eventHasLoadedData(currentEventId()) ? 80 : 180) : 60;
     renderTimer = setTimeout(() => {
       const start = performance.now ? performance.now() : Date.now();
       try{
@@ -333,8 +341,23 @@
     patchChartContainer();
     patchRenderers();
     if(!graficasVisible()) return;
-    const base = getBaseRender();
-    if(typeof base === 'function') runGraphRender(base, window.ControlEventV434 || window, {force:'hard', reason:'event-stable'});
+    clearTimeout(finalRenderTimer);
+    finalRenderTimer = setTimeout(() => {
+      if(!graficasVisible()) return;
+      const key = chartKey();
+      const now = Date.now();
+      const wrap = $('eventChartWrap');
+      if(key && key === lastFinalRenderKey && hasStableChart(wrap) && !htmlLooksBlankChart(rawGetInnerHTML(wrap)) && (now - lastFinalRenderAt) < 2600){
+        metrics.dedupedRenderAfterStable++;
+        return;
+      }
+      const base = getBaseRender();
+      if(typeof base === 'function'){
+        lastFinalRenderKey = key;
+        lastFinalRenderAt = now;
+        runGraphRender(base, window.ControlEventV434 || window, {force:'soft', reason:'event-stable-2d'});
+      }
+    }, 120);
   }
   async function hydrateReceipts(force){
     const ev = currentEventId();
@@ -374,8 +397,15 @@
   }
 
   window.addEventListener('change', function(ev){ if(ev.target && ev.target.id === 'selectedEvent') startSwitch('select-change'); }, true);
-  window.addEventListener('controlevent:opt1-event-stable', () => { startSwitch('opt1-stable'); setTimeout(() => { renderAfterStable(); hydrateReceipts(true); }, 150); }, true);
-  window.addEventListener('controlevent:event-ready', () => { setTimeout(() => { install(); hydrateReceipts(false); renderAfterStable(); }, 180); }, true);
+  window.addEventListener('controlevent:opt1-event-stable', () => {
+    startSwitch('opt1-stable');
+    setTimeout(() => { renderAfterStable(); hydrateReceipts(true); }, 180);
+  }, true);
+  let eventReadyTimer = 0;
+  window.addEventListener('controlevent:event-ready', () => {
+    clearTimeout(eventReadyTimer);
+    eventReadyTimer = setTimeout(() => { install(); hydrateReceipts(false); renderAfterStable(); }, 260);
+  }, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30), true));
   document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(install, 80); }, true);
   [0,120,450,1200,2600].forEach(ms => setTimeout(install, ms));

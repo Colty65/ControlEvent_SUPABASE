@@ -167,9 +167,9 @@
     const style = document.createElement('style');
     style.id = 'ceV447Style';
     style.textContent = `
-      #ceEventSwitchNotice{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:5000;max-width:min(560px,92vw);padding:10px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:white;font-weight:800;font-size:13px;box-shadow:0 12px 28px rgba(15,23,42,.26);pointer-events:none;opacity:0;transition:opacity .16s ease, transform .16s ease;text-align:center;}
+      #ceEventSwitchNotice{display:none!important;visibility:hidden!important;position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:5000;max-width:min(560px,92vw);padding:10px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:white;font-weight:800;font-size:13px;box-shadow:0 12px 28px rgba(15,23,42,.26);pointer-events:none;opacity:0;transition:opacity .16s ease, transform .16s ease;text-align:center;}
       #ceEventSwitchNotice.visible{opacity:1;transform:translateX(-50%) translateY(0);}
-      .ce-v447-loading{margin:14px 0;padding:16px 18px;border-radius:18px;background:rgba(248,250,252,.96);border:1px solid rgba(148,163,184,.28);color:#334155;font-weight:800;box-shadow:0 10px 28px rgba(15,23,42,.08);}
+      .ce-v447-loading{display:none!important;visibility:hidden!important;margin:14px 0;padding:16px 18px;border-radius:18px;background:rgba(248,250,252,.96);border:1px solid rgba(148,163,184,.28);color:#334155;font-weight:800;box-shadow:0 10px 28px rgba(15,23,42,.08);}
       .ce-v447-loading small{display:block;margin-top:3px;color:#64748b;font-weight:700;}
       body.ce-v447-switching #selectedEvent{outline:2px solid rgba(37,99,235,.65);box-shadow:0 0 0 4px rgba(37,99,235,.13);}
       body.ce-v447-login-loading #btnLogin{opacity:.72;pointer-events:none;}
@@ -177,13 +177,8 @@
     document.head.appendChild(style);
   }
   function notice(text){
-    injectStyle();
-    let box = $('ceEventSwitchNotice');
-    if(!box){ box = document.createElement('div'); box.id = 'ceEventSwitchNotice'; document.body.appendChild(box); }
-    box.textContent = text || 'Cargando evento...';
-    box.classList.add('visible');
-    clearTimeout(box.__hideTimer);
-    box.__hideTimer = setTimeout(() => box.classList.remove('visible'), 1400);
+    // v16_opt_2D: cambio de evento silencioso. No mostrar pastillas negras.
+    try{ const box = $('ceEventSwitchNotice'); if(box) box.remove(); }catch(_){ }
   }
   function setSwitching(on){ try{ document.body.classList.toggle('ce-v447-switching', !!on); }catch(_){ } }
   function clearPendingWork(){
@@ -240,15 +235,19 @@
     const includeActive = options.includeActive === true;
     Object.entries(DYNAMIC_IDS).forEach(([tab, ids]) => {
       if(tab === activeTab && !includeActive) return;
-      ids.forEach(clearContainer);
+      ids.forEach(id => {
+        // v16_opt_2D: en GRAFICAS no vaciar eventChartWrap durante el cambio; mantener el último gráfico válido.
+        if(tab === 'graficas' && id === 'eventChartWrap'){
+          const w = $(id);
+          if(w && w.firstElementChild && w.firstElementChild.classList && w.firstElementChild.classList.contains('ce-v434-chart-layout-shell')) return;
+        }
+        clearContainer(id);
+      });
     });
   }
   function showLoading(tab, label){
-    const ids = DYNAMIC_IDS[tab] || [];
-    const id = ids[ids.length - 1] || ids[0];
-    const el = id ? $(id) : null;
-    if(!el) return;
-    el.innerHTML = `<div class="ce-v447-loading">${escapeHtml(label || 'Cargando nuevo evento...')}<small>Preparando la ventana ${escapeHtml(tab || '')}.</small></div>`;
+    // v16_opt_2D: no pintar pantallas intermedias de carga; dejan la UI fea y provocan reflujo.
+    return;
   }
   function closeMobileDrawer(){ try{ document.body.classList.remove('mobile-drawer-open'); }catch(_){ } }
   function ensureVisibleControl(el, visible = true){
@@ -563,7 +562,7 @@
       try{ window.dispatchEvent(new CustomEvent('controlevent:event-ready', {detail:{eventId:currentEventId(), tab:currentTab(), reason:reason || 'v50.25'}})); }catch(_){ }
       applyVersion();
     };
-    [0,80,220,520,1000,1800].forEach(ms => setTimeout(run, ms));
+    [0,520].forEach(ms => setTimeout(run, ms));
   }
   function renderActive(tab){
     if(!hasValidEvent()) return;
