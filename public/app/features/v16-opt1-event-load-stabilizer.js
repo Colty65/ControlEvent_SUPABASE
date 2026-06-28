@@ -142,6 +142,8 @@
     const start = performance.now ? performance.now() : Date.now();
     metrics.eventChanges++;
     metrics.lastEventId = id;
+    try{ window.dispatchEvent(new CustomEvent('controlevent:opt1-event-start', {detail:{eventId:id, tab:currentTab()}})); }catch(_){ }
+    try{ window.ControlEventOpt2I?.begin?.(id, 'opt1-event-start'); }catch(_){ }
     setBusy(true);
     closeHeavyFloaters();
     rememberEvent(id);
