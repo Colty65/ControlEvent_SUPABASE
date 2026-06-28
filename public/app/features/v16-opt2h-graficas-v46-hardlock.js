@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod OPT2H - bloqueo duro de gráficas antiguas.
+/* ControlEvent v16_prod OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
    Objetivo: que nunca se vea la gráfica antigua de 4 quesos / 2 columnas.
    Estrategia:
    - Se carga muy pronto y también al final para reengancharse.
@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v16_opt_2h';
+  const VERSION = 'v16_opt_2j';
   const now = () => Date.now();
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
@@ -34,7 +34,10 @@
     finalCommits: 0,
     lastReason: '',
     lastEventId: '',
-    lastBlockedSnippet: ''
+    lastBlockedSnippet: '',
+    duplicateCommitSkips: 0,
+    lockedCommitSkips: 0,
+    skippedSchedulesFresh: 0
   };
 
   let protoDesc = null;
@@ -47,6 +50,28 @@
   let reassertTimer = 0;
   let activeRawCommit = false;
   let lastFinalAt = 0;
+  let lastCommitSig = '';
+  let lastCommitEventId = '';
+  const POST_COMMIT_LOCK_MS = 1450;
+  const FRESH_SCHEDULE_LOCK_MS = 1900;
+
+  function normalizedHtmlSig(html){
+    html = String(html || '');
+    // Firma estable: elimina ruido de estilos/espacios, suficiente para detectar repintados idénticos.
+    const norm = html.replace(/style=\"[^\"]*\"/g,'').replace(/data-[a-zA-Z0-9_-]+=\"[^\"]*\"/g,'').replace(/\s+/g,' ').trim();
+    let h = 2166136261;
+    for(let i=0;i<norm.length;i++){ h ^= norm.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return String((h >>> 0).toString(16)) + ':' + norm.length;
+  }
+  function currentStrictFresh(w){
+    w = w || $('eventChartWrap');
+    if(!w) return false;
+    const ev = currentEventId();
+    if(!ev || ev !== lastCommitEventId) return false;
+    if(now() - lastFinalAt > FRESH_SCHEDULE_LOCK_MS) return false;
+    const html = rawGet(w) || '';
+    return isStrictV46Html(html) && !isBlankChartHtml(html);
+  }
 
   function state(){ try{ return (typeof window.state !== 'undefined' && window.state) || window.ControlEventApp?.state || {}; }catch(_){ return {}; } }
   function currentEventId(){ return text(state().selectedEventId || $('selectedEvent')?.value || ''); }
@@ -130,6 +155,31 @@
     const w = $('eventChartWrap'); if(!w) return false;
     html = String(html || '');
     if(!isStrictV46Html(html) || isBlankChartHtml(html)) return false;
+    const ev = currentEventId();
+    const incomingSig = normalizedHtmlSig(html);
+    const currentHtml = rawGet(w) || '';
+    const currentIsStrict = isStrictV46Html(currentHtml) && !isBlankChartHtml(currentHtml);
+    const elapsed = now() - lastFinalAt;
+
+    // OPT2J: una vez que ya se ha pintado la V46 buena del evento, no volvemos a escribir
+    // otra V46 inmediatamente. Esos segundos commits eran el pequeño retemblor post-pintado.
+    if(currentIsStrict && ev && ev === lastCommitEventId && elapsed >= 0 && elapsed < POST_COMMIT_LOCK_MS){
+      if(normalizedHtmlSig(currentHtml) === incomingSig){ metrics.duplicateCommitSkips++; }
+      else { metrics.lockedCommitSkips++; }
+      cachedHtml = currentHtml;
+      cachedHeight = Math.max(420, Math.round(w.getBoundingClientRect?.().height || w.scrollHeight || cachedHeight));
+      metrics.lastReason = 'skip-postcommit-' + (reason || 'commit');
+      return true;
+    }
+
+    if(currentIsStrict && normalizedHtmlSig(currentHtml) === incomingSig && ev && ev === lastCommitEventId){
+      metrics.duplicateCommitSkips++;
+      cachedHtml = currentHtml;
+      cachedHeight = Math.max(420, Math.round(w.getBoundingClientRect?.().height || w.scrollHeight || cachedHeight));
+      metrics.lastReason = 'skip-duplicate-' + (reason || 'commit');
+      return true;
+    }
+
     rawSet(w, html);
     w.classList.remove('ce-opt2h-holding','ce-opt2g-holding','ce-opt2f-holding','ce-opt2e-frozen','ce-opt2c-holding','ce-opt2c-rendering');
     w.classList.add('ce-opt2h-final');
@@ -137,8 +187,10 @@
     cachedHeight = Math.max(420, Math.round(w.getBoundingClientRect?.().height || w.scrollHeight || cachedHeight));
     metrics.finalCommits++;
     metrics.lastReason = reason || 'commit';
-    metrics.lastEventId = currentEventId();
+    metrics.lastEventId = ev;
     lastFinalAt = now();
+    lastCommitEventId = ev;
+    lastCommitSig = incomingSig;
     return true;
   }
 
@@ -181,6 +233,11 @@
     clearTimeout(renderTimer);
     if(!graficasVisible()) return;
     const w = $('eventChartWrap'); if(!w) return;
+    if(currentStrictFresh(w)){
+      metrics.skippedSchedulesFresh++;
+      metrics.lastReason = 'skip-run-fresh-' + (reason || 'final');
+      return;
+    }
     const fn = findV46Renderer();
     if(typeof fn !== 'function'){
       hold('no-v46-' + (reason || ''));
@@ -199,6 +256,12 @@
   }
   function scheduleFinal(reason, delay){
     if(!graficasVisible()) return;
+    const w = $('eventChartWrap');
+    if(currentStrictFresh(w)){
+      metrics.skippedSchedulesFresh++;
+      metrics.lastReason = 'skip-schedule-fresh-' + (reason || 'scheduled');
+      return;
+    }
     metrics.finalSchedules++;
     clearTimeout(renderTimer);
     renderTimer = setTimeout(() => runFinal(reason || 'scheduled'), Number(delay == null ? 140 : delay));
@@ -316,7 +379,7 @@
     installObserver();
     cacheIfStrict();
     guardDom(reason || 'reassert');
-    if(graficasVisible()) scheduleFinal(reason || 'reassert', 160);
+    if(graficasVisible() && !currentStrictFresh()) scheduleFinal(reason || 'reassert', 160);
   }
   metrics.reassert = reassert;
 
