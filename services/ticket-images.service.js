@@ -10,18 +10,18 @@ export function listImages(eventId) {
   return imagesForEvent(eventId || '');
 }
 
-export async function uploadImage({ eventId, key, dataUrl, eventSnapshot, tk, replace } = {}) {
+export async function uploadImage({ eventId, key, dataUrl, eventSnapshot } = {}) {
   if (!eventId || !key || !dataUrl) {
     const err = new Error('Faltan eventId, key o dataUrl.');
     err.status = 400;
     throw err;
   }
-  return uploadTicketImageDb({ eventId, key, dataUrl, eventSnapshot, tk, replace });
+  return uploadTicketImageDb({ eventId, key, dataUrl, eventSnapshot });
 }
 
-export async function deleteImage({ eventId, key, tk } = {}) {
-  const result = await deleteTicketImageDb({ eventId: eventId || '', key: key || '', tk: tk || '' });
-  return { ok: true, ...(result || {}) };
+export async function deleteImage({ eventId, key } = {}) {
+  await deleteTicketImageDb({ eventId: eventId || '', key: key || '' });
+  return { ok: true };
 }
 
 export async function deleteEventImages({ eventId } = {}) {

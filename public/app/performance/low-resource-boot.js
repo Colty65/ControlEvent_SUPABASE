@@ -47,19 +47,13 @@
     legacyPatch: null
   };
 
-  // OPT3J: en PC de escritorio tambien hay bucles legacy cortos (900/1200/1500/1800 ms)
-  // que ya no son necesarios cuando las ventanas se pintan por evento. No activamos el modo LITE
-  // completo en escritorio; solo convertimos esos barridos repetitivos en vigilancia lenta.
-  const desktopIdleGuard = !enabled && !forcedOff;
-
   function interval(ms){
     const value = Number(ms || 0);
-    if(!value) return value;
+    if(!enabled || !value) return value;
     if(value >= 30000) return value;
-    if(!enabled && !desktopIdleGuard) return value;
     stats.intervalsAdjusted += 1;
-    // En v29.1 se multiplicaban; en equipos antiguos y ahora tambien en PC normal
-    // los intervalos legacy repetitivos pasan a modo "vigilancia", no a modo "repintado".
+    // En v29.1 se multiplicaban; en equipos antiguos seguia habiendo barridos cada pocos segundos.
+    // En v30.7 los intervalos legacy repetitivos pasan a modo "vigilancia", no a modo "repintado".
     if(value <= 2500) return 45000;
     if(value <= 10000) return Math.max(45000, value * 4);
     return Math.max(30000, value);
@@ -276,7 +270,7 @@
     console.groupEnd();
     return report;
   }
-  window.ControlEventLowResource = {version:VERSION, enabled, isLite:enabled, reason, desktopIdleGuard, stats, interval, timeout, inspect, print, ensureUi, openPanel, closePanel, refreshUi};
+  window.ControlEventLowResource = {version:VERSION, enabled, isLite:enabled, reason, stats, interval, timeout, inspect, print, ensureUi, openPanel, closePanel, refreshUi};
   try{ document.documentElement.dataset.ceLite = enabled ? 'on' : 'off'; document.documentElement.dataset.ceLiteReason = reason; }catch(_){}
   function startUiRefresh(){
     ensureUi();
