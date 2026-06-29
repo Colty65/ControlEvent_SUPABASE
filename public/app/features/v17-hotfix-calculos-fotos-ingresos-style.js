@@ -1,5 +1,5 @@
 /* ControlEvent v17_prod - Cálculos por tienda/ticket: fotos con método tipo Documentos.
-   FIX7: mantiene fotos FIX6, recupera detalle de filas y elimina icono (i). No cambia versión. */
+   FIX8: mantiene fotos FIX6, recupera detalle completo de filas sin icono (i). No cambia versión. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
@@ -229,6 +229,82 @@
     if(typeof fn==='function')return safe(()=>fn()||[],[]);
     return [];
   }
+
+  function arr(name){
+    for(const s of stateObjects()){
+      const v=s?.[name];
+      if(Array.isArray(v)) return v;
+    }
+    return [];
+  }
+  function byId(name,id){
+    const sid=String(id??'');
+    return arr(name).find(x=>String(x?.id??x?.ID??'')===sid) || {};
+  }
+  function displayName(obj){return norm(obj?.nombre||obj?.name||obj?.titulo||obj?.descripcion||obj?.label||obj?.id||'');}
+  function productName(c){
+    return norm(c?.producto?.nombre||c?.product?.nombre||c?.productoNombre||c?.productName||c?.nombreProducto||displayName(byId('productos',c?.productoId??c?.producto_id??c?.productId))||'Producto');
+  }
+  function storeName(c){
+    return norm(c?.tienda?.nombre||c?.store?.nombre||c?.tiendaNombre||c?.storeName||displayName(byId('tiendas',c?.tiendaId??c?.tienda_id??c?.storeId))||'Sin tienda');
+  }
+  function personName(id){return displayName(byId('personas',id))||'';}
+  function donorName(c){
+    const ref=norm(c?.donorRef??c?.donanteRef??c?.donante_id??c?.donanteId??c?.personaId??'');
+    if(ref.startsWith('P:')) return personName(ref.slice(2)) || 'Sin donante';
+    if(ref.startsWith('T:')) return displayName(byId('tiendas',ref.slice(2))) || 'Sin donante';
+    if(ref) return personName(ref) || displayName(byId('tiendas',ref)) || ref;
+    return norm(c?.donante?.nombre||c?.donor?.nombre||c?.persona?.nombre||c?.tiendaDonante?.nombre||'Sin donante');
+  }
+  function units(c){return Number(c?.unidades??c?.uds??c?.cantidad??c?.qty??0)||0;}
+  function price(c){
+    const p=c?.precio??c?.precioUnitario??c?.price??c?.importeUnitario??c?.producto?.defaultPrecio??c?.producto?.precio??byId('productos',c?.productoId??c?.producto_id??c?.productId)?.defaultPrecio??byId('productos',c?.productoId??c?.producto_id??c?.productId)?.precio??0;
+    return Number(p)||0;
+  }
+  function valueLine(c){
+    const explicit=c?.importe??c?.total??c?.valor??c?.amount;
+    const n=Number(explicit);
+    if(Number.isFinite(n)&&n!==0) return n;
+    return units(c)*price(c);
+  }
+  function ticketOf(c){return norm(c?.ticketDonacion??c?.ticket_donacion??c?.ticket??c?.donacion??c?.ticketId??'');}
+  function isDonationTicket(t){const u=up(t); return u.startsWith('DONADO')||u.includes('DONACION')||u.includes('DONADO');}
+  function isCurrentOrPending(t){
+    const u=up(t);
+    return !u || u==='GASTOS CORRIENTES' || u.includes('GASTOS CORRIENTES') || u.includes('PTE') || u.includes('PENDIENTE');
+  }
+  function fmtNum(v){return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(Number(v||0));}
+  function linePurchase(c,first){return [first,storeName(c),productName(c),fmtNum(units(c)),money(price(c)),money(valueLine(c))];}
+  function lineDonation(c){return [donorName(c),productName(c),fmtNum(units(c)),money(price(c)),money(valueLine(c))];}
+  function detailedRowsFromState(){
+    const ev=eventId();
+    if(!ev) return [];
+    const filled=new Map(), pending=new Map();
+    arr('compras').filter(c=>String(c?.eventId??c?.event_id??'')===ev).forEach(c=>{
+      const tk=ticketOf(c);
+      const donated=isDonationTicket(tk);
+      const v=valueLine(c);
+      if(!donated && isCurrentOrPending(tk)){
+        const key=storeName(c)+' | Pte. Compra u otros gastos';
+        if(!pending.has(key)) pending.set(key,{key,label:key,k:key,v:0,pending:true,donated:false,attachable:false,lines:[],headers:['Ticket/Otros gastos','Tienda','Producto','Uds','Precio','Total']});
+        const r=pending.get(key); r.v+=v; r.lines.push(linePurchase(c,tk||'PTE.COMPRA')); return;
+      }
+      const holder=donated?donorName(c):storeName(c);
+      const key=holder+' | '+(tk || 'Pte. Compra u otros gastos');
+      if(!filled.has(key)) filled.set(key,{key,label:key,k:key,v:0,pending:false,donated,attachable:!donated&&!isCurrentOrPending(tk),rawTicket:tk,lines:[],headers:donated?['Donante','Producto','Uds','Precio estimado','Valor estimado']:['Ticket/Otros gastos','Tienda','Producto','Uds','Precio','Total']});
+      const r=filled.get(key); r.v+=v; r.lines.push(donated?lineDonation(c):linePurchase(c,tk||'PTE.COMPRA'));
+    });
+    return [...filled.values(),...pending.values()];
+  }
+  function hasFullDetail(r){return Array.isArray(r?.headers)&&r.headers.length&&Array.isArray(r?.lines)&&r.lines.length;}
+  function fullDetailFor(label,row){
+    if(hasFullDetail(row)) return row;
+    const clean=cleanLabel(label||rowKey(row)||row?.label||row?.key||'');
+    const u=up(clean);
+    const found=detailedRowsFromState().find(x=>up(cleanLabel(x.key||x.label||''))===u) || null;
+    if(found) return {...row,...found,v:Number(row?.v??found.v??0)||Number(found.v||0)};
+    return row||{key:clean,label:clean,v:0,headers:[],lines:[]};
+  }
   function tipForRow(r,label){
     if(r?.headers&&Array.isArray(r?.lines)){
       const out=[]; out.push(r.donated?'CÁLCULOS POR DONANTE Y DONACIÓN':(r.pending?'PENDIENTE DE COMPRA U OTROS GASTOS':'CÁLCULOS POR TIENDA Y TICKET'));
@@ -249,13 +325,14 @@
   }
   function showRowDetail(r,label,ev){
     stop(ev||{});
+    const clean=cleanLabel(label||rowKey(r)||r?.label||r?.key||'');
+    r=fullDetailFor(clean,r||{});
     document.querySelectorAll('.ce-v17-rowdetail-modal').forEach(x=>x.remove());
     const title=rowTitle(r);
-    const clean=cleanLabel(label||rowKey(r)||r?.label||r?.key||'');
     const heads=Array.isArray(r?.headers)?r.headers.map(x=>String(x??'')):[];
     const lines=Array.isArray(r?.lines)?r.lines:[];
     const modal=document.createElement('div');
-    modal.className='ce-v17-rowdetail-modal';
+    modal.className='ce-v17-rowdetail-modal'+(r?.pending?' pending':'')+(r?.donated?' donated':'');
     let body='';
     if(heads.length){
       const htmlRows=(lines.length?lines:[['Sin detalle']]).map(line=>{
@@ -480,6 +557,11 @@
       .ce-v17-rowdetail-table td:nth-last-child(-n+3),.ce-v17-rowdetail-table th:nth-last-child(-n+3){text-align:right!important;}
       .ce-v17-rowdetail-table td:first-child{font-weight:850!important;}
       .ce-v17-rowdetail-pre{white-space:pre-wrap!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:12px!important;padding:10px!important;max-height:55vh!important;overflow:auto!important;font-family:inherit!important;}
+      #summaryTiendaTicket .ce-v17-pending .ce-hf10-label{color:#b91c1c!important;font-weight:950!important;}
+      .ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-head h3,.ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-head p{color:#b91c1c!important;}
+      .ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-total{background:#fef2f2!important;color:#b91c1c!important;}
+      #ceV104TicketDetail .ce-v104-close-row,#ceV103TicketDetail .ce-v103-close-row,#ceV102TicketDetail .ce-v102-close-row{position:sticky!important;bottom:0!important;z-index:20!important;background:linear-gradient(to top,#fff 72%,rgba(255,255,255,0))!important;padding:10px 4px 4px!important;margin-top:0!important;}
+      #ceV104TicketDetail [data-ce-v104-close],#ceV103TicketDetail [data-ce-v103-close],#ceV102TicketDetail [data-ce-v102-close],#ceV101TicketDetail [data-ce-v101-close],#ceV100TicketDetail [data-ce-v100-close],#ceV96TicketDetail [data-ce-v96-close]{position:fixed!important;right:calc(2vw + 20px)!important;bottom:calc(3vh + 16px)!important;top:auto!important;z-index:10000080!important;min-width:96px!important;min-height:38px!important;font-weight:950!important;background:#fff!important;}
     `;
     document.head.appendChild(style);
   }
@@ -488,5 +570,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix7_detalle_sin_i'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix8_detalle_completo_avance'};
 })();

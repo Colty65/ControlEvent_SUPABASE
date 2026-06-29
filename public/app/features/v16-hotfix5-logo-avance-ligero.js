@@ -1,7 +1,7 @@
 /* ControlEvent v17_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    - No cambia versión.
    - Evita los handlers antiguos del logo que disparaban observers pesados.
-   - Muestra un globo propio, efímero, con colores fijos y cierre fácil. */
+   - Muestra un globo propio, estable, sin autocierre ni cierre por scroll/fuera; se alterna con el logo. */
 (function(){
   'use strict';
   if(window.__ceV16Hotfix5LogoAvanceLigero) return;
@@ -103,9 +103,19 @@
     blue:['#2563eb','#eff6ff'], green:['#16a34a','#ecfdf5'], orange:['#f59e0b','#fff7ed'], red:['#ef4444','#fef2f2'], purple:['#8b5cf6','#faf5ff']
   };
   let timer=0;
+  let lastToggle=0;
   function closeAvance(){
     const layer=$('ceV16Hf5AvanceLayer'); if(layer) layer.classList.remove('visible');
     clearTimeout(timer);
+  }
+  function toggleAvance(ev){
+    if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
+    const now=Date.now();
+    if(now-lastToggle<260) return false;
+    lastToggle=now;
+    const layer=$('ceV16Hf5AvanceLayer');
+    if(layer?.classList?.contains('visible')) closeAvance(); else showAvance();
+    return false;
   }
   function showAvance(){
     // Por si algún handler antiguo se ha disparado, limpiamos sus capas sin tocar el resto.
@@ -122,7 +132,7 @@
     layer.querySelector('.ce-v16hf5-close')?.addEventListener('click',ev=>{ev.preventDefault(); ev.stopPropagation(); closeAvance();},{once:true});
     const bubble=layer.querySelector('.ce-v16hf5-bubble');
     bubble?.addEventListener('click',ev=>ev.stopPropagation());
-    clearTimeout(timer); timer=setTimeout(closeAvance,5200);
+    clearTimeout(timer);
   }
 
   function rewireLogo(){
@@ -139,25 +149,17 @@
     document.querySelectorAll('.ce-brand-logo-safe').forEach(logo=>{
       if(logo.__ceV16Hf5Bound) return;
       logo.__ceV16Hf5Bound=true;
-      logo.addEventListener('click',ev=>{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.(); showAvance(); return false; }, true);
-      logo.addEventListener('pointerup',ev=>{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.(); showAvance(); return false; }, true);
+      logo.addEventListener('click',toggleAvance, true);
+      logo.addEventListener('pointerup',toggleAvance, true);
     });
   }
 
   function bindGlobalClose(){
     if(window.__ceV16Hf5GlobalClose) return;
     window.__ceV16Hf5GlobalClose=true;
-    ['pointerdown','click','touchstart'].forEach(evName=>{
-      document.addEventListener(evName,ev=>{
-        const layer=$('ceV16Hf5AvanceLayer');
-        if(!layer?.classList?.contains('visible')) return;
-        const inside=!!ev.target?.closest?.('.ce-v16hf5-bubble');
-        const logo=!!ev.target?.closest?.('.ce-brand-logo-safe');
-        if(!inside && !logo){ closeAvance(); }
-      }, true);
-    });
+    // FIX8: no cerrar por click fuera, scroll ni temporizador.
+    // El globo permanece visible hasta volver a pulsar el logo ColtyLAB, cerrar con X o Escape.
     document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') closeAvance(); }, true);
-    window.addEventListener('scroll',()=>closeAvance(),true);
   }
 
   function run(){ rewireLogo(); bindGlobalClose(); }
