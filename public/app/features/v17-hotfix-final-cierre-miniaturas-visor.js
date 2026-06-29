@@ -1,10 +1,10 @@
-/* ControlEvent v17_prod - FIX10 puntual:
+/* ControlEvent v17_prod - FIX11 puntual (cargado realmente desde index):
    1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas; 3) visor ticket con detalle a la izquierda y Cerrar abajo derecha.
    No cambia versión. */
 (function(){
   'use strict';
-  if(window.__ceV17Fix10CierreMiniaturasVisor) return;
-  window.__ceV17Fix10CierreMiniaturasVisor = true;
+  if(window.__ceV17Fix11CierreMiniaturasVisor) return;
+  window.__ceV17Fix11CierreMiniaturasVisor = true;
 
   const STYLE_ID='ceV17Fix10CierreMiniaturasVisorStyle';
   const $=id=>document.getElementById(id);
@@ -87,17 +87,18 @@
   function splitParts(label){return cleanLabel(label).split('|').map(x=>norm(x)).filter(Boolean);}
   function fmtNum(v){return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(Number(v||0));}
 
+  function rowEventId(c){ return norm(c?.eventId??c?.event_id??c?.eventoId??c?.evento_id??c?.idEvento??c?.evento??''); }
+  function rowBelongsEvent(c){ const ev=eventId(); const rid=rowEventId(c); return !ev || !rid || rid===ev; }
   function rowsForTicketLabel(label){
-    const ev=eventId();
     const clean=cleanLabel(label);
     const parts=splitParts(clean);
     const tiendaU=up(parts[0]||'');
     const tk=ticketToken(clean);
-    if(!ev||!tk) return [];
-    let rows=arr('compras').filter(c=>String(c?.eventId??c?.event_id??'')===ev && up(ticketOf(c))===tk);
-    if(tiendaU) rows=rows.filter(c=>up(storeName(c))===tiendaU || !storeName(c));
-    if(!rows.length){
-      rows=arr('compras').filter(c=>String(c?.eventId??c?.event_id??'')===ev && up(ticketOf(c))===tk);
+    if(!tk) return [];
+    let rows=arr('compras').filter(c=>rowBelongsEvent(c) && up(ticketOf(c))===tk);
+    if(tiendaU){
+      const strict=rows.filter(c=>up(storeName(c))===tiendaU);
+      if(strict.length) rows=strict;
     }
     return rows;
   }
@@ -105,6 +106,9 @@
   function modalRoots(){
     return '#ceV17TicketViewerFinal,#ceV104TicketDetail,#ceV103TicketDetail,#ceV102TicketDetail,#ceV101TicketDetail,#ceV100TicketDetail,#ceV96TicketDetail,#ceV40TicketPhotoModal,#ceV310PhotoViewer,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v40-modal,.ce-v401-pc-modal';
   }
+  let lastThumbForViewer=null;
+  let lastThumbAt=0;
+  function legacyModalOpen(){ return !!document.querySelector('#ceV104TicketDetail,#ceV103TicketDetail,#ceV102TicketDetail,#ceV101TicketDetail,#ceV100TicketDetail,#ceV96TicketDetail,#ceV40TicketPhotoModal,#ceV310PhotoViewer,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v40-modal,.ce-v401-pc-modal'); }
   function closeTicketViewers(ev){
     if(ev) stop(ev);
     document.querySelectorAll(modalRoots()).forEach(m=>{try{m.remove();}catch(_){try{m.classList.remove('visible');}catch(__){}}});
@@ -117,6 +121,7 @@
     const label=cleanLabel(img.dataset.ceV17Label||row?.dataset?.ceV17Label||row?.dataset?.ceTicketLabel||row?.innerText||'');
     const tk=ticketToken(label)||norm(img.dataset.ceHf12Tk||img.dataset.ceHf10Tk||'').toUpperCase();
     if(!src||!tk) return false;
+    lastThumbForViewer=img; lastThumbAt=Date.now();
     stop(ev);
     closeTicketViewers();
     const rows=rowsForTicketLabel(label||tk);
@@ -151,11 +156,20 @@
     const root=$('summaryTiendaTicket');
     if(!root) return;
     root.querySelectorAll('.summary-item,.ce-v17-doc-row').forEach(row=>{
-      const thumbs=Array.from(row.querySelectorAll('img.ticket-thumb,img.ce-v17-doc-thumb'));
+      const actionsAll=Array.from(row.querySelectorAll('.ticket-actions,.ce-v17-doc-actions'));
+      if(actionsAll.length>1){
+        const keepActions=actionsAll[0];
+        actionsAll.slice(1).forEach(a=>{
+          // Si la segunda caja solo aporta miniaturas duplicadas, se elimina.
+          if(a.querySelector('img')){ try{a.remove();}catch(_){a.style.display='none';} }
+        });
+        keepActions.classList.add('ticket-actions','ce-v17-doc-actions');
+      }
+      const thumbs=Array.from(row.querySelectorAll('img.ticket-thumb,img.ce-v17-doc-thumb,img[src*="ticket-images"],img[src^="data:image/"]'));
       if(thumbs.length>1){
         const keep=thumbs[0];
-        thumbs.slice(1).forEach(img=>{try{img.remove();}catch(_){img.style.display='none';}});
         keep.classList.add('ce-v17-doc-thumb','ticket-thumb');
+        thumbs.slice(1).forEach(img=>{try{img.remove();}catch(_){img.style.setProperty('display','none','important');}});
       }
       row.querySelectorAll('.ticket-actions').forEach(actions=>{
         const btns=Array.from(actions.querySelectorAll('button[data-ce-v17-photo]'));
@@ -182,7 +196,9 @@
     st.id=STYLE_ID;
     st.textContent=`
       #summaryTiendaTicket .summary-item img.ticket-thumb:nth-of-type(n+2),
-      #summaryTiendaTicket .ce-v17-doc-row img.ticket-thumb:nth-of-type(n+2){display:none!important;}
+      #summaryTiendaTicket .ce-v17-doc-row img.ticket-thumb:nth-of-type(n+2),
+      #summaryTiendaTicket .ticket-actions img:nth-of-type(n+2),
+      #summaryTiendaTicket .ce-v17-doc-actions img:nth-of-type(n+2){display:none!important;}
       .ce-v17-rowdetail-close{pointer-events:auto!important;cursor:pointer!important;z-index:10000050!important;}
       #ceV17TicketViewerFinal{position:fixed!important;inset:0!important;z-index:10000090!important;background:rgba(15,23,42,.72)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-card{background:#fff!important;border-radius:14px!important;width:96vw!important;max-width:1420px!important;height:94vh!important;max-height:94vh!important;overflow:auto!important;padding:14px!important;border:2px solid #fb923c!important;display:flex!important;flex-direction:column!important;gap:14px!important;}
@@ -207,7 +223,7 @@
   }
 
   function handleClick(ev){
-    if(ev.target?.closest?.('.ce-v17-rowdetail-close')) return closeRowDetail(ev);
+    if(ev.target?.closest?.('.ce-v17-rowdetail-close,.ce-v17-rowdetail-head button,[aria-label="Cerrar"]')) return closeRowDetail(ev);
     if(ev.target?.closest?.('[data-ce-v17-ticket-close],[data-ce-v104-close],[data-ce-v103-close],[data-ce-v102-close],[data-ce-v101-close],[data-ce-v100-close],[data-ce-v96-close],.ce-v40-modal-close')) return closeTicketViewers(ev);
     const img=ev.target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#summaryTiendaTicket img.ce-v17-doc-thumb');
     if(img) return openTicketViewerFromThumb(img,ev);
@@ -221,9 +237,19 @@
   function install(){injectStyle();sanitizeSummaryThumbs();}
   ['click','pointerdown','pointerup','touchend'].forEach(t=>document.addEventListener(t,handleClick,true));
   document.addEventListener('keydown',handleKey,true);
-  const mo=new MutationObserver(()=>{clearTimeout(mo.__t); mo.__t=setTimeout(sanitizeSummaryThumbs,40);});
+  const mo=new MutationObserver(()=>{
+    clearTimeout(mo.__t);
+    mo.__t=setTimeout(()=>{
+      sanitizeSummaryThumbs();
+      if(legacyModalOpen() && lastThumbForViewer && Date.now()-lastThumbAt<3000){
+        const img=lastThumbForViewer;
+        closeTicketViewers();
+        setTimeout(()=>openTicketViewerFromThumb(img,null),20);
+      }
+    },40);
+  });
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_){ }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,900,1800].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix10_cierre_miniaturas_visor'};
+  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix11_cierre_miniaturas_visor_cargado'};
 })();
