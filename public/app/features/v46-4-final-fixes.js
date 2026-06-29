@@ -618,43 +618,38 @@
       const donor = donorName(sorted[i]) || 'Sin donante';
       const group = [];
       while(i < sorted.length && (donorName(sorted[i]) || 'Sin donante') === donor){ group.push(sorted[i]); i += 1; }
-      group.sort((a,b) => {
-        const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-        return pa.localeCompare(pb, 'es', {sensitivity:'base'});
-      });
       group.forEach(r => out.push(`${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
-      out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      if(group.length > 1){
+        out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      }
     }
     return out;
   }
   function expenseLines(rows){
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
+      const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
       const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
       const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
-      return ta.localeCompare(tb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'}) || sa.localeCompare(sb, 'es', {sensitivity:'base'});
+      return sa.localeCompare(sb, 'es', {sensitivity:'base'}) || ta.localeCompare(tb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
     });
-    if(!sorted.length) return ['Ticket | Tienda | Producto | Cant. | Precio | Total', 'Sin registros'];
-    const out = ['Ticket | Tienda | Producto | Cant. | Precio | Total'];
+    if(!sorted.length) return ['Tienda | Ticket | Producto | Cant. | Precio | Total', 'Sin registros'];
+    const out = ['Tienda | Ticket | Producto | Cant. | Precio | Total'];
     let i = 0;
     while(i < sorted.length){
+      const store = sorted[i]?.tienda?.nombre || storeName(sorted[i]?.tiendaId) || 'Sin tienda';
       const ticket = sorted[i]?.ticketDonacion || 'Pte.Compra';
       const group = [];
       while(i < sorted.length){
         const r = sorted[i];
+        const sName = r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
         const tName = r?.ticketDonacion || 'Pte.Compra';
-        if(tName !== ticket) break;
+        if(sName !== store || tName !== ticket) break;
         group.push(r); i += 1;
       }
-      group.sort((a,b) => {
-        const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-        const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
-        return pa.localeCompare(pb, 'es', {sensitivity:'base'}) || sa.localeCompare(sb, 'es', {sensitivity:'base'});
-      });
-      group.forEach(r => out.push(`${r.ticketDonacion || 'Pte.Compra'} | ${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
-      const stores = Array.from(new Set(group.map(r => r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda')));
-      const label = stores.length === 1 ? `Total ${ticket} / ${stores[0]}` : `Total ${ticket}`;
-      out.push(`${label} |  |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      group.forEach(r => out.push(`${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+      if(group.length > 1){
+        out.push(`Total ${store} / ${ticket} |  |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      }
     }
     return out;
   }
@@ -684,7 +679,7 @@
     });
   }
   function detailHeaderFor(label){
-    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Ticket | Tienda | Producto | Cant. | Precio | Total';
+    return upper(label).includes('DONADO') ? 'Donante | Producto | Cant. | Precio | Total' : 'Tienda | Ticket | Producto | Cant. | Precio | Total';
   }
   function pieDisplayAngles(nonzero){
     if(nonzero.length <= 1) return nonzero.map(() => 360);
