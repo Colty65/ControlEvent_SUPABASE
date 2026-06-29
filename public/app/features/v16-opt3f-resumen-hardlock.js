@@ -33,10 +33,34 @@
     if(v && typeof v === 'object') return Object.keys(v).length;
     return 0;
   }
+  function tinyHash(str){
+    str = String(str || ''); let h = 0;
+    for(let i = 0; i < str.length; i += 1) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    return String(h >>> 0);
+  }
+  function imageBagStamp(v){
+    if(!v) return '';
+    try{
+      if(Array.isArray(v)){
+        return v.map(row => {
+          const k = norm(row?.key || row?.image_key || row?.id || row?.ticket || row?.tk || '');
+          const src = imageValue(row?.image || row?.url || row?.publicUrl || row?.pathname || row?.path || row?.storage_path || row);
+          return k + '>' + tinyHash(src);
+        }).sort().join('¬');
+      }
+      if(typeof v === 'object'){
+        return Object.entries(v).map(([k,val]) => norm(k) + '>' + tinyHash(imageValue(val))).sort().join('¬');
+      }
+    }catch(_){ }
+    return String(listLen(v));
+  }
+  function imageStamp(){
+    const s = stateRef();
+    return [s.ticketImages, s.ticketImageRefs, s.ticketImagesByKey, s.ticket_images, s.ce_ticket_images].map(imageBagStamp).join('|');
+  }
   function lightStamp(){
     const s = stateRef();
-    const images = listLen(s.ticketImages) + listLen(s.ticketImageRefs) + listLen(s.ticketImagesByKey) + listLen(s.ticket_images) + listLen(s.ce_ticket_images);
-    return [evId(), s.summaryTiendaSort || 'tienda', listLen(s.compras), listLen(s.productos), listLen(s.tiendas), listLen(s.personas), images].join('|');
+    return [evId(), s.summaryTiendaSort || 'tienda', listLen(s.compras), listLen(s.productos), listLen(s.tiendas), listLen(s.personas), imageStamp()].join('|');
   }
 
   let ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
@@ -95,7 +119,7 @@
   function imageIndex(){
     const id = evId();
     const s = stateRef();
-    const stamp = id + '|' + listLen(s.ticketImages) + '|' + listLen(s.ticketImageRefs) + '|' + listLen(s.ticketImagesByKey) + '|' + listLen(s.ticket_images) + '|' + listLen(s.ce_ticket_images);
+    const stamp = id + '|' + imageStamp();
     if(ticketImageIndexCache.stamp === stamp && ticketImageIndexCache.eventId === id) return ticketImageIndexCache.map;
     const map = new Map();
     const add = (key, img) => {
@@ -380,7 +404,14 @@
   }, true);
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape') document.querySelectorAll('.ce-opt3e-modal').forEach(m => m.remove()); }, true);
 
-  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget});
+  function clearCaches(){
+    ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
+    rowsCache = {stamp:'', eventId:'', rows:null, at:0};
+    metrics.cacheClears = (metrics.cacheClears || 0) + 1;
+    try{ const root = $(ROOT_ID); if(root){ delete root.dataset.ceOpt3eLightStamp; delete root.dataset.ceOpt3eSig; } }catch(_){ }
+  }
+
+  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget, clearCaches});
   injectStyle();
   patchRenderSummaryList();
   patchRenderBudget();
