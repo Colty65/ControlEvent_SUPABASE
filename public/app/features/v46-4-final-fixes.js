@@ -606,50 +606,54 @@
     return ['Nombre | Ingreso | Importe', ...sorted.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
   }
   function donationLines(rows){
+    const donorOf = r => donorName(r) || 'Sin donante';
+    const productOf = r => r?.producto?.nombre || productName(r?.productoId) || 'Producto';
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
-      const da = donorName(a) || 'Sin donante'; const db = donorName(b) || 'Sin donante';
-      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      return da.localeCompare(db, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+      return donorOf(a).localeCompare(donorOf(b), 'es', {sensitivity:'base'})
+        || productOf(a).localeCompare(productOf(b), 'es', {sensitivity:'base'});
     });
     if(!sorted.length) return ['Donante | Producto | Cant. | Precio | Total', 'Sin registros'];
     const out = ['Donante | Producto | Cant. | Precio | Total'];
     let i = 0;
     while(i < sorted.length){
-      const donor = donorName(sorted[i]) || 'Sin donante';
+      const donor = donorOf(sorted[i]);
+      const donorKey = upper(donor);
       const group = [];
-      while(i < sorted.length && (donorName(sorted[i]) || 'Sin donante') === donor){ group.push(sorted[i]); i += 1; }
-      group.forEach(r => out.push(`${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
-      if(group.length > 1){
-        out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
-      }
+      while(i < sorted.length && upper(donorOf(sorted[i])) === donorKey){ group.push(sorted[i]); i += 1; }
+      group.forEach(r => out.push(`${donorOf(r)} | ${productOf(r)} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+      out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
     }
     return out;
   }
   function expenseLines(rows){
+    const storeOf = r => r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
+    const ticketOf = r => r?.ticketDonacion || 'Pte.Compra';
+    const productOf = r => r?.producto?.nombre || productName(r?.productoId) || 'Producto';
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
-      const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
-      const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
-      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      return sa.localeCompare(sb, 'es', {sensitivity:'base'}) || ta.localeCompare(tb, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+      return storeOf(a).localeCompare(storeOf(b), 'es', {sensitivity:'base'})
+        || ticketOf(a).localeCompare(ticketOf(b), 'es', {numeric:true, sensitivity:'base'})
+        || productOf(a).localeCompare(productOf(b), 'es', {sensitivity:'base'});
     });
     if(!sorted.length) return ['Tienda | Ticket | Producto | Cant. | Precio | Total', 'Sin registros'];
     const out = ['Tienda | Ticket | Producto | Cant. | Precio | Total'];
     let i = 0;
     while(i < sorted.length){
-      const store = sorted[i]?.tienda?.nombre || storeName(sorted[i]?.tiendaId) || 'Sin tienda';
-      const ticket = sorted[i]?.ticketDonacion || 'Pte.Compra';
-      const group = [];
-      while(i < sorted.length){
-        const r = sorted[i];
-        const sName = r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
-        const tName = r?.ticketDonacion || 'Pte.Compra';
-        if(sName !== store || tName !== ticket) break;
-        group.push(r); i += 1;
+      const store = storeOf(sorted[i]);
+      const storeKey = upper(store);
+      let storeTotal = 0;
+      while(i < sorted.length && upper(storeOf(sorted[i])) === storeKey){
+        const ticket = ticketOf(sorted[i]);
+        const ticketKey = upper(ticket);
+        const group = [];
+        while(i < sorted.length && upper(storeOf(sorted[i])) === storeKey && upper(ticketOf(sorted[i])) === ticketKey){
+          group.push(sorted[i]); i += 1;
+        }
+        group.forEach(r => out.push(`${storeOf(r)} | ${ticketOf(r)} | ${productOf(r)} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+        const ticketTotal = sum(group.map(rowValue));
+        storeTotal += ticketTotal;
+        out.push(`Total ${store}, ${ticket} |  |  |  |  | ${moneyF(ticketTotal)}`);
       }
-      group.forEach(r => out.push(`${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
-      if(group.length > 1){
-        out.push(`Total ${store} / ${ticket} |  |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
-      }
+      out.push(`Total ${store} |  |  |  |  | ${moneyF(storeTotal)}`);
     }
     return out;
   }
@@ -661,7 +665,7 @@
     return ['SALDO OPERATIVO', 'TOTAL | Importe', `Ingreso total previsto | ${moneyF(income)}`, `Gasto total previsto | ${moneyF(expense)}`, `SALDO OPERATIVO | ${moneyF(saldo)}`, '', 'INGRESOS INCLUIDOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS INCLUIDOS', ...limited(expenseLines(expenseRows))];
   }
   function valoracionLines(expenseRows, donationRows, expenses, donations, valoracion, pending){
-    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Gastos previstos | ${moneyF(expenses)}`, `Donación de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows)), '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows))];
+    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Donación de producto | ${moneyF(donations)}`, `Gastos previstos | ${moneyF(expenses)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows)), '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows))];
   }
   function polar(cx, cy, r, angle){ const rad = (angle - 90) * Math.PI / 180; return {x:cx + r * Math.cos(rad), y:cy + r * Math.sin(rad)}; }
   function arcPath(cx, cy, r, start, end){ const s = polar(cx,cy,r,end), e = polar(cx,cy,r,start); const large = end - start <= 180 ? 0 : 1; return `M ${cx} ${cy} L ${s.x.toFixed(3)} ${s.y.toFixed(3)} A ${r} ${r} 0 ${large} 0 ${e.x.toFixed(3)} ${e.y.toFixed(3)} Z`; }

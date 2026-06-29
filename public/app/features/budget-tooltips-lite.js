@@ -259,17 +259,17 @@
     return compras().filter(row => up(row.ticketDonacion || row.ticket || '') === c).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
   }
   function donationTableRows(rows){
-    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
+    const donorOf = row => donorName(row) || 'Sin donante';
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(donorOf(a), donorOf(b)) || cmp(productName(a), productName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
-      const donor = donorName(sorted[i]);
+      const donor = donorOf(sorted[i]);
+      const donorKey = up(donor);
       const group = [];
-      while(i < sorted.length && donorName(sorted[i]) === donor){ group.push(sorted[i]); i += 1; }
-      group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
-      }
+      while(i < sorted.length && up(donorOf(sorted[i])) === donorKey){ group.push(sorted[i]); i += 1; }
+      group.forEach(row => out.push([donorOf(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+      out.push([`Total ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
     }
     return out;
   }
@@ -300,18 +300,24 @@
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
   function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
   function expenseTableRows(rows){
-    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(expenseTicket(a), expenseTicket(b)) || cmp(storeName(a), storeName(b)) || cmp(productName(a), productName(b)));
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(storeName(a), storeName(b)) || String(expenseTicket(a)).localeCompare(String(expenseTicket(b)), 'es', {numeric:true, sensitivity:'base'}) || cmp(productName(a), productName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
-      const ticket = expenseTicket(sorted[i]);
       const store = storeName(sorted[i]);
-      const group = [];
-      while(i < sorted.length && expenseTicket(sorted[i]) === ticket && storeName(sorted[i]) === store){ group.push(sorted[i]); i += 1; }
-      group.forEach(row => out.push([expenseTicket(row), storeName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${ticket} / ${store}`, '', '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      const storeKey = up(store);
+      let storeTotal = 0;
+      while(i < sorted.length && up(storeName(sorted[i])) === storeKey){
+        const ticket = expenseTicket(sorted[i]);
+        const ticketKey = up(ticket);
+        const group = [];
+        while(i < sorted.length && up(storeName(sorted[i])) === storeKey && up(expenseTicket(sorted[i])) === ticketKey){ group.push(sorted[i]); i += 1; }
+        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+        const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
+        storeTotal += ticketTotal;
+        out.push([`Total ${store}, ${ticket}`, '', '', '', '', money(ticketTotal)]);
       }
+      out.push([`Total ${store}`, '', '', '', '', money(storeTotal)]);
     }
     return out;
   }
@@ -335,7 +341,7 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Ticket','Tienda','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table};
   }
   function installLegacyTipAttributeFirewall(){
