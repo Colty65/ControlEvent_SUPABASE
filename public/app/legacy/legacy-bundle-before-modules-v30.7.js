@@ -16378,9 +16378,9 @@ window.addCellNote = addCellNote;
       const amountStyle = r.pending ? ' style="background:#fef2f2;color:#b91c1c"' : (r.donated ? ' style="text-decoration:line-through"' : '');
       const encoded = encodeURIComponent(r.k || r.label || '');
       const img = r.attachable ? imageRefFor(r.k || r.label || '') : '';
-      const preview = img ? `<img class="ticket-thumb ce-opt3p-thumb" src="${esc(img)}" alt="ticket" data-ce-ticket-key="${encoded}" />` : '<span class="hint ce-opt3p-noimg">Sin imagen</span>';
+      const preview = img ? `<img class="ticket-thumb" src="${esc(img)}" alt="ticket" />` : '<span class="hint">Sin imagen</span>';
       const actions = r.attachable && !r.pending
-        ? `<span class="ticket-actions ce-opt3p-actions" data-ce-ticket-key="${encoded}"><button type="button" class="outline small ce-opt3p-upload" title="Adjuntar o sustituir foto" onclick="uploadTicketImage('${encoded}'); return false;">📎</button>${preview}${img ? `<button type="button" class="outline small ce-opt3p-delete" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">🗑️</button>` : ''}</span>`
+        ? `<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImage('${encoded}'); return false;">Adjuntar</button>${preview}${img ? `<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">Eliminar</button>` : ''}</span>`
         : '';
       div.innerHTML = `<span>${esc(r.label || r.k || '')}</span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"><span class="pill"${amountStyle}>${esc(money(r.v))}</span>${actions}</span>`;
       const tip = ticketTip(r);
