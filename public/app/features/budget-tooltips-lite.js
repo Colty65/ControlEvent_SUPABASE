@@ -263,13 +263,12 @@
     const out = [];
     let i = 0;
     while(i < sorted.length){
-      const donor = donorName(sorted[i]);
+      const donor = donorName(sorted[i]) || 'Sin donante';
       const group = [];
-      while(i < sorted.length && donorName(sorted[i]) === donor){ group.push(sorted[i]); i += 1; }
-      group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
-      }
+      while(i < sorted.length && (donorName(sorted[i]) || 'Sin donante') === donor){ group.push(sorted[i]); i += 1; }
+      group.sort((a,b) => cmp(productName(a), productName(b)) || cmp(storeName(a), storeName(b)));
+      group.forEach(row => out.push([donorName(row) || 'Sin donante', productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+      out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
     }
     return out;
   }
@@ -300,18 +299,18 @@
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
   function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
   function expenseTableRows(rows){
-    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(expenseTicket(a), expenseTicket(b)) || cmp(storeName(a), storeName(b)) || cmp(productName(a), productName(b)));
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(expenseTicket(a), expenseTicket(b)) || cmp(productName(a), productName(b)) || cmp(storeName(a), storeName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
-      const ticket = expenseTicket(sorted[i]);
-      const store = storeName(sorted[i]);
+      const ticket = expenseTicket(sorted[i]) || 'Pte.Compra';
       const group = [];
-      while(i < sorted.length && expenseTicket(sorted[i]) === ticket && storeName(sorted[i]) === store){ group.push(sorted[i]); i += 1; }
+      while(i < sorted.length && (expenseTicket(sorted[i]) || 'Pte.Compra') === ticket){ group.push(sorted[i]); i += 1; }
+      group.sort((a,b) => cmp(productName(a), productName(b)) || cmp(storeName(a), storeName(b)));
       group.forEach(row => out.push([expenseTicket(row), storeName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${ticket} / ${store}`, '', '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
-      }
+      const stores = Array.from(new Set(group.map(storeName).filter(Boolean)));
+      const label = stores.length === 1 ? `TOTAL ${ticket} / ${stores[0]}` : `TOTAL ${ticket}`;
+      out.push([label, '', '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
     }
     return out;
   }

@@ -30,6 +30,20 @@
     return '';
   }
   function linePurchase(c, first){ return [first, storeName(c), productName(c), num(units(c)), money(price(c)), money(value(c))]; }
+  function sortSummaryDetailLines(lines, donated){
+    return (Array.isArray(lines)?lines.slice():[]).filter(line=>!/^TOTAL\b/i.test(norm(Array.isArray(line)?line[0]:line))).sort((a,b)=>{
+      const aa=Array.isArray(a)?a:String(a||'').split('|').map(x=>norm(x));
+      const bb=Array.isArray(b)?b:String(b||'').split('|').map(x=>norm(x));
+      if(donated) return up(aa[0]||'').localeCompare(up(bb[0]||''),'es') || up(aa[1]||'').localeCompare(up(bb[1]||''),'es');
+      return up(aa[0]||'').localeCompare(up(bb[0]||''),'es') || up(aa[2]||'').localeCompare(up(bb[2]||''),'es') || up(aa[1]||'').localeCompare(up(bb[1]||''),'es');
+    });
+  }
+  function summaryTotalLine(row,cols){
+    const out=new Array(Math.max(1,Number(cols||0))).fill('');
+    const parts=String(row?.key||'').split('|').map(x=>norm(x)).filter(Boolean);
+    const group=row?.donated?(parts[0]||'DONANTE'):(parts[1]||'Pte. Compra');
+    out[0]='TOTAL '+group; out[out.length-1]=money(row?.v||0); return out;
+  }
   function lineDonation(c){ return [donorName(c), productName(c), num(units(c)), money(price(c)), money(value(c))]; }
   function rowsForSummary(){
     const filled=new Map(), pending=new Map();
@@ -48,7 +62,7 @@
     const rows=[...filled.values(),...pending.values()];
     const mode=st().summaryTiendaSort||'tienda';
     rows.sort((a,b)=>{ const [a1='',a2='']=String(a.key).split(' | '); const [b1='',b2='']=String(b.key).split(' | '); return mode==='ticket' ? (a2.localeCompare(b2,'es')||a1.localeCompare(b1,'es')) : (a1.localeCompare(b1,'es')||a2.localeCompare(b2,'es')); });
-    return rows.map(r=>({...r,image:r.attachable?imageRefFor(r.key):''}));
+    return rows.map(r=>({...r,lines:sortSummaryDetailLines(r.lines,r.donated),image:r.attachable?imageRefFor(r.key):''}));
   }
 
   function tipForRow(row){
@@ -67,7 +81,9 @@
     document.querySelectorAll('.ce-hf10-modal').forEach(x=>x.remove());
     const title=row.donated?'CÁLCULOS POR DONANTE Y DONACIÓN':(row.pending?'PENDIENTE DE COMPRA U OTROS GASTOS':'CÁLCULOS POR TIENDA Y TICKET');
     const heads=row.headers||[];
-    const htmlRows=(row.lines||[]).map(line=>`<tr>${line.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${heads.length||1}">Sin detalle</td></tr>`;
+    const sortedLines=sortSummaryDetailLines(row.lines,row.donated);
+    const tableLines=sortedLines.length?sortedLines.concat([summaryTotalLine(row,heads.length)]):[];
+    const htmlRows=tableLines.map(line=>`<tr>${line.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${heads.length||1}">Sin detalle</td></tr>`;
     const modal=document.createElement('div'); modal.className='ce-hf10-modal';
     modal.innerHTML=`<div class="ce-hf10-card" role="dialog" aria-modal="true"><div class="ce-hf10-head"><div><h3>${esc(title)}</h3><p>${esc(row.key)}</p></div><button type="button" class="ce-hf10-close" data-ce-hf10-close="1" aria-label="Cerrar">×</button></div><div class="ce-hf10-total"><span>${esc(row.donated?'TOTAL ESTIMADO':'TOTAL')}</span><strong>${esc(money(row.v))}</strong></div><div class="ce-hf10-table-wrap"><table class="ce-hf10-table"><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></div></div>`;
     modal.addEventListener('click',e=>{ if(e.target===modal || e.target.closest('[data-ce-hf10-close],.ce-hf10-close')){ e.preventDefault(); e.stopPropagation(); modal.remove(); } }, true);
