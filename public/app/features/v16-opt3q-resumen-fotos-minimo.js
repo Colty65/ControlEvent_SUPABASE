@@ -9,7 +9,7 @@
 
   const SCOPE = 'ticket-image-v8-5-fix23';
   const ROOT_ID = 'summaryTiendaTicket';
-  const metrics = window.ControlEventOpt3Q = {version:'v16_opt_3r', deletes:0, uploads:0, reloads:0, busy:false, lastLabel:'', lastError:'', installedAt:new Date().toISOString()};
+  const metrics = window.ControlEventOpt3Q = {version:'v16_opt_3s', deletes:0, uploads:0, reloads:0, busy:false, lastLabel:'', lastError:'', installedAt:new Date().toISOString()};
   const $ = id => document.getElementById(id);
   const clean = v => String(v == null ? '' : v).trim();
   const norm = v => clean(v).replace(/\s+/g,' ');
@@ -71,6 +71,21 @@
     });
     return [];
   }
+  function upsertLocalImage(img){
+    const s = stateRef();
+    if(!s.ticketImages || typeof s.ticketImages !== 'object' || Array.isArray(s.ticketImages)) s.ticketImages = {};
+    if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object' || Array.isArray(s.ticketImageRefs)) s.ticketImageRefs = {};
+    if(!s.ticketImagesByKey || typeof s.ticketImagesByKey !== 'object' || Array.isArray(s.ticketImagesByKey)) s.ticketImagesByKey = {};
+    const k = imageKey(img); const src = bust(srcOf(img));
+    if(!k || !src) return false;
+    const item = {key:k, image_key:k, url:src, pathname:src, storage_path:img?.storage_path || '', label:imageLabel(img), updated_at:img?.updated_at || img?.created_at || new Date().toISOString()};
+    s.ticketImages[k] = src;
+    s.ticketImageRefs[k] = item;
+    s.ticketImagesByKey[k] = item;
+    try{ if(window.ControlEventApp) window.ControlEventApp.state = s; }catch(_){ }
+    hardClearCaches();
+    return true;
+  }
   function rebuildLocalFromServer(images){
     const list = normalizeServerImages(images);
     const s = stateRef();
@@ -83,14 +98,7 @@
       const bag = s[name];
       Object.keys(bag).forEach(k => { if(!ev || k.startsWith(ev + '|') || ticketToken(k)) delete bag[k]; });
     });
-    list.forEach(img => {
-      const k = imageKey(img); const src = bust(srcOf(img));
-      if(!k || !src) return;
-      const item = {key:k, image_key:k, url:src, pathname:src, label:imageLabel(img), updated_at:img.updated_at || img.created_at || new Date().toISOString()};
-      s.ticketImages[k] = src;
-      s.ticketImageRefs[k] = item;
-      s.ticketImagesByKey[k] = item;
-    });
+    list.forEach(img => { upsertLocalImage(img); });
     try{ if(window.ControlEventApp) window.ControlEventApp.state = s; }catch(_){ }
     hardClearCaches();
   }
@@ -168,7 +176,7 @@
       metrics.deletes++;
     }catch(err){
       metrics.lastError = err?.message || String(err);
-      console.error('[v16_opt_3r] eliminar foto', err);
+      console.error('[v16_opt_3s] eliminar foto', err);
       alert('No se pudo eliminar la foto: ' + metrics.lastError);
     }finally{ setBusy(false); }
     return false;
@@ -180,12 +188,14 @@
     try{
       const dataUrl = await compress(file);
       purgeLocal(label);
-      await apiUpload(label, dataUrl);
+      const uploaded = await apiUpload(label, dataUrl);
+      if(uploaded?.image) upsertLocalImage(uploaded.image);
+      try{ window.ControlEventOpt3F?.renderNow?.(true); }catch(_){ }
       await reloadImagesAndRender();
       metrics.uploads++;
     }catch(err){
       metrics.lastError = err?.message || String(err);
-      console.error('[v16_opt_3r] adjuntar foto', err);
+      console.error('[v16_opt_3s] adjuntar foto', err);
       alert('No se pudo adjuntar la foto: ' + metrics.lastError);
     }finally{ setBusy(false); }
     return false;
@@ -253,13 +263,24 @@
     modal.addEventListener('click', ev => { if(ev.target === modal || ev.target.closest('.ce-opt3q-info-close')) modal.remove(); }, true);
     document.body.appendChild(modal);
   }
+  let lastInfoOpenAt = 0;
+  let lastInfoOpenKey = '';
   function onInfoClick(ev){
     const root = $(ROOT_ID); if(!root || !root.contains(ev.target)) return;
+    // La captura en window llega antes que los globos heredados que bloqueaban el clic.
+    // Se excluyen botones/foto para no robar adjuntar, eliminar, ordenar ni ampliar miniatura.
     if(ev.target.closest?.('button,input,select,textarea,a,img,.ticket-actions,[data-opt3e-sort]')) return;
     const row = ev.target.closest?.('#summaryTiendaTicket .ce-opt3e-row,#summaryTiendaTicket .summary-item:not(.ce-tt-total-evento),#summaryTiendaTicket [data-ce-opt3e-key]');
     if(!row || row.classList.contains('ce-tt-total-evento')) return;
     const data = rowDataFromElement(row);
     if(!data) return;
+    const now = Date.now();
+    const k = String(data.key || labelFromRowText(row) || '');
+    if(k && k === lastInfoOpenKey && (now - lastInfoOpenAt) < 450){
+      ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.();
+      return false;
+    }
+    lastInfoOpenAt = now; lastInfoOpenKey = k;
     ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.();
     metrics.infoOpens = (metrics.infoOpens || 0) + 1;
     showInfoModal(data);
@@ -312,6 +333,10 @@
     });
   }
   document.addEventListener('click', onClick, {capture:true, passive:false});
+  // window/capture: llega antes que budget-tooltips-lite y capas antiguas de globos.
+  window.addEventListener('pointerup', onInfoClick, {capture:true, passive:false});
+  window.addEventListener('click', onInfoClick, {capture:true, passive:false});
+  window.addEventListener('touchend', onInfoClick, {capture:true, passive:false});
   document.addEventListener('click', onInfoClick, {capture:true, passive:false});
   document.addEventListener('touchend', onInfoClick, {capture:true, passive:false});
   const mo = new MutationObserver(() => setTimeout(fixCloseInline, 30));
