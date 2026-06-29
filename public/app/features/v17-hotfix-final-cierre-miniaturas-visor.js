@@ -1,6 +1,8 @@
-/* ControlEvent v17_prod - FIX12 puntual (cargado realmente desde index):
-   1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas; 3) visor ticket con detalle a la izquierda y Cerrar abajo derecha.
-   No cambia versión. */
+/* ControlEvent v17_prod - FIX13 puntual (cargado realmente desde index):
+   1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas;
+   3) visor ticket con detalle a la izquierda y Cerrar abajo derecha;
+   4) título del evento en visor: verde En curso, rojo Finalizado.
+   No cambia versión visible. */
 (function(){
   'use strict';
   if(window.__ceV17Fix12CierreMiniaturasVisor) return;
@@ -148,6 +150,13 @@
     return rows;
   }
   function titleEvent(){return norm(currentEvent()?.titulo||currentEvent()?.nombre||$('selectedEvent')?.selectedOptions?.[0]?.textContent||'Evento seleccionado');}
+  function eventStatusText(){
+    const ev=currentEvent()||{};
+    return norm(ev.situacion||ev.estado||ev.status||$('eventStatus')?.textContent||'En curso');
+  }
+  function eventStatusClass(){
+    return /FINALIZADO/.test(up(eventStatusText())) ? 'ce-v17-event-finalizado' : 'ce-v17-event-curso';
+  }
   function modalRoots(){
     return '#ceV17TicketViewerFinal,#ceV104TicketDetail,#ceV103TicketDetail,#ceV102TicketDetail,#ceV101TicketDetail,#ceV100TicketDetail,#ceV96TicketDetail,#ceV40TicketPhotoModal,#ceV310PhotoViewer,#ceTicketModalV234,#ceTicketImageModalV225,.ce-v40-modal,.ce-v401-pc-modal';
   }
@@ -188,6 +197,7 @@
     }
     const modal=document.createElement('div');
     modal.id='ceV17TicketViewerFinal';
+    modal.className=eventStatusClass();
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.innerHTML='<div class="ce-v17-ticket-card">'
@@ -257,7 +267,9 @@
       .ce-v17-rowdetail-close{pointer-events:auto!important;cursor:pointer!important;z-index:10000050!important;}
       #ceV17TicketViewerFinal{position:fixed!important;inset:0!important;z-index:10000090!important;background:rgba(15,23,42,.72)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-card{background:#fff!important;border-radius:14px!important;width:96vw!important;max-width:1420px!important;height:94vh!important;max-height:94vh!important;overflow:auto!important;padding:14px!important;border:2px solid #fb923c!important;display:flex!important;flex-direction:column!important;gap:14px!important;}
-      #ceV17TicketViewerFinal h2{margin:0!important;text-align:center!important;color:#991b1b!important;font-size:24px!important;font-weight:950!important;}
+      #ceV17TicketViewerFinal h2{margin:0!important;text-align:center!important;font-size:24px!important;font-weight:950!important;}
+      #ceV17TicketViewerFinal.ce-v17-event-curso h2{color:#166534!important;}
+      #ceV17TicketViewerFinal.ce-v17-event-finalizado h2{color:#991b1b!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-grid{display:grid!important;grid-template-columns:minmax(320px,38%) 1fr!important;gap:14px!important;min-height:0!important;flex:1 1 auto!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-lines{border:1px solid #dbe4ee!important;border-radius:12px!important;overflow:auto!important;background:#fff!important;align-self:start!important;max-height:calc(94vh - 86px)!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-meta{display:flex!important;justify-content:space-between!important;gap:10px!important;align-items:center!important;background:#f8fafc!important;border-bottom:1px solid #e2e8f0!important;padding:10px!important;font-weight:950!important;color:#334155!important;}
@@ -314,5 +326,5 @@
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_){ }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,900,1800].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix12_visor_detalle_cierre_abajo'};
+  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix13_titulo_evento_color_estado'};
 })();
