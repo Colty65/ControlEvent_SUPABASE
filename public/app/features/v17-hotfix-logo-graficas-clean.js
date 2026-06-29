@@ -1,140 +1,42 @@
-/* ControlEvent v17_prod - logo inicial fijo y transición limpia a GRAFICAS.
-   No cambia version. Evita reescrituras repetidas: CSS fijo desde cabecera + una sola
-   inserción de imagen si el contenedor no trae logo. */
+/* ControlEvent v17_prod - logo inicial fijo por CSS, sin ficha/texto ni cambios de tamaño. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV17LogoGraficasCleanStableV4';
+  const INSTALLED='__ceV17LogoFijoUnaVezFinal';
   if(window[INSTALLED]) return;
-  window[INSTALLED] = true;
-
-  const STYLE_ID = 'ceV17LogoGraficasStableStyleV4';
-  const ICON = './assets/icons/controlevent-welcome-v44.png';
-  const $ = id => document.getElementById(id);
-  const norm = value => String(value ?? '').trim();
-  const safe = (fn, fb) => { try{ const out = fn(); return out === undefined ? fb : out; }catch(_){ return fb; } };
-  const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);
-  const setLexical = (name, value) => safe(() => Function('value', name + ' = value;')(value), undefined);
-
-  function stateObjects(){
-    const out = [];
-    const add = item => { if(item && typeof item === 'object' && !out.includes(item)) out.push(item); };
-    add(getLexical('state'));
-    add(window.state);
-    add(window.ControlEventApp?.state);
-    add(window.ControlEventRuntime?.app?.state);
-    return out;
-  }
-  function auth(){
-    const lexical = safe(() => (typeof authUser !== 'undefined' && authUser) ? authUser : null, null);
-    return lexical || window.authUser || window.ControlEventApp?.authUser || null;
-  }
-  function selectedId(){
-    for(const s of stateObjects()){ if(norm(s?.selectedEventId)) return norm(s.selectedEventId); }
-    return norm($('selectedEvent')?.value || '');
-  }
-  function events(){
-    for(const s of stateObjects()){ if(Array.isArray(s?.eventos)) return s.eventos; }
-    return [];
-  }
-  function hasValidEvent(id = selectedId()){
-    id = norm(id);
-    return !!id && events().some(ev => String(ev?.id || '') === id);
-  }
-  function setGraficasTab(){
-    setLexical('currentMainTab', 'graficas');
-    try{ window.currentMainTab = 'graficas'; }catch(_){ }
-    try{ window.__ceCurrentMainTab = 'graficas'; }catch(_){ }
-    try{ if(window.ControlEventApp?.navigation) window.ControlEventApp.navigation.currentMainTab = 'graficas'; }catch(_){ }
-  }
+  window[INSTALLED]=true;
+  const STYLE_ID='ceV17LogoFijoUnaVezStyle';
+  const $=id=>document.getElementById(id);
+  const norm=v=>String(v??'').trim();
+  const safe=(fn,fb)=>{try{const out=fn();return out===undefined?fb:out;}catch(_){return fb;}};
+  const getLexical=name=>safe(()=>Function('return (typeof '+name+'!=="undefined")?'+name+':undefined')(),undefined);
+  const setLexical=(name,value)=>safe(()=>Function('value',name+'=value;')(value),undefined);
   function injectStyle(){
     if($(STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = `
-      #noEventMessage.ce-v17-logo-only,#noEventMessage.ce-v44-welcome-card.ce-v17-logo-only,#noEventMessage.card.ce-v17-logo-only{display:flex!important;align-items:center!important;justify-content:center!important;min-height:44vh!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;overflow:hidden!important;}
-      #noEventMessage.ce-v17-logo-only.hidden{display:none!important;}
-      #noEventMessage.ce-v17-logo-only .ce-v44-welcome,#noEventMessage.ce-v17-logo-only .ce-v17-welcome-logo-only,#noEventMessage.ce-v17-logo-only .empty{width:auto!important;max-width:none!important;margin:0 auto!important;padding:0!important;text-align:center!important;background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;}
-      #noEventMessage.ce-v17-logo-only h1,#noEventMessage.ce-v17-logo-only h2,#noEventMessage.ce-v17-logo-only h3,#noEventMessage.ce-v17-logo-only p,#noEventMessage.ce-v17-logo-only .empty:not(.ce-v17-welcome-logo-only){display:none!important;visibility:hidden!important;opacity:0!important;max-height:0!important;overflow:hidden!important;}
-      #noEventMessage.ce-v17-logo-only img{display:block!important;width:min(150px,36vw)!important;max-width:150px!important;height:auto!important;margin:0 auto!important;border-radius:24px!important;filter:drop-shadow(0 12px 22px rgba(15,23,42,.20))!important;transform:none!important;transition:none!important;animation:none!important;}
-      body.ce-v17-event-switching #noEventMessage,body.ce-v17-has-event #noEventMessage{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;max-height:0!important;overflow:hidden!important;}
+    const st=document.createElement('style'); st.id=STYLE_ID;
+    st.textContent=`
+      #noEventMessage{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:44vh!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;transition:none!important;animation:none!important;}
+      #noEventMessage.hidden,body.ce-v17-has-event #noEventMessage,body.ce-v17-event-switching #noEventMessage{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;max-height:0!important;min-height:0!important;overflow:hidden!important;}
+      #noEventMessage>*{display:none!important;visibility:hidden!important;opacity:0!important;max-height:0!important;overflow:hidden!important;}
+      #noEventMessage::before{content:""!important;display:block!important;width:150px!important;height:150px!important;max-width:36vw!important;max-height:36vw!important;background:url('./assets/icons/controlevent-welcome-v44.png') center/contain no-repeat!important;border-radius:24px!important;filter:drop-shadow(0 12px 22px rgba(15,23,42,.20))!important;transform:none!important;transition:none!important;animation:none!important;}
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(st);
   }
-  function ensureLogoNode(){
-    const msg = $('noEventMessage');
-    if(!msg) return;
-    msg.classList.add('ce-v17-logo-only');
-    msg.classList.remove('hidden');
-    msg.removeAttribute('aria-hidden');
-    msg.style.removeProperty('display');
-    msg.style.removeProperty('visibility');
-    msg.style.removeProperty('pointer-events');
-    msg.style.removeProperty('max-height');
-    msg.style.removeProperty('overflow');
-    let img = msg.querySelector('img');
-    if(!img){
-      msg.innerHTML = `<div class="ce-v17-welcome-logo-only"><img src="${ICON}" alt="ControlEvent" /></div>`;
-      img = msg.querySelector('img');
-    }else{
-      // No reescribir el contenedor si ya existe una imagen: solo fijar el src si venia vacio.
-      if(!norm(img.getAttribute('src'))) img.setAttribute('src', ICON);
-    }
+  function stateObjects(){const out=[];const add=o=>{if(o&&typeof o==='object'&&!out.includes(o))out.push(o);};add(getLexical('state'));add(window.state);add(window.ControlEventApp?.state);add(window.ControlEventRuntime?.app?.state);return out;}
+  function eventId(){for(const s of stateObjects()){if(norm(s?.selectedEventId))return norm(s.selectedEventId);}return norm($('selectedEvent')?.value||'');}
+  function events(){for(const s of stateObjects()){if(Array.isArray(s?.eventos))return s.eventos;}return [];}
+  function validEvent(id=eventId()){id=norm(id);return !!id&&events().some(e=>String(e?.id||'')===id);}
+  function setGraficas(){setLexical('currentMainTab','graficas');try{window.currentMainTab='graficas';}catch(_){ }try{window.__ceCurrentMainTab='graficas';}catch(_){ }}
+  function hideLogo(){document.body.classList.add('ce-v17-event-switching','ce-v17-has-event');const msg=$('noEventMessage');if(msg){msg.classList.add('hidden');msg.setAttribute('aria-hidden','true');msg.style.setProperty('display','none','important');}}
+  function showLogoIfNoEvent(){injectStyle(); if(validEvent()){hideLogo();return;} document.body.classList.remove('ce-v17-event-switching','ce-v17-has-event'); const msg=$('noEventMessage'); if(msg){msg.classList.remove('hidden');msg.removeAttribute('aria-hidden');msg.style.removeProperty('display');}}
+  function wrapChange(){
+    const fn=getLexical('changeSelectedEvent')||window.changeSelectedEvent;
+    if(typeof fn!=='function'||fn.__ceV17LogoFinal) return;
+    const wrapped=function(value){if(norm(value)){setGraficas();hideLogo();} const ret=fn.apply(this,arguments); Promise.resolve(ret).finally(()=>setTimeout(()=>{document.body.classList.remove('ce-v17-event-switching'); if(validEvent())hideLogo();},40)); return ret;};
+    wrapped.__ceV17LogoFinal=true; try{window.changeSelectedEvent=wrapped;setLexical('changeSelectedEvent',wrapped);}catch(_){window.changeSelectedEvent=wrapped;}
   }
-  function hideWelcomeNow(){
-    try{ document.body.classList.add('ce-v17-event-switching','ce-v17-has-event'); }catch(_){ }
-    const msg = $('noEventMessage');
-    if(msg){
-      msg.classList.add('hidden');
-      msg.setAttribute('aria-hidden','true');
-      msg.style.setProperty('display','none','important');
-      msg.style.setProperty('visibility','hidden','important');
-      msg.style.setProperty('pointer-events','none','important');
-      msg.style.setProperty('max-height','0','important');
-      msg.style.setProperty('overflow','hidden','important');
-    }
-  }
-  function apply(){
-    injectStyle();
-    if(!auth()) return;
-    const valid = hasValidEvent();
-    try{ document.body.classList.toggle('ce-v17-has-event', valid); }catch(_){ }
-    if(valid){ hideWelcomeNow(); return; }
-    try{ document.body.classList.remove('ce-v17-event-switching','ce-v17-has-event'); }catch(_){ }
-    ensureLogoNode();
-  }
-  function wrapChangeSelected(){
-    const fn = window.changeSelectedEvent || getLexical('changeSelectedEvent');
-    if(typeof fn !== 'function' || fn.__ceV17LogoStable) return;
-    const wrapped = function(value){
-      if(norm(value)){
-        setGraficasTab();
-        hideWelcomeNow();
-      }
-      const result = fn.apply(this, arguments);
-      Promise.resolve(result).finally(() => setTimeout(() => {
-        try{ document.body.classList.remove('ce-v17-event-switching'); }catch(_){ }
-        apply();
-      }, 80));
-      return result;
-    };
-    wrapped.__ceV17LogoStable = true;
-    window.changeSelectedEvent = wrapped;
-    setLexical('changeSelectedEvent', wrapped);
-    try{ if(window.ControlEventApp?.actions) window.ControlEventApp.actions.changeSelectedEvent = (...args) => wrapped(...args); }catch(_){ }
-  }
-  function handleSelectCapture(event){
-    const sel = event.target?.closest?.('#selectedEvent');
-    if(!sel) return;
-    if(norm(sel.value)){
-      setGraficasTab();
-      hideWelcomeNow();
-    }
-  }
-  function install(){ injectStyle(); wrapChangeSelected(); apply(); }
-
-  window.addEventListener('change', handleSelectCapture, true);
-  document.addEventListener('change', handleSelectCapture, true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40), true));
-  [0,180,900].forEach(ms => setTimeout(install, ms));
-  window.ControlEventV17LogoGraficasClean = {install, apply, hideWelcomeNow, version:'v17_prod_logo_fijo'};
+  function install(){injectStyle();wrapChange();showLogoIfNoEvent();}
+  document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='selectedEvent'&&norm(ev.target.value)){setGraficas();hideLogo();}},true);
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-loaded'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,20),true));
+  [0,200,900].forEach(ms=>setTimeout(install,ms));
+  window.ControlEventV17LogoFijo={install,hideLogo,showLogoIfNoEvent,version:'v17_prod_logo_fijo_una_vez'};
 })();

@@ -1,531 +1,437 @@
-/* ControlEvent v17_prod - mantenimiento estable de fotos en Cálculos por tienda y ticket.
-   Base FIX2: no cambia version. Sustituye los controles inestables por un flujo calcado
-   al de Documentos/Ingresos: input efimero, escritura explicita, sin renderBudget y sin
-   rehidrataciones de ventana. */
+/* ControlEvent v17_prod - Cálculos por tienda/ticket: fotos con método tipo Documentos.
+   No cambia versión. Fuente visual única: /api/ticket-images. Sin renderBudget tras adjuntar/borrar. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV17CalculosFotosDocumentosStyleV4';
+  const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
   if(window[INSTALLED]) return;
-  window[INSTALLED] = true;
+  window[INSTALLED]=true;
 
-  const STYLE_ID = 'ceV17CalculosFotosDocStyleV4';
-  const WRITE_SCOPE = 'ticket-image-v8-5-fix26';
-  const $ = id => document.getElementById(id);
-  const norm = value => String(value ?? '').trim();
-  const up = value => norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const isDataUrl = value => /^data:image\//i.test(String(value || ''));
-  const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
-  const safe = (fn, fb) => { try{ const out = fn(); return out === undefined ? fb : out; }catch(_){ return fb; } };
-  const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);
-  const setLexical = (name, value) => safe(() => Function('value', name + ' = value;')(value), undefined);
+  const STYLE_ID='ceV17CalculosFotosDocMethodFinalStyle';
+  const WRITE_SCOPE='ticket-image-v8-5-fix26';
+  const DB_NAME='controlevent_ticket_images_v225';
+  const DB_STORE='images';
+  const $=id=>document.getElementById(id);
+  const norm=v=>String(v??'').trim();
+  const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const safe=(fn,fb)=>{try{const out=fn();return out===undefined?fb:out;}catch(_){return fb;}};
+  const getLexical=name=>safe(()=>Function('return (typeof '+name+'!=="undefined")?'+name+':undefined')(),undefined);
+  const setLexical=(name,value)=>safe(()=>Function('value',name+'=value;')(value),undefined);
+  const stop=ev=>{try{ev?.preventDefault?.();ev?.stopPropagation?.();ev?.stopImmediatePropagation?.();}catch(_){ } return false;};
 
-  let lastActionSig = '';
-  let lastActionAt = 0;
-  let normalizeTimer = 0;
-  const busy = new Set();
+  let previousRenderSummaryList=null;
+  let previousSummaryByTiendaTicket=null;
+  let previousRender=null;
+  let previousRenderBudget=null;
+  let drawing=false;
+  let fetchingEvent='';
+  let loadedEvent='';
+  let fetchPromise=null;
+  let lastDrawSig='';
+  const serverImages={};
+  const tombstones=new Set();
+  const busy=new Set();
 
-  function uniquePush(list, item){ if(item && typeof item === 'object' && !list.includes(item)) list.push(item); }
   function stateObjects(){
-    const out = [];
-    uniquePush(out, getLexical('state'));
-    uniquePush(out, window.state);
-    uniquePush(out, window.ControlEventApp?.state);
-    uniquePush(out, window.ControlEventRuntime?.app?.state);
-    uniquePush(out, window.__CONTROL_EVENT_STATE__);
-    if(!out.length) out.push({});
+    const out=[];
+    const add=o=>{if(o&&typeof o==='object'&&!out.includes(o))out.push(o);};
+    add(getLexical('state'));
+    add(window.state);
+    add(window.ControlEventApp?.state);
+    add(window.ControlEventRuntime?.app?.state);
+    add(window.__CONTROL_EVENT_STATE__);
     return out;
   }
-  function st(){ return stateObjects()[0] || {}; }
-  function arrFromAny(name){
-    for(const s of stateObjects()){ if(Array.isArray(s?.[name])) return s[name]; }
-    return [];
-  }
+  function st(){return stateObjects()[0]||{};}
   function eventId(){
-    const fromSelected = safe(() => (typeof selectedEvent === 'function' ? selectedEvent() : null)?.id, '') || safe(() => window.selectedEvent?.()?.id, '');
-    if(norm(fromSelected)) return norm(fromSelected);
-    for(const s of stateObjects()){ if(norm(s?.selectedEventId)) return norm(s.selectedEventId); }
-    return norm($('selectedEvent')?.value || '');
+    const sid=safe(()=>typeof selectedEvent==='function'?(selectedEvent()||{}).id:'','')||safe(()=>window.selectedEvent?.()?.id,'');
+    if(norm(sid)) return norm(sid);
+    for(const s of stateObjects()){if(norm(s?.selectedEventId))return norm(s.selectedEventId);}
+    return norm($('selectedEvent')?.value||'');
   }
   function currentEvent(){
-    const id = eventId();
+    const id=eventId();
     for(const s of stateObjects()){
-      const ev = (Array.isArray(s?.eventos) ? s.eventos : []).find(item => String(item?.id || '') === id);
-      if(ev) return ev;
+      const ev=(Array.isArray(s?.eventos)?s.eventos:[]).find(x=>String(x?.id||'')===id);
+      if(ev)return ev;
     }
     return {};
   }
-  function role(){
-    const lexical = safe(() => (typeof authUser !== 'undefined' && authUser) ? authUser.nivel : '', '');
-    return up(lexical || window.authUser?.nivel || window.ControlEventApp?.authUser?.nivel || '');
-  }
-  function canWrite(){ return role() === 'GD' || role() === 'RW'; }
+  function role(){return up(safe(()=>authUser?.nivel,'')||window.authUser?.nivel||window.ControlEventApp?.authUser?.nivel||'');}
+  function canWrite(){const r=role();return r==='GD'||r==='RW';}
   function locked(){
-    const lexical = safe(() => typeof isLocked === 'function' ? isLocked() : undefined, undefined);
-    if(lexical !== undefined) return !!lexical;
-    if(typeof window.isLocked === 'function') return !!safe(() => window.isLocked(), false);
-    return up(currentEvent().situacion || '') === 'FINALIZADO';
+    const val=safe(()=>typeof isLocked==='function'?isLocked():undefined,undefined);
+    if(val!==undefined)return !!val;
+    return /FINALIZADO/i.test(norm(currentEvent().situacion||currentEvent().estado||''));
   }
-
-  function ensureStoresOn(s){
-    if(!s || typeof s !== 'object') return {images:{}, refs:{}, byKey:{}};
-    if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
-    if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object') s.ticketImageRefs = {};
-    if(!s.ticketImagesByKey || typeof s.ticketImagesByKey !== 'object') s.ticketImagesByKey = {};
-    return {images:s.ticketImages, refs:s.ticketImageRefs, byKey:s.ticketImagesByKey};
+  function money(v){
+    const n=Number(v||0);
+    const fn=getLexical('money')||window.money;
+    if(typeof fn==='function')return safe(()=>fn(n),new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n));
+    return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n);
   }
-  function allBags(){
-    const out = [];
-    for(const s of stateObjects()){
-      const stores = ensureStoresOn(s);
-      out.push(stores.images, stores.refs, stores.byKey);
-    }
-    return out.filter(Boolean);
-  }
-  function decodeMaybe(value){
-    const raw = norm(value);
-    if(!raw) return '';
-    try{ return /%[0-9A-F]{2}/i.test(raw) ? decodeURIComponent(raw) : raw; }catch(_){ return raw; }
-  }
+  function ticketToken(label){const m=norm(label).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);return m?m[0].replace(/\s+/g,'').toUpperCase():'';}
   function cleanLabel(label){
-    const ev = eventId();
-    let out = decodeMaybe(label).replace(/\s*\|\s*/g, ' | ').trim();
-    if(ev && out.startsWith(ev + ' | ')) out = out.slice(ev.length + 3).trim();
-    if(ev && out.startsWith(ev + '|')) out = out.slice(ev.length + 1).trim();
-    return out.replace(/\s*\|\s*/g, ' | ').trim();
+    const ev=eventId();
+    let s=norm(label);
+    try{s=decodeURIComponent(s);}catch(_){ }
+    s=s.split('·')[0].replace(/\s*\|\s*/g,' | ').trim();
+    if(ev&&s.startsWith(ev+' | '))s=s.slice(ev.length+3).trim();
+    if(ev&&s.startsWith(ev+'|'))s=s.slice(ev.length+1).trim();
+    return s.replace(/\s*\|\s*/g,' | ').trim();
   }
-  function ticketToken(label){
-    const match = norm(label).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
-    return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
-  }
-  function labelParts(label){ return cleanLabel(label).split('|').map(part => norm(part)).filter(Boolean); }
-  function keyOnly(label){ return cleanLabel(label); }
-  function primaryKey(label){ const ev = eventId(); const clean = cleanLabel(label); return ev && clean ? `${ev}|${clean}` : clean; }
-  function imageSource(value){
-    if(!value) return '';
-    if(typeof value === 'string') return norm(value);
-    if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.src || value.base64 || '');
+  function rowKey(row){return cleanLabel(row?.key||row?.k||row?.label||row?.concepto||'');}
+  function splitParts(label){return cleanLabel(label).split('|').map(x=>norm(x)).filter(Boolean);}
+  function canonicalKey(label){const ev=eventId();const clean=cleanLabel(label);return ev&&clean?ev+'|'+clean:clean;}
+  function imageValue(v){
+    if(!v)return '';
+    if(typeof v==='string')return norm(v);
+    if(typeof v==='object')return norm(v.url||v.public_url||v.publicUrl||v.pathname||v.path||v.storage_path||v.dataUrl||v.src||v.base64||'');
     return '';
   }
-  function imageKeyRest(key){ const ev = eventId(); const k = norm(key); return ev && k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k; }
-  function imageEventFromValue(value){
-    const src = imageSource(value);
-    const m = src.match(/\/ticket-images\/([^\/?#]+)\//i);
-    return m ? decodeURIComponent(m[1]) : '';
+  function cacheBust(src, seed){
+    src=norm(src); if(!src||/^data:/i.test(src))return src;
+    if(/[?&]ce_img=/.test(src))return src;
+    return src+(src.includes('?')?'&':'?')+'ce_img='+encodeURIComponent(seed||Date.now().toString(36));
   }
-  function sameEventKey(key, value){
-    const ev = eventId(); const k = norm(key);
-    if(!ev) return false;
-    if(k.startsWith(ev + '|')) return true;
-    return imageEventFromValue(value) === ev;
+  function sameEventImageKey(key,value){
+    const ev=eventId(); if(!ev)return false;
+    const k=norm(key);
+    if(k.startsWith(ev+'|'))return true;
+    const src=imageValue(value);
+    const m=src.match(/\/ticket-images\/([^\/?#]+)\//i);
+    return !!(m&&decodeURIComponent(m[1])===ev);
   }
-  function imageVariants(label){
-    const ev = eventId();
-    const raw = decodeMaybe(label);
-    const clean = cleanLabel(label);
-    const parts = labelParts(label);
-    const tk = ticketToken(clean || raw);
-    const out = [];
-    const add = value => { value = norm(value); if(value && !out.includes(value)) out.push(value); };
-    const scoped = value => { value = norm(value); if(!value) return; add(value); if(ev && !value.startsWith(ev + '|')) add(`${ev}|${value}`); };
-    [raw, clean].forEach(scoped);
-    if(parts.length >= 2){
-      const left = parts[0];
-      const right = parts.slice(1).join(' | ');
-      [`${left} | ${right}`, `${left}|${right}`, right, tk ? `${left} | ${tk}` : '', tk ? `${left}|${tk}` : '', tk || ''].forEach(scoped);
+  function imageRest(key){const ev=eventId();const k=norm(key);return ev&&k.startsWith(ev+'|')?k.slice(ev.length+1):k;}
+  function candidateKeys(label){
+    const ev=eventId(), clean=cleanLabel(label), parts=splitParts(clean), tk=ticketToken(clean);
+    const out=[]; const add=v=>{v=norm(v);if(v&&!out.includes(v))out.push(v);};
+    const scoped=v=>{v=cleanLabel(v);if(!v)return;add(v);if(ev)add(ev+'|'+v);};
+    scoped(clean);
+    if(parts.length>=2){
+      const store=parts[0], rest=parts.slice(1).join(' | ');
+      [store+' | '+rest,store+'|'+rest,rest,tk?store+' | '+tk:'',tk?store+'|'+tk:'',tk||''].forEach(scoped);
     }else if(tk){ scoped(tk); }
     return out;
   }
-  function shouldTouchKey(label, key, value){
-    const ev = eventId();
-    const clean = cleanLabel(label);
-    const tk = ticketToken(clean);
-    const variants = new Set(imageVariants(clean).map(norm));
-    const k = norm(key);
-    const rest = imageKeyRest(k);
-    if(variants.has(k) || variants.has(rest)) return true;
-    if(!sameEventKey(k, value)) return false;
-    const restUp = up(rest);
-    if(tk && restUp.includes(tk)) return true;
-    if(up(rest) === up(clean)) return true;
-    return false;
+  function matchesLabel(label,key,value){
+    const ev=eventId(); const clean=cleanLabel(label); const tk=ticketToken(clean); const rest=imageRest(key); const restU=up(rest);
+    const vars=new Set(candidateKeys(clean).map(norm));
+    if(vars.has(norm(key))||vars.has(rest))return true;
+    if(!sameEventImageKey(key,value))return false;
+    if(tk&&restU.includes(tk)){
+      const p=splitParts(clean); const store=up(p[0]||'');
+      return !store || restU.includes(store) || restU===tk;
+    }
+    return up(rest)===up(clean);
   }
-  function clearLocal(label){
-    for(const bag of allBags()){
-      Object.keys(bag || {}).forEach(key => { if(shouldTouchKey(label, key, bag[key])){ try{ delete bag[key]; }catch(_){ } } });
+  function normalizeApiImages(images){
+    Object.keys(serverImages).forEach(k=>delete serverImages[k]);
+    for(const [k,v] of Object.entries(images||{})){
+      const src=cacheBust(imageValue(v), norm(v?.storage_path||v?.pathname||v?.url||k));
+      if(src)serverImages[k]=src;
     }
   }
-  function putLocal(label, src, ref){
-    if(!src) return;
-    const key = primaryKey(label);
-    if(!key) return;
+  async function loadServerImages(force=false){
+    const ev=eventId(); if(!ev)return {};
+    if(!force&&loadedEvent===ev)return Promise.resolve(serverImages);
+    if(!force&&fetchingEvent===ev&&fetchPromise)return fetchPromise;
+    fetchingEvent=ev;
+    fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev),{cache:'no-store'})
+      .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); normalizeApiImages(json.images||{}); loadedEvent=ev; return serverImages;})
+      .catch(err=>{console.warn('[ControlEvent v17_prod] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
+      .finally(()=>{fetchPromise=null;});
+    return fetchPromise;
+  }
+  function imageFor(label){
+    const clean=cleanLabel(label); const tk=ticketToken(clean); const p=splitParts(clean); const storeU=up(p[0]||'');
+    if(tombstones.has(canonicalKey(clean))||tombstones.has(tk))return '';
+    let best={score:-1,src:''};
+    for(const [key,src] of Object.entries(serverImages)){
+      if(!sameEventImageKey(key,src))continue;
+      const rest=imageRest(key); const restU=up(rest); let score=-1;
+      if(key===canonicalKey(clean))score=1000;
+      else if(up(rest)===up(clean))score=800;
+      else if(tk&&restU.includes(tk)&&(!storeU||restU.includes(storeU)||restU===tk))score=500;
+      else if(matchesLabel(clean,key,src))score=300;
+      if(score>best.score)best={score,src};
+    }
+    return best.score>=0?best.src:'';
+  }
+  function clearStateAliases(label){
+    const clean=cleanLabel(label), tk=ticketToken(clean), p=splitParts(clean), storeU=up(p[0]||'');
+    const keys=new Set(candidateKeys(clean));
     for(const s of stateObjects()){
-      const {images, refs, byKey} = ensureStoresOn(s);
-      const item = ref && typeof ref === 'object' ? {...ref, key, url:src, pathname:ref.pathname || ref.url || src} : {key, url:src, pathname:src};
-      images[key] = src;
-      refs[key] = item;
-      byKey[key] = item;
+      ['ticketImages','ticketImageRefs','ticketImagesByKey','__photoCache','ticketImagesBackup','ticketImagesLocal'].forEach(name=>{
+        const bag=s?.[name]; if(!bag||typeof bag!=='object')return;
+        Object.keys(bag).forEach(k=>{
+          const restU=up(imageRest(k));
+          if(keys.has(k)||matchesLabel(clean,k,bag[k])||(tk&&sameEventImageKey(k,bag[k])&&restU.includes(tk)&&(!storeU||restU.includes(storeU)||restU===tk))){
+            try{delete bag[k];}catch(_){ }
+          }
+        });
+      });
     }
-  }
-  function scoreImageCandidate(label, key, value){
-    const src = imageSource(value);
-    if(!src || !sameEventKey(key, value)) return -1;
-    const clean = cleanLabel(label);
-    const pkey = primaryKey(clean);
-    const rest = imageKeyRest(key);
-    const tk = ticketToken(clean);
-    let score = 0;
-    if(key === pkey) score += 1000;
-    if(up(rest) === up(clean)) score += 700;
-    if(up(rest).includes(up(clean))) score += 300;
-    if(tk && up(rest).includes(tk)) score += 120;
-    if(/\?ce_img=|&ce_img=/.test(src)) score += 20;
-    if(!isDataUrl(src)) score += 10;
-    return score;
-  }
-  function imageForLabel(label){
-    let best = {score:-1, src:''};
-    for(const bag of allBags()){
-      for(const [key, value] of Object.entries(bag || {})){
-        const score = scoreImageCandidate(label, key, value);
-        if(score > best.score){ best = {score, src:imageSource(value)}; }
+    try{
+      const storageKey=norm(getLexical('STORAGE_KEY')||'controlevent_v6_4');
+      const raw=localStorage.getItem(storageKey);
+      if(raw){
+        const obj=JSON.parse(raw);
+        ['ticketImages','ticketImageRefs','ticketImagesByKey'].forEach(name=>{
+          const bag=obj?.[name]; if(!bag||typeof bag!=='object')return;
+          Object.keys(bag).forEach(k=>{if(keys.has(k)||matchesLabel(clean,k,bag[k]))delete bag[k];});
+        });
+        localStorage.setItem(storageKey,JSON.stringify(obj));
       }
-    }
-    return best.score > 0 ? best.src : '';
+    }catch(_){ }
   }
-
-  function captureScroll(){
-    const data = {x:window.scrollX || 0, y:window.scrollY || 0, els:[]};
-    ['summaryTiendaTicket','tabResumen','budgetLayout','mainTabs'].forEach(id => { const el = $(id); if(el) data.els.push([id, el.scrollLeft || 0, el.scrollTop || 0]); });
-    return data;
-  }
-  function restoreScroll(data){
-    if(!data) return;
-    const run = () => {
-      try{ window.scrollTo(data.x || 0, data.y || 0); }catch(_){ }
-      (data.els || []).forEach(([id,x,y]) => { const el = $(id); if(el){ try{ el.scrollLeft = x; el.scrollTop = y; }catch(_){ } } });
-    };
-    [0,60,160].forEach(ms => setTimeout(run, ms));
-  }
-  function rowLabelFromNode(node){
-    const row = node?.closest?.('.summary-item') || node;
-    const explicit = row?.dataset?.ceV17Label || row?.dataset?.ceTicketLabel || '';
-    if(explicit) return cleanLabel(explicit);
-    const first = row?.querySelector?.(':scope > span:first-child,.ce-hf10-label');
-    return cleanLabel(norm(first?.textContent || '').replace(/\s*ⓘ\s*$/,'').trim());
-  }
-  function makeButton(action, label){
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'outline small ce-v17-photo-icon';
-    btn.dataset.ceV17PhotoAction = action;
-    btn.dataset.ceV17Label = label;
-    btn.textContent = action === 'remove' ? '🗑️' : '📎';
-    btn.title = action === 'remove' ? 'Eliminar foto' : 'Adjuntar foto';
-    btn.setAttribute('aria-label', btn.title);
-    return btn;
-  }
-  function normalizeRow(row, forcedSrc){
-    if(!row || row.classList?.contains('ce-hf10-donation') || row.classList?.contains('red-row')) return;
-    const label = rowLabelFromNode(row);
-    if(!label || !ticketToken(label)) return;
-    const actions = row.querySelector('.ticket-actions');
-    if(!actions) return;
-    const src = forcedSrc !== undefined ? (forcedSrc || '') : imageForLabel(label);
-    const sig = `${label}|${src ? src.slice(0, 120) + ':' + src.length : 'noimg'}|${busy.has(label) ? 'busy' : 'free'}`;
-    const ownButtons = actions.querySelectorAll(':scope > button[data-ce-v17-photo-action]');
-    const legacyBits = actions.querySelector('input.ticket-file-input,:scope > button:not([data-ce-v17-photo-action])');
-    const imgCount = actions.querySelectorAll(':scope > img.ticket-thumb').length;
-    const cleanStructure = !legacyBits && !!actions.querySelector(':scope > button[data-ce-v17-photo-action="attach"]') && (src ? (imgCount === 1 && !!actions.querySelector(':scope > button[data-ce-v17-photo-action="remove"]') && ownButtons.length === 2) : (imgCount === 0 && !actions.querySelector(':scope > button[data-ce-v17-photo-action="remove"]') && ownButtons.length === 1));
-    if(actions.dataset.ceV17Sig === sig && cleanStructure) return;
-    actions.dataset.ceV17Sig = sig;
-    actions.dataset.ceV17Label = label;
-    row.dataset.ceV17Label = label;
-    row.dataset.ceTicketLabel = label;
-    while(actions.firstChild) actions.removeChild(actions.firstChild);
-    const attach = makeButton('attach', label);
-    attach.disabled = busy.has(label);
-    actions.appendChild(attach);
-    if(src){
-      const img = document.createElement('img');
-      img.className = 'ticket-thumb ce-v17-ticket-thumb';
-      img.alt = 'ticket';
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.src = src;
-      const tk = ticketToken(label);
-      if(tk) img.dataset.ceHf12Tk = tk;
-      const tip = row.getAttribute('data-ce-tip-v21') || row.getAttribute('data-ce-tip') || '';
-      if(tip) img.dataset.ceTipV21 = tip;
-      actions.appendChild(img);
-      const remove = makeButton('remove', label);
-      remove.disabled = busy.has(label);
-      actions.appendChild(remove);
-    }else{
-      const span = document.createElement('span');
-      span.className = 'hint ce-v17-noimage';
-      span.textContent = 'Sin imagen';
-      actions.appendChild(span);
-    }
-  }
-  function normalizeAll(){
-    clearTimeout(normalizeTimer);
-    normalizeTimer = 0;
-    document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => normalizeRow(row));
-  }
-  function scheduleNormalize(delay = 60){
-    clearTimeout(normalizeTimer);
-    normalizeTimer = setTimeout(normalizeAll, delay);
-  }
-  function repaintLabel(label, src, scroll){
-    const clean = cleanLabel(label);
-    document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
-      if(rowLabelFromNode(row) === clean) normalizeRow(row, src || '');
+  async function clearIndexedDbAliases(label){
+    if(!('indexedDB' in window))return;
+    const clean=cleanLabel(label), tk=ticketToken(clean), p=splitParts(clean), storeU=up(p[0]||'');
+    const keySet=new Set(candidateKeys(clean));
+    await new Promise(resolve=>{
+      const req=indexedDB.open(DB_NAME,1);
+      req.onerror=()=>resolve();
+      req.onsuccess=()=>{
+        const db=req.result;
+        try{
+          if(!db.objectStoreNames.contains(DB_STORE)){db.close(); resolve(); return;}
+          const tx=db.transaction(DB_STORE,'readwrite'); const store=tx.objectStore(DB_STORE);
+          const cur=store.openCursor();
+          cur.onsuccess=()=>{
+            const c=cur.result;
+            if(c){
+              const k=String(c.key||''); const restU=up(imageRest(k));
+              if(keySet.has(k)||(tk&&k.startsWith(eventId()+'|')&&restU.includes(tk)&&(!storeU||restU.includes(storeU)||restU===tk))) c.delete();
+              c.continue();
+            }
+          };
+          tx.oncomplete=()=>{try{db.close();}catch(_){ } resolve();};
+          tx.onerror=()=>{try{db.close();}catch(_){ } resolve();};
+        }catch(_){try{db.close();}catch(__){ } resolve();}
+      };
     });
-    restoreScroll(scroll);
   }
-  function setBusy(label, on){
-    label = cleanLabel(label);
-    if(!label) return;
-    if(on) busy.add(label); else busy.delete(label);
-    repaintLabel(label, imageForLabel(label), null);
+  function setServerImage(label,src){
+    const key=canonicalKey(label);
+    if(src)serverImages[key]=src; else delete serverImages[key];
   }
-
-  function readFile(file){
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(reader.error || new Error('No se pudo leer la imagen.'));
-      reader.onload = () => resolve(String(reader.result || ''));
+  function beginTombstone(label){
+    const clean=cleanLabel(label), tk=ticketToken(clean);
+    tombstones.add(canonicalKey(clean)); if(tk)tombstones.add(tk);
+  }
+  function endTombstone(label){
+    const clean=cleanLabel(label), tk=ticketToken(clean);
+    tombstones.delete(canonicalKey(clean)); if(tk)tombstones.delete(tk);
+  }
+  function rowsFromExisting(){
+    const fn=previousSummaryByTiendaTicket||getLexical('summaryByTiendaTicket')||window.summaryByTiendaTicket;
+    if(typeof fn==='function')return safe(()=>fn()||[],[]);
+    return [];
+  }
+  function tipForRow(r,label){
+    if(r?.headers&&Array.isArray(r?.lines)){
+      const out=[]; out.push(r.donated?'CÁLCULOS POR DONANTE Y DONACIÓN':(r.pending?'PENDIENTE DE COMPRA U OTROS GASTOS':'CÁLCULOS POR TIENDA Y TICKET'));
+      out.push(label); out.push('TOTAL | '+money(r.v||0)); out.push(''); out.push((r.headers||[]).join(' | '));
+      (r.lines||[]).forEach(line=>out.push((line||[]).join(' | ')));
+      return out.join('\n');
+    }
+    return norm(r?.tip||r?.tooltip||r?.label||label);
+  }
+  function renderSummaryTiendaTicketDirect(rowsArg){
+    const root=$('summaryTiendaTicket'); if(!root||drawing)return;
+    const rows=(Array.isArray(rowsArg)&&rowsArg.length?rowsArg:rowsFromExisting()).filter(Boolean);
+    const ev=eventId(); if(ev&&loadedEvent!==ev)loadServerImages(false).then(()=>renderSummaryTiendaTicketDirect(rows)).catch(()=>{});
+    const mode=st().summaryTiendaSort||'tienda';
+    const sig=JSON.stringify([ev,mode,rows.map(r=>[rowKey(r),Math.round(Number(r.v||0)*100),!!r.pending,!!r.donated,!!r.attachable,imageFor(rowKey(r))])]);
+    if(root.dataset.ceV17DocPhotoSig===sig&&root.querySelector('.ce-v17-doc-sortbar'))return;
+    drawing=true;
+    try{
+      root.dataset.ceV17DocPhotoSig=sig;
+      root.classList.add('ce-v17-doc-photo-ready','ce-hf10-ready');
+      root.innerHTML='';
+      const tools=document.createElement('div'); tools.className='hint ce-v17-doc-sortbar ce-hf10-sortbar';
+      tools.innerHTML='<span>Ordenar por:</span> <button type="button" class="outline small '+(mode==='tienda'?'active':'')+'" data-ce-v17-sort="tienda">Tienda</button> <button type="button" class="outline small '+(mode==='ticket'?'active':'')+'" data-ce-v17-sort="ticket">Ticket/Donación/Otros gastos</button>';
+      root.appendChild(tools);
+      if(!rows.length){const empty=document.createElement('div');empty.className='hint';empty.textContent='Sin datos.';root.appendChild(empty);return;}
+      let total=0;
+      rows.forEach(r=>{
+        const label=rowKey(r); if(!label)return;
+        total+=Number(r.v||0);
+        const pending=!!r.pending; const donated=!!r.donated; const attachable=!!r.attachable&&!pending&&!donated&&!!ticketToken(label);
+        const src=attachable?imageFor(label):''; const rowTip=tipForRow(r,label);
+        const div=document.createElement('div');
+        div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'');
+        div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.setAttribute('data-ce-tip-v21',rowTip); div.setAttribute('data-ce-tip',rowTip);
+        const amountStyle=pending?' style="background:#fef2f2;color:#b91c1c"':(donated?' style="text-decoration:line-through"':'');
+        const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label)+(rowTip?' <i>ⓘ</i>':'');
+        const right=document.createElement('span'); right.className='ce-v17-doc-right'; right.innerHTML='<span class="pill"'+amountStyle+'>'+esc(money(r.v||0))+'</span>';
+        if(attachable){
+          const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
+          const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
+          if(src){
+            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; if(rowTip)img.setAttribute('data-ce-tip-v21',rowTip); actions.appendChild(img);
+            const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
+          }else{
+            const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
+          }
+          right.appendChild(actions);
+        }
+        div.appendChild(left); div.appendChild(right);
+        div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img,.ticket-actions'))return; const show=getLexical('showTable')||window.showTable; if(typeof show==='function')safe(()=>show(r),null); });
+        root.appendChild(div);
+      });
+      const td=document.createElement('div'); td.className='summary-item ce-v17-doc-total'; td.style.fontWeight='800'; td.innerHTML='<span>TOTAL EVENTO</span><span class="pill">'+esc(money(total))+'</span>'; root.appendChild(td);
+      root.querySelectorAll('[data-ce-v17-sort]').forEach(btn=>btn.addEventListener('click',ev=>{stop(ev); st().summaryTiendaSort=btn.dataset.ceV17Sort||'tienda'; try{localStorage.setItem(getLexical('STORAGE_KEY')||'controlevent_v6_4',JSON.stringify(st()));}catch(_){ } root.dataset.ceV17DocPhotoSig=''; if(typeof previousRenderBudget==='function')previousRenderBudget(); else renderSummaryTiendaTicketDirect();},true));
+    }finally{drawing=false;}
+  }
+  function redraw(){renderSummaryTiendaTicketDirect();}
+  function refreshAfterAction(label,src){
+    if(src)setServerImage(label,src); else setServerImage(label,'');
+    const root=$('summaryTiendaTicket'); if(root)root.dataset.ceV17DocPhotoSig='';
+    renderSummaryTiendaTicketDirect();
+  }
+  function guard(ev){
+    if(!canWrite()){alert('No autorizado para modificar fotos.');return stop(ev||{});}
+    if(locked()){alert('Evento finalizado. No se puede modificar.');return stop(ev||{});}
+    return true;
+  }
+  function fileToCompressedDataUrl(file){
+    return new Promise((resolve,reject)=>{
+      if(!file)return reject(new Error('Selecciona una imagen.'));
+      if(file.type&&!/^image\//i.test(file.type))return reject(new Error('El archivo debe ser una imagen.'));
+      const reader=new FileReader();
+      reader.onerror=()=>reject(reader.error||new Error('No se pudo leer la imagen.'));
+      reader.onload=()=>{
+        const original=String(reader.result||'');
+        const img=new Image();
+        img.onerror=()=>resolve(original);
+        img.onload=()=>{
+          try{const max=1500;let w=img.width||max,h=img.height||max;const r=Math.min(max/Math.max(w,1),max/Math.max(h,1),1);w=Math.max(1,Math.round(w*r));h=Math.max(1,Math.round(h*r));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',0.84));}catch(_){resolve(original);}
+        };
+        img.src=original;
+      };
       reader.readAsDataURL(file);
     });
   }
-  async function fileToCompressedDataUrl(file){
-    if(!file) throw new Error('Selecciona una imagen.');
-    if(file.type && !/^image\//i.test(file.type)) throw new Error('El archivo debe ser una imagen.');
-    const original = await readFile(file);
-    return await new Promise(resolve => {
-      const img = new Image();
-      img.onerror = () => resolve(original);
-      img.onload = () => {
-        try{
-          const max = 1500;
-          let w = img.width || max, h = img.height || max;
-          const ratio = Math.min(max / Math.max(w, 1), max / Math.max(h, 1), 1);
-          w = Math.max(1, Math.round(w * ratio));
-          h = Math.max(1, Math.round(h * ratio));
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.84));
-        }catch(_){ resolve(original); }
-      };
-      img.src = original;
-    });
-  }
-  async function apiJson(url, options = {}){
-    const res = await fetch(url, {
-      cache:'no-store',
-      ...options,
-      headers:{
-        'Content-Type':'application/json',
-        'X-ControlEvent-Write-Scope':WRITE_SCOPE,
-        ...(options.headers || {})
-      }
-    });
-    const text = await res.text().catch(() => '');
-    let json = {};
-    try{ json = text ? JSON.parse(text) : {}; }catch(_){ json = {}; }
-    if(!res.ok) throw new Error(json.error || json.message || text || `HTTP ${res.status}`);
+  async function apiJson(url,options={}){
+    const res=await fetch(url,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':WRITE_SCOPE,...(options.headers||{})}});
+    const text=await res.text().catch(()=>''); let json={}; try{json=text?JSON.parse(text):{};}catch(_){json={};}
+    if(!res.ok)throw new Error(json.error||json.message||text||('HTTP '+res.status));
     return json;
   }
   async function deleteServer(label){
-    const ev = eventId(); const key = keyOnly(label);
-    if(!ev || !key) return {ok:true};
-    return apiJson(`/api/ticket-images?eventId=${encodeURIComponent(ev)}&key=${encodeURIComponent(key)}`, {
-      method:'DELETE',
-      body:JSON.stringify({eventId:ev, key})
-    });
+    const ev=eventId(), key=cleanLabel(label); if(!ev||!key)return {ok:true};
+    return apiJson('/api/ticket-images?eventId='+encodeURIComponent(ev)+'&key='+encodeURIComponent(key),{method:'DELETE',body:JSON.stringify({eventId:ev,key})});
   }
-  async function uploadServer(label, dataUrl){
-    const ev = eventId(); const key = keyOnly(label);
-    if(!ev || !key || !isDataUrl(dataUrl)) throw new Error('Falta evento, ticket o imagen.');
-    const json = await apiJson('/api/ticket-images', {
-      method:'POST',
-      body:JSON.stringify({eventId:ev, key, dataUrl})
-    });
-    const image = json.image || json || {};
-    const src = imageSource(image) || dataUrl;
-    clearLocal(label);
-    putLocal(label, src, image);
-    return src;
+  async function uploadServer(label,dataUrl){
+    const ev=eventId(), key=cleanLabel(label); if(!ev||!key||!/^data:image\//i.test(dataUrl))throw new Error('Falta evento, ticket o imagen.');
+    const json=await apiJson('/api/ticket-images',{method:'POST',body:JSON.stringify({eventId:ev,key,dataUrl})});
+    const image=json.image||json||{}; const src=cacheBust(imageValue(image)||dataUrl,image.storage_path||image.pathname||image.url||Date.now());
+    return {image,src};
   }
-  function guardCanModify(ev){
-    if(!canWrite()){ alert('No autorizado para modificar fotos.'); return stop(ev || {}); }
-    if(locked()){ alert('Evento finalizado. No se puede modificar.'); return stop(ev || {}); }
-    return true;
-  }
-  async function attachPhoto(label, ev){
-    stop(ev || {});
-    if(guardCanModify(ev || null) !== true) return false;
-    label = cleanLabel(label);
-    if(!label) return false;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.style.position = 'fixed';
-    input.style.left = '-9999px';
-    input.style.top = '-9999px';
-    input.style.width = '1px';
-    input.style.height = '1px';
-    document.body.appendChild(input);
-    input.addEventListener('change', async () => {
-      const scroll = captureScroll();
+  async function attachPhoto(label,ev){
+    stop(ev||{}); if(guard(ev)!==true)return false; label=cleanLabel(label); if(!label)return false;
+    const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.cssText='position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0'; document.body.appendChild(input);
+    input.addEventListener('change',async()=>{
+      const file=input.files&&input.files[0]; if(!file)return;
+      const bkey=canonicalKey(label); busy.add(bkey); beginTombstone(label); clearStateAliases(label); await clearIndexedDbAliases(label); refreshAfterAction(label,'');
       try{
-        const file = input.files && input.files[0];
-        if(!file) return;
-        setBusy(label, true);
-        const localDataUrl = await fileToCompressedDataUrl(file);
-        // Igual que Documentos: limpiar, subir y usar exactamente la URL devuelta.
-        // No se invoca renderBudget ni recargas globales.
-        clearLocal(label);
-        repaintLabel(label, '', scroll);
-        await deleteServer(label).catch(error => console.warn('[ControlEvent v17_prod] Limpieza previa de foto TK:', error?.message || error));
-        clearLocal(label);
-        putLocal(label, localDataUrl);
-        repaintLabel(label, localDataUrl, scroll);
-        const finalUrl = await uploadServer(label, localDataUrl);
-        repaintLabel(label, finalUrl, scroll);
-      }catch(error){
-        alert('No se pudo adjuntar la foto. ' + (error?.message || error));
-        restoreScroll(scroll);
-      }finally{
-        setBusy(label, false);
-        try{ input.value = ''; input.remove(); }catch(_){ }
-      }
-    }, {once:true});
-    input.click();
-    return false;
+        const dataUrl=await fileToCompressedDataUrl(file);
+        await deleteServer(label).catch(err=>console.warn('[ControlEvent v17_prod] Limpieza previa TK:',err?.message||err));
+        clearStateAliases(label); await clearIndexedDbAliases(label);
+        const uploaded=await uploadServer(label,dataUrl);
+        endTombstone(label); setServerImage(label,uploaded.src); clearStateAliases(label);
+        for(const s of stateObjects()){
+          if(!s.ticketImages||typeof s.ticketImages!=='object')s.ticketImages={};
+          if(!s.ticketImageRefs||typeof s.ticketImageRefs!=='object')s.ticketImageRefs={};
+          const k=canonicalKey(label); s.ticketImages[k]=uploaded.src; s.ticketImageRefs[k]={key:k,url:uploaded.src,pathname:uploaded.src};
+        }
+        refreshAfterAction(label,uploaded.src);
+        window.dispatchEvent(new CustomEvent('controlevent:ticket-image-changed',{detail:{eventId:eventId(),key:canonicalKey(label),action:'upload'}}));
+      }catch(error){endTombstone(label); alert('No se pudo adjuntar la foto. '+(error?.message||error)); await loadServerImages(true); refreshAfterAction(label,imageFor(label));}
+      finally{busy.delete(bkey); try{input.value='';input.remove();}catch(_){ } refreshAfterAction(label,imageFor(label));}
+    },{once:true});
+    input.click(); return false;
   }
-  async function removePhoto(label, ev){
-    stop(ev || {});
-    if(guardCanModify(ev || null) !== true) return false;
-    label = cleanLabel(label);
-    if(!label) return false;
-    if(!confirm('¿Eliminar la foto asociada a este ticket?')) return false;
-    const scroll = captureScroll();
+  async function removePhoto(label,ev){
+    stop(ev||{}); if(guard(ev)!==true)return false; label=cleanLabel(label); if(!label)return false;
+    if(!confirm('¿Eliminar la foto asociada a este ticket?'))return false;
+    const bkey=canonicalKey(label); busy.add(bkey); beginTombstone(label); clearStateAliases(label); await clearIndexedDbAliases(label); refreshAfterAction(label,'');
     try{
-      setBusy(label, true);
       await deleteServer(label);
-      clearLocal(label);
-      repaintLabel(label, '', scroll);
-    }catch(error){
-      alert('No se pudo eliminar la foto. ' + (error?.message || error));
-      restoreScroll(scroll);
-    }finally{
-      setBusy(label, false);
-    }
+      clearStateAliases(label); await clearIndexedDbAliases(label); setServerImage(label,'');
+      refreshAfterAction(label,'');
+      window.dispatchEvent(new CustomEvent('controlevent:ticket-image-changed',{detail:{eventId:eventId(),key:canonicalKey(label),action:'delete'}}));
+    }catch(error){alert('No se pudo eliminar la foto. '+(error?.message||error));}
+    finally{busy.delete(bkey); await loadServerImages(true); if(!imageFor(label))beginTombstone(label); refreshAfterAction(label,imageFor(label));}
     return false;
   }
   function labelFromControl(control){
-    const explicit = control?.dataset?.ceV17Label || control?.closest?.('.ticket-actions')?.dataset?.ceV17Label || control?.closest?.('.summary-item')?.dataset?.ceV17Label || '';
-    if(explicit) return cleanLabel(explicit);
-    const onclick = norm(control?.getAttribute?.('onclick') || '');
-    const match = onclick.match(/(?:uploadTicketImage|removeTicketImage)\((?:event\s*,\s*)?['"]([^'"]+)['"]/i);
-    if(match) return cleanLabel(match[1]);
-    const input = control?.closest?.('.ticket-actions')?.querySelector?.('input.ticket-file-input[onchange*="uploadTicketImage"]');
-    const onchg = norm(input?.getAttribute?.('onchange') || '');
-    const m2 = onchg.match(/uploadTicketImage\(event\s*,\s*['"]([^'"]+)['"]/i);
-    if(m2) return cleanLabel(m2[1]);
-    return rowLabelFromNode(control);
+    const explicit=control?.dataset?.ceV17Label||control?.closest?.('.ticket-actions')?.dataset?.ceV17Label||control?.closest?.('.summary-item')?.dataset?.ceV17Label||'';
+    if(explicit)return cleanLabel(explicit);
+    const onclick=norm(control?.getAttribute?.('onclick')||'');
+    const m=onclick.match(/(?:uploadTicketImage|removeTicketImage)[^(]*\((?:event\s*,\s*)?['"]([^'"]+)['"]/i); if(m)return cleanLabel(m[1]);
+    const row=control?.closest?.('#summaryTiendaTicket .summary-item'); return row?rowKey({label:row.querySelector('.ce-hf10-label,span:first-child')?.textContent||''}):'';
   }
   function actionFromControl(control){
-    const data = norm(control?.dataset?.ceV17PhotoAction || '');
-    if(data === 'attach' || data === 'remove') return data;
-    const txt = up((control?.textContent || '') + ' ' + (control?.title || '') + ' ' + (control?.getAttribute?.('aria-label') || '') + ' ' + (control?.getAttribute?.('onclick') || ''));
-    if(/REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(txt)) return 'remove';
-    if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt)) return 'attach';
+    const data=norm(control?.dataset?.ceV17Photo||control?.dataset?.ceV17PhotoAction||''); if(data==='attach'||data==='remove')return data;
+    const txt=up((control?.textContent||'')+' '+(control?.title||'')+' '+(control?.getAttribute?.('aria-label')||'')+' '+(control?.getAttribute?.('onclick')||''));
+    if(/REMOVE|ELIMINAR|BORRAR|🗑/.test(txt))return 'remove';
+    if(/UPLOAD|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt))return 'attach';
     return '';
   }
-  function controlFromEvent(ev){
-    return ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button,#summaryTiendaTicket input.ticket-file-input,#ceBudgetLiteTooltipV307 input.ticket-file-input');
-  }
   function handleActivation(ev){
-    const control = controlFromEvent(ev);
-    if(!control) return;
-    const action = actionFromControl(control);
-    if(!action) return;
-    const label = labelFromControl(control);
-    if(!label) return;
-    const sig = action + '|' + label;
-    const now = Date.now();
-    if(sig === lastActionSig && now - lastActionAt < 650) return stop(ev);
-    lastActionSig = sig; lastActionAt = now;
-    if(busy.has(cleanLabel(label))) return stop(ev);
-    if(action === 'attach') return attachPhoto(label, ev);
-    if(action === 'remove') return removePhoto(label, ev);
+    const c=ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket .ticket-actions input,#summaryTiendaTicket button[onclick*="uploadTicketImage"],#summaryTiendaTicket button[onclick*="removeTicketImage"]');
+    if(!c)return;
+    const action=actionFromControl(c), label=labelFromControl(c); if(!action||!label)return;
+    if(action==='attach')return attachPhoto(label,ev);
+    if(action==='remove')return removePhoto(label,ev);
   }
   function wrapGlobals(){
-    const wrappedUpload = function(evOrEncoded, maybeEncoded){
-      const isFileChange = evOrEncoded && evOrEncoded.target && evOrEncoded.target.files;
-      const label = isFileChange ? maybeEncoded : evOrEncoded;
-      if(isFileChange){
-        const file = evOrEncoded.target.files && evOrEncoded.target.files[0];
-        const clean = cleanLabel(maybeEncoded || '');
-        if(!clean || !file) return false;
-        const scroll = captureScroll();
-        (async () => {
-          try{
-            if(guardCanModify(evOrEncoded) !== true) return;
-            setBusy(clean, true);
-            const dataUrl = await fileToCompressedDataUrl(file);
-            await deleteServer(clean).catch(error => console.warn('[ControlEvent v17_prod] Limpieza previa TK:', error?.message || error));
-            clearLocal(clean); putLocal(clean, dataUrl); repaintLabel(clean, dataUrl, scroll);
-            const url = await uploadServer(clean, dataUrl); repaintLabel(clean, url, scroll);
-          }catch(error){ alert('No se pudo adjuntar la foto. ' + (error?.message || error)); restoreScroll(scroll); }
-          finally{ setBusy(clean, false); try{ evOrEncoded.target.value = ''; }catch(_){ } }
-        })();
-        return false;
-      }
-      return attachPhoto(label, null);
+    const upFn=function(evOrEncoded,maybeEncoded){
+      if(evOrEncoded&&evOrEncoded.target&&evOrEncoded.target.files){ const label=cleanLabel(maybeEncoded||''); const file=evOrEncoded.target.files&&evOrEncoded.target.files[0]; if(!file||!label)return false; const input=evOrEncoded.target; (async()=>{try{const dataUrl=await fileToCompressedDataUrl(file); beginTombstone(label); clearStateAliases(label); await clearIndexedDbAliases(label); refreshAfterAction(label,''); await deleteServer(label).catch(()=>{}); const uploaded=await uploadServer(label,dataUrl); endTombstone(label); setServerImage(label,uploaded.src); refreshAfterAction(label,uploaded.src);}catch(e){alert('No se pudo adjuntar la foto. '+(e?.message||e));}finally{try{input.value='';}catch(_){}}})(); return false; }
+      return attachPhoto(evOrEncoded,null);
     };
-    const wrappedRemove = function(encoded){ return removePhoto(encoded, null); };
-    try{ window.uploadTicketImage = wrappedUpload; setLexical('uploadTicketImage', wrappedUpload); }catch(_){ window.uploadTicketImage = wrappedUpload; }
-    try{ window.uploadTicketImageV164 = wrappedUpload; setLexical('uploadTicketImageV164', wrappedUpload); }catch(_){ window.uploadTicketImageV164 = wrappedUpload; }
-    try{ window.uploadTicketImageV202 = wrappedUpload; }catch(_){ }
-    try{ window.removeTicketImage = wrappedRemove; setLexical('removeTicketImage', wrappedRemove); }catch(_){ window.removeTicketImage = wrappedRemove; }
-    try{ window.removeTicketImageV164 = wrappedRemove; setLexical('removeTicketImageV164', wrappedRemove); }catch(_){ window.removeTicketImageV164 = wrappedRemove; }
-    try{ window.removeTicketImageV202 = wrappedRemove; }catch(_){ }
+    const rmFn=function(encoded){return removePhoto(encoded,null);};
+    ['uploadTicketImage','uploadTicketImageV164','uploadTicketImageV202'].forEach(name=>{try{window[name]=upFn;setLexical(name,upFn);}catch(_){window[name]=upFn;}});
+    ['removeTicketImage','removeTicketImageV164','removeTicketImageV202'].forEach(name=>{try{window[name]=rmFn;setLexical(name,rmFn);}catch(_){window[name]=rmFn;}});
+  }
+  function wrapRenderers(){
+    if(!previousRenderSummaryList){previousRenderSummaryList=getLexical('renderSummaryList')||window.renderSummaryList||null;}
+    if(!previousSummaryByTiendaTicket){previousSummaryByTiendaTicket=getLexical('summaryByTiendaTicket')||window.summaryByTiendaTicket||null;}
+    const rs=function(targetId,rows){ if(targetId==='summaryTiendaTicket'){renderSummaryTiendaTicketDirect(rows);return;} return typeof previousRenderSummaryList==='function'?previousRenderSummaryList.apply(this,arguments):undefined; };
+    try{window.renderSummaryList=rs;setLexical('renderSummaryList',rs);}catch(_){window.renderSummaryList=rs;}
+    if(!previousRenderBudget){previousRenderBudget=getLexical('renderBudget')||window.renderBudget||null;}
+    if(previousRenderBudget&&!previousRenderBudget.__ceV17DocWrapped){
+      const originalBudget=previousRenderBudget;
+      const rb=function(){const ret=originalBudget.apply(this,arguments); setTimeout(redraw,0); return ret;}; rb.__ceV17DocWrapped=true; try{window.renderBudget=rb;setLexical('renderBudget',rb);}catch(_){window.renderBudget=rb;}
+    }
+    if(!previousRender){previousRender=getLexical('render')||window.render||null;}
+    if(previousRender&&!previousRender.__ceV17DocWrapped){
+      const originalRender=previousRender;
+      const rr=function(){const ret=originalRender.apply(this,arguments); setTimeout(redraw,0); return ret;}; rr.__ceV17DocWrapped=true; try{window.render=rr;setLexical('render',rr);}catch(_){window.render=rr;}
+    }
   }
   function injectStyle(){
-    if($(STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = `
-      #summaryTiendaTicket .ticket-actions,#ceBudgetLiteTooltipV307 .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;min-width:112px!important;justify-content:flex-end!important;white-space:nowrap!important;}
-      #summaryTiendaTicket .ticket-actions input.ticket-file-input,#ceBudgetLiteTooltipV307 .ticket-actions input.ticket-file-input{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      #summaryTiendaTicket .ticket-actions button.ce-v17-photo-icon,#ceBudgetLiteTooltipV307 .ticket-actions button.ce-v17-photo-icon{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:16px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;pointer-events:auto!important;}
-      #summaryTiendaTicket .ticket-actions img.ticket-thumb,#ceBudgetLiteTooltipV307 .ticket-actions img.ticket-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;}
-      #summaryTiendaTicket .ticket-actions .ce-v17-noimage,#ceBudgetLiteTooltipV307 .ticket-actions .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
+    if($(STYLE_ID))return;
+    const style=document.createElement('style'); style.id=STYLE_ID;
+    style.textContent=`
+      #summaryTiendaTicket .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;white-space:nowrap!important;min-width:112px!important;}
+      #summaryTiendaTicket .ticket-actions input.ticket-file-input,#summaryTiendaTicket .ticket-actions button:not([data-ce-v17-photo]):not(.ce-v17-doc-photo-btn){display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #summaryTiendaTicket .ce-v17-doc-photo-btn{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:17px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;}
+      #summaryTiendaTicket .ticket-thumb.ce-v17-doc-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;}
+      #summaryTiendaTicket .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
+      #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;}
+      #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;}
+      #summaryTiendaTicket .ce-v17-doc-sortbar button.active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;}
     `;
     document.head.appendChild(style);
   }
-  function install(){ injectStyle(); wrapGlobals(); scheduleNormalize(30); }
-
-  ['click','pointerup','touchend'].forEach(type => {
-    window.addEventListener(type, handleActivation, {capture:true, passive:false});
-    document.addEventListener(type, handleActivation, {capture:true, passive:false});
-  });
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-loaded','controlevent:data-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30), true));
-  window.addEventListener('controlevent:event-changed', () => setTimeout(install, 180), true);
-  try{
-    new MutationObserver(mutations => {
-      for(const m of mutations){
-        if(m.target?.id === 'summaryTiendaTicket' || m.target?.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307')){ scheduleNormalize(80); break; }
-      }
-    }).observe(document.body, {childList:true, subtree:true});
-  }catch(_){ }
-  [0,160,700,1600].forEach(ms => setTimeout(install, ms));
-  window.ControlEventV17CalculosFotos = {install, attachPhoto, removePhoto, clearLocal, imageForLabel, version:'v17_prod_calculos_fotos_documentos_style'};
+  function install(){injectStyle();wrapGlobals();wrapRenderers();loadServerImages(false).then(redraw);redraw();}
+  ['click','pointerup','touchend'].forEach(type=>{window.addEventListener(type,handleActivation,{capture:true,passive:false});document.addEventListener(type,handleActivation,{capture:true,passive:false});});
+  document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
+  [0,250,1000].forEach(ms=>setTimeout(install,ms));
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_final'};
 })();
