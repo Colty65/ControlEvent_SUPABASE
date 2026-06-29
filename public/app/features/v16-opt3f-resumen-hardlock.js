@@ -7,7 +7,7 @@
   if(window.__ceV16Opt3FResumenHardlock) return;
   window.__ceV16Opt3FResumenHardlock = true;
 
-  const VERSION = 'v16_opt_3k_core';
+  const VERSION = 'v16_opt_3i_core';
   const ROOT_ID = 'summaryTiendaTicket';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -42,13 +42,6 @@
   let ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
   let rowsCache = {stamp:'', eventId:'', rows:null, at:0};
 
-  function clearCaches(){
-    ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
-    rowsCache = {stamp:'', eventId:'', rows:null, at:0};
-    metrics.cacheClears++;
-    try{ const root = $(ROOT_ID); if(root){ delete root.dataset.ceOpt3eLightStamp; delete root.dataset.ceOpt3eSig; } }catch(_){}
-  }
-
   const metrics = window.ControlEventOpt3F = {
     version: VERSION,
     installedAt: new Date().toISOString(),
@@ -65,9 +58,7 @@
     lastEventId: '',
     lightSkips: 0,
     imageIndexBuilds: 0,
-    rowsCacheHits: 0,
-    budgetStableSkips: 0,
-    cacheClears: 0
+    rowsCacheHits: 0
   };
 
   function byId(listName, id){
@@ -279,7 +270,7 @@
         div.setAttribute('data-ce-tip', rowTip);
         div.__ceOpt3eRow = row;
         const encoded = encodeURIComponent(row.key || '');
-        const actions = row.attachable ? `<span class="ticket-actions" data-ce-opt3k-ticket-actions="1" data-ce-ticket-key="${esc(row.key || '')}"><button type="button" class="outline small" title="Insertar foto" data-ce-opt3k-upload="1" data-ce-ticket-key="${esc(row.key || '')}">📎</button>${row.image ? `<img class="ticket-thumb" src="${esc(row.image)}" alt="ticket" data-ce-ticket-key="${esc(row.key || '')}" data-ce-hf12-tk="${esc(row.rawTicket || '')}" data-ce-tip-v21="${esc(rowTip)}" />` : '<span class="hint">Sin imagen</span>'}${row.image ? `<button type="button" class="outline small" title="Eliminar foto" data-ce-opt3k-delete="1" data-ce-ticket-key="${esc(row.key || '')}">🗑️</button>` : ''}</span>` : '';
+        const actions = row.attachable ? `<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImage('${encoded}'); return false;">📎</button>${row.image ? `<img class="ticket-thumb" src="${esc(row.image)}" alt="ticket" data-ce-hf12-tk="${esc(row.rawTicket || '')}" data-ce-tip-v21="${esc(rowTip)}" />` : '<span class="hint">Sin imagen</span>'}${row.image ? `<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">🗑️</button>` : ''}</span>` : '';
         div.innerHTML = `<span class="ce-opt3e-label ce-hf10-label">${esc(row.key)} <i>ⓘ</i></span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"><span class="pill">${esc(money(row.v))}</span>${actions}</span>`;
         frag.appendChild(div);
       });
@@ -341,19 +332,10 @@
     try{ old = window.renderBudget || eval('typeof renderBudget === "function" ? renderBudget : null'); }catch(_){ old = window.renderBudget || null; }
     if(!old || old.__ceOpt3FBudgetWrapped) return;
     const wrapped = function(){
-      const root = $(ROOT_ID);
-      const sameStable = isResumenVisible() && rootLooksOwned(root) && root?.dataset?.ceOpt3eEventId === evId() && root?.dataset?.ceOpt3eLightStamp === lightStamp();
-      const focusShield = Number(window.__ceOpt3KFocusShieldUntil || 0) > Date.now();
-      const photoBusyUntil = Number(window.__ceOpt3KPhotoBusyUntil || 0);
-      // OPT3K: al volver de otra tarea Windows, renderBudget heredado repintaba el bloque completo
-      // aunque los datos no hubieran cambiado. Si el bloque ya es del evento actual, se bloquea
-      // ese repintado visual feo y solo se permite cuando hay foto en curso o cambio real.
-      if(sameStable && focusShield && photoBusyUntil < Date.now()){
-        metrics.budgetStableSkips++;
-        schedule('renderBudget-focus-skip', 220, false);
-        return undefined;
-      }
       const ret = old.apply(this, arguments);
+      // OPT3H: renderBudget puede ejecutarse varias veces al cambiar de ventana/evento.
+      // Solo pedimos estabilizar Cálculos si Resumen está visible; además schedule+renderNow
+      // ya descartan el mismo contenido.
       if(isResumenVisible()) schedule('renderBudget-tail', 180, true);
       return ret;
     };
@@ -398,7 +380,7 @@
   }, true);
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape') document.querySelectorAll('.ce-opt3e-modal').forEach(m => m.remove()); }, true);
 
-  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget, clearCaches});
+  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget});
   injectStyle();
   patchRenderSummaryList();
   patchRenderBudget();
