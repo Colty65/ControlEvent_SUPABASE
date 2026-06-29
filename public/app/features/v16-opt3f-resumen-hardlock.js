@@ -33,9 +33,27 @@
     if(v && typeof v === 'object') return Object.keys(v).length;
     return 0;
   }
+  function imagesStamp(){
+    const s = stateRef();
+    const id = evId();
+    const parts = [];
+    const add = (k,v) => {
+      const ks = norm(k);
+      if(id && ks.includes('|') && !ks.startsWith(id + '|')) return;
+      const img = imageValue(v);
+      if(img) parts.push(ks + '=' + String(img).slice(-80));
+    };
+    for(const name of ['ticketImages','ticketImageRefs','ticketImagesByKey']){
+      const bag = s[name]; if(bag && typeof bag === 'object' && !Array.isArray(bag)){ for(const [k,v] of Object.entries(bag)) add(k,v); }
+    }
+    for(const name of ['ticket_images','ce_ticket_images']){
+      const bag = s[name]; if(Array.isArray(bag)){ bag.forEach((row,i)=>add(row?.image_key || row?.key || row?.ticket || row?.tk || i, row?.image || row?.url || row?.public_url || row?.publicUrl || row?.pathname || row?.path || row)); }
+    }
+    return parts.sort().join('¬');
+  }
   function lightStamp(){
     const s = stateRef();
-    const images = listLen(s.ticketImages) + listLen(s.ticketImageRefs) + listLen(s.ticketImagesByKey) + listLen(s.ticket_images) + listLen(s.ce_ticket_images);
+    const images = imagesStamp();
     return [evId(), s.summaryTiendaSort || 'tienda', listLen(s.compras), listLen(s.productos), listLen(s.tiendas), listLen(s.personas), images].join('|');
   }
 
@@ -95,7 +113,7 @@
   function imageIndex(){
     const id = evId();
     const s = stateRef();
-    const stamp = id + '|' + listLen(s.ticketImages) + '|' + listLen(s.ticketImageRefs) + '|' + listLen(s.ticketImagesByKey) + '|' + listLen(s.ticket_images) + '|' + listLen(s.ce_ticket_images);
+    const stamp = id + '|' + imagesStamp();
     if(ticketImageIndexCache.stamp === stamp && ticketImageIndexCache.eventId === id) return ticketImageIndexCache.map;
     const map = new Map();
     const add = (key, img) => {
@@ -356,6 +374,12 @@
     return rows.find(r => up(r.key) === nlabel) || rows.find(r => nlabel.includes(up(r.key)) || up(r.key).includes(nlabel)) || null;
   }
 
+  function clearCaches(){
+    ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
+    rowsCache = {stamp:'', eventId:'', rows:null, at:0};
+    try{ const root = $(ROOT_ID); if(root){ delete root.dataset.ceOpt3eSig; delete root.dataset.ceOpt3eLightStamp; } }catch(_){}
+  }
+
   function install(){
     injectStyle();
     patchRenderSummaryList();
@@ -380,7 +404,7 @@
   }, true);
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape') document.querySelectorAll('.ce-opt3e-modal').forEach(m => m.remove()); }, true);
 
-  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget});
+  window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget, clearCaches});
   injectStyle();
   patchRenderSummaryList();
   patchRenderBudget();
