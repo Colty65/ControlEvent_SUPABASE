@@ -7,7 +7,7 @@
   if(window.__ceV16Opt3FResumenHardlock) return;
   window.__ceV16Opt3FResumenHardlock = true;
 
-  const VERSION = 'v16_opt_3t_core';
+  const VERSION = 'v16_opt_3u_core';
   const ROOT_ID = 'summaryTiendaTicket';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -120,6 +120,9 @@
     if(explicit !== undefined && explicit !== null && explicit !== '') return num(explicit);
     return units(c) * price(c);
   }
+  function rowEventId(c){
+    return norm(c?.eventId || c?.event_id || c?.eventoId || c?.evento_id || c?.idEvento || c?.id_evento || c?.evento || '');
+  }
   function isDonatedTicket(t){ return /^DONADO/i.test(norm(t)); }
   function isCurrentExpense(t){ const s = up(t); return s === 'GASTOS CORRIENTES' || s.includes('GASTOS CORRIENTES'); }
   function imageValue(v){
@@ -202,7 +205,7 @@
     const nowMs = Date.now();
     if(rowsCache.stamp === cacheStamp && rowsCache.eventId === evId() && rowsCache.rows && (nowMs - rowsCache.at) < 12000){ metrics.rowsCacheHits++; return rowsCache.rows; }
     const s = stateRef(); const selected = evId(); const filled = new Map(); const pending = new Map();
-    arr(s.compras).filter(c => !selected || norm(c?.eventId || c?.eventoId) === selected).forEach(c => {
+    arr(s.compras).filter(c => !selected || !rowEventId(c) || rowEventId(c) === selected).forEach(c => {
       const tk = norm(c.ticketDonacion || c.ticket || c.tk || c.tipoTicket);
       const donated = isDonatedTicket(tk);
       const v = value(c);
@@ -322,7 +325,7 @@
     const mode = stateRef().summaryTiendaSort || 'tienda';
     root.innerHTML = `<div class="hint ce-opt3e-sortbar ce-hf10-sortbar"><span>Ordenar por:</span><button type="button" class="outline small ${mode === 'tienda' ? 'active' : ''}" data-opt3e-sort="tienda">Tienda</button><button type="button" class="outline small ${mode === 'ticket' ? 'active' : ''}" data-opt3e-sort="ticket">Ticket/Donación/Otros gastos</button></div>`;
     if(!rows.length){
-      if(isEventLoading() && rootLooksOwned(root)){ metrics.lightSkips++; return true; }
+      if(isEventLoading() && rootLooksOwned(root)){ metrics.lightSkips++; rendering = false; return true; }
       root.insertAdjacentHTML('beforeend','<div class="hint">Sin datos.</div>');
     }else{
       let total = 0;

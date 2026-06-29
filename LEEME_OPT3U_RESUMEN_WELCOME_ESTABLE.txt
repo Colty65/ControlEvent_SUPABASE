@@ -1,0 +1,18 @@
+ControlEvent v16_prod OPT3U - Resumen/welcome estable
+
+Cambios mínimos sobre OPT3T:
+
+1) Cálculos por tienda y ticket:
+   - Se corrige el filtro de evento en el resumen inferior para aceptar eventId, event_id, eventoId, evento_id, idEvento e id_evento.
+   - Se añade rescate tardío del bloque summaryTiendaTicket si una capa antigua lo deja vacío o sin desplegar.
+
+2) Pantalla sin evento:
+   - Se elimina el texto "Selecciona un evento para trabajar...".
+   - Se deja solo el icono CE, sin ficha/card debajo.
+   - El icono se fuerza con tamaño fijo para evitar el salto de grande a pequeño.
+
+3) Cambio de evento hacia GRAFICAS:
+   - Al seleccionar evento se oculta antes el icono CE.
+   - Mientras entra el evento se evita enseñar GRAFICAS a medio pintar; se libera al llegar event-ready/opt1-event-stable o por seguridad a los 2,6 s.
+
+No se toca el flujo de adjuntar/eliminar fotos de OPT3T.
