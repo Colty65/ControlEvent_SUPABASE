@@ -1,12 +1,13 @@
-/* ControlEvent v16_prod OPT3F - Resumen hardlock controlado, suavizado en OPT3H.
-   Rebase sobre OPT3E seguro. No toca login, /api/state ni selector de eventos.
-   OPT3H elimina el bucle de repintados: conserva la lista estable y no fuerza renders repetidos. */
+/* ControlEvent v16_prod OPT3I - Resumen hardlock controlado + reposo real.
+   Rebase sobre OPT3H. No toca login, /api/state, selector, gráficas, compras ni tickets.
+   OPT3I corta el trabajo repetido después de un cambio de evento: si el bloque ya pertenece al
+   evento actual no vuelve a recalcular filas, importes ni miniaturas durante la ventana de reposo. */
 (function(){
   'use strict';
   if(window.__ceV16Opt3FResumenHardlock) return;
   window.__ceV16Opt3FResumenHardlock = true;
 
-  const VERSION = 'v16_opt_3h_core';
+  const VERSION = 'v16_opt_3i_core';
   const ROOT_ID = 'summaryTiendaTicket';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -27,6 +28,20 @@
   const money = v => { try{ if(typeof window.money === 'function') return window.money(num(v)); }catch(_){} return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(num(v)); };
   const nfmt = v => { try{ return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(num(v)); }catch(_){ return String(v || 0); } };
 
+  function listLen(v){
+    if(Array.isArray(v)) return v.length;
+    if(v && typeof v === 'object') return Object.keys(v).length;
+    return 0;
+  }
+  function lightStamp(){
+    const s = stateRef();
+    const images = listLen(s.ticketImages) + listLen(s.ticketImageRefs) + listLen(s.ticketImagesByKey) + listLen(s.ticket_images) + listLen(s.ce_ticket_images);
+    return [evId(), s.summaryTiendaSort || 'tienda', listLen(s.compras), listLen(s.productos), listLen(s.tiendas), listLen(s.personas), images].join('|');
+  }
+
+  let ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
+  let rowsCache = {stamp:'', eventId:'', rows:null, at:0};
+
   const metrics = window.ControlEventOpt3F = {
     version: VERSION,
     installedAt: new Date().toISOString(),
@@ -40,7 +55,10 @@
     fallbackClicks: 0,
     lastMs: 0,
     lastSig: '',
-    lastEventId: ''
+    lastEventId: '',
+    lightSkips: 0,
+    imageIndexBuilds: 0,
+    rowsCacheHits: 0
   };
 
   function byId(listName, id){
@@ -74,31 +92,50 @@
     return '';
   }
   function ticketToken(label){ const m = up(label).match(/\bTK\d{1,3}\b/); return m ? m[0] : ''; }
-  function imageRefFor(label){
-    const id = evId(); const tk = ticketToken(label); if(!tk) return '';
+  function imageIndex(){
+    const id = evId();
     const s = stateRef();
+    const stamp = id + '|' + listLen(s.ticketImages) + '|' + listLen(s.ticketImageRefs) + '|' + listLen(s.ticketImagesByKey) + '|' + listLen(s.ticket_images) + '|' + listLen(s.ce_ticket_images);
+    if(ticketImageIndexCache.stamp === stamp && ticketImageIndexCache.eventId === id) return ticketImageIndexCache.map;
+    const map = new Map();
+    const add = (key, img) => {
+      const m = up(key).match(/\bTK\d{1,3}\b/g);
+      if(!m || !img) return;
+      m.forEach(tk => { if(!map.has(tk)) map.set(tk, img); });
+    };
     const bags = [s.ticketImages, s.ticketImageRefs, s.ticketImagesByKey, s.ticket_images, s.ce_ticket_images];
     for(const bag of bags){
       if(Array.isArray(bag)){
         for(const row of bag){
           if(id && row?.eventId && norm(row.eventId) !== id) continue;
-          const parts = [row?.ticket, row?.tk, row?.ticketKey, row?.key, row?.codigo].map(up).join('|');
-          if(parts.includes(tk)){ const img = imageValue(row?.image || row?.url || row?.publicUrl || row?.path || row); if(img) return img; }
+          const parts = [row?.ticket, row?.tk, row?.ticketKey, row?.key, row?.codigo].map(norm).join('|');
+          const img = imageValue(row?.image || row?.url || row?.publicUrl || row?.path || row);
+          add(parts, img);
         }
       }else if(bag && typeof bag === 'object'){
         for(const [k,v] of Object.entries(bag)){
           const ks = norm(k); if(id && ks.includes('|') && !ks.startsWith(id + '|')) continue;
-          if(up(ks).includes(tk)){ const img = imageValue(v); if(img) return img; }
+          add(ks, imageValue(v));
         }
       }
     }
-    return '';
+    ticketImageIndexCache = {stamp, eventId:id, map};
+    metrics.imageIndexBuilds++;
+    return map;
+  }
+  function imageRefFor(label){
+    const tk = ticketToken(label);
+    if(!tk) return '';
+    return imageIndex().get(tk) || '';
   }
 
   function linePurchase(c, first){ return [first, storeName(c), productName(c), nfmt(units(c)), money(price(c)), money(value(c))]; }
   function lineDonation(c){ return [donorName(c), productName(c), nfmt(units(c)), money(price(c)), money(value(c))]; }
 
   function rowsForSummary(){
+    const cacheStamp = lightStamp();
+    const nowMs = Date.now();
+    if(rowsCache.stamp === cacheStamp && rowsCache.eventId === evId() && rowsCache.rows && (nowMs - rowsCache.at) < 12000){ metrics.rowsCacheHits++; return rowsCache.rows; }
     const s = stateRef(); const selected = evId(); const filled = new Map(); const pending = new Map();
     arr(s.compras).filter(c => !selected || norm(c?.eventId || c?.eventoId) === selected).forEach(c => {
       const tk = norm(c.ticketDonacion || c.ticket || c.tk || c.tipoTicket);
@@ -121,7 +158,9 @@
       const [b1='', b2=''] = String(b.key).split(' | ');
       return mode === 'ticket' ? (a2.localeCompare(b2,'es') || a1.localeCompare(b1,'es')) : (a1.localeCompare(b1,'es') || a2.localeCompare(b2,'es'));
     });
-    return rows.map(r => ({...r, image: r.attachable ? imageRefFor(r.key) : ''}));
+    const out = rows.map(r => ({...r, image: r.attachable ? imageRefFor(r.key) : ''}));
+    rowsCache = {stamp: cacheStamp, eventId: selected, rows: out, at: Date.now()};
+    return out;
   }
 
   function tipForRow(row){
@@ -180,6 +219,13 @@
     if(!readyToWork()){ metrics.blockedBeforeLogin++; return false; }
     if(!force && !isResumenVisible()){ return false; }
     const start = performance.now ? performance.now() : Date.now();
+    const light = lightStamp();
+    const nowCheap = Date.now();
+    // Salida temprana barata: evita recalcular toda la lista si ya está pintada para este evento.
+    if(root.dataset.ceOpt3eLightStamp === light && rootLooksOwned(root) && (nowCheap - lastRenderAt) < 12000){
+      metrics.lightSkips++;
+      return true;
+    }
     const rows = rowsForSummary();
     const sig = signature(rows);
     const now = Date.now();
@@ -201,6 +247,7 @@
     }
     rendering = true;
     root.dataset.ceOpt3eSig = sig;
+    root.dataset.ceOpt3eLightStamp = light;
     root.dataset.ceOpt3eEventId = evId();
     root.classList.add('ce-opt3e-ready','ce-hf10-ready');
     const h = Math.round(root.getBoundingClientRect?.().height || root.offsetHeight || 0);
