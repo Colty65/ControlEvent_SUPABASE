@@ -1,55 +1,86 @@
-/* ControlEvent v17_prod - hotfix acotado fotos en Calculos por tienda y ticket.
-   Cambio FIX3: sustitucion real del gestor legacy por un gestor unico, igual de estable que
-   Ingresos/Documentos: input efimero, clave canonica por fila, borrado agresivo de alias TKxx,
-   URL nueva/cache-busted y sin renderBudget tras adjuntar/eliminar. No cambia version. */
+/* ControlEvent v17_prod - mantenimiento estable de fotos en Cálculos por tienda y ticket.
+   Base FIX2: no cambia version. Sustituye los controles inestables por un flujo calcado
+   al de Documentos/Ingresos: input efimero, escritura explicita, sin renderBudget y sin
+   rehidrataciones de ventana. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV17CalculosFotosIngresosStyleV3';
+  const INSTALLED = '__ceV17CalculosFotosDocumentosStyleV4';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const STYLE_ID = 'ceV17CalculosFotosStyleV3';
+  const STYLE_ID = 'ceV17CalculosFotosDocStyleV4';
   const WRITE_SCOPE = 'ticket-image-v8-5-fix26';
   const $ = id => document.getElementById(id);
   const norm = value => String(value ?? '').trim();
   const up = value => norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
   const isDataUrl = value => /^data:image\//i.test(String(value || ''));
+  const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
+  const safe = (fn, fb) => { try{ const out = fn(); return out === undefined ? fb : out; }catch(_){ return fb; } };
+  const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);
+  const setLexical = (name, value) => safe(() => Function('value', name + ' = value;')(value), undefined);
 
   let lastActionSig = '';
   let lastActionAt = 0;
+  let normalizeTimer = 0;
   const busy = new Set();
 
-  function st(){
-    try{ if(typeof state !== 'undefined' && state) return state; }catch(_){ }
-    try{ if(window.state) return window.state; }catch(_){ }
-    try{ if(window.ControlEventApp?.state) return window.ControlEventApp.state; }catch(_){ }
+  function uniquePush(list, item){ if(item && typeof item === 'object' && !list.includes(item)) list.push(item); }
+  function stateObjects(){
+    const out = [];
+    uniquePush(out, getLexical('state'));
+    uniquePush(out, window.state);
+    uniquePush(out, window.ControlEventApp?.state);
+    uniquePush(out, window.ControlEventRuntime?.app?.state);
+    uniquePush(out, window.__CONTROL_EVENT_STATE__);
+    if(!out.length) out.push({});
+    return out;
+  }
+  function st(){ return stateObjects()[0] || {}; }
+  function arrFromAny(name){
+    for(const s of stateObjects()){ if(Array.isArray(s?.[name])) return s[name]; }
+    return [];
+  }
+  function eventId(){
+    const fromSelected = safe(() => (typeof selectedEvent === 'function' ? selectedEvent() : null)?.id, '') || safe(() => window.selectedEvent?.()?.id, '');
+    if(norm(fromSelected)) return norm(fromSelected);
+    for(const s of stateObjects()){ if(norm(s?.selectedEventId)) return norm(s.selectedEventId); }
+    return norm($('selectedEvent')?.value || '');
+  }
+  function currentEvent(){
+    const id = eventId();
+    for(const s of stateObjects()){
+      const ev = (Array.isArray(s?.eventos) ? s.eventos : []).find(item => String(item?.id || '') === id);
+      if(ev) return ev;
+    }
     return {};
   }
-  function arr(name){ const s = st(); return Array.isArray(s[name]) ? s[name] : []; }
-  function selectedEventId(){
-    try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return norm(ev.id); }catch(_){ }
-    try{ const ev = typeof window.selectedEvent === 'function' ? window.selectedEvent() : null; if(ev?.id) return norm(ev.id); }catch(_){ }
-    return norm(st().selectedEventId || $('selectedEvent')?.value || '');
-  }
-  function currentEvent(){ const id = selectedEventId(); return arr('eventos').find(ev => String(ev?.id || '') === id) || {}; }
   function role(){
-    try{ if(typeof authUser !== 'undefined' && authUser) return up(authUser.nivel); }catch(_){ }
-    return up(window.authUser?.nivel || window.ControlEventApp?.authUser?.nivel || '');
+    const lexical = safe(() => (typeof authUser !== 'undefined' && authUser) ? authUser.nivel : '', '');
+    return up(lexical || window.authUser?.nivel || window.ControlEventApp?.authUser?.nivel || '');
   }
   function canWrite(){ return role() === 'GD' || role() === 'RW'; }
   function locked(){
-    try{ if(typeof isLocked === 'function') return !!isLocked(); }catch(_){ }
-    try{ if(typeof window.isLocked === 'function') return !!window.isLocked(); }catch(_){ }
+    const lexical = safe(() => typeof isLocked === 'function' ? isLocked() : undefined, undefined);
+    if(lexical !== undefined) return !!lexical;
+    if(typeof window.isLocked === 'function') return !!safe(() => window.isLocked(), false);
     return up(currentEvent().situacion || '') === 'FINALIZADO';
   }
-  function ensureStores(){
-    const s = st();
+
+  function ensureStoresOn(s){
+    if(!s || typeof s !== 'object') return {images:{}, refs:{}, byKey:{}};
     if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
     if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object') s.ticketImageRefs = {};
     if(!s.ticketImagesByKey || typeof s.ticketImagesByKey !== 'object') s.ticketImagesByKey = {};
     return {images:s.ticketImages, refs:s.ticketImageRefs, byKey:s.ticketImagesByKey};
+  }
+  function allBags(){
+    const out = [];
+    for(const s of stateObjects()){
+      const stores = ensureStoresOn(s);
+      out.push(stores.images, stores.refs, stores.byKey);
+    }
+    return out.filter(Boolean);
   }
   function decodeMaybe(value){
     const raw = norm(value);
@@ -57,8 +88,8 @@
     try{ return /%[0-9A-F]{2}/i.test(raw) ? decodeURIComponent(raw) : raw; }catch(_){ return raw; }
   }
   function cleanLabel(label){
-    const ev = selectedEventId();
-    let out = decodeMaybe(label).replace(/\s*\|\s*/g, ' | ').replace(/\s*ⓘ\s*$/,'').trim();
+    const ev = eventId();
+    let out = decodeMaybe(label).replace(/\s*\|\s*/g, ' | ').trim();
     if(ev && out.startsWith(ev + ' | ')) out = out.slice(ev.length + 3).trim();
     if(ev && out.startsWith(ev + '|')) out = out.slice(ev.length + 1).trim();
     return out.replace(/\s*\|\s*/g, ' | ').trim();
@@ -67,100 +98,105 @@
     const match = norm(label).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
     return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
   }
-  function storeToken(label){
-    const parts = cleanLabel(label).split('|').map(p => norm(p)).filter(Boolean);
-    return parts.length > 1 ? up(parts[0]) : '';
-  }
-  function primaryKey(label){ const ev = selectedEventId(); const clean = cleanLabel(label); return ev && clean ? `${ev}|${clean}` : clean; }
-  function imageValue(value){
+  function labelParts(label){ return cleanLabel(label).split('|').map(part => norm(part)).filter(Boolean); }
+  function keyOnly(label){ return cleanLabel(label); }
+  function primaryKey(label){ const ev = eventId(); const clean = cleanLabel(label); return ev && clean ? `${ev}|${clean}` : clean; }
+  function imageSource(value){
     if(!value) return '';
     if(typeof value === 'string') return norm(value);
-    if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.src || '');
+    if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.src || value.base64 || '');
     return '';
   }
-  function keyRest(key){ const ev = selectedEventId(); const k = norm(key); return ev && k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k; }
-  function variants(label){
-    const ev = selectedEventId();
+  function imageKeyRest(key){ const ev = eventId(); const k = norm(key); return ev && k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k; }
+  function imageEventFromValue(value){
+    const src = imageSource(value);
+    const m = src.match(/\/ticket-images\/([^\/?#]+)\//i);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function sameEventKey(key, value){
+    const ev = eventId(); const k = norm(key);
+    if(!ev) return false;
+    if(k.startsWith(ev + '|')) return true;
+    return imageEventFromValue(value) === ev;
+  }
+  function imageVariants(label){
+    const ev = eventId();
+    const raw = decodeMaybe(label);
     const clean = cleanLabel(label);
-    const tk = ticketToken(clean);
-    const parts = clean.split('|').map(p => norm(p)).filter(Boolean);
+    const parts = labelParts(label);
+    const tk = ticketToken(clean || raw);
     const out = [];
     const add = value => { value = norm(value); if(value && !out.includes(value)) out.push(value); };
     const scoped = value => { value = norm(value); if(!value) return; add(value); if(ev && !value.startsWith(ev + '|')) add(`${ev}|${value}`); };
-    scoped(clean);
+    [raw, clean].forEach(scoped);
     if(parts.length >= 2){
-      scoped(`${parts[0]} | ${parts.slice(1).join(' | ')}`);
-      scoped(`${parts[0]}|${parts.slice(1).join('|')}`);
-      if(tk){ scoped(`${parts[0]} | ${tk}`); scoped(`${parts[0]}|${tk}`); }
-    }
-    if(tk) scoped(tk);
+      const left = parts[0];
+      const right = parts.slice(1).join(' | ');
+      [`${left} | ${right}`, `${left}|${right}`, right, tk ? `${left} | ${tk}` : '', tk ? `${left}|${tk}` : '', tk || ''].forEach(scoped);
+    }else if(tk){ scoped(tk); }
     return out;
   }
-  function shouldClear(label, key, value){
-    const ev = selectedEventId();
+  function shouldTouchKey(label, key, value){
+    const ev = eventId();
     const clean = cleanLabel(label);
     const tk = ticketToken(clean);
+    const variants = new Set(imageVariants(clean).map(norm));
     const k = norm(key);
-    const rest = keyRest(k);
-    const exact = new Set(variants(clean));
-    if(exact.has(k) || exact.has(rest)) return true;
-    if(ev && k.startsWith(ev + '|') && tk && up(k).includes(tk)) return true;
-    const src = imageValue(value);
-    if(ev && src.includes(`/ticket-images/${encodeURIComponent(ev)}/`) && tk && up(k + ' ' + rest).includes(tk)) return true;
+    const rest = imageKeyRest(k);
+    if(variants.has(k) || variants.has(rest)) return true;
+    if(!sameEventKey(k, value)) return false;
+    const restUp = up(rest);
+    if(tk && restUp.includes(tk)) return true;
+    if(up(rest) === up(clean)) return true;
     return false;
   }
   function clearLocal(label){
-    const bags = ensureStores();
-    [bags.images, bags.refs, bags.byKey].forEach(bag => {
-      Object.keys(bag || {}).forEach(key => { if(shouldClear(label, key, bag[key])){ try{ delete bag[key]; }catch(_){ } } });
-    });
+    for(const bag of allBags()){
+      Object.keys(bag || {}).forEach(key => { if(shouldTouchKey(label, key, bag[key])){ try{ delete bag[key]; }catch(_){ } } });
+    }
   }
   function putLocal(label, src, ref){
-    const clean = cleanLabel(label);
-    const key = primaryKey(clean);
-    if(!key || !src) return;
-    const bags = ensureStores();
-    const row = ref && typeof ref === 'object' ? {...ref, key, url:src, pathname:ref.pathname || ref.url || src} : {key, url:src, pathname:src};
-    bags.images[key] = src;
-    bags.refs[key] = row;
-    bags.byKey[key] = row;
-  }
-  function findLocalImage(label){
-    const clean = cleanLabel(label);
-    const bags = ensureStores();
-    const direct = [primaryKey(clean), ...variants(clean)];
-    for(const key of direct){
-      for(const bag of [bags.images, bags.refs, bags.byKey]){
-        const src = imageValue(bag?.[key]);
-        if(src) return src;
-      }
+    if(!src) return;
+    const key = primaryKey(label);
+    if(!key) return;
+    for(const s of stateObjects()){
+      const {images, refs, byKey} = ensureStoresOn(s);
+      const item = ref && typeof ref === 'object' ? {...ref, key, url:src, pathname:ref.pathname || ref.url || src} : {key, url:src, pathname:src};
+      images[key] = src;
+      refs[key] = item;
+      byKey[key] = item;
     }
-    const ev = selectedEventId();
+  }
+  function scoreImageCandidate(label, key, value){
+    const src = imageSource(value);
+    if(!src || !sameEventKey(key, value)) return -1;
+    const clean = cleanLabel(label);
+    const pkey = primaryKey(clean);
+    const rest = imageKeyRest(key);
     const tk = ticketToken(clean);
-    const store = storeToken(clean);
-    if(!ev || !tk) return '';
-    for(const bag of [bags.images, bags.refs, bags.byKey]){
-      for(const [key,value] of Object.entries(bag || {})){
-        const k = norm(key);
-        if(k.includes('|') && !k.startsWith(ev + '|')) continue;
-        const rest = up(keyRest(k));
-        if(rest.includes(tk) && (!store || rest.includes(store))){
-          const src = imageValue(value);
-          if(src) return src;
-        }
+    let score = 0;
+    if(key === pkey) score += 1000;
+    if(up(rest) === up(clean)) score += 700;
+    if(up(rest).includes(up(clean))) score += 300;
+    if(tk && up(rest).includes(tk)) score += 120;
+    if(/\?ce_img=|&ce_img=/.test(src)) score += 20;
+    if(!isDataUrl(src)) score += 10;
+    return score;
+  }
+  function imageForLabel(label){
+    let best = {score:-1, src:''};
+    for(const bag of allBags()){
+      for(const [key, value] of Object.entries(bag || {})){
+        const score = scoreImageCandidate(label, key, value);
+        if(score > best.score){ best = {score, src:imageSource(value)}; }
       }
     }
-    return '';
+    return best.score > 0 ? best.src : '';
   }
-  function hardBust(src, nonce){
-    src = norm(src);
-    if(!src || isDataUrl(src)) return src;
-    const sep = src.includes('?') ? '&' : '?';
-    return `${src}${sep}ce_client=${encodeURIComponent(nonce || Date.now())}`;
-  }
+
   function captureScroll(){
     const data = {x:window.scrollX || 0, y:window.scrollY || 0, els:[]};
-    ['summaryTiendaTicket','comprasSummaryBody','tabResumen','budgetLayout','mainTabs'].forEach(id => { const el = $(id); if(el) data.els.push([id, el.scrollLeft || 0, el.scrollTop || 0]); });
+    ['summaryTiendaTicket','tabResumen','budgetLayout','mainTabs'].forEach(id => { const el = $(id); if(el) data.els.push([id, el.scrollLeft || 0, el.scrollTop || 0]); });
     return data;
   }
   function restoreScroll(data){
@@ -169,105 +205,119 @@
       try{ window.scrollTo(data.x || 0, data.y || 0); }catch(_){ }
       (data.els || []).forEach(([id,x,y]) => { const el = $(id); if(el){ try{ el.scrollLeft = x; el.scrollTop = y; }catch(_){ } } });
     };
-    [0,50,150,320].forEach(ms => setTimeout(run, ms));
+    [0,60,160].forEach(ms => setTimeout(run, ms));
   }
-  function rowFromNode(node){ return node?.closest?.('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item') || null; }
-  function rowLabel(row){
-    if(!row) return '';
-    const ds = cleanLabel(row.dataset.ceTicketLabel || row.querySelector('.ticket-actions')?.dataset.ceTicketLabel || '');
-    if(ds) return ds;
-    const first = row.querySelector(':scope > span:first-child');
-    return cleanLabel(first?.textContent || '');
+  function rowLabelFromNode(node){
+    const row = node?.closest?.('.summary-item') || node;
+    const explicit = row?.dataset?.ceV17Label || row?.dataset?.ceTicketLabel || '';
+    if(explicit) return cleanLabel(explicit);
+    const first = row?.querySelector?.(':scope > span:first-child,.ce-hf10-label');
+    return cleanLabel(norm(first?.textContent || '').replace(/\s*ⓘ\s*$/,'').trim());
   }
-  function makeButton(action){
+  function makeButton(action, label){
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'outline small ce-v17-photo-icon';
-    btn.dataset.ceV17TicketAction = action;
-    if(action === 'attach'){
-      btn.textContent = '📎'; btn.title = 'Adjuntar foto'; btn.setAttribute('aria-label', 'Adjuntar foto');
-    } else {
-      btn.textContent = '🗑️'; btn.title = 'Eliminar foto'; btn.setAttribute('aria-label', 'Eliminar foto');
-    }
+    btn.dataset.ceV17PhotoAction = action;
+    btn.dataset.ceV17Label = label;
+    btn.textContent = action === 'remove' ? '🗑️' : '📎';
+    btn.title = action === 'remove' ? 'Eliminar foto' : 'Adjuntar foto';
+    btn.setAttribute('aria-label', btn.title);
     return btn;
   }
-  function renderActions(row, label, src){
-    const actions = row?.querySelector?.('.ticket-actions');
+  function normalizeRow(row, forcedSrc){
+    if(!row || row.classList?.contains('ce-hf10-donation') || row.classList?.contains('red-row')) return;
+    const label = rowLabelFromNode(row);
+    if(!label || !ticketToken(label)) return;
+    const actions = row.querySelector('.ticket-actions');
     if(!actions) return;
-    const clean = cleanLabel(label || rowLabel(row));
-    if(!clean) return;
-    row.dataset.ceTicketLabel = clean;
-    actions.dataset.ceTicketLabel = clean;
-    actions.innerHTML = '';
-    const writable = canWrite() && !locked();
-    if(writable) actions.appendChild(makeButton('attach'));
+    const src = forcedSrc !== undefined ? (forcedSrc || '') : imageForLabel(label);
+    const sig = `${label}|${src ? src.slice(0, 120) + ':' + src.length : 'noimg'}|${busy.has(label) ? 'busy' : 'free'}`;
+    const ownButtons = actions.querySelectorAll(':scope > button[data-ce-v17-photo-action]');
+    const legacyBits = actions.querySelector('input.ticket-file-input,:scope > button:not([data-ce-v17-photo-action])');
+    const imgCount = actions.querySelectorAll(':scope > img.ticket-thumb').length;
+    const cleanStructure = !legacyBits && !!actions.querySelector(':scope > button[data-ce-v17-photo-action="attach"]') && (src ? (imgCount === 1 && !!actions.querySelector(':scope > button[data-ce-v17-photo-action="remove"]') && ownButtons.length === 2) : (imgCount === 0 && !actions.querySelector(':scope > button[data-ce-v17-photo-action="remove"]') && ownButtons.length === 1));
+    if(actions.dataset.ceV17Sig === sig && cleanStructure) return;
+    actions.dataset.ceV17Sig = sig;
+    actions.dataset.ceV17Label = label;
+    row.dataset.ceV17Label = label;
+    row.dataset.ceTicketLabel = label;
+    while(actions.firstChild) actions.removeChild(actions.firstChild);
+    const attach = makeButton('attach', label);
+    attach.disabled = busy.has(label);
+    actions.appendChild(attach);
     if(src){
       const img = document.createElement('img');
-      img.className = 'ticket-thumb';
+      img.className = 'ticket-thumb ce-v17-ticket-thumb';
       img.alt = 'ticket';
       img.loading = 'lazy';
+      img.decoding = 'async';
       img.src = src;
+      const tk = ticketToken(label);
+      if(tk) img.dataset.ceHf12Tk = tk;
+      const tip = row.getAttribute('data-ce-tip-v21') || row.getAttribute('data-ce-tip') || '';
+      if(tip) img.dataset.ceTipV21 = tip;
       actions.appendChild(img);
-      if(writable) actions.appendChild(makeButton('remove'));
-    } else {
-      const hint = document.createElement('span');
-      hint.className = 'hint';
-      hint.textContent = 'Sin imagen';
-      actions.appendChild(hint);
+      const remove = makeButton('remove', label);
+      remove.disabled = busy.has(label);
+      actions.appendChild(remove);
+    }else{
+      const span = document.createElement('span');
+      span.className = 'hint ce-v17-noimage';
+      span.textContent = 'Sin imagen';
+      actions.appendChild(span);
     }
   }
-  function normalizeTicketRows(){
-    document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
-      if(!row.querySelector('.ticket-actions')) return;
-      const label = rowLabel(row);
-      if(!label) return;
-      renderActions(row, label, findLocalImage(label));
-    });
+  function normalizeAll(){
+    clearTimeout(normalizeTimer);
+    normalizeTimer = 0;
+    document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => normalizeRow(row));
   }
-  function refreshOneRow(label, src, scroll){
+  function scheduleNormalize(delay = 60){
+    clearTimeout(normalizeTimer);
+    normalizeTimer = setTimeout(normalizeAll, delay);
+  }
+  function repaintLabel(label, src, scroll){
     const clean = cleanLabel(label);
     document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
-      if(rowLabel(row) === clean) renderActions(row, clean, src || findLocalImage(clean));
+      if(rowLabelFromNode(row) === clean) normalizeRow(row, src || '');
     });
     restoreScroll(scroll);
-    [60,180,420].forEach(ms => setTimeout(() => { normalizeTicketRows(); restoreScroll(scroll); }, ms));
   }
   function setBusy(label, on){
-    const clean = cleanLabel(label);
-    if(!clean) return;
-    if(on) busy.add(clean); else busy.delete(clean);
-    document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
-      if(rowLabel(row) !== clean) return;
-      row.querySelectorAll('.ticket-actions button').forEach(btn => { btn.disabled = !!on; btn.style.pointerEvents = on ? 'none' : ''; });
-    });
+    label = cleanLabel(label);
+    if(!label) return;
+    if(on) busy.add(label); else busy.delete(label);
+    repaintLabel(label, imageForLabel(label), null);
   }
-  function guardCanModify(ev){
-    if(!canWrite()){ alert('No autorizado para modificar fotos.'); return stop(ev || {}); }
-    if(locked()){ alert('Evento finalizado. No se puede modificar.'); return stop(ev || {}); }
-    return true;
-  }
-  function fileToDataUrl(file){
+
+  function readFile(file){
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onerror = () => reject(reader.error || new Error('No se pudo leer la foto.'));
+      reader.onerror = () => reject(reader.error || new Error('No se pudo leer la imagen.'));
       reader.onload = () => resolve(String(reader.result || ''));
       reader.readAsDataURL(file);
     });
   }
-  async function compressImageFile(file){
-    const original = await fileToDataUrl(file);
+  async function fileToCompressedDataUrl(file){
+    if(!file) throw new Error('Selecciona una imagen.');
+    if(file.type && !/^image\//i.test(file.type)) throw new Error('El archivo debe ser una imagen.');
+    const original = await readFile(file);
     return await new Promise(resolve => {
       const img = new Image();
       img.onerror = () => resolve(original);
       img.onload = () => {
         try{
-          const max = 1400;
-          let w = img.width || 0, h = img.height || 0;
+          const max = 1500;
+          let w = img.width || max, h = img.height || max;
           const ratio = Math.min(max / Math.max(w, 1), max / Math.max(h, 1), 1);
-          w = Math.max(1, Math.round(w * ratio)); h = Math.max(1, Math.round(h * ratio));
+          w = Math.max(1, Math.round(w * ratio));
+          h = Math.max(1, Math.round(h * ratio));
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+          ctx.drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.84));
         }catch(_){ resolve(original); }
       };
@@ -275,80 +325,85 @@
     });
   }
   async function apiJson(url, options = {}){
-    const headers = {'X-ControlEvent-Write-Scope': WRITE_SCOPE, 'Cache-Control':'no-cache', ...(options.headers || {})};
-    if(options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    const res = await fetch(url, {...options, headers, cache:'no-store'});
+    const res = await fetch(url, {
+      cache:'no-store',
+      ...options,
+      headers:{
+        'Content-Type':'application/json',
+        'X-ControlEvent-Write-Scope':WRITE_SCOPE,
+        ...(options.headers || {})
+      }
+    });
     const text = await res.text().catch(() => '');
-    let payload = {};
-    try{ payload = text ? JSON.parse(text) : {}; }catch(_){ payload = {message:text}; }
-    if(!res.ok) throw new Error(payload.error || payload.message || text || `HTTP ${res.status}`);
-    return payload;
+    let json = {};
+    try{ json = text ? JSON.parse(text) : {}; }catch(_){ json = {}; }
+    if(!res.ok) throw new Error(json.error || json.message || text || `HTTP ${res.status}`);
+    return json;
   }
   async function deleteServer(label){
-    const ev = selectedEventId();
-    const key = cleanLabel(label);
+    const ev = eventId(); const key = keyOnly(label);
     if(!ev || !key) return {ok:true};
-    const url = `/api/ticket-images?eventId=${encodeURIComponent(ev)}&key=${encodeURIComponent(key)}&ce_aggressive=1&_=${Date.now()}`;
-    return apiJson(url, {method:'DELETE'});
-  }
-  async function uploadServer(label, dataUrl, nonce){
-    const ev = selectedEventId();
-    const key = cleanLabel(label);
-    if(!ev || !key || !isDataUrl(dataUrl)) throw new Error('Falta evento, ticket o imagen.');
-    const payload = await apiJson('/api/ticket-images', {
-      method:'POST',
-      body:JSON.stringify({eventId:ev, key, dataUrl, replace:true, ticket:ticketToken(key), nonce})
+    return apiJson(`/api/ticket-images?eventId=${encodeURIComponent(ev)}&key=${encodeURIComponent(key)}`, {
+      method:'DELETE',
+      body:JSON.stringify({eventId:ev, key})
     });
-    const image = payload.image || {};
-    let src = image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || '';
-    src = hardBust(src, nonce);
-    if(!payload.ok || !src) throw new Error(payload.error || payload.message || 'No se pudo guardar la foto en servidor.');
-    return {src, image:{...image, url:src, pathname:src}};
   }
-  async function attachWithFile(label, file, ev){
-    if(guardCanModify(ev || null) !== true) return false;
-    label = cleanLabel(label);
-    if(!label || !file) return false;
-    if(file.type && !/^image\//i.test(file.type)){ alert('Selecciona una imagen para el ticket.'); return false; }
-    const scroll = captureScroll();
-    const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    try{
-      setBusy(label, true);
-      const dataUrl = await compressImageFile(file);
-      clearLocal(label);
-      putLocal(label, dataUrl, {key:primaryKey(label), url:dataUrl, pathname:dataUrl});
-      refreshOneRow(label, dataUrl, scroll);
-      await deleteServer(label);
-      clearLocal(label);
-      putLocal(label, dataUrl, {key:primaryKey(label), url:dataUrl, pathname:dataUrl});
-      refreshOneRow(label, dataUrl, scroll);
-      const saved = await uploadServer(label, dataUrl, nonce);
-      clearLocal(label);
-      putLocal(label, saved.src, saved.image);
-      refreshOneRow(label, saved.src, scroll);
-    }catch(error){
-      alert('No se pudo adjuntar la foto. ' + (error?.message || error));
-      restoreScroll(scroll);
-    }finally{
-      setBusy(label, false);
-    }
-    return false;
+  async function uploadServer(label, dataUrl){
+    const ev = eventId(); const key = keyOnly(label);
+    if(!ev || !key || !isDataUrl(dataUrl)) throw new Error('Falta evento, ticket o imagen.');
+    const json = await apiJson('/api/ticket-images', {
+      method:'POST',
+      body:JSON.stringify({eventId:ev, key, dataUrl})
+    });
+    const image = json.image || json || {};
+    const src = imageSource(image) || dataUrl;
+    clearLocal(label);
+    putLocal(label, src, image);
+    return src;
   }
-  function pickFile(label, ev){
+  function guardCanModify(ev){
+    if(!canWrite()){ alert('No autorizado para modificar fotos.'); return stop(ev || {}); }
+    if(locked()){ alert('Evento finalizado. No se puede modificar.'); return stop(ev || {}); }
+    return true;
+  }
+  async function attachPhoto(label, ev){
     stop(ev || {});
     if(guardCanModify(ev || null) !== true) return false;
+    label = cleanLabel(label);
+    if(!label) return false;
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.style.position = 'fixed';
-    input.style.left = '-10000px';
-    input.style.top = '-10000px';
+    input.style.left = '-9999px';
+    input.style.top = '-9999px';
     input.style.width = '1px';
     input.style.height = '1px';
     document.body.appendChild(input);
     input.addEventListener('change', async () => {
-      try{ await attachWithFile(label, input.files && input.files[0], ev || null); }
-      finally{ try{ input.value = ''; input.remove(); }catch(_){ } }
+      const scroll = captureScroll();
+      try{
+        const file = input.files && input.files[0];
+        if(!file) return;
+        setBusy(label, true);
+        const localDataUrl = await fileToCompressedDataUrl(file);
+        // Igual que Documentos: limpiar, subir y usar exactamente la URL devuelta.
+        // No se invoca renderBudget ni recargas globales.
+        clearLocal(label);
+        repaintLabel(label, '', scroll);
+        await deleteServer(label).catch(error => console.warn('[ControlEvent v17_prod] Limpieza previa de foto TK:', error?.message || error));
+        clearLocal(label);
+        putLocal(label, localDataUrl);
+        repaintLabel(label, localDataUrl, scroll);
+        const finalUrl = await uploadServer(label, localDataUrl);
+        repaintLabel(label, finalUrl, scroll);
+      }catch(error){
+        alert('No se pudo adjuntar la foto. ' + (error?.message || error));
+        restoreScroll(scroll);
+      }finally{
+        setBusy(label, false);
+        try{ input.value = ''; input.remove(); }catch(_){ }
+      }
     }, {once:true});
     input.click();
     return false;
@@ -362,11 +417,9 @@
     const scroll = captureScroll();
     try{
       setBusy(label, true);
-      clearLocal(label);
-      refreshOneRow(label, '', scroll);
       await deleteServer(label);
       clearLocal(label);
-      refreshOneRow(label, '', scroll);
+      repaintLabel(label, '', scroll);
     }catch(error){
       alert('No se pudo eliminar la foto. ' + (error?.message || error));
       restoreScroll(scroll);
@@ -376,98 +429,103 @@
     return false;
   }
   function labelFromControl(control){
-    const row = rowFromNode(control);
-    const ds = cleanLabel(control?.dataset?.ceTicketLabel || control?.closest?.('.ticket-actions')?.dataset?.ceTicketLabel || row?.dataset?.ceTicketLabel || '');
-    if(ds) return ds;
+    const explicit = control?.dataset?.ceV17Label || control?.closest?.('.ticket-actions')?.dataset?.ceV17Label || control?.closest?.('.summary-item')?.dataset?.ceV17Label || '';
+    if(explicit) return cleanLabel(explicit);
     const onclick = norm(control?.getAttribute?.('onclick') || '');
-    const match = onclick.match(/(?:uploadTicketImage|removeTicketImage|uploadTicketImageV164|removeTicketImageV164|uploadTicketImageV202|removeTicketImageV202)\((?:event\s*,\s*)?['"]([^'"]+)['"]/i);
+    const match = onclick.match(/(?:uploadTicketImage|removeTicketImage)\((?:event\s*,\s*)?['"]([^'"]+)['"]/i);
     if(match) return cleanLabel(match[1]);
     const input = control?.closest?.('.ticket-actions')?.querySelector?.('input.ticket-file-input[onchange*="uploadTicketImage"]');
     const onchg = norm(input?.getAttribute?.('onchange') || '');
     const m2 = onchg.match(/uploadTicketImage\(event\s*,\s*['"]([^'"]+)['"]/i);
     if(m2) return cleanLabel(m2[1]);
-    return rowLabel(row);
+    return rowLabelFromNode(control);
   }
   function actionFromControl(control){
-    const ds = norm(control?.dataset?.ceV17TicketAction || '');
-    if(ds === 'attach' || ds === 'remove') return ds;
+    const data = norm(control?.dataset?.ceV17PhotoAction || '');
+    if(data === 'attach' || data === 'remove') return data;
     const txt = up((control?.textContent || '') + ' ' + (control?.title || '') + ' ' + (control?.getAttribute?.('aria-label') || '') + ' ' + (control?.getAttribute?.('onclick') || ''));
     if(/REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(txt)) return 'remove';
     if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt)) return 'attach';
     return '';
   }
   function controlFromEvent(ev){
-    return ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button,#summaryTiendaTicket .ce-photo-btn-v202,#ceBudgetLiteTooltipV307 .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img],#ceBudgetLiteTooltipV307 [data-ce-delete-img]');
+    return ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button,#summaryTiendaTicket input.ticket-file-input,#ceBudgetLiteTooltipV307 input.ticket-file-input');
   }
-  function handleClick(ev){
+  function handleActivation(ev){
     const control = controlFromEvent(ev);
     if(!control) return;
     const action = actionFromControl(control);
+    if(!action) return;
     const label = labelFromControl(control);
-    if(!action || !label) return;
-    const sig = `${action}|${label}`;
+    if(!label) return;
+    const sig = action + '|' + label;
     const now = Date.now();
-    if(sig === lastActionSig && now - lastActionAt < 700) return stop(ev);
+    if(sig === lastActionSig && now - lastActionAt < 650) return stop(ev);
     lastActionSig = sig; lastActionAt = now;
     if(busy.has(cleanLabel(label))) return stop(ev);
-    if(action === 'attach') return pickFile(label, ev);
+    if(action === 'attach') return attachPhoto(label, ev);
     if(action === 'remove') return removePhoto(label, ev);
   }
-  function handleLegacyInputChange(ev){
-    const input = ev.target;
-    if(!input?.matches?.('#summaryTiendaTicket input.ticket-file-input,#ceBudgetLiteTooltipV307 input.ticket-file-input')) return;
-    const file = input.files && input.files[0];
-    const label = labelFromControl(input);
-    if(!file || !label) return;
-    stop(ev);
-    attachWithFile(label, file, ev).finally(() => { try{ input.value = ''; }catch(_){ } });
-    return false;
-  }
   function wrapGlobals(){
-    const upload = function(evOrEncoded, maybeEncoded){
-      if(evOrEncoded && evOrEncoded.target && evOrEncoded.target.files){
-        const label = cleanLabel(maybeEncoded || labelFromControl(evOrEncoded.target));
+    const wrappedUpload = function(evOrEncoded, maybeEncoded){
+      const isFileChange = evOrEncoded && evOrEncoded.target && evOrEncoded.target.files;
+      const label = isFileChange ? maybeEncoded : evOrEncoded;
+      if(isFileChange){
         const file = evOrEncoded.target.files && evOrEncoded.target.files[0];
-        attachWithFile(label, file, evOrEncoded);
+        const clean = cleanLabel(maybeEncoded || '');
+        if(!clean || !file) return false;
+        const scroll = captureScroll();
+        (async () => {
+          try{
+            if(guardCanModify(evOrEncoded) !== true) return;
+            setBusy(clean, true);
+            const dataUrl = await fileToCompressedDataUrl(file);
+            await deleteServer(clean).catch(error => console.warn('[ControlEvent v17_prod] Limpieza previa TK:', error?.message || error));
+            clearLocal(clean); putLocal(clean, dataUrl); repaintLabel(clean, dataUrl, scroll);
+            const url = await uploadServer(clean, dataUrl); repaintLabel(clean, url, scroll);
+          }catch(error){ alert('No se pudo adjuntar la foto. ' + (error?.message || error)); restoreScroll(scroll); }
+          finally{ setBusy(clean, false); try{ evOrEncoded.target.value = ''; }catch(_){ } }
+        })();
         return false;
       }
-      return pickFile(cleanLabel(evOrEncoded || ''), null);
+      return attachPhoto(label, null);
     };
-    const remove = function(encoded){ return removePhoto(cleanLabel(encoded || ''), null); };
-    try{ window.uploadTicketImage = upload; uploadTicketImage = upload; }catch(_){ window.uploadTicketImage = upload; }
-    try{ window.uploadTicketImageV164 = upload; uploadTicketImageV164 = upload; }catch(_){ window.uploadTicketImageV164 = upload; }
-    try{ window.uploadTicketImageV202 = upload; }catch(_){ }
-    try{ window.removeTicketImage = remove; removeTicketImage = remove; }catch(_){ window.removeTicketImage = remove; }
-    try{ window.removeTicketImageV164 = remove; removeTicketImageV164 = remove; }catch(_){ window.removeTicketImageV164 = remove; }
-    try{ window.removeTicketImageV202 = remove; }catch(_){ }
+    const wrappedRemove = function(encoded){ return removePhoto(encoded, null); };
+    try{ window.uploadTicketImage = wrappedUpload; setLexical('uploadTicketImage', wrappedUpload); }catch(_){ window.uploadTicketImage = wrappedUpload; }
+    try{ window.uploadTicketImageV164 = wrappedUpload; setLexical('uploadTicketImageV164', wrappedUpload); }catch(_){ window.uploadTicketImageV164 = wrappedUpload; }
+    try{ window.uploadTicketImageV202 = wrappedUpload; }catch(_){ }
+    try{ window.removeTicketImage = wrappedRemove; setLexical('removeTicketImage', wrappedRemove); }catch(_){ window.removeTicketImage = wrappedRemove; }
+    try{ window.removeTicketImageV164 = wrappedRemove; setLexical('removeTicketImageV164', wrappedRemove); }catch(_){ window.removeTicketImageV164 = wrappedRemove; }
+    try{ window.removeTicketImageV202 = wrappedRemove; }catch(_){ }
   }
   function injectStyle(){
     if($(STYLE_ID)) return;
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #summaryTiendaTicket .ticket-actions,#ceBudgetLiteTooltipV307 .ticket-actions{
-        display:inline-flex!important;align-items:center!important;gap:8px!important;min-width:82px!important;justify-content:flex-end!important;
-      }
+      #summaryTiendaTicket .ticket-actions,#ceBudgetLiteTooltipV307 .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;min-width:112px!important;justify-content:flex-end!important;white-space:nowrap!important;}
       #summaryTiendaTicket .ticket-actions input.ticket-file-input,#ceBudgetLiteTooltipV307 .ticket-actions input.ticket-file-input{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      #summaryTiendaTicket .ticket-actions button.ce-v17-photo-icon,#ceBudgetLiteTooltipV307 .ticket-actions button.ce-v17-photo-icon{
-        width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;
-        display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:16px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;
-      }
-      #summaryTiendaTicket .ticket-actions img.ticket-thumb,#ceBudgetLiteTooltipV307 .ticket-actions img.ticket-thumb{
-        width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;visibility:visible!important;opacity:1!important;
-      }
+      #summaryTiendaTicket .ticket-actions button.ce-v17-photo-icon,#ceBudgetLiteTooltipV307 .ticket-actions button.ce-v17-photo-icon{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:16px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;pointer-events:auto!important;}
+      #summaryTiendaTicket .ticket-actions img.ticket-thumb,#ceBudgetLiteTooltipV307 .ticket-actions img.ticket-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;}
+      #summaryTiendaTicket .ticket-actions .ce-v17-noimage,#ceBudgetLiteTooltipV307 .ticket-actions .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
     `;
     document.head.appendChild(style);
   }
-  function install(){ injectStyle(); wrapGlobals(); normalizeTicketRows(); }
+  function install(){ injectStyle(); wrapGlobals(); scheduleNormalize(30); }
 
-  document.addEventListener('click', handleClick, true);
-  window.addEventListener('click', handleClick, true);
-  document.addEventListener('change', handleLegacyInputChange, true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
-  try{ new MutationObserver(() => setTimeout(normalizeTicketRows, 30)).observe(document.body, {childList:true, subtree:true}); }catch(_){ }
-  [0,80,220,600,1200,2400,4200].forEach(ms => setTimeout(install, ms));
-
-  window.ControlEventV17CalculosFotos = {install, normalizeTicketRows, clearLocal, attachPhoto:pickFile, removePhoto, version:'v17_prod_calculos_fotos_fix3'};
+  ['click','pointerup','touchend'].forEach(type => {
+    window.addEventListener(type, handleActivation, {capture:true, passive:false});
+    document.addEventListener(type, handleActivation, {capture:true, passive:false});
+  });
+  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-loaded','controlevent:data-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30), true));
+  window.addEventListener('controlevent:event-changed', () => setTimeout(install, 180), true);
+  try{
+    new MutationObserver(mutations => {
+      for(const m of mutations){
+        if(m.target?.id === 'summaryTiendaTicket' || m.target?.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307')){ scheduleNormalize(80); break; }
+      }
+    }).observe(document.body, {childList:true, subtree:true});
+  }catch(_){ }
+  [0,160,700,1600].forEach(ms => setTimeout(install, ms));
+  window.ControlEventV17CalculosFotos = {install, attachPhoto, removePhoto, clearLocal, imageForLabel, version:'v17_prod_calculos_fotos_documentos_style'};
 })();
