@@ -270,7 +270,7 @@
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
           const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
           if(src){
-            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; if(rowTip)img.setAttribute('data-ce-tip-v21',rowTip); actions.appendChild(img);
+            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; if(rowTip)img.setAttribute('data-ce-tip-v21',rowTip); actions.appendChild(img);
             const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
           }else{
             const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
