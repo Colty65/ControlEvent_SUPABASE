@@ -1,5 +1,5 @@
 /* ControlEvent v17_prod - Cálculos por tienda/ticket: fotos con método tipo Documentos.
-   FIX8: mantiene fotos FIX6, recupera detalle completo de filas sin icono (i). No cambia versión. */
+   FIX9: gastos corrientes como comprado y Refrescar fuerza fotos. No cambia versión. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
@@ -269,9 +269,10 @@
   }
   function ticketOf(c){return norm(c?.ticketDonacion??c?.ticket_donacion??c?.ticket??c?.donacion??c?.ticketId??'');}
   function isDonationTicket(t){const u=up(t); return u.startsWith('DONADO')||u.includes('DONACION')||u.includes('DONADO');}
+  function isGastosCorrientes(t){const u=up(t); return u==='GASTOS CORRIENTES'||u.includes('GASTOS CORRIENTES');}
   function isCurrentOrPending(t){
     const u=up(t);
-    return !u || u==='GASTOS CORRIENTES' || u.includes('GASTOS CORRIENTES') || u.includes('PTE') || u.includes('PENDIENTE');
+    return !u || (!isGastosCorrientes(t) && (u.includes('PTE') || u.includes('PENDIENTE')));
   }
   function fmtNum(v){return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(Number(v||0));}
   function linePurchase(c,first){return [first,storeName(c),productName(c),fmtNum(units(c)),money(price(c)),money(valueLine(c))];}
@@ -290,9 +291,10 @@
         const r=pending.get(key); r.v+=v; r.lines.push(linePurchase(c,tk||'PTE.COMPRA')); return;
       }
       const holder=donated?donorName(c):storeName(c);
-      const key=holder+' | '+(tk || 'Pte. Compra u otros gastos');
-      if(!filled.has(key)) filled.set(key,{key,label:key,k:key,v:0,pending:false,donated,attachable:!donated&&!isCurrentOrPending(tk),rawTicket:tk,lines:[],headers:donated?['Donante','Producto','Uds','Precio estimado','Valor estimado']:['Ticket/Otros gastos','Tienda','Producto','Uds','Precio','Total']});
-      const r=filled.get(key); r.v+=v; r.lines.push(donated?lineDonation(c):linePurchase(c,tk||'PTE.COMPRA'));
+      const ticketLabel=isGastosCorrientes(tk)?'GASTOS CORRIENTES':(tk || 'Pte. Compra u otros gastos');
+      const key=holder+' | '+ticketLabel;
+      if(!filled.has(key)) filled.set(key,{key,label:key,k:key,v:0,pending:false,donated,attachable:!donated&&!isCurrentOrPending(tk)&&!isGastosCorrientes(tk),rawTicket:ticketLabel,lines:[],headers:donated?['Donante','Producto','Uds','Precio estimado','Valor estimado']:['Ticket/Otros gastos','Tienda','Producto','Uds','Precio','Total']});
+      const r=filled.get(key); r.v+=v; r.lines.push(donated?lineDonation(c):linePurchase(c,ticketLabel));
     });
     return [...filled.values(),...pending.values()];
   }
@@ -353,9 +355,34 @@
     document.body.appendChild(modal);
     return false;
   }
+  function mergeRowsWithFullState(rowsArg){
+    const base=(Array.isArray(rowsArg)&&rowsArg.length?rowsArg:rowsFromExisting()).filter(Boolean);
+    const full=detailedRowsFromState();
+    if(!full.length) return base;
+    const byKey=new Map(full.map(r=>[up(cleanLabel(r.key||r.label||'')),r]));
+    const byStoreGastos=new Map();
+    full.forEach(r=>{
+      const parts=splitParts(r.key||r.label||'');
+      if(parts.length>=2 && isGastosCorrientes(parts.slice(1).join(' | '))) byStoreGastos.set(up(parts[0]),r);
+    });
+    const seen=new Set();
+    const out=[];
+    base.forEach(r=>{
+      const label=rowKey(r); const parts=splitParts(label); const keyU=up(cleanLabel(label));
+      let repl=byKey.get(keyU);
+      if(!repl && parts.length>=2 && up(parts.slice(1).join(' | ')).includes('PTE') && byStoreGastos.has(up(parts[0]))) repl=byStoreGastos.get(up(parts[0]));
+      const row=repl?{...r,...repl,v:Number(repl.v||r.v||0)}:fullDetailFor(label,r);
+      const finalKey=up(cleanLabel(row.key||row.label||label));
+      if(finalKey && seen.has(finalKey)) return;
+      if(finalKey) seen.add(finalKey);
+      out.push(row);
+    });
+    full.forEach(r=>{const k=up(cleanLabel(r.key||r.label||'')); if(k&&!seen.has(k)){seen.add(k); out.push(r);}});
+    return out;
+  }
   function renderSummaryTiendaTicketDirect(rowsArg){
     const root=$('summaryTiendaTicket'); if(!root||drawing)return;
-    const rows=(Array.isArray(rowsArg)&&rowsArg.length?rowsArg:rowsFromExisting()).filter(Boolean);
+    const rows=mergeRowsWithFullState(rowsArg);
     const ev=eventId(); if(ev&&loadedEvent!==ev)loadServerImages(false).then(()=>renderSummaryTiendaTicketDirect(rows)).catch(()=>{});
     const mode=st().summaryTiendaSort||'tienda';
     const sig=JSON.stringify([ev,mode,rows.map(r=>[rowKey(r),Math.round(Number(r.v||0)*100),!!r.pending,!!r.donated,!!r.attachable,imageFor(rowKey(r))])]);
@@ -376,7 +403,8 @@
         const pending=!!r.pending; const donated=!!r.donated; const attachable=!!r.attachable&&!pending&&!donated&&!!ticketToken(label);
         const src=attachable?imageFor(label):''; const rowTip=tipForRow(r,label);
         const div=document.createElement('div');
-        div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'');
+        const gastosCorrientes=up(label).includes('GASTOS CORRIENTES');
+        div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'')+(gastosCorrientes?' ce-v17-gastos-corrientes':'');
         div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.setAttribute('role','button'); div.setAttribute('tabindex','0'); div.setAttribute('aria-label','Ver detalle');
         const amountStyle=pending?' style="background:#fef2f2;color:#b91c1c"':(donated?' style="text-decoration:line-through"':'');
         const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label);
@@ -557,6 +585,9 @@
       .ce-v17-rowdetail-table td:nth-last-child(-n+3),.ce-v17-rowdetail-table th:nth-last-child(-n+3){text-align:right!important;}
       .ce-v17-rowdetail-table td:first-child{font-weight:850!important;}
       .ce-v17-rowdetail-pre{white-space:pre-wrap!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:12px!important;padding:10px!important;max-height:55vh!important;overflow:auto!important;font-family:inherit!important;}
+
+      #summaryTiendaTicket .ce-v17-gastos-corrientes .ce-hf10-label{color:#0f172a!important;font-weight:700!important;}
+      #summaryTiendaTicket .ce-v17-gastos-corrientes .pill{background:#eef6ff!important;color:#0f172a!important;text-decoration:none!important;}
       #summaryTiendaTicket .ce-v17-pending .ce-hf10-label{color:#b91c1c!important;font-weight:950!important;}
       .ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-head h3,.ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-head p{color:#b91c1c!important;}
       .ce-v17-rowdetail-modal.pending .ce-v17-rowdetail-total{background:#fef2f2!important;color:#b91c1c!important;}
@@ -565,10 +596,45 @@
     `;
     document.head.appendChild(style);
   }
-  function install(){injectStyle();wrapGlobals();wrapRenderers();loadServerImages(false).then(redraw);redraw();}
+  function bustImgSrc(img,seed){
+    try{
+      const src=norm(img.currentSrc||img.src||'');
+      if(!src||/^data:/i.test(src)||/^blob:/i.test(src))return;
+      if(!/(ticket-images|storage|supabase|justificante|document|receipt|ingresos)/i.test(src))return;
+      const u=new URL(src,location.href);
+      u.searchParams.set('ce_refresh',seed||Date.now());
+      img.src=u.toString();
+    }catch(_){ }
+  }
+  function bustVisiblePhotoUrls(seed){
+    document.querySelectorAll('#summaryTiendaTicket img,#tabIngresos img,#tabDocumentos img,.ce-doc-modal-v85 img,.ticket-thumb,.ce-doc-thumb').forEach(img=>bustImgSrc(img,seed));
+  }
+  async function refreshPhotosFromServer(reason){
+    const seed=Date.now().toString(36);
+    Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; fetchingEvent=''; fetchPromise=null;
+    try{ await loadServerImages(true); }catch(_){ }
+    const root=$('summaryTiendaTicket'); if(root)root.dataset.ceV17DocPhotoSig='';
+    try{ redraw(); }catch(_){ }
+    try{ window.ControlEventDocumentsV85?.render?.(); }catch(_){ }
+    try{ if(typeof renderIngresos==='function')renderIngresos(); }catch(_){ }
+    try{ if(typeof window.renderIngresos==='function')window.renderIngresos(); }catch(_){ }
+    bustVisiblePhotoUrls(seed);
+    [250,900,1800].forEach(ms=>setTimeout(()=>bustVisiblePhotoUrls(seed),ms));
+  }
+  function patchRefreshForPhotos(){
+    if(window.__ceV17Fix9RefreshPhotosPatched)return;
+    window.__ceV17Fix9RefreshPhotosPatched=true;
+    const schedule=()=>[500,1400,2600,4200].forEach(ms=>setTimeout(()=>refreshPhotosFromServer('refresh-button'),ms));
+    ['click','pointerup','touchend'].forEach(type=>{
+      document.addEventListener(type,ev=>{
+        if(ev.target?.closest?.('#btnSoftRefresh,#btnRefrescar,#btnRefresh,#ceBtnRefresV518,#ceBtnRefresV517,#ceBtnRefresV514,#ceBtnRefresV513,[data-ce-soft-refresh]')) schedule();
+      },true);
+    });
+  }
+  function install(){injectStyle();wrapGlobals();wrapRenderers();patchRefreshForPhotos();loadServerImages(false).then(redraw);redraw();}
   ['click','pointerup','touchend'].forEach(type=>{window.addEventListener(type,handleActivation,{capture:true,passive:false});document.addEventListener(type,handleActivation,{capture:true,passive:false});});
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix8_detalle_completo_avance'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix9_gastos_corrientes_refresh_fotos'};
 })();
