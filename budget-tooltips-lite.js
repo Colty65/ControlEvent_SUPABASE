@@ -267,9 +267,7 @@
       const group = [];
       while(i < sorted.length && donorName(sorted[i]) === donor){ group.push(sorted[i]); i += 1; }
       group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
-      }
+      out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
     }
     return out;
   }
@@ -299,19 +297,30 @@
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
   function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
+  function ticketSortKey(value){
+    const t = norm(value || 'Pte.Compra');
+    const m = /^TK\s*(\d+)/i.exec(t);
+    if(m) return 'TK' + String(Number(m[1])).padStart(6,'0');
+    if(/^PTE\.?\s*COMPRA/i.test(t)) return 'ZZZ-PTE-COMPRA';
+    return up(t);
+  }
   function expenseTableRows(rows){
-    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(expenseTicket(a), expenseTicket(b)) || cmp(storeName(a), storeName(b)) || cmp(productName(a), productName(b)));
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(storeName(a), storeName(b)) || ticketSortKey(expenseTicket(a)).localeCompare(ticketSortKey(expenseTicket(b)), 'es', {sensitivity:'base'}) || cmp(productName(a), productName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
-      const ticket = expenseTicket(sorted[i]);
       const store = storeName(sorted[i]);
-      const group = [];
-      while(i < sorted.length && expenseTicket(sorted[i]) === ticket && storeName(sorted[i]) === store){ group.push(sorted[i]); i += 1; }
-      group.forEach(row => out.push([expenseTicket(row), storeName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      if(group.length > 1){
-        out.push([`TOTAL ${ticket} / ${store}`, '', '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      let storeTotal = 0;
+      while(i < sorted.length && storeName(sorted[i]) === store){
+        const ticket = expenseTicket(sorted[i]);
+        const group = [];
+        while(i < sorted.length && storeName(sorted[i]) === store && expenseTicket(sorted[i]) === ticket){ group.push(sorted[i]); i += 1; }
+        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+        const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
+        storeTotal += ticketTotal;
+        out.push([`TOTAL ${store}, ${ticket}`, '', '', '', '', money(ticketTotal)]);
       }
+      out.push([`TOTAL ${store}`, '', '', '', '', money(storeTotal)]);
     }
     return out;
   }
@@ -335,7 +344,7 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Ticket','Tienda','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table};
   }
   function installLegacyTipAttributeFirewall(){

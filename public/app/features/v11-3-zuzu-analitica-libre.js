@@ -116,6 +116,7 @@
   }
   function openModal(){
     injectStyle();
+    try{ document.body.classList.add('ce-zuzu-open'); }catch(_){ }
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml());
     var closeBtn=$('ceAiClose');
@@ -127,7 +128,7 @@
     $('ceAiDownloadResult').onclick=printZuzuPdf;
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
+  function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); try{ document.body.classList.remove('ce-zuzu-open'); }catch(_){ } }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   async function runAi(){
     var ev=currentEvent();
