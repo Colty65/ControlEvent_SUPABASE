@@ -1,18 +1,20 @@
 /* ControlEvent v17_prod - hotfix acotado fotos en Calculos por tienda y ticket.
-   Copia el patrón robusto de INGRESOS: input efímero, limpieza local amplia,
-   escritura explícita /api/ticket-images y refresco sólo del resumen. No cambia versión. */
+   Objetivo: mismo comportamiento practico que INGRESOS/Documentos: input efimero,
+   sin reutilizar inputs antiguos, sin renderBudget completo y sin hidrataciones que hagan parpadear.
+   No cambia version. */
 (function(){
   'use strict';
-  const INSTALLED = '__ceV17CalculosFotosIngresosStyle';
+  const INSTALLED = '__ceV17CalculosFotosIngresosStyleV2';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
+  const STYLE_ID = 'ceV17CalculosFotosStyleV2';
   const $ = id => document.getElementById(id);
   const norm = value => String(value ?? '').trim();
   const up = value => norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const isDataUrl = value => /^data:image\//i.test(String(value || ''));
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const stop = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } return false; };
-  const isDataUrl = value => /^data:image\//i.test(String(value || ''));
 
   let lastActionSig = '';
   let lastActionAt = 0;
@@ -25,16 +27,14 @@
     return {};
   }
   function arr(name){ const s = st(); return Array.isArray(s[name]) ? s[name] : []; }
-  function currentEvent(){
-    try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return ev; }catch(_){ }
-    try{ const ev = typeof window.selectedEvent === 'function' ? window.selectedEvent() : null; if(ev?.id) return ev; }catch(_){ }
-    const id = eventId();
-    return arr('eventos').find(ev => String(ev?.id || '') === id) || {};
-  }
   function eventId(){
     try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return norm(ev.id); }catch(_){ }
     try{ const ev = typeof window.selectedEvent === 'function' ? window.selectedEvent() : null; if(ev?.id) return norm(ev.id); }catch(_){ }
-    return norm(st().selectedEventId || '');
+    return norm(st().selectedEventId || $('selectedEvent')?.value || '');
+  }
+  function currentEvent(){
+    const id = eventId();
+    return arr('eventos').find(ev => String(ev?.id || '') === id) || {};
   }
   function role(){
     try{ if(typeof authUser !== 'undefined' && authUser) return up(authUser.nivel); }catch(_){ }
@@ -50,7 +50,8 @@
     const s = st();
     if(!s.ticketImages || typeof s.ticketImages !== 'object') s.ticketImages = {};
     if(!s.ticketImageRefs || typeof s.ticketImageRefs !== 'object') s.ticketImageRefs = {};
-    return {images:s.ticketImages, refs:s.ticketImageRefs};
+    if(!s.ticketImagesByKey || typeof s.ticketImagesByKey !== 'object') s.ticketImagesByKey = {};
+    return {images:s.ticketImages, refs:s.ticketImageRefs, byKey:s.ticketImagesByKey};
   }
   function decodeMaybe(value){
     const raw = norm(value);
@@ -68,15 +69,29 @@
     const match = norm(label).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i);
     return match ? match[0].replace(/\s+/g, '').toUpperCase() : '';
   }
-  function primaryKey(label){ const ev = eventId(); const clean = cleanLabel(label); return ev && clean ? `${ev}|${clean}` : clean; }
+  function labelParts(label){ return cleanLabel(label).split('|').map(part => norm(part)).filter(Boolean); }
   function keyOnly(label){ return cleanLabel(label); }
+  function primaryKey(label){ const ev = eventId(); const clean = cleanLabel(label); return ev && clean ? `${ev}|${clean}` : clean; }
   function valueToSrc(value){
     if(!value) return '';
     if(typeof value === 'string') return norm(value);
     if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.src || '');
     return '';
   }
-  function labelParts(label){ return cleanLabel(label).split('|').map(part => norm(part)).filter(Boolean); }
+  function imageKeyRest(key){
+    const ev = eventId();
+    const k = norm(key);
+    return ev && k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k;
+  }
+  function sameEventKey(key, value){
+    const ev = eventId();
+    const k = norm(key);
+    if(!ev) return false;
+    if(k.startsWith(ev + '|')) return true;
+    const src = valueToSrc(value);
+    const m = src.match(/\/ticket-images\/([^\/?#]+)\//i);
+    return !!(m && decodeURIComponent(m[1]) === ev);
+  }
   function imageVariants(label){
     const ev = eventId();
     const raw = decodeMaybe(label);
@@ -89,7 +104,7 @@
     [raw, clean].forEach(scoped);
     if(parts.length >= 2){
       const store = parts[0];
-      const second = parts[1];
+      const second = parts.slice(1).join(' | ');
       [
         `${store} | ${second}`,
         `${store}|${second}`,
@@ -103,33 +118,42 @@
     }
     return out;
   }
-  function clearLocal(label){
-    const {images, refs} = stores();
-    const variants = new Set(imageVariants(label));
+  function shouldPurgeKey(label, key, value){
     const ev = eventId();
-    const tk = ticketToken(label);
-    const wantStore = up(labelParts(label)[0] || '');
-    Object.keys(images).concat(Object.keys(refs)).forEach(key => {
-      const k = String(key || '');
-      const rest = ev && k.startsWith(ev + '|') ? k.slice(ev.length + 1) : k;
-      const matchesVariant = variants.has(k) || variants.has(rest);
-      const matchesTicket = ev && k.startsWith(ev + '|') && tk && up(rest).includes(tk) && (!wantStore || up(rest).includes(wantStore) || up(rest) === tk);
-      if(matchesVariant || matchesTicket) variants.add(k);
+    const clean = cleanLabel(label);
+    const tk = ticketToken(clean);
+    const variants = new Set(imageVariants(clean));
+    const k = norm(key);
+    const rest = imageKeyRest(k);
+    if(variants.has(k) || variants.has(rest)) return true;
+    if(!sameEventKey(k, value)) return false;
+    const restUp = up(rest);
+    if(tk && restUp.includes(tk)) return true;
+    if(up(rest) === up(clean)) return true;
+    return false;
+  }
+  function clearLocal(label){
+    const bags = stores();
+    [bags.images, bags.refs, bags.byKey].forEach(bag => {
+      Object.keys(bag || {}).forEach(key => {
+        if(shouldPurgeKey(label, key, bag[key])){ try{ delete bag[key]; }catch(_){ } }
+      });
     });
-    variants.forEach(key => { try{ delete images[key]; delete refs[key]; }catch(_){ } });
   }
   function putLocal(label, src, ref){
     if(!src) return;
-    const {images, refs} = stores();
+    const {images, refs, byKey} = stores();
     const clean = cleanLabel(label);
     const pkey = primaryKey(clean);
     const tk = ticketToken(clean);
     const keys = [pkey];
-    if(tk) keys.push(`${eventId()}|${tk}`);
+    // Se mantiene un alias por TKxx porque otros visores antiguos buscan por ticket.
+    if(tk && eventId()) keys.push(`${eventId()}|${tk}`);
     keys.forEach(key => {
       if(!key) return;
       images[key] = src;
       refs[key] = ref && typeof ref === 'object' ? {...ref, key, url:src, pathname:ref.pathname || ref.url || src} : {key, url:src, pathname:src};
+      byKey[key] = refs[key];
     });
   }
   function captureScroll(){
@@ -148,41 +172,68 @@
     };
     [0,40,120,260].forEach(ms => setTimeout(run, ms));
   }
+  function rowLabelFromNode(node){
+    const row = node?.closest?.('.summary-item') || node;
+    const first = row?.querySelector?.(':scope > span:first-child');
+    return norm(row?.dataset?.ceTicketLabel || first?.textContent || '').replace(/\s*ⓘ\s*$/,'').trim();
+  }
   function setBusy(label, on){
     const key = cleanLabel(label);
     if(!key) return;
     if(on) busy.add(key); else busy.delete(key);
     document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
-      const rowLabel = rowLabelFromNode(row);
-      if(cleanLabel(rowLabel) !== key) return;
+      const rowLabel = cleanLabel(rowLabelFromNode(row));
+      if(rowLabel !== key) return;
       row.querySelectorAll('.ticket-actions button').forEach(btn => { try{ btn.disabled = !!on; btn.style.pointerEvents = on ? 'none' : ''; }catch(_){ } });
     });
+  }
+  function iconizeButton(btn, action){
+    if(!btn) return;
+    if(action === 'attach'){
+      btn.textContent = '📎';
+      btn.title = 'Adjuntar foto';
+      btn.setAttribute('aria-label', 'Adjuntar foto');
+      btn.classList.add('ce-v17-photo-icon');
+    }else if(action === 'remove'){
+      btn.textContent = '🗑️';
+      btn.title = 'Eliminar foto';
+      btn.setAttribute('aria-label', 'Eliminar foto');
+      btn.classList.add('ce-v17-photo-icon');
+    }
   }
   function repaintRowDom(label, src){
     const key = cleanLabel(label);
     document.querySelectorAll('#summaryTiendaTicket .summary-item,#ceBudgetLiteTooltipV307 .summary-item').forEach(row => {
       const rowLabel = cleanLabel(rowLabelFromNode(row));
       if(rowLabel !== key) return;
+      row.dataset.ceTicketLabel = key;
       const actions = row.querySelector('.ticket-actions');
       if(!actions) return;
       actions.querySelectorAll('.hint').forEach(el => { if(/Sin imagen/i.test(el.textContent || '')) el.remove(); });
+      actions.querySelectorAll('button').forEach(btn => {
+        const txt = up((btn.textContent || '') + ' ' + (btn.title || '') + ' ' + (btn.getAttribute('aria-label') || '') + ' ' + (btn.getAttribute('onclick') || ''));
+        if(/REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(txt)) iconizeButton(btn, 'remove');
+        else if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt)) iconizeButton(btn, 'attach');
+      });
       let img = actions.querySelector('img.ticket-thumb');
       if(src){
         if(!img){ img = document.createElement('img'); img.className = 'ticket-thumb'; img.alt = 'ticket'; actions.appendChild(img); }
-        img.src = src;
+        if(img.src !== src) img.src = src;
         img.style.display = 'inline-block';
-        const encoded = encodeURIComponent(key);
-        if(!actions.querySelector('button[onclick*="removeTicketImage"]')){
-          const del = document.createElement('button');
-          del.type = 'button'; del.className = 'outline small'; del.title = 'Eliminar foto'; del.textContent = 'Eliminar';
-          del.setAttribute('onclick', `removeTicketImage('${encoded}'); return false;`);
+        let del = Array.from(actions.querySelectorAll('button')).find(btn => /REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(up((btn.textContent || '') + ' ' + (btn.title || '') + ' ' + (btn.getAttribute('onclick') || ''))));
+        if(!del){
+          del = document.createElement('button');
+          del.type = 'button'; del.className = 'outline small ce-v17-photo-icon';
+          del.setAttribute('onclick', `removeTicketImage('${encodeURIComponent(key)}'); return false;`);
           actions.appendChild(del);
         }
+        iconizeButton(del, 'remove');
       } else {
         if(img) img.remove();
         actions.querySelectorAll('button').forEach(btn => {
-          const txt = up(btn.textContent + ' ' + (btn.title || '') + ' ' + (btn.getAttribute('onclick') || ''));
-          if(/ELIMINAR|BORRAR|REMOVETICKETIMAGE|🗑/.test(txt)) btn.remove();
+          const txt = up((btn.textContent || '') + ' ' + (btn.title || '') + ' ' + (btn.getAttribute('onclick') || ''));
+          if(/REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(txt)) btn.remove();
+          else if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt)) iconizeButton(btn, 'attach');
         });
         if(!actions.querySelector('.hint')){
           const span = document.createElement('span'); span.className = 'hint'; span.textContent = 'Sin imagen'; actions.appendChild(span);
@@ -190,12 +241,11 @@
       }
     });
   }
-  function refreshSummary(label, src, scroll){
+  function quietRefresh(label, src, scroll){
+    // No renderBudget(): evita que Resumen parpadee y que los scripts antiguos alternen texto/icono.
     repaintRowDom(label, src || '');
-    try{ if(typeof window.renderBudget === 'function') window.renderBudget(); else if(typeof renderBudget === 'function') renderBudget(); }catch(_){ }
-    try{ window.ControlEventV40ProdPhotos?.sync?.(true); }catch(_){ }
-    try{ window.ControlEventV40ProdPhotos?.hydrate?.(true); }catch(_){ }
-    [70,180,420,900].forEach(ms => setTimeout(() => { repaintRowDom(label, src || ''); restoreScroll(scroll); }, ms));
+    restoreScroll(scroll);
+    [50,180,420].forEach(ms => setTimeout(() => { repaintRowDom(label, src || ''); restoreScroll(scroll); }, ms));
   }
   function readImageAsDataUrl(file){
     return new Promise((resolve, reject) => {
@@ -225,39 +275,51 @@
       img.src = original;
     });
   }
+  function xhrJson(url, options = {}){
+    return new Promise((resolve, reject) => {
+      try{
+        const xhr = new XMLHttpRequest();
+        xhr.open(options.method || 'GET', url, true);
+        xhr.setRequestHeader('X-ControlEvent-Write-Scope', 'ticket-image-v8-5-fix26');
+        if(options.body) xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Cache-Control', 'no-cache');
+        xhr.onload = () => {
+          let payload = {};
+          try{ payload = xhr.responseText ? JSON.parse(xhr.responseText) : {}; }catch(_){ payload = {}; }
+          if(xhr.status >= 200 && xhr.status < 300) resolve(payload);
+          else reject(new Error(payload.error || payload.message || `HTTP ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Error de red al escribir la foto.'));
+        xhr.send(options.body || null);
+      }catch(error){ reject(error); }
+    });
+  }
   async function uploadServer(label, src){
     const ev = eventId();
     const key = keyOnly(label);
     if(!ev || !key || !isDataUrl(src)) throw new Error('Falta evento, ticket o imagen.');
-    const res = await fetch('/api/ticket-images', {
+    const payload = await xhrJson('/api/ticket-images', {
       method:'POST',
-      headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix26'},
       body:JSON.stringify({eventId:ev, key, dataUrl:src})
     });
-    const payload = await res.json().catch(() => ({}));
-    if(!res.ok || !payload.ok || !payload.image) throw new Error(payload.error || payload.message || 'No se pudo guardar la foto en servidor.');
+    if(!payload.ok || !payload.image) throw new Error(payload.error || payload.message || 'No se pudo guardar la foto en servidor.');
     const image = payload.image || {};
     const savedUrl = valueToSrc(image) || src;
+    clearLocal(label);
     putLocal(label, savedUrl, image);
     if(image.key && image.key !== primaryKey(label)){
-      const {images, refs} = stores();
+      const {images, refs, byKey} = stores();
       images[image.key] = savedUrl;
       refs[image.key] = {...image, key:image.key, url:savedUrl, pathname:image.pathname || savedUrl};
+      byKey[image.key] = refs[image.key];
     }
     return savedUrl;
   }
   async function deleteServer(label){
     const ev = eventId();
     const key = keyOnly(label);
-    if(!ev || !key) return;
-    const res = await fetch(`/api/ticket-images?eventId=${encodeURIComponent(ev)}&key=${encodeURIComponent(key)}`, {
-      method:'DELETE',
-      headers:{'X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix26'}
-    });
-    if(!res.ok){
-      const payload = await res.json().catch(() => ({}));
-      throw new Error(payload.error || payload.message || 'No se pudo eliminar la foto en servidor.');
-    }
+    if(!ev || !key) return {ok:true};
+    return xhrJson(`/api/ticket-images?eventId=${encodeURIComponent(ev)}&key=${encodeURIComponent(key)}`, {method:'DELETE'});
   }
   function guardCanModify(ev){
     if(!canWrite()){ alert('No autorizado para modificar fotos.'); return stop(ev || {}); }
@@ -266,7 +328,7 @@
   }
   async function attachPhoto(label, ev){
     stop(ev || {});
-    if(guardCanModify(null) !== true) return false;
+    if(guardCanModify(ev || null) !== true) return false;
     label = cleanLabel(label);
     if(!label) return false;
     const scroll = captureScroll();
@@ -276,6 +338,8 @@
     input.style.position = 'fixed';
     input.style.left = '-9999px';
     input.style.top = '-9999px';
+    input.style.width = '1px';
+    input.style.height = '1px';
     document.body.appendChild(input);
     input.addEventListener('change', async () => {
       try{
@@ -284,11 +348,16 @@
         if(file.type && !/^image\//i.test(file.type)){ alert('Selecciona una imagen para el ticket.'); return; }
         setBusy(label, true);
         const src = await compressImageFile(file);
+        // Purga local y servidor antes de la subida para que no sobreviva ningun alias TKxx antiguo.
         clearLocal(label);
         putLocal(label, src);
-        refreshSummary(label, src, scroll);
+        quietRefresh(label, src, scroll);
+        await deleteServer(label);
+        clearLocal(label);
+        putLocal(label, src);
+        quietRefresh(label, src, scroll);
         const url = await uploadServer(label, src);
-        refreshSummary(label, url, scroll);
+        quietRefresh(label, url, scroll);
       }catch(error){
         alert('No se pudo adjuntar la foto. ' + (error?.message || error));
         restoreScroll(scroll);
@@ -302,16 +371,18 @@
   }
   async function removePhoto(label, ev){
     stop(ev || {});
-    if(guardCanModify(null) !== true) return false;
+    if(guardCanModify(ev || null) !== true) return false;
     label = cleanLabel(label);
     if(!label) return false;
     if(!confirm('¿Eliminar la foto asociada a este ticket?')) return false;
     const scroll = captureScroll();
     try{
       setBusy(label, true);
+      clearLocal(label);
+      quietRefresh(label, '', scroll);
       await deleteServer(label);
       clearLocal(label);
-      refreshSummary(label, '', scroll);
+      quietRefresh(label, '', scroll);
     }catch(error){
       alert('No se pudo eliminar la foto. ' + (error?.message || error));
       restoreScroll(scroll);
@@ -319,11 +390,6 @@
       setBusy(label, false);
     }
     return false;
-  }
-  function rowLabelFromNode(node){
-    const row = node?.closest?.('.summary-item') || node;
-    const first = row?.querySelector?.(':scope > span:first-child');
-    return norm(first?.textContent || row?.dataset?.ceTicketLabel || '');
   }
   function labelFromControl(control){
     const onclick = norm(control?.getAttribute?.('onclick') || '');
@@ -336,13 +402,16 @@
     return cleanLabel(rowLabelFromNode(control));
   }
   function actionFromControl(control){
-    const txt = up((control?.textContent || '') + ' ' + (control?.title || '') + ' ' + (control?.getAttribute?.('onclick') || ''));
+    const txt = up((control?.textContent || '') + ' ' + (control?.title || '') + ' ' + (control?.getAttribute?.('aria-label') || '') + ' ' + (control?.getAttribute?.('onclick') || ''));
     if(/REMOVETICKETIMAGE|ELIMINAR|BORRAR|🗑/.test(txt)) return 'remove';
-    if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|📎/.test(txt)) return 'attach';
+    if(/UPLOADTICKETIMAGE|ADJUNTAR|INSERTAR|SUBIR|📎/.test(txt)) return 'attach';
     return '';
   }
+  function controlFromEvent(ev){
+    return ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button,#summaryTiendaTicket input.ticket-file-input,#ceBudgetLiteTooltipV307 input.ticket-file-input');
+  }
   function handleActivation(ev){
-    const control = ev.target?.closest?.('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button');
+    const control = controlFromEvent(ev);
     if(!control) return;
     const action = actionFromControl(control);
     if(!action) return;
@@ -369,8 +438,10 @@
             if(guardCanModify(evOrEncoded) !== true) return;
             setBusy(clean, true);
             const src = await compressImageFile(file);
-            clearLocal(clean); putLocal(clean, src); refreshSummary(clean, src, scroll);
-            const url = await uploadServer(clean, src); refreshSummary(clean, url, scroll);
+            clearLocal(clean); putLocal(clean, src); quietRefresh(clean, src, scroll);
+            await deleteServer(clean);
+            clearLocal(clean); putLocal(clean, src); quietRefresh(clean, src, scroll);
+            const url = await uploadServer(clean, src); quietRefresh(clean, url, scroll);
           }catch(error){ alert('No se pudo adjuntar la foto. ' + (error?.message || error)); restoreScroll(scroll); }
           finally{ setBusy(clean, false); try{ evOrEncoded.target.value = ''; }catch(_){ } }
         })();
@@ -386,10 +457,36 @@
     try{ window.removeTicketImageV164 = wrappedRemove; removeTicketImageV164 = wrappedRemove; }catch(_){ window.removeTicketImageV164 = wrappedRemove; }
     try{ window.removeTicketImageV202 = wrappedRemove; }catch(_){ }
   }
-  function install(){ wrapGlobals(); }
+  function injectStyle(){
+    if($(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #summaryTiendaTicket .ticket-actions button.ce-v17-photo-icon,
+      #ceBudgetLiteTooltipV307 .ticket-actions button.ce-v17-photo-icon{
+        width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;
+        padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+        font-size:16px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;
+      }
+      #summaryTiendaTicket .ticket-actions,
+      #ceBudgetLiteTooltipV307 .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;min-width:82px!important;}
+      #summaryTiendaTicket .ticket-actions img.ticket-thumb,
+      #ceBudgetLiteTooltipV307 .ticket-actions img.ticket-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;}
+    `;
+    document.head.appendChild(style);
+  }
+  function normalizeVisibleButtons(){
+    document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#ceBudgetLiteTooltipV307 .ticket-actions button').forEach(btn => {
+      const action = actionFromControl(btn);
+      if(action) iconizeButton(btn, action);
+    });
+  }
+  function install(){ injectStyle(); wrapGlobals(); normalizeVisibleButtons(); }
 
+  window.addEventListener('click', handleActivation, true);
   document.addEventListener('click', handleActivation, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
+  try{ new MutationObserver(() => setTimeout(normalizeVisibleButtons, 40)).observe(document.body, {childList:true, subtree:true}); }catch(_){ }
   [0,80,240,700,1500,3000].forEach(ms => setTimeout(install, ms));
-  window.ControlEventV17CalculosFotos = {install, attachPhoto, removePhoto, clearLocal, imageVariants};
+  window.ControlEventV17CalculosFotos = {install, attachPhoto, removePhoto, clearLocal, imageVariants, version:'v17_prod_calculos_fotos_sin_render'};
 })();
