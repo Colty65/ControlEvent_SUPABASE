@@ -1,12 +1,12 @@
-/* ControlEvent v17_prod - FIX11 puntual (cargado realmente desde index):
+/* ControlEvent v17_prod - FIX12 puntual (cargado realmente desde index):
    1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas; 3) visor ticket con detalle a la izquierda y Cerrar abajo derecha.
    No cambia versión. */
 (function(){
   'use strict';
-  if(window.__ceV17Fix11CierreMiniaturasVisor) return;
-  window.__ceV17Fix11CierreMiniaturasVisor = true;
+  if(window.__ceV17Fix12CierreMiniaturasVisor) return;
+  window.__ceV17Fix12CierreMiniaturasVisor = true;
 
-  const STYLE_ID='ceV17Fix10CierreMiniaturasVisorStyle';
+  const STYLE_ID='ceV17Fix12CierreMiniaturasVisorStyle';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -86,6 +86,51 @@
   }
   function splitParts(label){return cleanLabel(label).split('|').map(x=>norm(x)).filter(Boolean);}
   function fmtNum(v){return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(Number(v||0));}
+  function parseMoneyText(text){
+    let s=norm(text).replace(/[^0-9,.-]/g,'');
+    if(!s) return 0;
+    const lastComma=s.lastIndexOf(','), lastDot=s.lastIndexOf('.');
+    if(lastComma!==-1 && lastDot!==-1){
+      s=lastComma>lastDot?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+    }else if(lastComma!==-1){
+      s=s.replace(/\./g,'').replace(',','.');
+    }else{
+      const dots=(s.match(/\./g)||[]).length;
+      if(dots>1) s=s.replace(/\./g,'');
+    }
+    const n=Number(s); return Number.isFinite(n)?n:0;
+  }
+  function parseDomDetail(img){
+    const row=img?.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
+    const raw=img?.dataset?.ceV17Detail || row?.dataset?.ceV17Detail || '';
+    if(!raw) return null;
+    try{
+      const d=JSON.parse(raw);
+      if(!d || typeof d!=='object') return null;
+      const headers=Array.isArray(d.headers)?d.headers.map(x=>String(x??'')):[];
+      const lines=Array.isArray(d.lines)?d.lines:[];
+      if(!headers.length || !lines.length) return null;
+      return {
+        title:norm(d.title||''),
+        label:cleanLabel(d.label||row?.dataset?.ceV17Label||''),
+        store:norm(d.store||''),
+        ticket:norm(d.ticket||''),
+        total:Number(d.total||0),
+        headers,
+        lines
+      };
+    }catch(_){ return null; }
+  }
+  function tableFromDomDetail(detail){
+    const headers=detail?.headers||[];
+    const lines=Array.isArray(detail?.lines)?detail.lines:[];
+    const body=(lines.length?lines:[['Sin detalle']]).map(line=>{
+      const cells=Array.isArray(line)?line.map(x=>String(x??'')):String(line??'').split('|').map(x=>norm(x));
+      while(cells.length<headers.length) cells.push('');
+      return '<tr>'+cells.slice(0,Math.max(headers.length,cells.length)).map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>';
+    }).join('');
+    return '<table class="ce-v17-ticket-table-dom"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table>';
+  }
 
   function rowEventId(c){ return norm(c?.eventId??c?.event_id??c?.eventoId??c?.evento_id??c?.idEvento??c?.evento??''); }
   function rowBelongsEvent(c){ const ev=eventId(); const rid=rowEventId(c); return !ev || !rid || rid===ev; }
@@ -119,18 +164,28 @@
     const src=norm(img.currentSrc||img.src||img.dataset.ceV17Src||'');
     const row=img.closest('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
     const label=cleanLabel(img.dataset.ceV17Label||row?.dataset?.ceV17Label||row?.dataset?.ceTicketLabel||row?.innerText||'');
-    const tk=ticketToken(label)||norm(img.dataset.ceHf12Tk||img.dataset.ceHf10Tk||'').toUpperCase();
+    const domDetail=parseDomDetail(img);
+    const tk=ticketToken(label)||norm(domDetail?.ticket||img.dataset.ceHf12Tk||img.dataset.ceHf10Tk||'').toUpperCase();
     if(!src||!tk) return false;
     lastThumbForViewer=img; lastThumbAt=Date.now();
     stop(ev);
     closeTicketViewers();
     const rows=rowsForTicketLabel(label||tk);
-    const total=rows.length?rows.reduce((a,c)=>a+valueLine(c),0):Number((row?.querySelector?.('.pill')?.textContent||'').replace(/[^0-9,.-]/g,'').replace(',','.'))||0;
-    const store=splitParts(label)[0]||rows[0]&&storeName(rows[0])||'';
-    const lineRows=rows.length?rows.map(c=>{
-      const imp=valueLine(c);
-      return '<tr><td>'+esc(productName(c))+'</td><td>'+esc(fmtNum(units(c)))+'</td><td>'+esc(money(price(c)))+'</td><td>'+esc(money(imp))+'</td></tr>';
-    }).join(''):'<tr><td colspan="4">Sin líneas contables para este ticket.</td></tr>';
+    const rowPillTotal=parseMoneyText(row?.querySelector?.('.pill')?.textContent||'');
+    const rowsTotal=rows.length?rows.reduce((a,c)=>a+valueLine(c),0):0;
+    const detailTotal=domDetail&&Number.isFinite(domDetail.total)?Number(domDetail.total||0):0;
+    const total=detailTotal||rowsTotal||rowPillTotal||0;
+    const store=domDetail?.store||splitParts(label)[0]||rows[0]&&storeName(rows[0])||'';
+    let tableHtml='';
+    if(domDetail){
+      tableHtml=tableFromDomDetail(domDetail);
+    }else{
+      const lineRows=rows.length?rows.map(c=>{
+        const imp=valueLine(c);
+        return '<tr><td>'+esc(productName(c))+'</td><td>'+esc(fmtNum(units(c)))+'</td><td>'+esc(money(price(c)))+'</td><td>'+esc(money(imp))+'</td></tr>';
+      }).join(''):'<tr><td colspan="4">Sin líneas contables para este ticket.</td></tr>';
+      tableHtml='<table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+lineRows+'</tbody></table>';
+    }
     const modal=document.createElement('div');
     modal.id='ceV17TicketViewerFinal';
     modal.setAttribute('role','dialog');
@@ -141,11 +196,10 @@
         +'<div class="ce-v17-ticket-lines">'
           +'<div class="ce-v17-ticket-meta"><strong>'+esc(store)+'</strong><strong>'+esc(tk)+'</strong></div>'
           +'<div class="ce-v17-ticket-total">'+esc(money(total))+'</div>'
-          +'<div class="ce-v17-ticket-table-wrap"><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+lineRows+'</tbody></table></div>'
+          +'<div class="ce-v17-ticket-table-wrap">'+tableHtml+'</div>'
         +'</div>'
-        +'<div class="ce-v17-ticket-image"><img alt="Foto '+esc(tk)+'" src="'+esc(src)+'"></div>'
+        +'<div class="ce-v17-ticket-image"><img alt="Foto '+esc(tk)+'" src="'+esc(src)+'"><button type="button" class="outline small" data-ce-v17-ticket-close>✕ Cerrar</button></div>'
       +'</div>'
-      +'<div class="ce-v17-ticket-close-row"><button type="button" class="outline small" data-ce-v17-ticket-close>✕ Cerrar</button></div>'
     +'</div>';
     document.body.appendChild(modal);
     try{modal.querySelector('[data-ce-v17-ticket-close]')?.focus({preventScroll:true});}catch(_){ }
@@ -165,10 +219,11 @@
         });
         keepActions.classList.add('ticket-actions','ce-v17-doc-actions');
       }
-      const thumbs=Array.from(row.querySelectorAll('img.ticket-thumb,img.ce-v17-doc-thumb,img[src*="ticket-images"],img[src^="data:image/"]'));
+      const thumbs=Array.from(row.querySelectorAll('img.ce-v17-doc-thumb,img[src*="ticket-images"],img[src^="data:image/"]'));
+      thumbs.forEach(img=>{try{img.classList.add('ce-v17-doc-thumb'); img.classList.remove('ticket-thumb'); if(!img.dataset.ceV17Label && row.dataset.ceV17Label) img.dataset.ceV17Label=row.dataset.ceV17Label; if(!img.dataset.ceV17Detail && row.dataset.ceV17Detail) img.dataset.ceV17Detail=row.dataset.ceV17Detail;}catch(_){}});
       if(thumbs.length>1){
         const keep=thumbs[0];
-        keep.classList.add('ce-v17-doc-thumb','ticket-thumb');
+        keep.classList.add('ce-v17-doc-thumb'); keep.classList.remove('ticket-thumb');
         thumbs.slice(1).forEach(img=>{try{img.remove();}catch(_){img.style.setProperty('display','none','important');}});
       }
       row.querySelectorAll('.ticket-actions').forEach(actions=>{
@@ -195,8 +250,8 @@
     const st=document.createElement('style');
     st.id=STYLE_ID;
     st.textContent=`
-      #summaryTiendaTicket .summary-item img.ticket-thumb:nth-of-type(n+2),
-      #summaryTiendaTicket .ce-v17-doc-row img.ticket-thumb:nth-of-type(n+2),
+      #summaryTiendaTicket .summary-item img.ce-v17-doc-thumb:nth-of-type(n+2),
+      #summaryTiendaTicket .ce-v17-doc-row img.ce-v17-doc-thumb:nth-of-type(n+2),
       #summaryTiendaTicket .ticket-actions img:nth-of-type(n+2),
       #summaryTiendaTicket .ce-v17-doc-actions img:nth-of-type(n+2){display:none!important;}
       .ce-v17-rowdetail-close{pointer-events:auto!important;cursor:pointer!important;z-index:10000050!important;}
@@ -204,7 +259,7 @@
       #ceV17TicketViewerFinal .ce-v17-ticket-card{background:#fff!important;border-radius:14px!important;width:96vw!important;max-width:1420px!important;height:94vh!important;max-height:94vh!important;overflow:auto!important;padding:14px!important;border:2px solid #fb923c!important;display:flex!important;flex-direction:column!important;gap:14px!important;}
       #ceV17TicketViewerFinal h2{margin:0!important;text-align:center!important;color:#991b1b!important;font-size:24px!important;font-weight:950!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-grid{display:grid!important;grid-template-columns:minmax(320px,38%) 1fr!important;gap:14px!important;min-height:0!important;flex:1 1 auto!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-lines{border:1px solid #dbe4ee!important;border-radius:12px!important;overflow:auto!important;background:#fff!important;align-self:start!important;max-height:calc(94vh - 130px)!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-lines{border:1px solid #dbe4ee!important;border-radius:12px!important;overflow:auto!important;background:#fff!important;align-self:start!important;max-height:calc(94vh - 86px)!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-meta{display:flex!important;justify-content:space-between!important;gap:10px!important;align-items:center!important;background:#f8fafc!important;border-bottom:1px solid #e2e8f0!important;padding:10px!important;font-weight:950!important;color:#334155!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-total{padding:10px!important;font-weight:950!important;color:#0f172a!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-table-wrap{overflow:auto!important;}
@@ -212,10 +267,9 @@
       #ceV17TicketViewerFinal th,#ceV17TicketViewerFinal td{border-top:1px solid #e2e8f0!important;padding:7px!important;text-align:left!important;}
       #ceV17TicketViewerFinal th{background:#f8fafc!important;font-weight:950!important;position:sticky!important;top:0!important;}
       #ceV17TicketViewerFinal td:nth-child(n+2),#ceV17TicketViewerFinal th:nth-child(n+2){text-align:right!important;white-space:nowrap!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-image{display:flex!important;align-items:flex-start!important;justify-content:center!important;overflow:auto!important;min-height:0!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-image img{max-width:100%!important;max-height:calc(94vh - 130px)!important;object-fit:contain!important;border-radius:10px!important;background:#fff!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-close-row{position:sticky!important;bottom:0!important;display:flex!important;justify-content:flex-end!important;background:linear-gradient(to top,#fff 74%,rgba(255,255,255,0))!important;padding:12px 4px 4px!important;margin-top:auto!important;z-index:5!important;}
-      #ceV17TicketViewerFinal [data-ce-v17-ticket-close]{min-width:112px!important;min-height:40px!important;font-weight:950!important;font-size:15px!important;background:#fff!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-image{position:relative!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;overflow:auto!important;min-height:0!important;padding-bottom:8px!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-image img{max-width:100%!important;max-height:calc(94vh - 112px)!important;object-fit:contain!important;border-radius:10px!important;background:#fff!important;}
+      #ceV17TicketViewerFinal [data-ce-v17-ticket-close]{position:sticky!important;bottom:10px!important;align-self:flex-end!important;margin:8px 10px 0 auto!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;font-size:15px!important;background:#fff!important;z-index:8!important;box-shadow:0 8px 24px rgba(15,23,42,.20)!important;}
       @media(max-width:760px){#ceV17TicketViewerFinal .ce-v17-ticket-grid{grid-template-columns:1fr!important;}#ceV17TicketViewerFinal .ce-v17-ticket-lines{max-height:34vh!important;}#ceV17TicketViewerFinal .ce-v17-ticket-image img{max-height:45vh!important;}}
       #ceV104TicketDetail [data-ce-v104-close],#ceV103TicketDetail [data-ce-v103-close],#ceV102TicketDetail [data-ce-v102-close],#ceV101TicketDetail [data-ce-v101-close],#ceV100TicketDetail [data-ce-v100-close],#ceV96TicketDetail [data-ce-v96-close],#ceV40TicketPhotoModal .ce-v40-modal-close{position:fixed!important;right:calc(2vw + 24px)!important;bottom:calc(3vh + 16px)!important;top:auto!important;z-index:10000095!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;background:#fff!important;}
     `;
@@ -225,7 +279,7 @@
   function handleClick(ev){
     if(ev.target?.closest?.('.ce-v17-rowdetail-close,.ce-v17-rowdetail-head button,[aria-label="Cerrar"]')) return closeRowDetail(ev);
     if(ev.target?.closest?.('[data-ce-v17-ticket-close],[data-ce-v104-close],[data-ce-v103-close],[data-ce-v102-close],[data-ce-v101-close],[data-ce-v100-close],[data-ce-v96-close],.ce-v40-modal-close')) return closeTicketViewers(ev);
-    const img=ev.target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#summaryTiendaTicket img.ce-v17-doc-thumb');
+    const img=ev.target?.closest?.('#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*="ticket-images"],#summaryTiendaTicket img[src^="data:image/"]');
     if(img) return openTicketViewerFromThumb(img,ev);
   }
   function handleKey(ev){
@@ -241,15 +295,24 @@
     clearTimeout(mo.__t);
     mo.__t=setTimeout(()=>{
       sanitizeSummaryThumbs();
-      if(legacyModalOpen() && lastThumbForViewer && Date.now()-lastThumbAt<3000){
-        const img=lastThumbForViewer;
-        closeTicketViewers();
-        setTimeout(()=>openTicketViewerFromThumb(img,null),20);
+      if(legacyModalOpen()){
+        let img=(lastThumbForViewer && Date.now()-lastThumbAt<3000)?lastThumbForViewer:null;
+        if(!img){
+          const legacyImg=document.querySelector(modalRoots()+' img');
+          const legacySrc=norm(legacyImg?.currentSrc||legacyImg?.src||'');
+          if(legacySrc){
+            img=Array.from(document.querySelectorAll('#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*=\"ticket-images\"],#summaryTiendaTicket img[src^=\"data:image/\"]')).find(x=>norm(x.currentSrc||x.src||'')===legacySrc || norm(x.dataset.ceV17Src||'')===legacySrc) || null;
+          }
+        }
+        if(img){
+          closeTicketViewers();
+          setTimeout(()=>openTicketViewerFromThumb(img,null),20);
+        }
       }
     },40);
   });
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_){ }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,900,1800].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix11_cierre_miniaturas_visor_cargado'};
+  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v17_prod_fix12_visor_detalle_cierre_abajo'};
 })();

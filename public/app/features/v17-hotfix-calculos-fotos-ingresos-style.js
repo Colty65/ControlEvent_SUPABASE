@@ -1,5 +1,5 @@
 /* ControlEvent v17_prod - Cálculos por tienda/ticket: fotos con método tipo Documentos.
-   FIX9: gastos corrientes como comprado y Refrescar fuerza fotos. No cambia versión. */
+   FIX12: las miniaturas del cálculo abren visor propio con detalle completo; se evita que los visores antiguos intercepten el clic. No cambia versión. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
@@ -402,10 +402,21 @@
         total+=Number(r.v||0);
         const pending=!!r.pending; const donated=!!r.donated; const attachable=!!r.attachable&&!pending&&!donated&&!!ticketToken(label);
         const src=attachable?imageFor(label):''; const rowTip=tipForRow(r,label);
+        const detailPayload={
+          label,
+          title:rowTitle(r),
+          total:Number(r.v||0),
+          headers:Array.isArray(r.headers)?r.headers:[],
+          lines:Array.isArray(r.lines)?r.lines:[],
+          donated:!!r.donated,
+          pending:!!r.pending,
+          ticket:ticketToken(label),
+          store:splitParts(label)[0]||''
+        };
         const div=document.createElement('div');
         const gastosCorrientes=up(label).includes('GASTOS CORRIENTES');
         div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'')+(gastosCorrientes?' ce-v17-gastos-corrientes':'');
-        div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.setAttribute('role','button'); div.setAttribute('tabindex','0'); div.setAttribute('aria-label','Ver detalle');
+        div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.dataset.ceV17Detail=JSON.stringify(detailPayload); div.setAttribute('role','button'); div.setAttribute('tabindex','0'); div.setAttribute('aria-label','Ver detalle');
         const amountStyle=pending?' style="background:#fef2f2;color:#b91c1c"':(donated?' style="text-decoration:line-through"':'');
         const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label);
         const right=document.createElement('span'); right.className='ce-v17-doc-right'; right.innerHTML='<span class="pill"'+amountStyle+'>'+esc(money(r.v||0))+'</span>';
@@ -413,7 +424,7 @@
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
           const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
           if(src){
-            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; actions.appendChild(img);
+            const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; actions.appendChild(img);
             const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
           }else{
             const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
@@ -564,7 +575,7 @@
       #summaryTiendaTicket .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;white-space:nowrap!important;min-width:112px!important;}
       #summaryTiendaTicket .ticket-actions input.ticket-file-input,#summaryTiendaTicket .ticket-actions button:not([data-ce-v17-photo]):not(.ce-v17-doc-photo-btn){display:none!important;visibility:hidden!important;pointer-events:none!important;}
       #summaryTiendaTicket .ce-v17-doc-photo-btn{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:17px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;}
-      #summaryTiendaTicket .ticket-thumb.ce-v17-doc-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;}
+      #summaryTiendaTicket .ce-v17-doc-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;cursor:pointer!important;}
       #summaryTiendaTicket .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
       #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;}
       #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;}
@@ -636,5 +647,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix9_gastos_corrientes_refresh_fotos'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix12_visor_detalle_miniaturas'};
 })();
