@@ -1,11 +1,11 @@
-/* ControlEvent v16_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
+/* ControlEvent v17_prod - BACKUP con EVENTO_ID real, sin EVxxx para eventos.
    - EVENTOS ya no exporta EVENTO_CODIGO.
    - En hojas relacionales, EVENTO_CODIGO contiene el id real de ce_eventos.
    - La importación acepta el nuevo formato y conserva EVENTO_ID. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV841BackupEventIdFormat';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -175,7 +175,7 @@
     return String(value);
   }
   function decodeBase64UrlText(value){
-    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i, '');
+    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i, '').split('.v')[0];
     if(!raw) return '';
     try{ const b64 = raw.replace(/-/g,'+').replace(/_/g,'/'); const padded = b64 + '='.repeat((4 - b64.length % 4) % 4); return decodeURIComponent(Array.prototype.map.call(atob(padded), ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join('')); }catch(_){ return ''; }
   }

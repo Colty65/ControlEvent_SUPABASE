@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
+/* ControlEvent v17_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
    Parche acotado sobre v4.0_prod:
    - No toca login.
    - No toca INFOEVENTO/BACKUP salvo textos de version globales.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV40ProdPhotoSync';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -78,7 +78,7 @@
     return changed;
   }
   function decodeBase64UrlText(value){
-    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'').split('.v')[0];
     if(!raw) return '';
     try{
       const b64 = raw.replace(/-/g,'+').replace(/_/g,'/');
@@ -353,7 +353,7 @@
       const payload = await res.json().catch(() => ({}));
       const images = payload && payload.images ? payload.images : {};
       Object.entries(images).forEach(([rawKey, value]) => { if(addImageVariants(rawKey, value)) changed = true; });
-    }catch(error){ console.warn('[ControlEvent v16_prod] No se pudieron hidratar fotos.', error); }
+    }catch(error){ console.warn('[ControlEvent v17_prod] No se pudieron hidratar fotos.', error); }
     finally{ hydrateBusy = false; }
     return changed;
   }

@@ -1,10 +1,10 @@
-/* ControlEvent v16_prod - Hidratación puntual de fotos TKxx al volver a un evento.
+/* ControlEvent v17_prod - Hidratación puntual de fotos TKxx al volver a un evento.
    Objetivo: si ce_ticket_images ya está limpia, que las miniaturas aparezcan al volver al evento
    sin tener que pulsar Adjuntar ni Refrescar. Sin setInterval ni barridos continuos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV821TicketImagesVisibleAfterEvent';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -38,7 +38,7 @@
     return out;
   }
   function decodeBase64UrlText(value){
-    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'').split('.v')[0];
     if(!raw) return '';
     try{
       const b64 = raw.replace(/-/g,'+').replace(/_/g,'/');
@@ -129,7 +129,7 @@
         if(res.ok && data && data.images){
           Object.entries(data.images).forEach(([k,v]) => { if(putImage(k,v,ev)) changed = true; });
         }
-      }catch(err){ console.warn('[ControlEvent v16_prod] No se pudieron traer fotos del evento.', err); }
+      }catch(err){ console.warn('[ControlEvent v17_prod] No se pudieron traer fotos del evento.', err); }
       try{ if(window.ControlEventV82TicketScopeFix && typeof window.ControlEventV82TicketScopeFix.normalizeStore === 'function') window.ControlEventV82TicketScopeFix.normalizeStore(); }catch(_){ }
       refreshVisibleSummary();
       return changed;

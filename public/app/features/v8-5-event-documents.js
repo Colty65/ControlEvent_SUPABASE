@@ -1,12 +1,12 @@
-/* ControlEvent v16_prod - Documentos del evento (fase 1: menú, gestión y foto DOCXX).
+/* ControlEvent v17_prod - Documentos del evento (fase 1: menú, gestión y foto DOCXX).
    - Nueva pantalla "Documentos" con fecha, descripción y foto.
    - RW/GD pueden mantener en eventos En curso; RO visualiza y puede ampliar foto.
    - Las imágenes se codifican como EVENTO_ID|DOCXX, empezando en DOC01 por evento.
    - No toca todavía BACKUP ni INFOEVENTO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV85EventDocuments';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -126,7 +126,7 @@
       if(!s.eventDocumentMeta) s.eventDocumentMeta = {};
       s.eventDocumentMeta[found.id] = {fecha: found.fecha, descripcion: found.descripcion};
       saveNow({skipDocumentPersist:true});
-      persistDocumentsForEvent(found.eventId).catch(error => console.warn('[ControlEvent v16_prod] No se pudo materializar DOC recuperado:', error?.message || error));
+      persistDocumentsForEvent(found.eventId).catch(error => console.warn('[ControlEvent v17_prod] No se pudo materializar DOC recuperado:', error?.message || error));
       return found;
     }
     return null;
@@ -210,7 +210,7 @@
     // Ese guardado completo podía reconstruir el evento desde imágenes y borrar fecha/texto.
     if(typeof fn === 'function' && !options.skipDocumentPersist) safe(() => fn(), null);
     if(!options.skipDocumentPersist){
-      persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v16_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
+      persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v17_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
     }
   }
 
@@ -604,12 +604,16 @@
       imageUrl = uploaded.url || uploaded.public_url || uploaded.pathname || uploaded.path || dataUrl;
       dataUrl = imageUrl;
     }catch(error){
-      console.warn('[ControlEvent v16_prod] No se pudo subir DOC ahora, queda en estado local/protegido:', error?.message || error);
+      console.warn('[ControlEvent v17_prod] No se pudo subir DOC ahora, queda en estado local/protegido:', error?.message || error);
       status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
     const id = `${eventId}|${code}`;
-    s.ticketImages[docKey(eventId, code)] = dataUrl;
+    const key = docKey(eventId, code);
+    delete s.ticketImages[key];
+    if(s.ticketImageRefs) delete s.ticketImageRefs[key];
+    s.ticketImages[key] = dataUrl;
+    if(s.ticketImageRefs) s.ticketImageRefs[key] = {key, url:imageUrl, pathname:imageUrl};
     s.eventDocumentMeta[`${eventId}|${code}`] = {fecha, descripcion};
     s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== id);
     s.eventDocuments.push({
@@ -625,6 +629,8 @@
     });
     saveNow({skipDocumentPersist:true});
     await persistDocumentsForEvent(eventId);
+    const fileInput = $('eventDocNewFile');
+    if(fileInput) fileInput.value = '';
     renderEventDocuments();
     status('Documento añadido correctamente.', 'ok');
   }
@@ -642,11 +648,15 @@
       imageUrl = uploaded.url || uploaded.public_url || uploaded.pathname || uploaded.path || dataUrl;
       dataUrl = imageUrl;
     }catch(error){
-      console.warn('[ControlEvent v16_prod] No se pudo subir DOC ahora, queda local:', error?.message || error);
+      console.warn('[ControlEvent v17_prod] No se pudo subir DOC ahora, queda local:', error?.message || error);
       status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
-    s.ticketImages[docKey(doc.eventId, code)] = dataUrl;
+    const key = docKey(doc.eventId, code);
+    delete s.ticketImages[key];
+    if(s.ticketImageRefs) delete s.ticketImageRefs[key];
+    s.ticketImages[key] = dataUrl;
+    if(s.ticketImageRefs) s.ticketImageRefs[key] = {key, url:imageUrl, pathname:imageUrl};
     doc.imageUrl = imageUrl;
     doc.imageKey = code;
     doc.updatedAt = new Date().toISOString();
@@ -664,11 +674,13 @@
     if(!confirm('¿Eliminar solo la foto? Se mantiene la ficha del documento.')) return;
     status('Eliminando foto del documento...', 'working');
     await deleteDocumentImage(doc.eventId, code).catch(error => {
-      console.warn('[ControlEvent v16_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
+      console.warn('[ControlEvent v17_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
       throw error;
     });
     const s = ensureStateShape();
-    delete s.ticketImages[docKey(doc.eventId, code)];
+    const key = docKey(doc.eventId, code);
+    delete s.ticketImages[key];
+    if(s.ticketImageRefs) delete s.ticketImageRefs[key];
     doc.imageUrl = '';
     doc.updatedAt = new Date().toISOString();
     saveNow({skipDocumentPersist:true});
@@ -686,11 +698,13 @@
     if(imageFor(doc)){
       await deleteDocumentImage(doc.eventId, code).catch(error => {
         // HOTFIX40: si el servidor no borra la imagen, no dejamos bloqueado el documento.
-        console.warn('[ControlEvent v16_prod] No se pudo eliminar imagen en servidor; se elimina localmente:', error?.message || error);
+        console.warn('[ControlEvent v17_prod] No se pudo eliminar imagen en servidor; se elimina localmente:', error?.message || error);
       });
     }
     const s = ensureStateShape();
-    delete s.ticketImages[docKey(doc.eventId, code)];
+    const key = docKey(doc.eventId, code);
+    delete s.ticketImages[key];
+    if(s.ticketImageRefs) delete s.ticketImageRefs[key];
     delete s.eventDocumentMeta[String(doc.id || `${doc.eventId}|${code}`)];
     s.eventDocuments = s.eventDocuments.filter(item => String(item.id || '') !== String(docId));
     saveNow({skipDocumentPersist:true});
@@ -861,7 +875,7 @@
     }
     if(openDocFromEvent(event)) return false;
     const repl = target.closest('[data-doc-replace]');
-    if(repl){ event.preventDefault(); const input = document.querySelector(`input[data-doc-upload-input="${cssEscape(repl.dataset.docReplace)}"]`); input?.click(); return false; }
+    if(repl){ event.preventDefault(); const input = document.querySelector(`input[data-doc-upload-input="${cssEscape(repl.dataset.docReplace)}"]`); if(input) input.value = ''; input?.click(); return false; }
     const remImg = target.closest('[data-doc-remove-image]');
     if(remImg){ event.preventDefault(); event.stopPropagation(); removeImage(remImg.dataset.docRemoveImage).catch(error => { alert('No se pudo eliminar la foto: ' + (error?.message || error)); status('Error eliminando foto.', 'bad'); }); return false; }
     const save = target.closest('[data-doc-save]');
@@ -886,7 +900,7 @@
     if(target.matches?.('input[data-doc-upload-input]')){
       const id = target.dataset.docUploadInput;
       const file = target.files?.[0] || null;
-      replaceImage(id, file).catch(error => { alert('No se pudo reemplazar la foto: ' + (error?.message || error)); status('Error actualizando foto.', 'bad'); });
+      replaceImage(id, file).catch(error => { alert('No se pudo reemplazar la foto: ' + (error?.message || error)); status('Error actualizando foto.', 'bad'); }).finally(() => { try{ target.value = ''; }catch(_){ } });
       return;
     }
     if(target.id === 'selectedEvent'){

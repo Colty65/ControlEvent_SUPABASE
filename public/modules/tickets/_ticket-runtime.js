@@ -29,6 +29,24 @@ export function stateKey(label, eventId = selectedEventId()){
   return `${eventId}|${clean}`;
 }
 
+export function imageKeyCandidates(label, eventId = selectedEventId()){
+  const clean = normalizeLabel(label);
+  const ev = String(eventId || '').trim();
+  const stripped = ev && clean.startsWith(`${ev}|`) ? clean.slice(ev.length + 1).trim() : clean;
+  const out = [];
+  const add = value => {
+    const v = normalizeLabel(value);
+    if(v && !out.includes(v)) out.push(v);
+  };
+  [clean, stripped, stateKey(clean, ev), stateKey(stripped, ev), ev ? `${ev}|${clean}` : '', ev ? `${ev}|${stripped}` : ''].forEach(add);
+  const ingreso = stripped.match(/^INGRESO[:|]([^|\s]+)/i);
+  if(ingreso){
+    const id = ingreso[1];
+    [`INGRESO:${id}`, `INGRESO|${id}`, ev ? `${ev}|INGRESO:${id}` : '', ev ? `${ev}|INGRESO|${id}` : '', ev ? `INGRESO:${ev}|${id}` : ''].forEach(add);
+  }
+  return out;
+}
+
 export function getImage(label, eventId = selectedEventId()){
   const app = resolveApp();
   const images = app?.state?.ticketImages || window.state?.ticketImages || {};
@@ -57,10 +75,12 @@ export function removeImage(label, eventId = selectedEventId()){
   const app = resolveApp();
   const state = app?.state || window.state;
   if(!state?.ticketImages) return false;
-  const key = stateKey(label, eventId);
-  delete state.ticketImages[key];
-  delete state.ticketImages[normalizeLabel(label)];
-  lastOperation = {type:'remove', label:normalizeLabel(label), key, at:Date.now()};
+  const keys = imageKeyCandidates(label, eventId);
+  keys.forEach(key => {
+    if(state.ticketImages) delete state.ticketImages[key];
+    if(state.ticketImageRefs) delete state.ticketImageRefs[key];
+  });
+  lastOperation = {type:'remove', label:normalizeLabel(label), key:keys[0] || stateKey(label, eventId), keys, at:Date.now()};
   window.dispatchEvent(new CustomEvent('controlevent:ticket-image-changed', {detail:lastOperation}));
   return true;
 }
@@ -110,6 +130,7 @@ export function installTicketRuntime(){
     getImage,
     setImage,
     removeImage,
+    imageKeyCandidates,
     upload,
     remove,
     normalizeLabel,

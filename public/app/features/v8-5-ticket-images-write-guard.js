@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod FIX13 - guardia de escritura ce_ticket_images.
+/* ControlEvent v17_prod FIX13 - guardia de escritura ce_ticket_images.
    Evita que migraciones antiguas/locales suban fotos al abrir la pantalla de login
    con un selectedEventId obsoleto y creen event_id huérfanos. */
 (function(){
@@ -8,7 +8,7 @@
   window[INSTALLED] = true;
 
   const norm = value => String(value ?? '').trim();
-  const isTicketImagesPost = (url, method) => /\/api\/ticket-images(?:$|\?)/i.test(String(url || '')) && String(method || 'GET').toUpperCase() === 'POST';
+  const isTicketImagesWrite = (url, method) => /\/api\/ticket-images(?:$|\?)/i.test(String(url || '')) && ['POST','DELETE'].includes(String(method || 'GET').toUpperCase());
   const jsonResponse = (status, body) => new Response(JSON.stringify(body || {}), {status, headers:{'Content-Type':'application/json'}});
 
   function stateRef(){
@@ -34,7 +34,16 @@
     if(!body || typeof body !== 'string') return {};
     try{ return JSON.parse(body); }catch(_){ return {}; }
   }
-  function shouldBlockUpload(payload){
+  function decodeQuery(url){
+    try{
+      const parsed = new URL(String(url || ''), window.location.href);
+      return {eventId:parsed.searchParams.get('eventId') || '', key:parsed.searchParams.get('key') || ''};
+    }catch(_){ return {}; }
+  }
+  function requestPayload(url, init){
+    return {...decodeQuery(url), ...decodeBody(init || {})};
+  }
+  function shouldBlockWrite(payload){
     const eventId = norm(payload && payload.eventId) || selectedEventId();
     if(!authenticated()) return {block:true, reason:'not_authenticated', eventId};
     if(!eventId) return {block:true, reason:'empty_event_id', eventId};
@@ -51,12 +60,12 @@
     const wrapped = function(input, init){
       const url = String(typeof input === 'string' ? input : (input && input.url) || '');
       const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
-      if(isTicketImagesPost(url, method)){
-        const payload = decodeBody(init || {});
-        const check = shouldBlockUpload(payload);
+      if(isTicketImagesWrite(url, method)){
+        const payload = requestPayload(url, init || {});
+        const check = shouldBlockWrite(payload);
         if(check.block){
-          try{ console.warn('[ControlEvent v8.5 FIX13/FIX26] POST /api/ticket-images bloqueado:', check); }catch(_){ }
-          return Promise.resolve(jsonResponse(409, {ok:false, blocked:true, error:'Subida de foto bloqueada: evento no valido o usuario no autenticado.', detail:check}));
+          try{ console.warn('[ControlEvent v17_prod] Escritura /api/ticket-images bloqueada:', method, check); }catch(_){ }
+          return Promise.resolve(jsonResponse(409, {ok:false, blocked:true, error:'Operacion de foto bloqueada: evento no valido o usuario no autenticado.', detail:check}));
         }
         const headers = (()=>{ try{ return init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : {...(init?.headers||{})}; }catch(_){ return {}; } })();
         headers['X-ControlEvent-Write-Scope'] = 'ticket-image-v8-5-fix26';
@@ -68,5 +77,5 @@
     window.fetch = wrapped;
   }
 
-  window.ControlEventV85TicketImagesWriteGuard = {version:'v8.5_prod FIX13', authenticated, liveEventIds, selectedEventId};
+  window.ControlEventV85TicketImagesWriteGuard = {version:'v17_prod ticket-images write guard', authenticated, liveEventIds, selectedEventId};
 })();

@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v17_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV469FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -114,7 +114,14 @@
   }
   async function deleteReceiptFromServer(id){
     const eventId = selectedId(); if(!eventId || !id) return;
-    try{ await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}&key=${encodeURIComponent(imageKeyOnly(id))}`, {method:'DELETE'}); }catch(_){ }
+    const res = await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}&key=${encodeURIComponent(imageKeyOnly(id))}`, {
+      method:'DELETE',
+      headers:{'X-ControlEvent-Write-Scope':'ticket-image-v8-5-fix26'}
+    });
+    if(!res.ok){
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.error || payload.message || 'No se pudo eliminar el justificante en servidor.');
+    }
   }
   async function hydrateEventReceipts(force){
     const eventId = selectedId(); if(!eventId) return;
@@ -284,7 +291,9 @@
       try{
         const file = input.files && input.files[0]; if(!file) return;
         if(!/^image\//i.test(file.type || '')){ alert('Selecciona una imagen para el justificante.'); return; }
+        input.value = '';
         const src = await readImageAsDataUrl(file);
+        deleteReceiptLocal(id);
         setReceiptLocal(id, src); compactIngresoReceipts(); renderNow(); restoreScroll(scroll);
         try{ const url = await uploadReceiptToServer(id, src); if(url) setReceiptLocal(id, url, {key:primaryKey(id), url, pathname:url}); }catch(error){ console.warn('[v50.1] justificante no subido, queda copia local/estado', error); }
         saveNow();
@@ -300,7 +309,8 @@
     if(isLockedSafe()){ alert('Evento finalizado. No se puede modificar.'); return stop(ev || {}); }
     if(!confirm('¿Eliminar el justificante de este ingreso?')) return stop(ev || {});
     const scroll = captureScroll();
-    deleteReceiptLocal(id); await deleteReceiptFromServer(id); saveNow(); renderNow(); restoreScroll(scroll);
+    try{ await deleteReceiptFromServer(id); }catch(error){ alert('No se pudo eliminar el justificante en servidor. ' + (error?.message || error)); restoreScroll(scroll); return stop(ev || {}); }
+    deleteReceiptLocal(id); saveNow(); renderNow(); restoreScroll(scroll);
     [80,220,520,1000].forEach(ms => setTimeout(() => { compactIngresoReceipts(); enrichOpenTooltips(); restoreScroll(scroll); }, ms));
     return stop(ev || {});
   }

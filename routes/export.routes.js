@@ -5,8 +5,8 @@ import { getState } from '../services/state.service.js';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v16_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v16_prod';
+const BACKUP_VERSION = 'ControlEvent v17_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v17_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -253,7 +253,7 @@ function ticketImageSource(value){
   return '';
 }
 function decodeBase64UrlText(value){
-  const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+  const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'').split('.v')[0];
   if(!raw) return '';
   try{
     if(typeof Buffer !== 'undefined') return Buffer.from(raw.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString('utf8');

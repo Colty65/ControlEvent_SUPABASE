@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod OPT2G - GRAFICAS: solo renderer V46 estricto.
+/* ControlEvent v17_prod OPT2G - GRAFICAS: solo renderer V46 estricto.
    Corrige el caso en el que se cuela la gráfica antigua de 2 quesos de ancho.
    La única gráfica aceptada en #eventChartWrap debe contener .ce-v46-pies con 6 tarjetas.
 */
@@ -7,7 +7,7 @@
   if(window.__ceV16Opt2GInstalled) return;
   window.__ceV16Opt2GInstalled = true;
 
-  const VERSION = 'v16_opt_2g';
+  const VERSION = 'v17_prod_opt_2g';
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
   const now = () => Date.now();
@@ -209,8 +209,8 @@
     if(!eventHasAnyData() && cachedHtml){ holdCached('wait-data-' + (reason || '')); scheduleFinal('wait-data', 360); return; }
     metrics.finalRuns++;
     runningFinal = true;
-    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v16_opt_2g_' + (reason || 'final')}); }
-    catch(err){ console.warn('[v16_opt_2g] render final gráficas', err); }
+    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v17_prod_opt_2g_' + (reason || 'final')}); }
+    catch(err){ console.warn('[v17_prod_opt_2g] render final gráficas', err); }
     finally{ runningFinal = false; }
     const html = rawGet(w) || '';
     if(!commitStrict(html, reason || 'final')){

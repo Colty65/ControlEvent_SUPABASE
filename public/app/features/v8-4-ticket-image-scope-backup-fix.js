@@ -1,9 +1,9 @@
-/* ControlEvent v16_prod - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
+/* ControlEvent v17_prod - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
    Sin intervalos: normaliza solo en carga, cambio de evento, refresco, foto cambiada o descarga. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v16_prod';
-  const VERSION_FILE = 'ControlEvent_v16_prod';
+  const VERSION = 'ControlEvent v17_prod';
+  const VERSION_FILE = 'ControlEvent_v17_prod';
   const INSTALLED = '__ceV82TicketScopeFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -22,7 +22,7 @@
     return '';
   }
   function decodeBase64UrlText(value){
-    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'');
+    const raw = norm(value).replace(/\.[a-z0-9]+(?:\?.*)?$/i,'').split('.v')[0];
     if(!raw) return '';
     try{
       const b64 = raw.replace(/-/g,'+').replace(/_/g,'/');

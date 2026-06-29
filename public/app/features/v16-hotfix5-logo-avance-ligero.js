@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v17_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    - No cambia versión.
    - Evita los handlers antiguos del logo que disparaban observers pesados.
    - Muestra un globo propio, efímero, con colores fijos y cierre fácil. */

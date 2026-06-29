@@ -20,8 +20,8 @@ export async function uploadImage({ eventId, key, dataUrl, eventSnapshot } = {})
 }
 
 export async function deleteImage({ eventId, key } = {}) {
-  await deleteTicketImageDb({ eventId: eventId || '', key: key || '' });
-  return { ok: true };
+  const result = await deleteTicketImageDb({ eventId: eventId || '', key: key || '' });
+  return { ok: true, ...(result || {}) };
 }
 
 export async function deleteEventImages({ eventId } = {}) {

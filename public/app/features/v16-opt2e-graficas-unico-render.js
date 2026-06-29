@@ -1,4 +1,4 @@
-/* ControlEvent v16_prod OPT2E - GRAFICAS: un solo pintado final sin retemblores.
+/* ControlEvent v17_prod OPT2E - GRAFICAS: un solo pintado final sin retemblores.
    Alcance cerrado: solo estabilización visual de GRAFICAS durante cambio de evento.
    - No cambia planificación, compras, ingresos, documentos, tickets ni avance.
    - Mantiene la última gráfica válida durante el cambio.
@@ -10,7 +10,7 @@
   if(window.__ceV16Opt2EInstalled) return;
   window.__ceV16Opt2EInstalled = true;
 
-  const VERSION = 'v16_opt_2e';
+  const VERSION = 'v17_prod_opt_2e';
   const $ = id => document.getElementById(id);
   const txt = v => String(v == null ? '' : v).trim();
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -210,7 +210,7 @@
     allowDirectCommit = true;
     metrics.finalRenders++;
     try{
-      fn.call(window.ControlEventV434 || window.ControlEventV462 || window, {force:true, reason:'v16_opt_2e_final'});
+      fn.call(window.ControlEventV434 || window.ControlEventV462 || window, {force:true, reason:'v17_prod_opt_2e_final'});
       const html = rawGet(w) || '';
       if(looksChart(html) && !looksBlank(html)){
         w.classList.remove('ce-opt2e-frozen');
@@ -226,7 +226,7 @@
         holdCached();
         setTimeout(() => finalPaint('retry-after-blank'), 380);
       }
-    }catch(err){ console.warn('[v16_opt_2e] final render', err); }
+    }catch(err){ console.warn('[v17_prod_opt_2e] final render', err); }
     finally{ allowDirectCommit = false; queuedHtml = ''; }
   }
 
