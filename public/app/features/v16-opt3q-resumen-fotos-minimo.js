@@ -9,7 +9,7 @@
 
   const SCOPE = 'ticket-image-v8-5-fix23';
   const ROOT_ID = 'summaryTiendaTicket';
-  const metrics = window.ControlEventOpt3Q = {version:'v16_opt_3s', deletes:0, uploads:0, reloads:0, busy:false, lastLabel:'', lastError:'', installedAt:new Date().toISOString()};
+  const metrics = window.ControlEventOpt3Q = {version:'v16_opt_3t', deletes:0, uploads:0, reloads:0, busy:false, lastLabel:'', lastError:'', installedAt:new Date().toISOString()};
   const $ = id => document.getElementById(id);
   const clean = v => String(v == null ? '' : v).trim();
   const norm = v => clean(v).replace(/\s+/g,' ');
@@ -163,6 +163,11 @@
     metrics.busy = !!value;
     const root = $(ROOT_ID); if(root) root.classList.toggle('ce-opt3q-busy', !!value);
   }
+  function emitTicketImageChanged(label){
+    try{
+      window.dispatchEvent(new CustomEvent('controlevent:ticket-image-changed', {detail:{eventId:eventId(), key:label, tk:ticketToken(label), reason:'v16_opt_3t'}}));
+    }catch(_){ }
+  }
   async function remove(labelOrEncoded){
     const label = decode(labelOrEncoded || '');
     if(!label || !eventId()) return false;
@@ -173,10 +178,11 @@
       await apiDelete(label);
       purgeLocal(label);
       await reloadImagesAndRender();
+      emitTicketImageChanged(label);
       metrics.deletes++;
     }catch(err){
       metrics.lastError = err?.message || String(err);
-      console.error('[v16_opt_3s] eliminar foto', err);
+      console.error('[v16_opt_3t] eliminar foto', err);
       alert('No se pudo eliminar la foto: ' + metrics.lastError);
     }finally{ setBusy(false); }
     return false;
@@ -192,10 +198,11 @@
       if(uploaded?.image) upsertLocalImage(uploaded.image);
       try{ window.ControlEventOpt3F?.renderNow?.(true); }catch(_){ }
       await reloadImagesAndRender();
+      emitTicketImageChanged(label);
       metrics.uploads++;
     }catch(err){
       metrics.lastError = err?.message || String(err);
-      console.error('[v16_opt_3s] adjuntar foto', err);
+      console.error('[v16_opt_3t] adjuntar foto', err);
       alert('No se pudo adjuntar la foto: ' + metrics.lastError);
     }finally{ setBusy(false); }
     return false;
@@ -259,7 +266,8 @@
     }
     const totalLabel = row.donated ? 'TOTAL ESTIMADO' : 'TOTAL';
     const modal = document.createElement('div'); modal.className = 'ce-opt3q-info-modal';
-    modal.innerHTML = `<div class="ce-opt3q-info-card" role="dialog" aria-modal="true"><div class="ce-opt3q-info-head"><div><h3>${esc(title)}</h3><p>${esc(row.key || '')}</p></div><button type="button" class="ce-opt3q-info-close" aria-label="Cerrar">×</button></div><div class="ce-opt3q-info-total"><span>${esc(totalLabel)}</span><strong>${esc(money(row.v || 0))}</strong></div>${body}</div>`;
+    const cardClass = 'ce-opt3q-info-card' + (row.pending ? ' ce-opt3q-pending' : '');
+    modal.innerHTML = `<div class="${cardClass}" role="dialog" aria-modal="true"><div class="ce-opt3q-info-head"><div><h3>${esc(title)}</h3><p>${esc(row.key || '')}</p></div><button type="button" class="ce-opt3q-info-close" aria-label="Cerrar">×</button></div><div class="ce-opt3q-info-total"><span>${esc(totalLabel)}</span><strong>${esc(money(row.v || 0))}</strong></div>${body}</div>`;
     modal.addEventListener('click', ev => { if(ev.target === modal || ev.target.closest('.ce-opt3q-info-close')) modal.remove(); }, true);
     document.body.appendChild(modal);
   }
@@ -309,6 +317,9 @@
       .ce-opt3q-info-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;margin-bottom:8px;padding-bottom:8px;}
       .ce-opt3q-info-head h3{margin:0;font-size:18px;font-weight:950;color:#0f172a}.ce-opt3q-info-head p{margin:4px 0 0;font-weight:850;color:#334155}.ce-opt3q-info-close{border:0;background:#0f172a;color:#fff;border-radius:999px;width:46px;height:46px;font-size:30px;font-weight:950;line-height:1;cursor:pointer;}
       .ce-opt3q-info-total{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#e0f2fe;border-radius:12px;padding:8px 10px;margin-bottom:8px;font-weight:950;}
+      .ce-opt3q-info-card.ce-opt3q-pending{border-color:#ef4444!important;background:#fef2f2!important;}
+      .ce-opt3q-info-card.ce-opt3q-pending .ce-opt3q-info-head h3,.ce-opt3q-info-card.ce-opt3q-pending .ce-opt3q-info-head p{color:#dc2626!important;}
+      .ce-opt3q-info-card.ce-opt3q-pending .ce-opt3q-info-total{background:#fef2f2!important;color:#dc2626!important;}
       .ce-opt3q-table-wrap{overflow:auto;border:1px solid #dbe4ee;border-radius:12px}.ce-opt3q-table{border-collapse:separate;border-spacing:0;width:100%;min-width:680px;font-size:13px}.ce-opt3q-table th,.ce-opt3q-table td{padding:7px 9px;border-bottom:1px solid #e2e8f0;border-right:1px solid #eef2f7;text-align:left;white-space:nowrap}.ce-opt3q-table th{position:sticky;top:0;background:#f1f5f9;font-weight:950;z-index:1}.ce-opt3q-table td:nth-last-child(-n+3),.ce-opt3q-table th:nth-last-child(-n+3){text-align:right}.ce-opt3q-table td:first-child{font-weight:850}.ce-opt3q-pre{white-space:pre-wrap;margin:0;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;}
       #ceV40TicketPhotoModal .ce-v40-modal-close,
       #ceV310PhotoViewer .ce-v310-photo-close,
@@ -339,6 +350,7 @@
   window.addEventListener('touchend', onInfoClick, {capture:true, passive:false});
   document.addEventListener('click', onInfoClick, {capture:true, passive:false});
   document.addEventListener('touchend', onInfoClick, {capture:true, passive:false});
+  window.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeInfoModals(); }, true);
   const mo = new MutationObserver(() => setTimeout(fixCloseInline, 30));
   try{ mo.observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(_){ }
   ['DOMContentLoaded','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:module-mounted','controlevent:rendered','focus'].forEach(name => {

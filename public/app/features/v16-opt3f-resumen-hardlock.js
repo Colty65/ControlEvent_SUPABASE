@@ -7,7 +7,7 @@
   if(window.__ceV16Opt3FResumenHardlock) return;
   window.__ceV16Opt3FResumenHardlock = true;
 
-  const VERSION = 'v16_opt_3i_core';
+  const VERSION = 'v16_opt_3t_core';
   const ROOT_ID = 'summaryTiendaTicket';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
@@ -25,6 +25,12 @@
   const readyToWork = () => !authVisible() && !!evId();
   const isVisible = el => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
   const isResumenVisible = () => readyToWork() && isVisible($(ROOT_ID));
+  const isEventLoading = () => {
+    try{
+      const body = document.body;
+      return !!(body && (body.classList.contains('ce-event-loading-fix48') || body.classList.contains('ce-hf47-event-loading')));
+    }catch(_){ return false; }
+  };
   const money = v => { try{ if(typeof window.money === 'function') return window.money(num(v)); }catch(_){} return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(num(v)); };
   const nfmt = v => { try{ return new Intl.NumberFormat('es-ES',{maximumFractionDigits:2}).format(num(v)); }catch(_){ return String(v || 0); } };
 
@@ -63,7 +69,7 @@
     return [evId(), s.summaryTiendaSort || 'tienda', listLen(s.compras), listLen(s.productos), listLen(s.tiendas), listLen(s.personas), imageStamp()].join('|');
   }
 
-  let ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
+  let ticketImageIndexCache = {stamp:'', eventId:'', map:new Map(), exact:new Map()};
   let rowsCache = {stamp:'', eventId:'', rows:null, at:0};
 
   const metrics = window.ControlEventOpt3F = {
@@ -82,7 +88,14 @@
     lastEventId: '',
     lightSkips: 0,
     imageIndexBuilds: 0,
-    rowsCacheHits: 0
+    rowsCacheHits: 0,
+    clearCaches(){
+      ticketImageIndexCache = {stamp:'', eventId:'', map:new Map(), exact:new Map()};
+      rowsCache = {stamp:'', eventId:'', rows:null, at:0};
+      this.lastSig = '';
+      try{ clearTimeout(timer); }catch(_){ }
+      return true;
+    }
   };
 
   function byId(listName, id){
@@ -120,37 +133,65 @@
     const id = evId();
     const s = stateRef();
     const stamp = id + '|' + imageStamp();
-    if(ticketImageIndexCache.stamp === stamp && ticketImageIndexCache.eventId === id) return ticketImageIndexCache.map;
+    if(ticketImageIndexCache.stamp === stamp && ticketImageIndexCache.eventId === id) return ticketImageIndexCache;
     const map = new Map();
-    const add = (key, img) => {
-      const m = up(key).match(/\bTK\d{1,3}\b/g);
-      if(!m || !img) return;
-      m.forEach(tk => { if(!map.has(tk)) map.set(tk, img); });
+    const exact = new Map();
+    const pushExact = (key, img) => {
+      const k = up(key);
+      if(!k || !img || exact.has(k)) return;
+      exact.set(k, img);
+    };
+    const add = (key, label, img, rowEvent) => {
+      const src = imageValue(img);
+      if(!src) return;
+      const rawKey = norm(key);
+      const rawLabel = norm(label);
+      const base = rawKey.includes('|') ? rawKey.split('|').slice(1).join(' | ') : rawKey;
+      const keyEvent = rawKey.includes('|') ? norm(rawKey.split('|')[0]) : '';
+      const inferredEvent = norm(rowEvent || keyEvent);
+      if(id && inferredEvent && inferredEvent !== id) return;
+      pushExact(rawKey, src);
+      pushExact(rawLabel, src);
+      pushExact(base, src);
+      if(id){
+        pushExact(`${id}|${base}`, src);
+        if(rawLabel) pushExact(`${id}|${rawLabel}`, src);
+      }
+      const m = up([rawKey, rawLabel, base].join(' | ')).match(/\bTK\d{1,3}\b/g);
+      if(!m) return;
+      m.forEach(tk => { if(!map.has(tk)) map.set(tk, src); });
     };
     const bags = [s.ticketImages, s.ticketImageRefs, s.ticketImagesByKey, s.ticket_images, s.ce_ticket_images];
     for(const bag of bags){
       if(Array.isArray(bag)){
         for(const row of bag){
-          if(id && row?.eventId && norm(row.eventId) !== id) continue;
-          const parts = [row?.ticket, row?.tk, row?.ticketKey, row?.key, row?.codigo].map(norm).join('|');
-          const img = imageValue(row?.image || row?.url || row?.publicUrl || row?.path || row);
-          add(parts, img);
+          const rowEvent = norm(row?.eventId || row?.event_id || row?.eventoId || row?.idEvento || imageEventId(row?.image_key || row?.key || row?.ticketKey || row?.label || ''));
+          if(id && rowEvent && rowEvent !== id) continue;
+          const rowKey = norm(row?.image_key || row?.key || row?.ticketKey || row?.codigo || row?.ticket || row?.tk || '');
+          const rowLabel = norm(row?.label || row?.ticket || row?.tk || '');
+          const img = imageValue(row?.image || row?.url || row?.publicUrl || row?.path || row?.pathname || row?.storage_path || row);
+          add(rowKey || rowLabel, rowLabel || rowKey, img, rowEvent);
         }
       }else if(bag && typeof bag === 'object'){
         for(const [k,v] of Object.entries(bag)){
-          const ks = norm(k); if(id && ks.includes('|') && !ks.startsWith(id + '|')) continue;
-          add(ks, imageValue(v));
+          const ks = norm(k);
+          const valueEvent = norm(imageEventId(imageValue(v)) || imageEventId(v?.image_key || v?.key || ''));
+          const keyEvent = ks.includes('|') ? norm(ks.split('|')[0]) : '';
+          if(id && ((keyEvent && keyEvent !== id) || (valueEvent && valueEvent !== id))) continue;
+          const rowLabel = norm(v?.label || (ks.includes('|') ? ks.split('|').slice(1).join(' | ') : ks));
+          add(ks, rowLabel, imageValue(v), valueEvent || keyEvent);
         }
       }
     }
-    ticketImageIndexCache = {stamp, eventId:id, map};
+    ticketImageIndexCache = {stamp, eventId:id, map, exact};
     metrics.imageIndexBuilds++;
-    return map;
+    return ticketImageIndexCache;
   }
   function imageRefFor(label){
-    const tk = ticketToken(label);
-    if(!tk) return '';
-    return imageIndex().get(tk) || '';
+    const lookup = imageIndex();
+    const raw = norm(label);
+    const exactEventKey = evId() ? `${evId()}|${raw}` : raw;
+    return lookup.exact.get(up(exactEventKey)) || lookup.exact.get(up(raw)) || lookup.map.get(ticketToken(label)) || '';
   }
 
   function linePurchase(c, first){ return [first, storeName(c), productName(c), nfmt(units(c)), money(price(c)), money(value(c))]; }
@@ -211,9 +252,10 @@
       #summaryTiendaTicket .ce-opt3e-sortbar button.active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;box-shadow:0 0 0 3px rgba(15,23,42,.12)!important;}
       #summaryTiendaTicket .ce-opt3e-row{cursor:pointer;min-height:44px!important;transition:none!important;will-change:auto!important;}
       #summaryTiendaTicket .ce-opt3e-row.ce-opt3e-donation .pill{text-decoration:line-through;}
-      #summaryTiendaTicket .ce-opt3e-row.ce-opt3e-pending .pill{background:#fef2f2!important;color:#b91c1c!important;}
+      #summaryTiendaTicket .ce-opt3e-row.ce-opt3e-pending{background:#fef2f2!important;border-left:5px solid #ef4444!important;}
+      #summaryTiendaTicket .ce-opt3e-row.ce-opt3e-pending .pill{background:#fef2f2!important;color:#dc2626!important;}
+      #summaryTiendaTicket .ce-opt3e-row.ce-opt3e-pending .ce-opt3e-label{color:#dc2626!important;font-weight:900!important;}
       #summaryTiendaTicket .ce-opt3e-label{display:block;max-width:calc(100% - 130px);white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;text-align:left!important;font-weight:800;color:#0f172a;}
-      #summaryTiendaTicket .ce-opt3e-label i{font-style:normal;color:#2563eb;font-weight:950;margin-left:5px;}
       .ce-opt3e-modal{position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:7200;display:flex;align-items:center;justify-content:center;padding:14px;}
       .ce-opt3e-card{width:min(980px,94vw);max-height:78vh;overflow:auto;background:#fff;border-radius:18px;border:2px solid #0f172a;box-shadow:0 24px 80px rgba(15,23,42,.35);padding:14px;}
       .ce-opt3e-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:8px;}
@@ -242,6 +284,7 @@
     if(!root){ return false; }
     if(!readyToWork()){ metrics.blockedBeforeLogin++; return false; }
     if(!force && !isResumenVisible()){ return false; }
+    if(isEventLoading() && rootLooksOwned(root)){ metrics.lightSkips++; return true; }
     const start = performance.now ? performance.now() : Date.now();
     const light = lightStamp();
     const nowCheap = Date.now();
@@ -279,6 +322,7 @@
     const mode = stateRef().summaryTiendaSort || 'tienda';
     root.innerHTML = `<div class="hint ce-opt3e-sortbar ce-hf10-sortbar"><span>Ordenar por:</span><button type="button" class="outline small ${mode === 'tienda' ? 'active' : ''}" data-opt3e-sort="tienda">Tienda</button><button type="button" class="outline small ${mode === 'ticket' ? 'active' : ''}" data-opt3e-sort="ticket">Ticket/Donación/Otros gastos</button></div>`;
     if(!rows.length){
+      if(isEventLoading() && rootLooksOwned(root)){ metrics.lightSkips++; return true; }
       root.insertAdjacentHTML('beforeend','<div class="hint">Sin datos.</div>');
     }else{
       let total = 0;
@@ -295,7 +339,7 @@
         div.__ceOpt3eRow = row;
         const encoded = encodeURIComponent(row.key || '');
         const actions = row.attachable ? `<span class="ticket-actions"><button type="button" class="outline small" title="Insertar foto" onclick="uploadTicketImage('${encoded}'); return false;">📎</button>${row.image ? `<img class="ticket-thumb" src="${esc(row.image)}" alt="ticket" data-ce-hf12-tk="${esc(row.rawTicket || '')}" data-ce-tip-v21="${esc(rowTip)}" />` : '<span class="hint">Sin imagen</span>'}${row.image ? `<button type="button" class="outline small" title="Eliminar foto" onclick="removeTicketImage('${encoded}'); return false;">🗑️</button>` : ''}</span>` : '';
-        div.innerHTML = `<span class="ce-opt3e-label ce-hf10-label">${esc(row.key)} <i>ⓘ</i></span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"><span class="pill">${esc(money(row.v))}</span>${actions}</span>`;
+        div.innerHTML = `<span class="ce-opt3e-label ce-hf10-label">${esc(row.key)}</span><span style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"><span class="pill">${esc(money(row.v))}</span>${actions}</span>`;
         frag.appendChild(div);
       });
       root.appendChild(frag);
@@ -405,10 +449,11 @@
   window.addEventListener('keydown', ev => { if(ev.key === 'Escape') document.querySelectorAll('.ce-opt3e-modal').forEach(m => m.remove()); }, true);
 
   function clearCaches(){
-    ticketImageIndexCache = {stamp:'', eventId:'', map:new Map()};
+    ticketImageIndexCache = {stamp:'', eventId:'', map:new Map(), exact:new Map()};
     rowsCache = {stamp:'', eventId:'', rows:null, at:0};
+    lastRenderAt = 0;
     metrics.cacheClears = (metrics.cacheClears || 0) + 1;
-    try{ const root = $(ROOT_ID); if(root){ delete root.dataset.ceOpt3eLightStamp; delete root.dataset.ceOpt3eSig; } }catch(_){ }
+    try{ const root = $(ROOT_ID); if(root){ delete root.dataset.ceOpt3eLightStamp; delete root.dataset.ceOpt3eSig; delete root.dataset.ceOpt3eEventId; } }catch(_){ }
   }
 
   window.ControlEventOpt3F = Object.assign(metrics, {install, renderNow, rowsForSummary, patchRenderSummaryList, patchRenderBudget, clearCaches});

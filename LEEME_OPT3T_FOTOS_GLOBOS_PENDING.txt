@@ -1,0 +1,10 @@
+ControlEvent v16_prod - OPT3T
+
+Cambios aplicados:
+1) RESUMEN PRESUPUESTARIO: filas y modal de Pte. Compra / otros gastos en rojo (mismo tono del resumen/gráficas).
+2) Se elimina el icono (i) de las líneas del resumen.
+3) Los globos/modales del resumen se cierran también con ESC.
+4) Foto de TKxx: prioridad por clave exacta del ticket/tienda antes que por token TK, para evitar que reaparezca una foto vieja.
+5) Se expone clearCaches en el hardlock y se dispara ticket-image-changed al adjuntar/eliminar foto.
+6) Backend ticket-images: matching/list usan la misma selección robusta por evento (incluye filas antiguas prefijadas) para no dejar alias viejos.
+7) Se evita repintado vacío transitorio del resumen mientras el cambio de evento sigue en carga, para reducir retemblor.
