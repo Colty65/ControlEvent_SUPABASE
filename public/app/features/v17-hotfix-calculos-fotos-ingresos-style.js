@@ -1,5 +1,5 @@
 /* ControlEvent v17_prod - Cálculos por tienda/ticket: fotos con método tipo Documentos.
-   No cambia versión. Fuente visual única: /api/ticket-images. Sin renderBudget tras adjuntar/borrar. */
+   FIX7: mantiene fotos FIX6, recupera detalle de filas y elimina icono (i). No cambia versión. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
@@ -238,6 +238,44 @@
     }
     return norm(r?.tip||r?.tooltip||r?.label||label);
   }
+  function rowTitle(r){
+    return r?.donated?'CÁLCULOS POR DONANTE Y DONACIÓN':(r?.pending?'PENDIENTE DE COMPRA U OTROS GASTOS':'CÁLCULOS POR TIENDA Y TICKET');
+  }
+  function normalizeLine(line,cols){
+    if(Array.isArray(line)) return line.map(x=>String(x??''));
+    const parts=String(line??'').split('|').map(x=>norm(x));
+    if(cols&&parts.length<cols){ while(parts.length<cols) parts.push(''); }
+    return parts;
+  }
+  function showRowDetail(r,label,ev){
+    stop(ev||{});
+    document.querySelectorAll('.ce-v17-rowdetail-modal').forEach(x=>x.remove());
+    const title=rowTitle(r);
+    const clean=cleanLabel(label||rowKey(r)||r?.label||r?.key||'');
+    const heads=Array.isArray(r?.headers)?r.headers.map(x=>String(x??'')):[];
+    const lines=Array.isArray(r?.lines)?r.lines:[];
+    const modal=document.createElement('div');
+    modal.className='ce-v17-rowdetail-modal';
+    let body='';
+    if(heads.length){
+      const htmlRows=(lines.length?lines:[['Sin detalle']]).map(line=>{
+        const cells=normalizeLine(line,heads.length);
+        return '<tr>'+cells.map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>';
+      }).join('');
+      body='<div class="ce-v17-rowdetail-table-wrap"><table class="ce-v17-rowdetail-table"><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+htmlRows+'</tbody></table></div>';
+    }else{
+      const txt=tipForRow(r,clean)||'Sin detalle';
+      body='<pre class="ce-v17-rowdetail-pre">'+esc(txt)+'</pre>';
+    }
+    modal.innerHTML='<div class="ce-v17-rowdetail-card" role="dialog" aria-modal="true"><div class="ce-v17-rowdetail-head"><div><h3>'+esc(title)+'</h3><p>'+esc(clean)+'</p></div><button type="button" class="ce-v17-rowdetail-close" aria-label="Cerrar">×</button></div><div class="ce-v17-rowdetail-total"><span>'+esc(r?.donated?'TOTAL ESTIMADO':'TOTAL')+'</span><strong>'+esc(money(r?.v||0))+'</strong></div>'+body+'</div>';
+    modal.addEventListener('click',e=>{
+      if(e.target===modal||e.target.closest('.ce-v17-rowdetail-close')){
+        stop(e); modal.remove();
+      }
+    },true);
+    document.body.appendChild(modal);
+    return false;
+  }
   function renderSummaryTiendaTicketDirect(rowsArg){
     const root=$('summaryTiendaTicket'); if(!root||drawing)return;
     const rows=(Array.isArray(rowsArg)&&rowsArg.length?rowsArg:rowsFromExisting()).filter(Boolean);
@@ -262,15 +300,15 @@
         const src=attachable?imageFor(label):''; const rowTip=tipForRow(r,label);
         const div=document.createElement('div');
         div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'');
-        div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.setAttribute('data-ce-tip-v21',rowTip); div.setAttribute('data-ce-tip',rowTip);
+        div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.setAttribute('role','button'); div.setAttribute('tabindex','0'); div.setAttribute('aria-label','Ver detalle');
         const amountStyle=pending?' style="background:#fef2f2;color:#b91c1c"':(donated?' style="text-decoration:line-through"':'');
-        const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label)+(rowTip?' <i>ⓘ</i>':'');
+        const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label);
         const right=document.createElement('span'); right.className='ce-v17-doc-right'; right.innerHTML='<span class="pill"'+amountStyle+'>'+esc(money(r.v||0))+'</span>';
         if(attachable){
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
           const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
           if(src){
-            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; if(rowTip)img.setAttribute('data-ce-tip-v21',rowTip); actions.appendChild(img);
+            const img=document.createElement('img'); img.className='ticket-thumb ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; actions.appendChild(img);
             const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
           }else{
             const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
@@ -278,7 +316,8 @@
           right.appendChild(actions);
         }
         div.appendChild(left); div.appendChild(right);
-        div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img,.ticket-actions'))return; const show=getLexical('showTable')||window.showTable; if(typeof show==='function')safe(()=>show(r),null); });
+        div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img,.ticket-actions'))return; showRowDetail(r,label,ev); });
+        div.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ showRowDetail(r,label,ev); } });
         root.appendChild(div);
       });
       const td=document.createElement('div'); td.className='summary-item ce-v17-doc-total'; td.style.fontWeight='800'; td.innerHTML='<span>TOTAL EVENTO</span><span class="pill">'+esc(money(total))+'</span>'; root.appendChild(td);
@@ -425,6 +464,22 @@
       #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;}
       #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;}
       #summaryTiendaTicket .ce-v17-doc-sortbar button.active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;}
+      #summaryTiendaTicket .ce-hf10-label i,#summaryTiendaTicket .ce-v17-doc-row i{display:none!important;visibility:hidden!important;}
+      #summaryTiendaTicket .ce-v17-doc-row{cursor:pointer!important;}
+      .ce-v17-rowdetail-modal{position:fixed!important;inset:0!important;background:rgba(15,23,42,.38)!important;z-index:9800!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
+      .ce-v17-rowdetail-card{width:min(980px,94vw)!important;max-height:78vh!important;overflow:auto!important;background:#fff!important;border-radius:18px!important;border:2px solid #0f172a!important;box-shadow:0 24px 80px rgba(15,23,42,.35)!important;padding:14px!important;color:#0f172a!important;}
+      .ce-v17-rowdetail-head{display:flex!important;justify-content:space-between!important;gap:12px!important;align-items:flex-start!important;border-bottom:1px solid #e2e8f0!important;padding-bottom:8px!important;margin-bottom:8px!important;}
+      .ce-v17-rowdetail-head h3{margin:0!important;font-size:18px!important;font-weight:950!important;}
+      .ce-v17-rowdetail-head p{margin:4px 0 0!important;font-weight:850!important;color:#334155!important;}
+      .ce-v17-rowdetail-close{border:0!important;background:#0f172a!important;color:#fff!important;border-radius:999px!important;width:46px!important;height:46px!important;font-size:30px!important;font-weight:950!important;line-height:1!important;cursor:pointer!important;}
+      .ce-v17-rowdetail-total{display:flex!important;justify-content:space-between!important;gap:12px!important;align-items:center!important;background:#e0f2fe!important;border-radius:12px!important;padding:8px 10px!important;margin-bottom:8px!important;font-weight:950!important;}
+      .ce-v17-rowdetail-table-wrap{overflow:auto!important;border:1px solid #dbe4ee!important;border-radius:12px!important;}
+      .ce-v17-rowdetail-table{border-collapse:separate!important;border-spacing:0!important;width:100%!important;min-width:680px!important;font-size:13px!important;}
+      .ce-v17-rowdetail-table th,.ce-v17-rowdetail-table td{padding:7px 9px!important;border-bottom:1px solid #e2e8f0!important;border-right:1px solid #eef2f7!important;text-align:left!important;white-space:nowrap!important;}
+      .ce-v17-rowdetail-table th{position:sticky!important;top:0!important;background:#f1f5f9!important;font-weight:950!important;z-index:1!important;}
+      .ce-v17-rowdetail-table td:nth-last-child(-n+3),.ce-v17-rowdetail-table th:nth-last-child(-n+3){text-align:right!important;}
+      .ce-v17-rowdetail-table td:first-child{font-weight:850!important;}
+      .ce-v17-rowdetail-pre{white-space:pre-wrap!important;background:#f8fafc!important;border:1px solid #e2e8f0!important;border-radius:12px!important;padding:10px!important;max-height:55vh!important;overflow:auto!important;font-family:inherit!important;}
     `;
     document.head.appendChild(style);
   }
@@ -433,5 +488,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_final'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v17_prod_doc_method_fix7_detalle_sin_i'};
 })();
