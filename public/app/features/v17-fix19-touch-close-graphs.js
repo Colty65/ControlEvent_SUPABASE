@@ -1,6 +1,6 @@
-/* ControlEvent v17_prod FIX20 - cierre móvil/iPhone avance, cierre visor a la izquierda,
-   deduplicación de miniaturas, bloqueo visual de gráficas antiguas y layout móvil de resumen.
-   No cambia cálculos ni datos. */
+/* ControlEvent v17_prod FIX21 - cierre iPhone avance, menú oculto hasta elegir evento,
+   doble toque móvil en Por tienda y Ticket, cierre visor a la izquierda, deduplicación de miniaturas
+   y bloqueo visual de gráficas antiguas. No cambia cálculos ni datos. */
 (function(){
   'use strict';
   if(window.__ceV17Fix19TouchCloseGraphs) return;
@@ -9,6 +9,23 @@
   const $ = id => document.getElementById(id);
   const stop = ev => { try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){} return false; };
   const norm = v => String(v == null ? '' : v).trim();
+  const st = () => { try{ return (typeof state !== 'undefined' && state) || window.state || window.ControlEventApp?.state || {}; }catch(_){ return window.state || window.ControlEventApp?.state || {}; } };
+  const arr = name => Array.isArray(st()[name]) ? st()[name] : [];
+  function isPhoneOrAndroidPhone(){
+    const ua = String(navigator.userAgent || '');
+    const iPhone = /iPhone|iPod/i.test(ua);
+    const androidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+    const iPadLike = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && Number(navigator.maxTouchPoints || 0) > 1);
+    const narrowTouch = !!(window.matchMedia && window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches);
+    return iPhone || androidPhone || (narrowTouch && !iPadLike);
+  }
+  function validSelectedEvent(){
+    const sel = $('selectedEvent');
+    const id = norm(st().selectedEventId || (sel && sel.value) || '');
+    if(!id) return false;
+    const evs = arr('eventos');
+    return !evs.length || evs.some(e => norm(e && e.id) === id);
+  }
 
   function injectStyle(){
     if($('ceV17Fix19TouchCloseGraphsStyle')) return;
@@ -41,6 +58,30 @@
         -webkit-tap-highlight-color:transparent!important;touch-action:manipulation!important;cursor:pointer!important;
       }
       #ceHf48AvanceLayer.visible .ce-v17-fix20-avance-close-float{display:inline-flex!important;}
+      /* Avance ligero real (ceV16Hf5): el X superior derecho debe cerrar también en iPhone. */
+      #ceV16Hf5AvanceLayer{pointer-events:auto!important;}
+      #ceV16Hf5AvanceLayer.visible{display:flex!important;}
+      #ceV16Hf5AvanceLayer .ce-v16hf5-close{
+        z-index:2147483647!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
+        cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;
+      }
+      /* Hasta que se elige evento, no se muestran menús ni secciones. */
+      body.ce-v17-fix21-awaiting-event #mainTabs,
+      body.ce-v17-fix21-awaiting-event .footer,
+      body.ce-v17-fix21-awaiting-event #tabIngresos,
+      body.ce-v17-fix21-awaiting-event #tabDonaciones,
+      body.ce-v17-fix21-awaiting-event #tabCompras,
+      body.ce-v17-fix21-awaiting-event #tabMapa,
+      body.ce-v17-fix21-awaiting-event #tabDocumentos,
+      body.ce-v17-fix21-awaiting-event #tabPlanificacionInicial,
+      body.ce-v17-fix21-awaiting-event #tabResumen,
+      body.ce-v17-fix21-awaiting-event #tabGraficas,
+      body.ce-v17-fix21-awaiting-event #maintenanceWrapper{
+        display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+      }
+      @media(max-width:640px) and (pointer:coarse){
+        #summaryTiendaTicket > .summary-item.ce-v17-fix21-singletap-blocked{outline:2px solid rgba(37,99,235,.22)!important;}
+      }
       /* Resumen presupuestario / Por tienda y ticket: SOLO móviles. Dos líneas útiles y miniatura a la derecha. */
       @media(max-width:640px){
         #summaryTiendaTicket > .summary-item{
@@ -86,10 +127,16 @@
   }
 
   function closeAvance(ev){
-    const layer = $('ceHf48AvanceLayer');
-    if(!layer || !layer.classList.contains('visible')) return false;
-    if(ev) stop(ev);
-    try{ layer.classList.remove('visible'); layer.setAttribute('aria-hidden','true'); }catch(_){}
+    let closed = false;
+    const layer48 = $('ceHf48AvanceLayer');
+    const layer16 = $('ceV16Hf5AvanceLayer');
+    if(layer48 && layer48.classList.contains('visible')){
+      try{ layer48.classList.remove('visible'); layer48.setAttribute('aria-hidden','true'); closed = true; }catch(_){}
+    }
+    if(layer16 && layer16.classList.contains('visible')){
+      try{ layer16.classList.remove('visible'); layer16.setAttribute('aria-hidden','true'); closed = true; }catch(_){}
+    }
+    if(closed && ev) stop(ev);
     return false;
   }
   function normalizeAvanceClose(){
@@ -127,6 +174,25 @@
       });
     }
   }
+  function normalizeV16AvanceClose(){
+    const layer = $('ceV16Hf5AvanceLayer');
+    if(!layer) return;
+    const btn = layer.querySelector('.ce-v16hf5-close');
+    if(!btn) return;
+    try{
+      btn.type = 'button';
+      btn.setAttribute('aria-label','Cerrar avance del evento');
+      btn.style.setProperty('touch-action','manipulation','important');
+      btn.style.setProperty('-webkit-tap-highlight-color','transparent','important');
+      if(!btn.__ceV17Fix21IphoneCloseBound){
+        btn.__ceV17Fix21IphoneCloseBound = true;
+        ['touchstart','touchend','pointerdown','pointerup','mousedown','mouseup','click'].forEach(type => {
+          btn.addEventListener(type, closeAvance, {capture:true, passive:false});
+        });
+      }
+    }catch(_){}
+  }
+
   function bindAvanceClose(){
     if(window.__ceV17Fix19AvanceCloseBound) return;
     window.__ceV17Fix19AvanceCloseBound = true;
@@ -143,6 +209,60 @@
       }, {capture:true, passive:false});
     });
     document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeAvance(ev); }, true);
+  }
+
+  function bindV16IphoneClose(){
+    if(window.__ceV17Fix21V16IphoneCloseBound) return;
+    window.__ceV17Fix21V16IphoneCloseBound = true;
+    ['touchstart','touchend','pointerdown','pointerup','mousedown','mouseup','click'].forEach(type => {
+      window.addEventListener(type, ev => {
+        const layer = $('ceV16Hf5AvanceLayer');
+        if(!layer || !layer.classList.contains('visible')) return;
+        const target = ev.target;
+        if(target?.closest?.('.ce-v16hf5-close')) return closeAvance(ev);
+      }, {capture:true, passive:false});
+    });
+  }
+
+  function setEventMenuGate(){
+    const overlay = $('authOverlay');
+    const loggedIn = !!(overlay && overlay.classList.contains('hidden')) || document.body.classList.contains('ce-v5019-authenticated') || document.body.classList.contains('ce-v44-authenticated');
+    const waiting = loggedIn && !validSelectedEvent();
+    document.body.classList.toggle('ce-v17-fix21-awaiting-event', !!waiting);
+  }
+  function bindEventMenuGate(){
+    if(window.__ceV17Fix21MenuGateBound) return;
+    window.__ceV17Fix21MenuGateBound = true;
+    document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(setEventMenuGate, 0); }, true);
+    ['controlevent:event-loaded','controlevent:event-ready','controlevent:module-mounted','controlevent:data-loaded','controlevent:app-ready','controlevent:runtime-ready'].forEach(evt => window.addEventListener(evt, () => setTimeout(setEventMenuGate, 40), true));
+    document.addEventListener('click', ev => { if(ev.target?.closest?.('#btnLogin,#btnLogout,#selectedEvent')) setTimeout(setEventMenuGate, 120); }, true);
+    [80,260,700,1400,2800,5200].forEach(ms => setTimeout(setEventMenuGate, ms));
+  }
+
+  let ceFix21LastSummaryTap = {row:null, at:0};
+  function isSummaryInteractiveTarget(target){
+    return !!target?.closest?.('img,button,input,select,textarea,a,label,.ticket-actions,[role="button"],[data-ce-v17-ticket-open],[data-ce-v17-ticket-close]');
+  }
+  function bindSummaryDoubleTapMobile(){
+    if(window.__ceV17Fix21SummaryDoubleTapBound) return;
+    window.__ceV17Fix21SummaryDoubleTapBound = true;
+    window.addEventListener('click', ev => {
+      if(!isPhoneOrAndroidPhone()) return;
+      const root = $('summaryTiendaTicket');
+      if(!root) return;
+      const row = ev.target?.closest?.('#summaryTiendaTicket > .summary-item,#summaryTiendaTicket .ce-v17-doc-row');
+      if(!row || !root.contains(row)) return;
+      if(isSummaryInteractiveTarget(ev.target)) return;
+      const now = Date.now();
+      const isDouble = ceFix21LastSummaryTap.row === row && (now - ceFix21LastSummaryTap.at) <= 650;
+      ceFix21LastSummaryTap = {row, at:now};
+      if(isDouble){
+        try{ row.classList.remove('ce-v17-fix21-singletap-blocked'); }catch(_){}
+        return; // segundo toque: se deja pasar al manejador normal del globo
+      }
+      try{ row.classList.add('ce-v17-fix21-singletap-blocked'); setTimeout(()=>row.classList.remove('ce-v17-fix21-singletap-blocked'), 520); }catch(_){}
+      return stop(ev);
+    }, {capture:true, passive:false});
   }
 
   function closeAllTicketViewers(ev){
@@ -234,8 +354,13 @@
     scheduled = 0;
     injectStyle();
     bindAvanceClose();
+    bindV16IphoneClose();
+    bindEventMenuGate();
+    bindSummaryDoubleTapMobile();
     bindTicketClose();
     normalizeAvanceClose();
+    normalizeV16AvanceClose();
+    setEventMenuGate();
     dedupeTicketThumbs();
     patchGraphWrap();
     removeVisibleOldGraphs();
@@ -249,8 +374,15 @@
   window.addEventListener('load', run, {once:true});
   ['controlevent:event-loaded','controlevent:event-ready','controlevent:module-mounted','controlevent:data-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(run, 60), true));
   document.addEventListener('click', () => setTimeout(run, 30), true);
-  try{ new MutationObserver(schedule).observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(_){}
+  try{
+    new MutationObserver(muts => {
+      if((muts||[]).some(m => {
+        const nodes = Array.from(m.addedNodes||[]);
+        return nodes.some(n => n && n.nodeType===1 && (n.id==='summaryTiendaTicket' || n.id==='ceV16Hf5AvanceLayer' || n.id==='ceHf48AvanceLayer' || n.querySelector?.('#summaryTiendaTicket,#ceV16Hf5AvanceLayer,#ceHf48AvanceLayer,img.ce-v17-doc-thumb,img.ticket-thumb')));
+      })) schedule();
+    }).observe(document.body || document.documentElement, {childList:true, subtree:true});
+  }catch(_){}
   [120,600,1400,3000].forEach(ms => setTimeout(run, ms));
 
-  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, version:'v17_prod_fix20_mobile_close_summary_layout'};
+  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, setEventMenuGate, version:'v17_prod_fix21_iphone_avance_menu_doubletap'};
 })();
