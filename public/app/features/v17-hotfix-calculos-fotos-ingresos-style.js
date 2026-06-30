@@ -18,6 +18,32 @@
   const getLexical=name=>safe(()=>Function('return (typeof '+name+'!=="undefined")?'+name+':undefined')(),undefined);
   const setLexical=(name,value)=>safe(()=>Function('value',name+'=value;')(value),undefined);
   const stop=ev=>{try{ev?.preventDefault?.();ev?.stopPropagation?.();ev?.stopImmediatePropagation?.();}catch(_){ } return false;};
+  const isPhoneOrAndroidPhone=()=>{
+    try{
+      const ua=String(navigator.userAgent||'');
+      const iphone=/iPhone|iPod/i.test(ua);
+      const androidPhone=/Android/i.test(ua)&&/Mobile/i.test(ua);
+      const ipad=/iPad/i.test(ua)||(/Macintosh/i.test(ua)&&Number(navigator.maxTouchPoints||0)>1);
+      const narrowTouch=!!(window.matchMedia&&window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches);
+      return iphone||androidPhone||(narrowTouch&&!ipad);
+    }catch(_){return false;}
+  };
+  const ceV17SummaryTap={row:null,at:0};
+  function requireDoubleTapForSummaryRow(ev,row){
+    try{
+      if(!isPhoneOrAndroidPhone())return false;
+      if(!row||!row.closest?.('#summaryTiendaTicket'))return false;
+      if(ev?.target?.closest?.('img,button,input,select,textarea,a,label,.ticket-actions,.ce-v17-doc-actions,[data-ce-v17-photo],[data-ce-v17-ticket-open]'))return false;
+      const now=Date.now();
+      const okAt=Number(row.dataset.ceV17DoubleTapOk||0);
+      if(okAt && (now-okAt)<=750){ try{delete row.dataset.ceV17DoubleTapOk;}catch(_){} return false; }
+      const ok=ceV17SummaryTap.row===row&&(now-ceV17SummaryTap.at)<=650;
+      ceV17SummaryTap.row=row; ceV17SummaryTap.at=now;
+      if(ok){try{row.classList.remove('ce-v17-fix21-singletap-blocked');}catch(_){} return false;}
+      try{row.classList.add('ce-v17-fix21-singletap-blocked');setTimeout(()=>row.classList.remove('ce-v17-fix21-singletap-blocked'),520);}catch(_){}
+      return stop(ev);
+    }catch(_){return false;}
+  }
 
   let previousRenderSummaryList=null;
   let previousSummaryByTiendaTicket=null;
@@ -432,7 +458,7 @@
           right.appendChild(actions);
         }
         div.appendChild(left); div.appendChild(right);
-        div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img,.ticket-actions'))return; showRowDetail(r,label,ev); });
+        div.addEventListener('click',ev=>{ if(ev.target.closest('button,input,select,a,img,.ticket-actions'))return; if(requireDoubleTapForSummaryRow(ev,div))return; showRowDetail(r,label,ev); });
         div.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ showRowDetail(r,label,ev); } });
         root.appendChild(div);
       });

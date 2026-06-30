@@ -22,6 +22,24 @@
     #noEventMessage>*{display:none!important;visibility:hidden!important;opacity:0!important;max-height:0!important;overflow:hidden!important;}
     #noEventMessage::before{content:""!important;display:block!important;width:150px!important;height:150px!important;max-width:36vw!important;max-height:36vw!important;background:url('./assets/icons/controlevent-welcome-v44.png') center/contain no-repeat!important;border-radius:24px!important;filter:drop-shadow(0 12px 22px rgba(15,23,42,.20))!important;transform:none!important;transition:none!important;animation:none!important;}
   </style>
+  
+  <style id="ce-v17-fix22-no-event-early">
+    body:not(.ce-v17-fix22-event-ready) #mainTabs,
+    body:not(.ce-v17-fix22-event-ready) .footer,
+    body:not(.ce-v17-fix22-event-ready) #tabIngresos,
+    body:not(.ce-v17-fix22-event-ready) #tabDonaciones,
+    body:not(.ce-v17-fix22-event-ready) #tabCompras,
+    body:not(.ce-v17-fix22-event-ready) #tabMapa,
+    body:not(.ce-v17-fix22-event-ready) #tabMapaProductos,
+    body:not(.ce-v17-fix22-event-ready) #tabDocumentos,
+    body:not(.ce-v17-fix22-event-ready) #tabPlanificacionInicial,
+    body:not(.ce-v17-fix22-event-ready) #tabResumen,
+    body:not(.ce-v17-fix22-event-ready) #tabGraficas,
+    body:not(.ce-v17-fix22-event-ready) #maintenanceWrapper,
+    body:not(.ce-v17-fix22-event-ready) .maintenance-tabs{
+      display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+    }
+  </style>
   <style id="ce-login-overlay-clean-head">#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
 
     <link rel="stylesheet" href="./app/styles/app.css" />
@@ -35,7 +53,7 @@
     #eventChartWrap.ce-v17-fix19-guarding{min-height:540px!important;contain:layout paint!important;}
   </style>
 </head>
-<body>
+<body class="ce-v17-fix22-no-event">
   <div id="authOverlay" class="auth-overlay">
     <div class="auth-card">
       <h2>Acceso a ControlEvent</h2>
@@ -629,6 +647,6 @@
 <script src="./app/features/v17-hotfix-calculos-fotos-ingresos-style.js?v=v17_prod_fix12_calculos_detalle_miniaturas"></script>
 <script src="./app/features/v17-hotfix-final-cierre-miniaturas-visor.js?v=v17_prod_fix13_titulo_evento_color_estado"></script>
 <script src="./app/features/v17-hotfix-logo-graficas-clean.js?v=v17_prod_sin_cambio_version_logo_fix6"></script>
-<script src="./app/features/v17-fix19-touch-close-graphs.js?v=v17_prod_fix21_iphone_avance_menu_doubletap"></script>
+<script src="./app/features/v17-fix19-touch-close-graphs.js?v=v17_prod_fix22_menu_inicio_doubletap_movil"></script>
 </body>
 </html>
