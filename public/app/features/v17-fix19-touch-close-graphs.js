@@ -1,5 +1,5 @@
-/* ControlEvent v17_prod FIX19 - cierre móvil avance, cierre visor a la izquierda,
-   deduplicación de miniaturas y bloqueo visual de gráficas antiguas de barras.
+/* ControlEvent v17_prod FIX20 - cierre móvil/iPhone avance, cierre visor a la izquierda,
+   deduplicación de miniaturas, bloqueo visual de gráficas antiguas y layout móvil de resumen.
    No cambia cálculos ni datos. */
 (function(){
   'use strict';
@@ -33,6 +33,48 @@
         box-shadow:0 8px 26px rgba(15,23,42,.24)!important;z-index:10000002!important;
       }
       @media(max-width:760px){#ceHf48AvanceLayer .ce-hf48-bubble{width:96vw!important;max-height:82vh!important;}}
+      #ceHf48AvanceLayer .ce-v17-fix20-avance-close-float{
+        position:fixed!important;left:calc(10px + env(safe-area-inset-left))!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;
+        right:auto!important;top:auto!important;z-index:10000020!important;display:none!important;align-items:center!important;justify-content:center!important;gap:6px!important;
+        min-width:118px!important;height:44px!important;padding:0 14px!important;border-radius:999px!important;border:1px solid #cbd5e1!important;
+        background:#fff!important;color:#0f172a!important;font-size:15px!important;font-weight:950!important;box-shadow:0 10px 28px rgba(15,23,42,.28)!important;
+        -webkit-tap-highlight-color:transparent!important;touch-action:manipulation!important;cursor:pointer!important;
+      }
+      #ceHf48AvanceLayer.visible .ce-v17-fix20-avance-close-float{display:inline-flex!important;}
+      /* Resumen presupuestario / Por tienda y ticket: SOLO móviles. Dos líneas útiles y miniatura a la derecha. */
+      @media(max-width:640px){
+        #summaryTiendaTicket > .summary-item{
+          display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-rows:auto auto!important;
+          align-items:center!important;column-gap:6px!important;row-gap:1px!important;min-height:50px!important;padding:6px 7px!important;
+          font-size:11px!important;line-height:1.12!important;overflow:hidden!important;
+        }
+        #summaryTiendaTicket > .summary-item > span:first-child{
+          grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;
+          white-space:nowrap!important;text-align:left!important;font-size:11px!important;font-weight:800!important;line-height:1.14!important;
+        }
+        #summaryTiendaTicket > .summary-item > span:nth-child(2){display:contents!important;}
+        #summaryTiendaTicket > .summary-item > .pill,
+        #summaryTiendaTicket > .summary-item > span:nth-child(2) > .pill{
+          grid-column:1!important;grid-row:2!important;justify-self:start!important;align-self:center!important;
+          font-size:10.5px!important;line-height:1!important;padding:3px 7px!important;white-space:nowrap!important;text-align:left!important;
+        }
+        #summaryTiendaTicket > .summary-item .ticket-actions{
+          grid-column:2!important;grid-row:1 / 3!important;justify-self:end!important;align-self:center!important;
+          display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:4px!important;margin:0!important;flex-wrap:nowrap!important;min-width:max-content!important;
+        }
+        #summaryTiendaTicket > .summary-item .ticket-actions button,
+        #summaryTiendaTicket > .summary-item .ticket-actions .outline.small{
+          width:26px!important;min-width:26px!important;height:26px!important;min-height:26px!important;padding:0!important;border-radius:8px!important;font-size:14px!important;line-height:1!important;
+        }
+        #summaryTiendaTicket > .summary-item .ticket-actions input{display:none!important;}
+        #summaryTiendaTicket > .summary-item .ticket-actions img,
+        #summaryTiendaTicket > .summary-item img.ce-v17-doc-thumb,
+        #summaryTiendaTicket > .summary-item img.ticket-thumb{
+          width:42px!important;height:42px!important;max-width:42px!important;max-height:42px!important;object-fit:cover!important;border-radius:8px!important;flex:0 0 auto!important;
+        }
+        #summaryTiendaTicket > .summary-item.ce-tt-total-evento{min-height:36px!important;}
+        #summaryTiendaTicket > .summary-item.ce-tt-total-evento > span:first-child{grid-row:1 / 3!important;align-self:center!important;}
+      }
       /* Duplicados: si una capa antigua mete otra miniatura, solo queda visible una. */
       #summaryTiendaTicket .summary-item img.ce-v17-duplicate-thumb,
       #summaryTiendaTicket .ce-v17-doc-row img.ce-v17-duplicate-thumb{display:none!important;visibility:hidden!important;pointer-events:none!important;}
@@ -59,21 +101,45 @@
         btn.textContent = '✕ Cerrar';
         btn.setAttribute('aria-label','Cerrar avance del evento');
         btn.type = 'button';
+        btn.style.setProperty('touch-action','manipulation','important');
+        btn.style.setProperty('-webkit-tap-highlight-color','transparent','important');
+        if(!btn.__ceV17Fix20CloseBound){
+          btn.__ceV17Fix20CloseBound = true;
+          ['touchstart','touchend','pointerdown','pointerup','mousedown','click'].forEach(type => {
+            btn.addEventListener(type, closeAvance, {capture:true, passive:false});
+          });
+        }
       }catch(_){}
+    }
+    let floatBtn = layer.querySelector('.ce-v17-fix20-avance-close-float');
+    if(!floatBtn){
+      floatBtn = document.createElement('button');
+      floatBtn.type = 'button';
+      floatBtn.className = 'ce-v17-fix20-avance-close-float';
+      floatBtn.textContent = '✕ Cerrar';
+      floatBtn.setAttribute('aria-label','Cerrar avance del evento');
+      try{ layer.appendChild(floatBtn); }catch(_){}
+    }
+    if(floatBtn && !floatBtn.__ceV17Fix20CloseBound){
+      floatBtn.__ceV17Fix20CloseBound = true;
+      ['touchstart','touchend','pointerdown','pointerup','mousedown','click'].forEach(type => {
+        floatBtn.addEventListener(type, closeAvance, {capture:true, passive:false});
+      });
     }
   }
   function bindAvanceClose(){
     if(window.__ceV17Fix19AvanceCloseBound) return;
     window.__ceV17Fix19AvanceCloseBound = true;
-    ['pointerdown','touchstart','mousedown','click'].forEach(type => {
+    ['touchstart','touchend','pointerdown','pointerup','mousedown','mouseup','click'].forEach(type => {
       document.addEventListener(type, ev => {
         const layer = $('ceHf48AvanceLayer');
         if(!layer || !layer.classList.contains('visible')) return;
         const target = ev.target;
-        if(target?.closest?.('.ce-hf48-close')) return closeAvance(ev);
-        const bubble = target?.closest?.('.ce-hf48-bubble');
+        const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
+        if(target?.closest?.('.ce-hf48-close,.ce-v17-fix20-avance-close-float') || path.some(n => n?.classList?.contains?.('ce-hf48-close') || n?.classList?.contains?.('ce-v17-fix20-avance-close-float'))) return closeAvance(ev);
+        const bubble = target?.closest?.('.ce-hf48-bubble') || path.some(n => n?.classList?.contains?.('ce-hf48-bubble'));
         const logo = target?.closest?.('.brand,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large');
-        if(!bubble && !logo) return closeAvance(ev);
+        if(target === layer || (!bubble && !logo)) return closeAvance(ev);
       }, {capture:true, passive:false});
     });
     document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeAvance(ev); }, true);
@@ -186,5 +252,5 @@
   try{ new MutationObserver(schedule).observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(_){}
   [120,600,1400,3000].forEach(ms => setTimeout(run, ms));
 
-  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, version:'v17_prod_fix19_touch_close_graph_guard'};
+  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, version:'v17_prod_fix20_mobile_close_summary_layout'};
 })();
