@@ -229,12 +229,22 @@
         });
         keepActions.classList.add('ticket-actions','ce-v17-doc-actions');
       }
-      const thumbs=Array.from(row.querySelectorAll('img.ce-v17-doc-thumb,img[src*="ticket-images"],img[src^="data:image/"]'));
-      thumbs.forEach(img=>{try{img.classList.add('ce-v17-doc-thumb'); img.classList.remove('ticket-thumb'); if(!img.dataset.ceV17Label && row.dataset.ceV17Label) img.dataset.ceV17Label=row.dataset.ceV17Label; if(!img.dataset.ceV17Detail && row.dataset.ceV17Detail) img.dataset.ceV17Detail=row.dataset.ceV17Detail;}catch(_){}});
+      const thumbs=Array.from(row.querySelectorAll('img.ce-v17-doc-thumb,img.ticket-thumb,img[src*="ticket-images"],img[src^="data:image/"]'));
+      thumbs.forEach(img=>{try{img.classList.add('ce-v17-doc-thumb'); img.classList.remove('ticket-thumb'); if(!img.dataset.ceV17Label && row.dataset.ceV17Label) img.dataset.ceV17Label=row.dataset.ceV17Label; if(!img.dataset.ceV17Detail && row.dataset.ceV17Detail) img.dataset.ceV17Detail=row.dataset.ceV17Detail;}catch(_){} });
       if(thumbs.length>1){
-        const keep=thumbs[0];
+        const score=img=>{
+          let n=0;
+          if(norm(img.dataset.ceV17Detail)) n+=100;
+          if(norm(row.dataset.ceV17Detail) && !norm(img.dataset.ceV17Detail)) n+=40;
+          if(img.classList.contains('ce-v17-doc-thumb')) n+=10;
+          if(norm(img.dataset.ceV17Label)) n+=5;
+          return n;
+        };
+        const keep=thumbs.slice().sort((a,b)=>score(b)-score(a))[0] || thumbs[0];
+        if(norm(row.dataset.ceV17Detail) && !norm(keep.dataset.ceV17Detail)) keep.dataset.ceV17Detail=row.dataset.ceV17Detail;
+        if(norm(row.dataset.ceV17Label) && !norm(keep.dataset.ceV17Label)) keep.dataset.ceV17Label=row.dataset.ceV17Label;
         keep.classList.add('ce-v17-doc-thumb'); keep.classList.remove('ticket-thumb');
-        thumbs.slice(1).forEach(img=>{try{img.remove();}catch(_){img.style.setProperty('display','none','important');}});
+        thumbs.filter(img=>img!==keep).forEach(img=>{try{img.remove();}catch(_){img.style.setProperty('display','none','important');}});
       }
       row.querySelectorAll('.ticket-actions').forEach(actions=>{
         const btns=Array.from(actions.querySelectorAll('button[data-ce-v17-photo]'));
@@ -281,9 +291,9 @@
       #ceV17TicketViewerFinal td:nth-child(n+2),#ceV17TicketViewerFinal th:nth-child(n+2){text-align:right!important;white-space:nowrap!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-image{position:relative!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;overflow:auto!important;min-height:0!important;padding-bottom:8px!important;}
       #ceV17TicketViewerFinal .ce-v17-ticket-image img{max-width:100%!important;max-height:calc(94vh - 112px)!important;object-fit:contain!important;border-radius:10px!important;background:#fff!important;}
-      #ceV17TicketViewerFinal [data-ce-v17-ticket-close]{position:sticky!important;bottom:10px!important;align-self:flex-end!important;margin:8px 10px 0 auto!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;font-size:15px!important;background:#fff!important;z-index:8!important;box-shadow:0 8px 24px rgba(15,23,42,.20)!important;}
+      #ceV17TicketViewerFinal [data-ce-v17-ticket-close]{position:sticky!important;bottom:10px!important;align-self:flex-start!important;margin:8px auto 0 10px!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;font-size:15px!important;background:#fff!important;z-index:8!important;box-shadow:0 8px 24px rgba(15,23,42,.20)!important;}
       @media(max-width:760px){#ceV17TicketViewerFinal .ce-v17-ticket-grid{grid-template-columns:1fr!important;}#ceV17TicketViewerFinal .ce-v17-ticket-lines{max-height:34vh!important;}#ceV17TicketViewerFinal .ce-v17-ticket-image img{max-height:45vh!important;}}
-      #ceV104TicketDetail [data-ce-v104-close],#ceV103TicketDetail [data-ce-v103-close],#ceV102TicketDetail [data-ce-v102-close],#ceV101TicketDetail [data-ce-v101-close],#ceV100TicketDetail [data-ce-v100-close],#ceV96TicketDetail [data-ce-v96-close],#ceV40TicketPhotoModal .ce-v40-modal-close{position:fixed!important;right:calc(2vw + 24px)!important;bottom:calc(3vh + 16px)!important;top:auto!important;z-index:10000095!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;background:#fff!important;}
+      #ceV104TicketDetail [data-ce-v104-close],#ceV103TicketDetail [data-ce-v103-close],#ceV102TicketDetail [data-ce-v102-close],#ceV101TicketDetail [data-ce-v101-close],#ceV100TicketDetail [data-ce-v100-close],#ceV96TicketDetail [data-ce-v96-close],#ceV40TicketPhotoModal .ce-v40-modal-close{position:fixed!important;left:calc(2vw + 24px)!important;right:auto!important;bottom:calc(3vh + 16px)!important;top:auto!important;z-index:10000095!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;background:#fff!important;}
     `;
     document.head.appendChild(st);
   }

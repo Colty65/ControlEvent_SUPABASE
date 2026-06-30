@@ -29,6 +29,11 @@
     <script src="./app/features/v8-5-crud-root-fix28.js?v=v17_prod_fix28_hf5_manto"></script>
 
   <!-- HOTFIX26_CACHE_BUST_PLANIFICACION -->
+
+  <style id="ce-v17-fix19-early-graph-guard">
+    #eventChartWrap .chart-bars,#eventChartWrap .vbars-wrap,#eventChartWrap .vbars-grid{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+    #eventChartWrap.ce-v17-fix19-guarding{min-height:540px!important;contain:layout paint!important;}
+  </style>
 </head>
 <body>
   <div id="authOverlay" class="auth-overlay">
@@ -624,5 +629,6 @@
 <script src="./app/features/v17-hotfix-calculos-fotos-ingresos-style.js?v=v17_prod_fix12_calculos_detalle_miniaturas"></script>
 <script src="./app/features/v17-hotfix-final-cierre-miniaturas-visor.js?v=v17_prod_fix13_titulo_evento_color_estado"></script>
 <script src="./app/features/v17-hotfix-logo-graficas-clean.js?v=v17_prod_sin_cambio_version_logo_fix6"></script>
+<script src="./app/features/v17-fix19-touch-close-graphs.js?v=v17_prod_fix19_touch_close_graph_guard"></script>
 </body>
 </html>
