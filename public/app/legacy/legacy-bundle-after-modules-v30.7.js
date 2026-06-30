@@ -1547,7 +1547,7 @@ window.__ceDisableLegacyBarGraficas = true;
   }
   applyFinal();
   [100, 600, 1500, 3200].forEach(ms => setTimeout(applyFinal, ms));
-  setInterval(applyDonationTipsFinal, window.ControlEventLowResource?.interval?.(1800) || 1800);
+  setInterval(applyDonationTipsFinal, window.ControlEventLowResource?.interval?.(6000) || 6000);
   window.__ceV253Final = {apply: applyFinal, applyDonationTips: applyDonationTipsFinal, rebuildResumenSheet};
 })();
 
@@ -1985,7 +1985,7 @@ window.__ceDisableLegacyBarGraficas = true;
       if(!window.__ceDisableLegacyBarGraficas && ((typeof currentMainTab !== 'undefined' && currentMainTab === 'graficas') || !$('tabGraficas')?.classList.contains('hidden'))) renderGraficasV254();
     }catch(_){ }
   }, ms));
-  setInterval(applyDonationTipsV254, window.ControlEventLowResource?.interval?.(1800) || 1800);
+  setInterval(applyDonationTipsV254, window.ControlEventLowResource?.interval?.(6000) || 6000);
   window.__ceV254 = {version: VERSION, apply: applyV254, graphParts: graphPartsV254, renderGraficas: renderGraficasV254, makeChartImageDataUrl: makeChartImageDataUrlV254, rebuildGraficasSheet: rebuildGraficasSheetV254, applyDonationTips: applyDonationTipsV254};
 })();
 

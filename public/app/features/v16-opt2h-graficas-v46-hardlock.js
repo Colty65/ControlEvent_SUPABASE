@@ -396,9 +396,9 @@
   });
 
   reassert('install');
-  [0,30,80,160,320,700,1200,2200,3600,5200].forEach(ms => setTimeout(() => reassert('boot-'+ms), ms));
+  [0,120,420,1000,2200].forEach(ms => setTimeout(() => reassert('boot-'+ms), ms));
   reassertTimer = setInterval(() => {
     reassert('interval');
-    if(now() - (new Date(metrics.installedAt).getTime()) > 20000){ clearInterval(reassertTimer); }
-  }, 500);
+    if(now() - (new Date(metrics.installedAt).getTime()) > 8000){ clearInterval(reassertTimer); }
+  }, 1200);
 })();

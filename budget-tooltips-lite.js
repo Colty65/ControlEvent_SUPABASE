@@ -259,16 +259,20 @@
     return compras().filter(row => up(row.ticketDonacion || row.ticket || '') === c).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
   }
   function donationTableRows(rows){
+    const donorKey = row => up(donorName(row));
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
       const donor = donorName(sorted[i]);
+      const key = donorKey(sorted[i]);
       const group = [];
-      while(i < sorted.length && donorName(sorted[i]) === donor){ group.push(sorted[i]); i += 1; }
+      while(i < sorted.length && donorKey(sorted[i]) === key){ group.push(sorted[i]); i += 1; }
       group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      out.push([`TOTAL ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      out.push([`Total ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
+      out.push(['', '', '', '', '']);
     }
+    while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
   }
   function donationTipForCode(title, code){
@@ -297,31 +301,31 @@
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
   function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
-  function ticketSortKey(value){
-    const t = norm(value || 'Pte.Compra');
-    const m = /^TK\s*(\d+)/i.exec(t);
-    if(m) return 'TK' + String(Number(m[1])).padStart(6,'0');
-    if(/^PTE\.?\s*COMPRA/i.test(t)) return 'ZZZ-PTE-COMPRA';
-    return up(t);
-  }
   function expenseTableRows(rows){
-    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(storeName(a), storeName(b)) || ticketSortKey(expenseTicket(a)).localeCompare(ticketSortKey(expenseTicket(b)), 'es', {sensitivity:'base'}) || cmp(productName(a), productName(b)));
+    const storeKey = row => up(storeName(row));
+    const ticketKey = row => up(expenseTicket(row));
+    const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => cmp(storeName(a), storeName(b)) || cmp(expenseTicket(a), expenseTicket(b)) || cmp(productName(a), productName(b)));
     const out = [];
     let i = 0;
     while(i < sorted.length){
       const store = storeName(sorted[i]);
+      const sKey = storeKey(sorted[i]);
       let storeTotal = 0;
-      while(i < sorted.length && storeName(sorted[i]) === store){
+      while(i < sorted.length && storeKey(sorted[i]) === sKey){
         const ticket = expenseTicket(sorted[i]);
+        const tKey = ticketKey(sorted[i]);
         const group = [];
-        while(i < sorted.length && storeName(sorted[i]) === store && expenseTicket(sorted[i]) === ticket){ group.push(sorted[i]); i += 1; }
-        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+        while(i < sorted.length && storeKey(sorted[i]) === sKey && ticketKey(sorted[i]) === tKey){ group.push(sorted[i]); i += 1; }
         const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
         storeTotal += ticketTotal;
-        out.push([`TOTAL ${store}, ${ticket}`, '', '', '', '', money(ticketTotal)]);
+        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
+        out.push([`Total ${store}, ${ticket}`, '', '', '', '', money(ticketTotal)]);
+        out.push(['', '', '', '', '', '']);
       }
-      out.push([`TOTAL ${store}`, '', '', '', '', money(storeTotal)]);
+      out.push([`Total ${store}`, '', '', '', '', money(storeTotal)]);
+      out.push(['', '', '', '', '', '']);
     }
+    while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
   }
   function operativeTipForRow(row){
@@ -552,7 +556,7 @@
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [0, 80, 240, 700, 1400].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
+  [0, 220, 900].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
   ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready'].forEach(evt => {
     window.addEventListener(evt, () => setTimeout(() => rehydrateBudgetLite(evt), 60));
   });

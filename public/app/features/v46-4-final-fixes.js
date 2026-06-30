@@ -605,66 +605,65 @@
     if(!sorted.length) return ['Nombre | Ingreso | Importe', 'Sin registros'];
     return ['Nombre | Ingreso | Importe', ...sorted.map(r => `${r.persona?.nombre || personName(r.personaId) || 'Sin nombre'} | ${r.situacion || 'Pendiente'} | ${moneyF(incomeTotal(r))}`)];
   }
-  function ticketSortKey(value){
-    const t = norm(value || 'Pte.Compra');
-    const m = /^TK\s*(\d+)/i.exec(t);
-    if(m) return 'TK' + String(Number(m[1])).padStart(6,'0');
-    if(/^PTE\.?\s*COMPRA/i.test(t)) return 'ZZZ-PTE-COMPRA';
-    return upper(t);
-  }
   function donationLines(rows){
+    const donorLabel = r => donorName(r) || 'Sin donante';
+    const productLabel = r => r?.producto?.nombre || productName(r?.productoId) || 'Producto';
+    const donorKey = r => upper(donorLabel(r));
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
-      const da = donorName(a) || 'Sin donante'; const db = donorName(b) || 'Sin donante';
-      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      return da.localeCompare(db, 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+      return donorLabel(a).localeCompare(donorLabel(b), 'es', {sensitivity:'base'})
+        || productLabel(a).localeCompare(productLabel(b), 'es', {sensitivity:'base'});
     });
     if(!sorted.length) return ['Donante | Producto | Cant. | Precio | Total', 'Sin registros'];
     const out = ['Donante | Producto | Cant. | Precio | Total'];
     let i = 0;
     while(i < sorted.length){
-      const donor = donorName(sorted[i]) || 'Sin donante';
+      const donor = donorLabel(sorted[i]);
+      const key = donorKey(sorted[i]);
       const group = [];
-      while(i < sorted.length && (donorName(sorted[i]) || 'Sin donante') === donor){ group.push(sorted[i]); i += 1; }
-      group.forEach(r => out.push(`${donorName(r) || 'Sin donante'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+      while(i < sorted.length && donorKey(sorted[i]) === key){ group.push(sorted[i]); i += 1; }
+      group.forEach(r => out.push(`${donorLabel(r)} | ${productLabel(r)} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
       out.push(`Total ${donor} |  |  |  | ${moneyF(sum(group.map(rowValue)))}`);
+      out.push('');
     }
+    while(out.length && out[out.length - 1] === '') out.pop();
     return out;
   }
   function expenseLines(rows){
+    const storeLabel = r => r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
+    const ticketLabel = r => r?.ticketDonacion || 'Pte.Compra';
+    const productLabel = r => r?.producto?.nombre || productName(r?.productoId) || 'Producto';
+    const storeKey = r => upper(storeLabel(r));
+    const ticketKey = r => upper(ticketLabel(r));
     const sorted = (Array.isArray(rows) ? rows.slice() : []).sort((a,b) => {
-      const sa = a?.tienda?.nombre || storeName(a?.tiendaId) || 'Sin tienda'; const sb = b?.tienda?.nombre || storeName(b?.tiendaId) || 'Sin tienda';
-      const ta = a?.ticketDonacion || 'Pte.Compra'; const tb = b?.ticketDonacion || 'Pte.Compra';
-      const pa = a?.producto?.nombre || productName(a?.productoId) || 'Producto'; const pb = b?.producto?.nombre || productName(b?.productoId) || 'Producto';
-      return sa.localeCompare(sb, 'es', {sensitivity:'base'}) || ticketSortKey(ta).localeCompare(ticketSortKey(tb), 'es', {sensitivity:'base'}) || pa.localeCompare(pb, 'es', {sensitivity:'base'});
+      return storeLabel(a).localeCompare(storeLabel(b), 'es', {sensitivity:'base'})
+        || ticketLabel(a).localeCompare(ticketLabel(b), 'es', {sensitivity:'base', numeric:true})
+        || productLabel(a).localeCompare(productLabel(b), 'es', {sensitivity:'base'});
     });
     if(!sorted.length) return ['Tienda | Ticket | Producto | Cant. | Precio | Total', 'Sin registros'];
     const out = ['Tienda | Ticket | Producto | Cant. | Precio | Total'];
     let i = 0;
     while(i < sorted.length){
-      const store = sorted[i]?.tienda?.nombre || storeName(sorted[i]?.tiendaId) || 'Sin tienda';
+      const store = storeLabel(sorted[i]);
+      const sKey = storeKey(sorted[i]);
       let storeTotal = 0;
-      while(i < sorted.length){
-        const currentStore = sorted[i]?.tienda?.nombre || storeName(sorted[i]?.tiendaId) || 'Sin tienda';
-        if(currentStore !== store) break;
-        const ticket = sorted[i]?.ticketDonacion || 'Pte.Compra';
+      while(i < sorted.length && storeKey(sorted[i]) === sKey){
+        const ticket = ticketLabel(sorted[i]);
+        const tKey = ticketKey(sorted[i]);
         const group = [];
-        while(i < sorted.length){
-          const r = sorted[i];
-          const sName = r?.tienda?.nombre || storeName(r?.tiendaId) || 'Sin tienda';
-          const tName = r?.ticketDonacion || 'Pte.Compra';
-          if(sName !== store || tName !== ticket) break;
-          group.push(r); i += 1;
-        }
-        group.forEach(r => out.push(`${r.tienda?.nombre || storeName(r.tiendaId) || 'Sin tienda'} | ${r.ticketDonacion || 'Pte.Compra'} | ${r.producto?.nombre || productName(r.productoId) || 'Producto'} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
+        while(i < sorted.length && storeKey(sorted[i]) === sKey && ticketKey(sorted[i]) === tKey){ group.push(sorted[i]); i += 1; }
         const ticketTotal = sum(group.map(rowValue));
         storeTotal += ticketTotal;
+        group.forEach(r => out.push(`${storeLabel(r)} | ${ticketLabel(r)} | ${productLabel(r)} | ${qtyF(r)} | ${moneyF(unitPriceFor(r))} | ${moneyF(rowValue(r))}`));
         out.push(`Total ${store}, ${ticket} |  |  |  |  | ${moneyF(ticketTotal)}`);
+        out.push('');
       }
       out.push(`Total ${store} |  |  |  |  | ${moneyF(storeTotal)}`);
+      out.push('');
     }
+    while(out.length && out[out.length - 1] === '') out.pop();
     return out;
   }
-  function limited(list, max=80){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
+  function limited(list, max=500){ return list.length > max ? list.slice(0,max).concat([`... ${list.length - max} registros más`]) : list; }
   function saldoActualLines(incomeRows, expenseRows, income, expense, saldo){
     return ['SALDO ACTUAL', 'TOTAL | Importe', `Ingresos realizados | ${moneyF(income)}`, `Gastos realizados | ${moneyF(expense)}`, `SALDO ACTUAL | ${moneyF(saldo)}`, '', 'INGRESOS REALIZADOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS REALIZADOS', ...limited(expenseLines(expenseRows))];
   }
@@ -672,7 +671,7 @@
     return ['SALDO OPERATIVO', 'TOTAL | Importe', `Ingreso total previsto | ${moneyF(income)}`, `Gasto total previsto | ${moneyF(expense)}`, `SALDO OPERATIVO | ${moneyF(saldo)}`, '', 'INGRESOS INCLUIDOS', ...limited(incomeLines(incomeRows)), '', 'GASTOS INCLUIDOS', ...limited(expenseLines(expenseRows))];
   }
   function valoracionLines(expenseRows, donationRows, expenses, donations, valoracion, pending){
-    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Gastos previstos | ${moneyF(expenses)}`, `Donación de producto | ${moneyF(donations)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows)), '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows))];
+    return ['VALORACION DEL EVENTO', 'TOTAL | Importe', `Donación de producto | ${moneyF(donations)}`, `Gastos previstos | ${moneyF(expenses)}`, `Pendiente incluido | ${moneyF(pending)}`, `VALORACION DEL EVENTO | ${moneyF(valoracion)}`, '', 'DONACIONES DE PRODUCTO', ...limited(donationLines(donationRows)), '', 'GASTOS PREVISTOS', ...limited(expenseLines(expenseRows))];
   }
   function polar(cx, cy, r, angle){ const rad = (angle - 90) * Math.PI / 180; return {x:cx + r * Math.cos(rad), y:cy + r * Math.sin(rad)}; }
   function arcPath(cx, cy, r, start, end){ const s = polar(cx,cy,r,end), e = polar(cx,cy,r,start); const large = end - start <= 180 ? 0 : 1; return `M ${cx} ${cy} L ${s.x.toFixed(3)} ${s.y.toFixed(3)} A ${r} ${r} 0 ${large} 0 ${e.x.toFixed(3)} ${e.y.toFixed(3)} Z`; }
@@ -926,6 +925,6 @@
   document.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleExportClick, true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
-  [0,120,600,1600,3000].forEach(ms => setTimeout(install, ms));
+  [0,220,900].forEach(ms => setTimeout(install, ms));
   window.ControlEventV462 = {version:VERSION, renderGraficas:renderGraficasV460, install, directInfoEvento, directBackup}; window.ControlEventV461 = window.ControlEventV462; window.ControlEventV460 = window.ControlEventV462;
 })();

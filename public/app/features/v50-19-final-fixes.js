@@ -317,7 +317,7 @@
     lastEventSelectedAt = Date.now();
     finalizeSelectedEvent(id, reason);
     const tab = currentTab();
-    [80,240,650,1200,2200].forEach(ms => setTimeout(() => {
+    [90,420].forEach(ms => setTimeout(() => {
       if(!hasValidEvent(id) || String(currentEventId()) !== String(id)) return;
       finalizeSelectedEvent(id, reason);
       renderActiveTab(currentTab() || tab);
@@ -415,7 +415,7 @@
     }, true);
     document.addEventListener('click', ev => {
       const btn = ev.target?.closest?.('#tabResumenBtn,#tabIngresosBtn,#tabDonacionesBtn,#tabComprasBtn,#tabGraficasBtn,#tabMapaBtn,#tabDocumentosBtn');
-      if(btn) [120,420,900].forEach(ms => setTimeout(() => { if(hasValidEvent()) { renderActiveTab(currentTab()); hydrateBudgetTips('tab-click'); } }, ms));
+      if(btn) setTimeout(() => { if(hasValidEvent()) { renderActiveTab(currentTab()); hydrateBudgetTips('tab-click'); } }, 90);
     }, true);
     document.addEventListener('keydown', ev => { if(ev.key === 'Escape'){ const m=document.querySelector('.ce-v468-modal'); if(m){ stop(ev); m.remove(); return false; } const b=$(BUDGET_TIP_ID); if(b?.classList.contains('open')) return closeBudgetTooltip(ev); } }, true);
   }
@@ -452,6 +452,6 @@
   }
 
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 30)));
-  [0,80,250,650,1400,2600,4800].forEach(ms => setTimeout(() => { bootGuard(); install(); }, ms));
+  [0,180,900,2500].forEach(ms => setTimeout(() => { bootGuard(); install(); }, ms));
   window.ControlEventV5019 = {version:VERSION, versionFile:VERSION_FILE, install, showAwaitingEvent, afterEventSelected, refreshHere, logout, applyVersion, ensureMobileDock};
 })();

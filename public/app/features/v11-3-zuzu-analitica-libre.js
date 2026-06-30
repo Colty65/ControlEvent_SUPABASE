@@ -45,7 +45,9 @@
       '#ceGeminiLibreOverlay .ce-ai-vbars{height:320px;display:flex;align-items:flex-end;gap:14px;border:1px solid #e0f2fe;border-radius:16px;background:linear-gradient(180deg,#fff,#f8fafc);padding:34px 14px 58px;overflow:auto}#ceGeminiLibreOverlay .ce-ai-vbar{height:100%;min-width:74px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative}#ceGeminiLibreOverlay .ce-ai-vbar-col{width:48px;border-radius:12px 12px 0 0;box-shadow:0 8px 20px rgba(15,23,42,.12)}#ceGeminiLibreOverlay .ce-ai-vbar-value{position:absolute;bottom:calc(100% + 8px);font-size:12px;font-weight:900;color:#075985;white-space:nowrap;transform:rotate(-90deg);transform-origin:center}#ceGeminiLibreOverlay .ce-ai-vbar-label{position:absolute;bottom:-42px;max-width:110px;text-align:center;font-size:12px;font-weight:900;color:#334155;white-space:normal;line-height:1.15}\n'+
       '#ceGeminiLibreOverlay .ce-ai-pie-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-pie{width:220px;height:220px;border-radius:50%;box-shadow:inset 0 0 0 42px rgba(255,255,255,.82),0 10px 24px rgba(15,23,42,.12)}#ceGeminiLibreOverlay .ce-ai-pie.donut{box-shadow:inset 0 0 0 64px rgba(255,255,255,.88),0 10px 24px rgba(15,23,42,.12)}#ceGeminiLibreOverlay .ce-ai-pie-list{display:grid;gap:8px;min-width:220px}#ceGeminiLibreOverlay .ce-ai-pie-legend{font-weight:850;color:#0f172a}#ceGeminiLibreOverlay .ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}\n'+
       '#ceGeminiLibreOverlay .ce-ai-line-svg{width:100%;height:320px;border:1px solid #e0f2fe;border-radius:16px;background:linear-gradient(180deg,#fff,#f8fafc)}#ceGeminiLibreOverlay .ce-ai-stacked-wrap{display:grid;gap:12px}#ceGeminiLibreOverlay .ce-ai-stack-row{display:grid;grid-template-columns:minmax(130px,240px) 1fr;gap:10px;align-items:center}#ceGeminiLibreOverlay .ce-ai-stack-label{font-weight:900;color:#0f172a;overflow:hidden;text-overflow:ellipsis}#ceGeminiLibreOverlay .ce-ai-stack-track{height:30px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}#ceGeminiLibreOverlay .ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:900;min-width:3px}#ceGeminiLibreOverlay .ce-ai-stack-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-weight:900;color:#334155}#ceGeminiLibreOverlay .ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}\n'+
-      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n';
+      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
+      '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
+      '@media(pointer:coarse){#ceGeminiLibreOverlay .ce-ai-thinking-orb,#ceGeminiLibreOverlay .ce-ai-thinking-orb:before,#ceGeminiLibreOverlay .ce-ai-thinking-orb:after,#ceGeminiLibreOverlay .ce-ai-spinner{animation:none!important}}\n';
     document.head.appendChild(css);
   }
 
@@ -114,9 +116,23 @@
     setStatus('', '');
     try{ if(p) p.focus(); }catch(_){ }
   }
+  function installPromptEventShield(){
+    if(window.__ceZuzuPromptShieldV18) return;
+    window.__ceZuzuPromptShieldV18 = true;
+    var block = function(ev){
+      var t = ev && ev.target;
+      if(!t || !t.closest || !t.closest('#ceGeminiLibreOverlay #ceAiPrompt')) return;
+      if(ev.type === 'keydown' && ev.key === 'Escape'){ closeModal(); try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ } return false; }
+      try{ ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
+      return undefined;
+    };
+    ['keydown','keyup','keypress','beforeinput','input','paste','compositionstart','compositionupdate','compositionend'].forEach(function(type){
+      window.addEventListener(type, block, {capture:true, passive:false});
+    });
+  }
   function openModal(){
     injectStyle();
-    try{ document.body.classList.add('ce-zuzu-open'); }catch(_){ }
+    installPromptEventShield();
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml());
     var closeBtn=$('ceAiClose');
@@ -128,7 +144,7 @@
     $('ceAiDownloadResult').onclick=printZuzuPdf;
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); try{ document.body.classList.remove('ce-zuzu-open'); }catch(_){ } }
+  function closeModal(){ var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   async function runAi(){
     var ev=currentEvent();
