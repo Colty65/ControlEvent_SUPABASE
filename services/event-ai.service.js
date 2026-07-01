@@ -2997,7 +2997,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('Encargo total a Zuzu: se han cargado directamente las donaciones/existencias confirmadas del prompt y se ha pedido a Gemini que interprete el resto de la planificación.');
+    aiNotes.push('FIX28_PLANIFICACION activo: se han cargado directamente las donaciones/existencias confirmadas del prompt y Gemini interpreta el resto del texto (concepto, duración, comidas y preferencias), sin menú local fijo.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 26000 : 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, [], state, form);
@@ -3012,6 +3012,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX28_PLANIFICACION activo: encargo total sin copiar históricos ni compras locales de seguridad; manda el prompt completo a Gemini.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, baseRows, state, form);
@@ -3041,7 +3042,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v17_prod',
+    version: 'v17_prod_FIX28_PLANIFICACION',
     provider: aiProvider,
     model: aiModel,
     mode: m,
