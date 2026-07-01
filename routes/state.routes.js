@@ -6,7 +6,8 @@ const router = express.Router();
 
 router.get('/state', asyncHandler(async (req, res) => {
   const eventId = String(req.query.eventId || req.query.event_id || '').trim();
-  res.json(await getState(eventId ? { eventId } : {}));
+  const boot = String(req.query.boot || req.query.bootstrap || '').trim() === '1';
+  res.json(await getState(eventId ? { eventId } : (boot ? { boot: true } : {})));
 }));
 
 router.put('/state', asyncHandler(async (req, res) => {
