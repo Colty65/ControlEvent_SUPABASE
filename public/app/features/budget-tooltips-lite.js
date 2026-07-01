@@ -2,7 +2,7 @@
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
    FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo.
-   FIX28_SOLO_ORDEN: ordena únicamente los globos de RESUMEN (Donación y Operativa). */
+   FIX28_SOLO_ORDEN_REAL: ordena únicamente los globos de RESUMEN (Donación y Operativa) y se carga al final para evitar que los globos legacy pisen el orden. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v17_prod';
@@ -458,7 +458,7 @@
       const wrapped = function(name, value){
         try{
           const attr = String(name || '');
-          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite')){
+          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite,#budgetLayout .budget-panel.operativo')){
             return undefined;
           }
         }catch(_){ }
@@ -712,10 +712,15 @@
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [0, 220, 900].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
-  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready'].forEach(evt => {
+  [0, 120, 320, 900, 1800].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
+  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-changed','controlevent:data-loaded'].forEach(evt => {
     window.addEventListener(evt, () => setTimeout(() => rehydrateBudgetLite(evt), 60));
   });
+  try{
+    const observer = new MutationObserver(() => { if(isBudgetLayoutActive()) scheduleSanitize(); });
+    observer.observe(document.body || document.documentElement, {childList:true, subtree:true, attributes:true, attributeFilter: LEGACY_TIP_ATTRS});
+  }catch(_){ }
+  setInterval(() => { if(isBudgetLayoutActive()) rehydrateBudgetLite('safety'); }, window.ControlEventLowResource?.interval?.(2200) || 2200);
   document.addEventListener('click', event => {
     if(event.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(() => rehydrateBudgetLite('resumen-tab'), 180);
   }, true);
