@@ -42,8 +42,12 @@
   const isRW = () => role() === 'RW';
   const canWrite = () => isGD() || isRW();
   function selectedId(){
+    // FIX30: durante la primera selección tras login puede existir un selectedEvent() legacy
+    // desincronizado con el estado real. Para Gráficas manda primero state.selectedEventId.
+    const sid = norm(st().selectedEventId || $('selectedEvent')?.value || '');
+    if(sid) return sid;
     try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return String(ev.id); }catch(_){ }
-    return String(st().selectedEventId || '');
+    return '';
   }
   function selectedEv(){
     const id = selectedId();

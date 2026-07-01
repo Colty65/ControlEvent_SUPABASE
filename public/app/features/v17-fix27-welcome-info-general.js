@@ -8,7 +8,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v17_prod_FIX29';
+  const VERSION_LABEL = 'v17_prod_FIX30';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){

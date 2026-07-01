@@ -5,7 +5,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v17_prod_opt_2i';
+  const VERSION = 'v17_prod_opt_2i_fix30';
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
   const now = () => Date.now();
@@ -157,13 +157,13 @@
     const commits = Number(window.ControlEventOpt2H?.finalCommits || 0);
     const selectedOk = !targetEventId || currentEventId() === targetEventId || $('selectedEvent')?.value === targetEventId;
     const strict = isStrictV46(html);
-    const quiet = (now() - lastMutationAt) >= 220;
+    const quiet = (now() - lastMutationAt) >= 340;
 
     // Mantiene la instantánea mientras el sistema hace los repintados internos.
     // Si Opt2H ya hizo algún commit final y el DOM está quieto, se puede revelar.
-    if(selectedOk && strict && quiet && elapsed >= 420 && commits > startFinalCommits) return true;
+    if(selectedOk && strict && quiet && elapsed >= 760 && commits > startFinalCommits) return true;
     // En eventos lentos, espera algo más para no soltar justo antes del segundo render.
-    if(selectedOk && strict && quiet && elapsed >= 1750) return true;
+    if(selectedOk && strict && quiet && elapsed >= 2200) return true;
     return false;
   }
 
@@ -204,7 +204,7 @@
       targetEventId = eventId || targetEventId;
       lastMutationAt = now();
       clearTimeout(watchdogTimer);
-      watchdogTimer = setTimeout(() => release('watchdog', true), 3600);
+      watchdogTimer = setTimeout(() => release('watchdog', true), 4300);
       tryRelease('begin-again');
       return;
     }
@@ -223,7 +223,7 @@
     observeWrap();
     try{ window.ControlEventOpt2H?.reassert?.('opt2i-begin'); }catch(_){ }
     clearTimeout(watchdogTimer);
-    watchdogTimer = setTimeout(() => release('watchdog', true), 3600);
+    watchdogTimer = setTimeout(() => release('watchdog', true), 4300);
     releaseTimer = setTimeout(() => tryRelease('initial'), 240);
   }
 

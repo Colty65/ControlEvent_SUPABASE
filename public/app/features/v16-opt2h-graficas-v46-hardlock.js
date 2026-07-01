@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v17_prod_opt_2j';
+  const VERSION = 'v17_prod_opt_2j_fix30';
   const now = () => Date.now();
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
@@ -52,8 +52,8 @@
   let lastFinalAt = 0;
   let lastCommitSig = '';
   let lastCommitEventId = '';
-  const POST_COMMIT_LOCK_MS = 1450;
-  const FRESH_SCHEDULE_LOCK_MS = 1900;
+  const POST_COMMIT_LOCK_MS = 2300;
+  const FRESH_SCHEDULE_LOCK_MS = 3000;
 
   function normalizedHtmlSig(html){
     html = String(html || '');

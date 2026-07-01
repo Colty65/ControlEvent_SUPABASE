@@ -39,13 +39,27 @@
   }
   function applyState(serverState, eventId){
     const s=stateObj();
+    // FIX30: conservar maestros globales si /api/state?eventId trae solo datos scoped.
+    const keep={};
+    ['eventos','personas','productos','tiendas','acceso','usuarios'].forEach(k=>{ if(Array.isArray(s[k]) && s[k].length) keep[k]=s[k].slice(); });
     const merged=mergeLoaded(serverState || {});
     Object.keys(s).forEach(k=>{ delete s[k]; });
     Object.assign(s, merged);
+    ['compras','colaboradores','donaciones','eventDocuments'].forEach(k=>{
+      if(eventId && Array.isArray(s[k])) s[k].forEach(r=>{ if(r && !r.eventId && !r.event_id) r.eventId=eventId; });
+    });
+    Object.keys(keep).forEach(k=>{
+      if(!Array.isArray(s[k]) || !s[k].length || (k==='eventos' && eventId && !s[k].some(e=>text(e && e.id).trim()===text(eventId).trim()))){
+        s[k]=keep[k];
+      }
+    });
     if(eventId) s.selectedEventId=eventId;
+    const sel=document.getElementById('selectedEvent');
+    if(sel && eventId){ try{ sel.value=eventId; }catch(_){} }
     rememberEvent(s.selectedEventId || eventId || '');
     persistLocal();
     try{ window.state=s; }catch(_){}
+    try{ if(window.ControlEventApp) window.ControlEventApp.state=s; }catch(_){}
     return s;
   }
   function decorateStateUrl(input){
