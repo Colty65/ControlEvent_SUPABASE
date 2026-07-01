@@ -706,7 +706,14 @@
     return out;
   }
   function pieCard(title, total, items){
-    const nonzero = items.filter(it => Math.abs(Number(it.value || 0)) > 0);
+    const list = Array.isArray(items) ? items : [];
+    const nonzero = list.filter(it => Math.abs(Number(it.value || 0)) > 0);
+    // FIX28: SALDO ACTUAL y SALDO OPERATIVO deben abrir detalle aunque el saldo sea 0,00 €.
+    // Donación de producto sigue mostrando "Sin datos" si no hay donaciones reales.
+    const saldoDetail = /SALDO\s+ACTUAL|SALDO\s+OPERATIVO/i.test(String(title || ''))
+      ? list.filter(it => it && Array.isArray(it.lines) && it.lines.length)
+      : [];
+    const visibleItems = nonzero.length ? nonzero : saldoDetail;
     let angle = 0;
     const angles = pieDisplayAngles(nonzero);
     const slices = nonzero.length ? nonzero.map((it, idx) => {
@@ -714,8 +721,11 @@
       if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></circle><circle class="ce-v434-pie-hit" cx="50" cy="50" r="42" ${tipAttrs(it, it.color)}></circle>`;
       const d = arcPath(50,50,42,start,angle);
       return `<path class="ce-v434-pie-slice" d="${d}" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></path><path class="ce-v434-pie-hit" d="${d}" ${tipAttrs(it, it.color)}></path>`;
-    }).join('') : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`;
-    const legend = (nonzero.length ? nonzero : [{label:'Sin datos', value:0, color:'#e5e7eb', lines:['Sin registros']}]).map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
+    }).join('') : (visibleItems.length
+      ? `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="#e5e7eb" ${tipAttrs(visibleItems[0], visibleItems[0].color || '#64748b', visibleItems[0].layout || 'metricv460')}></circle><circle class="ce-v434-pie-hit" cx="50" cy="50" r="42" ${tipAttrs(visibleItems[0], visibleItems[0].color || '#64748b', visibleItems[0].layout || 'metricv460')}></circle>`
+      : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`);
+    const legendItems = visibleItems.length ? visibleItems : [{label:'Sin datos', value:0, color:'#e5e7eb', lines:['Sin registros']}];
+    const legend = legendItems.map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
     return `<div class="ce-v434-pie-card"><div class="ce-v434-pie-title"><span>${esc(title)}</span><strong>${esc(moneyF(total))}</strong></div><svg class="ce-v434-pie-svg" viewBox="0 0 100 100" role="img" aria-label="${esc(title)}">${slices}<circle cx="50" cy="50" r="21" fill="#fff"></circle></svg><div class="ce-v434-legend">${legend}</div></div>`;
   }
   function hasDestinoValues(row){ return Math.abs(Number(row?.comprado || 0)) > 0 || Math.abs(Number(row?.donado || 0)) > 0 || Math.abs(Number(row?.pendiente || 0)) > 0; }
