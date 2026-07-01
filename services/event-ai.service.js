@@ -78,11 +78,10 @@ function configuredGeminiModels() {
 }
 
 function configuredGeminiPlanningModels() {
-  // FIX32: planificación prioriza modelos rápidos. La propuesta debe responder en segundos,
-  // no en llamadas largas con exceso de contexto.
+  // FIX33: planificación prioriza modelos rápidos y con menos problemas de cuota.
   const configuredRaw = trim(process.env.CONTROLEVENT_PLAN_AI_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
   const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
-  const fallback = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest'];
+  const fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   const out = [];
   [...configured, ...fallback].forEach(model => {
     const m = trim(model).replace(/^models\//, '');
@@ -1757,7 +1756,11 @@ function planReadableNotes(rawNotes, rows, form, budgetNotes) {
     .slice(0, 2);
   const donCount = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).length;
   const donUnits = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).reduce((sum, r) => sum + num(r.unidades), 0);
-  const base = `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). Compra prevista final: ${round(total,2)} € (${round(per,2)} €/persona). Donaciones/existencias detectadas: ${donCount} líneas / ${round(donUnits,2)} ud.; solo se descuentan si están confirmadas por el prompt o por histórico real.`;
+  const compraCount = arr(rows).filter(r => r?.tipo === 'COMPRA' && r.include !== false).length;
+  const geminiFailed = arr(rawNotes).some(n => /Gemini no pudo|no devolvi[oó]|tard[oó] demasiado|timeout|aborted|cuota|quota/i.test(trim(n)));
+  const base = (geminiFailed && compraCount === 0)
+    ? `Atención: Gemini no ha devuelto compras estructuradas para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). ControlEvent conserva ${donCount} donaciones/existencias detectadas, pero NO da por calculada la compra: vuelve a generar o revisa la traza.`
+    : `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). Compra prevista final: ${round(total,2)} € (${round(per,2)} €/persona). Donaciones/existencias detectadas: ${donCount} líneas / ${round(donUnits,2)} ud.; solo se descuentan si están confirmadas por el prompt o por histórico real.`;
   const guide = `Para afinar de verdad, usa el campo de información como una conversación guiada: asistentes que beben cerveza, asistentes que toman cubatas, niños/no bebedores, comidas incluidas, presupuesto objetivo y existencias/donaciones confirmadas.`;
   return [base, ...arr(budgetNotes).map(n => trim(n)).filter(Boolean), ...useful, guide].filter(Boolean);
 }
@@ -2041,425 +2044,71 @@ function planExplicitDonationSections(info) {
   }).filter(x => planExplicitItemLines(x.block).length);
 }
 function planExplicitDonationRowsFromPrompt(form, state) {
-  const info = planPromptRawText(form);
-  if (!info) return [];
+  const info = planPromptRawText(form).replace(/\r/g, '');
+  if (!trim(info)) return [];
   const maps = planBuildMaps(state);
   const rowsOut = [];
-  function addRows(block, defaults) {
-    const donorLabel = defaults.donor || defaults.store || 'Sin donante';
-    const responsableLabel = defaults.responsable || donorLabel;
-    const storeLabel = defaults.store || donorLabel;
-    const donorRef = planRefFromLooseLabel(donorLabel, maps, defaults.preferredDonorKind || 'P') || planRefFromLooseLabel(storeLabel, maps, 'T') || trim(donorLabel);
-    const resp = planFindPersonLoose(responsableLabel, maps);
-    const store = planFindStoreLoose(storeLabel, maps);
-    for (const itemRaw of planExplicitItemLines(block)) {
-      let item = itemRaw;
-      let lineDonorLabel = donorLabel;
-      let lineRespLabel = responsableLabel;
-      let lineStoreLabel = storeLabel;
-      let lineTicket = defaults.ticketDonacion || 'DONADO SOCIO';
-      const donorPrefix = trim(itemRaw).match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,160}:\s*\d+(?:[,.]\d+)?\b.*)$/i);
-      if (donorPrefix) {
-        const prefix = trim(donorPrefix[1]);
-        const mentionedStore = planFindStoreLoose(prefix, maps);
-        const mentionedPerson = planFindPersonLoose(prefix, maps);
-        if (mentionedStore?.id || mentionedPerson?.id || /pe[nñ]a|despensa|tienda|almacen|almac[eé]n/i.test(prefix)) {
-          item = donorPrefix[2];
-          if (mentionedStore?.id || /tienda|despensa/i.test(prefix)) {
-            lineTicket = 'DONADO TIENDA';
-            lineStoreLabel = mentionedStore?.nombre || prefix;
-            lineDonorLabel = mentionedStore?.nombre || prefix;
-            lineRespLabel = trim(form.defaultResponsibleName || responsableLabel || '');
-          } else {
-            lineTicket = 'DONADO SOCIO';
-            lineDonorLabel = mentionedPerson?.nombre || prefix;
-            lineRespLabel = mentionedPerson?.nombre || prefix;
-          }
-        }
-      }
-      const productoTexto = planCleanExplicitProductText(item);
-      const prod = planFindProductLoose(productoTexto, maps) || {};
-      const unidades = Math.max(0.01, planExplicitUnits(item));
-      const rowDonorRef = planRefFromLooseLabel(lineDonorLabel, maps, lineTicket === 'DONADO TIENDA' ? 'T' : 'P') || planRefFromLooseLabel(lineStoreLabel, maps, 'T') || trim(lineDonorLabel);
-      const rowResp = planFindPersonLoose(lineRespLabel, maps);
-      const rowStore = planFindStoreLoose(lineStoreLabel, maps);
-      rowsOut.push({
-        key:`prompt-don:${rowsOut.length}:${trim(prod?.id || productoTexto)}`,
-        include:true,
-        tipo:'DONACION',
-        productId:trim(prod?.id || ''),
-        productName:trim(prod?.nombre || productoTexto),
-        segmento:trim(prod?.segmento || 'Sin segmento'),
-        destino:trim(prod?.destino || 'Sin destino'),
-        unidades:round(unidades, 2),
-        precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0),
-        tiendaId:trim(rowStore?.id || store?.id || form.defaultStoreId || ''),
-        responsableId:trim(rowResp?.id || resp?.id || form.defaultResponsibleId || ''),
-        ticketDonacion:lineTicket,
-        donorRef:rowDonorRef,
-        confidence:'Prompt explícito',
-        explicitPromptDonation:true,
-        explicitConfirmedDonation:true,
-        explicitPromptStrictHf12: defaults.strictHf12 === true,
-        reason:`Existencia/donación indicada literalmente por el usuario (${lineDonorLabel}).`
-      });
-    }
+  const seen = new Set();
+  function donationTypeFromText(txt) {
+    const n = normPlanKey(txt || '');
+    if (/donado\s+tienda|donacion\s+de\s+tienda|donaci[oó]n\s+de\s+tienda|tienda/.test(n)) return 'DONADO TIENDA';
+    if (/donado\s+otros|donacion\s+de\s+otros|donaci[oó]n\s+de\s+otros|otros/.test(n)) return 'DONADO OTROS';
+    return 'DONADO SOCIO';
   }
-  for (const section of planExplicitDonationSections(info)) {
-    const header = section.header;
-    const headBlock = header + '\n' + section.block.split(/\n/).slice(0, 8).join('\n');
-    const mentionedStore = planMentionedStore(headBlock, maps);
-    const mentionedPerson = planMentionedPerson(headBlock, maps);
-    const rawDonor = planExtractBracket(headBlock, ['Donante']) || planExtractBracket(headBlock, ['Dona', 'De']) || (mentionedPerson?.nombre || '') || (/PE[NÑ]A/i.test(headBlock) ? 'Peña El Arrastre' : 'Donante indicado');
-    const rawStore = planExtractBracket(headBlock, ['Tienda']) || mentionedStore?.nombre || '';
-    addRows(section.block, {
-      ticketDonacion:section.ticketDonacion,
-      donor:section.ticketDonacion === 'DONADO TIENDA' ? (rawStore || rawDonor) : rawDonor,
-      store:section.ticketDonacion === 'DONADO TIENDA' ? (rawStore || rawDonor) : '',
-      responsable:planExtractBracket(headBlock, ['Responsable']) || mentionedPerson?.nombre || trim(form.defaultResponsibleName || ''),
-      preferredDonorKind:section.ticketDonacion === 'DONADO TIENDA' ? 'T' : 'P'
-    });
+  function labelFromHeader(block, header, ticket) {
+    const head = header + '\n' + block.slice(0, 700);
+    let donor = planExtractBracket(head, ['Donante']) || '';
+    let responsable = planExtractBracket(head, ['Responsable']) || '';
+    let tienda = planExtractBracket(head, ['Tienda']) || '';
+    let m = head.match(/(?:donado|donaci[oó]n)\s+(?:socio|tienda|otros)\s*[-–:]\s*([^\/\n\[]+)/i);
+    if (!donor && m) donor = trim(m[1]);
+    m = head.match(/responsable\s*[:=]?\s*([^\]\n\/]+)/i);
+    if (!responsable && m) responsable = trim(m[1]);
+    if (!donor && /producto\s+en\s+la\s+pe[nñ]a/i.test(head)) donor = 'Peña El Arrastre';
+    if (!donor) donor = ticket === 'DONADO TIENDA' ? (tienda || 'Tienda donante') : (ticket === 'DONADO OTROS' ? 'Donante externo' : 'Donante indicado');
+    if (!responsable) responsable = trim(form.defaultResponsibleName || donor);
+    if (!tienda && ticket === 'DONADO TIENDA') tienda = donor;
+    return { donor, responsable, tienda };
   }
-  const existBlock = planBlockBetween(info, /EXISTENCIAS\s+QUE\s+YA\s+TENEMOS\s*:?/i, [/DONACIONES\s+PREVISTAS\s*:?/i, /CRITERIO\s+DE\s+C[ÁA]LCULO\s*:?/i, /RESULTADO\s+QUE\s+QUIERO\s*:?/i]);
-  if (existBlock) {
-    const header = existBlock.split(/\n/).slice(0, 5).join('\n');
-    addRows(existBlock, {
-      ticketDonacion:/DONADO\s+TIENDA/i.test(header) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(header) ? 'DONADO OTROS' : 'DONADO SOCIO'),
-      donor:planExtractBracket(header, ['Donante']) || planExtractBracket(header, ['de', 'socio']) || 'Peña El Arrastre',
-      store:planExtractBracket(header, ['Tienda']) || 'PEÑA EL ARRASTRE',
-      responsable:planExtractBracket(header, ['responsable', 'Responsable']) || trim(form.defaultResponsibleName || ''),
-      preferredDonorKind:'P'
-    });
+  function pushItem(itemRaw, meta) {
+    const productoTexto = planCleanExplicitProductText(itemRaw);
+    if (!productoTexto || /^(productos?|donante|responsable|tratar\s+todo|bloque)$/i.test(productoTexto)) return;
+    const unidades = Math.max(0.01, planExplicitUnits(itemRaw));
+    const k = [meta.ticket, normPlanKey(meta.donor), normPlanKey(productoTexto), unidades].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    const prod = planFindProductLoose(productoTexto, maps) || {};
+    const donorKind = meta.ticket === 'DONADO TIENDA' ? 'T' : 'P';
+    const donorRef = planRefFromLooseLabel(meta.donor, maps, donorKind) || (meta.ticket === 'DONADO TIENDA' ? planRefFromLooseLabel(meta.tienda || meta.donor, maps, 'T') : '') || trim(meta.donor);
+    const rowResp = planFindPersonLoose(meta.responsable, maps);
+    const rowStore = planFindStoreLoose(meta.tienda || meta.donor, maps);
+    rowsOut.push({ key:`prompt-don-fix33:${rowsOut.length}:${trim(prod?.id || productoTexto)}`, include:true, tipo:'DONACION', productId:trim(prod?.id || ''), productName:trim(prod?.nombre || productoTexto), segmento:trim(prod?.segmento || 'Sin segmento'), destino:trim(prod?.destino || 'Sin destino'), unidades:round(unidades, 2), precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0), tiendaId:trim(rowStore?.id || form.defaultStoreId || ''), responsableId:trim(rowResp?.id || form.defaultResponsibleId || ''), ticketDonacion:meta.ticket, donorRef, confidence:'Prompt explícito', explicitPromptDonation:true, explicitConfirmedDonation:true, explicitPromptStrictHf12:true, reason:`Existencia/donación indicada literalmente por el usuario (${meta.donor}).` });
   }
-  const donatedBlock = planBlockBetween(info, /DONACIONES\s+PREVISTAS\s*:?/i, [/CRITERIO\s+DE\s+C[ÁA]LCULO\s*:?/i, /RESULTADO\s+QUE\s+QUIERO\s*:?/i]);
-  if (donatedBlock) {
-    const header = donatedBlock.split(/\n/).slice(0, 12).join('\n');
-    addRows(donatedBlock, {
-      ticketDonacion:/DONADO\s+TIENDA/i.test(header) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(header) ? 'DONADO OTROS' : 'DONADO SOCIO'),
-      donor:planExtractBracket(header, ['Donante']) || planExtractBracket(header, ['DE']) || 'Donante previsto',
-      store:planExtractBracket(header, ['Tienda']) || '',
-      responsable:planExtractBracket(header, ['Responsable']) || planExtractBracket(header, ['Donante']) || trim(form.defaultResponsibleName || ''),
-      preferredDonorKind:'P'
-    });
-  }
-  // Lectura conservadora de líneas tipo "Anchoas: 1" o "Rollo papel secamanos: 1" cuando están
-  // dentro de un bloque o contexto de donaciones/existencias. Esto evita convertir en COMPRA
-  // una donación explícita del prompt aunque la línea no lleve la palabra "donado".
-  const infoLines = info.replace(/\r/g, '').split(/\n/);
-  infoLines.forEach((line, i) => {
-    const s = trim(line);
-    if (!s || !/\d/.test(s) || !planExplicitItemLines(s).length) return;
-    if (/^\s*[•\-]?\s*(COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i.test(s)) return;
-    const before = infoLines.slice(Math.max(0, i - 6), i + 1).join('\n');
-    const after = infoLines.slice(i, Math.min(infoLines.length, i + 2)).join('\n');
-    const ctx = before + '\n' + after;
-    if (/\b(sin|no)\s+(donaci[oó]n|donaciones|donado|donada|existencias?)\b/i.test(ctx)) return;
-    const isDonationCtx = /(donaci[oó]n|donaciones|donado|donada|donados|donadas|existencias?|ya\s+tenemos|producto\s+en\s+la\s+pe[nñ]a|productos?\s+donados?|material\s+donado|donante|dona|aporta|cedido|regalado)/i.test(ctx);
-    if (!isDonationCtx) return;
-    const lastCompra = Math.max(before.toUpperCase().lastIndexOf('COMPRA:'), before.toUpperCase().lastIndexOf('COMPRAS:'), before.toUpperCase().lastIndexOf('A COMPRAR'));
-    const lastDona = Math.max(before.toUpperCase().lastIndexOf('DONACION'), before.toUpperCase().lastIndexOf('DONACIONES'), before.toUpperCase().lastIndexOf('DONADO'), before.toUpperCase().lastIndexOf('EXISTENCIAS'), before.toUpperCase().lastIndexOf('PRODUCTO EN LA PE'));
-    if (lastCompra > lastDona && !/(donad|donaci[oó]n|existenc|dona|aporta)/i.test(s)) return;
-    const mentionedStore = planMentionedStore(ctx, maps);
-    const mentionedPerson = planMentionedPerson(ctx, maps);
-    const isStoreDonation = /DONADO\s+TIENDA|tienda|despensa/i.test(ctx) && !!mentionedStore;
-    addRows(s, {
-      ticketDonacion: isStoreDonation ? 'DONADO TIENDA' : 'DONADO SOCIO',
-      donor: isStoreDonation ? (mentionedStore?.nombre || 'Tienda donante') : (mentionedPerson?.nombre || (/PE[NÑ]A/i.test(ctx) ? 'Peña El Arrastre' : 'Donante indicado')),
-      store: isStoreDonation ? (mentionedStore?.nombre || '') : '',
-      responsable: planExtractBracket(ctx, ['Responsable']) || mentionedPerson?.nombre || trim(form.defaultResponsibleName || ''),
-      preferredDonorKind: isStoreDonation ? 'T' : 'P'
-    });
+  const headerRe = /(?:^|\n)\s*(?:[-*•]\s*)?(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s+DE\s+SOCIOS?|DONACI[OÓ]N\s+DE\s+TIENDA|DONACION\s+DE\s+TIENDA|DONACI[OÓ]N\s+DE\s+OTROS|DONACION\s+DE\s+OTROS|EXISTENCIAS?\s+(?:CONFIRMADAS|QUE\s+YA\s+TENEMOS)?|YA\s+TENEMOS|PRODUCTOS?\s+DONADOS?|MATERIAL\s+DONADO)[^\n]*/gi;
+  const matches = []; let m;
+  while ((m = headerRe.exec(info))) matches.push({ index:m.index, end:headerRe.lastIndex, header:trim(m[0]) });
+  matches.forEach((h, idx) => {
+    let end = idx + 1 < matches.length ? matches[idx + 1].index : info.length;
+    const tail = info.slice(h.end, end);
+    const stop = tail.search(/\n\s*(?:PISTAS?\s+DE\s+COMPRA|REGLAS?\s+FINALES|CRITERIOS?\s+DE\s+C[ÁA]LCULO|DATOS\s+PARA\s+EL\s+C[ÁA]LCULO|DESCRIPCI[OÓ]N\s+CONCEPTUAL|OBJETIVO\s+DEL\s+EVENTO)\b/i);
+    if (stop >= 0) end = h.end + stop;
+    const block = info.slice(h.end, end);
+    const ticket = donationTypeFromText(h.header + '\n' + block.slice(0, 500));
+    const metaLabels = labelFromHeader(block, h.header, ticket);
+    const productMarker = block.search(/(?:^|\n)\s*PRODUCTOS?\s*:\s*/i);
+    const productBlock = productMarker >= 0 ? block.slice(productMarker) : block;
+    const items = planExplicitItemLines(productBlock).filter(x => !/^(?:tratar\s+todo|donante|responsable|productos?)\b/i.test(trim(x)));
+    items.forEach(item => pushItem(item, { ticket, ...metaLabels }));
   });
-
   info.split(/\n+/).forEach(line => {
     const s = trim(line);
-    if (!s || !/\d/.test(s) || !/(dona|donar|donad|aport|regala|cede|existenc)/i.test(s)) return;
+    if (!s || !/(dona|donar|donad|aport|regala|cede|existenc|ya\s+tenemos)/i.test(s)) return;
     let m = s.match(/^\s*(?:[•\-]\s*)?(.{2,80}?)\s+(?:dona|donar[áa]?|aporta|regala|cede)\s+(.+)$/i);
-    if (m) {
-      addRows('- ' + trim(m[2]), { ticketDonacion:'DONADO SOCIO', donor:trim(m[1]), responsable:trim(m[1]) || trim(form.defaultResponsibleName || ''), preferredDonorKind:'P' });
-      return;
-    }
-    m = s.match(/^\s*(?:[•\-]\s*)?(.+?)\s+(?:donad[oa]s?|aportad[oa]s?|cedid[oa]s?)\s+(?:por|de)\s+(.+)$/i);
-    if (m) addRows('- ' + trim(m[1]), { ticketDonacion:'DONADO SOCIO', donor:trim(m[2]), responsable:trim(m[2]) || trim(form.defaultResponsibleName || ''), preferredDonorKind:'P' });
+    if (m) { pushItem(trim(m[2]), { ticket:'DONADO SOCIO', donor:trim(m[1]), responsable:trim(m[1]), tienda:'' }); return; }
+    m = s.match(/^\s*(?:[•\-]\s*)?(?:ya\s+tenemos|existencias?)\s*:?\s*(.+)$/i);
+    if (m) pushItem(trim(m[1]), { ticket:'DONADO SOCIO', donor:'Existencias', responsable:trim(form.defaultResponsibleName || 'Responsable'), tienda:'' });
   });
-
-  // HOTFIX12: lectura estricta de bloques simples de donaciones:
-  // Donaciones:
-  // Pocholo y Celes:
-  // - Cerveza AMSTEL (Barril 30l): 1
-  // DESPENSA:
-  // - Cerveza CON SKOL (Lata 33cl): 24
-  // En este formato cada cabecera intermedia manda sobre las líneas siguientes.
-  (function parseSimpleDonationBlockHf12(){
-    const lines = info.replace(/\r/g, '').split(/\n/);
-    let inDonBlock = false;
-    let currentDonor = '';
-    let currentKind = 'P';
-    const stopRe = /^\s*(?:COMPRA|COMPRAS|A\s+COMPRAR|CRITERIO|RESULTADO|OBJETIVO|MEN[ÚU]|MENU|COMIDAS?|BEBIDAS?)\s*:/i;
-    lines.forEach(rawLine => {
-      const line = trim(rawLine);
-      if(!line) return;
-      if(/^\s*DONACIONES?\s*:/i.test(line)){ inDonBlock = true; currentDonor = ''; currentKind = 'P'; return; }
-      if(!inDonBlock) return;
-      if(stopRe.test(line)){ inDonBlock = false; return; }
-      const header = line.match(/^\s*([A-Za-zÁÉÍÓÚÜÑ0-9][^:\n]{1,80})\s*:\s*$/);
-      if(header){
-        const label = trim(header[1]);
-        if(!/^(donaciones?|productos?|compras?|responsable|donante|tienda)$/i.test(label)){
-          const store = planFindStoreLoose(label, maps);
-          const person = planFindPersonLoose(label, maps);
-          currentDonor = trim(store?.nombre || person?.nombre || label);
-          currentKind = (store?.id || /^(DESPENSA|TIENDA|SUPERMERCADO|ALMAC[EÉ]N)$/i.test(label)) ? 'T' : 'P';
-        }
-        return;
-      }
-      if(!currentDonor) return;
-      if(!/^\s*[-•*]/.test(line) && !/^[^:\n]{2,160}:\s*(?:\d|un|una|uno)\b/i.test(line)) return;
-      const donorIsStore = currentKind === 'T';
-      addRows(line, {
-        ticketDonacion: donorIsStore ? 'DONADO TIENDA' : 'DONADO SOCIO',
-        donor: currentDonor,
-        store: donorIsStore ? currentDonor : '',
-        responsable: donorIsStore ? trim(form.defaultResponsibleName || '') : currentDonor,
-        preferredDonorKind: donorIsStore ? 'T' : 'P',
-        strictHf12:true
-      });
-    });
-  })();
-
-
-  // HOTFIX13: parser estricto de bloques largos tipo:
-  // PRODUCTO EN LA PEÑA (...) / DONACIONES: / DONACION:
-  //   PRODUCTOS
-  //   • Producto: cantidad
-  // Respeta cantidades exactas escritas, incluidos "1 pack de 24 ud.".
-  (function parseStructuredDonationBlocksHf13(){
-    const lines = info.replace(/\r/g, '').split(/\n/);
-    let active = null;
-    const headerRe = /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?|DONACION|EXISTENCIAS?|YA\s+TENEMOS|PRODUCTOS?\s+DONADOS?)/i;
-    const stopRe = /^\s*(?:COMPRA|COMPRAS|A\s+COMPRAR|CRITERIO|RESULTADO|OBJETIVO|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS)\s*:/i;
-    function sectionDefaults(header){
-      const h = trim(header || '');
-      const tipo = /DONADO\s+TIENDA/i.test(h) ? 'DONADO TIENDA' : (/DONADO\s+OTROS/i.test(h) ? 'DONADO OTROS' : 'DONADO SOCIO');
-      const donor = planExtractBracket(h, ['Donante']) || planExtractBracket(h, ['Dona','De']) || (/PE[NÑ]A/i.test(h) ? 'Peña El Arrastre' : '');
-      const resp = planExtractBracket(h, ['Responsable']) || donor || trim(form.defaultResponsibleName || '');
-      const store = tipo === 'DONADO TIENDA' ? (donor || planExtractBracket(h, ['Tienda']) || '') : '';
-      return { ticketDonacion:tipo, donor:donor || store || 'Donante indicado', store, responsable:resp, preferredDonorKind:tipo==='DONADO TIENDA'?'T':'P', strictHf12:true };
-    }
-    lines.forEach(rawLine => {
-      const line = trim(rawLine);
-      if(!line) return;
-      if(stopRe.test(line)){ if(!/^COMPRA/i.test(line)) active = null; else active = null; return; }
-      if(headerRe.test(line) && /DONADO\s+(SOCIO|TIENDA|OTROS)|Donante:|Responsable:|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACION/i.test(line)){
-        active = sectionDefaults(line);
-        return;
-      }
-      if(active && /^PRODUCTOS?\s*$/i.test(line)) return;
-      if(active && (/^\s*[•\-]/.test(line) || /^[^:\n]{2,180}:\s*.+\d/.test(line))){
-        addRows(line, active);
-      }
-    });
-  })();
-
-
-  // HOTFIX16: parser directo y determinista de donaciones/existencias confirmadas.
-  // Cualquier producto listado dentro de PRODUCTO EN LA PEÑA / DONACIONES / DONACION se acepta como DONACION.
-  // Si no encuentra producto exacto en catálogo, conserva el nombre textual como donación revisable, pero NO lo convierte en compra.
-  (function parseConfirmedPromptDonationsHf16(){
-    const lines = info.replace(/\r/g, '').split(/\n/);
-    let active = null;
-
-    function kindFrom(text){
-      const h = trim(text || '');
-      if (/DONADO\s+TIENDA|DONACION\s+DE\s+TIENDA/i.test(h)) return 'DONADO TIENDA';
-      if (/DONADO\s+OTROS|DONACION\s+DE\s+OTROS/i.test(h)) return 'DONADO OTROS';
-      return 'DONADO SOCIO';
-    }
-    function updateMetaFromText(meta, text){
-      const h = trim(text || '');
-      if (!meta) meta = {};
-      if (/DONADO\s+TIENDA|DONACION\s+DE\s+TIENDA/i.test(h)) meta.ticketDonacion = 'DONADO TIENDA';
-      if (/DONADO\s+OTROS|DONACION\s+DE\s+OTROS/i.test(h)) meta.ticketDonacion = 'DONADO OTROS';
-      if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?/i.test(h)) meta.ticketDonacion = 'DONADO SOCIO';
-      const donor = planExtractBracket(h, ['Donante']) || planExtractBracket(h, ['Dona']) || '';
-      const resp = planExtractBracket(h, ['Responsable']) || '';
-      if (donor) meta.donor = donor;
-      if (resp) meta.responsable = resp;
-      if (!meta.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) meta.donor = 'Peña El Arrastre';
-      if (!meta.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) meta.responsable = trim(form.defaultResponsibleName || 'Colty');
-      if (!meta.ticketDonacion) meta.ticketDonacion = kindFrom(h);
-      return meta;
-    }
-    function isSectionStart(line){
-      return /^(?:\s*)(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACION\b|DONACI[ÓO]N\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i.test(line)
-        || (/Tratar\s+como\s+DONADO\s+(?:SOCIO|TIENDA|OTROS)/i.test(line) && /\[Donante:/i.test(line));
-    }
-    function isHardStop(line){
-      return /^(?:\s*)(PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR|OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N\s+CONCEPTUAL|CRITERIOS?\s+DE|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS)\s*:/i.test(line);
-    }
-    function looksItem(line){
-      const s = trim(line || '');
-      if (!s) return false;
-      if (/^(PRODUCTOS?|Tratar\s+como)\b/i.test(s)) return false;
-      if (/^\s*[•\-]\s*/.test(s)) return true;
-      return /^[^:\n]{2,180}:\s*(?:\d|un|una|uno)/i.test(s);
-    }
-    function addDirect(itemRaw, meta){
-      const item = trim(itemRaw).replace(/^\s*[•\-]\s*/, '');
-      const productText = planCleanExplicitProductText(item);
-      if (!productText || /^(PRODUCTOS?|Tratar\s+como)$/i.test(productText)) return;
-      const prod = planFindProductLoose(productText, maps);
-      const unidades = Math.max(0.01, planExplicitUnits(item));
-      const ticket = meta.ticketDonacion || 'DONADO SOCIO';
-      const donorLabel = trim(meta.donor || (ticket === 'DONADO TIENDA' ? meta.store : '') || 'Donante indicado');
-      const respLabel = trim(meta.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
-      const storeLabel = ticket === 'DONADO TIENDA' ? donorLabel : '';
-      const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || trim(donorLabel);
-      const resp = planFindPersonLoose(respLabel, maps);
-      const store = planFindStoreLoose(storeLabel || donorLabel, maps);
-      rowsOut.push({
-        key:`prompt-confirmed-hf16:${rowsOut.length}:${trim(prod?.id || productText)}`,
-        include:true,
-        tipo:'DONACION',
-        productId:trim(prod?.id || ''),
-        productName:trim(prod?.nombre || productText),
-        segmento:trim(prod?.segmento || 'Sin segmento'),
-        destino:trim(prod?.destino || 'Sin destino'),
-        unidades:round(unidades, 2),
-        precio:planReasonablePlanPrice(prod?.nombre || productText, prod?.defaultPrecio ?? prod?.precio ?? 0),
-        tiendaId:trim((ticket === 'DONADO TIENDA' ? (store?.id || form.defaultStoreId || '') : (store?.id || form.defaultStoreId || ''))),
-        responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
-        ticketDonacion:ticket,
-        donorRef,
-        confidence:'Prompt explícito confirmado',
-        explicitPromptDonation:true,
-        explicitConfirmedDonation:true,
-        explicitPromptStrictHf12:true,
-        reason:`Donación/existencia confirmada por el prompt (${donorLabel}). No requiere histórico.`
-      });
-    }
-
-    lines.forEach(raw => {
-      const line = trim(raw);
-      if (!line) return;
-      if (isHardStop(line)) { active = null; return; }
-      if (isSectionStart(line)) {
-        active = updateMetaFromText({}, line);
-        return;
-      }
-      if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) {
-        active = updateMetaFromText(active, line);
-        return;
-      }
-      if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
-      if (active && looksItem(line)) addDirect(line, active);
-    });
-  })();
-
-
-  // HOTFIX19: barrido final simple y fiable de todas las líneas de productos de bloques confirmados.
-  // Es deliberadamente menos "inteligente" y más contable: si está bajo un bloque de donación,
-  // cada línea con "* producto: cantidad" / "- producto: cantidad" / "• producto: cantidad" entra.
-  (function parseEveryConfirmedDonationLineHf19(){
-    const lines = info.replace(/\r/g, '').split(/\n/);
-    let active = null;
-    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES|COMIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
-    const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
-    function metaFrom(line, prev){
-      const h = trim(line || '');
-      const m = {...(prev || {})};
-      if (/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
-      else if (/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
-      else if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
-      if (!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
-      const donor = planExtractBracket(h, ['Donante']) || '';
-      const resp = planExtractBracket(h, ['Responsable']) || '';
-      if (donor) m.donor = donor;
-      if (resp) m.responsable = resp;
-      if (!m.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donor = 'Peña El Arrastre';
-      if (!m.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsable = trim(form.defaultResponsibleName || 'Colty');
-      return m;
-    }
-    function lineQty(raw){
-      const s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
-      const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
-      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
-      if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
-      m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
-      if (m) return Math.max(0, round(num(m[1]), 2));
-      m = tail.match(/(\d+(?:[,.]\d+)?)/);
-      if (m) return Math.max(0, num(m[1]));
-      return 1;
-    }
-    function lineProduct(raw){
-      let s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
-      if (!s.includes(':')) return '';
-      s = s.slice(0, s.lastIndexOf(':'));
-      return planCleanExplicitProductText(s);
-    }
-    function add(raw, meta){
-      const productText = lineProduct(raw);
-      if (!productText || /^(PRODUCTOS?|Tratar\s+como)$/i.test(productText)) return;
-      const qty = lineQty(raw);
-      const prod = planFindProductLoose(productText, maps);
-      const ticket = meta.ticketDonacion || 'DONADO SOCIO';
-      const donorLabel = trim(meta.donor || 'Donante indicado');
-      const respLabel = trim(meta.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
-      const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || donorLabel;
-      const resp = planFindPersonLoose(respLabel, maps);
-      const store = ticket === 'DONADO TIENDA' ? planFindStoreLoose(donorLabel, maps) : null;
-      rowsOut.push({
-        key:`prompt-line-hf19:${rowsOut.length}:${trim(prod?.id || productText)}`,
-        include:true,
-        tipo:'DONACION',
-        productId:trim(prod?.id || ''),
-        productName:trim(prod?.nombre || productText),
-        segmento:trim(prod?.segmento || 'Sin segmento'),
-        destino:trim(prod?.destino || 'Sin destino'),
-        unidades:round(qty, 2),
-        precio:planReasonablePlanPrice(prod?.nombre || productText, prod?.defaultPrecio ?? prod?.precio ?? 0),
-        tiendaId:trim(store?.id || form.defaultStoreId || ''),
-        responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
-        ticketDonacion:ticket,
-        donorRef,
-        confidence:'Prompt confirmado línea a línea',
-        explicitPromptDonation:true,
-        explicitConfirmedDonation:true,
-        explicitPromptStrictHf12:true,
-        reason:`Donación/existencia confirmada por línea del prompt (${donorLabel}).`
-      });
-    }
-    lines.forEach(rawLine => {
-      const line = trim(rawLine);
-      if (!line) return;
-      if (stop.test(line)) { active = null; return; }
-      if (start.test(line)) { active = metaFrom(line, {}); return; }
-      if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) { active = metaFrom(line, active); return; }
-      if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
-      if (active && /^\s*[•\-\*]\s*[^:\n]{2,220}:\s*(?:\d|un|una|uno|pack|paquete)/i.test(rawLine)) add(rawLine, active);
-    });
-  })();
-
-  const strictProductKeysHf12 = new Set(rowsOut.filter(r => r.explicitPromptStrictHf12 === true).map(r => trim(r.productId)).filter(Boolean));
-  const finalRowsHf12 = strictProductKeysHf12.size
-    ? rowsOut.filter(r => !strictProductKeysHf12.has(trim(r.productId)) || r.explicitPromptStrictHf12 === true)
-    : rowsOut;
-  // HOTFIX19: si hay varias lecturas de la misma línea/producto/donante, manda el barrido final línea a línea.
-  const best = new Map();
-  finalRowsHf12.forEach((r, pos) => {
-    const productKey = trim(r.productId) || planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || '');
-    const k = [productKey, trim(r.donorRef), trim(r.ticketDonacion).toUpperCase()].join('|');
-    const weight = String(r.key || '').includes('prompt-line-hf19') ? 10000 : (r.explicitPromptStrictHf12 ? 1000 : 0);
-    const prev = best.get(k);
-    if (!prev || weight + pos > prev.weight + prev.pos) best.set(k, {r, weight, pos});
-  });
-  const seen = new Set();
-  return Array.from(best.values()).map(x => x.r).filter(r => {
-    const productKey = trim(r.productId) || planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || '');
-    const k = [productKey, trim(r.donorRef), trim(r.ticketDonacion).toUpperCase(), num(r.unidades)].join('|');
-    if (seen.has(k)) return false;
-    seen.add(k); return true;
-  });
+  return rowsOut;
 }
 function planDonationProductKey(row) {
   return trim(row?.productId) || planProductAliasKey(row?.productName || row?.producto || '') || normPlanKey(row?.productName || row?.producto || '');
@@ -2740,29 +2389,18 @@ function planCatalogForGemini(state, form = {}) {
   const totalMode = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL';
   const finalizados = totalMode ? [] : arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion)));
   const productosBase = arr(state?.productos).map(p => ({
-    id: trim(p.id),
-    nombre: trim(p.nombre),
-    segmento: trim(p.segmento),
-    destino: trim(p.destino),
-    precio: round(p.defaultPrecio ?? p.precio, 4),
-    tienda: planStoreName(p.defaultTiendaId || p.tiendaId, maps),
+    id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino),
+    precio: round(p.defaultPrecio ?? p.precio, 4), tienda: planStoreName(p.defaultTiendaId || p.tiendaId, maps),
     __score: planPlanningProductScore(p, raw)
   })).filter(p => p.nombre);
+  const mustHave = /cerveza|vino|ron|whisky|ginebra|gin|coca|fanta|sprite|kas|tonica|refresco|agua|hielo|jamon|chorizo|salchichon|queso|anchoa|mejillon|patata|berenjena|tortilla|huevo|pan|lomo|panceta|morcilla|venao|venado|chuleta|bacon|baicon|barbacoa|carbon|butano|vaso|plato|servilleta|bolsa|basura|fairy|jabon|papel|secamanos|higienico|ambientador|cafe|aceite|vinagre/i;
   const productosOrdenados = productosBase
-    .filter(p => !totalMode || p.__score > 0)
+    .filter(p => !totalMode || p.__score > 0 || mustHave.test([p.nombre,p.segmento,p.destino].join(' ')))
     .sort((a,b) => b.__score - a.__score || a.nombre.localeCompare(b.nombre, 'es'));
   const productos = (productosOrdenados.length ? productosOrdenados : productosBase)
-    .slice(0, totalMode ? 320 : 650)
-    .map(({__score, ...p}) => p);
-  return {
-    modoCatalogo: totalMode ? 'compacto-relevante-fix32' : 'historico-ampliado',
-    totalProductosCatalogo: arr(state?.productos).length,
-    productosEntregadosGemini: productos.length,
-    eventosFinalizados: finalizados.map(e => ({ id: trim(e.id), titulo: planEventTitle(e), fechaIni: trim(e.fechaIni), fechaFin: trim(e.fechaFin), precio: round(e.precio, 2), asistentes: planAttendeesForEvent(state, e.id) })).slice(0, 60),
-    productos,
-    tiendas: arr(state?.tiendas).map(t => trim(t.nombre)).filter(Boolean).slice(0, 180),
-    personas: arr(state?.personas).map(p => ({ nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 250)
-  };
+    .slice(0, totalMode ? 120 : 650)
+    .map(({__score, tienda, ...p}) => totalMode ? p : ({...p, tienda}));
+  return { modoCatalogo: totalMode ? 'compacto-relevante-fix33' : 'historico-ampliado', totalProductosCatalogo: arr(state?.productos).length, productosEntregadosGemini: productos.length, eventosFinalizados: finalizados.map(e => ({ id: trim(e.id), titulo: planEventTitle(e), fechaIni: trim(e.fechaIni), fechaFin: trim(e.fechaFin), precio: round(e.precio, 2), asistentes: planAttendeesForEvent(state, e.id) })).slice(0, 60), productos, tiendas: totalMode ? [] : arr(state?.tiendas).map(t => trim(t.nombre)).filter(Boolean).slice(0, 180), personas: totalMode ? [] : arr(state?.personas).map(p => ({ nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 250) };
 }
 function planDetectedDaysFromPrompt(form = {}) {
   const raw = trim([form.title, form.descripcion, form.info].filter(Boolean).join('\n'));
@@ -2850,111 +2488,88 @@ function planExtractParagraph(raw, startWord, nextWords) {
 function planMomentsFromPrompt(form = {}) {
   const raw = planPromptRawText(form).replace(/\r/g, '');
   const days = planEffectiveDays(form);
-  const out = [];
-  const rx = /(?:^|\n)\s*(?:[-*]\s*)?(?:dia|día)\s*[_\- ]*(\d{1,2})\s*(?:\([^\n)]*\))?\s*:?\s*([^\n]+)/gi;
-  let m;
-  while ((m = rx.exec(raw))) {
-    const diaNum = Math.max(1, Math.min(14, Math.round(num(m[1]))));
-    const desc = trim(m[2] || '');
-    if (!desc || /^todo\s+el\s+d[ií]a\s*:?\s*$/i.test(desc)) continue;
-    const n = normPlanKey(desc);
-    const add = (momento, detalle) => out.push({ dia:`dia_${diaNum}`, momento, detalle: trim(detalle || desc) });
-    if (/aperitivo/.test(n)) add('aperitivo', desc);
-    if (/comida/.test(n)) add('comida', desc);
-    if (/tardeo|cubatas?\s+de\s+tarde|tarde.*cubata|cubata.*tarde/.test(n)) add('tardeo/cubatas', desc);
-    if (/cena/.test(n)) add('cena', desc);
-    if (/cubatas?\s+noche|noche/.test(n) && /cubata/.test(n)) add('cubatas noche', desc);
+  const lines = raw.split(/\n/);
+  const dayLineRe = /^\s*(?:[-*•]\s*)?(?:d[ií]a|dia|jornada)\s*[_\- ]*(\d{1,2})\b([^\n]*)/i;
+  const stopRe = /^\s*(?:DATOS\s+PARA|DESCRIPCI[OÓ]N\s+CONCEPTUAL|CRITERIOS?|REGLAS?|PRODUCTO\s+EN|DONACIONES?|DONACI[OÓ]N|PISTAS?|RESULTADO|OBJETIVO)\b/i;
+  const segments = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].match(dayLineRe);
+    if (!m) continue;
+    const dia = Math.max(1, Math.min(14, Math.round(num(m[1]))));
+    const buf = [trim(m[2] || '')];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (dayLineRe.test(lines[j]) || stopRe.test(lines[j])) break;
+      const l = trim(lines[j]);
+      if (l) buf.push(l);
+      if (buf.join(' ').length > 1200) break;
+    }
+    segments.push({ dia, text: buf.join(' ') });
   }
-  if (out.length) return out.filter(item => num(item.dia.replace(/\D/g,'')) <= days);
-  return planExpectedMenuSlots(days).map(x => ({ ...x, detalle: 'Franja a definir por Zuzu según concepto del evento.' }));
+  function findSlots(segText) {
+    const s = trim(segText || '');
+    const n = normPlanKey(s);
+    const found = [];
+    const add = (momento, rx) => { const m = n.match(rx); if (m) found.push({ momento, index: m.index, detalle: s }); };
+    add('desayuno', /\bdesayuno\b/);
+    add('aperitivo', /\b(aperitivo|vermut|verm[uú]t|picoteo|entrantes?)\b/);
+    add('comida', /\b(comida|almuerzo|paella|asado|buffet)\b/);
+    add('tardeo/cubatas', /\b(tardeo|sobremesa|cubatas?\s+de\s+tarde|copas?\s+de\s+tarde|tarde[^.;,\n]{0,40}cubatas?|cubatas?[^.;,\n]{0,40}tarde)\b/);
+    add('merienda', /\bmerienda\b/);
+    add('cena', /\b(cena|cenar|cenas)\b/);
+    if (/\b(cubatas?|copas?)\b/.test(n) && /\b(noche|nocturn[oa]s?)\b/.test(n)) add('cubatas noche', /\b(cubatas?\s+noche|copas?\s+noche|noche[^.;,\n]{0,40}cubatas?|noche[^.;,\n]{0,40}copas?)\b/);
+    if (/todo\s+el\s+d[ií]a|dia\s+completo|día\s+completo/.test(n) && !found.length) return ['aperitivo','comida','tardeo/cubatas','cena'].map((momento,index)=>({momento,index,detalle:s||'Jornada completa detectada; Zuzu debe concretar.'}));
+    const seen = new Set();
+    return found.sort((a,b)=>a.index-b.index).filter(x => { const k=normPlanKey(x.momento); if(seen.has(k)) return false; seen.add(k); return true; });
+  }
+  const out = [];
+  segments.forEach(seg => { if(seg.dia>days) return; findSlots(seg.text).forEach(slot => out.push({ dia:`dia_${seg.dia}`, momento:slot.momento, detalle:trim(slot.detalle || seg.text || 'Franja detectada por ControlEvent.') })); });
+  if (!out.length) {
+    const n = normPlanKey(raw); const slots = [];
+    if (/aperitivo|vermut|picoteo/.test(n)) slots.push('aperitivo');
+    if (/comida|almuerzo|buffet|paella|asado/.test(n)) slots.push('comida');
+    if (/tardeo|sobremesa|cubata|copa/.test(n)) slots.push('tardeo/cubatas');
+    if (/cena|cenar/.test(n)) slots.push('cena');
+    const use = slots.length ? slots : ['aperitivo','comida','tardeo/cubatas','cena'];
+    for (let d=1; d<=Math.max(1,days); d+=1) use.forEach(momento => out.push({ dia:`dia_${d}`, momento, detalle:'Franja inferida genéricamente del prompt; Gemini debe concretarla.' }));
+  }
+  return out.slice(0, 120);
 }
 function planPromptBriefObject(form = {}, state = {}) {
   const raw = planPromptRawText(form);
   const budget = planBudgetFromPrompt(form);
-  const personas = planPromptNumber(form, [/personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i], num(form.personas));
+  const personas = planPromptNumber(form, [/personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /(\d+(?:[,.]\d+)?)\s+personas/i], num(form.personas));
   const cenas = planPromptNumber(form, [/personas\s+que\s+cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cena[^\n]{0,80}?(\d+(?:[,.]\d+)?)\s*personas/i], 0);
-  const brief = {
-    versionBrief: 'FIX32_TRACE_BRIEF_EVENTO_V1',
-    objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title),
-    duracionDias: planEffectiveDays(form),
-    personasAsistentes: personas || num(form.personas) || 0,
-    presupuestoObjetivoPorPersona: budget.objetivoPorPersona,
-    limiteMaximoPorPersona: budget.maximoPorPersona,
-    temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''),
-    personasCerveza: planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0),
-    personasCubatas: planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0),
-    cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0),
-    cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0),
-    personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0),
-    personasCenaReal: cenas,
-    horas: {
-      aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''),
-      comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''),
-      tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''),
-      cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '')
-    },
-    momentosPorDia: planMomentsFromPrompt(form),
-    concepto: {
-      aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']),
-      comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']),
-      tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']),
-      cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\s+en\s+la\s+pe[nñ]a', 'donaciones?', 'pistas'])
-    },
-    reglasBebida: [
-      'Cerveza solo a personas consumidoras, máximo indicado por prompt.',
-      'Cubatas solo a personas consumidoras, separar refrescos de mezcla y refrescos directos.',
-      'Con calor subir agua, hielo, cerveza y refrescos sin exagerar.',
-      'Redondear latas/refrescos a múltiplos de 24 cuando tenga sentido.'
-    ],
-    reglasComida: [
-      'No multiplicar todos los productos por todos los asistentes.',
-      'Aperitivo como picoteo compartido.',
-      'Cena informal solo para quienes cenan realmente.',
-      'Compra = necesidad total - donaciones/existencias confirmadas.'
-    ],
-    donacionesDetectadas: planExplicitDonationRowsFromPrompt(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 120)
-  };
-  return brief;
+  return { versionBrief: 'FIX33_PROMPT_COMPACTO_VARIABLE_V1', objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title), duracionDias: planEffectiveDays(form), personasAsistentes: personas || num(form.personas) || 0, presupuestoObjetivoPorPersona: budget.objetivoPorPersona, limiteMaximoPorPersona: budget.maximoPorPersona, temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''), personasCerveza: planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), personasCubatas: planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0), cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0), personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0), personasCenaReal: cenas, horas: { aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''), comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''), tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''), cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '') }, momentosPorDia: planMomentsFromPrompt(form), concepto: { aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']), comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']), tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']), cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas']) }, reglasBebida: ['Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.', 'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.', 'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.', 'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'], reglasComida: ['No multiplicar todos los productos por todos los asistentes.', 'Calcular aperitivos como picoteo compartido si procede.', 'Calcular cenas solo para quienes cenan realmente si el prompt lo indica.', 'Compra = necesidad total - donaciones/existencias confirmadas.'], donacionesDetectadas: planExplicitDonationRowsFromPrompt(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140) };
 }
 function planPromptBriefText(form = {}, state = {}) {
   const b = planPromptBriefObject(form, state);
   const lines = [];
-  lines.push('BRIEF ESTRUCTURADO DEL EVENTO - generado por ControlEvent antes de llamar a Gemini');
-  lines.push(`Duración: ${b.duracionDias} día(s)`);
-  lines.push(`Asistentes: ${b.personasAsistentes || 'sin dato'} | Cerveza: ${b.personasCerveza || 'sin dato'} personas · máximo ${b.cervezasMaxPorPersonaDia || '?'} ud/persona/día | Cubatas: ${b.personasCubatas || 'sin dato'} personas · ${b.cubatasPorPersonaConsumidora || '?'} cubatas/persona | Sin alcohol/niños: ${b.personasSinAlcoholNinos || 'sin dato'} | Cenan realmente: ${b.personasCenaReal || 'sin dato'}`);
+  lines.push('BRIEF ESTRUCTURADO DEL EVENTO - ControlEvent FIX33');
+  lines.push(`Duración: ${b.duracionDias} día(s). Asistentes: ${b.personasAsistentes || 'sin dato'}.`);
+  lines.push(`Bebida: cerveza ${b.personasCerveza || 'sin dato'} personas (${b.cervezasMaxPorPersonaDia || '?'} ud/persona/día si aplica); cubatas ${b.personasCubatas || 'sin dato'} personas (${b.cubatasPorPersonaConsumidora || '?'} por persona si aplica); sin alcohol/niños ${b.personasSinAlcoholNinos || 'sin dato'}.`);
+  if (b.personasCenaReal) lines.push(`Cena real: ${b.personasCenaReal} personas.`);
   if (b.presupuestoObjetivoPorPersona || b.limiteMaximoPorPersona) lines.push(`Presupuesto: objetivo ${b.presupuestoObjetivoPorPersona || '?'} €/persona; máximo ${b.limiteMaximoPorPersona || '?'} €/persona.`);
-  if (b.temperatura) lines.push(`Temperatura: ${b.temperatura}`);
-  lines.push('Momentos por día:');
+  if (b.temperatura) lines.push(`Temperatura/clima: ${b.temperatura}`);
+  lines.push('Momentos detectados:');
   b.momentosPorDia.forEach(m => lines.push(`- ${m.dia} (${m.momento}): ${m.detalle}`));
-  lines.push('Concepto culinario resumido:');
-  Object.entries(b.concepto).forEach(([k,v]) => { if (v) lines.push(`- ${k}: ${v}`); });
-  lines.push(`Donaciones/existencias detectadas: ${b.donacionesDetectadas.length} línea(s).`);
-  lines.push('Reglas clave: compra solo por déficit; no inventar donaciones; no copiar eventos anteriores; usar catálogo si coincide y conservar nombres parecidos si no coincide perfecto.');
+  const conceptLines = Object.entries(b.concepto).filter(([,v]) => v).map(([k,v]) => `- ${k}: ${v}`);
+  if (conceptLines.length) lines.push('Concepto resumido:\n' + conceptLines.join('\n'));
+  lines.push(`Donaciones/existencias confirmadas detectadas: ${b.donacionesDetectadas.length} línea(s).`);
+  lines.push('Regla central: Gemini calcula compras por déficit; ControlEvent conserva donaciones literales y no copia históricos en encargo total.');
   return lines.join('\n');
 }
 function planMenuResumenFromBrief(form = {}) {
-  const raw = planPromptRawText(form);
   const b = planPromptBriefObject(form, {});
-  const concept = b.concepto || {};
-  const byDay = new Map();
-  b.momentosPorDia.forEach(m => {
-    const key = `${m.dia}|${normPlanKey(m.momento)}`;
-    if (!byDay.has(key)) byDay.set(key, m);
-  });
-  function dayNum(dia) { return Math.max(1, num(String(dia || '').replace(/\D/g,'')) || 1); }
   function resumenPara(item) {
-    const d = dayNum(item.dia);
-    const mom = normPlanKey(item.momento);
-    if (/aperitivo/.test(mom)) return 'Será a base de picoteo de pie y compartido: ibéricos, queso, anchoas/mejillones, patatas, encurtidos, tortilla y productos donados por socios, ajustando compra solo al déficit.';
-    if (/comida/.test(mom)) {
-      if (d === 2 && /jam[oó]n\s+asado/i.test(raw)) return 'Será a base de jamón asado en horno de leña servido tipo buffet, con acompañamientos sencillos, pan y bebida, descontando lo existente/donado.';
-      if (d === 3 && /sobrad[ao]s?|barbacoa/i.test(raw)) return 'Será a base de aprovechamiento planificado de carne sobrante de las barbacoas/cenas, con acompañamientos fríos y compra mínima de apoyo.';
-      return 'Será una comida sentada o principal definida por el concepto del prompt, con cantidades ajustadas a asistentes reales y existencias.';
-    }
-    if (/tardeo|cubata/.test(mom) && !/noche/.test(mom)) return 'Será a base de cubatas y música: ron, whisky, ginebra, refrescos de mezcla separados de refrescos directos, hielo, vasos y reposición prudente por calor.';
-    if (/cena/.test(mom)) return 'Será una barbacoa informal calculada para las personas que realmente cenan, repartiendo chorizo de asar, panceta, lomo fresco, morcilla y venao en salsa sin multiplicarlo todo por los 30 asistentes.';
-    if (/noche/.test(mom)) return 'Será a base de cubatas de noche, reforzando hielo, refrescos de mezcla, vasos y bebida alcohólica según consumidores reales.';
-    return 'Será a base de una propuesta libre de Zuzu ajustada al brief del evento, sin plantilla fija.';
+    const det = trim(item?.detalle || '');
+    if (det && !/franja\s+(?:a\s+definir|inferida)/i.test(det)) { const limpio = det.replace(/^todo\s+el\s+d[ií]a\s*:?\s*/i, '').replace(/\s+/g, ' ').trim(); return /^ser[aá]\s+a\s+base\s+de/i.test(limpio) ? limpio : `Será a base de ${limpio.charAt(0).toLowerCase()}${limpio.slice(1)}`; }
+    const mom = normPlanKey(item?.momento);
+    if (/aperitivo/.test(mom)) return 'Será a base de aperitivo/picoteo compartido, ajustado al concepto del usuario y a las donaciones disponibles.';
+    if (/comida/.test(mom)) return 'Será a base de una comida principal definida por Gemini según el brief, con compras solo por déficit.';
+    if (/tardeo|cubata/.test(mom) && !/noche/.test(mom)) return 'Será a base de tardeo/copas/cubatas si procede, separando mezcla, consumo directo, hielo y vasos.';
+    if (/cena/.test(mom)) return 'Será a base de una cena ajustada a las personas que realmente cenan y al tipo de evento indicado.';
+    if (/noche/.test(mom)) return 'Será a base de copas/cubatas de noche si procede, calculadas para consumidores reales.';
+    return 'Será a base de una propuesta libre de Zuzu ajustada al brief, sin plantilla fija.';
   }
   return b.momentosPorDia.map(item => ({ dia:item.dia, momento:item.momento, resumen:resumenPara(item) }));
 }
@@ -2970,66 +2585,54 @@ function planCompleteMenuResumen(raw, form = {}) {
 }
 
 
+
+function planPromptCompactForGemini33(form = {}) {
+  const raw = planPromptRawText(form).replace(/\r/g, '');
+  if (!raw) return '';
+  const lines = raw.split(/\n/).map(x => trim(x)).filter(Boolean);
+  const useful = [];
+  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|presupuesto|l[ií]mite|temperatura|tipo\s+de\s+evento|personas\s+que|sin\s+alcohol|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?)/i;
+  for (const line of lines) { if (useful.join('\n').length > 3500) break; if (keepRx.test(line) || /^(?:d[ií]a|dia)\s*[_\- ]*\d+/i.test(line)) useful.push(line); }
+  const txt = useful.join('\n') || raw.slice(0, 3500);
+  return txt.slice(0, 4200);
+}
+function planDonationRowsForGemini33(form = {}, state = {}) {
+  const maps = planBuildMaps(state);
+  return planExplicitDonationRowsFromPrompt(form, state).map(r => ({ producto: trim(r.productName), unidades: round(r.unidades, 2), precio: round(r.precio, 4), tipoDonacion: trim(r.ticketDonacion), donante: planDonorLabel(r.donorRef, maps) || trim(r.donorRef), responsable: planPersonName(r.responsableId, maps) || trim(r.responsableId), segmento: trim(r.segmento), destino: trim(r.destino) })).slice(0, 140);
+}
 function planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules) {
-  const compactRows = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
+  const totalMode = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL';
+  const compactRows = totalMode ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
   const diasDetectadosPrompt = planDetectedDaysFromPrompt(form);
   const diasOperativos = planEffectiveDays(form);
-  return {
-    modo: planModeLabel(form.mode),
-    aislamientoEncargoTotal: trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo catálogo compacto, prompt completo y donaciones explícitas.' : 'NO ACTIVO',
-    modulosSolicitados: modules,
-    eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas), descripcion: trim(form.descripcion), informacionConstruccion: trim(form.info) },
-    promptOriginalCompleto: planPromptRawText(form),
-    briefEvento: planPromptBriefObject(form, state),
-    briefEventoTexto: planPromptBriefText(form, state),
-    franjasMenuEsperadas: planExpectedMenuSlots(diasOperativos),
-    eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null,
-    responsablePorDefecto: trim(form.defaultResponsibleName),
-    tiendaPorDefecto: trim(form.defaultStoreName),
-    filasHistoricasBase: compactRows,
-    ingresosHistoricosBase: arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })),
-    reglasDonacionesDetectadas: planInfoDonationRules(planPromptRawText(form), planBuildMaps(state)).map(r => ({producto:r.productText, donante:r.donorLabel, responsable:r.responsableLabel, tipo:r.ticketDonacion})),
-    existenciasYDonacionesExplicitas: planExplicitDonationRowsFromPrompt(form, state).map(r => ({producto:r.productName, unidades:r.unidades, precio:r.precio, tipoDonacion:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId, tienda:r.tiendaId})),
-    catalogos: planCatalogForGemini(state, form)
-  };
+  const brief = planPromptBriefObject(form, state);
+  const donaciones = planDonationRowsForGemini33(form, state);
+  return { versionContexto: totalMode ? 'FIX33_PROMPT_COMPACTO_VARIABLE' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Gemini.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
 }
 function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
   const ctx = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
-  const maxContextChars = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? 90000 : 140000;
-  return `Eres Zuzu dentro de ControlEvent, módulo de PLANIFICACIÓN INICIAL. Debes crear una propuesta revisable para un evento nuevo, usando históricos y las instrucciones del usuario.
+  const totalMode = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL';
+  const maxContextChars = totalMode ? 14000 : 70000;
+  return `Eres Zuzu, planificador de eventos dentro de ControlEvent.
 
-Reglas:
+OBJETIVO
+Crear una propuesta revisable de menú y compras. La app ya ha extraído un brief variable desde el texto libre del usuario. No estás atado a Santiago/Santa Ana ni a ningún evento concreto: funciona para cualquier evento que describa el usuario.
+
+REGLAS DURAS
 - Devuelve SOLO JSON válido según el esquema.
-- La fuente principal es ctx.briefEvento y ctx.briefEventoTexto. El brief ya viene cocinado por ControlEvent desde el prompt del usuario: duración, momentos por día, asistentes, bebida, cenas reales, presupuesto, calor, donaciones y reglas. Antes de proponer productos, lee ese brief y haz una propuesta coherente con él.
-- Calculas COSTE REAL de evento, no precio de bar/restaurante. Si el prompt indica presupuesto objetivo o límite por persona, úsalo como referencia para TODO el evento; si no lo indica, usa criterio razonable y marca supuestos.
-- NO inventes productos donados. En Encargo total o parcial, solo devuelve DONACION si aparece como donación/existencia explícita en el prompt. En réplica exacta sí puedes conservar DONACIONES históricas base. Si crees que algo podría donarse, trátalo como COMPRA con la razón "posible donación pendiente de confirmar", pero NO lo descuentes.
-- Cerveza lata/botellín: usa el máximo indicado por el prompt para personas consumidoras, no para todos los asistentes. Si el prompt dice 5 latas/botellines por persona consumidora y día, respétalo.
-- Cubatas: usa el número indicado por el prompt para personas consumidoras. Si el prompt dice 6 por persona consumidora, respétalo. Calcula refrescos de mezcla según cubatas y separa refrescos de consumo directo.
-- No uses nunca un menú fijo por defecto. La palabra genérica comida/comer no significa automáticamente paella, y la palabra cena no significa automáticamente barbacoa.
-- Sí puedes proponer paella, arroz, barbacoa, bocadillos, tapas, comida fría, tortillas, pizzas u otras ideas si encajan de verdad con el concepto, duración, presupuesto y tono del evento. Si eliges una de esas líneas de menú, debe ser una decisión tuya razonada como organizador experto, no una plantilla repetida.
-- No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
-- Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
-- Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
-- Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas, patrones de un evento anterior o menús fijos. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala.
-- En Encargo total debes obedecer el texto completo de descripcion/informacionConstruccion y, sobre todo, el briefEvento: duración/días, concepto del evento, comidas indicadas, horarios, preferencias de comida, bebida, cosas que NO se quieren y nivel de detalle pedido.
-- En Encargo total manda el prompt del usuario. Si el prompt habla de 3 días, 2 días o varios momentos, construye una propuesta para TODOS esos días aunque el campo diasFormulario venga a 1. Usa diasDetectadosPrompt/diasOperativos como referencia de trabajo.
-- Si falta algún dato, participa activamente: propone una solución razonable y deja en notes qué preguntas faltan para afinar. Solo te bloqueas si no hay personas ni concepto mínimo; no vuelvas a una plantilla fija.
-- Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
-- Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
-- Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
-- La cantidad de una DONACION indicada en la descripción/informaciónConstruccion queda BLOQUEADA: no aumentes nunca esa línea para cubrir necesidad calculada. Si falta más producto, crea o deja que la app cree una COMPRA por el déficit.
-- Para bebidas en lata/botellín, si propones compra y el usuario pide múltiplos de 24, redondea las unidades de compra al alza al múltiplo de 24.
-- No agrupes productos bajo conceptos genéricos tipo "cosas de paella" si el usuario pide desglose: usa líneas concretas de arroz, carne, verduras, aceite, platos, vasos, hielo, agua, refrescos, pan, etc.
-- Tipo debe ser COMPRA o DONACION. Para donaciones usa ticketDonacion DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
-- Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en todas esas filas de DONACION.
-- Si modulosSolicitados está vacío por la opción Ningún dato, apóyate solo en la información del usuario y el catálogo de productos; no copies históricos de eventos.
-- Sé creativo y operativo como organizador experto: propone menús completos pero razonables para aperitivo, comida, tardeo/cubatas, cena, limpieza y menaje si se han pedido. No te limites a repetir literalmente el prompt.
-- OBLIGATORIO: devuelve menuResumen con una línea por cada momento real del briefEvento.momentosPorDia, no solo cuatro líneas genéricas. Formato: "Será a base de ...". Debe explicar al usuario el menú antes de ver la tabla de compras/donaciones. Si hay 3 días, devuelve día_1, día_2 y día_3; si el día 1 solo tiene cena y cubatas noche, no inventes aperitivo/comida de día 1.
-- En cada producto, intenta devolver necesidadTotal: necesidad total antes de restar donado/existente. Las líneas DONACION representan lo que ya hay o se donará; las líneas COMPRA representan solo el déficit.
-- No devuelvas más de 180 filas. Prioriza productos útiles y evita productos absurdos o no pedidos.
-- La app mostrará la propuesta para que el usuario pueda editarla; no estás creando el evento real.
+- En Encargo total NO copies históricos ni plantillas ni menú fijo. No conviertas "comida" en paella ni "cena" en barbacoa salvo que encaje o el usuario lo pida.
+- Sí puedes proponer paella, barbacoa u otras ideas si son razonables; no están prohibidas.
+- ControlEvent ya crea las donaciones/existencias explícitas. No las repitas salvo que sea imprescindible; centra rows en COMPRA por déficit.
+- Compra = necesidad total - donaciones/existencias. Si falta más producto, crea una COMPRA revisable.
+- Si un producto no existe claro en catálogo, conserva el nombre propuesto como revisable; no lo elimines.
+- Devuelve menuResumen con una línea por CADA momento de ctx.momentosEsperados.
+- Calcula bebida solo para consumidores reales cuando el brief lo indique; separa refrescos de mezcla y consumo directo cuando proceda.
+- Si faltan datos, haz supuestos explícitos y sigue; solo pregunta al final para afinar.
 
-CONTEXTO:
+SALIDA ESPERADA
+{"menuResumen":[{"dia":"dia_1","momento":"aperitivo","resumen":"Será a base de ..."}],"rows":[{"tipo":"COMPRA","producto":"...","unidades":1,"precio":0,"necesidadTotal":1,"reason":"déficit tras restar donado/existente"}],"notes":["supuestos y avisos"],"preguntasPendientes":[]}
+
+CONTEXTO COMPACTO
 ${JSON.stringify(ctx).slice(0, maxContextChars)}`;
 }
 async function callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules) {
@@ -3039,7 +2642,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
   const promptText = planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules);
   const context = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
   const trace = {
-    version: 'FIX32_TRAZA_GEMINI',
+    version: 'FIX33_PROMPT_COMPACTO',
     startedAt: new Date(started).toISOString(),
     mode: trim(form?.mode),
     promptChars: promptText.length,
@@ -3054,7 +2657,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
     },
     briefEvento: context.briefEvento,
     briefEventoTexto: context.briefEventoTexto,
-    geminiRequestPreview: promptText.slice(0, 25000),
+    geminiRequestPreview: promptText.slice(0, 20000),
     attempts: []
   };
   let lastError = null;
@@ -3072,7 +2675,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
     };
     try {
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timeoutMs = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL' ? 15000 : 18000;
+      const timeoutMs = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL' ? 10000 : 18000;
       const abortTimer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
       let res;
       try {
@@ -3328,7 +2931,7 @@ function planConfirmedPromptDonationHintsHf21(form, state) {
 
 function planHasConfirmedDonationBlocksHf17(form) {
   const info = planPromptRawText(form);
-  return /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s*:|DONACION\s*:|DONACI[ÓO]N\s*:|EXISTENCIAS?\s*:|YA\s+TENEMOS)/i.test(info)
+  return /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?(?:\s+DE\s+[^:\n]+)?\s*:|DONACION(?:\s+DE\s+[^:\n]+)?\s*:|DONACI[ÓO]N(?:\s+DE\s+[^:\n]+)?\s*:|EXISTENCIAS?(?:\s+[^:\n]+)?\s*:|YA\s+TENEMOS)/i.test(info)
     && /\[Donante:|Tratar\s+como\s+DONADO|PRODUCTOS?\s*:/i.test(info);
 }
 function planRowsFromExplicitPromptOnlyHf17(form, state) {
@@ -3390,9 +2993,9 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('FIX32_TRAZA_GEMINI activo: ControlEvent extrae un brief estructurado del prompt y se lo entrega a Gemini; donaciones/existencias confirmadas cargadas; compras y menú deben venir del brief+Gemini.');
+    aiNotes.push('FIX33_PROMPT_COMPACTO activo: ControlEvent extrae un brief estructurado del prompt y se lo entrega a Gemini; donaciones/existencias confirmadas cargadas; compras y menú deben venir del brief+Gemini.');
     try {
-      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 25000 : 18000, 'Gemini planificación');
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 13000 : 10000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
       const matched = matchPlanRows(ai?.rows, [], state, form);
       if (aiTrace) aiTrace.matchCounts = { rowsGemini: arr(ai?.rows).length, matched: matched.length, comprasMatched: matched.filter(r=>r.tipo==='COMPRA').length, donacionesMatched: matched.filter(r=>r.tipo==='DONACION').length };
@@ -3409,9 +3012,9 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX32_TRAZA_GEMINI activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX33_PROMPT_COMPACTO activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
     try {
-      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 18000, 'Gemini planificación');
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 12000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
       const matched = matchPlanRows(ai?.rows, baseRows, state, form);
       if (aiTrace) aiTrace.matchCounts = { rowsGemini: arr(ai?.rows).length, matched: matched.length, comprasMatched: matched.filter(r=>r.tipo==='COMPRA').length, donacionesMatched: matched.filter(r=>r.tipo==='DONACION').length };
@@ -3436,7 +3039,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
     if (m === 'ZUZU_TOTAL') {
-      aiNotes.push('FIX32_TRAZA_GEMINI activo: Gemini decide el menú y las compras desde el brief del prompt; ControlEvent no elimina paella/barbacoa ni mete menú local fijo.');
+      aiNotes.push('FIX33_PROMPT_COMPACTO activo: Gemini decide el menú y las compras desde el brief del prompt; ControlEvent no elimina paella/barbacoa ni mete menú local fijo.');
     }
     if (!aiMenuResumen.length) aiMenuResumen = planCompleteMenuResumen([], form);
     const budget = planBudgetGuard(rowsOut, form);
@@ -3447,7 +3050,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v17_prod_FIX32_PLANIFICACION_TRAZA_GEMINI',
+    version: 'v17_prod_FIX33_PLANIFICACION_PROMPT_COMPACTO',
     provider: aiProvider,
     model: aiModel,
     mode: m,
@@ -3459,7 +3062,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     menuResumen: aiMenuResumen,
     briefEvento: planPromptBriefObject(form, state),
     debugPlanificacion: {
-      ...(aiTrace || { version:'FIX32_TRAZA_GEMINI', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
+      ...(aiTrace || { version:'FIX33_PROMPT_COMPACTO', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
       finalCounts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length },
       providerFinal: aiProvider,
       modelFinal: aiModel,

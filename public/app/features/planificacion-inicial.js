@@ -2470,7 +2470,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX32_TRAZA_GEMINI: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX33_PROMPT_COMPACTO: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -4125,7 +4125,7 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX32_TRAZA_GEMINI: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX33_PROMPT_COMPACTO: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -4156,7 +4156,7 @@
     };
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX32: caja negra de Planificación / Gemini</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX33: caja negra de Planificación / Gemini</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4170,7 +4170,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX32 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX33 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4234,7 +4234,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX32_TRAZA_GEMINI: no se filtra la propuesta de Gemini.
+        // FIX33_PROMPT_COMPACTO: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
