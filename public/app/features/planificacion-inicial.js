@@ -1575,6 +1575,8 @@
     if(has('FANTA','NARANJA')) return 'alias:fanta-naranja';
     if(has('FANTA','LIMON')) return 'alias:fanta-limon';
     if(has('SPRITE')) return 'alias:sprite';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL') && (has('50') || /\b50\b/.test(n) || /\b50\b/.test(s))) return 'alias:cerveza-ambar-barril-50';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL') && (has('30') || /\b30\b/.test(n) || /\b30\b/.test(s))) return 'alias:cerveza-ambar-barril-30';
     if(has('CERVEZA','AMBAR') && hasS('BARRIL')) return 'alias:cerveza-ambar-barril';
     if(has('CERVEZA','SKOL')) return 'alias:cerveza-skol';
     if(has('TONICA','SCHWEPPES')) return 'alias:tonica-schweppes';
@@ -1624,23 +1626,29 @@
     const s = simplifyProductSearchKeyHf24(raw);
     const products = rows('productos');
     const has = (...parts) => parts.every(part => n.includes(normalizeProductSearchKeyHf24(part)) || s.includes(normalizeProductSearchKeyHf24(part)));
-    if(has('CERVEZA') && has('AMBAR') && (has('BARRIL') || n.includes('30') || s.includes('30'))){
+    const exactNormalized = products.find(p => normalizeProductSearchKeyHf24(p?.nombre || '') === n);
+    if(exactNormalized) return exactNormalized;
+    const exactSimple = products.find(p => simplifyProductSearchKeyHf24(p?.nombre || '') === s);
+    if(exactSimple) return exactSimple;
+    if(has('CERVEZA') && has('AMBAR') && has('BARRIL')){
+      const wants50 = /\b50\b/.test(n) || /\b50\b/.test(s);
+      const wants30 = /\b30\b/.test(n) || /\b30\b/.test(s);
       const candidates = products.filter(p => {
         const pn = normalizeProductSearchKeyHf24(p?.nombre || '');
         const ps = simplifyProductSearchKeyHf24(p?.nombre || '');
         return (pn.includes('CERVEZA') || ps.includes('CERVEZA')) &&
                (pn.includes('AMBAR') || ps.includes('AMBAR')) &&
-               (pn.includes('BARRIL') || ps.includes('BARRIL') || pn.includes('30') || ps.includes('30'));
+               (pn.includes('BARRIL') || ps.includes('BARRIL'));
       });
-      if(candidates.length){
-        return candidates.sort((a,b) => {
-          const an = normalizeProductSearchKeyHf24(a?.nombre || '');
-          const bn = normalizeProductSearchKeyHf24(b?.nombre || '');
-          const ascore = (an.includes('BARRIL') ? 100 : 0) + (an.includes('30') ? 30 : 0) - String(a.nombre||'').length/100;
-          const bscore = (bn.includes('BARRIL') ? 100 : 0) + (bn.includes('30') ? 30 : 0) - String(b.nombre||'').length/100;
-          return bscore - ascore;
-        })[0];
-      }
+      const sameSize = candidates.find(p => {
+        const pn = normalizeProductSearchKeyHf24(p?.nombre || '');
+        const ps = simplifyProductSearchKeyHf24(p?.nombre || '');
+        return (wants50 && (pn.includes('50') || ps.includes('50'))) || (wants30 && (pn.includes('30') || ps.includes('30')));
+      });
+      if(sameSize) return sameSize;
+      if(candidates.length === 1) return candidates[0];
+      // Si no se indica tamaño, no forzamos 30L por tener nombre más corto: dejamos al buscador normal decidir.
+      return null;
     }
     return null;
   }
@@ -2098,7 +2106,7 @@
       if(/DONADO OTROS|DONACION DE OTROS|DONACIÓN DE OTROS|OTROS/.test(n)) return 'DONADO OTROS';
       return 'DONADO SOCIO';
     };
-    const isHeader = line => /^\s*(?:[-*•]\s*)?(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s+(?:Y\s+EXISTENCIAS\s+CONFIRMADAS|DE\s+SOCIOS?|DE\s+TIENDA|DE\s+OTROS)|DONACI[ÓO]N\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONACION\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:]|EXISTENCIAS?\b|YA\s+TENEMOS\b|PRODUCTOS?\s+DONADOS?|MATERIAL\s+DONADO)\b/i.test(String(line || ''));
+    const isHeader = line => { const l = String(line || ''); if(/^\s*(?:[-*•]\s*)?DONACIONES?\s+Y\s+EXISTENCIAS\s+CONFIRMADAS\b/i.test(l)) return false; return /^\s*(?:[-*•]\s*)?(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s+(?:DE\s+SOCIOS?|DE\s+TIENDA|DE\s+OTROS)|DONACI[ÓO]N\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONACION\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:]|EXISTENCIAS?\b|YA\s+TENEMOS\b|PRODUCTOS?\s+DONADOS?|MATERIAL\s+DONADO)\b/i.test(l); };
     const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N\s+CONCEPTUAL|CRITERIOS?|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\b/i;
     const meta = (line, prev={}) => {
       const h = String(line || '');
@@ -2120,7 +2128,7 @@
       }
       if(!m.donorLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donorLabel = 'Peña El Arrastre';
       if(!m.responsableLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsableLabel = document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent || 'Colty';
-      if(!m.donorLabel && /EXISTENCIAS?|YA\s+TENEMOS/i.test(h)) m.donorLabel = 'Existencias';
+      if(!m.donorLabel && /^\s*(?:[-*•]\s*)?(?:EXISTENCIAS?|YA\s+TENEMOS)\b/i.test(h)) m.donorLabel = 'Existencias';
       return m;
     };
     const qtyFromLine = raw => {
@@ -2501,7 +2509,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX36_GEMINI_ULTRACORTO_FIX_MOMENTOS: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX38_PLANIFICACION_JSON_DIRECTO_Y_SALDO: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -3683,9 +3691,8 @@
 
   function ceHf46BalancePositiveSurplusOnce(list){
     // v16 HOTFIX4: reparto equitativo del saldo, añadiendo cerveza SKOL en la prioridad.
-    // Si el saldo sobre compras supera el 35%, añadimos de uno en uno siguiendo la prioridad indicada.
-    // Se detiene cuando el saldo ya queda en zona correcta (<=35%) o cuando el siguiente añadido bajaría
-    // el colchón por debajo del 20% de las compras finales.
+    // Si el saldo sobre compras supera el 25%, añadimos de uno en uno siguiendo la prioridad indicada por el usuario.
+    // Se detiene cuando el saldo queda como máximo en el 10% o cuando no se puede añadir sin dejar saldo negativo.
     let baseRows = (Array.isArray(list) ? list : []).filter(row => row && row.__ceHf46SaldoBalancer !== true && row.__ceHf52SaldoBalancer !== true);
     let rows = baseRows.slice();
     const totalBefore = ceHf46IncludedPurchaseTotal(rows);
@@ -3694,19 +3701,21 @@
 
     const initialSaldo = income - totalBefore;
     const initialRatio = initialSaldo / totalBefore;
-    if(initialSaldo <= 0 || initialRatio <= 0.35) return normalizeProposalRowsForGroups(rows);
+    if(initialSaldo <= 0 || initialRatio <= 0.25) return normalizeProposalRowsForGroups(rows);
 
     const priority = [
+      {label:'CERVEZA SKOL Lata 33cl', step:24, fallback:0.45},
       {label:'COCA COLA Bote 32 Cl', step:24, fallback:0.75},
+      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75},
+      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
+      {label:'HIELO', step:5, fallback:1.25},
       {label:'Ron BARCELO Añejo 0.7 L', step:1, fallback:14.35},
       {label:'Whisky 5 Años J.B Botella 0.7 L', step:1, fallback:11.69},
-      {label:'Tónica lata', step:24, fallback:0.75},
       {label:'Gin BEEFEATER 0.7 L. 43°', step:1, fallback:13.29},
-      {label:'CERVEZA SKOL Lata 33cl', step:24, fallback:0.45},
-      {label:'COCA COLA ZERO -ZERO 33 cl', step:24, fallback:0.75},
       {label:'FANTA Naranja Bote 32 C.L', step:24, fallback:0.75},
       {label:'FANTA Limon Bote 32 CL', step:24, fallback:0.75},
-      {label:'COCA COLA ZERO Bote 32 Cl', step:24, fallback:0.75},
+      {label:'Tónica lata', step:24, fallback:0.75},
+      {label:'Sprite lata (33cl)', step:24, fallback:0.52},
       {label:'RON Brugal Añejo 0.7 L', step:1, fallback:11.95}
     ];
 
@@ -3725,7 +3734,7 @@
       if(nextTotal <= 0) return false;
       const nextSaldo = income - nextTotal;
       const nextRatio = nextSaldo / nextTotal;
-      return nextSaldo >= -EPS && nextRatio >= 0.20 - EPS;
+      return nextSaldo >= -EPS;
     }
     function add(info, reason){
       if(!info || !canAddCost(info.cost)) return false;
@@ -3745,14 +3754,14 @@
       return false;
     }
 
-    while(currentRatio() > 0.35 + EPS && guard < 120){
+    while(currentRatio() > 0.10 + EPS && guard < 160){
       guard += 1;
       let did = false;
       for(let offset=0; offset<priority.length; offset++){
         const idx = (cursor + offset) % priority.length;
         const info = ceHf53SaldoItemInfo(rows, priority[idx]);
         if(!info || !canAddCost(info.cost)) continue;
-        if(add(info, `saldo positivo ${money(initialSaldo)} (${Math.round(initialRatio*100)}% sobre compras); ajuste por prioridad equilibrada, unidad a unidad, sin bajar del 20% de colchón final.`)){
+        if(add(info, `saldo positivo ${money(initialSaldo)} (${Math.round(initialRatio*100)}% sobre compras); ajuste FIX38 por prioridad: cerveza, Coca-Colas, hielo, ron Barceló, whisky JB, Beefeater, Fantas, tónicas; objetivo saldo máximo 10%.`)){
           cursor = (idx + 1) % priority.length;
           did = true;
           break;
@@ -3770,7 +3779,7 @@
     const rows = (Array.isArray(lastProposal) ? lastProposal : []).filter(row => row && (row.__ceHf46SaldoBalancer === true || row.__ceHf52SaldoBalancer === true) && row.include !== false && Number(row.unidades || 0) > 0);
     if(!rows.length) return '';
     const total = rows.reduce((sum,row)=>sum + Number(row.unidades || 0) * Number(row.precio || 0), 0);
-    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} línea(s) por ${esc(money(total))}, siguiendo la prioridad equilibrada indicada y sin dejar el colchón por debajo del 20%.</div>`;
+    return `<div class="planificacion-note compact-note"><strong>Ajuste automático de saldo:</strong> se han añadido/reforzado ${rows.length} línea(s) por ${esc(money(total))}, siguiendo la prioridad FIX38 indicada y dejando el saldo previsto como máximo alrededor del 10% cuando los formatos de compra lo permiten.</div>`;
   }
 
   function ceHf33SpiritShotsFromDonation(name, units){
@@ -4156,7 +4165,7 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX36_GEMINI_ULTRACORTO_FIX_MOMENTOS: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX38_PLANIFICACION_JSON_DIRECTO_Y_SALDO: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -4187,7 +4196,7 @@
     };
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX36: Gemini ultracorto / Planificación</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX38: JSON directo Gemini / Planificación</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4201,7 +4210,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX36 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX38 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4265,7 +4274,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX36_GEMINI_ULTRACORTO_FIX_MOMENTOS: no se filtra la propuesta de Gemini.
+        // FIX38_PLANIFICACION_JSON_DIRECTO_Y_SALDO: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
