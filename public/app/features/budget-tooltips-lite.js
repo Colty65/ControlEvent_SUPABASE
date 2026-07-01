@@ -1,6 +1,7 @@
 /* ControlEvent v17_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
-   bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android. */
+   bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
+   FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v17_prod';
@@ -28,6 +29,9 @@
   let lastOpenAt = 0;
   let sanitizeTimer = 0;
   let lastSanitizeAt = 0;
+  let mobileTapStart = null;
+  let mobileLastIntent = {row:null, at:0};
+  const MOBILE_DOUBLE_TAP_MS = 620;
   const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   function isBudgetLegacyText(text){
     const t = up(text);
@@ -50,6 +54,27 @@
     const resumen = $('tabResumen');
     if(resumen && !isActuallyVisible(resumen)) return false;
     return true;
+  }
+  function isPhoneOnlyBudgetTap(){
+    try{
+      const nav = window.navigator || {};
+      const ua = String(nav.userAgent || '');
+      const touch = Number(nav.maxTouchPoints || 0) > 0 || ('ontouchstart' in window);
+      const coarse = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : touch;
+      const sw = Math.min(Number(window.screen?.width || window.innerWidth || 9999), Number(window.screen?.height || window.innerHeight || 9999));
+      const ipadLike = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && Number(nav.maxTouchPoints || 0) > 1);
+      const androidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua) && sw >= 600;
+      return !!(touch && coarse && !ipadLike && !androidTablet && sw < 768);
+    }catch(_){ return false; }
+  }
+  function eventPoint(event){
+    const touch = event?.changedTouches?.[0] || event?.touches?.[0] || null;
+    const x = touch ? touch.clientX : event?.clientX;
+    const y = touch ? touch.clientY : event?.clientY;
+    return {x:Number(x || 0), y:Number(y || 0)};
+  }
+  function blockEvent(event){
+    try{ event.preventDefault?.(); event.stopPropagation?.(); event.stopImmediatePropagation?.(); }catch(_){ }
   }
   function releaseLegacyTooltipElement(el){
     if(!el) return;
@@ -474,15 +499,70 @@
     if(now() - lastOpenAt < 80) return true;
     return false;
   }
+  function rememberMobileBudgetTapStart(event){
+    if(!isPhoneOnlyBudgetTap()) return;
+    const row = findBudgetRow(event.target);
+    if(!row){ mobileTapStart = null; return; }
+    const p = eventPoint(event);
+    mobileTapStart = {row, x:p.x, y:p.y, at:now(), pointerId:event.pointerId || 0};
+  }
+  function mobileDoubleTapGate(event){
+    if(!isPhoneOnlyBudgetTap()) return {isRow:false, open:true};
+    const row = findBudgetRow(event.target);
+    if(!row) return {isRow:false, open:false};
+
+    const hasPointerEvents = !!window.PointerEvent;
+    if(hasPointerEvents && event.type !== 'pointerup' && event.type !== 'keydown') return {isRow:true, open:false};
+    if(!hasPointerEvents && event.type === 'click') return {isRow:true, open:false};
+
+    if(event.type === 'keydown') return {isRow:true, open:true};
+
+    const p = eventPoint(event);
+    const t = now();
+    const start = mobileTapStart;
+    if(start && start.row === row){
+      const dx = Math.abs(p.x - start.x);
+      const dy = Math.abs(p.y - start.y);
+      if(Math.max(dx, dy) > 14 || (t - start.at) > 820){
+        mobileLastIntent = {row:null, at:0};
+        return {isRow:true, open:false};
+      }
+    }
+
+    if(mobileLastIntent.row === row && (t - mobileLastIntent.at) <= MOBILE_DOUBLE_TAP_MS){
+      mobileLastIntent = {row:null, at:0};
+      return {isRow:true, open:true};
+    }
+
+    mobileLastIntent = {row, at:t};
+    hideTooltip();
+    hideLegacyBudgetTooltips();
+    try{
+      row.classList.add('ce-v17-fix26-waiting-second-tap');
+      setTimeout(() => { try{ row.classList.remove('ce-v17-fix26-waiting-second-tap'); }catch(_){ } }, MOBILE_DOUBLE_TAP_MS + 80);
+    }catch(_){ }
+    return {isRow:true, open:false};
+  }
   function activateFromEvent(event){
-    if(shouldIgnoreActivation(event)) return false;
+    const gate = mobileDoubleTapGate(event);
+    if(gate.isRow && !gate.open){
+      blockEvent(event);
+      return true;
+    }
+    if(!gate.isRow && shouldIgnoreActivation(event)) return false;
     if(openForTarget(event.target)){
-      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
+      blockEvent(event);
       setTimeout(hideLegacyBudgetTooltips, 0);
       return true;
     }
     return false;
   }
+  document.addEventListener('pointerdown', event => {
+    try{ rememberMobileBudgetTapStart(event); }catch(_){ }
+  }, true);
+  document.addEventListener('touchstart', event => {
+    try{ rememberMobileBudgetTapStart(event); }catch(_){ }
+  }, {capture:true, passive:true});
   document.addEventListener('pointerup', event => {
     if(activateFromEvent(event)) return;
   }, true);
