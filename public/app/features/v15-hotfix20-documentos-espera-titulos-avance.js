@@ -188,6 +188,7 @@
   document.addEventListener('DOMContentLoaded', install);
   document.addEventListener('click', function(){ setTimeout(function(){ ensureAvanceButton(); patchPhotoModalTitles(); }, 80); }, true);
   ['change','input'].forEach(type => document.addEventListener(type, () => setTimeout(function(){ ensureAvanceButton(); patchPhotoModalTitles(); }, 80), true));
-  setInterval(function(){ ensureAvanceButton(); patchPhotoModalTitles(); }, 1200);
+  // FIX24: eliminado barrido continuo; se mantiene por eventos/cambios reales.
+  // setInterval(function(){ ensureAvanceButton(); patchPhotoModalTitles(); }, 1200);
   try{ new MutationObserver(() => setTimeout(patchPhotoModalTitles, 30)).observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(_){ }
 })();

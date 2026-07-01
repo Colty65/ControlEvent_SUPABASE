@@ -18,10 +18,12 @@
   const forcedOff = /^(0|false|off|no)$/i.test(params.get('ceLite') || '');
   const diagForced = /^(1|true|on|si|sí)$/i.test(params.get('ceDiag') || '');
   const likelyLowResource = (memory && memory <= 4) || (cores && cores <= 4);
-  const detected = isAndroid || isIPad || (coarse && likelyLowResource && !isIPhone);
-  const enabled = forcedOn || (!forcedOff && detected);
+  // FIX24: el problema ya no es solo móvil. También en PC había ventilador y long tasks por barridos legacy.
+  // Activamos el modo estable para todos los dispositivos, salvo ceLite=0.
+  const detected = true;
+  const enabled = !forcedOff;
   const showBadge = diagForced;
-  const reason = forcedOn ? 'forzado-ceLite=1' : forcedOff ? 'desactivado-ceLite=0' : isAndroid ? 'Android' : isIPad ? 'iPad' : (coarse && likelyLowResource ? 'tactil-recursos-limitados' : 'equipo-normal');
+  const reason = forcedOff ? 'desactivado-ceLite=0' : forcedOn ? 'forzado-ceLite=1' : isAndroid ? 'Android' : isIPad ? 'iPad' : isIPhone ? 'iPhone' : 'modo-estable-global-fix24';
 
   const nativeSetInterval = window.setInterval ? window.setInterval.bind(window) : null;
   const nativeSetTimeout = window.setTimeout ? window.setTimeout.bind(window) : null;
@@ -110,6 +112,64 @@
     };
     EventTarget.prototype.addEventListener.__ceLowResourceWrapped = true;
   }
+
+
+  // FIX24: los parches antiguos tienen muchos MutationObserver sobre document.body.
+  // Los agrupamos y filtramos mutaciones del propio panel PERF para evitar bucles de diagnóstico.
+  try{
+    const NativeMutationObserver = window.MutationObserver;
+    if(enabled && NativeMutationObserver && !NativeMutationObserver.__ceLowResourceWrapped){
+      const isPerfNode = n => {
+        try{
+          if(!n) return false;
+          if(n.nodeType === 3) n = n.parentNode;
+          if(!n || n.nodeType !== 1) return false;
+          return n.id === 'cePerf442Panel' || n.id === 'cePerf442Button' || n.closest?.('#cePerf442Panel,#cePerf442Button');
+        }catch(_){ return false; }
+      };
+      const perfOnlyMutation = m => {
+        try{
+          if(isPerfNode(m.target)) return true;
+          const added = Array.from(m.addedNodes || []);
+          const removed = Array.from(m.removedNodes || []);
+          const all = added.concat(removed);
+          return all.length > 0 && all.every(isPerfNode);
+        }catch(_){ return false; }
+      };
+      const WrappedMutationObserver = function(callback){
+        let queued = [];
+        let scheduled = false;
+        let lastRun = 0;
+        const wrappedCallback = function(list, observer){
+          try{
+            const relevant = Array.from(list || []).filter(m => !perfOnlyMutation(m));
+            if(!relevant.length) return;
+            queued = queued.concat(relevant);
+            if(queued.length > 80) queued = queued.slice(-80);
+            if(scheduled) return;
+            const nowMs = Date.now();
+            const delay = Math.max(0, 180 - (nowMs - lastRun));
+            scheduled = true;
+            nativeSetTimeout(() => {
+              scheduled = false;
+              lastRun = Date.now();
+              const batch = queued;
+              queued = [];
+              try{ callback(batch, observer); }catch(err){ nativeSetTimeout(() => { throw err; }, 0); }
+            }, delay);
+          }catch(_){
+            try{ callback(list, observer); }catch(__){}
+          }
+        };
+        return new NativeMutationObserver(wrappedCallback);
+      };
+      WrappedMutationObserver.prototype = NativeMutationObserver.prototype;
+      WrappedMutationObserver.__ceLowResourceWrapped = true;
+      WrappedMutationObserver.__ceNative = NativeMutationObserver;
+      window.MutationObserver = WrappedMutationObserver;
+      stats.mutationObserverAdjusted = true;
+    }
+  }catch(_){ }
 
   try{
     const nativeScrollIntoView = Element.prototype.scrollIntoView;

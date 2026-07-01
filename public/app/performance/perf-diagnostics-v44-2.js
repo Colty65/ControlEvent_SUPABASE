@@ -304,9 +304,20 @@
       });
     }
     if(!window.__cePerf442MutationObserver && typeof MutationObserver === 'function'){
+      const isPerfNode = n => {
+        try{ if(n && n.nodeType === 3) n = n.parentNode; return !!(n && n.nodeType === 1 && (n.id === 'cePerf442Panel' || n.id === 'cePerf442Button' || n.closest?.('#cePerf442Panel,#cePerf442Button'))); }catch(_){ return false; }
+      };
+      const isPerfMutation = m => {
+        try{
+          if(isPerfNode(m.target)) return true;
+          const nodes = Array.from(m.addedNodes || []).concat(Array.from(m.removedNodes || []));
+          return nodes.length > 0 && nodes.every(isPerfNode);
+        }catch(_){ return false; }
+      };
       window.__cePerf442MutationObserver = new MutationObserver(list => {
-        state.counters.domMutations += list.length;
-        if(state.opened) scheduleUpdate();
+        const real = Array.from(list || []).filter(m => !isPerfMutation(m));
+        state.counters.domMutations += real.length;
+        if(state.opened) scheduleUpdate(false);
       });
       safe(() => window.__cePerf442MutationObserver.observe(document.body, {childList:true, subtree:true}), null);
     }
@@ -352,9 +363,12 @@
 
   let updateTimer = null;
   function scheduleUpdate(force){
+    // FIX24: el panel PERF ya no se repinta en bucle por cada mutación.
+    // Solo se actualiza al abrirlo, al pulsar Actualizar/Limpiar/Copiar o tras evento explícito.
     if(!state.opened && !force) return;
+    if(!force) return;
     clearTimeout(updateTimer);
-    updateTimer = setTimeout(updatePanel, 140);
+    updateTimer = setTimeout(updatePanel, 220);
   }
 
   function htmlEscape(value){
@@ -563,6 +577,6 @@ Optimización v45.4: limpiezas ${window.__ceV443Stats?.prunes||0}, nodos ${windo
   // v45.4: PERF solo se ofrece en PC para usuarios GD/RW; sin UI ni instrumentación activa en móvil/tablet/RO.
   setInterval(() => {
     install();
-    if(state.opened) updatePanel();
-  }, 1200);
+    // FIX24: sin refresco automático del panel abierto. El botón Actualizar sigue disponible.
+  }, window.ControlEventLowResource?.interval?.(60000) || 60000);
 })();
