@@ -115,9 +115,6 @@
     html = String(html == null ? '' : html);
     return html.includes('ce-v434-chart-layout-shell') || html.includes('ce-v434-chart-layout') || html.includes('chart-shell');
   }
-  function eventLoadingNow(){
-    try{ return document.body.classList.contains('ce-event-loading-fix48') || document.body.classList.contains('ce-opt1-switching') || document.body.classList.contains('ce-v447-switching') || document.body.classList.contains('ce-opt2i-freezing'); }catch(_){ return false; }
-  }
   function htmlLooksBlankChart(html){
     html = String(html == null ? '' : html);
     if(!html) return true;
@@ -127,10 +124,8 @@
     const sinDatos = (html.match(/Sin datos/g) || []).length;
     const ceros = (html.match(/0,00\s*€/g) || []).length;
     const emptyDestino = /Sin datos por destino/i.test(html);
-    const zeroShell = (sinDatos >= 2 || ceros >= 5 || emptyDestino);
-    // FIX29: durante el cambio de evento, el gráfico todo a cero es intermedio aunque tenga aros grises clicables.
-    if(zeroShell && eventLoadingNow()) return true;
-    if(slices === 0 && zeroShell) return true;
+    // Un gráfico válido tiene al menos alguna porción o barras por destino. Si todo son ceros/sin datos, es el estado intermedio que causa los quesos blancos.
+    if(slices === 0 && (sinDatos >= 2 || ceros >= 5 || emptyDestino)) return true;
     return false;
   }
   function eventHasLoadedData(ev){

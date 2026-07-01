@@ -1,8 +1,7 @@
 /* ControlEvent v17_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
-   FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo.
-   FIX29: orden estable en globos de DONACION y OPERATIVA, sin totales separados al final. */
+   FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v17_prod';
@@ -218,12 +217,7 @@
   }
 
   function tableHtml(headers, rows){
-    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => {
-      const first = String((row && row[0]) || '').trim();
-      const empty = Array.isArray(row) && row.every(cell => !String(cell || '').trim());
-      const cls = empty ? ' class="ce-budget-lite-blank-row"' : (/^—.+—$/.test(first) ? ' class="ce-budget-lite-section-row"' : (/^Total\s+/i.test(first) ? ' class="ce-budget-lite-total-row"' : ''));
-      return `<tr${cls}>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`;
-    }).join('');
+    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
     return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
   function showTooltip(title, totalLabel, totalValue, table){
@@ -300,21 +294,11 @@
       const group = [];
       while(i < sorted.length && donorKey(sorted[i]) === key){ group.push(sorted[i]); i += 1; }
       group.forEach(row => out.push([donorName(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-      // FIX29: el total del donante va inmediatamente debajo de SUS líneas, no en un bloque de totales separado.
       out.push([`Total ${donor}`, '', '', '', money(group.reduce((sum, row) => sum + productValue(row), 0))]);
       out.push(['', '', '', '', '']);
     }
     while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
-  }
-  function appendDonationSection(out, label, code){
-    const rows = donationRows(code);
-    const subtotal = rows.reduce((sum, row) => sum + productValue(row), 0);
-    out.push([`— ${label} —`, '', '', '', money(subtotal)]);
-    if(rows.length) out.push(...donationTableRows(rows));
-    else out.push(['Sin registros', '', '', '', money(0)]);
-    out.push(['', '', '', '', '']);
-    return subtotal;
   }
   function donationTipForCode(title, code){
     const rows = donationRows(code);
@@ -323,15 +307,9 @@
     return {title:`DONACION DE PRODUCTO / ${title}`, totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
   function donationTotalTip(){
-    // FIX29: el total se muestra por bloques fijos: TIENDAS, SOCIOS y NO SOCIOS.
-    // Así no se mezclan donantes de distinto tipo por orden alfabético global.
-    const body = [];
-    let total = 0;
-    total += appendDonationSection(body, 'TIENDAS', 'DONADO TIENDA');
-    total += appendDonationSection(body, 'SOCIOS', 'DONADO SOCIO');
-    total += appendDonationSection(body, 'NO SOCIOS', 'DONADO OTROS');
-    while(body.length && body[body.length - 1].every(cell => !String(cell || '').trim())) body.pop();
-    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], body);
+    const rows = compras().filter(row => isDonationTicket(row.ticketDonacion || row.ticket || '')).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
+    const total = rows.reduce((sum, row) => sum + productValue(row), 0);
+    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], donationTableRows(rows));
     return {title:'DONACION DE PRODUCTO / TOTAL', totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
   function donationTipForRow(row){
@@ -347,8 +325,6 @@
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
-  function currentExpenseRows(){ return allExpenseRows().filter(row => isCurrentExpenseTicket(row.ticketDonacion || row.ticket || '')); }
-  function ticketExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== '' && !isCurrentExpenseTicket(row.ticketDonacion || row.ticket || '')); }
   function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
   function expenseTableRows(rows){
     const storeKey = row => up(storeName(row));
@@ -381,36 +357,17 @@
     const text = up(row.textContent || '');
     let rows = [];
     let title = 'OPERATIVA / GASTOS';
-    let sectioned = false;
-    let body = [];
-    const appendExpenseSection = (label, list) => {
-      const subtotal = list.reduce((sum, item) => sum + productValue(item), 0);
-      body.push([`— ${label} —`, '', '', '', '', money(subtotal)]);
-      if(list.length) body.push(...expenseTableRows(list));
-      else body.push(['Sin registros', '', '', '', '', money(0)]);
-      body.push(['', '', '', '', '', '']);
-      return subtotal;
-    };
     if(text.includes('PTE')){
       rows = pendingExpenseRows();
       title = 'OPERATIVA / PTE. COMPRA U OTROS GASTOS';
     }else if(text.includes('GASTO POR COMPRAS') || text.includes('GASTOS REALIZADOS')){
-      rows = ticketExpenseRows().concat(currentExpenseRows());
+      rows = realisedExpenseRows();
       title = 'OPERATIVA / GASTOS REALIZADOS';
     }else if(text === 'GASTOS' || text.includes('GASTOS PREVISTOS')){
-      // FIX29: en el globo total de OPERATIVA no se mezclan ticket reales y PTE.COMPRA por tienda.
-      // Se muestran bloques fijos: realizados, gastos de organización y pendientes.
+      rows = allExpenseRows();
       title = 'OPERATIVA / GASTOS PREVISTOS Y REALIZADOS';
-      sectioned = true;
-      let total = 0;
-      total += appendExpenseSection('GASTOS REALIZADOS', ticketExpenseRows());
-      total += appendExpenseSection('GASTOS DE ORGANIZACION', currentExpenseRows());
-      total += appendExpenseSection('PTE.COMPRA U OTROS GASTOS', pendingExpenseRows());
-      while(body.length && body[body.length - 1].every(cell => !String(cell || '').trim())) body.pop();
-      const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], body);
-      return {title, totalLabel:'TOTAL', totalValue: money(total), table};
     }else if(text.includes('GASTOS DE ORGANIZACION')){
-      rows = currentExpenseRows();
+      rows = allExpenseRows().filter(item => isCurrentExpenseTicket(item.ticketDonacion || item.ticket || ''));
       title = 'OPERATIVA / GASTOS DE ORGANIZACION';
     }else{
       return null;

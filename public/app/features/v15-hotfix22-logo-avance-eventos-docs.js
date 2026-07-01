@@ -47,36 +47,14 @@
   }
   function applyScopedState(data, eventId){
     const target = st();
-    // FIX30: una carga scoped de evento no debe borrar los maestros globales.
-    // En la primera selección tras login se estaba quedando a veces sin lista de eventos
-    // y Gráficas renderizaba contra "sin evento" hasta hacer Refrescar/cambiar ventana.
-    const keep = {};
-    ['eventos','personas','productos','tiendas','acceso','usuarios'].forEach(k => {
-      if(Array.isArray(target[k]) && target[k].length) keep[k] = target[k].slice();
-    });
     let merged = data || {};
     try{ if(typeof mergeLoadedState === 'function' && typeof defaultState === 'function') merged = mergeLoadedState(data || {}, defaultState()); }catch(_){ }
     try{ Object.keys(target).forEach(k => delete target[k]); }catch(_){ }
     Object.assign(target, merged || {});
-    ['compras','colaboradores','donaciones','eventDocuments'].forEach(k => {
-      if(eventId && Array.isArray(target[k])) target[k].forEach(r => { if(r && !r.eventId && !r.event_id) r.eventId = eventId; });
-    });
-    Object.keys(keep).forEach(k => {
-      if(!Array.isArray(target[k]) || !target[k].length || (k === 'eventos' && !target[k].some(e => String(e?.id || '') === String(eventId || '')))){
-        target[k] = keep[k];
-      }
-    });
     target.selectedEventId = eventId;
     try{ window.state = target; }catch(_){ }
     try{ if(window.ControlEventApp) window.ControlEventApp.state = target; }catch(_){ }
-    const sel = $('selectedEvent'); if(sel){
-      const id = String(eventId || '');
-      if(id && !sel.querySelector(`option[value="${id.replace(/"/g,'\\"')}"]`)){
-        const ev = (target.eventos || []).find(e => String(e?.id || '') === id);
-        if(ev){ const opt = document.createElement('option'); opt.value = id; opt.textContent = ev.titulo || ev.nombre || id; sel.appendChild(opt); }
-      }
-      sel.value = eventId;
-    }
+    const sel = $('selectedEvent'); if(sel) sel.value = eventId;
     return target;
   }
   let loadSeq = 0;

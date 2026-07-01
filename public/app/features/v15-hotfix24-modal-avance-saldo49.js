@@ -119,17 +119,6 @@
 
   function sortTableByProduct(table){
     if(!table) return;
-    // FIX28: no reordenar los globos de presupuesto/gráficas que ya vienen agrupados
-    // por donante/tienda/ticket. HOTFIX49 mandaba todos los totales al final y mezclaba
-    // DONACION DE PRODUCTO y OPERATIVA.
-    try{
-      const box=table.closest('#ceBudgetLiteTooltipV307,#ceTooltipV21,.ce-budget-lite-tooltip-v306');
-      if(box){
-        const scope=norm((box.querySelector('.ce-budget-lite-title')?.textContent || '') + ' ' + (box.textContent || ''));
-        const grouped=/DONACI[OÓ]N\s+DE\s+PRODUCTO|OPERATIVA|GASTOS|PTE\.\s*COMPRA|SALDO\s+ACTUAL|SALDO\s+OPERATIVO|VALORACION\s+DEL\s+EVENTO|DONANTE\s*\|\s*PRODUCTO|TIENDA\s*\|\s*TICKET\s*\|\s*PRODUCTO/.test(scope);
-        if(grouped) return;
-      }
-    }catch(_){ }
     const rows=Array.from(table.rows||[]);
     if(rows.length<2) return;
     const headerIndex=rows.findIndex(r=>Array.from(r.cells||[]).some(c=>/producto/i.test(c.textContent||'')));

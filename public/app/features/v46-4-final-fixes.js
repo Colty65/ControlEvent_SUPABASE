@@ -2,7 +2,6 @@
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
-   - FIX29: SALDO 0 abre detalle desde toda la tarjeta y no pinta ceros intermedios durante carga.
 */
 (function(){
   'use strict';
@@ -42,12 +41,8 @@
   const isRW = () => role() === 'RW';
   const canWrite = () => isGD() || isRW();
   function selectedId(){
-    // FIX30: durante la primera selección tras login puede existir un selectedEvent() legacy
-    // desincronizado con el estado real. Para Gráficas manda primero state.selectedEventId.
-    const sid = norm(st().selectedEventId || $('selectedEvent')?.value || '');
-    if(sid) return sid;
     try{ const ev = typeof selectedEvent === 'function' ? selectedEvent() : null; if(ev?.id) return String(ev.id); }catch(_){ }
-    return '';
+    return String(st().selectedEventId || '');
   }
   function selectedEv(){
     const id = selectedId();
@@ -711,14 +706,7 @@
     return out;
   }
   function pieCard(title, total, items){
-    const list = Array.isArray(items) ? items : [];
-    const nonzero = list.filter(it => Math.abs(Number(it.value || 0)) > 0);
-    // FIX28: SALDO ACTUAL y SALDO OPERATIVO deben abrir detalle aunque el saldo sea 0,00 €.
-    // Donación de producto sigue mostrando "Sin datos" si no hay donaciones reales.
-    const saldoDetail = /SALDO\s+ACTUAL|SALDO\s+OPERATIVO/i.test(String(title || ''))
-      ? list.filter(it => it && Array.isArray(it.lines) && it.lines.length)
-      : [];
-    const visibleItems = nonzero.length ? nonzero : saldoDetail;
+    const nonzero = items.filter(it => Math.abs(Number(it.value || 0)) > 0);
     let angle = 0;
     const angles = pieDisplayAngles(nonzero);
     const slices = nonzero.length ? nonzero.map((it, idx) => {
@@ -726,14 +714,9 @@
       if(inc >= 359.99) return `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></circle><circle class="ce-v434-pie-hit" cx="50" cy="50" r="42" ${tipAttrs(it, it.color)}></circle>`;
       const d = arcPath(50,50,42,start,angle);
       return `<path class="ce-v434-pie-slice" d="${d}" fill="${esc(it.color)}" ${tipAttrs(it, it.color)}></path><path class="ce-v434-pie-hit" d="${d}" ${tipAttrs(it, it.color)}></path>`;
-    }).join('') : (visibleItems.length
-      ? `<circle class="ce-v434-pie-slice" cx="50" cy="50" r="42" fill="#e5e7eb" ${tipAttrs(visibleItems[0], visibleItems[0].color || '#64748b', visibleItems[0].layout || 'metricv460')}></circle><circle class="ce-v434-pie-hit" cx="50" cy="50" r="42" ${tipAttrs(visibleItems[0], visibleItems[0].color || '#64748b', visibleItems[0].layout || 'metricv460')}></circle>`
-      : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`);
-    const legendItems = visibleItems.length ? visibleItems : [{label:'Sin datos', value:0, color:'#e5e7eb', lines:['Sin registros']}];
-    const legend = legendItems.map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
-    const saldoClickable = /SALDO\s+ACTUAL|SALDO\s+OPERATIVO/i.test(String(title || '')) && visibleItems.length;
-    const cardAttrs = saldoClickable ? `${tipAttrs(visibleItems[0], visibleItems[0].color || '#0f766e', visibleItems[0].layout || 'metricv460')} role="button" tabindex="0"` : '';
-    return `<div class="ce-v434-pie-card" ${cardAttrs}><div class="ce-v434-pie-title"><span>${esc(title)}</span><strong>${esc(moneyF(total))}</strong></div><svg class="ce-v434-pie-svg" viewBox="0 0 100 100" role="img" aria-label="${esc(title)}">${slices}<circle cx="50" cy="50" r="21" fill="#fff" style="pointer-events:none"></circle></svg><div class="ce-v434-legend">${legend}</div></div>`;
+    }).join('') : `<circle cx="50" cy="50" r="42" fill="#e5e7eb"></circle>`;
+    const legend = (nonzero.length ? nonzero : [{label:'Sin datos', value:0, color:'#e5e7eb', lines:['Sin registros']}]).map(it => `<div class="ce-v434-legend-row" ${tipAttrs(it, it.color)}><span class="ce-v434-dot" style="background:${esc(it.color)}"></span><span>${esc(it.label)}: ${esc(moneyF(it.displayValue ?? it.value))}</span></div>`).join('');
+    return `<div class="ce-v434-pie-card"><div class="ce-v434-pie-title"><span>${esc(title)}</span><strong>${esc(moneyF(total))}</strong></div><svg class="ce-v434-pie-svg" viewBox="0 0 100 100" role="img" aria-label="${esc(title)}">${slices}<circle cx="50" cy="50" r="21" fill="#fff"></circle></svg><div class="ce-v434-legend">${legend}</div></div>`;
   }
   function hasDestinoValues(row){ return Math.abs(Number(row?.comprado || 0)) > 0 || Math.abs(Number(row?.donado || 0)) > 0 || Math.abs(Number(row?.pendiente || 0)) > 0; }
   function destinoRows(){
@@ -777,12 +760,6 @@
     const g = chartData(); const sig = chartSignature(g);
     const own = wrap.firstElementChild?.classList?.contains('ce-v434-chart-layout-shell') && wrap.children.length === 1;
     if(own && lastChartSignature === sig && options.force !== true) return;
-    const looksTransientZero = Math.abs(Number(g.totalIncome||0)) < .001 && Math.abs(Number(g.totalDon||0)) < .001 && Math.abs(Number(g.totalExp||0)) < .001 && Math.abs(Number(g.valoracion||0)) < .001;
-    const isLoadingEvent = document.body.classList.contains('ce-event-loading-fix48') || document.body.classList.contains('ce-opt1-switching') || document.body.classList.contains('ce-v447-switching');
-    if(looksTransientZero && isLoadingEvent && wrap.querySelector('.ce-v434-chart-layout-shell,.ce-v434-chart-layout,.chart-shell')){
-      // FIX29: no machacar una gráfica visible con el estado intermedio todo a cero mientras llega /api/state.
-      return;
-    }
     const html = `<div class="chart-shell ce-v434-chart-layout-shell"><div class="chart-row" data-v255-row="valoracion" data-v254-row="valoracion" style="display:none!important"></div><div class="ce-v434-chart-layout"><div class="ce-v434-chart-panel"><div class="ce-v434-panel-title"><span>Distribución general</span></div><div class="ce-v434-pies ce-v46-pies">${pieCard('INGRESOS', g.totalIncome, g.incomeItems)}${pieCard('DONACIÓN DE PRODUCTO', g.totalDon, g.donationItems)}${pieCard('GASTOS', g.totalExp, g.expenseItems)}${pieCard('SALDO ACTUAL', g.saldoActual, g.saldoActualItems)}${pieCard('SALDO OPERATIVO', g.saldoOperativo, g.saldoOperativoItems)}${pieCard('VALORACION DEL EVENTO', g.valoracion, g.valoracionItems)}</div></div>${destinoBars()}</div></div>`;
     wrap.innerHTML = html;
     lastChartSignature = sig;

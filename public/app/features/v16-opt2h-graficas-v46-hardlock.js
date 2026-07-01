@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod OPT2J/FIX29 - bloqueo duro de gráficas antiguas + anti segundo repintado.
+/* ControlEvent v17_prod OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
    Objetivo: que nunca se vea la gráfica antigua de 4 quesos / 2 columnas.
    Estrategia:
    - Se carga muy pronto y también al final para reengancharse.
@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v17_prod_opt_2j_fix30';
+  const VERSION = 'v17_prod_opt_2j';
   const now = () => Date.now();
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
@@ -52,8 +52,8 @@
   let lastFinalAt = 0;
   let lastCommitSig = '';
   let lastCommitEventId = '';
-  const POST_COMMIT_LOCK_MS = 2300;
-  const FRESH_SCHEDULE_LOCK_MS = 3000;
+  const POST_COMMIT_LOCK_MS = 1450;
+  const FRESH_SCHEDULE_LOCK_MS = 1900;
 
   function normalizedHtmlSig(html){
     html = String(html || '');
@@ -119,9 +119,6 @@
     return isChartHtml(html) && html.includes('ce-v46-pies') && pieCount(html) >= 6 &&
       /SALDO ACTUAL/i.test(html) && /SALDO OPERATIVO/i.test(html) && /VALORACION DEL EVENTO/i.test(html);
   }
-  function isEventLoading(){
-    try{ return document.body.classList.contains('ce-event-loading-fix48') || document.body.classList.contains('ce-opt1-switching') || document.body.classList.contains('ce-v447-switching') || document.body.classList.contains('ce-opt2i-freezing'); }catch(_){ return false; }
-  }
   function isBlankChartHtml(html){
     html = String(html || '');
     if(!html || isLoadingHtml(html)) return true;
@@ -129,11 +126,7 @@
     const slices = (html.match(/ce-v434-pie-slice/g) || []).length;
     const sinDatos = (html.match(/Sin datos/g) || []).length;
     const ceros = (html.match(/0,00\s*€/g) || []).length;
-    const zeroShell = (sinDatos >= 2 || ceros >= 5 || /Sin datos por destino/i.test(html));
-    // FIX29: durante el cambio/carga no aceptar la V46 todo a cero como contenido final.
-    // En eventos realmente vacíos, al terminar la carga ya no está activa la marca de loading y se podrá ver el cero real.
-    if(zeroShell && isEventLoading()) return true;
-    return slices === 0 && zeroShell;
+    return slices === 0 && (sinDatos >= 2 || ceros >= 5 || /Sin datos por destino/i.test(html));
   }
   function isWrongChartHtml(html){ return isChartHtml(html) && !isStrictV46Html(html); }
 
@@ -154,9 +147,8 @@
       w.style.setProperty('--ce-opt2h-h', cachedHeight + 'px');
       w.classList.add('ce-opt2h-holding');
       if(cachedHtml){ rawSet(w, cachedHtml); return true; }
-      // FIX29: si no hay instantánea, no vaciamos el contenedor. Dejamos que siga visible lo que haya
-      // hasta que llegue una V46 válida; esto evita el flash de gráficas sin contenido.
-      return false;
+      rawSet(w, '');
+      return true;
     }catch(_){ return false; }
   }
   function commitIfStrict(html, reason){
