@@ -2205,6 +2205,45 @@
     });
     return out;
   }
+  function cePlanFix31ExtractPromptBrief(){
+    const raw = String(fieldValue('planEventoTitulo') || '') + '\n' + String(fieldValue('planDescripcion') || '') + '\n' + String(fieldValue('planInfo') || '');
+    const norm = normalizeText(raw || '');
+    const numFrom = (rx, fallback) => { const m = raw.match(rx); return m ? Number(String(m[1]).replace(',','.')) : (fallback || 0); };
+    const days = Math.max(1, numFrom(/duraci[oó]n\s+del\s+evento\s*:\s*(\d+)/i, 0) || (raw.match(/(?:dia|día)\s*[_\- ]*(\d+)/gi) || []).map(x => Number((x.match(/\d+/)||[0])[0])).reduce((a,b)=>Math.max(a,b),0) || Number(fieldValue('planDias') || 1));
+    const asistentes = numFrom(/personas\s+asistentes\s*:\s*(\d+)/i, Number(fieldValue('planPersonas') || 0));
+    const cerveza = numFrom(/personas\s+que\s+beber[aá]n\s+cerveza\s*:\s*(\d+)/i, 0);
+    const cubatas = numFrom(/personas\s+que\s+tomar[aá]n\s+cubatas\s*:\s*(\d+)/i, 0);
+    const sinAlcohol = numFrom(/personas\s+sin\s+alcohol[^:\n]*:\s*(\d+)/i, 0);
+    const cenaReal = numFrom(/personas\s+que\s+cenar[aá]n\s+realmente\s*:\s*(\d+)/i, 0) || numFrom(/para\s+unas\s+(\d+)\s+personas/i, 0);
+    const presupuesto = numFrom(/presupuesto\s+objetivo\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
+    const maximo = numFrom(/l[ií]mite\s+m[aá]ximo\s+de\s+coste\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
+    const momentLines = [];
+    raw.replace(/(?:^|\n)\s*(?:[-*]\s*)?(?:dia|día)\s*[_\- ]*(\d{1,2})\s*(?:\([^\n)]*\))?\s*:?\s*([^\n]+)/gi, (_, d, text) => {
+      const n = normalizeText(text || '');
+      const add = m => momentLines.push(`dia_${d} (${m}): ${String(text || '').trim()}`);
+      if(/APERITIVO/.test(n)) add('aperitivo');
+      if(/COMIDA/.test(n)) add('comida');
+      if(/TARDEO|CUBATA/.test(n) && !/NOCHE/.test(n)) add('tardeo/cubatas');
+      if(/CENA/.test(n)) add('cena');
+      if(/CUBATA/.test(n) && /NOCHE/.test(n)) add('cubatas noche');
+      return '';
+    });
+    return {raw, norm, days, asistentes, cerveza, cubatas, sinAlcohol, cenaReal, presupuesto, maximo, momentLines};
+  }
+  function cePlanFix31BriefHtml(){
+    const b = cePlanFix31ExtractPromptBrief();
+    const donCount = ceHf27PromptBlocks().length;
+    const moments = b.momentLines.length ? b.momentLines.map(x => `<li>${esc(x)}</li>`).join('') : '<li>No se han detectado momentos por día; Zuzu deberá proponerlos o pedir datos.</li>';
+    return `<section class="ce-hf27-diagnostic ce-fix31-brief">
+      <div class="ce-hf27-head"><div><h3>Brief estructurado que se enviará a Gemini</h3><p>ControlEvent extrae esto antes de generar compras: duración, asistentes, momentos, bebida, cena real, presupuesto y donaciones. El botón de abajo ya no usa compra local: llama a Gemini con este brief.</p></div>
+      <div class="ce-hf27-kpis"><span>Días <b>${esc(b.days)}</b></span><span>Asistentes <b>${esc(b.asistentes || '—')}</b></span><span>Cerveza <b>${esc(b.cerveza || '—')}</b></span><span>Cubatas <b>${esc(b.cubatas || '—')}</b></span><span>Donaciones <b>${donCount}</b></span></div></div>
+      <div style="padding:12px 16px;background:#fff;border-top:1px solid #e5e7eb">
+        <p><b>Presupuesto:</b> objetivo ${esc(b.presupuesto || '—')} €/persona · máximo ${esc(b.maximo || '—')} €/persona · <b>sin alcohol/niños:</b> ${esc(b.sinAlcohol || '—')} · <b>cenan realmente:</b> ${esc(b.cenaReal || '—')}</p>
+        <ul style="margin:8px 0 0 18px">${moments}</ul>
+      </div>
+    </section>`;
+  }
+
   function ceHf27DiagnosticsHtml(){
     const rowsDiag = ceHf27PromptBlocks();
     const ok = rowsDiag.filter(x => x.match.productId && !x.match.review).length;
@@ -2225,7 +2264,7 @@
         <td><span class="ce-hf27-status">${esc(status)}</span><small>${esc(d.match.method)}${d.match.candidates?.length ? ' · Candidatos: ' + esc(d.match.candidates.join(' | ')) : ''}</small></td>
       </tr>`;
     }).join('');
-    return `<section id="ceHf27DiagnosticoPrompt" class="ce-hf27-diagnostic">
+    return cePlanFix31BriefHtml() + `<section id="ceHf27DiagnosticoPrompt" class="ce-hf27-diagnostic">
       <div class="ce-hf27-head">
         <div><h3>Diagnóstico verificable del prompt</h3><p>Esto es la caja negra abierta: cada producto leído, cómo se ha buscado en PRODUCTOS y qué se va a crear como donación.</p></div>
         <div class="ce-hf27-kpis"><span>OK <b>${ok}</b></span><span>Revisar <b>${revisar}</b></span><span>No encontrados <b>${no}</b></span><span>Total <b>${rowsDiag.length}</b></span><span>Valor <b>${money(valorDiagnostico)}</b></span></div>
@@ -2255,8 +2294,13 @@
     if(apply && !apply.__ceHf27Bound){
       apply.__ceHf27Bound = true;
       apply.addEventListener('click', () => {
-        lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf27TruthRowsFromDiagnostics())))));
-        renderProposal();
+        const box = document.getElementById('planificacionResultado');
+        if(box){
+          box.classList.remove('hidden');
+          box.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note"><strong>Brief aceptado:</strong> se genera propuesta llamando al backend/Gemini con el prompt completo y el brief estructurado; no se usa compra local de diagnóstico.</div>');
+        }
+        try{ generateProposal(); }
+        catch(error){ console.error('[ControlEvent FIX31] No se pudo lanzar Generar propuesta desde diagnóstico', error); }
       });
     }
     const copy = scope.querySelector?.('#btnHf27CopiarDiagnostico');
@@ -2424,7 +2468,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX30_PLANIFICACION: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX31_PLANIFICACION: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -4079,10 +4123,22 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX30_PLANIFICACION: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX31_PLANIFICACION: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
+
+  function renderZuzuMenuSummary(menuResumen){
+    const rows = Array.isArray(menuResumen) ? menuResumen.filter(x => x && (x.resumen || x.summary || x.descripcion)) : [];
+    if(!rows.length) return '';
+    const body = rows.map(item => {
+      const dia = esc(item.dia || item.day || 'dia');
+      const momento = esc(item.momento || item.slot || item.franja || 'momento');
+      const resumen = esc(item.resumen || item.summary || item.descripcion || item.texto || '');
+      return `<li><b>${dia} (${momento}):</b> ${resumen}</li>`;
+    }).join('');
+    return `<section class="planificacion-note compact-note ce-fix31-menu-summary"><strong>Resumen de menú propuesto por Zuzu:</strong><ul style="margin:8px 0 0 18px">${body}</ul></section>`;
+  }
 
   async function generateProposal(){
     if(!isGD()) return;
@@ -4131,7 +4187,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX30_PLANIFICACION: no se filtra la propuesta de Gemini.
+        // FIX31_PLANIFICACION: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
