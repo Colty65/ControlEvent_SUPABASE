@@ -2697,7 +2697,10 @@ Reglas:
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
-- Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas o patrones de un evento anterior. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala. Diseña desde cero con el prompt del usuario, personas/días y catálogo/precios solo como referencia. Respeta exactamente las existencias/donaciones explícitas que haya escrito.
+- Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas, patrones de un evento anterior o menús fijos. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala.
+- En Encargo total debes obedecer el texto completo de descripcion e informacionConstruccion: duración/días, concepto del evento, comidas indicadas, horarios, preferencias de comida, bebida, cosas que NO se quieren y nivel de detalle pedido.
+- NO uses nunca paella, arroz, marisco, barbacoa, lomo, morcilla, panceta o chorizo como menú por defecto. Solo propón esos productos si el usuario lo ha pedido o si encaja de forma explícita con el concepto descrito. Si el usuario dice bocadillos, tapas, aperitivo, comida fría, desayuno, merienda, pizza, tortillas, etc., propón productos coherentes con eso y no cambies a paella/barbacoa.
+- Si falta información básica para comprar con criterio (personas, días, comidas incluidas, bebida o concepto), NO rellenes con un menú inventado: devuelve las donaciones/existencias confirmadas y añade en notes las preguntas concretas que debe responder el usuario para completar la compra.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
 - Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
@@ -2989,23 +2992,24 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   const largePrompt = trim(form.info || '').length > 6000;
 
   if (m === 'ZUZU_TOTAL' && hasConfirmedPromptBlocks) {
-    // Para prompts largos con donaciones/existencias confirmadas, primero se construye de forma directa.
-    // Así evitamos 504 y garantizamos que las donaciones del usuario no dependan de Gemini.
+    // FIX28 planificación: las donaciones/existencias explícitas se cargan siempre,
+    // pero Gemini debe interpretar también el concepto, duración y comidas del prompt.
+    // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('Encargo total a Zuzu: se han cargado directamente las donaciones/existencias confirmadas del prompt para evitar esperas y errores 504.');
-    if (!largePrompt) {
-      try {
-        const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), 12000, 'Gemini planificación');
-        const matched = matchPlanRows(ai?.rows, [], state, form);
-        if (matched.length) {
-          rowsOut = planMergeExplicitDonations(matched, explicitDonationRows);
-          aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean).concat(aiNotes);
-          aiProvider = 'gemini-planificacion+prompt-confirmado'; aiModel = ai.__model || '';
-        }
-      } catch (error) {
-        aiNotes.push('Gemini no se usa en esta propuesta directa: ' + trim(error?.message || error));
+    aiNotes.push('Encargo total a Zuzu: se han cargado directamente las donaciones/existencias confirmadas del prompt y se ha pedido a Gemini que interprete el resto de la planificación.');
+    try {
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 26000 : 18000, 'Gemini planificación');
+      const matched = matchPlanRows(ai?.rows, [], state, form);
+      if (matched.length) {
+        rowsOut = planMergeExplicitDonations(matched, explicitDonationRows);
+        aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean).concat(aiNotes);
+        aiProvider = 'gemini-planificacion+prompt-confirmado'; aiModel = ai.__model || '';
+      } else {
+        aiNotes.push('Gemini no devolvió compras utilizables. No se añade una compra automática local para no inventar paella/barbacoa ni un menú que el usuario no haya pedido.');
       }
+    } catch (error) {
+      aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     try {

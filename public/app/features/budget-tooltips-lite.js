@@ -1,8 +1,7 @@
 /* ControlEvent v17_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
-   FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo.
-   FIX28_SOLO_ORDEN_REAL: ordena únicamente los globos de RESUMEN (Donación y Operativa) y se carga al final para evitar que los globos legacy pisen el orden. */
+   FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
 (function(){
   'use strict';
   const VERSION = 'ControlEvent v17_prod';
@@ -218,25 +217,8 @@
   }
 
   function tableHtml(headers, rows){
-    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => {
-      const isSection = row && row.__ceSection;
-      const cells = isSection ? row.cells : row;
-      const cls = isSection ? ' class="ce-budget-lite-section-row"' : '';
-      return `<tr${cls}>${cells.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`;
-    }).join('');
+    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
     return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
-  }
-  function emptyCells(cols){ return Array.from({length:cols}, () => ''); }
-  function sectionRow(title, cols){ const cells = emptyCells(cols); cells[0] = String(title || ''); return {__ceSection:true, cells}; }
-  function trimBlankRows(rows){
-    const out = Array.isArray(rows) ? rows.slice() : [];
-    while(out.length){
-      const last = out[out.length - 1];
-      const cells = last && last.__ceSection ? last.cells : last;
-      if(!Array.isArray(cells) || !cells.every(cell => !String(cell || '').trim())) break;
-      out.pop();
-    }
-    return out;
   }
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
@@ -324,26 +306,10 @@
     const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], donationTableRows(rows));
     return {title:`DONACION DE PRODUCTO / ${title}`, totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
-  function donationSectionRows(title, code){
-    const rows = donationRows(code);
-    if(!rows.length) return [];
-    return [sectionRow(title, 5), ...donationTableRows(rows), emptyCells(5)];
-  }
   function donationTotalTip(){
-    const groups = [
-      ['TIENDAS', 'DONADO TIENDA'],
-      ['SOCIOS', 'DONADO SOCIO'],
-      ['NO SOCIOS', 'DONADO OTROS']
-    ];
-    let total = 0;
-    let out = [];
-    groups.forEach(([title, code]) => {
-      const rows = donationRows(code);
-      total += rows.reduce((sum, row) => sum + productValue(row), 0);
-      out = out.concat(donationSectionRows(title, code));
-    });
-    out = trimBlankRows(out);
-    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], out);
+    const rows = compras().filter(row => isDonationTicket(row.ticketDonacion || row.ticket || '')).sort((a,b) => cmp(donorName(a), donorName(b)) || cmp(productName(a), productName(b)));
+    const total = rows.reduce((sum, row) => sum + productValue(row), 0);
+    const table = tableHtml(['Donante','Producto','Uds','Precio estimado','Valor estimado'], donationTableRows(rows));
     return {title:'DONACION DE PRODUCTO / TOTAL', totalLabel:'TOTAL ESTIMADO', totalValue: money(total), table};
   }
   function donationTipForRow(row){
@@ -358,15 +324,8 @@
   function expenseTicket(row){ return norm(row.ticketDonacion || row.ticket || '') || 'Pte.Compra'; }
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
-  function isPendingExpenseRow(row){
-    const t = up(row.ticketDonacion || row.ticket || '');
-    return !t || t === 'PTE.COMPRA' || t === 'PTE COMPRA' || t.includes('PENDIENTE') || t.includes('OTROS GASTOS');
-  }
-  function isCurrentExpenseRow(row){ return isCurrentExpenseTicket(row.ticketDonacion || row.ticket || ''); }
-  function realisedExpenseRows(){ return allExpenseRows().filter(row => !isPendingExpenseRow(row)); }
-  function realisedPurchaseRows(){ return allExpenseRows().filter(row => !isPendingExpenseRow(row) && !isCurrentExpenseRow(row)); }
-  function currentExpenseRows(){ return allExpenseRows().filter(isCurrentExpenseRow); }
-  function pendingExpenseRows(){ return allExpenseRows().filter(isPendingExpenseRow); }
+  function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
+  function pendingExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') === ''); }
   function expenseTableRows(rows){
     const storeKey = row => up(storeName(row));
     const ticketKey = row => up(expenseTicket(row));
@@ -394,62 +353,28 @@
     while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
   }
-  function expenseSectionRows(title, rows){
-    if(!Array.isArray(rows) || !rows.length) return [];
-    return [sectionRow(title, 6), ...expenseTableRows(rows), emptyCells(6)];
-  }
-  function plannedExpenseTableRows(){
-    const sections = [
-      ['GASTOS REALIZADOS', realisedPurchaseRows()],
-      ['GASTOS DE ORGANIZACION', currentExpenseRows()],
-      ['PTE.COMPRA U OTROS GASTOS', pendingExpenseRows()]
-    ];
-    let out = [];
-    sections.forEach(([title, rows]) => { out = out.concat(expenseSectionRows(title, rows)); });
-    return trimBlankRows(out);
-  }
-  function realisedExpenseTableRows(){
-    let out = [];
-    out = out.concat(expenseSectionRows('GASTOS POR TICKET', realisedPurchaseRows()));
-    out = out.concat(expenseSectionRows('GASTOS DE ORGANIZACION', currentExpenseRows()));
-    return trimBlankRows(out);
-  }
   function operativeTipForRow(row){
     const text = up(row.textContent || '');
     let rows = [];
     let title = 'OPERATIVA / GASTOS';
-    let tableRows = null;
     if(text.includes('PTE')){
       rows = pendingExpenseRows();
       title = 'OPERATIVA / PTE. COMPRA U OTROS GASTOS';
-    }else if(text.includes('GASTO POR COMPRAS')){
-      rows = realisedPurchaseRows();
-      title = 'OPERATIVA / GASTO POR COMPRAS';
-    }else if(text.includes('GASTOS REALIZADOS')){
+    }else if(text.includes('GASTO POR COMPRAS') || text.includes('GASTOS REALIZADOS')){
       rows = realisedExpenseRows();
       title = 'OPERATIVA / GASTOS REALIZADOS';
-      tableRows = realisedExpenseTableRows();
     }else if(text === 'GASTOS' || text.includes('GASTOS PREVISTOS')){
       rows = allExpenseRows();
-      title = 'OPERATIVA / GASTOS PREVISTOS';
-      tableRows = plannedExpenseTableRows();
+      title = 'OPERATIVA / GASTOS PREVISTOS Y REALIZADOS';
     }else if(text.includes('GASTOS DE ORGANIZACION')){
-      rows = currentExpenseRows();
+      rows = allExpenseRows().filter(item => isCurrentExpenseTicket(item.ticketDonacion || item.ticket || ''));
       title = 'OPERATIVA / GASTOS DE ORGANIZACION';
     }else{
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], tableRows || expenseTableRows(rows));
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table};
-  }
-
-  function installSectionRowCss(){
-    if(document.getElementById('ce-budget-lite-section-row-css')) return;
-    const style = document.createElement('style');
-    style.id = 'ce-budget-lite-section-row-css';
-    style.textContent = '.ce-budget-lite-table tr.ce-budget-lite-section-row td{font-weight:900;background:#f8fafc;color:#111827;border-top:2px solid #e5e7eb;}';
-    document.head.appendChild(style);
   }
   function installLegacyTipAttributeFirewall(){
     try{
@@ -458,7 +383,7 @@
       const wrapped = function(name, value){
         try{
           const attr = String(name || '');
-          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite,#budgetLayout .budget-panel.operativo')){
+          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite')){
             return undefined;
           }
         }catch(_){ }
@@ -708,19 +633,13 @@
     try{ hideLegacyBudgetTooltips(); }catch(_){ }
   }
   try{ document.body.classList.add('ce-budget-tips-lite-active-v307'); }catch(_){ }
-  installSectionRowCss();
   installLegacyTipAttributeFirewall();
   patchRenderBudget();
   sanitizeBudgetPanels();
-  [0, 120, 320, 900, 1800].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
-  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready','controlevent:event-changed','controlevent:data-loaded'].forEach(evt => {
+  [0, 220, 900].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
+  ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready'].forEach(evt => {
     window.addEventListener(evt, () => setTimeout(() => rehydrateBudgetLite(evt), 60));
   });
-  try{
-    const observer = new MutationObserver(() => { if(isBudgetLayoutActive()) scheduleSanitize(); });
-    observer.observe(document.body || document.documentElement, {childList:true, subtree:true, attributes:true, attributeFilter: LEGACY_TIP_ATTRS});
-  }catch(_){ }
-  setInterval(() => { if(isBudgetLayoutActive()) rehydrateBudgetLite('safety'); }, window.ControlEventLowResource?.interval?.(2200) || 2200);
   document.addEventListener('click', event => {
     if(event.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(() => rehydrateBudgetLite('resumen-tab'), 180);
   }, true);

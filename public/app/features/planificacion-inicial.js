@@ -4097,7 +4097,15 @@
       }
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
-      lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(Array.isArray(data.rows) ? data.rows : []))));
+      const rawPlanRows = Array.isArray(data.rows) ? data.rows : [];
+      // FIX28 planificación: en Encargo total la compra debe venir de Gemini/prompt.
+      // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
+      // o no devuelve compras; así evitamos inventar siempre la misma compra.
+      if(planMode() === 'ZUZU_TOTAL'){
+        lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
+      }else{
+        lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(rawPlanRows))));
+      }
       lastIncomeProposal = Array.isArray(data.incomes) ? data.incomes : [];
       if(planContent() === 'INGRESOS_SOCIOS_OBLIGATORIOS'){
         const baseCompra = lastProposal.filter(p => p.include && p.tipo === 'COMPRA').reduce((sum,p)=>sum + Number(p.unidades || 0) * Number(p.precio || 0), 0);
