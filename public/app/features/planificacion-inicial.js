@@ -2088,44 +2088,63 @@
     const lines = String(info || '').replace(/\r/g,'').split(/\n/);
     const out = [];
     let active = null;
-    const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
-    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
     const extract = (line, name) => {
       const m = String(line || '').match(new RegExp('\\[\\s*' + name + '\\s*[:=]\\s*([^\\]\\n]+)\\]', 'i'));
       return m ? String(m[1] || '').trim().replace(/[\]\)\.]+$/,'') : '';
     };
+    const donationType = h => {
+      const n = normalizeText(h || '');
+      if(/DONADO TIENDA|DONACION DE TIENDA|DONACIÓN DE TIENDA|TIENDA/.test(n)) return 'DONADO TIENDA';
+      if(/DONADO OTROS|DONACION DE OTROS|DONACIÓN DE OTROS|OTROS/.test(n)) return 'DONADO OTROS';
+      return 'DONADO SOCIO';
+    };
+    const isHeader = line => /^\s*(?:[-*•]\s*)?(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s+(?:Y\s+EXISTENCIAS\s+CONFIRMADAS|DE\s+SOCIOS?|DE\s+TIENDA|DE\s+OTROS)|DONACI[ÓO]N\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONACION\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:]|EXISTENCIAS?\b|YA\s+TENEMOS\b|PRODUCTOS?\s+DONADOS?|MATERIAL\s+DONADO)\b/i.test(String(line || ''));
+    const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N\s+CONCEPTUAL|CRITERIOS?|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\b/i;
     const meta = (line, prev={}) => {
       const h = String(line || '');
       const m = {...prev};
-      if(/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
-      else if(/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
-      else if(/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+      if(/DONADO|DONACI[ÓO]N|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|EXISTENCIAS?|YA\s+TENEMOS/i.test(h)) m.ticketDonacion = donationType(h);
       if(!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
-      const d = extract(h, 'Donante'), r = extract(h, 'Responsable');
+      const d = extract(h, 'Donante'), r = extract(h, 'Responsable'), t = extract(h, 'Tienda');
       if(d) m.donorLabel = d;
       if(r) m.responsableLabel = r;
+      if(t) m.tiendaLabel = t;
+      let mm = h.match(/donado\s+(socio|tienda|otros)\s*[-–:]\s*([^\n\[]+)/i) || h.match(/donaci[óo]n\s+de\s+(socio|socios|tienda|otros)\s*[-–:]\s*([^\n\[]+)/i);
+      if(mm){
+        const kind = normalizeText(mm[1] || '');
+        m.ticketDonacion = /TIENDA/.test(kind) ? 'DONADO TIENDA' : (/OTRO/.test(kind) ? 'DONADO OTROS' : 'DONADO SOCIO');
+        const parts = String(mm[2] || '').split('/').map(x => x.trim()).filter(Boolean);
+        if(!m.donorLabel && parts[0]) m.donorLabel = parts[0].replace(/responsable\s*[:=]?.*$/i,'').trim();
+        const rp = parts.find(x => /responsable/i.test(x));
+        if(!m.responsableLabel && rp) m.responsableLabel = rp.replace(/responsable\s*[:=]?/i,'').trim();
+      }
       if(!m.donorLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donorLabel = 'Peña El Arrastre';
       if(!m.responsableLabel && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsableLabel = document.getElementById('planResponsable')?.selectedOptions?.[0]?.textContent || 'Colty';
+      if(!m.donorLabel && /EXISTENCIAS?|YA\s+TENEMOS/i.test(h)) m.donorLabel = 'Existencias';
       return m;
     };
     const qtyFromLine = raw => {
       const s = String(raw || '').replace(/^\s*[•\-\*]\s*/,'');
       const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
-      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+      let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes|caja|cajas)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
       if(m) return Math.max(0, Math.round(Number(String(m[1]).replace(',','.')) * Number(String(m[2]).replace(',','.')) * 100) / 100);
-      m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
-      if(m) return Math.max(0, Number(String(m[1]).replace(',','.')));
       m = tail.match(/(\d+(?:[,.]\d+)?)/);
       return m ? Math.max(0, Number(String(m[1]).replace(',','.'))) : 1;
+    };
+    const isProductLine = raw => {
+      const s = String(raw || '').trim();
+      if(!s || /^PRODUCTOS?\s*:?$/i.test(s)) return false;
+      if(/^(?:tratar\s+todo|donante|responsable|tienda)\b/i.test(s)) return false;
+      return /^\s*[•\-\*]\s*[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(raw || '')
+        || /^[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(s);
     };
     lines.forEach((rawLine, idx) => {
       const line = String(rawLine || '').trim();
       if(!line) return;
       if(stop.test(line)){ active = null; return; }
-      if(start.test(line)){ active = meta(line, {section:line}); return; }
-      if(active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))){ active = meta(line, active); return; }
-      if(active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
-      if(!active || !/^\s*[•\-\*]\s*[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|;|$)/i.test(rawLine)) return;
+      if(isHeader(line)){ active = meta(line, active || {section:line}); active.section = active.section || line; return; }
+      if(active && (/Tratar\s+todo\s+este\s+bloque\s+como\s+DONADO/i.test(line) || /Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:|^responsable\s*[:=]|^donante\s*[:=]/i.test(line))){ active = meta(line, active); return; }
+      if(!active || !isProductLine(rawLine)) return;
       let productText = String(rawLine).replace(/^\s*[•\-\*]\s*/,'');
       productText = productText.includes(':') ? productText.slice(0, productText.lastIndexOf(':')) : productText;
       productText = cleanPromptProductNameHf25(productText);
@@ -2220,15 +2239,27 @@
     const presupuesto = numFrom(/presupuesto\s+objetivo\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
     const maximo = numFrom(/l[ií]mite\s+m[aá]ximo\s+de\s+coste\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
     const momentLines = [];
-    raw.replace(/(?:^|\n)\s*(?:[-*]\s*)?(?:dia|día)\s*[_\- ]*(\d{1,2})\s*(?:\([^\n)]*\))?\s*:?\s*([^\n]+)/gi, (_, d, text) => {
-      const n = normalizeText(text || '');
-      const add = m => momentLines.push(`dia_${d} (${m}): ${String(text || '').trim()}`);
-      if(/APERITIVO/.test(n)) add('aperitivo');
-      if(/COMIDA/.test(n)) add('comida');
-      if(/TARDEO|CUBATA.*TARDE|TARDE.*CUBATA/.test(n)) add('tardeo/cubatas');
-      if(/CENA/.test(n)) add('cena');
-      if(/CUBATA/.test(n) && /NOCHE/.test(n)) add('cubatas noche');
-      return '';
+    const seenMom = new Set();
+    const addMoment = (d, m, text) => { const key = `${d}|${normalizeText(m)}`; if(seenMom.has(key)) return; seenMom.add(key); momentLines.push(`dia_${d} (${m}): ${String(text || '').trim()}`); };
+    raw.split(/\n/).forEach(line => {
+      const mm = String(line || '').match(/^\s*(?:[-*•]\s*)?(?:dia|día|jornada)\s*[_\- ]*(\d{1,2})\b\s*(?:\(([^)]*)\))?\s*:??\s*([^\n]*)/i);
+      if(!mm) return;
+      const d = mm[1];
+      const par = normalizeText(mm[2] || '');
+      const txt = String(mm[3] || mm[2] || '').trim();
+      const n = normalizeText(txt || '');
+      const explicit = [];
+      if(/APERITIVO|VERMUT|PICOTEO/.test(par)) explicit.push('aperitivo');
+      if(/COMIDA|ALMUERZO/.test(par)) explicit.push('comida');
+      if(/TARDEO|CUBATA.*TARDE|TARDE.*CUBATA/.test(par)) explicit.push('tardeo/cubatas');
+      if(/CUBATA.*NOCHE|NOCHE.*CUBATA|COPA.*NOCHE/.test(par)) explicit.push('cubatas noche');
+      if(/CENA/.test(par)) explicit.push('cena');
+      if(explicit.length && !/VIERNES|SABADO|SÁBADO|DOMINGO|LUNES|MARTES|MIERCOLES|MIÉRCOLES|JUEVES|\d{1,2}\/\d{1,2}/.test(par)) { explicit.forEach(m => addMoment(d,m,txt || mm[2])); return; }
+      if(/APERITIVO|VERMUT|PICOTEO/.test(n)) addMoment(d,'aperitivo',txt);
+      if(/COMIDA|ALMUERZO|BUFFET|PAELLA|ASADO/.test(n)) addMoment(d,'comida',txt);
+      if(/TARDEO|CUBATA.*TARDE|TARDE.*CUBATA/.test(n)) addMoment(d,'tardeo/cubatas',txt);
+      if(/CENA|CENAR/.test(n)) addMoment(d,'cena',txt);
+      if(/CUBATA|COPA/.test(n) && /NOCHE|NOCTURN/.test(n)) addMoment(d,'cubatas noche',txt);
     });
     return {raw, norm, days, asistentes, cerveza, cubatas, cubatasPorPersona, cervezasMax, sinAlcohol, cenaReal, presupuesto, maximo, momentLines};
   }
@@ -2470,7 +2501,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX33_PROMPT_COMPACTO: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX34_PARSER_DONACIONES_MOMENTOS_TIMEOUT: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -4125,7 +4156,7 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX33_PROMPT_COMPACTO: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX34_PARSER_DONACIONES_MOMENTOS_TIMEOUT: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -4156,7 +4187,7 @@
     };
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX33: caja negra de Planificación / Gemini</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX34: caja negra de Planificación / Gemini</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4170,7 +4201,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX33 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX34 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4234,7 +4265,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX33_PROMPT_COMPACTO: no se filtra la propuesta de Gemini.
+        // FIX34_PARSER_DONACIONES_MOMENTOS_TIMEOUT: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
