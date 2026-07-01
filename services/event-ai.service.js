@@ -1237,6 +1237,18 @@ function planAiSchema() {
       ok: { type: 'BOOLEAN' },
       title: { type: 'STRING' },
       notes: { type: 'ARRAY', items: { type: 'STRING' } },
+      menuResumen: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            dia: { type: 'STRING', description: 'dia_1, dia_2, dia_3...' },
+            momento: { type: 'STRING', description: 'aperitivo, comida, tardeo/cubatas, cena u otro momento del día' },
+            resumen: { type: 'STRING', description: 'Resumen claro de qué se va a servir o de qué va a componerse ese momento' }
+          },
+          required: ['dia','momento','resumen']
+        }
+      },
       rows: {
         type: 'ARRAY',
         items: {
@@ -1259,7 +1271,7 @@ function planAiSchema() {
         }
       }
     },
-    required: ['ok','title','notes','rows']
+    required: ['ok','title','notes','menuResumen','rows']
   };
 }
 function planModeLabel(mode) {
@@ -1672,25 +1684,11 @@ function planLegacyMenuFamilyHf29(productName) {
   return '';
 }
 function planFilterUnrequestedLegacyMenuRowsHf29(rows, form) {
-  const intent = planMenuIntentHf29(form);
-  const removed = [];
-  const out = arr(rows).filter(row => {
-    if (!row || row.tipo !== 'COMPRA') return true;
-    if (row.explicitPromptDonation === true || row.explicitConfirmedDonation === true || row.explicitPromptStrictHf12 === true) return true;
-    const family = planLegacyMenuFamilyHf29(row.productName || row.producto || '');
-    if (family === 'paella' && !intent.paella) { removed.push(row.productName || row.producto || 'producto de paella'); return false; }
-    if (family === 'bbq' && !intent.bbq) { removed.push(row.productName || row.producto || 'producto de barbacoa'); return false; }
-    return true;
-  });
-  const notes = [];
-  if (removed.length) {
-    const sample = [...new Set(removed.map(x => trim(x)).filter(Boolean))].slice(0, 8).join(', ');
-    notes.push(`FIX29_PLANIFICACION activo: se han retirado compras de menú fijo no pedidas (${sample}). Zuzu no debe meter arroz/paella/barbacoa si el usuario no lo pide literalmente.`);
-  } else {
-    notes.push('FIX29_PLANIFICACION activo: filtro anti-menú fijo aplicado; no se permite arroz/paella/barbacoa salvo petición explícita del usuario.');
-  }
-  return { rows: out, notes };
+  // FIX30_PLANIFICACION: se deja como no-op defensivo.
+  // ControlEvent ya no elimina paella/barbacoa propuestas por Gemini: solo se evita el menú local fijo saltándose este filtro.
+  return { rows: arr(rows).slice(), notes: [] };
 }
+
 
 function planBudgetGuard(rows, form) {
   const people = Math.max(1, num(form?.personas) || 25);
@@ -2709,14 +2707,60 @@ function planCatalogForGemini(state, form = {}) {
     personas: arr(state?.personas).map(p => ({ nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 500)
   };
 }
+
+function planDetectedDaysFromPrompt(form = {}) {
+  const raw = trim([form.title, form.descripcion, form.info].filter(Boolean).join('\n'));
+  const text = normPlanKey(raw);
+  const candidates = [];
+  const add = v => { const n = Math.round(num(v)); if (n >= 1 && n <= 14) candidates.push(n); };
+  let m;
+  const patterns = [
+    /(?:DURARA|DURARA|DURA|DURACION|DURACIÓN|SERAN|SERÁN|SON|DE)\s+(\d{1,2})\s+(?:DIA|DIAS|DÍA|DÍAS|JORNADA|JORNADAS)/g,
+    /(\d{1,2})\s+(?:DIA|DIAS|DÍA|DÍAS|JORNADA|JORNADAS)\s+(?:DE\s+EVENTO|DE\s+FIESTA|COMPLETOS|COMPLETAS)?/g,
+    /(?:DIA|DÍA)\s*[_\- ]*([1-9]\d?)/g
+  ];
+  patterns.forEach(rx => { while ((m = rx.exec(text))) add(m[1]); });
+  const weekdayMatches = new Set();
+  const weekdays = ['LUNES','MARTES','MIERCOLES','MIÉRCOLES','JUEVES','VIERNES','SABADO','SÁBADO','DOMINGO'];
+  weekdays.forEach(d => { if (text.includes(d.normalize('NFD').replace(/[\u0300-\u036f]/g,''))) weekdayMatches.add(d.normalize('NFD').replace(/[\u0300-\u036f]/g,'')); });
+  if (weekdayMatches.size >= 2) candidates.push(Math.min(7, weekdayMatches.size));
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+function planEffectiveDays(form = {}) {
+  return Math.max(1, planDetectedDaysFromPrompt(form) || num(form?.dias) || 1);
+}
+function planExpectedMenuSlots(days) {
+  const total = Math.max(1, Math.min(14, Math.round(num(days) || 1)));
+  const slots = [];
+  for (let i = 1; i <= total; i += 1) {
+    ['aperitivo','comida','tardeo/cubatas','cena'].forEach(momento => slots.push({ dia:`dia_${i}`, momento }));
+  }
+  return slots;
+}
+function planNormalizeMenuResumen(raw, form = {}) {
+  const expectedDays = planEffectiveDays(form);
+  const list = arr(raw).map((item, idx) => {
+    if (typeof item === 'string') return { dia:`dia_${Math.floor(idx / 4) + 1}`, momento:'resumen', resumen:trim(item) };
+    return { dia:trim(item?.dia || item?.day || `dia_${Math.floor(idx / 4) + 1}`), momento:trim(item?.momento || item?.slot || item?.franja || 'resumen'), resumen:trim(item?.resumen || item?.summary || item?.descripcion || item?.texto || '') };
+  }).filter(item => item.resumen);
+  if (!list.length) return [];
+  return list.map(item => ({
+    dia: /^dia[_\- ]?\d+/i.test(item.dia) ? item.dia.replace(/\s+/g,'_').toLowerCase() : item.dia,
+    momento: item.momento,
+    resumen: item.resumen
+  })).slice(0, Math.max(4, expectedDays * 6));
+}
+
 function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
   const compactRows = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
+  const diasDetectadosPrompt = planDetectedDaysFromPrompt(form);
+  const diasOperativos = planEffectiveDays(form);
   const ctx = {
     modo: planModeLabel(form.mode),
     aislamientoEncargoTotal: trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo catálogo, prompt y donaciones explícitas.' : 'NO ACTIVO',
     modulosSolicitados: modules,
-    eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), dias: num(form.dias), personasEstimadas: num(form.personas), descripcion: trim(form.descripcion), informacionConstruccion: trim(form.info) },
-    intencionMenuDetectada: planMenuIntentHf29(form),
+    eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas), descripcion: trim(form.descripcion), informacionConstruccion: trim(form.info) },
+    franjasMenuEsperadas: planExpectedMenuSlots(diasOperativos),
     eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null,
     responsablePorDefecto: trim(form.defaultResponsibleName),
     tiendaPorDefecto: trim(form.defaultStoreName),
@@ -2733,15 +2777,15 @@ Reglas:
 - Calculas COSTE REAL de evento, no precio de bar/restaurante: objetivo normal 25 €/persona y límite caro 35 €/persona para evento de 1 día. Si te vas por encima, ajusta cantidades antes de responder.
 - NO inventes productos donados. En Encargo total o parcial, solo devuelve DONACION si aparece como donación/existencia explícita en el prompt. En réplica exacta sí puedes conservar DONACIONES históricas base. Si crees que algo podría donarse, trátalo como COMPRA con la razón "posible donación pendiente de confirmar", pero NO lo descuentes.
 - Cerveza lata/botellín: usa como referencia hasta unas 5 unidades por persona consumidora en todo el día, no por todos los asistentes. Cubatas: 3 o 4 por persona consumidora; calcula refrescos de mezcla según cubatas, no como botella por persona.
-- Paella/arroz/marisco: NO lo propongas salvo que el usuario escriba explícitamente paella, arroz, fideuá, marisco, gambones/gambas o almejas. La palabra genérica comida/comer NO significa paella.
-- Cena/barbacoa: NO conviertas una cena genérica en barbacoa. Solo propón lomo, morcilla, panceta, chorizo o parrilla si el usuario escribe explícitamente barbacoa, brasa, parrilla, plancha, asado o esos productos.
+- No uses nunca un menú fijo por defecto. La palabra genérica comida/comer no significa automáticamente paella, y la palabra cena no significa automáticamente barbacoa.
+- Sí puedes proponer paella, arroz, barbacoa, bocadillos, tapas, comida fría, tortillas, pizzas u otras ideas si encajan de verdad con el concepto, duración, presupuesto y tono del evento. Si eliges una de esas líneas de menú, debe ser una decisión tuya razonada como organizador experto, no una plantilla repetida.
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
 - Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas, patrones de un evento anterior o menús fijos. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala.
 - En Encargo total debes obedecer el texto completo de descripcion e informacionConstruccion: duración/días, concepto del evento, comidas indicadas, horarios, preferencias de comida, bebida, cosas que NO se quieren y nivel de detalle pedido.
-- NO uses nunca paella, arroz, marisco, barbacoa, lomo, morcilla, panceta o chorizo como menú por defecto. Solo propón esos productos si el usuario lo ha escrito de forma directa. Si el usuario dice bocadillos, tapas, aperitivo, comida fría, desayuno, merienda, pizza, tortillas, etc., propón productos coherentes con eso y queda prohibido cambiarlo a paella/barbacoa.
-- Si falta información básica para comprar con criterio (personas, días, comidas incluidas, bebida o concepto), NO rellenes con un menú inventado: devuelve las donaciones/existencias confirmadas y añade en notes las preguntas concretas que debe responder el usuario para completar la compra.
+- En Encargo total manda el prompt del usuario. Si el prompt habla de 3 días, 2 días o varios momentos, construye una propuesta para TODOS esos días aunque el campo diasFormulario venga a 1. Usa diasDetectadosPrompt/diasOperativos como referencia de trabajo.
+- Si falta algún dato, participa activamente: propone una solución razonable y deja en notes qué preguntas faltan para afinar. Solo te bloqueas si no hay personas ni concepto mínimo; no vuelvas a una plantilla fija.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
 - Si el usuario dice que hay existencias o donaciones previstas, debes devolver esas líneas como DONACION con las unidades exactas indicadas; no las conviertas en compra.
@@ -2752,6 +2796,7 @@ Reglas:
 - Respeta las instrucciones explícitas de donante/responsable del prompt. Si el usuario dice que ciertas existencias son DONADO SOCIO de una persona/peña y responsable concreto, usa esos datos en todas esas filas de DONACION.
 - Si modulosSolicitados está vacío por la opción Ningún dato, apóyate solo en la información del usuario y el catálogo de productos; no copies históricos de eventos.
 - Sé creativo y operativo como organizador experto: propone menús completos pero razonables para aperitivo, comida, tardeo/cubatas, cena, limpieza y menaje si se han pedido. No te limites a repetir literalmente el prompt.
+- OBLIGATORIO: devuelve menuResumen con una línea por día y momento siguiendo franjasMenuEsperadas. Formato de cada resumen: "Será a base de ...". Ejemplo: dia_1 / comida / Será a base de bocadillos calientes y ensaladas; dia_2 / cena / Será a base de tapas frías y algo dulce. Esto debe explicar al usuario el menú antes de ver la tabla de compras/donaciones.
 - En cada producto, intenta devolver necesidadTotal: necesidad total antes de restar donado/existente. Las líneas DONACION representan lo que ya hay o se donará; las líneas COMPRA representan solo el déficit.
 - No devuelvas más de 180 filas. Prioriza productos útiles y evita productos absurdos o no pedidos.
 - La app mostrará la propuesta para que el usuario pueda editarla; no estás creando el evento real.
@@ -2765,7 +2810,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
   let lastError = null;
   for (const model of configuredGeminiModels()) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const body = { contents: [{ role: 'user', parts: [{ text: planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: planAiSchema(), temperature: 0.25 } };
+    const body = { contents: [{ role: 'user', parts: [{ text: planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: planAiSchema(), temperature: trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL' ? 0.55 : 0.25 } };
     try {
       const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body) });
       const payload = await res.json().catch(async () => ({ error:{ message: await res.text().catch(() => res.statusText) } }));
@@ -3010,7 +3055,10 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   const state = await getState();
   const maps = planBuildMaps(state);
   const modules = planContentModules(content);
-  const form = { mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, defaultResponsibleName: planPersonName(defaultResponsibleId, maps), defaultStoreName: planStoreName(defaultStoreId, maps), descripcion, info };
+  const rawForm = { mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info };
+  const diasDetectadosPrompt = planDetectedDaysFromPrompt(rawForm);
+  const diasOperativos = Math.max(1, diasDetectadosPrompt || num(dias) || 1);
+  const form = { ...rawForm, diasFormulario: dias, diasDetectadosPrompt, dias: diasOperativos, defaultResponsibleName: planPersonName(defaultResponsibleId, maps), defaultStoreName: planStoreName(defaultStoreId, maps) };
   const m = trim(mode || 'REPLICA').toUpperCase();
   const sourceEvent = planEventById(state, modelEventId);
   if ((m === 'REPLICA' || m === 'ZUZU_PARCIAL') && !sourceEvent) {
@@ -3021,7 +3069,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   const sourceAtt = sourceEvent ? planAttendeesForEvent(state, sourceEvent.id) : 0;
   const targetAtt = num(personas) || sourceAtt || 30;
   const sourceDays = sourceEvent ? Math.max(1, 1) : 1;
-  const targetDays = Math.max(1, num(dias) || 1);
+  const targetDays = Math.max(1, num(form.dias) || 1);
   if (m === 'ZUZU_PARCIAL' && sourceAtt > 0) baseRows = planScaleRows(baseRows, Math.max(0.1, (targetAtt / sourceAtt) * Math.sqrt(targetDays / sourceDays)), defaultStoreId, defaultResponsibleId);
   let incomeRows = modules.includes('INGRESOS') && sourceEvent ? planIncomeRowsForEvent(state, sourceEvent.id) : [];
   const explicitDonationRows = planExplicitDonationRowsFromPrompt(form, state);
@@ -3029,6 +3077,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   let aiNotes = [];
   let aiProvider = 'control-event-historico';
   let aiModel = '';
+  let aiMenuResumen = [];
   const hasConfirmedPromptBlocks = planHasConfirmedDonationBlocksHf17(form);
   const largePrompt = trim(form.info || '').length > 6000;
 
@@ -3038,12 +3087,13 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('FIX29_PLANIFICACION activo: se han cargado directamente las donaciones/existencias confirmadas del prompt y Gemini interpreta el resto del texto (concepto, duración, comidas y preferencias), sin menú local fijo.');
+    aiNotes.push('FIX30_PLANIFICACION activo: donaciones/existencias confirmadas del prompt cargadas; Gemini interpreta duración, concepto, menú por días y compras sin plantilla fija.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 26000 : 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, [], state, form);
       if (matched.length) {
         rowsOut = planMergeExplicitDonations(matched, explicitDonationRows);
+        aiMenuResumen = planNormalizeMenuResumen(ai?.menuResumen, form);
         aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean).concat(aiNotes);
         aiProvider = 'gemini-planificacion+prompt-confirmado'; aiModel = ai.__model || '';
       } else {
@@ -3053,12 +3103,13 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX29_PLANIFICACION activo: encargo total sin copiar históricos ni compras locales de seguridad; manda el prompt completo a Gemini.');
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX30_PLANIFICACION activo: encargo total con control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen de menú por días.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, baseRows, state, form);
       if (matched.length) {
         rowsOut = matched;
+        aiMenuResumen = planNormalizeMenuResumen(ai?.menuResumen, form);
         aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean);
         aiProvider = 'gemini-planificacion'; aiModel = ai.__model || '';
       } else aiNotes.push('Zuzu no devolvió filas utilizables; se mantiene la propuesta histórica base.');
@@ -3076,9 +3127,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
     if (m === 'ZUZU_TOTAL') {
-      const fixedMenuFilter = planFilterUnrequestedLegacyMenuRowsHf29(rowsOut, form);
-      rowsOut = fixedMenuFilter.rows;
-      aiNotes = aiNotes.concat(fixedMenuFilter.notes);
+      aiNotes.push('FIX30_PLANIFICACION activo: Gemini decide el menú y las compras desde el prompt completo; ControlEvent no elimina paella/barbacoa ni mete un menú local fijo.');
     }
     const budget = planBudgetGuard(rowsOut, form);
     rowsOut = planApplyFinalDefaultsHf14(budget.rows, form, state);
@@ -3088,7 +3137,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v17_prod_FIX29_PLANIFICACION_SIN_MENU_FIJO',
+    version: 'v17_prod_FIX30_PLANIFICACION_GEMINI_MENU_LIBRE',
     provider: aiProvider,
     model: aiModel,
     mode: m,
@@ -3097,6 +3146,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     rows: rowsOut,
     incomes: incomeRows,
     notes: aiNotes,
+    menuResumen: aiMenuResumen,
     counts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length }
   };
 }

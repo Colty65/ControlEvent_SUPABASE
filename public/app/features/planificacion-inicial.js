@@ -2423,11 +2423,17 @@
     const wasOpen = !!box.querySelector('.plan-advanced-lines')?.open;
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
-    lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(lastProposal)))));
-    ensurePurchaseRowsForVisibleDeficitsHf24();
-    // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
-    // porque estaba eliminando las compras que sí aparecen arriba.
-    lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(lastProposal)));
+    if(planMode() === 'ZUZU_TOTAL'){
+      // FIX30_PLANIFICACION: en Encargo total no se reconstruye la compra con imaginación local.
+      // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
+      lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
+    }else{
+      lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(lastProposal)))));
+      ensurePurchaseRowsForVisibleDeficitsHf24();
+      // HOTFIX30: después de crear compras por déficit, no se vuelve a pasar por el filtro diagnóstico,
+      // porque estaba eliminando las compras que sí aparecen arriba.
+      lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(lastProposal)));
+    }
 
     // HOTFIX53 / v16: los ingresos obligatorios deben existir ANTES de equilibrar el saldo.
     // En HF52 se calculaba el saldo con lastIncomeProposal vacío y por eso no añadía compra extra
@@ -4073,16 +4079,10 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    const intent = cePlanFix29MenuIntent();
-    return (Array.isArray(rows) ? rows : []).filter(row => {
-      if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA') return true;
-      if(row.explicitPromptDonation === true || row.explicitConfirmedDonation === true || row.explicitPromptStrictHf12 === true) return true;
-      const fam = cePlanFix29LegacyMenuFamily(row.productName || row.producto || '');
-      if(fam === 'paella' && !intent.paella) return false;
-      if(fam === 'bbq' && !intent.bbq) return false;
-      return true;
-    });
+    // FIX30_PLANIFICACION: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    return Array.isArray(rows) ? rows : [];
   }
+
 
   async function generateProposal(){
     if(!isGD()) return;
@@ -4131,7 +4131,9 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        lastProposal = cePlanFix29FilterFixedMenuRows(ceHf27ApplyDiagnosticTruth(rawPlanRows));
+        // FIX30_PLANIFICACION: no se filtra la propuesta de Gemini.
+        // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
+        lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
         lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(rawPlanRows))));
       }
@@ -4142,8 +4144,10 @@
       }
       lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
       renderProposal();
+      const menuSummary = renderZuzuMenuSummary(data.menuResumen);
       const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
-      if(note){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', note); }
+      const topInfo = menuSummary + note;
+      if(topInfo){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', topInfo); }
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
       console.warn('[ControlEvent v17_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
