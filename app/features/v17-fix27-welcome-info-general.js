@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod FIX35_PLANIFICACION_GEMINI_ULTRACORTO
+/* ControlEvent v17_prod FIX36_PLANIFICACION_GEMINI_FIX_MOMENTOS
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Bienvenida sin evento en cualquier dispositivo: ColtyLAB muestra ficha informativa en vez de avance vacío. */
 (function(){
@@ -8,7 +8,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v17_prod_FIX35_PLANIFICACION_GEMINI_ULTRACORTO';
+  const VERSION_LABEL = 'v17_prod_FIX36_PLANIFICACION_GEMINI_FIX_MOMENTOS';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
