@@ -2084,7 +2084,7 @@
     return candidates[0]?.value || label || '';
   }
   function ceHf27PromptBlocks(){
-    const info = fieldValue('planInfo');
+    const info = String(fieldValue('planInfo') || '') + '\n' + String(fieldValue('planDescripcion') || '') + '\n' + String(fieldValue('planEventoTitulo') || '');
     const lines = String(info || '').replace(/\r/g,'').split(/\n/);
     const out = [];
     let active = null;
@@ -2213,6 +2213,8 @@
     const asistentes = numFrom(/personas\s+asistentes\s*:\s*(\d+)/i, Number(fieldValue('planPersonas') || 0));
     const cerveza = numFrom(/personas\s+que\s+beber[aá]n\s+cerveza\s*:\s*(\d+)/i, 0);
     const cubatas = numFrom(/personas\s+que\s+tomar[aá]n\s+cubatas\s*:\s*(\d+)/i, 0);
+    const cubatasPorPersona = numFrom(/cubatas\s*[:=]\s*(\d+)\s*por\s+persona/i, 0) || numFrom(/(\d+)\s*cubatas\s+por\s+persona/i, 0);
+    const cervezasMax = numFrom(/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+)\s*(?:latas|botellines)/i, 0) || numFrom(/(\d+)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i, 0);
     const sinAlcohol = numFrom(/personas\s+sin\s+alcohol[^:\n]*:\s*(\d+)/i, 0);
     const cenaReal = numFrom(/personas\s+que\s+cenar[aá]n\s+realmente\s*:\s*(\d+)/i, 0) || numFrom(/para\s+unas\s+(\d+)\s+personas/i, 0);
     const presupuesto = numFrom(/presupuesto\s+objetivo\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
@@ -2223,12 +2225,12 @@
       const add = m => momentLines.push(`dia_${d} (${m}): ${String(text || '').trim()}`);
       if(/APERITIVO/.test(n)) add('aperitivo');
       if(/COMIDA/.test(n)) add('comida');
-      if(/TARDEO|CUBATA/.test(n) && !/NOCHE/.test(n)) add('tardeo/cubatas');
+      if(/TARDEO|CUBATA.*TARDE|TARDE.*CUBATA/.test(n)) add('tardeo/cubatas');
       if(/CENA/.test(n)) add('cena');
       if(/CUBATA/.test(n) && /NOCHE/.test(n)) add('cubatas noche');
       return '';
     });
-    return {raw, norm, days, asistentes, cerveza, cubatas, sinAlcohol, cenaReal, presupuesto, maximo, momentLines};
+    return {raw, norm, days, asistentes, cerveza, cubatas, cubatasPorPersona, cervezasMax, sinAlcohol, cenaReal, presupuesto, maximo, momentLines};
   }
   function cePlanFix31BriefHtml(){
     const b = cePlanFix31ExtractPromptBrief();
@@ -2238,7 +2240,7 @@
       <div class="ce-hf27-head"><div><h3>Brief estructurado que se enviará a Gemini</h3><p>ControlEvent extrae esto antes de generar compras: duración, asistentes, momentos, bebida, cena real, presupuesto y donaciones. El botón de abajo ya no usa compra local: llama a Gemini con este brief.</p></div>
       <div class="ce-hf27-kpis"><span>Días <b>${esc(b.days)}</b></span><span>Asistentes <b>${esc(b.asistentes || '—')}</b></span><span>Cerveza <b>${esc(b.cerveza || '—')}</b></span><span>Cubatas <b>${esc(b.cubatas || '—')}</b></span><span>Donaciones <b>${donCount}</b></span></div></div>
       <div style="padding:12px 16px;background:#fff;border-top:1px solid #e5e7eb">
-        <p><b>Presupuesto:</b> objetivo ${esc(b.presupuesto || '—')} €/persona · máximo ${esc(b.maximo || '—')} €/persona · <b>sin alcohol/niños:</b> ${esc(b.sinAlcohol || '—')} · <b>cenan realmente:</b> ${esc(b.cenaReal || '—')}</p>
+        <p><b>Presupuesto:</b> objetivo ${esc(b.presupuesto || '—')} €/persona · máximo ${esc(b.maximo || '—')} €/persona · <b>sin alcohol/niños:</b> ${esc(b.sinAlcohol || '—')} · <b>cenan realmente:</b> ${esc(b.cenaReal || '—')}</p><p><b>Reglas bebida:</b> cerveza máx. ${esc(b.cervezasMax || '—')} ud/persona/día · cubatas ${esc(b.cubatasPorPersona || '—')} por persona consumidora.</p>
         <ul style="margin:8px 0 0 18px">${moments}</ul>
       </div>
     </section>`;
@@ -2468,7 +2470,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX31_PLANIFICACION: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX32_TRAZA_GEMINI: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -4123,10 +4125,55 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX31_PLANIFICACION: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX32_TRAZA_GEMINI: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
+
+  function renderPlanDebugTrace(debug){
+    if(!debug) return '';
+    const ctx = debug.contextResumen || {};
+    const attempts = Array.isArray(debug.attempts) ? debug.attempts : [];
+    const final = debug.finalCounts || {};
+    const rowsAttempts = attempts.map(a => `<tr><td>${esc(a.model || '')}</td><td>${a.ok ? 'OK' : 'ERROR'}</td><td>${esc(a.elapsedMs || 0)} ms</td><td>${esc(a.rowsGemini ?? '')}</td><td>${esc(a.comprasGemini ?? '')}</td><td>${esc(a.donacionesGemini ?? '')}</td><td>${esc(a.error || '')}</td></tr>`).join('');
+    const traceShort = {
+      version: debug.version,
+      selectedModel: debug.selectedModel,
+      elapsedMs: debug.elapsedMs,
+      promptChars: debug.promptChars,
+      contextResumen: debug.contextResumen,
+      geminiParsedCounts: debug.geminiParsedCounts,
+      matchCounts: debug.matchCounts,
+      finalCounts: debug.finalCounts,
+      providerFinal: debug.providerFinal,
+      modelFinal: debug.modelFinal,
+      attempts: debug.attempts,
+      notesFinal: debug.notesFinal,
+      briefEvento: debug.briefEvento,
+      briefEventoTexto: debug.briefEventoTexto,
+      geminiRequestPreview: debug.geminiRequestPreview,
+      geminiRawTextPreview: debug.geminiRawTextPreview
+    };
+    return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
+      <div class="ce-hf27-head" style="background:#e0f2fe">
+        <div><h3>Trazabilidad FIX32: caja negra de Planificación / Gemini</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
+      </div>
+      <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
+      <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Filas Gemini</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="7">No hay intento Gemini registrado.</td></tr>'}</tbody></table></div>
+      <details style="padding:12px 16px"><summary><b>Ver brief / request / respuesta bruta</b></summary><pre style="white-space:pre-wrap;max-height:460px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px">${esc(JSON.stringify(traceShort, null, 2)).slice(0, 180000)}</pre></details>
+    </section>`;
+  }
+  function bindPlanDebugTraceCopy(debug){
+    const btn = document.getElementById('btnCePlanCopyTrace');
+    if(!btn || btn.__ceTraceBound) return;
+    btn.__ceTraceBound = true;
+    btn.addEventListener('click', async () => {
+      const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX32 copiada al portapapeles.'); }
+      catch(_){ alert(txt.slice(0, 20000)); }
+    });
+  }
 
   function renderZuzuMenuSummary(menuResumen){
     const rows = Array.isArray(menuResumen) ? menuResumen.filter(x => x && (x.resumen || x.summary || x.descripcion)) : [];
@@ -4137,7 +4184,7 @@
       const resumen = esc(item.resumen || item.summary || item.descripcion || item.texto || '');
       return `<li><b>${dia} (${momento}):</b> ${resumen}</li>`;
     }).join('');
-    return `<section class="planificacion-note compact-note ce-fix31-menu-summary"><strong>Resumen de menú propuesto por Zuzu:</strong><ul style="margin:8px 0 0 18px">${body}</ul></section>`;
+    return `<section class="planificacion-note compact-note ce-fix32-menu-summary"><strong>Resumen de menú propuesto por Zuzu:</strong><ul style="margin:8px 0 0 18px">${body}</ul></section>`;
   }
 
   async function generateProposal(){
@@ -4187,7 +4234,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX31_PLANIFICACION: no se filtra la propuesta de Gemini.
+        // FIX32_TRAZA_GEMINI: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
@@ -4202,8 +4249,11 @@
       renderProposal();
       const menuSummary = renderZuzuMenuSummary(data.menuResumen);
       const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
-      const topInfo = menuSummary + note;
+      window.__cePlanLastDebug = data.debugPlanificacion || null;
+      const tracePanel = renderPlanDebugTrace(data.debugPlanificacion);
+      const topInfo = menuSummary + note + tracePanel;
       if(topInfo){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', topInfo); }
+      bindPlanDebugTraceCopy(data.debugPlanificacion);
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
       console.warn('[ControlEvent v17_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
