@@ -3247,12 +3247,12 @@
         reason:'Compra sugerida por planificación HF31 al no recibir compras de Zuzu: ' + reason
       });
     };
-    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ|COMIDA/.test(desc)){
+    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ/.test(desc)){
       add('Arroz', Math.max(2, Math.round(personas * 0.10 * 100) / 100), 'paella/comida para asistentes');
       add('Gambones', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'paella de marisco');
       add('Almejas', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'paella de marisco');
     }
-    if(/BARBACOA|CENA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
+    if(/BARBACOA|BBQ|PARRILLA|BRASA|ASADO|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
       add('Lomo fresco', Math.max(2, Math.round(personas * 0.06 * 100) / 100), 'cena/barbacoa');
       add('Chorizos', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'cena/barbacoa');
       add('Morcilla', Math.max(1, Math.round(personas * 0.03 * 100) / 100), 'cena/barbacoa');
@@ -3851,7 +3851,7 @@
     const d = String(desc || '');
     const dnAove = ceHf37DonationUnitsByAlias(rows, 'alias:aceite-aove');
     const dnVinagre = ceHf37DonationUnitsByAlias(rows, 'alias:vinagre');
-    const needsKitchen = /PAELLA|ENSALADA|GUISO|COMIDA|CENA|APERITIVO|BARBACOA|ALIÑO|ALINO|COCINA/.test(d);
+    const needsKitchen = /PAELLA|ARROZ|ENSALADA|GUISO|APERITIVO|BARBACOA|BBQ|PARRILLA|BRASA|ALIÑO|ALINO|COCINA/.test(d);
     if(dnAove === 1 && ceHf37PurchaseUnitsByAlias(rows, 'alias:aceite-aove') <= 0){
       ceHf32AddPurchase(rows, 'Aceite AOVE (2l)', 1, 'HF37 stock mínimo: solo hay 1 AOVE disponible; se compra 1 de reserva.', {noRound:true});
     }else if(dnAove <= 0 && needsKitchen && /AOVE|ACEITE|PAELLA|ENSALADA|GUISO/.test(d) && ceHf37PurchaseUnitsByAlias(rows, 'alias:aceite-aove') <= 0){
@@ -3915,12 +3915,12 @@
     }
 
     // Comida y organización por concepto. Siempre algo de compra, aunque todo lo donado esté perfecto.
-    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ|COMIDA/.test(desc)){
+    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ/.test(desc)){
       ceHf32AddPurchase(rows, 'Arroz', Math.max(2, Math.round(personas * 0.10 * 100) / 100), 'HF36 compra de seguridad: base de paella/comida.', {noRound:true});
       ceHf32AddPurchase(rows, 'Gambon plancha (caja 2kg)', 1, 'HF36 compra de seguridad: paella, 1 caja/unidad de gambón 2 kg.', {noRound:true});
       ceHf32AddPurchase(rows, 'Almejas', 1, 'HF36 compra de seguridad: paella, 1 unidad/kg de almejas.', {noRound:true});
     }
-    if(/BARBACOA|CENA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
+    if(/BARBACOA|BBQ|PARRILLA|BRASA|ASADO|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
       ceHf32AddPurchase(rows, 'Lomo fresco', Math.max(2, Math.round(personas * 0.06 * 100) / 100), 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
       ceHf32AddPurchase(rows, 'Morcilla', 1, 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
       ceHf32AddPurchase(rows, 'Panceta', 1, 'HF36 compra de seguridad: cena/barbacoa.', {noRound:true});
@@ -4015,13 +4015,13 @@
     if(wineTarget - wineGlasses >= 6) ceHf32AddPurchase(rows, 'Vino tinto', 2, `vino: objetivo ${wineTarget} copas, donadas ${Math.round(wineGlasses)} copas aprox.`, {noRound:true});
 
     // Comida e infraestructura: compras necesarias que no son "más de lo donado".
-    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ|COMIDA/.test(desc)){
+    if(/PAELLA|ARROZ|MARISCO|GAMB|ALMEJ/.test(desc)){
       ceHf32AddPurchase(rows, 'Arroz', Math.max(2, Math.round(personas * 0.10 * 100) / 100), 'base de paella/comida.');
       ceHf32AddPurchase(rows, 'Gambon plancha (caja 2kg)', 1, 'paella mixta: 1 caja/unidad de 2 kg como compra moderada, no 2 cajas.', {noRound:true});
       ceHf32AddPurchase(rows, 'Almejas', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'paella mixta, marisco moderado.');
       ceHf32AddPurchase(rows, 'Caldo paella', 2, 'base para paella.', {noRound:true});
     }
-    if(/BARBACOA|CENA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
+    if(/BARBACOA|BBQ|PARRILLA|BRASA|ASADO|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO/.test(desc)){
       ceHf32AddPurchase(rows, 'Lomo fresco', Math.max(2, Math.round(personas * 0.06 * 100) / 100), 'cena/barbacoa para aproximadamente la mitad.');
       ceHf32AddPurchase(rows, 'Morcilla', Math.max(1, Math.round(personas * 0.03 * 100) / 100), 'cena/barbacoa.');
       ceHf32AddPurchase(rows, 'Panceta', Math.max(1, Math.round(personas * 0.04 * 100) / 100), 'cena/barbacoa.');
@@ -4053,6 +4053,35 @@
     ceHf37EnsureStockMinimums(rows, desc);
     ceHf34AddCreativePurchase(rows, desc);
     return rows;
+  }
+
+
+  function cePlanFix29MenuIntent(){
+    const raw = String(fieldValue('planInfo') || '') + '\n' + String(fieldValue('planDescripcion') || '');
+    const n = normalizeText(raw || '');
+    const negPaella = /\b(NO|SIN|NADA DE|EVITAR|EVITA|NO QUEREMOS|NO HACER|NO PREPARAR)\b.{0,50}\b(PAELLA|ARROZ|MARISCO|GAMBON|GAMBONES|ALMEJA|ALMEJAS)\b/.test(n);
+    const negBbq = /\b(NO|SIN|NADA DE|EVITAR|EVITA|NO QUEREMOS|NO HACER|NO PREPARAR)\b.{0,50}\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|LOMO|MORCILLA|PANCETA|CHORIZO)\b/.test(n);
+    return {
+      paella: !negPaella && /\b(PAELLA|ARROZ|FIDEUA|FIDEU[AÁ]|MARISCO|GAMBON|GAMBONES|GAMBA|GAMBAS|ALMEJA|ALMEJAS|CALDO PAELLA)\b/.test(n),
+      bbq: !negBbq && /\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|ASADA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO|MONTADO|MONTADOS)\b/.test(n)
+    };
+  }
+  function cePlanFix29LegacyMenuFamily(name){
+    const n = normalizeText(name || '');
+    if(/\bARROZ\b|GAMBON|GAMBONES|GAMBA|GAMBAS|LANGOSTINO|LANGOSTINOS|ALMEJA|ALMEJAS|CALDO PAELLA|PREPARADO PAELLA/.test(n)) return 'paella';
+    if(/\bLOMO\b|LOMO FRESCO|MORCILLA|PANCETA|CHORIZO|CHORIZOS/.test(n)) return 'bbq';
+    return '';
+  }
+  function cePlanFix29FilterFixedMenuRows(rows){
+    const intent = cePlanFix29MenuIntent();
+    return (Array.isArray(rows) ? rows : []).filter(row => {
+      if(!row || String(row.tipo || '').toUpperCase() !== 'COMPRA') return true;
+      if(row.explicitPromptDonation === true || row.explicitConfirmedDonation === true || row.explicitPromptStrictHf12 === true) return true;
+      const fam = cePlanFix29LegacyMenuFamily(row.productName || row.producto || '');
+      if(fam === 'paella' && !intent.paella) return false;
+      if(fam === 'bbq' && !intent.bbq) return false;
+      return true;
+    });
   }
 
   async function generateProposal(){
@@ -4102,7 +4131,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
+        lastProposal = cePlanFix29FilterFixedMenuRows(ceHf27ApplyDiagnosticTruth(rawPlanRows));
       }else{
         lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(rawPlanRows))));
       }

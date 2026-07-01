@@ -1652,6 +1652,46 @@ function planMinimumNeed(productName, form, currentNeed) {
 function planCompraTotal(rows) {
   return arr(rows).filter(r => r?.include !== false && r?.tipo === 'COMPRA').reduce((sum, r) => sum + num(r.unidades) * num(r.precio), 0);
 }
+
+function planMenuIntentHf29(form) {
+  const raw = trim((form?.descripcion || '') + '\n' + (form?.info || ''));
+  const n = normPlanKey(raw);
+  const negPaella = /\b(NO|SIN|NADA\s+DE|EVITAR|EVITA|NO\s+QUEREMOS|NO\s+HACER|NO\s+PREPARAR)\b.{0,50}\b(PAELLA|ARROZ|MARISCO|GAMBON|GAMBONES|ALMEJA|ALMEJAS)\b/.test(n);
+  const negBbq = /\b(NO|SIN|NADA\s+DE|EVITAR|EVITA|NO\s+QUEREMOS|NO\s+HACER|NO\s+PREPARAR)\b.{0,50}\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|LOMO|MORCILLA|PANCETA|CHORIZO)\b/.test(n);
+  const paella = !negPaella && /\b(PAELLA|ARROZ|FIDEUA|FIDEU[AÁ]|MARISCO|GAMBON|GAMBONES|GAMBA|GAMBAS|ALMEJA|ALMEJAS|CALDO\s+PAELLA)\b/.test(n);
+  const bbq = !negBbq && /\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|ASADA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO|MONTADO|MONTADOS)\b/.test(n);
+  const bocadillos = /\b(BOCADILLO|BOCADILLOS|SANDWICH|SANDWICHES|PERRITO|PERRITOS|HAMBURGUESA|HAMBURGUESAS)\b/.test(n);
+  const tapas = /\b(TAPA|TAPAS|APERITIVO|PICOTEO|RACIONES|TORTILLA|EMPANADA|CANAPE|CANAPES|EMBUTIDO|QUESO)\b/.test(n);
+  const frio = /\b(FRIO|FRIA|FRÍA|COMIDA\s+FRIA|COMIDA\s+FRÍA|ENSALADA|GAZPACHO)\b/.test(n);
+  return { paella, bbq, bocadillos, tapas, frio, texto: n.slice(0, 1200) };
+}
+function planLegacyMenuFamilyHf29(productName) {
+  const n = normPlanKey(productName || '');
+  if (/\bARROZ\b|GAMBON|GAMBONES|GAMBA|GAMBAS|LANGOSTINO|LANGOSTINOS|ALMEJA|ALMEJAS|CALDO\s+PAELLA|PREPARADO\s+PAELLA/.test(n)) return 'paella';
+  if (/\bLOMO\b|LOMO\s+FRESCO|MORCILLA|PANCETA|CHORIZO|CHORIZOS/.test(n)) return 'bbq';
+  return '';
+}
+function planFilterUnrequestedLegacyMenuRowsHf29(rows, form) {
+  const intent = planMenuIntentHf29(form);
+  const removed = [];
+  const out = arr(rows).filter(row => {
+    if (!row || row.tipo !== 'COMPRA') return true;
+    if (row.explicitPromptDonation === true || row.explicitConfirmedDonation === true || row.explicitPromptStrictHf12 === true) return true;
+    const family = planLegacyMenuFamilyHf29(row.productName || row.producto || '');
+    if (family === 'paella' && !intent.paella) { removed.push(row.productName || row.producto || 'producto de paella'); return false; }
+    if (family === 'bbq' && !intent.bbq) { removed.push(row.productName || row.producto || 'producto de barbacoa'); return false; }
+    return true;
+  });
+  const notes = [];
+  if (removed.length) {
+    const sample = [...new Set(removed.map(x => trim(x)).filter(Boolean))].slice(0, 8).join(', ');
+    notes.push(`FIX29_PLANIFICACION activo: se han retirado compras de menú fijo no pedidas (${sample}). Zuzu no debe meter arroz/paella/barbacoa si el usuario no lo pide literalmente.`);
+  } else {
+    notes.push('FIX29_PLANIFICACION activo: filtro anti-menú fijo aplicado; no se permite arroz/paella/barbacoa salvo petición explícita del usuario.');
+  }
+  return { rows: out, notes };
+}
+
 function planBudgetGuard(rows, form) {
   const people = Math.max(1, num(form?.personas) || 25);
   const notes = [];
@@ -2676,6 +2716,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
     aislamientoEncargoTotal: trim(form.mode).toUpperCase() === 'ZUZU_TOTAL' ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo catálogo, prompt y donaciones explícitas.' : 'NO ACTIVO',
     modulosSolicitados: modules,
     eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), dias: num(form.dias), personasEstimadas: num(form.personas), descripcion: trim(form.descripcion), informacionConstruccion: trim(form.info) },
+    intencionMenuDetectada: planMenuIntentHf29(form),
     eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null,
     responsablePorDefecto: trim(form.defaultResponsibleName),
     tiendaPorDefecto: trim(form.defaultStoreName),
@@ -2692,14 +2733,14 @@ Reglas:
 - Calculas COSTE REAL de evento, no precio de bar/restaurante: objetivo normal 25 €/persona y límite caro 35 €/persona para evento de 1 día. Si te vas por encima, ajusta cantidades antes de responder.
 - NO inventes productos donados. En Encargo total o parcial, solo devuelve DONACION si aparece como donación/existencia explícita en el prompt. En réplica exacta sí puedes conservar DONACIONES históricas base. Si crees que algo podría donarse, trátalo como COMPRA con la razón "posible donación pendiente de confirmar", pero NO lo descuentes.
 - Cerveza lata/botellín: usa como referencia hasta unas 5 unidades por persona consumidora en todo el día, no por todos los asistentes. Cubatas: 3 o 4 por persona consumidora; calcula refrescos de mezcla según cubatas, no como botella por persona.
-- Paella: evita saltos absurdos; para una paella normal 1 kg de gambones puede ser base suficiente y 5 kg solo si el número de personas lo justifica claramente.
-- Cena/barbacoa: no multipliques todos los productos por todos los asistentes; para una cena informal no todos comen chorizo + montado + morcilla + panceta completos.
+- Paella/arroz/marisco: NO lo propongas salvo que el usuario escriba explícitamente paella, arroz, fideuá, marisco, gambones/gambas o almejas. La palabra genérica comida/comer NO significa paella.
+- Cena/barbacoa: NO conviertas una cena genérica en barbacoa. Solo propón lomo, morcilla, panceta, chorizo o parrilla si el usuario escribe explícitamente barbacoa, brasa, parrilla, plancha, asado o esos productos.
 - No inventes claves internas. Si propones un producto existente, devuelve su productId del catálogo. Si dudas, usa el producto histórico base.
 - Para modo "Replicar un evento Finalizado", conserva las filas históricas base casi tal cual; solo completa responsable/tienda con los valores por defecto si faltan.
 - Para modo "Encargo parcial a Zuzu", usa el evento modelo como plantilla pero ajusta cantidades/variedad según días, personas estimadas e instrucciones.
 - Para modo "Encargo total a Zuzu", PROHIBIDO usar eventos pasados, listas históricas, patrones de un evento anterior o menús fijos. En este modo ControlEvent no te entrega eventos finalizados ni filas históricas; si recuerdas o deduces una lista vieja, ignórala.
 - En Encargo total debes obedecer el texto completo de descripcion e informacionConstruccion: duración/días, concepto del evento, comidas indicadas, horarios, preferencias de comida, bebida, cosas que NO se quieren y nivel de detalle pedido.
-- NO uses nunca paella, arroz, marisco, barbacoa, lomo, morcilla, panceta o chorizo como menú por defecto. Solo propón esos productos si el usuario lo ha pedido o si encaja de forma explícita con el concepto descrito. Si el usuario dice bocadillos, tapas, aperitivo, comida fría, desayuno, merienda, pizza, tortillas, etc., propón productos coherentes con eso y no cambies a paella/barbacoa.
+- NO uses nunca paella, arroz, marisco, barbacoa, lomo, morcilla, panceta o chorizo como menú por defecto. Solo propón esos productos si el usuario lo ha escrito de forma directa. Si el usuario dice bocadillos, tapas, aperitivo, comida fría, desayuno, merienda, pizza, tortillas, etc., propón productos coherentes con eso y queda prohibido cambiarlo a paella/barbacoa.
 - Si falta información básica para comprar con criterio (personas, días, comidas incluidas, bebida o concepto), NO rellenes con un menú inventado: devuelve las donaciones/existencias confirmadas y añade en notes las preguntas concretas que debe responder el usuario para completar la compra.
 - Si el usuario pide más bebida/calor/más días/más gente, ajusta unidades. Mantén precios de referencia razonables.
 - Antes de proponer compras, calcula necesidad total por producto para personas/días/temperatura y resta existencias o donaciones indicadas. La COMPRA debe ser solo el déficit con margen de seguridad si procede; la DONACION representa exactamente lo que ya se tiene o se prevé recibir.
@@ -2997,7 +3038,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('FIX28_PLANIFICACION activo: se han cargado directamente las donaciones/existencias confirmadas del prompt y Gemini interpreta el resto del texto (concepto, duración, comidas y preferencias), sin menú local fijo.');
+    aiNotes.push('FIX29_PLANIFICACION activo: se han cargado directamente las donaciones/existencias confirmadas del prompt y Gemini interpreta el resto del texto (concepto, duración, comidas y preferencias), sin menú local fijo.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), largePrompt ? 26000 : 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, [], state, form);
@@ -3012,7 +3053,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX28_PLANIFICACION activo: encargo total sin copiar históricos ni compras locales de seguridad; manda el prompt completo a Gemini.');
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX29_PLANIFICACION activo: encargo total sin copiar históricos ni compras locales de seguridad; manda el prompt completo a Gemini.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 18000, 'Gemini planificación');
       const matched = matchPlanRows(ai?.rows, baseRows, state, form);
@@ -3034,6 +3075,11 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   rowsOut = planApplyFinalDefaultsHf14(arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}` })), form, state);
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
     rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
+    if (m === 'ZUZU_TOTAL') {
+      const fixedMenuFilter = planFilterUnrequestedLegacyMenuRowsHf29(rowsOut, form);
+      rowsOut = fixedMenuFilter.rows;
+      aiNotes = aiNotes.concat(fixedMenuFilter.notes);
+    }
     const budget = planBudgetGuard(rowsOut, form);
     rowsOut = planApplyFinalDefaultsHf14(budget.rows, form, state);
     aiNotes = planReadableNotes(aiNotes, rowsOut, form, budget.notes);
@@ -3042,7 +3088,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v17_prod_FIX28_PLANIFICACION',
+    version: 'v17_prod_FIX29_PLANIFICACION_SIN_MENU_FIJO',
     provider: aiProvider,
     model: aiModel,
     mode: m,
