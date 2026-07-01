@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod - logo inicial fijo por CSS, sin ficha/texto ni cambios de tamaño. */
+/* ControlEvent v17_prod - logo inicial Peña El Arrastre fijo por CSS, sin ficha/texto ni cambios de tamaño. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17LogoFijoUnaVezFinal';
@@ -14,10 +14,10 @@
     if($(STYLE_ID)) return;
     const st=document.createElement('style'); st.id=STYLE_ID;
     st.textContent=`
-      #noEventMessage{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:44vh!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;transition:none!important;animation:none!important;}
-      #noEventMessage.hidden,body.ce-v17-has-event #noEventMessage,body.ce-v17-event-switching #noEventMessage{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;max-height:0!important;min-height:0!important;overflow:hidden!important;}
+      #noEventMessage{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:56vh!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;transition:none!important;animation:none!important;}
+      #noEventMessage.hidden,body.ce-v17-has-event #noEventMessage,body.ce-v17-event-switching #noEventMessage,body.ce-v17-fix25-has-event #noEventMessage{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;max-height:0!important;min-height:0!important;overflow:hidden!important;}
       #noEventMessage>*{display:none!important;visibility:hidden!important;opacity:0!important;max-height:0!important;overflow:hidden!important;}
-      #noEventMessage::before{content:""!important;display:block!important;width:150px!important;height:150px!important;max-width:36vw!important;max-height:36vw!important;background:url('./assets/icons/controlevent-welcome-v44.png') center/contain no-repeat!important;border-radius:24px!important;filter:drop-shadow(0 12px 22px rgba(15,23,42,.20))!important;transform:none!important;transition:none!important;animation:none!important;}
+      #noEventMessage::before{content:""!important;display:block!important;width:clamp(210px,38vw,340px)!important;height:clamp(160px,29vw,258px)!important;max-width:76vw!important;max-height:42vh!important;background:url('./assets/icons/penya-el-arrastre-welcome.png') center/contain no-repeat!important;border-radius:0!important;filter:none!important;transform:none!important;transition:none!important;animation:none!important;}
     `;
     document.head.appendChild(st);
   }
@@ -38,5 +38,5 @@
   document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='selectedEvent'&&norm(ev.target.value)){setGraficas();hideLogo();}},true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-loaded'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,20),true));
   [0,200,900].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17LogoFijo={install,hideLogo,showLogoIfNoEvent,version:'v17_prod_logo_fijo_una_vez'};
+  window.ControlEventV17LogoFijo={install,hideLogo,showLogoIfNoEvent,version:'v17_prod_logo_el_arrastre_una_vez'};
 })();
