@@ -4407,6 +4407,7 @@
       contextResumen: debug.contextResumen,
       geminiParsedCounts: debug.geminiParsedCounts,
       matchCounts: debug.matchCounts,
+      phaseDetails: debug.phaseDetails,
       finalCounts: debug.finalCounts,
       providerFinal: debug.providerFinal,
       modelFinal: debug.modelFinal,
@@ -4417,12 +4418,15 @@
       geminiRequestPreview: debug.geminiRequestPreview,
       geminiRawTextPreview: debug.geminiRawTextPreview
     };
+    const phaseRows = (Array.isArray(debug.phaseDetails) ? debug.phaseDetails : []).map(ph => `<tr><td><b>${esc(ph.fase || '')}</b></td><td>${esc(ph.origen || ph.estado || '')}</td><td>${esc(ph.compras ?? '')}</td><td>${esc(ph.donaciones ?? '')}</td><td>${esc(ph.totalCompras != null ? money(ph.totalCompras) : '')}</td><td>${esc(ph.detalle || '')}</td></tr>`).join('');
+    const phaseHtml = phaseRows ? `<div class="ce-hf27-tablewrap"><table><thead><tr><th>Fase</th><th>Origen/estado</th><th>Compras</th><th>Donaciones</th><th>Total compra</th><th>Detalle</th></tr></thead><tbody>${phaseRows}</tbody></table></div>` : '';
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX45: array necesidades + déficit local</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX46: fases de cálculo y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
+      ${phaseHtml}
       <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Filas Gemini</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="7">No hay intento Gemini registrado.</td></tr>'}</tbody></table></div>
       <details style="padding:12px 16px"><summary><b>Ver brief / request / respuesta bruta</b></summary><pre style="white-space:pre-wrap;max-height:460px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px">${esc(JSON.stringify(traceShort, null, 2)).slice(0, 180000)}</pre></details>
     </section>`;
@@ -4433,7 +4437,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX45 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX46 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4480,7 +4484,9 @@
         defaultResponsibleId: document.getElementById('planResponsable')?.value || '',
         defaultStoreId: document.getElementById('planTienda')?.value || '',
         descripcion: fieldValue('planDescripcion'),
-        info: fieldValue('planInfo')
+        info: fieldValue('planInfo'),
+        applySaldoAjuste: !!document.getElementById('planApplySaldoAjuste')?.checked,
+        applyProductCaps: !!document.getElementById('planApplyProductCaps')?.checked
       };
       const res = await fetch('/api/event-ai/planificacion-propuesta', {
         method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', body: JSON.stringify(payload)
