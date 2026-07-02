@@ -1,0 +1,12 @@
+ControlEvent v16_prod
+
+Versión de rescate afinada sobre v16_prod.
+
+Cambios principales:
+- Ticket Auto: similitud de productos más estricta para evitar falsos positivos tipo SAL dentro de ROSAL.
+- Ticket Auto: misma tienda en rojo; tienda distinta en naranja vivo; se pinta también la línea IA/manual emparejada.
+- COMPRAS/DONACIONES: buscador corregido para no encontrar la propia caja ni opciones ocultas de desplegables.
+- COMPRAS: rehidratación puntual si al cambiar de evento queda la lista vacía, sin bucles de refresco.
+- INGRESOS y DOCUMENTOS: reconstrucción de una única flecha de descarga por foto/miniatura.
+- Mapa de recursos: filtro de responsables más pequeño en iPad.
+- INFOEVENTO/BACKUP: versión de exportación actualizada a ControlEvent_v16_prod.

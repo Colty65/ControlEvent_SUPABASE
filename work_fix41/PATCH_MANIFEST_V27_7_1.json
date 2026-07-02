@@ -1,0 +1,44 @@
+{
+  "version": "v27.7.1",
+  "base": "v27.7",
+  "description": "Corrige falso aviso de IMPORTACIÓN en ControlEventMaintenanceDiagnostics; clearImportStatus pasa a ser opcional.",
+  "modified": [
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/data-integrity.js",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/maintenance-diagnostics.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/modules/forms/_forms-runtime.js",
+    "public/modules/module-loader.js",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V27_7_1.md",
+    "README_V27_7_1_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v27.7.1.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.7.1.js"
+  ],
+  "deleted_from_full": [
+    "public/app/legacy/legacy-bundle-before-modules-v27.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.7.js"
+  ],
+  "delete_manually_if_present": [
+    "public/app/legacy/legacy-bundle-before-modules-v27.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.7.js"
+  ],
+  "notes": [
+    "No toca funcionalmente INFOEVENTO, BACKUP, carga de datos ni mantenimiento real."
+  ]
+}

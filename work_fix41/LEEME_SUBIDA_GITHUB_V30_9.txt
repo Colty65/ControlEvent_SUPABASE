@@ -1,0 +1,17 @@
+ControlEvent v16_prod - SOLO SUBIR A GITHUB
+
+Sube el contenido de este ZIP al repositorio.
+
+Cambios principales:
+1. Corrección del login en PC respecto a v30.8.
+2. Globo DONACION DE PRODUCTO reforzado en iPhone/Android.
+3. Mapa de productos pasa a llamarse Mapa de recursos.
+4. Añadido filtro desplegable de responsables SOCIO.
+5. Orden del mapa: Tienda, primero Pte. comprar/otros gastos, después TKxx, y Producto.
+6. TKxx comprado en verde Excel transparente.
+
+Si GitHub conserva archivos antiguos, no pasa nada si quedan, porque index.html carga los nuevos:
+- public/app/features/mapa-recursos-v30.9.js
+- public/app/features/budget-tooltips-lite-v30.9.js
+
+Cache nuevo: controlevent-shell-v50-24

@@ -1,0 +1,15 @@
+HOTFIX sobre v16_prod - Planificación inicial
+
+Sin cambio de versión.
+
+Cambios:
+- La creación de evento real desde Planificación inicial ya no depende de saveState masivo (bloqueado por FIX23): usa CRUD fila a fila explícito para evento, colaboradores y compras/donaciones.
+- Al generar el evento, se guarda en BBDD antes de añadirlo a la memoria local, para que no desaparezca del desplegable al refrescar/cambiar estado.
+- La propuesta muestra una cabecera narrativa con lo solicitado, totales de compras, donaciones y valoración del evento, precio orientativo y cantidades producto por producto.
+- Añadidas opciones en Contenido: "Ingresos obligatorios de todos los socios" y "Ningún dato".
+- Para "Ingresos obligatorios de todos los socios", se preparan ingresos pendientes de socios detectados, estimando precio como Total compras / Nº estimado de asistentes.
+- Zuzu intenta respetar instrucciones explícitas de donante/responsable del prompt para existencias y posibles donaciones.
+
+Archivos tocados:
+- public/app/features/planificacion-inicial.js
+- services/event-ai.service.js

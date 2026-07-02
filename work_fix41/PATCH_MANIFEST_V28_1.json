@@ -1,0 +1,44 @@
+{
+  "version": "v28.1.1",
+  "base": "v28.0.2",
+  "modified": [
+    "package-lock.json",
+    "package.json",
+    "README_V28_0.md",
+    "README_V28_0_1.md",
+    "README_V28_0_1_DELETE_OLD_FILES.txt",
+    "README_V28_0_2.md",
+    "PATCH_MANIFEST_V28_0_2.json",
+    "public/index.html",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "routes/health.routes.js",
+    "server/paths.js",
+    "public/app/version.js",
+    "public/app/main.js",
+    "public/modules/module-loader.js",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/data-integrity.js",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/maintenance-diagnostics.js",
+    "public/app/diagnostics/mobile-performance.js",
+    "public/app/diagnostics/runtime-diagnostics.js"
+  ],
+  "new": [
+    "README_V28_1.md",
+    "PATCH_MANIFEST_V28_1.json",
+    "public/app/legacy/legacy-bundle-before-modules-v28.1.1.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.1.1.js",
+    "public/app/navigation/screen-lazy.js"
+  ],
+  "deleted": [
+    "public/app/legacy/legacy-bundle-before-modules-v28.0.2.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.0.2.js"
+  ],
+  "notes": "Carga diferida por pantalla: module-loader ya no activa pantalla inicial en runtime-ready; screen-lazy lo hace tras primer pintado. No toca INFOEVENTO/BACKUP."
+}

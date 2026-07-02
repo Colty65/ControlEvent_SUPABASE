@@ -1,0 +1,21 @@
+{
+  "version": "v16_prod",
+  "tipo": "rescate_estable",
+  "objetivo": "recuperar fluidez y arranque estable tras hotfixes de v10.4.2",
+  "cambios": [
+    "desactivar refresco automatico repetido de vistas",
+    "eliminar ocultacion prelogin y bienvenida experimental",
+    "mostrar login directamente desde el inicio",
+    "mantener ticket auto con candidatos rojo/naranja",
+    "mantener busqueda reforzada en compras/donaciones",
+    "limpiar descargas duplicadas en documentos/ingresos"
+  ],
+  "archivos_principales": [
+    "index.html",
+    "public/index.html",
+    "public/app/features/view-refresh-stabilizer.js",
+    "public/app/features/v10-4-app-fixes.js",
+    "public/app/features/v10-4-3-ticketauto-compras.js",
+    "public/app/features/v10-4-3-app-fixes.js"
+  ]
+}

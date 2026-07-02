@@ -1,0 +1,60 @@
+ControlEvent v16_prod - HOTFIX27 sin cambio de versión
+
+Cambio de método: diagnóstico verificable de Planificación inicial.
+
+Objetivo:
+- Dejar de hacer parches a ciegas.
+- Abrir la caja negra del prompt.
+- Ver antes de generar qué productos ha leído la app, qué producto de PRODUCTOS ha encontrado y con qué criterio.
+
+Cambios incluidos:
+
+1. Botón nuevo en Planificación inicial
+- Se añade el botón "Diagnosticar prompt" junto a "Generar propuesta".
+- No llama a Gemini ni genera evento.
+- Lee únicamente el campo "Información para la construcción".
+- Extrae los productos que estén dentro de bloques:
+  PRODUCTO EN LA PEÑA
+  DONACIONES
+  DONACION
+  EXISTENCIAS
+  YA TENEMOS
+
+2. Tabla de diagnóstico visible
+Muestra línea a línea:
+- Producto escrito en el prompt.
+- Cantidad leída.
+- Tipo de donación.
+- Donante / responsable.
+- Producto encontrado en PRODUCTOS.
+- Segmento / destino.
+- Precio.
+- Método de búsqueda usado.
+- Estado:
+  OK
+  REVISAR
+  NO ENCONTRADO
+
+3. Métodos de búsqueda transparentes
+El diagnóstico prueba:
+- exacto normalizado;
+- exacto sin envases;
+- alias de catálogo;
+- búsqueda tipo %cadena%;
+- recorte progresivo;
+- score por tokens útiles.
+
+4. Botón "Usar diagnóstico como propuesta"
+- Convierte la tabla diagnosticada en la propuesta de donaciones.
+- Así se puede comprobar si la propuesta queda limpia partiendo solo de lo que el prompt dice explícitamente.
+- Las compras de Zuzu que coincidan con una donación explícita se reducen o se eliminan por déficit.
+
+5. Botón "Copiar diagnóstico"
+- Copia una tabla tabulada al portapapeles para poder revisar los fallos concretos sin capturas.
+
+6. Se mantiene la versión visible
+- No cambia v16_prod.
+- Se cambia el cache-bust del script:
+  planificacion-inicial.js?v=v16_prod_planificacion_hf27_diagnostico_prompt
+
+No hay SQL nuevo.

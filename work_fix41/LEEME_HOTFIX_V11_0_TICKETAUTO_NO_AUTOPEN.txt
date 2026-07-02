@@ -1,0 +1,14 @@
+ControlEvent v16_prod - HOTFIX Ticket Auto no autoabrir
+
+No cambia versión.
+
+Objetivo:
+- Evitar que la ventana "Alta asistida de COMPRAS" aparezca antes/después del login o antes de elegir evento.
+- Ticket Auto solo debe quedar abierto si hay evento seleccionado y se está en la ventana COMPRAS.
+
+Archivos tocados:
+- index.html
+- public/index.html
+- public/app/features/v11-1-hotfix-ticketauto-no-autopen.js
+
+No toca backend, Gemini libre, modelo de datos, ni resto de módulos.

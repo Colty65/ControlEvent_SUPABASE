@@ -1,0 +1,32 @@
+ControlEvent v16_prod - HOTFIX4 SIN CAMBIO DE VERSION
+
+Cambios aplicados:
+
+1) MANTENIMIENTO
+- Al guardar PRODUCTOS, TIENDAS o PERSONAS ya no se debe cerrar la ventana total de mantenimiento.
+- Tras sincronizar con BBDD se restaura la pestaña de mantenimiento activa y el scroll.
+- Se mantiene el uso de RPC del hotfix anterior para modificar maestros usados en eventos finalizados.
+
+2) ZUZU / PROPUESTA EDITABLE TIPO MAPA DE RECURSOS
+- Se corrige la detección exacta de productos con tamaños/variantes entre paréntesis.
+  Ejemplo: "Aceite AOVE (2l): 1" conserva "(2l)" y no debe caer en "Aceite AOVE".
+- En donaciones/existencias explícitas se prioriza el producto exacto del catálogo.
+- La búsqueda de producto en la propuesta editable ya no usa el texto de todas las opciones del desplegable,
+  por lo que no se queda siempre en el primer registro.
+- La búsqueda mantiene el texto escrito y permite ir saltando entre coincidencias sucesivas.
+- En la ficha general vuelve a mostrarse Segmento / destino debajo del desplegable del producto.
+- Antes de crear el evento real se sincroniza de nuevo todo lo editado en el panel superior para que el detalle avanzado
+  y las líneas que se crean respeten lo introducido en "Propuesta editable tipo Mapa de recursos".
+
+3) REDONDEO DE UNIDADES
+- Las compras calculadas ya no quedan con unidades fraccionarias salvo productos claramente por peso/litro a granel.
+- En productos normales se redondea al menos a 1 unidad.
+- Bebidas en lata/bote/botellín o productos tipo cerveza, Coca-Cola, Fanta, tónica, Aquarius, refrescos, etc. se redondean a múltiplos de 24 unidades.
+- El control de presupuesto de Zuzu también respeta este redondeo final.
+
+4) GRAFICAS
+- En las gráficas de queso se añade proporción mínima visual a los trozos pequeños.
+- Se añade una zona invisible de pulsación más grande sobre cada trozo para que sea usable con ratón, iPad y móvil.
+- Las filas de leyenda quedan con altura táctil mínima en pantallas de dedo.
+
+No se ha cambiado la versión de la app.

@@ -1,0 +1,7 @@
+HOTFIX48 v16_prod
+- AVANCE DEL EVENTO queda solo en el logo ColtyLAB: elimina restos de Resumen y Mapa.
+- Globo centrado efímero, sin desplazar ventanas.
+- Refuerzo de mantenimiento desde Documentos.
+- Título de evento en Justificante de ingreso y tickets, verde/rojo según estado.
+- Ordenación A-Z de tablas de tickets y globos de Resumen, con cabecera en primera fila.
+- Limpieza adicional de restos de avance antiguos y refrescos visuales al cambiar evento.

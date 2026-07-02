@@ -1,0 +1,12 @@
+ControlEvent v16_prod
+
+Version generada desde v50.10.
+
+Cambios:
+- SALIR: vuelve a mostrar siempre la ventana de Login, limpiando sesion ligera y estados visuales autenticados.
+- CABECERA/VERSION: se deja de cargar v50-8-final-fixes.js y se unifican las constantes visibles a ControlEvent v16_prod para evitar alternancia v50.8/v50.10.
+- INGRESOS: registros con situacion Pendiente/Pte. en letra roja; resto en negro.
+- COMPRAS: registros con Pte.Compra/pendiente o sin ticket en letra roja; TKxx y GASTOS CORRIENTES en negro.
+- NO se toca el sistema de fotos de justificantes/tickets de INGRESOS.
+
+Al subir a GitHub/Vercel, en iPhone/iPad/Android conviene cerrar y abrir de nuevo la PWA/navegador para tomar la cache controlevent-shell-v50-24.

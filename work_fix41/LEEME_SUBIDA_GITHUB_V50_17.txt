@@ -1,0 +1,23 @@
+ControlEvent v16_prod
+===================
+
+Corrección conservadora sobre v50.16.
+
+Cambios principales:
+1. Se retiran de la carga las capas v50.15 y v50.16, que estaban interfiriendo con el flujo de selección de evento y dejando ventanas/globos a medio inicializar.
+2. Flujo de entrada unificado:
+   - Login correcto.
+   - Pantalla limpia con logo CE grande.
+   - Selector EVENTO en "Selecciona evento...".
+   - Solo al elegir evento se cargan y rehidratan datos y globos.
+3. Al elegir evento se rehidratan INGRESOS, DONACIONES, COMPRAS y la ventana activa.
+4. Botón Refres móvil: refresca en sitio, conservando evento y pestaña actual.
+5. Globos de RESUMEN PRESUPUESTARIO: las miniaturas "Just." se retagian para usar un visor ligero propio y evitar bloqueos en iPad/iPhone.
+6. No se modifica el sistema de justificantes dentro de INGRESOS, que ya estaba funcionando en PC, iPad y móviles.
+7. Versión y caché unificadas a ControlEvent v16_prod.
+
+Pruebas recomendadas:
+- Entrar con GD, RW y RO: debe aparecer CE grande y selector "Selecciona evento...".
+- Elegir evento: deben quedar disponibles INGRESOS, DONACIONES, COMPRAS y globos.
+- En RESUMEN PRESUPUESTARIO, abrir Ingresado socios/no socios y pulsar Just.: debe abrir/cerrar foto sin bloquear.
+- En móvil, Refres debe quedarse en el mismo evento y pestaña.

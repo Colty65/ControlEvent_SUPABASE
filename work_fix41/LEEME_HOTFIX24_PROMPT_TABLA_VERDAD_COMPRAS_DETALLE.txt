@@ -1,0 +1,55 @@
+ControlEvent v16_prod - HOTFIX24 sin cambio de versión
+
+Cambios incluidos:
+
+1. Patrón localizado por el usuario
+- Se trata cada línea de producto dentro de PRODUCTO EN LA PEÑA / DONACIONES / DONACION / EXISTENCIAS como tabla de verdad.
+- La línea del prompt manda sobre Zuzu:
+  * si es donación/existencia, queda como DONACION.
+  * si Zuzu había creado una compra equivalente, se anula.
+  * si Zuzu había calculado más unidades que las donadas, queda solo la compra por déficit.
+
+2. Buscador de PRODUCTOS por alias de catálogo
+- Se añade una capa de alias compartida en frontend y backend.
+- Se refuerzan casos detectados en la prueba:
+  * COCA COLA ZERO Bote 32 Cl
+  * COCA COLA ZERO -ZERO 33 cl
+  * FANTA Naranja / FANTA Limón
+  * Sprite
+  * Ron BARCELO / Ron BRUGAL
+  * Whisky 5 Años J.B / Whisky DYC / Whisky JHONY WALKER
+  * GINEBRA Puerto de Indias / Gin LARIOS / Gin BEEFEATER
+  * Café normal / descafeinado gorritas
+  * Vino tinto / blanco / frizzante
+  * Agua 1l cristal
+  * Baicon
+  * Chuleta cerdo
+  * Fairy
+  * Rollo papel secamanos
+  * Bolsas basura grandes
+  * Papel higiénico
+  * Jabón lavamanos
+  * Ambientador
+  * Oreja en salsa
+
+3. Precio, segmento y destino
+- Si el producto se localiza en PRODUCTOS, se arrastra:
+  * nombre oficial
+  * segmento
+  * destino
+  * precio
+- El precio intenta leer varios campos posibles del producto: defaultPrecio, precio, precioReferencia, precio_ref, pvp, importe.
+
+4. Compras visibles en el Detalle avanzado
+- Si PROPUESTA DETALLADA DEL EVENTO muestra compra por déficit, se crea/actualiza una fila de compra real en lastProposal.
+- Así el Detalle avanzado no se queda solo con donaciones.
+
+5. Donante/responsable en Detalle avanzado
+- En las filas de DONACION, el campo que antes aparecía como Tienda pasa a ser Donante.
+- El donante/responsable debe coincidir con el bloque del prompt.
+
+6. Fichas vacías
+- Se siguen ocultando fichas sin donación ni compra prevista.
+
+No cambia versión visible.
+No hay SQL nuevo.

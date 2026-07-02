@@ -1,0 +1,7 @@
+.env
+.env.*
+node_modules
+data/*.json
+data/*.tmp
+uploads/ticket-images/*
+*.log

@@ -846,6 +846,18 @@
     if(!normalizeDonorRef(row?.donorRef || '')) return true;
     return !donorNearProductInPrompt(row);
   }
+  function hasPendingDiagnosticReviewRow(row){
+    return !!row && String(row.__ceDiagnosticStatus || '').toUpperCase() === 'REVISAR' && row.__ceDiagnosticResolved !== true;
+  }
+  function clearPendingDiagnosticReview(indices, reason){
+    (Array.isArray(indices) ? indices : []).forEach(idx => {
+      const row = lastProposal[idx];
+      if(!hasPendingDiagnosticReviewRow(row)) return;
+      row.__ceDiagnosticResolved = true;
+      row.__ceDiagnosticResolutionReason = reason || 'manual-review';
+      row.__ceDiagnosticResolvedAt = new Date().toISOString();
+    });
+  }
   function planResourceRows(proposals){
     const map = new Map();
     const donationQuotaUsed = new Map();
@@ -862,7 +874,8 @@
         key, producto: canonicalName, productId:resolvedProductId || p.productId || '', segmento: canonicalSegmento, destino: canonicalDestino, necesidad:0,
         compra:0, donado:0, importeCompra:0, importeDonado:0, precioCompra:0, precioDonado:0,
         donantes:new Map(), compras:new Map(), purchaseIndices:[], donationIndices:[], allIndices:[], include:false,
-        tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:'', donationDetails:[], purchaseDetails:[]
+        tiendaId:'', responsableId:'', donorRef:'', donationResponsableId:'', donationTicket:'', donationDetails:[], purchaseDetails:[],
+        reviewCount:0, reviewLines:[], hasPendingReview:false
       };
       // Si Zuzu o el catálogo traen el mismo artículo con nombres ligeramente distintos
       // (RON Barcelo / Ron BARCELÓ Añejo 0.7 L, WISKI JB / Whisky 5 Años J.B...),
@@ -909,6 +922,7 @@
         row.donationTicket = row.donationTicket || p.ticketDonacion || 'DONADO';
         const label = `${p.ticketDonacion || 'DONADO'} · ${donorLabel(donorRef)} · Resp. ${personaName(p.responsableId)}`;
         row.donantes.set(label, (row.donantes.get(label) || 0) + units);
+        const needsReview = hasPendingDiagnosticReviewRow(p);
         row.donationDetails.push({
           idx,
           unidades:units,
@@ -918,8 +932,22 @@
           donorRef:donorRef || '',
           responsableId:p.responsableId || '',
           donorLabel:donorLabel(donorRef),
-          responsableLabel:personaName(p.responsableId)
+          responsableLabel:personaName(p.responsableId),
+          diagnosticStatus:String(p.__ceDiagnosticStatus || ''),
+          needsReview,
+          diagnosticReason:String(p.reason || '')
         });
+        if(needsReview){
+          row.reviewCount += 1;
+          row.hasPendingReview = true;
+          row.reviewLines.push({
+            idx,
+            donorRef:donorRef || '',
+            ticketDonacion:p.ticketDonacion || 'DONADO',
+            diagnosticReason:String(p.reason || ''),
+            productName:canonicalName
+          });
+        }
       }else{
         row.compra += units;
         row.importeCompra += importe;
@@ -970,6 +998,7 @@
   function renderPlanResourceEditor(proposals){
     const rows = planResourceRows(proposals).filter(r => r && (r.include || Number(r.compra||0) > 0 || Number(r.donado||0) > 0));
     if(!rows.length) return '';
+    const reviewRows = rows.filter(r => Number(r.reviewCount || 0) > 0);
     const tiendaOpts = (selected) => `<option value="" ${!selected?'selected':''}>-- tienda compra --</option>` + tiendas().map(t => `<option value="${esc(t.id)}" ${String(t.id)===String(selected)?'selected':''}>${esc(t.nombre || 'Tienda')}</option>`).join('');
     const respOpts = (selected, label='-- responsable compra --') => `<option value="" ${!selected?'selected':''}>${esc(label)}</option>` + socios().map(s => `<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre || 'Socio')}</option>`).join('');
     const donorOpts = (selected) => {
@@ -981,11 +1010,13 @@
     };
     const donationRows = (r) => (Array.isArray(r.donationDetails) ? r.donationDetails : []).map((d, n) => {
       const imp = Number(d.unidades || 0) * Number(d.precio || 0);
-      return `<div class="plan-resource-subrow plan-resource-donation-subrow" data-plan-donation-index="${esc(d.idx)}">
+      const reviewClass = d.needsReview ? ' plan-needs-review' : '';
+      const reviewText = d.needsReview ? '<small>⚠ REVISAR</small>' : '';
+      return `<div class="plan-resource-subrow plan-resource-donation-subrow${reviewClass}" data-plan-donation-index="${esc(d.idx)}">
         <label>Unidades<input type="number" min="0" step="0.01" value="${esc(d.unidades || 0)}" data-plan-resource-field="donationUnits" data-plan-proposal-index="${esc(d.idx)}"/></label>
         <label>Precio<input type="number" min="0" step="0.01" value="${esc(d.precio || 0)}" data-plan-resource-field="donationPrecio" data-plan-proposal-index="${esc(d.idx)}"/></label>
         <span class="plan-resource-mini"><b>Importe</b><strong data-plan-donation-total="${esc(d.idx)}">${money(imp)}</strong></span>
-        <span class="plan-resource-donation-badge">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}</span>
+        <span class="plan-resource-donation-badge ${d.needsReview ? 'plan-resource-donation-badge-review' : ''}" title="${esc(d.diagnosticReason || 'Caso pendiente de revisar')}">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}${reviewText}</span>
         <label>Donante<select data-plan-resource-field="donorRef" data-plan-proposal-index="${esc(d.idx)}">${donorOpts(d.donorRef)}</select></label>
         <label>Responsable<select data-plan-resource-field="donationResponsableId" data-plan-proposal-index="${esc(d.idx)}">${respOpts(d.responsableId, '-- responsable donación --')}</select></label>
       </div>`;
@@ -1000,11 +1031,13 @@
     const tr = rows.map(r => {
       const buyBase = Math.max(0, Number(r.compra || 0));
       const price = Number(r.precioCompra || r.precioDonado || 0);
-      const rowClass = ['plan-resource-edit-row', r.include ? '' : 'excluded', planSegDestClass(r)].filter(Boolean).join(' ');
+      const needsReview = Number(r.reviewCount || 0) > 0;
+      const rowClass = ['plan-resource-edit-row', r.include ? '' : 'excluded', planSegDestClass(r), needsReview ? 'plan-review-pending' : ''].filter(Boolean).join(' ');
       const badgeText = planResourceBadgeText({...r, compra:buyBase});
       const donations = donationRows(r);
       const purchase = purchaseRow(r, buyBase, price);
       const empty = (!donations && !purchase) ? '<div class="plan-resource-empty-flow">Sin donación ni compra prevista.</div>' : '';
+      const reviewSummary = needsReview ? `<div class="plan-review-summary" title="${esc((r.reviewLines || []).map(x => x.diagnosticReason || '').filter(Boolean).join(' · ') || 'Caso pendiente de revisar')}"><strong>⚠ Atención:</strong> ${esc(r.reviewCount)} caso(s) marcado(s) como <b>REVISAR</b> en el diagnóstico. Esta ficha queda resaltada hasta que tomes una decisión.</div>` : '';
       return `<tr class="${rowClass}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
         <td class="plan-resource-general">
           <div class="plan-resource-general-top">
@@ -1013,12 +1046,14 @@
           </div>
           <select class="plan-resource-product-select" data-plan-resource-field="productId" aria-label="Producto">${planProductOptions(r.productId, r.producto)}</select>
           <div class="plan-resource-meta"><b>Segmento / destino</b><span data-plan-resource-meta>${esc((r.segmento || 'Sin segmento') + ' · ' + (r.destino || 'Sin destino'))}</span></div>
+          ${reviewSummary}
         </td>
         <td class="plan-resource-flow">${donations}${purchase}${empty}</td>
       </tr>`;
     }).join('');
     return `<div class="plan-resource-editor-card" id="planResourceEditor">
       <div class="section-title tiny-title plan-resource-title"><div><h3>PROPUESTA DETALLADA DEL EVENTO</h3><p>Revisa necesidad, donaciones y compra del déficit. El producto se elige solo desde el desplegable, ya preseleccionado con el nombre detectado.</p></div><div class="plan-resource-order-actions"><input id="planBuscarRecurso" type="search" placeholder="Buscar producto, segmento, destino, tienda..." autocomplete="off"/><button type="button" class="outline" id="btnPlanBuscarRecurso">Buscar</button><button type="button" class="outline ${String(planResourceOrderMode || 'PRODUCTO').toUpperCase()==='PRODUCTO'?'active':''}" id="btnPlanOrdenProducto">Orden producto</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='SEGMENTO_DESTINO'?'active':''}" id="btnPlanOrdenSegmentoDestino">Orden segmento/destino</button><button type="button" class="outline ${String(planResourceOrderMode || '').toUpperCase()==='TIENDA'?'active':''}" id="btnPlanOrdenTienda">Orden tienda/producto</button></div></div>
+      ${reviewRows.length ? `<div class="planificacion-note compact-note plan-review-global-note"><strong>⚠ Productos a revisar:</strong> ${esc(reviewRows.length)} ficha(s) llegan marcadas desde el diagnóstico naranja. Se resaltan aquí y en el detalle avanzado para que no pasen desapercibidas hasta decidir qué hacer con ellas.</div>` : ''}
       <div class="table-scroll"><table class="ce-table plan-resource-edit-table plan-resource-split-table">
         <thead><tr><th>Ficha general del producto</th><th>Donaciones y compras que se crearán</th></tr></thead>
         <tbody>${tr}</tbody>
@@ -1039,9 +1074,9 @@
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.plan-resource-order-actions input{min-width:190px!important;max-width:260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-resource-order-actions button{white-space:nowrap}.plan-resource-order-actions button.active,.plan-resource-order-actions button.plan-order-active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;box-shadow:0 0 0 3px rgba(15,23,42,.16)!important}.plan-resource-order-actions button.active{background:#dbeafe!important;border-color:#2563eb!important;color:#0f172a!important;box-shadow:0 0 0 2px rgba(37,99,235,.16) inset!important}
       .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:30%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:70%!important}
       .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(82px,105px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:105px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
-      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
-      .plan-product-card{padding:7px 8px!important;border-radius:12px!important}.plan-product-head{margin-bottom:4px!important;gap:7px!important}.plan-product-title strong{font-size:14px!important;line-height:1.05!important}.plan-product-title span{font-size:11px!important;line-height:1.05!important}.plan-confidence{padding:2px 6px!important;font-size:11px!important}.plan-include{font-size:12px!important}.plan-product-grid.replica-grid{display:grid!important;grid-template-columns:repeat(6,minmax(95px,1fr))!important;gap:6px!important}.plan-product-grid.replica-grid .field{gap:2px!important}.plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}.plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}.plan-reason{display:none!important}.plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
-      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}.ce-plan-income-manager p{margin:8px 0 10px;color:#475569;font-weight:700}.ce-plan-income-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ce-plan-income-scroll{overflow:auto;max-height:360px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}.ce-plan-income-table{width:100%;border-collapse:collapse;font-size:13px}.ce-plan-income-table th,.ce-plan-income-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}.ce-plan-income-table th{position:sticky;top:0;background:#eef6ff;z-index:1;font-weight:950}.ce-plan-income-table small{display:block;color:#64748b;font-weight:800}.ce-plan-income-table input[type=number]{width:86px;max-width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:10px}.ce-plan-income-table tr.excluded{opacity:.48;background:#f8fafc}.ce-plan-income-include{white-space:nowrap}.ce-plan-income-table button.small,.ce-plan-income-toolbar button.small{padding:7px 10px!important;border-radius:10px!important;font-weight:900!important}
+      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-subrow.plan-needs-review{box-shadow:0 0 0 3px rgba(245,158,11,.80)!important;background:#fff7ed!important;border-color:#f59e0b!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-donation-badge-review{display:grid!important;gap:1px!important;background:#b45309!important;line-height:1.05!important}.plan-resource-donation-badge-review small{display:block!important;font-size:10px!important;font-weight:950!important;color:#fff!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
+      .plan-product-card{padding:7px 8px!important;border-radius:12px!important}.plan-product-head{margin-bottom:4px!important;gap:7px!important}.plan-product-title strong{font-size:14px!important;line-height:1.05!important}.plan-product-title span{font-size:11px!important;line-height:1.05!important}.plan-review-inline{margin-top:4px!important;padding:4px 8px!important;border-radius:999px!important;background:#fff7ed!important;border:1px solid #f59e0b!important;color:#9a3412!important;font-size:11px!important;font-weight:950!important;line-height:1.15!important}.plan-confidence{padding:2px 6px!important;font-size:11px!important}.plan-include{font-size:12px!important}.plan-product-grid.replica-grid{display:grid!important;grid-template-columns:repeat(6,minmax(95px,1fr))!important;gap:6px!important}.plan-product-grid.replica-grid .field{gap:2px!important}.plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}.plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}.plan-reason{display:none!important}.plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-needs-review{box-shadow:0 0 0 4px rgba(245,158,11,.88)!important;border:2px solid #f59e0b!important;background:#fff7ed!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
+      .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-review-pending>td{border-color:#f59e0b!important;box-shadow:inset 0 0 0 2px rgba(245,158,11,.26)!important}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-review-global-note{margin:8px 0 10px!important;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important}.plan-review-summary{margin-top:8px!important;padding:8px 10px!important;border-radius:12px!important;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important;font-size:12px!important;font-weight:850!important;line-height:1.35!important}.plan-review-summary strong{color:#7c2d12!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}.ce-plan-income-manager p{margin:8px 0 10px;color:#475569;font-weight:700}.ce-plan-income-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ce-plan-income-scroll{overflow:auto;max-height:360px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}.ce-plan-income-table{width:100%;border-collapse:collapse;font-size:13px}.ce-plan-income-table th,.ce-plan-income-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}.ce-plan-income-table th{position:sticky;top:0;background:#eef6ff;z-index:1;font-weight:950}.ce-plan-income-table small{display:block;color:#64748b;font-weight:800}.ce-plan-income-table input[type=number]{width:86px;max-width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:10px}.ce-plan-income-table tr.excluded{opacity:.48;background:#f8fafc}.ce-plan-income-include{white-space:nowrap}.ce-plan-income-table button.small,.ce-plan-income-toolbar button.small{padding:7px 10px!important;border-radius:10px!important;font-weight:900!important}
       .plan-resource-purchase-subrow input[data-plan-resource-field="compra"]{font-size:15px!important;font-weight:850!important}.plan-advanced-toolbar{display:flex!important;gap:8px!important;flex-wrap:wrap!important;align-items:center!important;margin:10px 0!important;padding:8px!important;border-radius:14px!important;background:#f8fafc!important;border:1px solid #e2e8f0!important}.plan-advanced-toolbar input{min-width:220px!important;flex:1 1 260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-advanced-toolbar button{white-space:nowrap!important}
       .plan-resource-edit-row.plan-sd-rara>td{background:#f8fafc!important;color:#111827!important}.plan-resource-edit-row.plan-sd-rara input,.plan-resource-edit-row.plan-sd-rara select{color:#111827!important}/*ce-hf18-no-black*/@media (max-width: 900px){.plan-resource-split-table{table-layout:auto!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child,.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:auto!important}.plan-resource-subrow{grid-template-columns:1fr 1fr!important}.plan-resource-general-top{grid-template-columns:auto 1fr!important}.plan-resource-split-table thead{display:none!important}.plan-resource-split-table tr,.plan-resource-split-table td{display:block!important;width:100%!important;border-radius:10px!important}}
       .plan-budget-warning{background:#fff7ed!important;border:1px solid #fdba74!important;color:#7c2d12!important}
@@ -2648,11 +2683,13 @@
     const donorOpts = donorOptions().map(d => `<option value="${esc(d.value)}" ${String(d.value)===String(p.donorRef)?'selected':''}>${esc(d.label)}</option>`).join('');
     const ticketOpts = (p.tipo === 'DONACION' ? DONATION_TICKET_OPTIONS : PURCHASE_TICKET_OPTIONS).map(v => `<option value="${esc(v)}" ${String(v)===String(p.ticketDonacion)?'selected':''}>${esc(v || 'Pte.Compra u otros gastos')}</option>`).join('');
     const importe = Number(p.unidades || 0) * Number(p.precio || 0);
+    const needsReview = hasPendingDiagnosticReviewRow(p);
+    const reviewNote = needsReview ? `<div class="plan-review-inline" title="${esc(p.reason || 'Caso pendiente de revisar')}">⚠ REVISAR · viene del diagnóstico naranja y sigue pendiente de decisión.</div>` : '';
     return `
-      <div class="plan-product-card ${p.include ? '' : 'excluded'} ${p.tipo === 'DONACION' ? 'plan-donation-card' : 'plan-purchase-card'}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
+      <div class="plan-product-card ${p.include ? '' : 'excluded'} ${p.tipo === 'DONACION' ? 'plan-donation-card' : 'plan-purchase-card'} ${needsReview ? 'plan-needs-review' : ''}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
         <div class="plan-product-head">
           <label class="plan-include"><input type="checkbox" data-plan-field="include" ${p.include ? 'checked' : ''}/> Incluir</label>
-          <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}</span></div>
+          <div class="plan-product-title"><strong>${esc(p.productName)}</strong><span>${esc(p.segmento)} · ${esc(p.destino)}</span>${reviewNote}</div>
           <span class="plan-confidence alta">${p.tipo === 'DONACION' ? 'Donación' : 'Compra'}</span>
         </div>
         <div class="plan-product-grid replica-grid">
@@ -2752,6 +2789,7 @@
     const selectedProductId = tr.querySelector('[data-plan-resource-field="productId"]')?.value || '';
     const selectedProduct = selectedProductId ? byId('productos', selectedProductId) : null;
     if(changedField === 'productId' && selectedProduct){
+      clearPendingDiagnosticReview(group.allIndices, 'product-selected-in-propuesta-detallada');
       const catalogPrice = ceHf27CatalogPrice(selectedProduct);
       price = Math.max(0, Number(catalogPrice || 0));
       if(priceInput) priceInput.value = String(price);
@@ -2790,6 +2828,9 @@
       include = true;
       const chk = tr.querySelector('[data-plan-resource-field="include"]');
       if(chk) chk.checked = true;
+    }
+    if(changedField === 'include' && !include){
+      clearPendingDiagnosticReview(group.allIndices, 'line-excluded-in-propuesta-detallada');
     }
 
     const newName = selectedProduct?.nombre || group.producto || 'Producto';

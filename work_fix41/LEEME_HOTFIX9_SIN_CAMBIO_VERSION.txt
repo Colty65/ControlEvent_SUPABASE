@@ -1,0 +1,23 @@
+HOTFIX 9 SIN CAMBIO DE VERSION (sigue v16_prod)
+
+Objetivo de este rescate:
+1) Hacer más vistosa y compacta la caja AVANCE del evento.
+2) Tomar la tabla superior editable como fuente única de verdad.
+3) Reflejar arriba/abajo la misma información y mantenerla sincronizada.
+4) Reducir donaciones fantasma muy pequeñas (ej. 0,01) que venían como ruido.
+5) Forzar mejor enlace con PRODUCTOS de catálogo para evitar desajustes por nombres no oficiales.
+
+Cambios aplicados:
+- public/app/features/planificacion-inicial.js
+  - Normalización previa de propuestas de Zuzu.
+  - Resolución automática contra catálogo PRODUCTOS por nombre.
+  - Reagrupación más estricta por producto/segmento/destino.
+  - Ocultación de micro-donaciones fantasma (<= 0,05 unidades, si no son explícitas del prompt).
+  - Reconstrucción del detalle avanzado a partir de la tabla superior editable.
+  - Sincronización arriba/abajo antes de crear el evento real.
+- public/app/features/v15-hotfix7-plan-avance-deficit.js
+  - Caja AVANCE del evento rediseñada: tipografía más pequeña, tarjetas más claras y visuales.
+
+Notas:
+- No cambia la versión visible de la app: permanece v16_prod.
+- Este hotfix intenta eliminar incoherencias entre la vista global y el detalle avanzado.

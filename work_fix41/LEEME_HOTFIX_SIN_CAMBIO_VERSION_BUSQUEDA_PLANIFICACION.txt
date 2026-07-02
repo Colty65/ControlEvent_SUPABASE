@@ -1,0 +1,19 @@
+HOTFIX SIN CAMBIO DE VERSIÓN - ControlEvent v16_prod
+
+No se ha cambiado el número de versión visible, ni INFOEVENTO, ni BACKUP.
+
+Cambios aplicados:
+- Búsqueda COMPRAS/DONACIONES en móvil/iPad: ahora busca primero en el array real de datos del evento y solo usa el DOM para saltar al registro por ID estable.
+- Búsqueda con normalización de texto y evento input compatible con teclados táctiles.
+- Planificación inicial: filas con déficit 0 siguen visibles como excluidas.
+- Edición en planificación: al modificar un registro se ilumina y no se reordena automáticamente.
+- Añadidos botones: Orden tienda y Orden segmento/destino.
+- Producto, tienda y responsable editados por el usuario se respetan en la propuesta.
+- Zuzu no acepta donaciones inventadas: las donaciones no confirmadas pasan a compra/posible donación pendiente.
+- Cálculos de Zuzu ajustados con reglas de coste real: referencias 25 €/persona habitual y 35 €/persona caro.
+- Reglas afinadas para cerveza, cubatas, refrescos de mezcla, paella/gambones y cena/barbacoa.
+
+Pruebas estáticas realizadas:
+- node --check public/app/features/planificacion-inicial.js
+- node --check public/app/features/v10-5-hotfix-busqueda-recarga-compartir.js
+- node --check services/event-ai.service.js

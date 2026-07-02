@@ -1,0 +1,33 @@
+ControlEvent v16_prod - RESCATE ESTABLE
+
+Motivo:
+La cadena de hotfix sobre v10.4.2 introdujo refrescos repetidos, temblores de pantalla, pérdida de foco en buscadores y problemas de arranque/login.
+Esta versión prioriza estabilidad y fluidez sobre la animación de bienvenida.
+
+Cambios principales:
+- Versión cambiada a v16_prod en referencias activas.
+- Desactivado el estabilizador de vistas automático que repintaba varias veces al cambiar de menú o evento.
+- Eliminada la lógica experimental de prelogin/welcome/cohetes que podía dejar la app sin montar o dispararse en el momento incorrecto.
+- El login se muestra directamente desde el inicio, sin logo grande previo de la app.
+- Se conserva Ticket Auto con candidatos:
+  * normal: sin similitud.
+  * rojo: producto similar y misma tienda.
+  * naranja: producto similar pero tienda distinta.
+  * la fila superior IA/manual se pinta con el mismo color que el posible emparejamiento.
+- Se conserva el buscador reforzado de COMPRAS/DONACIONES para que no encuentre la propia caja de búsqueda.
+- Documentos/Ingresos: limpieza de botones de descarga duplicados y conservación de miniaturas.
+
+Archivos tocados de forma deliberada:
+- index.html
+- public/index.html
+- public/app/version.js
+- package.json
+- package-lock.json
+- public/app/features/view-refresh-stabilizer.js
+- public/app/features/v10-4-app-fixes.js
+- public/app/features/v10-4-3-ticketauto-compras.js
+- public/app/features/v10-4-3-app-fixes.js
+
+Notas:
+- No se ha vuelto a tocar la base funcional de datos ni backend.
+- Se evita cualquier setInterval/render automático añadido por los últimos hotfix.

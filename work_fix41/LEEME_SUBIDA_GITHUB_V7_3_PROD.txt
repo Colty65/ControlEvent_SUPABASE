@@ -1,0 +1,8 @@
+ControlEvent v7.3_prod
+Base: v7.2_prod.
+
+Cambios:
+- INFOEVENTO: versión interna normalizada a ControlEvent_v7_3_prod.
+- Salir/Login: salida sin recarga dura para evitar el pico de consumo al volver a entrar.
+- Tras login: selector de evento queda en "Selecciona evento..." y selectedEventId vacío hasta elección del usuario.
+- Se mantiene la visualización de fotos/globos de v7.2.
