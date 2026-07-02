@@ -2452,13 +2452,21 @@
     const norm = normalizeText(raw || '');
     const numFrom = (rx, fallback) => { const m = raw.match(rx); return m ? Number(String(m[1]).replace(',','.')) : (fallback || 0); };
     const days = Math.max(1, numFrom(/duraci[oó]n\s+del\s+evento\s*:\s*(\d+)/i, 0) || (raw.match(/(?:dia|día)\s*[_\- ]*(\d+)/gi) || []).map(x => Number((x.match(/\d+/)||[0])[0])).reduce((a,b)=>Math.max(a,b),0) || Number(fieldValue('planDias') || 1));
-    const asistentes = numFrom(/personas\s+asistentes\s*:\s*(\d+)/i, Number(fieldValue('planPersonas') || 0));
+    const asistentesBase = numFrom(/asistentes\s+base\s*[:=]\s*(\d+)/i, 0) || numFrom(/personas\s+base\s*[:=]\s*(\d+)/i, 0) || numFrom(/personas\s+asistentes\s*:\s*(\d+)/i, Number(fieldValue('planPersonas') || 0));
+    const explicitOpen = numFrom(/consumo\s+abierto\s*[:=]\s*(\d+)/i, 0) || numFrom(/asistentes\s+(?:de\s+)?consumo\s+abierto\s*[:=]\s*(\d+)/i, 0);
+    const openHint = /CONSUMO\s+ABIERTO|PE[NÑ]A[^\n]{0,80}PLAZA|PLAZA[^\n]{0,80}PE[NÑ]A|PASA\s+MUCHA\s+GENTE|GENTE\s+DE\s+PASO|SE\s+(?:LES\s+)?INVITA|EVENTO\s+ABIERTO/.test(norm);
+    const consumoAbierto = explicitOpen || (openHint && asistentesBase ? Math.ceil(asistentesBase * 1.66) : asistentesBase);
+    const consumoAbiertoAplicado = Boolean(explicitOpen || openHint);
+    const asistentes = asistentesBase;
     const cerveza = numFrom(/personas\s+que\s+beber[aá]n\s+cerveza\s*:\s*(\d+)/i, 0);
     const cubatas = numFrom(/personas\s+que\s+tomar[aá]n\s+cubatas\s*:\s*(\d+)/i, 0);
     const cubatasPorPersona = numFrom(/cubatas\s*[:=]\s*(\d+)\s*por\s+persona/i, 0) || numFrom(/(\d+)\s*cubatas\s+por\s+persona/i, 0);
     const cervezasMax = numFrom(/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+)\s*(?:latas|botellines)/i, 0) || numFrom(/(\d+)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i, 0);
     const sinAlcohol = numFrom(/personas\s+sin\s+alcohol[^:\n]*:\s*(\d+)/i, 0);
-    const cenaReal = numFrom(/personas\s+que\s+cenar[aá]n\s+realmente\s*:\s*(\d+)/i, 0) || numFrom(/para\s+unas\s+(\d+)\s+personas/i, 0);
+    const cenaMatch = raw.match(/(?:asistentes\s+)?cena\s+real\s*[:=]\s*(\d+)(?:\s*(?:-|–|a|\/)\s*(\d+))?/i);
+    const cenaMin = cenaMatch ? Number(cenaMatch[1]) : (numFrom(/personas\s+que\s+cenar[aá]n\s+realmente\s*:\s*(\d+)/i, 0) || numFrom(/para\s+unas\s+(\d+)\s+personas/i, 0) || Math.ceil((asistentesBase || 0) / 2));
+    const cenaMax = cenaMatch && cenaMatch[2] ? Number(cenaMatch[2]) : cenaMin;
+    const cenaReal = cenaMax;
     const presupuesto = numFrom(/presupuesto\s+objetivo\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
     const maximo = numFrom(/l[ií]mite\s+m[aá]ximo\s+de\s+coste\s*:\s*(\d+(?:[,.]\d+)?)/i, 0);
     const momentLines = [];
@@ -2484,7 +2492,7 @@
       if(/CENA|CENAR/.test(n)) addMoment(d,'cena',txt);
       if(/CUBATA|COPA/.test(n) && /NOCHE|NOCTURN/.test(n)) addMoment(d,'cubatas noche',txt);
     });
-    return {raw, norm, days, asistentes, cerveza, cubatas, cubatasPorPersona, cervezasMax, sinAlcohol, cenaReal, presupuesto, maximo, momentLines};
+    return {raw, norm, days, asistentes, asistentesBase, consumoAbierto, consumoAbiertoAplicado, cerveza, cubatas, cubatasPorPersona, cervezasMax, sinAlcohol, cenaReal, cenaMin, cenaMax, presupuesto, maximo, momentLines};
   }
   function cePlanFix31BriefHtml(){
     const b = cePlanFix31ExtractPromptBrief();
@@ -2492,7 +2500,7 @@
     const moments = b.momentLines.length ? b.momentLines.map(x => `<li>${esc(x)}</li>`).join('') : '<li>No se han detectado momentos por día; Zuzu deberá proponerlos o pedir datos.</li>';
     return `<section class="ce-hf27-diagnostic ce-fix31-brief">
       <div class="ce-hf27-head"><div><h3>Brief estructurado que se enviará a Gemini</h3><p>ControlEvent extrae esto antes de generar compras: duración, asistentes, momentos, bebida, cena real, presupuesto y donaciones. El botón de abajo ya no usa compra local: llama a Gemini con este brief.</p></div>
-      <div class="ce-hf27-kpis"><span>Días <b>${esc(b.days)}</b></span><span>Asistentes <b>${esc(b.asistentes || '—')}</b></span><span>Cerveza <b>${esc(b.cerveza || '—')}</b></span><span>Cubatas <b>${esc(b.cubatas || '—')}</b></span><span>Donaciones <b>${donCount}</b></span></div></div>
+      <div class="ce-hf27-kpis"><span>Días <b>${esc(b.days)}</b></span><span>Base <b>${esc(b.asistentesBase || b.asistentes || '—')}</b></span><span>Consumo abierto <b>${esc(b.consumoAbiertoAplicado ? b.consumoAbierto : 'NO')}</b></span><span>Cena real <b>${esc(b.cenaMin && b.cenaMax && b.cenaMin !== b.cenaMax ? b.cenaMin + '-' + b.cenaMax : (b.cenaReal || '—'))}</b></span><span>Donaciones <b>${donCount}</b></span></div></div>
       <div style="padding:12px 16px;background:#fff;border-top:1px solid #e5e7eb">
         <p><b>Presupuesto:</b> objetivo ${esc(b.presupuesto || '—')} €/persona · máximo ${esc(b.maximo || '—')} €/persona · <b>sin alcohol/niños:</b> ${esc(b.sinAlcohol || '—')} · <b>cenan realmente:</b> ${esc(b.cenaReal || '—')}</p><p><b>Reglas bebida:</b> cerveza máx. ${esc(b.cervezasMax || '—')} ud/persona/día · cubatas ${esc(b.cubatasPorPersona || '—')} por persona consumidora.</p>
         <ul style="margin:8px 0 0 18px">${moments}</ul>
@@ -4422,7 +4430,7 @@
     const phaseHtml = phaseRows ? `<div class="ce-hf27-tablewrap"><table><thead><tr><th>Fase</th><th>Origen/estado</th><th>Compras</th><th>Donaciones</th><th>Total compra</th><th>Detalle</th></tr></thead><tbody>${phaseRows}</tbody></table></div>` : '';
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX46: fases de cálculo y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX47: consumo abierto, fases y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4437,7 +4445,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX46 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX47 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }

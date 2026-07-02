@@ -1762,7 +1762,8 @@ function planFilterUnrequestedLegacyMenuRowsHf29(rows, form) {
 
 
 function planBudgetGuard(rows, form) {
-  const people = Math.max(1, num(form?.personas) || 25);
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 25);
   const budget = planBudgetFromPrompt(form);
   const maxPer = budget.maximoPorPersona || 35;
   const targetPer = budget.objetivoPorPersona || Math.min(32.5, maxPer);
@@ -1802,7 +1803,8 @@ function planBudgetGuard(rows, form) {
 function planApplyPositiveSaldoFix39(rows, form, state) {
   const out = arr(rows).map(r => ({...r}));
   const budget = planBudgetFromPrompt(form);
-  const people = Math.max(1, num(form?.personas) || 0);
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 0);
   const income = people * num(budget.objetivoPorPersona);
   const notes = [];
   if (!income || income <= 0) return { rows: out, notes };
@@ -1916,7 +1918,8 @@ function planApplyPositiveSaldoFix39(rows, form, state) {
 
 
 function planClampOperationalUnitsFix40(rows, form, state = {}) {
-  const people = Math.max(1, num(form?.personas) || 30);
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 30);
   const days = Math.max(1, num(form?.dias) || 1);
   const out = arr(rows).map(r => ({...r}));
   const maxByPrompt = {
@@ -3029,6 +3032,60 @@ function planPromptNumber(form, patterns, fallback = 0) {
   }
   return fallback;
 }
+
+function planPromptRangeFix47(form, patterns, fallbackMin = 0, fallbackMax = 0) {
+  const raw = planPromptRawText(form);
+  for (const rx of patterns) {
+    const m = raw.match(rx);
+    if (!m) continue;
+    const a = num(m[1]);
+    const b = num(m[2]);
+    if (a > 0 || b > 0) {
+      const min = a > 0 ? a : b;
+      const max = b > 0 ? Math.max(a, b) : min;
+      return { min, max };
+    }
+  }
+  return { min: fallbackMin, max: fallbackMax || fallbackMin };
+}
+function planOpenConsumptionContextFix47(form = {}) {
+  const raw = planPromptRawText(form);
+  const base = planPromptNumber(form, [
+    /asistentes\s+base\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+base\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /(\d+(?:[,.]\d+)?)\s+personas/i
+  ], num(form.personas));
+  const explicitOpen = planPromptNumber(form, [
+    /consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /asistentes\s+(?:de\s+)?consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+(?:de\s+)?consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /equivalentes?\s+(?:de\s+)?consumo\s*[:=]\s*(\d+(?:[,.]\d+)?)/i
+  ], 0);
+  const hasOpenHint = /consumo\s+abierto|pe[nñ]a[^\n]{0,80}plaza|plaza[^\n]{0,80}pe[nñ]a|pasa\s+mucha\s+gente|gente\s+de\s+paso|se\s+(?:les\s+)?invita|se\s+invita\s+a\s+todos|evento\s+abierto/i.test(raw);
+  const derivedOpen = base > 0 ? Math.ceil(base * 1.66) : 0;
+  const consumoAbiertoPersonas = explicitOpen > 0 ? explicitOpen : (hasOpenHint ? derivedOpen : base);
+  const aplicaConsumoAbierto = explicitOpen > 0 || hasOpenHint;
+  const cenaRange = planPromptRangeFix47(form, [
+    /(?:asistentes\s+)?cena\s+real\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i,
+    /personas\s+que\s+cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i,
+    /cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i
+  ], 0, 0);
+  const derivedCena = base > 0 ? Math.ceil(base / 2) : 0;
+  const cenaRealMin = cenaRange.min > 0 ? cenaRange.min : derivedCena;
+  const cenaRealMax = cenaRange.max > 0 ? cenaRange.max : cenaRealMin;
+  return {
+    asistentesBase: base || 0,
+    consumoAbiertoPersonas: consumoAbiertoPersonas || 0,
+    consumoAbiertoCalculado: derivedOpen || 0,
+    aplicaConsumoAbierto,
+    consumoAbiertoOrigen: explicitOpen > 0 ? 'prompt' : (hasOpenHint ? 'formula_66_por_ciento' : 'base'),
+    cenaRealMin: cenaRealMin || 0,
+    cenaRealMax: cenaRealMax || 0,
+    cenaRealOrigen: (cenaRange.min > 0 || cenaRange.max > 0) ? 'prompt' : (derivedCena ? 'base_dividido_entre_2' : 'sin_dato')
+  };
+}
 function planBudgetFromPrompt(form = {}) {
   const objetivo = planPromptNumber(form, [
     /presupuesto\s+objetivo\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i,
@@ -3135,17 +3192,74 @@ function planMomentsFromPrompt(form = {}) {
 function planPromptBriefObject(form = {}, state = {}) {
   const raw = planPromptRawText(form);
   const budget = planBudgetFromPrompt(form);
-  const personas = planPromptNumber(form, [/personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /(\d+(?:[,.]\d+)?)\s+personas/i], num(form.personas));
-  const cenas = planPromptNumber(form, [/personas\s+que\s+cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cena[^\n]{0,80}?(\d+(?:[,.]\d+)?)\s*personas/i], 0);
-  return { versionBrief: 'FIX46_OPCIONES_CALCULO_TRAZA_V1', objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title), duracionDias: planEffectiveDays(form), personasAsistentes: personas || num(form.personas) || 0, presupuestoObjetivoPorPersona: budget.objetivoPorPersona, limiteMaximoPorPersona: budget.maximoPorPersona, temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''), personasCerveza: planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), personasCubatas: planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0), cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0), personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0), personasCenaReal: cenas, horas: { aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''), comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''), tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''), cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '') }, momentosPorDia: planMomentsFromPrompt(form), concepto: { aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']), comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']), tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']), cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas']) }, reglasBebida: ['Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.', 'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.', 'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.', 'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'], reglasComida: ['No multiplicar todos los productos por todos los asistentes.', 'Calcular aperitivos como picoteo compartido si procede.', 'Calcular cenas solo para quienes cenan realmente si el prompt lo indica.', 'Compra = necesidad total - donaciones/existencias confirmadas.'], donacionesDetectadas: planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140) };
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const basePeople = openCtx.asistentesBase || num(form.personas) || 0;
+  const beerDeclared = planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0);
+  const cubataDeclared = planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0);
+  const consumptionOpen = openCtx.consumoAbiertoPersonas || basePeople;
+  const beerCalc = openCtx.aplicaConsumoAbierto ? Math.max(beerDeclared, consumptionOpen) : beerDeclared;
+  const cubataCalc = openCtx.aplicaConsumoAbierto ? Math.max(cubataDeclared, consumptionOpen) : cubataDeclared;
+  return {
+    versionBrief: 'FIX47_CONSUMO_ABIERTO_VARIABLE_V1',
+    objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title),
+    duracionDias: planEffectiveDays(form),
+    personasAsistentes: basePeople,
+    asistentesBase: basePeople,
+    personasConsumoAbierto: consumptionOpen,
+    consumoAbiertoAplicado: openCtx.aplicaConsumoAbierto,
+    consumoAbiertoOrigen: openCtx.consumoAbiertoOrigen,
+    consumoAbiertoCalculado: openCtx.consumoAbiertoCalculado,
+    presupuestoObjetivoPorPersona: budget.objetivoPorPersona,
+    limiteMaximoPorPersona: budget.maximoPorPersona,
+    temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''),
+    personasCervezaDeclaradas: beerDeclared,
+    personasCerveza: beerCalc,
+    personasCubatasDeclaradas: cubataDeclared,
+    personasCubatas: cubataCalc,
+    cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0),
+    cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0),
+    personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0),
+    personasCenaReal: openCtx.cenaRealMax,
+    personasCenaRealMin: openCtx.cenaRealMin,
+    personasCenaRealMax: openCtx.cenaRealMax,
+    cenaRealOrigen: openCtx.cenaRealOrigen,
+    horas: {
+      aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''),
+      comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''),
+      tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''),
+      cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '')
+    },
+    momentosPorDia: planMomentsFromPrompt(form),
+    concepto: {
+      aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']),
+      comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']),
+      tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']),
+      cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas'])
+    },
+    reglasBebida: [
+      'Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.',
+      'Si existe consumo abierto, usar personasConsumoAbierto para cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje.',
+      'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.',
+      'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.',
+      'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'
+    ],
+    reglasComida: [
+      'No multiplicar todos los productos por todos los asistentes.',
+      'Calcular aperitivos como picoteo compartido si procede.',
+      'Calcular cenas solo para quienes cenan realmente si el prompt lo indica; si no, usar asistentesBase/2.',
+      'Compra = necesidad total - donaciones/existencias confirmadas.'
+    ],
+    donacionesDetectadas: planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140)
+  };
 }
 function planPromptBriefText(form = {}, state = {}) {
   const b = planPromptBriefObject(form, state);
   const lines = [];
-  lines.push('BRIEF ESTRUCTURADO DEL EVENTO - ControlEvent FIX45');
-  lines.push(`Duración: ${b.duracionDias} día(s). Asistentes: ${b.personasAsistentes || 'sin dato'}.`);
+  lines.push('BRIEF ESTRUCTURADO DEL EVENTO - ControlEvent FIX47');
+  lines.push(`Duración: ${b.duracionDias} día(s). Asistentes base: ${b.asistentesBase || b.personasAsistentes || 'sin dato'}.`);
+  lines.push(`Consumo abierto: ${b.consumoAbiertoAplicado ? `${b.personasConsumoAbierto} personas (${b.consumoAbiertoOrigen})` : 'no aplicado'}${b.consumoAbiertoCalculado ? ` · fórmula base+66%=${b.consumoAbiertoCalculado}` : ''}.`);
   lines.push(`Bebida: cerveza ${b.personasCerveza || 'sin dato'} personas (${b.cervezasMaxPorPersonaDia || '?'} ud/persona/día si aplica); cubatas ${b.personasCubatas || 'sin dato'} personas (${b.cubatasPorPersonaConsumidora || '?'} por persona si aplica); sin alcohol/niños ${b.personasSinAlcoholNinos || 'sin dato'}.`);
-  if (b.personasCenaReal) lines.push(`Cena real: ${b.personasCenaReal} personas.`);
+  if (b.personasCenaReal) lines.push(`Cena real: ${b.personasCenaRealMin && b.personasCenaRealMin !== b.personasCenaRealMax ? `${b.personasCenaRealMin}-${b.personasCenaRealMax}` : b.personasCenaReal} personas (${b.cenaRealOrigen}).`);
   if (b.presupuestoObjetivoPorPersona || b.limiteMaximoPorPersona) lines.push(`Presupuesto: objetivo ${b.presupuestoObjetivoPorPersona || '?'} €/persona; máximo ${b.limiteMaximoPorPersona || '?'} €/persona.`);
   if (b.temperatura) lines.push(`Temperatura/clima: ${b.temperatura}`);
   lines.push('Momentos detectados:');
@@ -3189,7 +3303,7 @@ function planPromptCompactForGemini33(form = {}) {
   if (!raw) return '';
   const lines = raw.split(/\n/).map(x => trim(x)).filter(Boolean);
   const useful = [];
-  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|presupuesto|l[ií]mite|temperatura|tipo\s+de\s+evento|personas\s+que|sin\s+alcohol|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?)/i;
+  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|asistentes\s+base|consumo\s+abierto|cena\s+real|presupuesto|l[ií]mite|temperatura|tipo\s+de\s+evento|personas\s+que|sin\s+alcohol|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?)/i;
   for (const line of lines) { if (useful.join('\n').length > 3500) break; if (keepRx.test(line) || /^(?:d[ií]a|dia)\s*[_\- ]*\d+/i.test(line)) useful.push(line); }
   const txt = useful.join('\n') || raw.slice(0, 3500);
   return txt.slice(0, 4200);
@@ -3209,7 +3323,7 @@ function planFormattedUserPromptForGemini38(form = {}) {
   const lines = raw.split(/\n/).map(x => trim(x)).filter(Boolean);
   const useful = [];
   let skipProducts = false;
-  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|presupuesto|l[ií]mite|temperatura|coste|personas que|sin alcohol|ni[ñn]os|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?|d[ií]a\s*[_\- ]*\d|donado\s+(?:socio|tienda|otros)|responsable|comprar solo|d[eé]ficit|no inventar|no copiar|cat[aá]logo)/i;
+  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|asistentes\s+base|consumo\s+abierto|cena\s+real|presupuesto|l[ií]mite|temperatura|coste|personas que|sin alcohol|ni[ñn]os|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?|d[ií]a\s*[_\- ]*\d|donado\s+(?:socio|tienda|otros)|responsable|comprar solo|d[eé]ficit|no inventar|no copiar|cat[aá]logo)/i;
   for (const line of lines) {
     if (/^PRODUCTOS\s*:?$/i.test(line)) { skipProducts = true; continue; }
     if (/^(?:Donado|Donaci[oó]n|Pistas|Reglas|Criterios|Datos|Resumen|Objetivo|Fechas|Duraci[oó]n|Asistentes|Presupuesto|L[ií]mite|Temperatura)/i.test(line)) skipProducts = false;
@@ -3233,7 +3347,7 @@ function planContextDirectJsonForGemini38(ctx, form = {}) {
     tienda: trim(p.tienda)
   })).filter(p => p.producto);
   return {
-    versionContexto: 'FIX46_OPCIONES_CALCULO_TRAZA',
+    versionContexto: 'FIX47_CONSUMO_ABIERTO_VARIABLE',
     modo: ctx?.modo,
     instruccionPrincipal: 'Lee el prompt formateado como fuente principal. Las donaciones ya las crea ControlEvent; usa el resumen solo para descontar déficit. Devuelve compras concretas y avisos, no repitas donaciones.',
     evento: {
@@ -3278,7 +3392,7 @@ function planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modul
   const diasOperativos = planEffectiveDays(form);
   const brief = planPromptBriefObject(form, state);
   const donaciones = planDonationRowsForGemini33(form, state);
-  return { __formForGemini38: form, versionContexto: totalMode ? 'FIX46_OPCIONES_CALCULO_TRAZA' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Gemini.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
+  return { __formForGemini38: form, versionContexto: totalMode ? 'FIX47_CONSUMO_ABIERTO_VARIABLE' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Gemini.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
 }
 function planPromptContextForGemini(ctx, totalMode) {
   if (!totalMode) return ctx;
@@ -3322,10 +3436,37 @@ function planCompactCatalogForNeedsFix43(state = {}, form = {}) {
 function planTheoreticalPromptContextFix43(form = {}, state = {}) {
   const brief = planPromptBriefObject(form, state);
   return {
-    versionContexto:'FIX46_OPCIONES_CALCULO_TRAZA',
+    versionContexto:'FIX47_CONSUMO_ABIERTO_VARIABLE',
     tarea:'Devuelve SOLO un array JSON de necesidades teóricas totales; ControlEvent descontará donaciones y calculará el déficit.',
-    evento:{dias:brief.duracionDias, asistentes:brief.personasAsistentes, clima:brief.temperatura, presupuestoPersona:brief.presupuestoObjetivoPorPersona, limitePersona:brief.limiteMaximoPorPersona},
-    consumo:{cervezaPersonas:brief.personasCerveza, cervezaMaxPorPersonaDia:brief.cervezasMaxPorPersonaDia, cubatasPersonas:brief.personasCubatas, cubatasPorPersona:brief.cubatasPorPersonaConsumidora, sinAlcoholNinos:brief.personasSinAlcoholNinos, cenaRealPersonas:brief.personasCenaReal},
+    evento:{
+      dias:brief.duracionDias,
+      asistentesBase:brief.asistentesBase || brief.personasAsistentes,
+      asistentes:brief.personasAsistentes,
+      consumoAbiertoPersonas:brief.personasConsumoAbierto,
+      consumoAbiertoAplicado:brief.consumoAbiertoAplicado,
+      consumoAbiertoOrigen:brief.consumoAbiertoOrigen,
+      cenaRealPersonas:brief.personasCenaReal,
+      cenaRealMin:brief.personasCenaRealMin,
+      cenaRealMax:brief.personasCenaRealMax,
+      clima:brief.temperatura,
+      presupuestoPersona:brief.presupuestoObjetivoPorPersona,
+      limitePersona:brief.limiteMaximoPorPersona
+    },
+    consumo:{
+      cervezaPersonasDeclaradas:brief.personasCervezaDeclaradas,
+      cervezaPersonasCalculo:brief.personasCerveza,
+      cervezaMaxPorPersonaDia:brief.cervezasMaxPorPersonaDia,
+      cubatasPersonasDeclaradas:brief.personasCubatasDeclaradas,
+      cubatasPersonasCalculo:brief.personasCubatas,
+      cubatasPorPersona:brief.cubatasPorPersonaConsumidora,
+      sinAlcoholNinos:brief.personasSinAlcoholNinos,
+      cenaRealPersonas:brief.personasCenaReal
+    },
+    reglasConsumoAbierto:[
+      'Si consumoAbiertoAplicado es true, calcula cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje usando consumoAbiertoPersonas, no asistentesBase.',
+      'La cena/barbacoa se calcula aparte con cenaRealPersonas o rango cenaRealMin-cenaRealMax.',
+      'Si no se indica consumo abierto pero el texto habla de peña en plaza, gente de paso o invitados, ControlEvent usa asistentesBase + 66%.'
+    ],
     momentos:arr(brief.momentosPorDia).slice(0, 14).map(m => `${m.dia} ${m.momento}: ${trim(m.detalle).slice(0,120)}`),
     concepto:planPromptWithoutDonationBlocksFix43(form),
     catalogo:planCompactCatalogForNeedsFix43(state, form),
@@ -3346,12 +3487,14 @@ function planSplitWholeFix45(total, weights) {
 function planLocalTheoreticalNeedsFix44(form = {}) {
   const b = planPromptBriefObject(form, {});
   const days = Math.max(1, num(b.duracionDias) || 1);
-  const people = Math.max(1, num(b.personasAsistentes) || num(form.personas) || 1);
-  const beerPeople = Math.max(0, num(b.personasCerveza));
+  const people = Math.max(1, num(b.asistentesBase || b.personasAsistentes) || num(form.personas) || 1);
+  const openPeople = Math.max(people, num(b.personasConsumoAbierto) || people);
+  const activePeople = b.consumoAbiertoAplicado ? openPeople : people;
+  const beerPeople = Math.max(0, num(b.personasCerveza) || (b.consumoAbiertoAplicado ? activePeople : 0));
   const beerPerDay = Math.max(0, num(b.cervezasMaxPorPersonaDia));
-  const cubataPeople = Math.max(0, num(b.personasCubatas));
+  const cubataPeople = Math.max(0, num(b.personasCubatas) || (b.consumoAbiertoAplicado ? activePeople : 0));
   const cubatasPer = Math.max(0, num(b.cubatasPorPersonaConsumidora));
-  const cenaPeople = Math.max(0, num(b.personasCenaReal) || Math.ceil(people / 2));
+  const cenaPeople = Math.max(0, num(b.personasCenaRealMax || b.personasCenaReal) || Math.ceil(people / 2));
   const hot = /calor|verano|sol/i.test(String(b.temperatura || '') + ' ' + planPromptRawText(form));
   const out = [];
   function add(producto, cantidadTotal, unidad, motivo){
@@ -3384,17 +3527,17 @@ function planLocalTheoreticalNeedsFix44(form = {}) {
     add('FANTA Limon Bote 32 CL', 24, 'ud', 'Refresco de apoyo para mezcla/consumo directo');
     add('HIELO', hot ? 35 : 25, 'bolsas', 'Cubatas, refrescos y conservación con ajuste por calor');
   }
-  add('Garrafa AGUA (5L)', hot ? Math.ceil((people * days * 1.2) / 5) : Math.ceil((people * days * 0.8) / 5), 'garrafas', 'Agua de apoyo por asistentes, días y temperatura');
+  add('Garrafa AGUA (5L)', hot ? Math.ceil((activePeople * days * 1.2) / 5) : Math.ceil((activePeople * days * 0.8) / 5), 'garrafas', 'Agua de apoyo por consumo abierto/base, días y temperatura');
   const raw = planPromptRawText(form);
   if(/chorizo/i.test(raw)) add('Chorizo fresco de asar', Math.max(1, round(cenaPeople * 0.10 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
   if(/lomo/i.test(raw)) add('Lomo fresco', Math.max(1, round(cenaPeople * 0.12 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
   if(/morcilla/i.test(raw)) add('Morcilla', Math.max(1, round(cenaPeople * 0.08 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
   if(/panceta|baicon|bacon/i.test(raw)) add('Panceta', Math.max(1, round(cenaPeople * 0.10 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
   if(/venao|venado/i.test(raw)) add('Venao en salsa', Math.max(2, round(cenaPeople * 0.18, 1)), 'kg', 'Plato indicado en cena, cantidad revisable');
-  if(/aperitivo|picoteo|patatas/i.test(raw)) add('patatas fritas (bolsa grande)', Math.max(4, days * 4), 'bolsas', 'Picoteo compartido para aperitivos');
-  if(/pan|barra|buffet|barbacoa/i.test(raw)) add('PAN (Barra)', Math.max(10, Math.ceil(people * days * 0.5)), 'ud', 'Pan de apoyo para buffet, barbacoa y acompañamientos');
-  add('Vasos de plástico', Math.max(100, Math.ceil((people * days * 4) / 50) * 50), 'ud', 'Vasos para bebida/cubatas');
-  add('Platos desechables', Math.max(50, Math.ceil((people * Math.min(days,3) * 1.5) / 50) * 50), 'ud', 'Platos para comidas/cenas');
+  if(/aperitivo|picoteo|patatas/i.test(raw)) add('patatas fritas (bolsa grande)', Math.max(4, Math.ceil(activePeople / 12) * days), 'bolsas', 'Picoteo compartido calculado con consumo abierto/base');
+  if(/pan|barra|buffet|barbacoa/i.test(raw)) add('PAN (Barra)', Math.max(10, Math.ceil(people * days * 0.55)), 'ud', 'Pan de apoyo calculado con asistentes base: 0,55 barras/persona/día');
+  add('Vasos de plástico', Math.max(100, Math.ceil((activePeople * days * 4) / 50) * 50), 'ud', 'Vasos para bebida/cubatas calculados con consumo abierto/base');
+  add('Platos desechables', Math.max(50, Math.ceil((Math.max(activePeople, cenaPeople) * Math.min(days,3) * 1.5) / 50) * 50), 'ud', 'Platos para comidas/cenas con consumo abierto y cena real');
   add('Servilletas', Math.max(2, days), 'paquetes', 'Servicio de comidas y aperitivos');
   add('Bolsas Basura Grandes 240L', Math.max(1, days), 'rollos', 'Infraestructura básica del local');
   return out.slice(0, 28);
@@ -3405,7 +3548,7 @@ function planMergeTheoreticalNeedsFix44(parsed, form = {}) {
   const seen = new Set(list.map(x => planFamilyFix43(x?.producto || x?.PRODUCTO || x?.product || x?.nombre || '')).filter(Boolean));
   for(const n of planLocalTheoreticalNeedsFix44(form)){
     const fam = planFamilyFix43(n.producto);
-    if(fam && !seen.has(fam)){ list.push({...n, motivo: trim(n.motivo || '') + ' · añadido por ControlEvent FIX45 porque Gemini no entregó esta familia.'}); seen.add(fam); }
+    if(fam && !seen.has(fam)){ list.push({...n, motivo: trim(n.motivo || '') + ' · añadido por ControlEvent FIX47 porque Gemini no entregó esta familia.'}); seen.add(fam); }
   }
   out.necesidadesTeoricas = list.slice(0, 28);
   out.__ceFix44MergedLocalNeeds = true;
@@ -3440,7 +3583,7 @@ function planRowsFromLocalTheoreticalNeedsFix44(form = {}, state = {}, explicitD
   return {
     rows: matched,
     menuResumen: planCompleteMenuResumen([], form),
-    notes: ['ControlEvent FIX45 ha completado necesidades teóricas por cálculo local porque Gemini no devolvió un JSON completo. Se usan datos del prompt: días, asistentes, cerveza, cubatas, calor, cenas reales, comida indicada e infraestructura básica.']
+    notes: ['ControlEvent FIX47 ha completado necesidades teóricas por cálculo local porque Gemini no devolvió un JSON completo. Se usan datos del prompt: días, asistentes, cerveza, cubatas, calor, cenas reales, comida indicada e infraestructura básica.']
   };
 }
 function planDirectDonationType38(value) {
@@ -3604,7 +3747,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
   const context = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
   const contextPrompt = planPromptContextForGemini(context, trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL');
   const trace = {
-    version: 'FIX46_OPCIONES_CALCULO_TRAZA',
+    version: 'FIX47_CONSUMO_ABIERTO_VARIABLE',
     startedAt: new Date(started).toISOString(),
     mode: trim(form?.mode),
     promptChars: promptText.length,
@@ -3612,6 +3755,9 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
       diasOperativos: context?.eventoNuevo?.diasOperativos,
       diasDetectadosPrompt: context?.eventoNuevo?.diasDetectadosPrompt,
       asistentes: context?.briefEvento?.personasAsistentes,
+      consumoAbierto: context?.briefEvento?.personasConsumoAbierto,
+      consumoAbiertoAplicado: context?.briefEvento?.consumoAbiertoAplicado,
+      cenaReal: context?.briefEvento?.personasCenaReal,
       momentos: arr(context?.briefEvento?.momentosPorDia).length,
       donacionesDetectadas: arr(context?.existenciasYDonacionesExplicitas).length,
       productosCatalogoEntregados: arr(contextPrompt?.productosCatalogo).length || arr(contextPrompt?.catalogoIndicativo).length || contextPrompt?.catalogos?.productosEntregadosGemini || context?.catalogos?.productosEntregadosGemini,
@@ -4108,7 +4254,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     totalCompras: round(planCompraTotal(rows), 2),
     ...extra
   });
-  phaseDetailsFix46.push({ fase:'Opciones', origen:'ControlEvent', compras:'', donaciones:'', totalCompras:null, detalle:`Ajuste saldo: ${planOptionsFix46.ajusteSaldo ? 'ACTIVO' : 'NO'} · Topes producto: ${planOptionsFix46.topesProducto ? 'ACTIVOS' : 'NO'}` });
+  phaseDetailsFix46.push({ fase:'Opciones', origen:'ControlEvent', compras:'', donaciones:'', totalCompras:null, detalle:`Ajuste saldo: ${planOptionsFix46.ajusteSaldo ? 'ACTIVO' : 'NO'} · Topes producto: ${planOptionsFix46.topesProducto ? 'ACTIVOS' : 'NO'} · Base ${planOpenConsumptionContextFix47(form).asistentesBase || '—'} · Consumo abierto ${planOpenConsumptionContextFix47(form).aplicaConsumoAbierto ? planOpenConsumptionContextFix47(form).consumoAbiertoPersonas : 'NO'} · Cena real ${planOpenConsumptionContextFix47(form).cenaRealMin && planOpenConsumptionContextFix47(form).cenaRealMax && planOpenConsumptionContextFix47(form).cenaRealMin !== planOpenConsumptionContextFix47(form).cenaRealMax ? planOpenConsumptionContextFix47(form).cenaRealMin + '-' + planOpenConsumptionContextFix47(form).cenaRealMax : (planOpenConsumptionContextFix47(form).cenaRealMax || '—')}` });
   const sourceEvent = planEventById(state, modelEventId);
   if ((m === 'REPLICA' || m === 'ZUZU_PARCIAL') && !sourceEvent) {
     const err = new Error('Debes elegir un Evento modelo finalizado para este modo de planificación.');
@@ -4116,7 +4262,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   let baseRows = (m === 'ZUZU_TOTAL') ? [] : planRowsForEvent(state, modelEventId, modules);
   const sourceAtt = sourceEvent ? planAttendeesForEvent(state, sourceEvent.id) : 0;
-  const targetAtt = num(personas) || sourceAtt || 30;
+  const targetAtt = num(planOpenConsumptionContextFix47(form).asistentesBase) || num(personas) || sourceAtt || 30;
   const sourceDays = sourceEvent ? Math.max(1, 1) : 1;
   const targetDays = Math.max(1, num(form.dias) || 1);
   if (m === 'ZUZU_PARCIAL' && sourceAtt > 0) baseRows = planScaleRows(baseRows, Math.max(0.1, (targetAtt / sourceAtt) * Math.sqrt(targetDays / sourceDays)), defaultStoreId, defaultResponsibleId);
@@ -4137,7 +4283,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('FIX46_OPCIONES_CALCULO_TRAZA activo: ControlEvent extrae y crea localmente las donaciones/existencias; Gemini devuelve solo necesidades teóricas totales y ControlEvent calcula el déficit real.');
+    aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: ControlEvent extrae y crea localmente las donaciones/existencias; Gemini devuelve solo necesidades teóricas totales y ControlEvent calcula el déficit real.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), 34000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
@@ -4180,7 +4326,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       }
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX46_OPCIONES_CALCULO_TRAZA activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 34000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
@@ -4231,7 +4377,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       phaseSnapshotFix46('3. Topes de producto', rowsOut, { origen:'ControlEvent', estado:'NO APLICADO', detalle:'Se conserva el déficit base sin recortar por topes operativos.' });
     }
     if (m === 'ZUZU_TOTAL') {
-      aiNotes.push('FIX46_OPCIONES_CALCULO activo: Gemini/ControlEvent generan necesidad base; el usuario decide si aplica ajuste por saldo y/o topes de producto.');
+      aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: Gemini/ControlEvent generan necesidad base; el usuario decide si aplica ajuste por saldo y/o topes de producto.');
     }
     if (!aiMenuResumen.length) aiMenuResumen = planCompleteMenuResumen([], form);
     const budgetNotes = [];
@@ -4266,7 +4412,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v17_prod_FIX46_OPCIONES_CALCULO_TRAZA',
+    version: 'v17_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
     provider: aiProvider,
     model: aiModel,
     mode: m,
@@ -4278,7 +4424,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     menuResumen: aiMenuResumen,
     briefEvento: planPromptBriefObject(form, state),
     debugPlanificacion: {
-      ...(aiTrace || { version:'FIX46_OPCIONES_CALCULO_TRAZA', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
+      ...(aiTrace || { version:'FIX47_CONSUMO_ABIERTO_VARIABLE', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
       phaseDetails: phaseDetailsFix46,
       opcionesCalculo: planOptionsFix46,
       finalCounts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length },

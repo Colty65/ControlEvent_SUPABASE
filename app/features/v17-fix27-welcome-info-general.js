@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod FIX46_OPCIONES_CALCULO_TRAZA
+/* ControlEvent v17_prod FIX47_CONSUMO_ABIERTO_VARIABLE
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Bienvenida sin evento en cualquier dispositivo: ColtyLAB muestra ficha informativa en vez de avance vacío. */
 (function(){
@@ -8,7 +8,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v17_prod_FIX46_OPCIONES_CALCULO_TRAZA';
+  const VERSION_LABEL = 'v17_prod_FIX47_CONSUMO_ABIERTO_VARIABLE';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
