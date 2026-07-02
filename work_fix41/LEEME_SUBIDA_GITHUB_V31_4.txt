@@ -1,6 +1,0 @@
-ControlEvent v16_prod
-
-Subir todo el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
-Especialmente importante: package.json, package-lock.json, public/index.html, public/sw.js y public/app/features/*.js.
-
-Esta versión corrige el package.json corrupto detectado por Vercel y añade control de duplicados en PERSONAS, EVENTOS, TIENDAS y PRODUCTOS.

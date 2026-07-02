@@ -858,6 +858,35 @@
       row.__ceDiagnosticResolvedAt = new Date().toISOString();
     });
   }
+  function markPlanDiagnosticReviewedByIndex(idx, reason){
+    const n = Number(idx);
+    if(!Number.isFinite(n) || n < 0) return false;
+    clearPendingDiagnosticReview([n], reason || 'usuario-dar-por-revisado');
+    return true;
+  }
+  function markPlanDiagnosticReviewedByKey(key, reason){
+    const group = productGroupFromKey(key);
+    if(!group) return false;
+    const ids = [...(group.allIndices || []), ...(group.donationIndices || []), ...(group.purchaseIndices || [])];
+    clearPendingDiagnosticReview([...new Set(ids)], reason || 'usuario-dar-por-revisado');
+    return true;
+  }
+  function bindPlanDiagnosticReviewButtons(root){
+    const scope = root || document;
+    scope.querySelectorAll('[data-plan-review-clear-index],[data-plan-review-clear-key]').forEach(btn => {
+      if(btn.__ceReviewClearBound) return;
+      btn.__ceReviewClearBound = true;
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const idx = btn.getAttribute('data-plan-review-clear-index');
+        const key = btn.getAttribute('data-plan-review-clear-key');
+        if(idx !== null && idx !== '') markPlanDiagnosticReviewedByIndex(idx);
+        if(key) markPlanDiagnosticReviewedByKey(key);
+        renderProposal();
+      });
+    });
+  }
   function planResourceRows(proposals){
     const map = new Map();
     const donationQuotaUsed = new Map();
@@ -1019,6 +1048,7 @@
         <span class="plan-resource-donation-badge ${d.needsReview ? 'plan-resource-donation-badge-review' : ''}" title="${esc(d.diagnosticReason || 'Caso pendiente de revisar')}">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}${reviewText}</span>
         <label>Donante<select data-plan-resource-field="donorRef" data-plan-proposal-index="${esc(d.idx)}">${donorOpts(d.donorRef)}</select></label>
         <label>Responsable<select data-plan-resource-field="donationResponsableId" data-plan-proposal-index="${esc(d.idx)}">${respOpts(d.responsableId, '-- responsable donación --')}</select></label>
+        ${d.needsReview ? `<button type="button" class="plan-review-clear-btn" data-plan-review-clear-index="${esc(d.idx)}">Dar por revisado</button>` : ''}
       </div>`;
     }).join('');
     const purchaseRow = (r, buyBase, price) => buyBase > 0 ? `<div class="plan-resource-subrow plan-resource-purchase-subrow">
@@ -1037,7 +1067,7 @@
       const donations = donationRows(r);
       const purchase = purchaseRow(r, buyBase, price);
       const empty = (!donations && !purchase) ? '<div class="plan-resource-empty-flow">Sin donación ni compra prevista.</div>' : '';
-      const reviewSummary = needsReview ? `<div class="plan-review-summary" title="${esc((r.reviewLines || []).map(x => x.diagnosticReason || '').filter(Boolean).join(' · ') || 'Caso pendiente de revisar')}"><strong>⚠ Atención:</strong> ${esc(r.reviewCount)} caso(s) marcado(s) como <b>REVISAR</b> en el diagnóstico. Esta ficha queda resaltada hasta que tomes una decisión.</div>` : '';
+      const reviewSummary = needsReview ? `<div class="plan-review-summary" title="${esc((r.reviewLines || []).map(x => x.diagnosticReason || '').filter(Boolean).join(' · ') || 'Caso pendiente de revisar')}"><span><strong>⚠ Atención:</strong> ${esc(r.reviewCount)} caso(s) marcado(s) como <b>REVISAR</b> en el diagnóstico. Esta ficha queda resaltada hasta que tomes una decisión.</span><button type="button" class="plan-review-clear-btn" data-plan-review-clear-key="${esc(r.key)}">Dar por revisado</button></div>` : '';
       return `<tr class="${rowClass}" data-plan-resource-key="${esc(r.key)}" data-plan-product-name="${esc(normalizeText(r.producto))}">
         <td class="plan-resource-general">
           <div class="plan-resource-general-top">
@@ -1074,7 +1104,7 @@
       .plan-resource-title{gap:12px!important;align-items:flex-start!important}.plan-resource-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.plan-resource-order-actions input{min-width:190px!important;max-width:260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-resource-order-actions button{white-space:nowrap}.plan-resource-order-actions button.active,.plan-resource-order-actions button.plan-order-active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;box-shadow:0 0 0 3px rgba(15,23,42,.16)!important}.plan-resource-order-actions button.active{background:#dbeafe!important;border-color:#2563eb!important;color:#0f172a!important;box-shadow:0 0 0 2px rgba(37,99,235,.16) inset!important}
       .plan-resource-split-table{table-layout:fixed!important;width:100%!important}.plan-resource-split-table th:first-child,.plan-resource-split-table td:first-child{width:30%!important}.plan-resource-split-table th:last-child,.plan-resource-split-table td:last-child{width:70%!important}
       .plan-resource-general{vertical-align:top!important;padding:10px!important}.plan-resource-general-top{display:grid!important;grid-template-columns:auto minmax(82px,105px)!important;gap:10px!important;align-items:center!important;margin-bottom:8px!important}.plan-include-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;border-radius:14px!important;background:rgba(255,255,255,.84)!important;border:2px solid rgba(17,24,39,.25)!important}.plan-include-icon input{width:22px!important;height:22px!important}.plan-include-icon span{display:none!important}.plan-need-large{display:grid!important;gap:3px!important;font-size:11px!important;font-weight:950!important;text-transform:uppercase!important;color:#111827!important}.plan-need-large input{font-size:20px!important;font-weight:950!important;text-align:center!important;padding:7px 8px!important;border-radius:12px!important;max-width:105px!important}.plan-resource-product-label{display:block!important;font-size:16px!important;line-height:1.2!important;margin:7px 0 4px!important}.plan-resource-meta{display:grid!important;gap:2px!important;margin-top:6px!important;color:#334155!important}.plan-resource-meta b{font-size:10px!important;letter-spacing:.06em!important}.plan-resource-meta span{font-size:12px!important;font-weight:850!important}
-      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-subrow.plan-needs-review{box-shadow:0 0 0 3px rgba(245,158,11,.80)!important;background:#fff7ed!important;border-color:#f59e0b!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-donation-badge-review{display:grid!important;gap:1px!important;background:#b45309!important;line-height:1.05!important}.plan-resource-donation-badge-review small{display:block!important;font-size:10px!important;font-weight:950!important;color:#fff!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
+      .plan-resource-flow{vertical-align:top!important;padding:8px!important}.plan-resource-subrow{display:grid!important;grid-template-columns:62px 76px 88px minmax(118px,150px) minmax(190px,1.6fr) minmax(190px,1.6fr)!important;gap:7px!important;align-items:end!important;margin:4px 0!important;padding:8px!important;border-radius:14px!important;border:1px solid rgba(17,24,39,.14)!important;background:rgba(255,255,255,.8)!important}.plan-resource-subrow label{display:grid!important;gap:3px!important;font-size:10px!important;font-weight:950!important;text-transform:uppercase!important;color:#334155!important}.plan-resource-subrow input,.plan-resource-subrow select{width:100%!important;min-width:0!important;padding:7px 8px!important;border-radius:10px!important}.plan-resource-mini{display:grid!important;gap:3px!important;font-size:10px!important;text-transform:uppercase!important;font-weight:950!important;color:#334155!important}.plan-resource-mini strong{font-size:13px!important;color:#111827!important}.plan-resource-donation-subrow{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-resource-subrow.plan-needs-review{box-shadow:0 0 0 3px rgba(245,158,11,.80)!important;background:#fff7ed!important;border-color:#f59e0b!important}.plan-review-clear-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:4px!important;padding:7px 10px!important;border-radius:999px!important;border:1px solid #92400e!important;background:#fff!important;color:#92400e!important;font-size:11px!important;font-weight:950!important;cursor:pointer!important;white-space:nowrap!important}.plan-review-clear-btn:hover{background:#fffbeb!important}.plan-review-clear-btn.mini{padding:4px 8px!important;font-size:10px!important;margin-left:8px!important}.plan-review-summary{display:flex!important;gap:8px!important;align-items:center!important;justify-content:space-between!important}.plan-review-inline{display:flex!important;gap:6px!important;align-items:center!important;justify-content:space-between!important}.plan-resource-purchase-subrow{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important;grid-template-columns:86px 78px 94px minmax(210px,1.5fr) minmax(200px,1.4fr)!important}.plan-resource-donation-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:35px!important;padding:5px 8px!important;border-radius:999px!important;background:#d97706!important;color:#fff!important;font-size:11px!important;font-weight:950!important;text-align:center!important}.plan-resource-donation-badge-review{display:grid!important;gap:1px!important;background:#b45309!important;line-height:1.05!important}.plan-resource-donation-badge-review small{display:block!important;font-size:10px!important;font-weight:950!important;color:#fff!important}.plan-resource-empty-flow{font-weight:900;color:#64748b;padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:rgba(255,255,255,.65)}
       .plan-product-card{padding:7px 8px!important;border-radius:12px!important}.plan-product-head{margin-bottom:4px!important;gap:7px!important}.plan-product-title strong{font-size:14px!important;line-height:1.05!important}.plan-product-title span{font-size:11px!important;line-height:1.05!important}.plan-review-inline{margin-top:4px!important;padding:4px 8px!important;border-radius:999px!important;background:#fff7ed!important;border:1px solid #f59e0b!important;color:#9a3412!important;font-size:11px!important;font-weight:950!important;line-height:1.15!important}.plan-confidence{padding:2px 6px!important;font-size:11px!important}.plan-include{font-size:12px!important}.plan-product-grid.replica-grid{display:grid!important;grid-template-columns:repeat(6,minmax(95px,1fr))!important;gap:6px!important}.plan-product-grid.replica-grid .field{gap:2px!important}.plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}.plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}.plan-reason{display:none!important}.plan-product-card.plan-donation-card{background:#fbbf24!important;border-color:#d97706!important;color:#111827!important}.plan-product-card.plan-purchase-card{background:#fca5a5!important;border-color:#f87171!important;color:#111827!important}.plan-product-card.plan-needs-review{box-shadow:0 0 0 4px rgba(245,158,11,.88)!important;border:2px solid #f59e0b!important;background:#fff7ed!important}.plan-product-card.plan-donation-card strong,.plan-product-card.plan-donation-card span,.plan-product-card.plan-donation-card label,.plan-product-card.plan-donation-card .plan-reason{color:#111827!important}.plan-product-card.plan-purchase-card strong,.plan-product-card.plan-purchase-card span,.plan-product-card.plan-purchase-card label,.plan-product-card.plan-purchase-card .plan-reason{color:#111827!important}.plan-product-card.plan-donation-card input,.plan-product-card.plan-donation-card select,.plan-product-card.plan-purchase-card input,.plan-product-card.plan-purchase-card select{background:#fff!important;color:#111827!important}.plan-product-card.plan-donation-card .plan-confidence{background:rgba(255,255,255,.35)!important;color:#111827!important;border-color:rgba(17,24,39,.18)!important}.plan-product-card.plan-purchase-card .plan-confidence{background:rgba(255,255,255,.45)!important;color:#111827!important;border-color:rgba(17,24,39,.20)!important}
       .plan-resource-edit-table{border-collapse:separate!important;border-spacing:0 4px!important}.plan-resource-edit-row>td{border-top:2px solid rgba(17,24,39,.72)!important;border-bottom:2px solid rgba(17,24,39,.72)!important}.plan-resource-edit-row>td:first-child{border-left:2px solid rgba(17,24,39,.72)!important;border-radius:10px 0 0 10px}.plan-resource-edit-row>td:last-child{border-right:2px solid rgba(17,24,39,.72)!important;border-radius:0 10px 10px 0}.plan-resource-edit-row.plan-review-pending>td{border-color:#f59e0b!important;box-shadow:inset 0 0 0 2px rgba(245,158,11,.26)!important}.plan-resource-edit-row.plan-row-changed>td{border-color:#92400e!important}.plan-review-global-note{margin:8px 0 10px!important;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important}.plan-review-summary{margin-top:8px!important;padding:8px 10px!important;border-radius:12px!important;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important;font-size:12px!important;font-weight:850!important;line-height:1.35!important}.plan-review-summary strong{color:#7c2d12!important}.plan-factory-indicator{display:flex!important;align-items:center!important;gap:12px!important;margin:10px 0 14px!important;padding:12px 14px!important;border-radius:18px!important;background:linear-gradient(135deg,#fff7ed,#fffbeb)!important;border:1px solid #fdba74!important;color:#7c2d12!important;box-shadow:0 10px 22px rgba(245,158,11,.15)!important}.plan-factory-indicator strong{display:block!important;font-size:15px!important}.plan-factory-indicator small{display:block!important;margin-top:2px!important;color:#9a3412!important;font-weight:700!important}.plan-factory-icon{font-size:28px!important;animation:cePlanPartyBounce 1.2s ease-in-out infinite}.plan-factory-dots{display:inline-flex!important;gap:6px!important;margin-left:auto!important;align-self:center!important}.plan-factory-dots i{display:block!important;width:9px!important;height:9px!important;border-radius:999px!important;background:#f59e0b!important;animation:cePlanPartyPulse 1s ease-in-out infinite}.plan-factory-dots i:nth-child(2){animation-delay:.18s}.plan-factory-dots i:nth-child(3){animation-delay:.36s}@keyframes cePlanPartyBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes cePlanPartyPulse{0%,100%{transform:scale(.7);opacity:.45}50%{transform:scale(1);opacity:1}}.ce-plan-income-manager p{margin:8px 0 10px;color:#475569;font-weight:700}.ce-plan-income-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ce-plan-income-scroll{overflow:auto;max-height:360px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}.ce-plan-income-table{width:100%;border-collapse:collapse;font-size:13px}.ce-plan-income-table th,.ce-plan-income-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}.ce-plan-income-table th{position:sticky;top:0;background:#eef6ff;z-index:1;font-weight:950}.ce-plan-income-table small{display:block;color:#64748b;font-weight:800}.ce-plan-income-table input[type=number]{width:86px;max-width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:10px}.ce-plan-income-table tr.excluded{opacity:.48;background:#f8fafc}.ce-plan-income-include{white-space:nowrap}.ce-plan-income-table button.small,.ce-plan-income-toolbar button.small{padding:7px 10px!important;border-radius:10px!important;font-weight:900!important}
       .plan-resource-purchase-subrow input[data-plan-resource-field="compra"]{font-size:15px!important;font-weight:850!important}.plan-advanced-toolbar{display:flex!important;gap:8px!important;flex-wrap:wrap!important;align-items:center!important;margin:10px 0!important;padding:8px!important;border-radius:14px!important;background:#f8fafc!important;border:1px solid #e2e8f0!important}.plan-advanced-toolbar input{min-width:220px!important;flex:1 1 260px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #cbd5e1!important}.plan-advanced-toolbar button{white-space:nowrap!important}
@@ -2620,7 +2650,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX41_GEMINI_COMPRAS_UI_PROPORCIONAL: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -2684,7 +2714,7 @@
     const ticketOpts = (p.tipo === 'DONACION' ? DONATION_TICKET_OPTIONS : PURCHASE_TICKET_OPTIONS).map(v => `<option value="${esc(v)}" ${String(v)===String(p.ticketDonacion)?'selected':''}>${esc(v || 'Pte.Compra u otros gastos')}</option>`).join('');
     const importe = Number(p.unidades || 0) * Number(p.precio || 0);
     const needsReview = hasPendingDiagnosticReviewRow(p);
-    const reviewNote = needsReview ? `<div class="plan-review-inline" title="${esc(p.reason || 'Caso pendiente de revisar')}">⚠ REVISAR · viene del diagnóstico naranja y sigue pendiente de decisión.</div>` : '';
+    const reviewNote = needsReview ? `<div class="plan-review-inline" title="${esc(p.reason || 'Caso pendiente de revisar')}"><span>⚠ REVISAR · viene del diagnóstico naranja y sigue pendiente de decisión.</span><button type="button" class="plan-review-clear-btn mini" data-plan-review-clear-index="${esc(index)}">Dar por revisado</button></div>` : '';
     return `
       <div class="plan-product-card ${p.include ? '' : 'excluded'} ${p.tipo === 'DONACION' ? 'plan-donation-card' : 'plan-purchase-card'} ${needsReview ? 'plan-needs-review' : ''}" data-plan-index="${index}" data-plan-product-name="${esc(normalizeText(p.productName))}">
         <div class="plan-product-head">
@@ -2707,6 +2737,7 @@
   }
   function bindAdvancedProposalControls(root){
     const scope = root || document.getElementById('planProposalList') || document;
+    bindPlanDiagnosticReviewButtons(scope);
     scope.querySelectorAll('[data-plan-index]').forEach(card => {
       if(card.__cePlanAdvancedBound) return;
       card.__cePlanAdvancedBound = true;
@@ -3134,6 +3165,7 @@
     bindAdvancedProposalControls(box);
     ceHf27BindDiagnostics(box);
     bindIncomeProposalControls(box);
+    bindPlanDiagnosticReviewButtons(box);
     box.querySelectorAll('.plan-resource-edit-row').forEach(tr => {
       const key = tr.dataset.planResourceKey || '';
       tr.querySelectorAll('[data-plan-resource-field]').forEach(input => {
@@ -4282,7 +4314,7 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX41_GEMINI_COMPRAS_UI_PROPORCIONAL: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -4313,7 +4345,7 @@
     };
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX41: donaciones locales + Gemini compras</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX43: necesidades teóricas + déficit local</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4327,7 +4359,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX41 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX43 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4391,7 +4423,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX41_GEMINI_COMPRAS_UI_PROPORCIONAL: no se filtra la propuesta de Gemini.
+        // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{

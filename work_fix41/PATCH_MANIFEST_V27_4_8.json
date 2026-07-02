@@ -1,9 +1,0 @@
-{
-  "version": "v27.4.8",
-  "purpose": "Desactivar descargas standalone RESUMEN/GRAFICAS porque la fuente fiable es INFOEVENTO.",
-  "indexHtmlLines": 447,
-  "notes": [
-    "INFOEVENTO no se toca funcionalmente",
-    "downloadStandalone devuelve disabled:true y no genera libros incorrectos"
-  ]
-}

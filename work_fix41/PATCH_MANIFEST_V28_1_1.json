@@ -1,9 +1,0 @@
-{
-  "version": "v28.1.1",
-  "base": "v28.1",
-  "description": "Correccion guardado /api/state por claves duplicadas, sin tocar INFOEVENTO ni BACKUP.",
-  "delete_old_files": [
-    "public/app/legacy/legacy-bundle-before-modules-v28.1.js",
-    "public/app/legacy/legacy-bundle-after-modules-v28.1.js"
-  ]
-}
