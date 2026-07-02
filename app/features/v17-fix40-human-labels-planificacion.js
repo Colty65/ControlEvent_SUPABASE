@@ -1,10 +1,10 @@
-/* ControlEvent v17_prod FIX40
+/* ControlEvent v17_prod FIX41
    - Traduce en pantalla P-id... y T-id... a nombres humanos en Compras/Donaciones.
    - Solo visual: no toca datos ni BD. */
 (function(){
   'use strict';
-  if(window.__ceFix40HumanLabels) return;
-  window.__ceFix40HumanLabels = true;
+  if(window.__ceFix41HumanLabels) return;
+  window.__ceFix41HumanLabels = true;
   function app(){ return window.ControlEventApp || window.ControlEventRuntime?.app || null; }
   function st(){ return app()?.state || window.state || {}; }
   function arr(name){ const v = st()[name]; return Array.isArray(v) ? v : []; }
@@ -26,8 +26,8 @@
     });
   }
   function walk(root){
-    if(!root || root.__ceFix40Walking) return;
-    root.__ceFix40Walking = true;
+    if(!root || root.__ceFix41Walking) return;
+    root.__ceFix41Walking = true;
     try{
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
         acceptNode(node){
@@ -42,7 +42,7 @@
         if(next !== node.nodeValue) node.nodeValue = next;
       });
     }catch(_){ }
-    finally{ root.__ceFix40Walking = false; }
+    finally{ root.__ceFix41Walking = false; }
   }
   function run(){
     ['tabDonaciones','tabCompras','tabPlanificacionInicial','planificacionResultado'].forEach(id => {
