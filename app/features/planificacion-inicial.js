@@ -850,19 +850,35 @@
     return !!row && String(row.__ceDiagnosticStatus || '').toUpperCase() === 'REVISAR' && row.__ceDiagnosticResolved !== true;
   }
   function clearPendingDiagnosticReview(indices, reason){
+    let changed = false;
     (Array.isArray(indices) ? indices : []).forEach(idx => {
       const row = lastProposal[idx];
-      if(!hasPendingDiagnosticReviewRow(row)) return;
-      row.__ceDiagnosticResolved = true;
-      row.__ceDiagnosticResolutionReason = reason || 'manual-review';
-      row.__ceDiagnosticResolvedAt = new Date().toISOString();
+      if(!row) return;
+      if(String(row.__ceDiagnosticStatus || '').toUpperCase() === 'REVISAR'){
+        row.__ceDiagnosticResolved = true;
+        row.__ceDiagnosticStatus = 'REVISADO';
+        row.__ceDiagnosticResolutionReason = reason || 'manual-review';
+        row.__ceDiagnosticResolvedAt = new Date().toISOString();
+        row.reason = String(row.reason || '').replace(/\bREVISAR\b/gi, 'REVISADO');
+        changed = true;
+      }
     });
+    return changed;
   }
   function markPlanDiagnosticReviewedByIndex(idx, reason){
     const n = Number(idx);
     if(!Number.isFinite(n) || n < 0) return false;
-    clearPendingDiagnosticReview([n], reason || 'usuario-dar-por-revisado');
-    return true;
+    const row = lastProposal[n];
+    const ids = [n];
+    const pid = String(row?.productId || '').trim();
+    const pname = normalizeText(row?.productName || '');
+    // FIX44: si la misma línea aparece agrupada en dos paneles, se revisan todas sus copias equivalentes.
+    lastProposal.forEach((r, i) => {
+      if(!r || i === n) return;
+      if(pid && String(r.productId || '').trim() === pid) ids.push(i);
+      else if(pname && normalizeText(r.productName || '') === pname) ids.push(i);
+    });
+    return clearPendingDiagnosticReview([...new Set(ids)], reason || 'usuario-dar-por-revisado');
   }
   function markPlanDiagnosticReviewedByKey(key, reason){
     const group = productGroupFromKey(key);
@@ -873,19 +889,22 @@
   }
   function bindPlanDiagnosticReviewButtons(root){
     const scope = root || document;
-    scope.querySelectorAll('[data-plan-review-clear-index],[data-plan-review-clear-key]').forEach(btn => {
-      if(btn.__ceReviewClearBound) return;
-      btn.__ceReviewClearBound = true;
-      btn.addEventListener('click', event => {
+    if(!window.__cePlanReviewDelegatedFix44){
+      window.__cePlanReviewDelegatedFix44 = true;
+      document.addEventListener('click', event => {
+        const btn = event.target && event.target.closest ? event.target.closest('[data-plan-review-clear-index],[data-plan-review-clear-key]') : null;
+        if(!btn) return;
         event.preventDefault();
         event.stopPropagation();
         const idx = btn.getAttribute('data-plan-review-clear-index');
         const key = btn.getAttribute('data-plan-review-clear-key');
-        if(idx !== null && idx !== '') markPlanDiagnosticReviewedByIndex(idx);
-        if(key) markPlanDiagnosticReviewedByKey(key);
-        renderProposal();
-      });
-    });
+        let changed = false;
+        if(idx !== null && idx !== '') changed = markPlanDiagnosticReviewedByIndex(idx) || changed;
+        if(key) changed = markPlanDiagnosticReviewedByKey(key) || changed;
+        if(changed) renderProposal();
+      }, true);
+    }
+    scope.querySelectorAll('[data-plan-review-clear-index],[data-plan-review-clear-key]').forEach(btn => { btn.__ceReviewClearBound = true; });
   }
   function planResourceRows(proposals){
     const map = new Map();
@@ -1048,7 +1067,6 @@
         <span class="plan-resource-donation-badge ${d.needsReview ? 'plan-resource-donation-badge-review' : ''}" title="${esc(d.diagnosticReason || 'Caso pendiente de revisar')}">${esc(d.ticketDonacion || ('DONADO ' + (n + 1)))}${reviewText}</span>
         <label>Donante<select data-plan-resource-field="donorRef" data-plan-proposal-index="${esc(d.idx)}">${donorOpts(d.donorRef)}</select></label>
         <label>Responsable<select data-plan-resource-field="donationResponsableId" data-plan-proposal-index="${esc(d.idx)}">${respOpts(d.responsableId, '-- responsable donación --')}</select></label>
-        ${d.needsReview ? `<button type="button" class="plan-review-clear-btn" data-plan-review-clear-index="${esc(d.idx)}">Dar por revisado</button>` : ''}
       </div>`;
     }).join('');
     const purchaseRow = (r, buyBase, price) => buyBase > 0 ? `<div class="plan-resource-subrow plan-resource-purchase-subrow">
@@ -2650,7 +2668,7 @@
     const prevAdvancedSearch = box.querySelector('#planBuscarDetalleAvanzado')?.value || '';
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
-      // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: en Encargo total no se reconstruye la compra con imaginación local.
+      // FIX44_NECESIDADES_ARRAY_REVISADO_OK: en Encargo total no se reconstruye la compra con imaginación local.
       // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
@@ -4314,7 +4332,7 @@
     return '';
   }
   function cePlanFix29FilterFixedMenuRows(rows){
-    // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: no-op. Se conserva el nombre solo por compatibilidad defensiva.
+    // FIX44_NECESIDADES_ARRAY_REVISADO_OK: no-op. Se conserva el nombre solo por compatibilidad defensiva.
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -4345,7 +4363,7 @@
     };
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX43: necesidades teóricas + déficit local</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX44: array necesidades + déficit local</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
@@ -4359,7 +4377,7 @@
     btn.__ceTraceBound = true;
     btn.addEventListener('click', async () => {
       const txt = JSON.stringify(debug || window.__cePlanLastDebug || {}, null, 2);
-      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX43 copiada al portapapeles.'); }
+      try{ await navigator.clipboard.writeText(txt); alert('Traza FIX44 copiada al portapapeles.'); }
       catch(_){ alert(txt.slice(0, 20000)); }
     });
   }
@@ -4423,7 +4441,7 @@
       // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX43_NECESIDADES_TEORICAS_SALDO_INFRA: no se filtra la propuesta de Gemini.
+        // FIX44_NECESIDADES_ARRAY_REVISADO_OK: no se filtra la propuesta de Gemini.
         // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
