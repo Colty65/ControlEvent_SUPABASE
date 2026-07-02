@@ -78,7 +78,7 @@ function configuredGeminiModels() {
 }
 
 function configuredGeminiPlanningModels() {
-  // FIX39: planificación prioriza modelos rápidos y Gemini solo devuelve menú/compras/avisos.
+  // FIX40: planificación prioriza modelos rápidos; donaciones locales, Gemini menú/compras y compras de saldo capadas.
   const configuredRaw = trim(process.env.CONTROLEVENT_PLAN_AI_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
   const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
   const fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
@@ -1632,6 +1632,17 @@ function planCanonicalProductForRow(row, maps) {
 function planCanonicalizeRowProduct(row, maps) {
   const prod = planCanonicalProductForRow(row, maps);
   if (!prod?.id) return row;
+  const original = trim(row?.__productoEscritoOriginal || row?.producto || row?.productName || '');
+  if (original && row?.__geminiDirect38 === true && !planProductFormatCompatible38(original, prod.nombre || '')) {
+    return {
+      ...row,
+      productId: '',
+      productName: original,
+      segmento: trim(row.segmento || prod.segmento || 'Sin segmento'),
+      destino: trim(row.destino || prod.destino || 'Sin destino'),
+      reason: trim(row.reason || '') + ' Producto conservado como revisable: el catálogo parecido cambiaba formato/capacidad.'
+    };
+  }
   return {
     ...row,
     productId: trim(prod.id),
@@ -1796,22 +1807,26 @@ function planApplyPositiveSaldoFix39(rows, form, state) {
   const maps = planBuildMaps(state || {});
   const defaults = { tiendaId: trim(form.defaultStoreId), responsableId: trim(form.defaultResponsibleId) };
   const priority = [
-    {q:'Cerveza lata 33cl', label:'Cerveza lata 33cl', units:24, fallback:0.55},
-    {q:'COCA COLA Bote 32 Cl', label:'COCA COLA Bote 32 Cl', units:24, fallback:0.75},
-    {q:'COCA COLA ZERO Bote 32 Cl', label:'COCA COLA ZERO Bote 32 Cl', units:24, fallback:0.75},
-    {q:'COCA COLA ZERO -ZERO 33 cl', label:'COCA COLA ZERO -ZERO 33 cl', units:24, fallback:0.75},
-    {q:'Hielo', label:'Hielo en cubitos', units:5, fallback:1.25},
-    {q:'Ron BARCELO Añejo 0.7 L', label:'Ron BARCELO Añejo 0.7 L', units:1, fallback:14.35},
-    {q:'Whisky 5 Años J.B Botella 0.7 L', label:'Whisky 5 Años J.B Botella 0.7 L', units:1, fallback:14.65},
-    {q:'GINEBRA Beefeater', label:'GINEBRA Beefeater', units:1, fallback:16.8},
-    {q:'FANTA Naranja Bote 32 C.L', label:'FANTA Naranja Bote 32 C.L', units:24, fallback:0.6},
-    {q:'FANTA Limon Bote 32 CL', label:'FANTA Limon Bote 32 CL', units:24, fallback:0.6},
-    {q:'Tónica lata', label:'Tónica lata', units:24, fallback:0.75},
-    {q:'Sprite lata (33cl)', label:'Sprite lata (33cl)', units:24, fallback:0.52},
-    {q:'Ron BRUGAL Añejo 0.7L', label:'Ron BRUGAL Añejo 0.7L', units:1, fallback:13.59}
+    {q:'Cerveza lata 33cl', label:'Cerveza lata 33cl', units:24, fallback:0.55, maxAdds:4},
+    {q:'COCA COLA Bote 32 Cl', label:'COCA COLA Bote 32 Cl', units:24, fallback:0.75, maxAdds:2},
+    {q:'COCA COLA ZERO Bote 32 Cl', label:'COCA COLA ZERO Bote 32 Cl', units:24, fallback:0.75, maxAdds:2},
+    {q:'COCA COLA ZERO -ZERO 33 cl', label:'COCA COLA ZERO -ZERO 33 cl', units:24, fallback:0.75, maxAdds:2},
+    {q:'Hielo', label:'Hielo en cubitos', units:5, fallback:1.25, maxAdds:5},
+    {q:'Ron BARCELO Añejo 0.7 L', label:'Ron BARCELO Añejo 0.7 L', units:1, fallback:14.35, maxAdds:2},
+    {q:'Whisky 5 Años J.B Botella 0.7 L', label:'Whisky 5 Años J.B Botella 0.7 L', units:1, fallback:14.65, maxAdds:2},
+    {q:'GINEBRA Beefeater', label:'GINEBRA Beefeater', units:1, fallback:16.8, maxAdds:2},
+    {q:'FANTA Naranja Bote 32 C.L', label:'FANTA Naranja Bote 32 C.L', units:24, fallback:0.6, maxAdds:1},
+    {q:'FANTA Limon Bote 32 CL', label:'FANTA Limon Bote 32 CL', units:24, fallback:0.6, maxAdds:1},
+    {q:'Tónica lata', label:'Tónica lata', units:24, fallback:0.75, maxAdds:1},
+    {q:'Sprite lata (33cl)', label:'Sprite lata (33cl)', units:24, fallback:0.52, maxAdds:1},
+    {q:'Ron BRUGAL Añejo 0.7L', label:'Ron BRUGAL Añejo 0.7L', units:1, fallback:13.59, maxAdds:1}
   ];
   function currentRatio() { const t = planCompraTotal(out); return t > 0 ? (income - t) / t : 0; }
+  const addCounts = new Map();
   function addOne(item) {
+    const countKey = normPlanKey(item.label || item.q);
+    const currentCount = addCounts.get(countKey) || 0;
+    if (item.maxAdds && currentCount >= item.maxAdds) return false;
     const prod = planFindProductLoose(item.q, maps) || planFindProductLoose(item.label, maps) || {};
     const productName = trim(prod.nombre || item.label);
     const price = planReasonablePlanPrice(productName, prod.defaultPrecio ?? prod.precio ?? item.fallback);
@@ -1822,13 +1837,14 @@ function planApplyPositiveSaldoFix39(rows, form, state) {
     const existing = out.find(r => r.tipo === 'COMPRA' && ((trim(r.productId) && trim(r.productId) === trim(prod.id)) || normPlanKey(r.productName) === normPlanKey(productName)));
     if (existing) {
       existing.unidades = round(num(existing.unidades) + units, 2);
-      existing.reason = trim(existing.reason || '') + ' Ajuste automático de saldo positivo FIX39.';
+      existing.reason = trim(existing.reason || '') + ' Ajuste automático de saldo positivo FIX40.';
       existing.__ceHf46SaldoBalancer = true;
       existing.__ceHf52SaldoBalancer = true;
+      addCounts.set(countKey, currentCount + 1);
       return true;
     }
     out.push({
-      key:`saldo-fix39:${out.length}:${trim(prod.id || productName)}`,
+      key:`saldo-fix40:${out.length}:${trim(prod.id || productName)}`,
       include:true,
       tipo:'COMPRA',
       productId:trim(prod.id || ''),
@@ -1841,11 +1857,12 @@ function planApplyPositiveSaldoFix39(rows, form, state) {
       responsableId:trim(defaults.responsableId),
       ticketDonacion:'',
       donorRef:'',
-      confidence:'Ajuste saldo FIX39',
-      reason:`Ajuste automático de saldo positivo FIX39: el saldo previsto superaba el 25% de las compras; se añade siguiendo la prioridad definida hasta dejarlo alrededor del 10%.`,
+      confidence:'Ajuste saldo FIX40',
+      reason:`Ajuste automático de saldo positivo FIX40: el saldo previsto superaba el 25% de las compras; se añade siguiendo la prioridad definida hasta dejarlo alrededor del 10%.`,
       __ceHf46SaldoBalancer:true,
       __ceHf52SaldoBalancer:true
     });
+    addCounts.set(countKey, currentCount + 1);
     return true;
   }
   let cursor = 0, guard = 0, added = 0;
@@ -1860,9 +1877,30 @@ function planApplyPositiveSaldoFix39(rows, form, state) {
   }
   if (added) {
     const finalTotal = planCompraTotal(out);
-    notes.push(`Ajuste automático de saldo: el saldo inicial era ${round(initialSaldo,2)} € (${round(initialRatio*100,1)}% sobre compras). Se han añadido/reforzado ${added} línea(s) por prioridad hasta compra prevista ${round(finalTotal,2)} € y saldo ${round(income-finalTotal,2)} €.`);
+    const capped = currentRatio() > 0.10 + 0.005;
+    notes.push(`Ajuste automático de saldo: el saldo inicial era ${round(initialSaldo,2)} € (${round(initialRatio*100,1)}% sobre compras). Se han añadido/reforzado ${added} línea(s) por prioridad hasta compra prevista ${round(finalTotal,2)} € y saldo ${round(income-finalTotal,2)} €${capped ? '; se para antes de inflar cantidades absurdas porque se alcanzaron los topes operativos FIX40' : ''}.`);
   }
   return { rows: out, notes };
+}
+
+
+function planClampOperationalUnitsFix40(rows, form) {
+  const people = Math.max(1, num(form?.personas) || 30);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const maxHieloBolsas = Math.max(35, Math.ceil(people * days * 0.6));
+  const maxTonicaLatas = Math.max(24, Math.ceil(people / 15) * 24);
+  return arr(rows).map(row => {
+    if (row?.tipo !== 'COMPRA') return row;
+    const n = normPlanKey(row.productName || row.producto || '');
+    let max = 0;
+    let motivo = '';
+    if (/\bhielo\b/.test(n)) { max = maxHieloBolsas; motivo = `tope operativo FIX40 para hielo (${maxHieloBolsas} bolsas aprox. para ${people} personas/${days} días)`; }
+    else if (/\btonica\b|schweppes/.test(n)) { max = maxTonicaLatas; motivo = `tope operativo FIX40 para tónica (${maxTonicaLatas} latas, evitar inflado por saldo)`; }
+    if (max && num(row.unidades) > max) {
+      return { ...row, unidades:max, aComprarCalculado:max, reason: trim(row.reason || '') + ' Ajustado por ' + motivo + '.' };
+    }
+    return row;
+  });
 }
 
 function planReadableNotes(rawNotes, rows, form, budgetNotes) {
@@ -2427,20 +2465,104 @@ function planExplicitDonationRowsFromPromptRobustFix39(form, state) {
   return rows;
 }
 
+
+function planExplicitDonationRowsUltraFix40(form, state) {
+  const info = planPromptRawText(form).replace(/\r/g, '');
+  if (!trim(info)) return [];
+  const maps = planBuildMaps(state || {});
+  const rows = [];
+  const seen = new Set();
+  function parseHeader(line) {
+    const h = trim(line || '');
+    let m = h.match(/^\s*(?:[-*•]\s*)?Donado\s+(socio|tienda|otros)\s*[-–:]\s*(.+)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaci[oó]n\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaciones\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i);
+    if (m) {
+      const kind = normPlanKey(m[1] || '');
+      const ticket = /tienda/.test(kind) ? 'DONADO TIENDA' : (/otro/.test(kind) ? 'DONADO OTROS' : 'DONADO SOCIO');
+      const rest = trim(m[2] || '');
+      const parts = rest.split('/').map(x => trim(x)).filter(Boolean);
+      const donor = trim((parts[0] || (ticket === 'DONADO TIENDA' ? 'Tienda donante' : ticket === 'DONADO OTROS' ? 'Donante externo' : 'Donante indicado')).replace(/responsable\s*[:=]?.*$/i, ''));
+      const respPart = parts.find(x => /responsable/i.test(x));
+      const responsable = respPart ? trim(respPart.replace(/responsable\s*[:=]?/i, '')) : trim(form.defaultResponsibleName || donor);
+      return { ticket, donor, responsable, tienda: ticket === 'DONADO TIENDA' ? donor : '' };
+    }
+    if (/^\s*(?:[-*•]\s*)?Producto\s+en\s+la\s+pe[nñ]a\b/i.test(h)) return { ticket:'DONADO SOCIO', donor:'Peña El Arrastre', responsable:trim(form.defaultResponsibleName || 'Colty'), tienda:'' };
+    return null;
+  }
+  function isStop(line) {
+    return /^\s*(?:Pistas?\s+de\s+compra|Reglas?\s+finales|Criterios?\s+de\s+c[aá]lculo|Datos\s+para\s+el\s+c[aá]lculo|Descripci[oó]n\s+conceptual|Resumen\s+de\s+men[uú]|Personas\s+y\s+consumo|Datos\s+generales|Objetivo\s+del\s+evento)\b/i.test(line || '');
+  }
+  function isProduct(line) {
+    const s = trim(line || '').replace(/^\s*[•\-*]\s*/, '');
+    if (!s || /^PRODUCTOS?\s*:?$/i.test(s)) return false;
+    if (/^(?:Tratar\s+todo|Donante|Responsable|Tienda)\b/i.test(s)) return false;
+    return /^[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(s);
+  }
+  function push(raw, meta) {
+    const clean = trim(String(raw || '').replace(/^\s*[•\-*]\s*/, ''));
+    const productoTexto = planCleanExplicitProductText(clean);
+    if (!productoTexto) return;
+    const unidades = Math.max(0.01, planExplicitUnits(clean));
+    const k = [normPlanKey(meta.ticket), normPlanKey(meta.donor), normPlanKey(productoTexto), round(unidades, 2)].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    let prod = planFindProductLoose(productoTexto, maps) || {};
+    const incompatible = prod?.id && !planProductFormatCompatible38(productoTexto, prod.nombre || '');
+    const donorKind = meta.ticket === 'DONADO TIENDA' ? 'T' : 'P';
+    const donorRef = planRefFromLooseLabel(meta.donor, maps, donorKind) || trim(meta.donor);
+    const rowResp = planFindPersonLoose(meta.responsable, maps);
+    const rowStore = meta.ticket === 'DONADO TIENDA' ? planFindStoreLoose(meta.tienda || meta.donor, maps) : null;
+    rows.push({
+      key:`prompt-don-fix40:${rows.length}:${trim((!incompatible && prod?.id) || productoTexto)}`,
+      include:true,
+      tipo:'DONACION',
+      productId: incompatible ? '' : trim(prod?.id || ''),
+      productName: incompatible ? productoTexto : trim(prod?.nombre || productoTexto),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      unidades:round(unidades, 2),
+      precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      tiendaId:trim(rowStore?.id || form.defaultStoreId || ''),
+      responsableId:trim(rowResp?.id || (String(donorRef).startsWith('P:') ? String(donorRef).slice(2) : '') || form.defaultResponsibleId || ''),
+      ticketDonacion:meta.ticket,
+      donorRef,
+      confidence:'Prompt explícito FIX40',
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      __productoEscritoOriginal: productoTexto,
+      reason:`Donación/existencia indicada literalmente por el usuario (${meta.donor}).`
+    });
+  }
+  let active = null;
+  info.split(/\n/).forEach(raw => {
+    const line = trim(raw);
+    if (!line) return;
+    const header = parseHeader(line);
+    if (header) { active = header; return; }
+    if (active && isStop(line)) { active = null; return; }
+    if (active && isProduct(line)) push(raw, active);
+  });
+  return rows;
+}
+
 function planExplicitDonationRowsLocalFix39(form, state) {
   const oldRows = arr(planExplicitDonationRowsFromPrompt(form, state));
   const robustRows = arr(planExplicitDonationRowsFromPromptRobustFix39(form, state));
+  const ultraRows = arr(planExplicitDonationRowsUltraFix40(form, state));
   const byKey = new Map();
   function key(row) { return [normPlanKey(row?.ticketDonacion), normPlanKey(row?.donorRef), normPlanKey(row?.productName), round(row?.unidades,2)].join('|'); }
-  oldRows.forEach(r => { if (r?.tipo === 'DONACION') byKey.set(key(r), r); });
-  robustRows.forEach(r => {
-    if (r?.tipo !== 'DONACION') return;
-    const k = key(r);
+  function donorIsGeneric(row){ return /EXISTENCIAS|DONANTE INDICADO|DONANTE EXTERNO|TIENDA DONANTE/.test(normPlanKey(row?.donorRef || row?.donorLabel || '')); }
+  function put(row){
+    if (row?.tipo !== 'DONACION') return;
+    const k = key(row);
     const old = byKey.get(k);
-    const oldDonor = normPlanKey(old?.donorRef || '');
-    const newDonor = normPlanKey(r?.donorRef || '');
-    if (!old || /EXISTENCIAS|DONANTE INDICADO|DONANTE EXTERNO|TIENDA DONANTE/.test(oldDonor) || (newDonor && !/EXISTENCIAS|DONANTE INDICADO|DONANTE EXTERNO|TIENDA DONANTE/.test(newDonor))) byKey.set(k, r);
-  });
+    if (!old || donorIsGeneric(old) || !donorIsGeneric(row)) byKey.set(k, row);
+  }
+  oldRows.forEach(put);
+  robustRows.forEach(put);
+  ultraRows.forEach(put);
   return [...byKey.values()];
 }
 
@@ -2909,7 +3031,7 @@ function planPromptBriefObject(form = {}, state = {}) {
   const budget = planBudgetFromPrompt(form);
   const personas = planPromptNumber(form, [/personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /(\d+(?:[,.]\d+)?)\s+personas/i], num(form.personas));
   const cenas = planPromptNumber(form, [/personas\s+que\s+cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cena[^\n]{0,80}?(\d+(?:[,.]\d+)?)\s*personas/i], 0);
-  return { versionBrief: 'FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO_V1', objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title), duracionDias: planEffectiveDays(form), personasAsistentes: personas || num(form.personas) || 0, presupuestoObjetivoPorPersona: budget.objetivoPorPersona, limiteMaximoPorPersona: budget.maximoPorPersona, temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''), personasCerveza: planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), personasCubatas: planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0), cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0), personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0), personasCenaReal: cenas, horas: { aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''), comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''), tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''), cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '') }, momentosPorDia: planMomentsFromPrompt(form), concepto: { aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']), comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']), tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']), cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas']) }, reglasBebida: ['Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.', 'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.', 'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.', 'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'], reglasComida: ['No multiplicar todos los productos por todos los asistentes.', 'Calcular aperitivos como picoteo compartido si procede.', 'Calcular cenas solo para quienes cenan realmente si el prompt lo indica.', 'Compra = necesidad total - donaciones/existencias confirmadas.'], donacionesDetectadas: planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140) };
+  return { versionBrief: 'FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS_V1', objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title), duracionDias: planEffectiveDays(form), personasAsistentes: personas || num(form.personas) || 0, presupuestoObjetivoPorPersona: budget.objetivoPorPersona, limiteMaximoPorPersona: budget.maximoPorPersona, temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''), personasCerveza: planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), personasCubatas: planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0), cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0), cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0), personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0), personasCenaReal: cenas, horas: { aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''), comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''), tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''), cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '') }, momentosPorDia: planMomentsFromPrompt(form), concepto: { aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']), comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']), tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']), cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas']) }, reglasBebida: ['Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.', 'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.', 'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.', 'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'], reglasComida: ['No multiplicar todos los productos por todos los asistentes.', 'Calcular aperitivos como picoteo compartido si procede.', 'Calcular cenas solo para quienes cenan realmente si el prompt lo indica.', 'Compra = necesidad total - donaciones/existencias confirmadas.'], donacionesDetectadas: planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140) };
 }
 function planPromptBriefText(form = {}, state = {}) {
   const b = planPromptBriefObject(form, state);
@@ -2993,7 +3115,7 @@ function planContextDirectJsonForGemini38(ctx, form = {}) {
     tienda: trim(p.tienda)
   })).filter(p => p.producto);
   return {
-    versionContexto: 'FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO',
+    versionContexto: 'FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS',
     modo: ctx?.modo,
     instruccionPrincipal: 'Lee el prompt formateado del usuario como fuente principal. Usa PRODUCTOS como catálogo de apoyo. Las donaciones ya las crea ControlEvent localmente: devuelve solo menuResumen, compras y avisos.',
     evento: {
@@ -3038,7 +3160,7 @@ function planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modul
   const diasOperativos = planEffectiveDays(form);
   const brief = planPromptBriefObject(form, state);
   const donaciones = planDonationRowsForGemini33(form, state);
-  return { __formForGemini38: form, versionContexto: totalMode ? 'FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Gemini.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
+  return { __formForGemini38: form, versionContexto: totalMode ? 'FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Gemini.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
 }
 function planPromptContextForGemini(ctx, totalMode) {
   if (!totalMode) return ctx;
@@ -3192,7 +3314,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
   const context = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
   const contextPrompt = planPromptContextForGemini(context, trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL');
   const trace = {
-    version: 'FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO',
+    version: 'FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS',
     startedAt: new Date(started).toISOString(),
     mode: trim(form?.mode),
     promptChars: promptText.length,
@@ -3306,18 +3428,40 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
 
 function planProductFormatTokens38(value) {
   const n = normPlanKey(value || '');
-  const vals = [];
+  const capacities = [];
+  const containers = new Set();
   let m;
-  const rx = /(\d+(?:[,.]\d+)?)\s*(l|litro|litros|kg|kilo|kilos|cl|ml|ud|uds|unidad|unidades|lata|latas|botella|botellas|barril|barriles)/g;
-  while ((m = rx.exec(n))) vals.push(`${String(m[1]).replace(',','.')}${m[2][0]}`);
-  return vals;
+  const capRx = /(\d+(?:[,.]\d+)?)\s*(l|litro|litros|kg|kilo|kilos|cl|ml)\b/g;
+  while ((m = capRx.exec(n))) {
+    const unitRaw = m[2];
+    const unit = /^k/.test(unitRaw) ? 'KG' : (/^c/.test(unitRaw) ? 'CL' : (/^m/.test(unitRaw) ? 'ML' : 'L'));
+    capacities.push(`${String(m[1]).replace(',','.')}:${unit}`);
+  }
+  if (/\bbarril(?:es)?\b/.test(n)) containers.add('BARRIL');
+  if (/\blata(?:s)?\b|\bbote(?:s)?\b/.test(n)) containers.add('LATA');
+  if (/\bbotella(?:s)?\b/.test(n)) containers.add('BOTELLA');
+  if (/\bgarrafa(?:s)?\b/.test(n)) containers.add('GARRAFA');
+  if (/\bbolsa(?:s)?\b|\bsaco(?:s)?\b/.test(n)) containers.add('BOLSA');
+  return { capacities, containers:[...containers] };
 }
 function planProductFormatCompatible38(written, catalogName) {
   const a = planProductFormatTokens38(written);
   const b = planProductFormatTokens38(catalogName);
-  if (!a.length || !b.length) return true;
-  // Si el usuario escribió 50l y el catálogo dice 30l, no se acepta como exacto.
-  return a.every(tok => b.includes(tok)) || b.every(tok => a.includes(tok));
+  if (a.capacities.length && b.capacities.length) {
+    // Si el usuario escribió 50l y el catálogo dice 30l, no se acepta como exacto.
+    const commonUnits = new Set(a.capacities.map(x => x.split(':')[1]).filter(u => b.capacities.some(y => y.endsWith(':'+u))));
+    for (const u of commonUnits) {
+      const av = a.capacities.filter(x => x.endsWith(':'+u)).map(x => x.split(':')[0]);
+      const bv = b.capacities.filter(x => x.endsWith(':'+u)).map(x => x.split(':')[0]);
+      if (av.length && bv.length && !av.some(v => bv.includes(v))) return false;
+    }
+  }
+  if (a.containers.length && b.containers.length) {
+    const same = a.containers.some(x => b.containers.includes(x));
+    // Lata/bote no debe convertirse en botella 2L, ni botella en lata; barril sí debe seguir siendo barril.
+    if (!same) return false;
+  }
+  return true;
 }
 function matchPlanRows(aiRows, baseRows, state, form) {
   const maps = planBuildMaps(state);
@@ -3589,7 +3733,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     // Si Gemini falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
     rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
     aiProvider = 'control-event-prompt-directo';
-    aiNotes.push('FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO activo: ControlEvent extrae y crea localmente las donaciones/existencias del prompt; Gemini recibe ese resumen y devuelve solo menú/compras/avisos.');
+    aiNotes.push('FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS activo: ControlEvent extrae y crea localmente las donaciones/existencias del prompt; Gemini recibe ese resumen y devuelve solo menú/compras/avisos.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), 28000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
@@ -3608,7 +3752,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
       aiNotes.push('Gemini no pudo completar la planificación del menú/compras: ' + trim(error?.message || error) + '. No se añade una compra automática local; completa o acorta el prompt y vuelve a generar.');
     }
   } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS activo: encargo total con brief estructurado y control real de Gemini; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
     try {
       const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 28000, 'Gemini planificación');
       aiTrace = ai?.__trace || null;
@@ -3633,21 +3777,21 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   rowsOut = planCoalesceDonationsAfterSanitize(rowsOut, explicitDonationRows, m);
   rowsOut = planApplyFinalDefaultsHf14(arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}` })), form, state);
   if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
-    rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
+    rowsOut = planClampOperationalUnitsFix40(planPostProcessPlanningRows(rowsOut, form, state), form);
     if (m === 'ZUZU_TOTAL') {
-      aiNotes.push('FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO activo: Gemini decide menú y compras; las donaciones salen del parser local y se aplican después reglas de saldo positivo.');
+      aiNotes.push('FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS activo: Gemini decide menú y compras; las donaciones salen del parser local y se aplican después reglas de saldo positivo.');
     }
     if (!aiMenuResumen.length) aiMenuResumen = planCompleteMenuResumen([], form);
     const budget = planBudgetGuard(rowsOut, form);
     const saldoFix39 = planApplyPositiveSaldoFix39(budget.rows, form, state);
-    rowsOut = planApplyFinalDefaultsHf14(saldoFix39.rows, form, state);
+    rowsOut = planApplyFinalDefaultsHf14(planClampOperationalUnitsFix40(saldoFix39.rows, form), form, state);
     aiNotes = planReadableNotes(aiNotes, rowsOut, form, arr(budget.notes).concat(saldoFix39.notes));
   } else {
     aiNotes = planReadableNotes(aiNotes, rowsOut, form, []);
   }
   return {
     ok: true,
-    version: 'v17_prod_FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO',
+    version: 'v17_prod_FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS',
     provider: aiProvider,
     model: aiModel,
     mode: m,
@@ -3659,7 +3803,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
     menuResumen: aiMenuResumen,
     briefEvento: planPromptBriefObject(form, state),
     debugPlanificacion: {
-      ...(aiTrace || { version:'FIX39_DONACIONES_LOCALES_GEMINI_COMPRAS_SALDO', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
+      ...(aiTrace || { version:'FIX40_DONACIONES_LOCAL_GEMINI_COMPRAS_CAPADAS', warning:'No hubo llamada Gemini trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
       finalCounts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length },
       providerFinal: aiProvider,
       modelFinal: aiModel,
