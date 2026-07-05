@@ -1,4 +1,4 @@
-# ControlEvent v18.4_prod · Zuzu orientada a actividad real del evento
+# ControlEvent v18.5_prod · Zuzu orientada a actividad real del evento
 
 Esta versión refuerza Zuzu para que, cuando el usuario pregunte por un evento, no conteste con la ficha técnica de EVENTOS salvo que se pidan datos técnicos como fecha, precio o estado.
 

@@ -1,4 +1,4 @@
-/* ControlEvent v18.4_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v18.5_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -701,7 +701,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v18.4_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v18.5_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -754,7 +754,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v18.4_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v18.5_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -847,6 +847,7 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
     tickets: zuzuUnique(arr(filters?.tickets)),
     segmentos: zuzuUnique(arr(filters?.segmentos)),
     destinos: zuzuUnique(arr(filters?.destinos)),
+    rangos: zuzuUnique(arr(filters?.rangos || filters?.rango)),
     anios: zuzuUnique(arr(filters?.anios || filters?.años)),
     estado: zuzuUnique(arr(filters?.estado))
   };
@@ -862,7 +863,7 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
   }
   const p = norm(prompt);
   const mods = arr(modules).map(zuzuUpperModule);
-  // v18.4: para preguntas tipo “qué eventos/productos ha donado X”, ControlEvent NO debe filtrar
+  // v18.5: para preguntas tipo “qué eventos/productos ha donado X”, ControlEvent NO debe filtrar
   // previamente por persona/tienda/donante. Primero entrega todas las donaciones de los eventos objetivo
   // y luego el resolutor local filtra por el nombre literal entre comillas. Así se evitan ceros falsos
   // cuando el donante puede estar en PERSONAS, TIENDAS o como texto libre.
@@ -881,6 +882,7 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
   const filterTickets = zuzuUnique([].concat(filters.tickets || []));
   const filterSegments = zuzuUnique([].concat(filters.segmentos || []));
   const filterDestinos = zuzuUnique([].concat(filters.destinos || []));
+  const filterRangos = zuzuUnique([].concat(filters.rangos || filters.rango || [])).map(norm).filter(Boolean);
   const promptProductHints = words(prompt).filter(w => !COMMON_STOP.has(w)).slice(0, 12);
   function anyMatch(value, list) { return !list.length || list.some(x => zuzuWordMatch(value, x) || zuzuNormIncludes(value, x)); }
   function productMatches(name) {
@@ -902,13 +904,17 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
     if (!filterDestinos.length) return true;
     return filterDestinos.some(x => norm(value) === norm(x));
   }
+  function rangoMatches(value) {
+    if (!filterRangos.length) return true;
+    return filterRangos.some(x => norm(value) === x || norm(value).includes(x) || x.includes(norm(value)));
+  }
   function lineMatchesCommon(line) {
     return productMatches(line.producto)
       && peopleMatches([line.responsable, line.donante, line.colaborador].join(' '))
       && storeMatches(line.tienda)
       && ticketMatches(line.tk || line.ticket || line.ticketTipo || '');
   }
-  return { filterPeople, filterProducts, filterStores, filterTickets, filterSegments, filterDestinos, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, segmentMatches, destinoMatches, lineMatchesCommon };
+  return { filterPeople, filterProducts, filterStores, filterTickets, filterSegments, filterDestinos, filterRangos, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, segmentMatches, destinoMatches, rangoMatches, lineMatchesCommon };
 }
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
@@ -950,15 +956,16 @@ function zuzuAllEventsRequested(prompt, plan = {}) {
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim);
   return plan?.todosLosEventos === true
     || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))
-    || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos|celebraciones|los\s+\d+\s+eventos|las\s+\d+\s+celebraciones|a[nñ]o\s+20\d{2}|durante\s+20\d{2})\b/i.test(prompt);
+    || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cualquier(?:a)?\s+de\s+los\s+eventos|en\s+cualquier(?:a)?\s+evento|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos|celebraciones|los\s+\d+\s+eventos|las\s+\d+\s+celebraciones|a[nñ]o\s+20\d{2}|durante\s+20\d{2})\b/i.test(prompt);
 }
 function zuzuCrossEventSearchRequested(prompt, modules = []) {
   const p = norm(prompt);
   const hasScopedData = arr(modules).some(m => ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'].includes(zuzuUpperModule(m)));
   if (!hasScopedData) return false;
   if (/\b(en\s+que\s+eventos|en\s+cuales\s+eventos|que\s+eventos|cuales\s+eventos|eventos\s+y\s+productos|eventos\s+donde|eventos\s+en\s+los\s+que)\b/.test(p)) return true;
-  if (/\b(eventos?)\b/.test(p) && /\b(ha[n]?\s+donado|donado|donados|aparece|aparecen|participa|participan|participo|participado|participacion|participación)\b/.test(p)) return true;
-  // v18.4: si se pide el papel de una persona como colaborador/responsable/donante y no se nombra
+  if (/\b(eventos?)\b/.test(p) && /\b(ha[n]?\s+donado|donado|donados|aparece|aparecen|participa|participan|participo|participado|participacion|participación|papel|desempeñad[oa]|desempenad[oa])\b/.test(p)) return true;
+  if (/\b(cualquier(?:a)?\s+de\s+los\s+eventos|en\s+cualquier(?:a)?\s+evento)\b/.test(p)) return true;
+  // v18.5: si se pide el papel de una persona como colaborador/responsable/donante y no se nombra
   // un evento concreto, la búsqueda debe ser transversal, no quedarse en el evento activo.
   if (/\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria|aparece|aparecen|participa|participan)\b/.test(p)
       && /\b(colaborador|colaboradora|colaboradores|responsable|responsables|donante|donantes|persona)\b/.test(p)) return true;
@@ -983,9 +990,9 @@ function zuzuInferModulesLocal(prompt) {
   const asksBoughtDonated = /\b(comprado\s*\/\s*donado|comprado\s+y\s+donado|compras?\s+y\s+donaciones?|donaciones?\s+y\s+compras?|separa\s+comprado\s*\/\s*donado)\b/.test(p);
   const asksCatalogProduct = /\b(ce_productos|tabla\s+de\s+productos|tabla\s+ce\s*productos|catalogo|catálogo|precio\s+rfa|precio\s+referencia|productos?\s+mas\s+caros|productos?\s+m[aá]s\s+caros|segmento\s*[=:]|destino\s*[=:])\b/.test(p);
   const cashAnalytic = /\b(saldo\s+de\s+caja|saldo\s+caja|caja|evolucion\s+del\s+saldo|evolución\s+del\s+saldo|balance\s+de\s+caja)\b/.test(p);
-  const personRoleAnalytic = /\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria)\b/.test(p) && /\b(responsable|responsables|donante|donantes|colaborador|colaboradores|persona)\b/.test(p);
   const quotedFragmentsCount = quotedFragments(prompt).length;
-  const participationAnalytic = /\b(participa|participan|participo|participó|participado|participacion|participación|aparece|aparecen|intervino|interviene|colabora|colaboro|colaboró)\b/.test(p) && (quotedFragmentsCount > 0 || /\b(persona|colaborador|responsable|donante)\b/.test(p));
+  const personRoleAnalytic = /\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria)\b/.test(p) && (/\b(responsable|responsables|donante|donantes|colaborador|colaboradores|persona)\b/.test(p) || quotedFragmentsCount > 0);
+  const participationAnalytic = /\b(participa|participan|participo|participó|participado|participacion|participación|aparece|aparecen|intervino|interviene|colabora|colaboro|colaboró|papel)\b/.test(p) && (quotedFragmentsCount > 0 || /\b(persona|colaborador|responsable|donante)\b/.test(p));
   const eventComparisonAnalytic = /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && (/\b(evento|eventos|jornada|jornadas|sysa|celebracion|celebración)\b/.test(p) || quotedFragmentsCount >= 2);
   const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
 
@@ -1048,6 +1055,14 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
   const estados = [];
   if (/\bfinalizad[oa]s?|cerrad[oa]s?|terminad[oa]s?\b/.test(p)) estados.push('Finalizado');
   if (/\ben\s+curso|activo|activa|abiert[oa]\b/.test(p)) estados.push('En curso');
+  const rangos = [];
+  const globalPersonaCatalogAsk = /\b(persona|personas)\b/.test(p) && /\b(sistema|registrad[ao]s?|maestro|tabla|catalogo|catálogo|rango|socios?|donantes?)\b/.test(p)
+    && !/\b(participa|participan|participado|papel|responsable|colaborador|evento|eventos|donado|donaciones?)\b/.test(p);
+  if (globalPersonaCatalogAsk) {
+    if (/\bno\s+socios?\b/.test(p)) rangos.push('NO SOCIO');
+    else if (/\bsocios?\b/.test(p)) rangos.push('SOCIO');
+    if (/\bdonantes?\b/.test(p)) rangos.push('DONANTE');
+  }
   const eventNorms = arr(state?.eventos).map(e => norm(e?.titulo)).filter(Boolean);
   const quotedPeople = (hasPersonCue || /\b(participa|participan|participado|participacion|participación|aparece|aparecen|colabora|intervino|interviene)\b/.test(p))
     ? quotedFragments(prompt).filter(q => { const nq = norm(q); return nq && !eventNorms.some(ev => ev === nq || ev.includes(nq) || nq.includes(ev)); })
@@ -1063,6 +1078,7 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
     tickets,
     segmentos: segmento ? [segmento] : [],
     destinos: destino ? [destino] : [],
+    rangos,
     anios,
     estado: estados
   };
@@ -1071,7 +1087,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
   const events = arr(state?.eventos).map(e => ({ id: trim(e?.id), titulo: trim(e?.titulo), situacion: trim(e?.situacion), fechaInicio: trim(e?.fechaIni), fechaFin: trim(e?.fechaFin), precioEntrada: round(e?.precio, 2) }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
   return {
-    version: 'ControlEvent Zuzu Planner v18.4_prod',
+    version: 'ControlEvent Zuzu Planner v18.5_prod',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     camposPorModulo: {
       INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Just.ing'],
@@ -1173,6 +1189,9 @@ function zuzuQueryFilterRows(rows, filters, matcher, moduleName) {
     if (filters.destinos?.length) {
       const des = row.Destino || '';
       if (!matcher.destinoMatches(des)) return false;
+    }
+    if (moduleName === 'PERSONAS' && (filters.rangos?.length || filters.rango?.length)) {
+      if (!matcher.rangoMatches(row.Rango || row.rango || '')) return false;
     }
     if (filters.tiendas?.length) {
       const tienda = row.Tienda || row['Nombre tienda'] || (moduleName === 'DONACIONES' ? row.Donante : '');
@@ -1355,7 +1374,7 @@ function zuzuModuleRawExpected(state, moduleName, eventIds) {
 }
 function zuzuFilterSummary(filters) {
   const out = {};
-  ['personas','productos','tiendas','responsables','donantes','tickets','segmentos','destinos','anios','estado'].forEach(k => {
+  ['personas','productos','tiendas','responsables','donantes','tickets','segmentos','destinos','rangos','anios','estado'].forEach(k => {
     const v = zuzuUnique(arr(filters?.[k]).map(trim).filter(Boolean));
     if (v.length) out[k] = v;
   });
@@ -1413,7 +1432,7 @@ function zuzuCanonicalMetricsFromModules(modulos) {
 }
 
 function zuzuMergePlanFilters(...items) {
-  const out = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], anios: [], estado: [] };
+  const out = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
   for (const src of items) {
     const f = src && typeof src === 'object' ? src : {};
     Object.keys(out).forEach(k => { arr(f[k] || (k === 'anios' ? f.años : [])).forEach(v => { const s = trim(v); if (s && !out[k].includes(s)) out[k].push(s); }); });
@@ -1477,6 +1496,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const helpers = makeHelpers(safeState);
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
   const eventScopedModules = ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'];
+  const hasEventScopedModules = modules.some(m => eventScopedModules.includes(m));
+  const masterCatalogOnly = !hasEventScopedModules && !modules.includes('EVENTOS');
   let eventIds = [];
   if (allRowsMode) {
     eventIds = zuzuFindEventIds(events, selectedId, userPrompt, p, { noSelectedFallback: true });
@@ -1488,6 +1509,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     eventIds = localEventIds.length ? localEventIds : planEventIds;
     if (!eventIds.length && modules.includes('EVENTOS')) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
   }
+  if (masterCatalogOnly) eventIds = [];
   if (!eventIds.length && modules.some(m => eventScopedModules.includes(m))) {
     return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: no he podido identificar el evento o eventos objetivo.' };
   }
@@ -1508,14 +1530,14 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (modules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (modules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (modules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
-  const eventRows = arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso') }));
+  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v18.4_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v18.5_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Zuzu no consulta Supabase, no ejecuta SQL y no modifica datos. ControlEvent entrega módulos completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
