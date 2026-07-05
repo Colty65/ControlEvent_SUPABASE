@@ -1,4 +1,4 @@
-// ControlEvent v18_prod FIX28
+// ControlEvent v18.1_prod ZUZU_INTELIGENTE
 // Service Worker neutralizado: nada de caché. Siempre red para evitar JS viejo.
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {

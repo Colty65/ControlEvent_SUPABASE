@@ -1,4 +1,4 @@
-/* ControlEvent v18_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v18.1_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -57,7 +57,7 @@ function geminiKey() {
     || process.env.OPENIA_API_KEY
     || process.env.GOOGLE_GENERATIVE_AI_API_KEY
     || '';
-  if (explicitGemini) return explicitGemini;
+  if (explicitZuzu) return explicitZuzu;
   const maybeOpenAiVar = process.env.OPENAI_API_KEY || '';
   return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
@@ -480,7 +480,7 @@ function isTransformAnalysisPrompt(prompt) {
 function isListExtractionPrompt(prompt) {
   const p = norm(prompt);
   if (isTransformAnalysisPrompt(prompt)) return false;
-  return /\b(lista|listado|relacion|relación|detalle|detallame|detalla|dame|muestra|muéstrame|ensena|enseña|ver|cuales|cuáles|todos|todas)\b/.test(p);
+  return /\b(lista|listado|relacion|relación|detalle|detallame|detalla|dame|muestra|muéstrame|ensena|enseña|ver|cuales|cuáles|que|qué|saber|todos|todas)\b/.test(p);
 }
 function directModuleResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
@@ -502,7 +502,7 @@ function directModuleResultIfApplicable(prompt, context) {
   const rows = arr(mods[moduleName]);
   const columns = orderedColumnsForModule(moduleName, rows);
   const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
-  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_prod.csv`);
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_1_prod.csv`);
   const tableLimit = 1000;
   const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
@@ -680,8 +680,8 @@ function directAggregateResultIfApplicable(prompt, context) {
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
     ],
     files: [
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
     ],
     provider: 'control-event-local-deterministico',
     model: 'sin-gemini-para-calculos'
@@ -784,7 +784,7 @@ function directComparativeAllDataResultIfApplicable(prompt, context) {
     tables: [
       { title: 'Comparativa general por evento', columns, rows: tableRows }
     ],
-    files: [{ filename: fileSafe(`Comparativa_eventos_v18_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v18_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-comparativa-estricta',
     model: 'sin-gemini-para-alcance-ni-calculos'
   };
@@ -795,6 +795,32 @@ function firstIntInPrompt(prompt, fallback = 25) {
   const m = text(prompt).match(/\b(\d{1,4})\b/);
   const n = m ? Number(m[1]) : fallback;
   return Number.isFinite(n) && n > 0 ? Math.min(n, 1000) : fallback;
+}
+function firstRankingLimitInPrompt(prompt, fallback = 25) {
+  const raw = text(prompt);
+  const patterns = [
+    /\b(?:top|ranking)\s*(?:de)?\s*(\d{1,3})\b/i,
+    /\b(\d{1,3})\s+(?:producto|productos|articulo|articulos)\b/i,
+    /\bprimer(?:os|as)?\s+(\d{1,3})\b/i
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    const n = m ? Number(m[1]) : 0;
+    if (Number.isFinite(n) && n > 0) return Math.min(n, 100);
+  }
+  return fallback;
+}
+function parseEventDateForSort(value) {
+  const s = trim(value);
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
+  if (m) {
+    let y = Number(m[3]); if (y < 100) y += 2000;
+    return new Date(y, Number(m[2]) - 1, Number(m[1])).getTime() || 0;
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() || 0;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : 0;
 }
 function eventNamesFromContext(context) {
   return arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.Evento || e?.EVENTO)).filter(Boolean);
@@ -830,7 +856,7 @@ function directEventPriceExtremesIfApplicable(prompt, context) {
     ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
   ];
   const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
-  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_1_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
 }
 function directPersonAppearanceIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -851,7 +877,7 @@ function directPersonAppearanceIfApplicable(prompt, context) {
   donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
   const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
   const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
-  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en todos los módulos disponibles: colaboradores/ingresos, responsables de compras y responsables de donaciones${/\bdonante|donantes\b/.test(p)?', y donantes de donaciones':''}. Aparece en ${rows.length} evento(s).`, warnings:[], charts:[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}], tables:[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Apariciones_${needle}_v18_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en todos los módulos disponibles: colaboradores/ingresos, responsables de compras y responsables de donaciones${/\bdonante|donantes\b/.test(p)?', y donantes de donaciones':''}. Aparece en ${rows.length} evento(s).`, warnings:[], charts:[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}], tables:[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Apariciones_${needle}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
 }
 function directBoughtDonatedUsageIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -869,7 +895,7 @@ function directBoughtDonatedUsageIfApplicable(prompt, context) {
   const eventos = eventNamesFromContext(context).join(', ');
   const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
   const shown = rows.slice(0, limit);
-  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
 }
 function directProductCatalogIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -891,7 +917,7 @@ function directProductCatalogIfApplicable(prompt, context) {
     tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
   }
   tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
-  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_1_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
 }
 function directPersonsCatalogIfApplicable(prompt, context) {
   const p = norm(prompt); const rows=arr(context?.modulosExtraidos?.PERSONAS);
@@ -900,7 +926,7 @@ function directPersonsCatalogIfApplicable(prompt, context) {
   const groups = new Map(); rows.forEach(r=>{ const k=trim(r.Rango)||'Sin rango'; groups.set(k,(groups.get(k)||0)+1); });
   const gcols=['Rango','Personas']; const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>[k,String(v)]);
   const cols=['Nombre persona','Rango'];
-  return {ok:true,rejected:false,title:'PERSONAS por rango',answer:`ControlEvent ha consultado la tabla PERSONAS completa y ha agrupado localmente por Rango. Registros: ${rows.length}.`,warnings:[],charts:[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}],tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe('PERSONAS_por_rango_v18_prod.csv'),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],provider:'control-event-local-personas',model:'sin-gemini-para-catalogos'};
+  return {ok:true,rejected:false,title:'PERSONAS por rango',answer:`ControlEvent ha consultado la tabla PERSONAS completa y ha agrupado localmente por Rango. Registros: ${rows.length}.`,warnings:[],charts:[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}],tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe('PERSONAS_por_rango_v18_1_prod.csv'),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],provider:'control-event-local-personas',model:'sin-gemini-para-catalogos'};
 }
 function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const p = norm(prompt); const events=eventNamesFromContext(context); if (events.length < 2 || !/\b(compara|comparar|comparativa)\b/.test(p)) return null;
@@ -913,9 +939,102 @@ function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
   const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const can=canonicalByEvent.get(norm(ev))||{}; let total; if(moduleName==='INGRESOS') total=round(can['Ingresos total'] ?? rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2); else if(moduleName==='COMPRAS') total=round(can['Compras realizadas'] ?? sumField(rs.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),valueField),2); else if(moduleName==='DONACIONES') total=round(can['Donaciones valor'] ?? sumField(rs,valueField),2); else total=sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
   const cols=['Evento','Registros','Total'];
-  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_1_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
 }
 
+function uniqueTextList(list) {
+  const out = [];
+  arr(list).forEach(x => { const v = trim(x); if (v && !out.some(y => norm(y) === norm(v))) out.push(v); });
+  return out;
+}
+function donorNeedlesFromContext(prompt, context) {
+  const filters = context?.planZuzu?.filtrosHumanos || {};
+  const eventNames = eventNamesFromContext(context).map(norm);
+  let names = [];
+  names = names.concat(arr(filters.personas), arr(filters.donantes));
+  arr(context?.modulosExtraidos?.PERSONAS).forEach(r => names.push(r?.['Nombre persona']));
+  quotedNames(prompt).forEach(q => {
+    const nq = norm(q);
+    if (eventNames.some(ev => ev === nq || ev.includes(nq) || nq.includes(ev))) return;
+    const parts = q.split(/\s+(?:y|e)\s+|[,;]/i).map(x => trim(x)).filter(x => x.length >= 2);
+    (parts.length > 1 ? parts : [q]).forEach(x => names.push(x));
+  });
+  return uniqueTextList(names).filter(n => n && !eventNames.some(ev => ev === norm(n)));
+}
+function directDonorDonationProductsIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(donado|donados|donacion|donaciones|ha\s+donado|han\s+donado)\b/.test(p)) return null;
+  if (!/\b(producto|productos|articulo|articulos|evento|eventos|que|qué|cuales|cuáles)\b/.test(p)) return null;
+  const rowsAll = arr(context?.modulosExtraidos?.DONACIONES);
+  if (!rowsAll.length) return null;
+  const names = donorNeedlesFromContext(prompt, context);
+  if (!names.length && /\b(ranking|top|mas|menos|mayor|menor|consumo|consumido|consumidos|consumidas|grafica|gráfica|temporal|evolucion|evolución)\b/.test(p)) return null;
+  const useResponsible = /\bresponsable|responsables\b/.test(p);
+  let rows = rowsAll;
+  if (names.length) {
+    rows = rowsAll.filter(r => names.some(n => nameMatches(r?.Donante, n) || (useResponsible && nameMatches(r?.Responsable, n))));
+  }
+  const titleNames = names.length ? names.join(' y ') : 'los donantes solicitados';
+  const detailColumns = ['Evento','Donante','Producto','Unidades','Valor','Tipo de donación','Responsable'];
+  const grouped = new Map();
+  rows.forEach(r => {
+    const key = [trim(r.Evento), trim(r.Donante), trim(r.Producto), trim(r['Tipo de donación']), trim(r.Responsable)].join('|');
+    const old = grouped.get(key) || { Evento: trim(r.Evento), Donante: trim(r.Donante), Producto: trim(r.Producto), Unidades: 0, Valor: 0, 'Tipo de donación': trim(r['Tipo de donación']), Responsable: trim(r.Responsable) };
+    old.Unidades += num(r.Unidades);
+    old.Valor += num(r.Valor);
+    grouped.set(key, old);
+  });
+  const detail = [...grouped.values()].map(r => ({ ...r, Unidades: round(r.Unidades,3), Valor: round(r.Valor,2) }))
+    .sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es') || String(a.Donante).localeCompare(String(b.Donante),'es') || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const evMap = new Map();
+  detail.forEach(r => {
+    const ev = trim(r.Evento) || 'Sin evento';
+    const old = evMap.get(ev) || { Evento: ev, Donantes: new Set(), Productos: new Set(), 'Unidades donadas': 0, 'Valor donado (€)': 0, 'Nº líneas': 0 };
+    old.Donantes.add(trim(r.Donante) || 'Sin donante');
+    old.Productos.add(trim(r.Producto) || 'Sin producto');
+    old['Unidades donadas'] += num(r.Unidades);
+    old['Valor donado (€)'] += num(r.Valor);
+    old['Nº líneas'] += 1;
+    evMap.set(ev, old);
+  });
+  const eventSummary = [...evMap.values()].map(r => ({ Evento: r.Evento, Donantes: [...r.Donantes].join(' | '), Productos: [...r.Productos].join(' | '), 'Unidades donadas': round(r['Unidades donadas'],3), 'Valor donado (€)': round(r['Valor donado (€)'],2), 'Nº líneas': r['Nº líneas'] }))
+    .sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
+  const prodMap = new Map();
+  detail.forEach(r => {
+    const prod = trim(r.Producto) || 'Sin producto';
+    const old = prodMap.get(prod) || { Producto: prod, Unidades: 0, Valor: 0 };
+    old.Unidades += num(r.Unidades); old.Valor += num(r.Valor); prodMap.set(prod, old);
+  });
+  const prodRows = [...prodMap.values()].map(r => ({ Producto: r.Producto, Unidades: round(r.Unidades,3), Valor: round(r.Valor,2) })).sort((a,b)=>num(b.Unidades)-num(a.Unidades) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const detailRows = detail.map(r => detailColumns.map(c => text(r[c])));
+  const eventColumns = ['Evento','Donantes','Productos','Unidades donadas','Valor donado (€)','Nº líneas'];
+  const prodColumns = ['Producto','Unidades','Valor'];
+  const answer = rows.length
+    ? `He encontrado ${detail.length} línea(s) agrupada(s) de donaciones para ${titleNames}. Aparecen en ${eventSummary.length} evento(s) y suman ${round(detail.reduce((a,r)=>a+num(r.Unidades),0),3)} unidades donadas.`
+    : `No he encontrado productos donados para ${titleNames} con los filtros actuales.`;
+  return {
+    ok: true,
+    rejected: false,
+    title: `Productos donados por ${titleNames}`,
+    answer,
+    warnings: rows.length ? [] : [`Se revisó el módulo DONACIONES, pero no hay líneas para ${titleNames}.`],
+    charts: prodRows.length ? [{ title: `Productos donados por ${titleNames}`, type: 'horizontalBar', labels: prodRows.slice(0,30).map(r=>r.Producto), values: prodRows.slice(0,30).map(r=>r.Unidades), unit: 'uds' }] : [],
+    tables: [
+      ...(eventSummary.length ? [{ title: 'Eventos donde aparecen esas donaciones', columns: eventColumns, rows: eventSummary.map(r=>eventColumns.map(c=>text(r[c])))}] : []),
+      ...(prodRows.length ? [{ title: 'Productos donados agrupados', columns: prodColumns, rows: prodRows.map(r=>prodColumns.map(c=>text(r[c])))}] : []),
+      ...(detailRows.length ? [{ title: 'Detalle de donaciones', columns: detailColumns, rows: detailRows.slice(0,500)}] : [])
+    ],
+    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
+    provider: 'control-event-analitica-donaciones',
+    model: 'calculo-local-oficial'
+  };
+}
+function directHighConfidenceResultIfApplicable(prompt, context) {
+  return directProductConsumptionResultIfApplicable(prompt, context)
+    || directDonorDonationProductsIfApplicable(prompt, context)
+    || directBoughtDonatedUsageIfApplicable(prompt, context);
+}
 function isProductConsumptionAnalysisPrompt(prompt) {
   const p = norm(prompt);
   return /\b(producto|productos|articulo|articulos|consumo|consumidos|consumidas|utilizado|utilizados|comprado|comprados|donado|donados)\b/.test(p)
@@ -934,7 +1053,8 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
   if (includeCompras) compras.forEach(r => rowsSrc.push({ origen:'Comprado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Importe), precio: num(r.Precio), detalle: trim(r['Ticket u otros gastos'] || ''), tercero: trim(r.Tienda || ''), responsable: trim(r.Responsable || '') }));
   if (includeDonaciones) donaciones.forEach(r => rowsSrc.push({ origen:'Donado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Valor), precio: num(r.Precio), detalle: trim(r['Tipo de donación'] || ''), tercero: trim(r.Donante || ''), responsable: trim(r.Responsable || '') }));
   if (!rowsSrc.length) return null;
-  const events = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean);
+  const eventMeta = arr(context.eventosObjetivo).map(e => ({ name: trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento), date: parseEventDateForSort(e?.['fecha ini'] || e?.fechaIni || e?.Fecha || '') })).filter(e => e.name);
+  const events = eventMeta.map(e => e.name);
   const byProduct = new Map();
   rowsSrc.forEach(r => {
     const key = r.producto || 'Sin producto';
@@ -950,6 +1070,7 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
   const summary = [...byProduct.values()].map(r => ({ ...r, Eventos: [...r.Eventos].join(' | '), 'Unidades total': round(r['Unidades total'],3), 'Coste/valor total (€)': round(r['Coste/valor total (€)'],2), 'Comprado unidades': round(r['Comprado unidades'],3), 'Comprado importe (€)': round(r['Comprado importe (€)'],2), 'Donado unidades': round(r['Donado unidades'],3), 'Donado valor (€)': round(r['Donado valor (€)'],2) }));
   const byCost = summary.slice().sort((a,b)=>num(b['Coste/valor total (€)'])-num(a['Coste/valor total (€)']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
   const byUnits = summary.slice().sort((a,b)=>num(b['Unidades total'])-num(a['Unidades total']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const limit = firstRankingLimitInPrompt(prompt, 25);
   const detailColumns = ['Evento','Origen','Producto','Unidades','Precio','Importe/Valor','Ticket/Tipo','Tienda/Donante','Responsable'];
   const detailRows = rowsSrc.slice().sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es')).map(r => [r.evento, r.origen, r.producto, String(round(r.unidades,3)), String(round(r.precio,4)), String(round(r.importe,2)), r.detalle, r.tercero, r.responsable]);
   const columns = ['Producto','Unidades total','Coste/valor total (€)','Comprado unidades','Comprado importe (€)','Donado unidades','Donado valor (€)','Nº líneas','Eventos'];
@@ -958,28 +1079,48 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
   const titleEvents = events.length ? ` - ${events.join(' | ')}` : '';
   const totalCost = round(summary.reduce((acc,r)=>acc+num(r['Coste/valor total (€)']),0),2);
   const totalUnits = round(summary.reduce((acc,r)=>acc+num(r['Unidades total']),0),3);
+  const wantsTemporal = /\b(temporal|tiempo|fecha|fechas|cronologico|cronológico|evolucion|evolución|por\s+evento|cada\s+evento)\b/.test(p);
+  const topProductsForTemporal = byUnits.slice(0, limit).map(r => r.Producto);
+  const sortedEventNames = (eventMeta.length ? eventMeta.slice().sort((a,b)=>a.date-b.date || a.name.localeCompare(b.name,'es')).map(e=>e.name) : events).filter(Boolean);
+  const eventProduct = new Map();
+  rowsSrc.forEach(r => {
+    const key = `${r.evento}|${r.producto}`;
+    const old = eventProduct.get(key) || { Evento: r.evento, Producto: r.producto, 'Unidades total': 0, 'Comprado unidades': 0, 'Donado unidades': 0, 'Coste/valor (€)': 0 };
+    old['Unidades total'] += num(r.unidades);
+    old['Coste/valor (€)'] += num(r.importe);
+    if (r.origen === 'Comprado') old['Comprado unidades'] += num(r.unidades); else old['Donado unidades'] += num(r.unidades);
+    eventProduct.set(key, old);
+  });
+  const eventProductRows = [...eventProduct.values()]
+    .filter(r => !topProductsForTemporal.length || topProductsForTemporal.includes(r.Producto))
+    .map(r => ({ ...r, 'Unidades total': round(r['Unidades total'],3), 'Comprado unidades': round(r['Comprado unidades'],3), 'Donado unidades': round(r['Donado unidades'],3), 'Coste/valor (€)': round(r['Coste/valor (€)'],2) }))
+    .sort((a,b)=>sortedEventNames.indexOf(a.Evento)-sortedEventNames.indexOf(b.Evento) || num(b['Unidades total'])-num(a['Unidades total']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const temporalSeries = topProductsForTemporal.map(prod => ({ name: prod, values: sortedEventNames.map(ev => round(eventProduct.get(`${ev}|${prod}`)?.['Unidades total'] || 0, 3)) }));
+  const temporalChart = wantsTemporal && sortedEventNames.length ? [{ title: `Consumo temporal por evento · Top ${topProductsForTemporal.length} productos`, type: 'stackedBar', labels: sortedEventNames, series: temporalSeries, unit: 'uds' }] : [];
   return {
     ok: true,
     rejected: false,
     title: `Productos consumidos${titleEvents}`,
-    answer: `He agrupado ${rowsSrc.length} línea(s) de ${includeCompras?'COMPRAS':''}${includeCompras&&includeDonaciones?' + ':''}${includeDonaciones?'DONACIONES':''} por producto. Total agrupado: ${totalUnits} unidades y ${totalCost} €. Incluyo dos gráficas: una ordenada de mayor a menor coste/valor y otra de mayor a menor unidades.`,
-    warnings: arr(context.advertencias).concat(['Respuesta de respaldo analítico de ControlEvent: se usa cuando Zuzu no devuelve JSON final válido. Los cálculos se hacen sobre módulos oficiales extraídos y se entregan en gráficas/tablas descargables.']),
+    answer: `He agrupado ${rowsSrc.length} línea(s) de ${includeCompras?'COMPRAS':''}${includeCompras&&includeDonaciones?' + ':''}${includeDonaciones?'DONACIONES':''} por producto. Total agrupado: ${totalUnits} unidades y ${totalCost} €. ${wantsTemporal ? `Además separo el Top ${topProductsForTemporal.length} por evento en orden temporal.` : 'Incluyo ranking por coste/valor y por unidades.'}`,
+    warnings: arr(context.advertencias),
     charts: [
-      { title: 'Productos consumidos ordenados por coste/valor', type: 'horizontalBar', labels: byCost.slice(0,30).map(r=>r.Producto), values: byCost.slice(0,30).map(r=>round(r['Coste/valor total (€)'],2)), unit: '€' },
-      { title: 'Productos consumidos ordenados por unidades', type: 'horizontalBar', labels: byUnits.slice(0,30).map(r=>r.Producto), values: byUnits.slice(0,30).map(r=>round(r['Unidades total'],3)), unit: 'ud' }
+      ...temporalChart,
+      { title: `Top ${Math.min(limit, byUnits.length)} productos por unidades`, type: 'horizontalBar', labels: byUnits.slice(0,limit).map(r=>r.Producto), values: byUnits.slice(0,limit).map(r=>round(r['Unidades total'],3)), unit: 'ud' },
+      { title: `Top ${Math.min(limit, byCost.length)} productos por coste/valor`, type: 'horizontalBar', labels: byCost.slice(0,limit).map(r=>r.Producto), values: byCost.slice(0,limit).map(r=>round(r['Coste/valor total (€)'],2)), unit: '€' }
     ],
     tables: [
-      { title: 'Ranking por coste/valor', columns, rows: tableCostRows.slice(0,80) },
-      { title: 'Ranking por unidades', columns, rows: tableUnitsRows.slice(0,80) },
+      { title: `Ranking por unidades · Top ${Math.min(limit, byUnits.length)}`, columns, rows: tableUnitsRows.slice(0,limit) },
+      { title: `Ranking por coste/valor · Top ${Math.min(limit, byCost.length)}`, columns, rows: tableCostRows.slice(0,limit) },
+      ...(wantsTemporal ? [{ title: `Detalle temporal por evento y producto · Top ${topProductsForTemporal.length}`, columns: ['Evento','Producto','Unidades total','Comprado unidades','Donado unidades','Coste/valor (€)'], rows: eventProductRows.map(r=>['Evento','Producto','Unidades total','Comprado unidades','Donado unidades','Coste/valor (€)'].map(c=>text(r[c]))).slice(0,500) }] : []),
       { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
     ],
     files: [
-      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
-      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
-      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_1_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
     ],
-    provider: 'control-event-productos-consumidos-fallback',
-    model: 'respaldo-local-si-gemini-no-estructura'
+    provider: 'control-event-analitica-productos',
+    model: 'calculo-local-oficial'
   };
 }
 
@@ -987,6 +1128,8 @@ function directDeterministicResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const productConsumption = directProductConsumptionResultIfApplicable(prompt, context);
   if (productConsumption) return productConsumption;
+  const donorDonations = directDonorDonationProductsIfApplicable(prompt, context);
+  if (donorDonations) return donorDonations;
   // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
   // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
   const personSearch = directPersonAppearanceIfApplicable(prompt, context);
@@ -1015,7 +1158,8 @@ function directDeterministicResultIfApplicable(prompt, context) {
   if (isTransformAnalysisPrompt(prompt)) return null;
   if (!isModuleDataPrompt(prompt)) return null;
   const mods = context.modulosExtraidos || {};
-  const first = Object.keys(mods).find(k => Array.isArray(mods[k]));
+  const prefer = ['DONACIONES','COMPRAS','INGRESOS','TICKETS','DOCUMENTOS','PRODUCTOS','EVENTOS','TIENDAS','PERSONAS'];
+  const first = prefer.find(k => Array.isArray(mods[k])) || Object.keys(mods).find(k => Array.isArray(mods[k]));
   if (!first) return null;
   const rows = arr(mods[first]);
   const columns = orderedColumnsForModule(first, rows);
@@ -1028,22 +1172,22 @@ function directDeterministicResultIfApplicable(prompt, context) {
     ['Registros extraídos', String(rows.length)],
     ['Registros fuente sin filtros', String(audit?.registrosFuenteSinFiltros ?? rows.length)],
     ['Filtros aplicados', audit?.filtrosAplicados ? JSON.stringify(audit.filtros || {}) : 'NO'],
-    ['Motor', 'ControlEvent local, diagnóstico de módulos']
+    ['Motor', 'ControlEvent local, consulta directa de módulos']
   ];
   return {
     ok: true,
     rejected: false,
-    title: `${first} extraído por ControlEvent`,
-    answer: `ControlEvent ha extraído ${rows.length} registro(s) del módulo ${first}${eventos ? ` para ${eventos}` : ''}. En esta fase de diagnóstico no se usa Zuzu para transformar los datos; se prioriza comprobar que el módulo devuelve los registros correctos y legibles.`,
+    title: `${first}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `He encontrado ${rows.length} registro(s) en ${first}${eventos ? ` para ${eventos}` : ''}. Te lo dejo en tabla y CSV para que puedas revisarlo o cruzarlo con otro dato.`,
     warnings: arr(context.advertencias),
     charts: [],
     tables: [
-      { title: 'Auditoría de extracción', columns: ['Dato','Valor'], rows: auditRows },
+      { title: 'Resumen de extracción', columns: ['Dato','Valor'], rows: auditRows },
       ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
     ],
-    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
-    provider: 'control-event-local-deterministico',
-    model: 'diagnostico-modulos-sin-gemini'
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    provider: 'control-event-local-consulta-directa',
+    model: 'consulta-modulos-sin-gemini'
   };
 }
 
@@ -1085,7 +1229,7 @@ function directGraphResultIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
-    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_1_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-graficas'
   };
@@ -1192,7 +1336,7 @@ async function callGeminiEvent(prompt, context) {
           warnings: ['Zuzu no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
           charts: [],
           tables: [],
-          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_1_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
           provider: 'gemini-rest-json-fallback',
           model
         };
@@ -1378,6 +1522,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     };
   }
 
+  const highConfidence = directHighConfidenceResultIfApplicable(userPrompt, context);
+  if (highConfidence) return highConfidence;
+
   try {
     return await callGeminiEvent(userPrompt, context);
   } catch (error) {
@@ -1393,7 +1540,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
 }
 
 
-// v18_prod - Planificación inicial asistida por Zuzu.
+// v18.1_prod - Planificación inicial asistida por Zuzu.
 function planAiSchema() {
   return {
     type: 'OBJECT',
@@ -4529,7 +4676,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v18_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
+    version: 'v18.1_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
     provider: aiProvider,
     model: aiModel,
     mode: m,
