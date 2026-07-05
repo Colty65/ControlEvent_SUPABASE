@@ -1,9 +1,9 @@
-/* ControlEvent v18_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.2_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18_prod';
+  var VERSION='v18.2_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -193,12 +193,12 @@
       var t=$('ceAiThinkingTitle'), d=$('ceAiThinkingDetail'), c=$('ceAiThinkingCounter');
       if(t) t.textContent=step.title;
       if(d) d.textContent=step.detail;
-      if(c) c.textContent='Actualizando cada 3 s · '+(idx+1)+'/'+steps.length;
+      if(c) c.textContent='Avance visual rápido · '+(idx+1)+'/'+steps.length;
       setStatus(step.title.replace(/^Fase\s*\d+\s*·\s*/,'Zuzu: '), 'ok');
       idx += 1;
     }
     paint();
-    window.__ceZuzuThinkingTimer=setInterval(paint,3000);
+    window.__ceZuzuThinkingTimer=setInterval(paint,650);
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); }
   async function runAi(){
