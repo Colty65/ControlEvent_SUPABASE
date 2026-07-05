@@ -1,9 +1,9 @@
-/* ControlEvent v18.3_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.4_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.3_prod';
+  var VERSION='v18.4_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -199,21 +199,24 @@
     var resEl=$('ceAiResult');
     if(!resEl) return;
     var steps=buildZuzuThinkingSteps(prompt);
-    window.__ceZuzuThinkingState={steps:steps,idx:0};
+    window.__ceZuzuThinkingState={steps:steps,idx:0,startedAt:Date.now()};
     resEl.innerHTML='<div class="ce-ai-card ce-ai-loading" id="ceAiThinkingCard"><h3>🧡 Zuzu está pensando...</h3><div class="ce-ai-thinking"><div class="ce-ai-thinking-orb" aria-hidden="true"></div><div class="ce-ai-thinking-lines is-live"><span class="ce-ai-step-title" id="ceAiThinkingTitle"></span><small id="ceAiThinkingDetail"></small><small class="ce-ai-step-counter" id="ceAiThinkingCounter"></small><div class="ce-ai-progress"><div class="ce-ai-progress-fill" id="ceAiThinkingProgress"></div></div></div></div></div>';
     paintZuzuThinkingState();
-    window.__ceZuzuThinkingTimer=setInterval(paintZuzuThinkingState,220);
+    window.__ceZuzuThinkingTimer=setInterval(paintZuzuThinkingState,160);
   }
   function sleepZuzu(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
   async function finishZuzuThinkingFast(){
     clearZuzuThinkingTimer();
     var st=window.__ceZuzuThinkingState;
     if(!st || !st.steps || !st.steps.length || !$('ceAiThinkingCard')) return;
+    var minVisible=1050;
+    var elapsed=Date.now()-(st.startedAt||Date.now());
+    if(elapsed<minVisible) await sleepZuzu(minVisible-elapsed);
     var guard=0;
     while(st.idx < st.steps.length && guard < 10){
       paintZuzuThinkingState();
       guard += 1;
-      await sleepZuzu(55);
+      await sleepZuzu(140);
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
