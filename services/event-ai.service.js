@@ -355,6 +355,7 @@ Arquitectura obligatoria ya ejecutada por ControlEvent:
 1) Gemini/planificador ha deducido los módulos necesarios.
 2) ControlEvent ha extraído esos módulos desde la app, en registros legibles y sin códigos internos.
 3) Ahora recibes TODOS los registros entregados por esos módulos y el prompt original del usuario. Tu trabajo es cocinar/formatear la respuesta final exactamente según lo pedido.
+4) ControlEvent NO debe decidir la conclusión por ti: si el contexto entregado no alcanza, debes pedir el dato o módulo que falta en warnings/answer, no inventar una respuesta cómoda.
 
 Reglas obligatorias:
 - Usa exclusivamente modulosExtraidos y metricasCanonicas. No inventes datos ni completes huecos por intuición.
@@ -373,7 +374,8 @@ Reglas obligatorias:
 - Para “producto/artículo más utilizado comprado/donado”, mide por Unidades, separando Comprado y Donado si el usuario lo pide.
 - Para listados, usa todos los registros relevantes. Puedes resumir en la respuesta principal, pero aporta una tabla o fichero si procede.
 - No generes SQL. No expliques claves internas. No propongas cambios en base de datos.
-- Si detectas que el contexto no contiene un módulo necesario para responder, dilo claramente en warnings.
+- Si detectas que el contexto no contiene un módulo necesario para responder, dilo claramente en warnings y formula una petición concreta de ampliación de contexto para ControlEvent, por ejemplo: "Necesito COMPRAS y DONACIONES de todos los eventos de 2025".
+- Si necesitas más datos de ControlEvent para responder con precisión, no completes por intuición: responde con una solicitud concreta de información adicional y qué módulo/eventos deberían extraerse.
 - Responde siempre en español.
 
 Campos oficiales por módulo:

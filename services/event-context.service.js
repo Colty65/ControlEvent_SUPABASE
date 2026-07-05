@@ -914,7 +914,7 @@ function zuzuAllEventsRequested(prompt, plan = {}) {
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim);
   return plan?.todosLosEventos === true
     || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))
-    || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos)\b/i.test(prompt);
+    || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos|celebraciones|los\s+\d+\s+eventos|las\s+\d+\s+celebraciones|a[nñ]o\s+20\d{2}|durante\s+20\d{2})\b/i.test(prompt);
 }
 function zuzuOnlyGlobalMasterModules(modules) {
   const masters = new Set(['EVENTOS','PRODUCTOS','TIENDAS','PERSONAS']);
@@ -939,6 +939,9 @@ function zuzuInferModulesLocal(prompt) {
   if (/\b(persona|personas|socio|socios)\b/.test(p) && !/\b(asistente|asistentes|ingreso|ingresos)\b/.test(p)) mods.add('PERSONAS');
   if (/\b(responsable|responsables)\b/.test(p)) { mods.add('COMPRAS'); mods.add('DONACIONES'); }
   if (/\b(busca|buscar|aparecen|aparece)\b/.test(p) && /\b(colaborador|colaboradores|responsable|responsables|donante|donantes)\b/.test(p)) { mods.add('INGRESOS'); mods.add('COMPRAS'); mods.add('DONACIONES'); mods.add('PERSONAS'); }
+  if (/\b(dispersion|dispersi[oó]n|tendencia|x\s*,?\s*y|evoluci[oó]n|serie\s+temporal|linea\s+temporal|l[ií]nea\s+temporal|grafica|gráfica|estadistica|estadística|comparativa|compara|comparar)\b/.test(p) && /\b(producto|productos|consumo|consumidos|comprados|donados)\b/.test(p)) {
+    ['EVENTOS','COMPRAS','DONACIONES','PRODUCTOS'].forEach(m=>mods.add(m));
+  }
   if (/\b(valoracion|valoración|dashboard|grafica|gráfica|estadistica|estadística|comparativa|compara|comparar)\b/.test(p)) {
     if (/\b(todo|todos|todas|global|general|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|tk|ticket|tickets|documento|documentos|donacion|donaciones)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
     else if (!mods.size) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES'].forEach(m=>mods.add(m));
@@ -1400,7 +1403,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-1-ALCANCE-EVENTOS', regla: 'Si el usuario cita eventos entre comillas, solo se usan esos eventos. No se añaden eventos parecidos por ordinal, fecha o palabras comunes.' },
       { id: 'EXP-2-COMPARATIVA-EVENTOS', regla: 'Una comparativa entre eventos debe calcular una fila por evento y por módulo solicitado. Está prohibido mezclar datos de eventos no citados.' },
       { id: 'EXP-3-FLUJO-ZUZU', regla: 'Primero se planifican módulos, después ControlEvent extrae datos completos y humanizados, y finalmente Gemini cocina/formatea la respuesta usando el prompt original y esos datos.' },
-      { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' }
+      { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
+      { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Gemini debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' }
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',
