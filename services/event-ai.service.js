@@ -368,6 +368,8 @@ Reglas obligatorias:
 - Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
+- Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
+- Si ControlEvent te entrega COMPRAS/DONACIONES/PRODUCTOS, úsalo como datos operativos; EVENTOS solo sirve para identificar título/fechas, no para construir una gráfica de consumo.
 - Tipos de gráfica disponibles: bar, horizontalBar, pie, donut, line y stackedBar. Para comparativas entre eventos usa bar/stackedBar. Para repartos por tipo usa pie/donut. Para rankings largos usa horizontalBar.
 - Para stackedBar rellena labels con las categorías y series con [{name, values}].
 - Para DONACIONES, suma el campo Valor. Para COMPRAS, suma Importe. Para INGRESOS, el total por línea es Importe obligatorio + Importe voluntario.
@@ -914,8 +916,78 @@ function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const cols=['Evento','Registros','Total'];
   return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v17_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
 }
+
+function isProductConsumptionAnalysisPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(producto|productos|articulo|articulos|consumo|consumidos|consumidas|utilizado|utilizados|comprado|comprados|donado|donados)\b/.test(p)
+    && /\b(grafica|gráfica|grafico|gráfico|barras|ranking|ordena|ordenar|coste|costes|importe|unidades|cantidad|cantidades|mas|menos|mayor|menor)\b/.test(p);
+}
+function directProductConsumptionResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isProductConsumptionAnalysisPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const compras = arr(mods.COMPRAS);
+  const donaciones = arr(mods.DONACIONES);
+  const p = norm(prompt);
+  const includeCompras = compras.length && (!/\bdonado|donados|donaciones\b/.test(p) || /\bcomprado|comprados|compras?|consumid/.test(p));
+  const includeDonaciones = donaciones.length && (!/\bcomprado|comprados|compras\b/.test(p) || /\bdonado|donados|donaciones|consumid/.test(p));
+  const rowsSrc = [];
+  if (includeCompras) compras.forEach(r => rowsSrc.push({ origen:'Comprado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Importe), precio: num(r.Precio), detalle: trim(r['Ticket u otros gastos'] || ''), tercero: trim(r.Tienda || ''), responsable: trim(r.Responsable || '') }));
+  if (includeDonaciones) donaciones.forEach(r => rowsSrc.push({ origen:'Donado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Valor), precio: num(r.Precio), detalle: trim(r['Tipo de donación'] || ''), tercero: trim(r.Donante || ''), responsable: trim(r.Responsable || '') }));
+  if (!rowsSrc.length) return null;
+  const events = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean);
+  const byProduct = new Map();
+  rowsSrc.forEach(r => {
+    const key = r.producto || 'Sin producto';
+    const old = byProduct.get(key) || { Producto:key, 'Unidades total':0, 'Coste/valor total (€)':0, 'Comprado unidades':0, 'Comprado importe (€)':0, 'Donado unidades':0, 'Donado valor (€)':0, 'Nº líneas':0, Eventos:new Set() };
+    old['Unidades total'] += num(r.unidades);
+    old['Coste/valor total (€)'] += num(r.importe);
+    if (r.origen === 'Comprado') { old['Comprado unidades'] += num(r.unidades); old['Comprado importe (€)'] += num(r.importe); }
+    else { old['Donado unidades'] += num(r.unidades); old['Donado valor (€)'] += num(r.importe); }
+    old['Nº líneas'] += 1;
+    if (r.evento) old.Eventos.add(r.evento);
+    byProduct.set(key, old);
+  });
+  const summary = [...byProduct.values()].map(r => ({ ...r, Eventos: [...r.Eventos].join(' | '), 'Unidades total': round(r['Unidades total'],3), 'Coste/valor total (€)': round(r['Coste/valor total (€)'],2), 'Comprado unidades': round(r['Comprado unidades'],3), 'Comprado importe (€)': round(r['Comprado importe (€)'],2), 'Donado unidades': round(r['Donado unidades'],3), 'Donado valor (€)': round(r['Donado valor (€)'],2) }));
+  const byCost = summary.slice().sort((a,b)=>num(b['Coste/valor total (€)'])-num(a['Coste/valor total (€)']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const byUnits = summary.slice().sort((a,b)=>num(b['Unidades total'])-num(a['Unidades total']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const detailColumns = ['Evento','Origen','Producto','Unidades','Precio','Importe/Valor','Ticket/Tipo','Tienda/Donante','Responsable'];
+  const detailRows = rowsSrc.slice().sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es')).map(r => [r.evento, r.origen, r.producto, String(round(r.unidades,3)), String(round(r.precio,4)), String(round(r.importe,2)), r.detalle, r.tercero, r.responsable]);
+  const columns = ['Producto','Unidades total','Coste/valor total (€)','Comprado unidades','Comprado importe (€)','Donado unidades','Donado valor (€)','Nº líneas','Eventos'];
+  const tableCostRows = byCost.map(r => columns.map(c => text(r[c])));
+  const tableUnitsRows = byUnits.map(r => columns.map(c => text(r[c])));
+  const titleEvents = events.length ? ` - ${events.join(' | ')}` : '';
+  const totalCost = round(summary.reduce((acc,r)=>acc+num(r['Coste/valor total (€)']),0),2);
+  const totalUnits = round(summary.reduce((acc,r)=>acc+num(r['Unidades total']),0),3);
+  return {
+    ok: true,
+    rejected: false,
+    title: `Productos consumidos${titleEvents}`,
+    answer: `He agrupado ${rowsSrc.length} línea(s) de ${includeCompras?'COMPRAS':''}${includeCompras&&includeDonaciones?' + ':''}${includeDonaciones?'DONACIONES':''} por producto. Total agrupado: ${totalUnits} unidades y ${totalCost} €. Incluyo dos gráficas: una ordenada de mayor a menor coste/valor y otra de mayor a menor unidades.`,
+    warnings: arr(context.advertencias).concat(['Respuesta de respaldo analítico de ControlEvent: se usa cuando Gemini no devuelve JSON final válido. Los cálculos se hacen sobre módulos oficiales extraídos y se entregan en gráficas/tablas descargables.']),
+    charts: [
+      { title: 'Productos consumidos ordenados por coste/valor', type: 'horizontalBar', labels: byCost.slice(0,30).map(r=>r.Producto), values: byCost.slice(0,30).map(r=>round(r['Coste/valor total (€)'],2)), unit: '€' },
+      { title: 'Productos consumidos ordenados por unidades', type: 'horizontalBar', labels: byUnits.slice(0,30).map(r=>r.Producto), values: byUnits.slice(0,30).map(r=>round(r['Unidades total'],3)), unit: 'ud' }
+    ],
+    tables: [
+      { title: 'Ranking por coste/valor', columns, rows: tableCostRows.slice(0,80) },
+      { title: 'Ranking por unidades', columns, rows: tableUnitsRows.slice(0,80) },
+      { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
+    ],
+    files: [
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v17_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v17_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v17_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+    ],
+    provider: 'control-event-productos-consumidos-fallback',
+    model: 'respaldo-local-si-gemini-no-estructura'
+  };
+}
+
 function directDeterministicResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
+  const productConsumption = directProductConsumptionResultIfApplicable(prompt, context);
+  if (productConsumption) return productConsumption;
   // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
   // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
   const personSearch = directPersonAppearanceIfApplicable(prompt, context);
@@ -938,6 +1010,10 @@ function directDeterministicResultIfApplicable(prompt, context) {
   if (gr) return gr;
   const list = directModuleResultIfApplicable(prompt, context);
   if (list) return list;
+  // No convertir una petición de análisis/gráficas en una auditoría técnica.
+  // Si Gemini no estructura y tampoco hay una salida local específica, se debe decir que falta respuesta,
+  // no enseñar una gráfica de campos técnicos del módulo EVENTOS.
+  if (isTransformAnalysisPrompt(prompt)) return null;
   if (!isModuleDataPrompt(prompt)) return null;
   const mods = context.modulosExtraidos || {};
   const first = Object.keys(mods).find(k => Array.isArray(mods[k]));
@@ -977,6 +1053,10 @@ function directGraphResultIfApplicable(prompt, context) {
   const p = norm(prompt);
   if (!/\b(grafica|gráfica|grafico|gráfico|diagrama|barras|tarta)\b/.test(p)) return null;
   const mods = context.modulosExtraidos || {};
+  if (/\b(producto|productos|consumo|consumidos|consumidas|utilizado|utilizados)\b/.test(p) && (Array.isArray(mods.COMPRAS) || Array.isArray(mods.DONACIONES))) {
+    const pc = directProductConsumptionResultIfApplicable(prompt, context);
+    if (pc) return pc;
+  }
   let moduleName = '';
   if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) moduleName = 'COMPRAS';
   else if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) moduleName = 'DONACIONES';
@@ -1046,7 +1126,27 @@ function normalizeResult(raw, model) {
   };
 }
 function geminiOutText(payload) { return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || ''; }
-function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
+function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|504|aborted|abort|tard[oó] demasiado|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
+
+
+async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body), signal: controller.signal });
+    const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+    return { res, payload };
+  } catch (error) {
+    if (error && (error.name === 'AbortError' || /abort/i.test(text(error.message)))) {
+      const e = new Error(`Gemini tardó demasiado y se abortó a los ${Math.round(timeoutMs/1000)} s`);
+      e.status = 504;
+      throw e;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function callGeminiEvent(prompt, context) {
   const apiKey = geminiKey();
@@ -1056,15 +1156,14 @@ async function callGeminiEvent(prompt, context) {
     throw err;
   }
   let lastError = null;
-  for (const model of configuredGeminiModels()) {
+  for (const model of configuredGeminiModels().slice(0, 2)) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: systemPrompt(prompt, context) }] }],
       generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2 }
     };
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body) });
-      const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 35000);
       if (!res.ok) {
         const e = new Error(payload?.error?.message || `Gemini HTTP ${res.status}`);
         e.status = Number(res.status || 502);
@@ -1079,9 +1178,9 @@ async function callGeminiEvent(prompt, context) {
         // v11_3_3 hotfix: nunca mostrar al usuario una respuesta cruda/rota de Gemini.
         // Si Gemini no respeta el JSON, se entrega una salida estructurada de ControlEvent
         // con los datos canónicos y una advertencia.
-        const fallback = directDeterministicResultIfApplicable(prompt, context) || directGraphResultIfApplicable(prompt, context) || directModuleResultIfApplicable(prompt, context);
+        const fallback = directProductConsumptionResultIfApplicable(prompt, context) || directDeterministicResultIfApplicable(prompt, context) || directGraphResultIfApplicable(prompt, context) || (!isTransformAnalysisPrompt(prompt) ? directModuleResultIfApplicable(prompt, context) : null);
         if (fallback) {
-          fallback.warnings = arr(fallback.warnings).concat('Gemini no devolvió JSON estructurado válido; se ha usado una salida estructurada de ControlEvent para no mostrar datos crudos ni desformateados.');
+          fallback.warnings = arr(fallback.warnings).concat('Gemini fue llamado pero no devolvió JSON estructurado válido; ControlEvent muestra una salida analítica estructurada para no dejar una pantalla inútil.');
           fallback.provider = `${fallback.provider || 'control-event'}-json-fallback`;
           fallback.model = 'formato-local-por-json-invalido';
           return fallback;
@@ -1265,9 +1364,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   try {
     return await callGeminiEvent(userPrompt, context);
   } catch (error) {
-    const fallback = directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
+    const fallback = directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
     if (fallback) {
-      fallback.warnings = arr(fallback.warnings).concat(`Gemini no pudo completar la respuesta final: ${trim(error?.message || error)}. Se muestra respaldo local de ControlEvent.`);
+      fallback.warnings = arr(fallback.warnings).concat(`Gemini no pudo completar la respuesta final: ${trim(error?.message || error)}. Se muestra respaldo analítico de ControlEvent basado en los módulos oficiales, no una auditoría técnica.`);
       fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
       fallback.model = 'sin-gemini-por-error';
       return fallback;

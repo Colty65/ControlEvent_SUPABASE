@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod FIX49_ZUZU_TAREAS_GEMINI_INDEPENDIENTE
+/* ControlEvent v17_prod FIX50_ZUZU_CALIDAD_ANALITICA
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Bienvenida sin evento en cualquier dispositivo: ColtyLAB muestra ficha informativa en vez de avance vacío. */
 (function(){
@@ -8,7 +8,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v17_prod_FIX49_ZUZU_TAREAS_GEMINI_INDEPENDIENTE';
+  const VERSION_LABEL = 'v17_prod_FIX50_ZUZU_CALIDAD_ANALITICA';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
