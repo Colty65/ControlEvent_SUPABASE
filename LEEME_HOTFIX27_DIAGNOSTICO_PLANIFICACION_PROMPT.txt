@@ -11,7 +11,7 @@ Cambios incluidos:
 
 1. Botón nuevo en Planificación inicial
 - Se añade el botón "Diagnosticar prompt" junto a "Generar propuesta".
-- No llama a Gemini ni genera evento.
+- No llama a Zuzu ni genera evento.
 - Lee únicamente el campo "Información para la construcción".
 - Extrae los productos que estén dentro de bloques:
   PRODUCTO EN LA PEÑA

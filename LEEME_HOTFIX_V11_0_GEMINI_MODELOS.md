@@ -1,4 +1,4 @@
-# Hotfix v11.1_prod - Gemini modelos soportados
+# Hotfix v11.1_prod - Zuzu modelos soportados
 
 Este hotfix no cambia la versión visible de la app: se mantiene **v11.1_prod**.
 

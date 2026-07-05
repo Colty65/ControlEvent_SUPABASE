@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod - RESCATE ESTABLE
+/* ControlEvent v18_prod - RESCATE ESTABLE
    Este módulo sustituye el estabilizador anterior porque repintaba varias veces la vista activa
    al cambiar de menú/evento y provocaba temblores, pérdida de foco en buscadores y cargas duplicadas.
    No hace render automático ni intervalos. Se deja solo una API manual por compatibilidad. */
@@ -6,7 +6,7 @@
   'use strict';
   if(window.__ceViewRefreshStabilizerStable1043) return;
   window.__ceViewRefreshStabilizerStable1043 = true;
-  const VERSION = 'ControlEvent v17_prod';
+  const VERSION = 'ControlEvent v18_prod';
   const stats = {version: VERSION, installed: true, mode: 'disabled-auto-refresh', hydrations: 0, schedules: 0};
   function getFn(name){ try{ return typeof window[name] === 'function' ? window[name] : null; }catch(_){ return null; } }
   function hydrate(tab, reason){

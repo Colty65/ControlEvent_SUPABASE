@@ -1,6 +1,6 @@
 ControlEvent v16_prod
 
-Mejora central: Gemini libre recibe ahora un contexto seguro y calculado mediante services/event-context.service.js.
+Mejora central: Zuzu libre recibe ahora un contexto seguro y calculado mediante services/event-context.service.js.
 
 No se permite SQL ni acceso directo a Supabase. El backend prepara un JSON de solo lectura con:
 - resumen de eventos,
@@ -12,4 +12,4 @@ No se permite SQL ni acceso directo a Supabase. El backend prepara un JSON de so
 - catálogos relacionados de productos, tiendas y responsables,
 - avisos de datos incompletos.
 
-También se refuerza el botón Cerrar de la ventana Gemini y se centra visualmente la situación del evento.
+También se refuerza el botón Cerrar de la ventana Zuzu y se centra visualmente la situación del evento.

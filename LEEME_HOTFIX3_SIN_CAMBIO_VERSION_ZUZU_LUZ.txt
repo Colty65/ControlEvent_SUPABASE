@@ -17,7 +17,7 @@ Cambios principales:
 
 2) ZUZU / CÁLCULOS
 - Se sustituyen las notas confusas por un resumen claro: compra final, coste/persona y reglas usadas.
-- Se eliminan mensajes contradictorios de Gemini sobre costes previos y coste final.
+- Se eliminan mensajes contradictorios de Zuzu sobre costes previos y coste final.
 - Si la primera propuesta supera 35 €/persona, se reduce hacia un rango realista con margen, evitando quedarse justo en 35 por redondeos.
 - Se recuerda que donaciones/existencias solo se descuentan si están confirmadas por prompt o histórico real.
 

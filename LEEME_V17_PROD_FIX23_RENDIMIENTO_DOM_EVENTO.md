@@ -1,4 +1,4 @@
-# ControlEvent v17_prod FIX23 - rendimiento DOM y carga por evento
+# ControlEvent v18_prod FIX23 - rendimiento DOM y carga por evento
 
 Base: FIX22.
 

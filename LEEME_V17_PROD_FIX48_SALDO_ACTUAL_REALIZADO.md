@@ -1,4 +1,4 @@
-# CE v17_prod FIX48 - Saldo actual realizado
+# CE v18_prod FIX48 - Saldo actual realizado
 
 Cambio mínimo aplicado sobre FIX47.
 
@@ -20,4 +20,4 @@ Cualquier otra situación, blanco, pendiente o texto no reconocido queda fuera d
 
 ## Alcance
 
-No se toca Planificación inicial, Gemini, compras, donaciones, gráficas, globos ni fotos.
+No se toca Planificación inicial, Zuzu, compras, donaciones, gráficas, globos ni fotos.

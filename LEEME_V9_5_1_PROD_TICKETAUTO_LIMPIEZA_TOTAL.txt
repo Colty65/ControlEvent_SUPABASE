@@ -11,7 +11,7 @@ Cambios incluidos:
 
 2) Aprovechamiento de pantalla
 - Eliminadas las líneas explicativas que ocupaban altura.
-- Eliminado el rótulo "Indicaciones adicionales para Gemini".
+- Eliminado el rótulo "Indicaciones adicionales para Zuzu".
 - Eliminada la línea de foto cargada como fila independiente.
 - Eliminada la explicación de compras previstas.
 - Eliminada la línea de conteo/resumen de compras Pte.Compra.

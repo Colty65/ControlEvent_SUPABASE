@@ -1,9 +1,9 @@
-/* ControlEvent v17_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v17_prod';
+  var VERSION='v18_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -162,7 +162,7 @@
     var f=zuzuPromptFlags(prompt);
     var steps=[];
     steps.push({title:'Fase 1 · Leo tu petición literal', detail:'Identifico si pides eventos concretos, año completo, productos, compras, donaciones, ingresos, tickets, documentos o gráficas.'});
-    steps.push({title:'Fase 2 · Pido a Gemini el plan de extracción', detail:'Gemini decide qué módulos necesita ControlEvent; si duda, debe pedir más contexto en vez de inventar.'});
+    steps.push({title:'Fase 2 · Zuzu decide módulos y filtros', detail:'Zuzu devuelve los módulos y filtros de datos que necesita; ControlEvent no manda todo, extrae solo lo necesario.'});
     if(f.allEvents) steps.push({title:'Fase 3 · Localizo eventos objetivo', detail:'Busco eventos por año, título, fechas y expresión “todos/celebraciones/eventos registrados”.'});
     else steps.push({title:'Fase 3 · Localizo el evento objetivo', detail:'Uso el evento activo y las referencias del texto para no mezclar eventos que no has pedido.'});
     var mods=[];
@@ -172,9 +172,9 @@
     if(f.docs) mods.push('DOCUMENTOS');
     if(!mods.length) mods.push('EVENTOS y módulos relacionados');
     steps.push({title:'Fase 4 · Extraigo datos oficiales de ControlEvent', detail:'Módulos previstos: '+mods.join(' · ')+'. Se entregan nombres humanos, no códigos internos.'});
-    if(f.charts) steps.push({title:'Fase 5 · Preparo datos para gráficas', detail:'Agrupo valores, fechas y productos para que Gemini pueda devolver charts, tablas y CSV de detalle.'});
-    else steps.push({title:'Fase 5 · Preparo tablas y métricas', detail:'Calculo totales oficiales, rankings y registros completos antes de entregar el contexto a Gemini.'});
-    steps.push({title:'Fase 6 · Gemini cocina la respuesta', detail:'Gemini recibe el prompt original más los módulos extraídos; ControlEvent no debe cambiar la conclusión por su cuenta.'});
+    if(f.charts) steps.push({title:'Fase 5 · Preparo datos para gráficas', detail:'Agrupo valores, fechas y productos para que Zuzu pueda devolver charts, tablas y CSV de detalle.'});
+    else steps.push({title:'Fase 5 · Preparo tablas y métricas', detail:'Calculo totales oficiales, rankings y registros completos antes de entregar el contexto a Zuzu.'});
+    steps.push({title:'Fase 6 · Zuzu cocina la respuesta', detail:'Zuzu recibe el prompt original más los módulos filtrados; ControlEvent no debe cambiar la conclusión por su cuenta.'});
     steps.push({title:'Fase 7 · Reviso formato y preparo salida', detail:'Valido JSON, gráficas, tablas y ficheros. Si falta información, Zuzu debe indicarlo claramente.'});
     return steps;
   }

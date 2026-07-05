@@ -17,7 +17,7 @@ Cambios aplicados sobre versión anterior:
 
 7. Corrección importante PRODUCTOS: si el producto ya existe, el refresco de precio se hace mediante actualización segura de default_precio/default_tienda_id, sin modificar nombre, segmento ni destino, y sin quedar bloqueado por uso del producto en eventos finalizados.
 
-8. Gemini recibe ahora las indicaciones adicionales con prioridad real:
+8. Zuzu recibe ahora las indicaciones adicionales con prioridad real:
    - puede añadir líneas indicadas explícitamente por el usuario,
    - puede aplicar IVA/recargos/descuentos según la explicación,
    - puede devolver segmento y destino si el usuario los indica.

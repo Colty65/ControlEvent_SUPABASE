@@ -1,4 +1,4 @@
-# ControlEvent v17_prod - FIX10 cierre, miniaturas y visor ticket
+# ControlEvent v18_prod - FIX10 cierre, miniaturas y visor ticket
 
 No cambia la versión visible.
 

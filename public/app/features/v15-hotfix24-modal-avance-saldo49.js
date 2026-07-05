@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod - HOTFIX49: limpia títulos duplicados, colorea avance, globos con cabecera/productos A-Z. */
+/* ControlEvent v18_prod - HOTFIX49: limpia títulos duplicados, colorea avance, globos con cabecera/productos A-Z. */
 (function(){
   'use strict';
   const INSTALLED='__ceV15Hotfix24ModalAvanceSaldo49';

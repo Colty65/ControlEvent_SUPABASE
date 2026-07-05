@@ -1,6 +1,6 @@
-# ControlEvent v17_prod - HOTFIX fotos Cálculos FIX5 FINAL
+# ControlEvent v18_prod - HOTFIX fotos Cálculos FIX5 FINAL
 
-No cambia la versión visible: se mantiene `v17_prod`.
+No cambia la versión visible: se mantiene `v18_prod`.
 
 ## Cambios aplicados
 

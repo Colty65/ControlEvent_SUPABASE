@@ -4,18 +4,18 @@ Cambios aplicados sobre v9.4_prod:
 
 1. Tickets IA / COMPRAS
 - Se elimina MATERIAL como opción proponible del desplegable SEGMENTO.
-- Para material auxiliar tipo carbón, vasos, platos, hielo, bolsas, servilletas, etc., Gemini recibe instrucción de no proponer MATERIAL y usar INFRAESTRUCTURA si procede o dejarlo vacío.
+- Para material auxiliar tipo carbón, vasos, platos, hielo, bolsas, servilletas, etc., Zuzu recibe instrucción de no proponer MATERIAL y usar INFRAESTRUCTURA si procede o dejarlo vacío.
 - La línea explicativa bajo “Alta asistida de COMPRAS” queda eliminada.
 - Eliminada la frase “Estas indicaciones se envían solo para el análisis de la foto actual”.
 - Los campos SEGMENTO y DESTINO pasan a desplegables reales en la tabla para evitar fallos de datalist y mejorar el despliegue de opciones.
 - La pantalla se compacta: botones de IA/manual/limpieza/proceso/recarga pasan a iconos.
 - El botón Tickets IA de COMPRAS queda como icono compacto 🧾✨ en la cabecera de COMPRAS, al lado derecho del título.
 
-2. Gemini / indicaciones adicionales
-- Gemini recibe ahora también la lista de responsables SOCIO y tiendas existentes como contexto.
+2. Zuzu / indicaciones adicionales
+- Zuzu recibe ahora también la lista de responsables SOCIO y tiendas existentes como contexto.
 - El JSON de respuesta admite campo responsable.
-- Si el usuario indica responsable, encargado o persona concreta, Gemini debe devolverlo y la pantalla intenta seleccionarlo automáticamente en el desplegable Responsable.
-- Aunque Gemini no lo devuelva, la pantalla analiza las indicaciones escritas y busca coincidencia con PERSONAS/SOCIO para seleccionar el responsable.
+- Si el usuario indica responsable, encargado o persona concreta, Zuzu debe devolverlo y la pantalla intenta seleccionarlo automáticamente en el desplegable Responsable.
+- Aunque Zuzu no lo devuelva, la pantalla analiza las indicaciones escritas y busca coincidencia con PERSONAS/SOCIO para seleccionar el responsable.
 - Las indicaciones adicionales siguen teniendo prioridad para añadir líneas, aplicar IVA, corregir importes, SEGMENTO y DESTINO.
 
 3. PRODUCTOS / precio

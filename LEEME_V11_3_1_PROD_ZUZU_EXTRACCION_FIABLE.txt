@@ -2,7 +2,7 @@ ControlEvent v16_prod - Correccion Zuzu extraccion fiable
 
 Objetivo:
 - Evitar que Zuzu entregue listados incompletos cuando el usuario pide datos concretos de un modulo.
-- Reducir la dependencia del criterio de Gemini para listados: ControlEvent extrae y entrega directamente los registros cuando la peticion es tipo lista/listado/dame/muestra/detalle.
+- Reducir la dependencia del criterio de Zuzu para listados: ControlEvent extrae y entrega directamente los registros cuando la peticion es tipo lista/listado/dame/muestra/detalle.
 
 Cambios principales:
 1. Deteccion de eventos mas fiable:
@@ -11,10 +11,10 @@ Cambios principales:
 
 2. Filtros seguros:
    - Los filtros que recortan lineas se toman de deteccion local contra catalogos reales.
-   - No se aplican filtros inventados por Gemini planner que puedan ocultar lineas reales.
+   - No se aplican filtros inventados por Zuzu planner que puedan ocultar lineas reales.
 
 3. Listados directos por ControlEvent:
-   - Si el usuario pide una lista de COMPRAS, DONACIONES, INGRESOS, TICKETS o DOCUMENTOS, ControlEvent devuelve la tabla extraida del modulo sin pedir a Gemini que la resuma.
+   - Si el usuario pide una lista de COMPRAS, DONACIONES, INGRESOS, TICKETS o DOCUMENTOS, ControlEvent devuelve la tabla extraida del modulo sin pedir a Zuzu que la resuma.
    - Se incluye CSV descargable con todas las lineas extraidas.
    - La respuesta indica cuantos registros se han extraido.
 

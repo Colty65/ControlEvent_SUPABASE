@@ -1,10 +1,10 @@
-/* ControlEvent v17_prod - cierre final de versión, Excel y visores sin bucles periódicos.
+/* ControlEvent v18_prod - cierre final de versión, Excel y visores sin bucles periódicos.
    Alcance: no cambia datos, Supabase ni render general. Evita setInterval y sólo actúa por eventos reales. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v17_prod';
-  const VERSION_FILE = 'ControlEvent_v17_prod';
+  const VERSION = 'ControlEvent v18_prod';
+  const VERSION_FILE = 'ControlEvent_v18_prod';
   const INSTALLED = '__ceV510ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

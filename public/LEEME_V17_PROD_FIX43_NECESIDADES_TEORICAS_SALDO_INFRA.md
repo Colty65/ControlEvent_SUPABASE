@@ -1,15 +1,15 @@
-# v17_prod_FIX43_NECESIDADES_TEORICAS_SALDO_INFRA
+# v18_prod_FIX43_NECESIDADES_TEORICAS_SALDO_INFRA
 
 Base: `CE_v17_PROD_FIX42_DIAGNOSTICO_NARANJA_DESTACADO.zip`.
 
 Cambios aplicados:
 
 1. Planificación inicial / Encargo total a Zuzu
-   - Cambio de estrategia: Gemini ya no devuelve compra final ni descuenta donaciones.
-   - Gemini recibe el prompt formateado sin bloques largos de donaciones, momentos del evento, reglas de consumo y catálogo útil.
-   - Gemini debe devolver primero `necesidadesTeoricas`: cantidades totales teóricas necesarias.
+   - Cambio de estrategia: Zuzu ya no devuelve compra final ni descuenta donaciones.
+   - Zuzu recibe el prompt formateado sin bloques largos de donaciones, momentos del evento, reglas de consumo y catálogo útil.
+   - Zuzu debe devolver primero `necesidadesTeoricas`: cantidades totales teóricas necesarias.
    - ControlEvent resta localmente las donaciones/existencias confirmadas y convierte el resultado en compra por déficit.
-   - Se mantiene el menú resumen y avisos si Gemini los devuelve.
+   - Se mantiene el menú resumen y avisos si Zuzu los devuelve.
 
 2. Regla de saldo positivo
    - Mantiene ajuste si saldo/compras > 25% hasta acercarse al 10%.

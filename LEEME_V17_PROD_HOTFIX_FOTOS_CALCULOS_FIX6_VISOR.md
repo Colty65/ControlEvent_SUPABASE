@@ -1,4 +1,4 @@
-# ControlEvent v17_prod - FIX6 visor fotos Cálculos
+# ControlEvent v18_prod - FIX6 visor fotos Cálculos
 
 Sin cambio de versión visible.
 

@@ -1,4 +1,4 @@
-# v17_prod FIX45 - revisión manual + límites de compra y proporciones
+# v18_prod FIX45 - revisión manual + límites de compra y proporciones
 
 Base: FIX44_NECESIDADES_ARRAY_REVISADO_OK.
 

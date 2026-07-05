@@ -1,4 +1,4 @@
-# ControlEvent v17_prod FIX21 - iPhone avance, inicio limpio y doble toque móvil
+# ControlEvent v18_prod FIX21 - iPhone avance, inicio limpio y doble toque móvil
 
 Base: CE_v17_PROD_FIX20_CIERRE_IPHONE_RESUMEN_MOVIL.zip
 

@@ -5,11 +5,11 @@ Cambios principales:
 - Botones: Zuzu, escobita para limpiar y descarga de resultado.
 - Corregido botón Limpiar: limpia prompt, resultado y estado.
 - Nueva arquitectura de Zuzu:
-  1) Gemini actúa primero como planificador seguro y devuelve módulos a usar.
+  1) Zuzu actúa primero como planificador seguro y devuelve módulos a usar.
   2) ControlEvent extrae datos completos, selectivos y humanizados desde los módulos indicados.
-  3) Gemini recibe el prompt original + el JSON preparado por ControlEvent y responde.
+  3) Zuzu recibe el prompt original + el JSON preparado por ControlEvent y responde.
 - Si el planificador no está disponible o falla por cuota, ControlEvent usa planificador local de respaldo.
-- Si la petición es ambigua o demasiado amplia, ControlEvent pide concreción antes de llamar a Gemini.
+- Si la petición es ambigua o demasiado amplia, ControlEvent pide concreción antes de llamar a Zuzu.
 
 Módulos disponibles:
 - INGRESOS: Colaborador; Rango; Numero; Ingreso; Importe Obligatorio; Importe Voluntario; Just.ing; Total calculado.

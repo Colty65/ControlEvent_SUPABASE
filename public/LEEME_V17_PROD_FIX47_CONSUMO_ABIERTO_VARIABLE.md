@@ -1,4 +1,4 @@
-# v17_prod FIX47 - consumo abierto variable
+# v18_prod FIX47 - consumo abierto variable
 
 Cambios aplicados sobre FIX46:
 
@@ -8,17 +8,17 @@ Cambios aplicados sobre FIX46:
    - Si no se indica cena real, se calcula: `Cena real = Asistentes base / 2`.
    - Si el prompt trae rango, por ejemplo `Cena real: 15-20`, se conserva el rango y se usa el máximo operativo para cálculo.
 
-2. El contexto enviado a Gemini separa:
+2. El contexto enviado a Zuzu separa:
    - asistentes base,
    - consumo abierto,
    - cena real,
    - consumo declarado de cerveza/cubatas,
    - consumo de cálculo.
 
-3. Gemini debe usar consumo abierto para cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje; y cena real para barbacoa/cena.
+3. Zuzu debe usar consumo abierto para cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje; y cena real para barbacoa/cena.
 
 4. El cálculo local de emergencia también usa la misma regla de consumo abierto.
 
 5. La traza añade Base / Consumo abierto / Cena real en la fase de opciones.
 
-Versión visible: `v17_prod_FIX47_CONSUMO_ABIERTO_VARIABLE`.
+Versión visible: `v18_prod_FIX47_CONSUMO_ABIERTO_VARIABLE`.

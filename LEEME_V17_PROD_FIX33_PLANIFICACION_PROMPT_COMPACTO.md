@@ -1,4 +1,4 @@
-# CE v17_prod FIX33 - Planificación: prompt compacto variable para Gemini
+# CE v18_prod FIX33 - Planificación: prompt compacto variable para Zuzu
 
 Base: CE_v17_PROD_FIX32_PLANIFICACION_TRAZA_GEMINI.
 
@@ -7,8 +7,8 @@ Cambio limitado a Planificación inicial / Encargo total a Zuzu.
 Objetivo:
 - No condicionar la lógica al prompt de Santiago/Santa Ana; ese prompt queda solo como prueba dura.
 - Extraer un brief variable desde cualquier explicación libre del evento.
-- Enviar a Gemini un contexto compacto y útil, no un paquete de ~90.000 caracteres.
-- Evitar que, si Gemini falla, ControlEvent presente una compra 0 € como si fuera una propuesta calculada.
+- Enviar a Zuzu un contexto compacto y útil, no un paquete de ~90.000 caracteres.
+- Evitar que, si Zuzu falla, ControlEvent presente una compra 0 € como si fuera una propuesta calculada.
 
 Cambios principales:
 1. Extractor genérico de momentos por día:
@@ -24,7 +24,7 @@ Cambios principales:
    - EXISTENCIAS / YA TENEMOS / PRODUCTOS DONADOS
    Mantiene tipo, donante, responsable, producto y cantidad cuando aparecen en el prompt.
 
-3. Prompt compacto para Gemini:
+3. Prompt compacto para Zuzu:
    - Se elimina el envío duplicado del prompt original completo en Encargo total.
    - Se entrega brief estructurado, donaciones limpias, reglas de cálculo y catálogo reducido.
    - Catálogo de Encargo total limitado a productos relevantes, manteniendo productos no encontrados como revisables.
@@ -34,7 +34,7 @@ Cambios principales:
    - Timeout de Encargo total reducido para evitar esperas largas.
 
 5. Fallback honrado:
-   - Si Gemini no devuelve compras, ControlEvent conserva donaciones detectadas, pero avisa que la compra no está calculada.
+   - Si Zuzu no devuelve compras, ControlEvent conserva donaciones detectadas, pero avisa que la compra no está calculada.
    - No se inventa compra local de seguridad ni menú fijo.
 
 No tocado:

@@ -1,10 +1,10 @@
-# ControlEvent v17_prod FIX41 - Gemini compras + UI compras/donaciones
+# ControlEvent v18_prod FIX41 - Zuzu compras + UI compras/donaciones
 
 Cambios:
 
 1. Planificación inicial
-- Donaciones locales: Gemini no repite donaciones.
-- Prompt a Gemini recortado: brief + momentos + resumen de donaciones + catálogo reducido útil.
+- Donaciones locales: Zuzu no repite donaciones.
+- Prompt a Zuzu recortado: brief + momentos + resumen de donaciones + catálogo reducido útil.
 - Se prioriza gemini-2.5-flash antes de flash-lite.
 - Timeout de planificación ampliado y prompt final trazado con `promptCharsFinal`.
 

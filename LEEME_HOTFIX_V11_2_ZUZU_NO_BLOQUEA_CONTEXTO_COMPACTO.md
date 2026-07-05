@@ -11,6 +11,6 @@ Cambios:
 - Se eleva el límite de contexto antes de recorte en el prompt interno, evitando recortes prematuros.
 
 Seguridad:
-- Gemini sigue sin acceso directo a Supabase.
-- Gemini no ejecuta SQL.
+- Zuzu sigue sin acceso directo a Supabase.
+- Zuzu no ejecuta SQL.
 - Todo lo enviado procede de JSON calculado por ControlEvent y legible para humano.

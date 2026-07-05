@@ -1,4 +1,4 @@
-/* ControlEvent v17_prod - Alta asistida para lectura de tickets de compra.
+/* ControlEvent v18_prod - Alta asistida para lectura de tickets de compra.
    FIX v9.5: Gemini por REST + indicaciones adicionales por ticket/factura. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -239,7 +239,7 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
   return { ...parseJsonStrictish(outText, 'OpenAI'), modelo: model, proveedorIa: 'openai' };
 }
 function configuredGeminiModels() {
-  // v11.1: no volver a llamar a Gemini 1.5 desde v1beta.
+  // v11.1: no volver a llamar a Zuzu 1.5 desde v1beta.
   // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
   const configuredRaw = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
   const configured = configuredRaw.split(/[;,\s]+/).map(x => x.replace(/^models\//, '').trim()).filter(Boolean);
@@ -360,7 +360,7 @@ async function callGemini({ dataUrl, instrucciones = '', responsables = [], tien
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v17_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v18_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -392,7 +392,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v17_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v18_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;

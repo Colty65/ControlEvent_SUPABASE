@@ -2,7 +2,7 @@ ControlEvent v16_prod
 
 Cambios principales:
 - Planificación inicial incorpora Zuzu con tres modos: replicar evento finalizado, encargo total y encargo parcial.
-- Nuevo endpoint /api/event-ai/planificacion-propuesta para generar propuestas con históricos y Gemini cuando esté disponible.
+- Nuevo endpoint /api/event-ai/planificacion-propuesta para generar propuestas con históricos y Zuzu cuando esté disponible.
 - Contenido seleccionable por módulos: todos, ingresos, compras, donaciones y combinaciones.
 - Botones renombrados: Generar propuesta y Generar nuevo evento.
 - Responsable inicial pasa a Responsable por defecto.

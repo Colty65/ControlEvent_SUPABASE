@@ -1,6 +1,6 @@
-# ControlEvent v17_prod - FIX8 Detalle completo / cierre abajo / avance fijo
+# ControlEvent v18_prod - FIX8 Detalle completo / cierre abajo / avance fijo
 
-No cambia la versión visible: sigue siendo v17_prod.
+No cambia la versión visible: sigue siendo v18_prod.
 
 Base: FIX7_DETALLE_SIN_I.
 

@@ -1,4 +1,4 @@
-# v17_prod FIX46 - opciones de cálculo y traza por fases
+# v18_prod FIX46 - opciones de cálculo y traza por fases
 
 Cambios aplicados sobre FIX45:
 
@@ -6,12 +6,12 @@ Cambios aplicados sobre FIX45:
    - Añadidas dos casillas:
      - Ajuste de compras por saldo.
      - Aplicar topes de producto.
-   - Si no están marcadas, ControlEvent no aplica saldo ni topes, y no usa cálculo local de emergencia si Gemini no devuelve necesidades.
+   - Si no están marcadas, ControlEvent no aplica saldo ni topes, y no usa cálculo local de emergencia si Zuzu no devuelve necesidades.
    - Si se marcan, el sistema aplica esos ajustes al reejecutar la planificación.
 
 2. Trazabilidad
    - La traza muestra fases separadas:
-     - Gemini / fallback antes de cocinar.
+     - Zuzu / fallback antes de cocinar.
      - Donaciones confirmadas.
      - Déficit base.
      - Topes de producto.
@@ -20,6 +20,6 @@ Cambios aplicados sobre FIX45:
      - Compra final presentada.
 
 3. Versionado
-   - Versión visible: v17_prod_FIX46_OPCIONES_CALCULO_TRAZA.
+   - Versión visible: v18_prod_FIX46_OPCIONES_CALCULO_TRAZA.
 
 No se han tocado gráficas, resumen presupuestario, globos ni fotos.

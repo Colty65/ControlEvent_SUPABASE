@@ -1,4 +1,4 @@
-# CE v17_prod FIX34 - Planificación: parser donaciones/momentos + timeout Gemini
+# CE v18_prod FIX34 - Planificación: parser donaciones/momentos + timeout Zuzu
 
 Base: CE_v17_PROD_FIX33_PLANIFICACION_PROMPT_COMPACTO.
 
@@ -24,14 +24,14 @@ Cambios aplicados:
    - Si una línea está escrita como `dia_3 (comida): ... cenas`, respeta el momento explícito `comida` y no lo convierte en cena por aparecer la palabra cenas dentro de la descripción.
    - Evita duplicados por día+momento.
 
-3. Prompt a Gemini sin JSON cortado
+3. Prompt a Zuzu sin JSON cortado
    - Se elimina el `.slice()` sobre el JSON completo del contexto, que podía dejar el JSON incompleto.
    - Se envía un contexto compacto válido: brief, momentos, donaciones limpias, reglas y catálogo reducido.
-   - Catálogo de encargo total reducido en la llamada real a Gemini.
+   - Catálogo de encargo total reducido en la llamada real a Zuzu.
 
-4. Timeout Gemini
-   - Encargo total pasa a 25 s de espera real para Gemini y 28 s de envoltura externa.
-   - Si Gemini no responde, ControlEvent no inventa compras: conserva donaciones detectadas y avisa de que la compra no se calculó.
+4. Timeout Zuzu
+   - Encargo total pasa a 25 s de espera real para Zuzu y 28 s de envoltura externa.
+   - Si Zuzu no responde, ControlEvent no inventa compras: conserva donaciones detectadas y avisa de que la compra no se calculó.
 
 5. Diagnóstico visible
    - `Diagnosticar prompt` usa el mismo criterio genérico para contar donaciones y momentos.

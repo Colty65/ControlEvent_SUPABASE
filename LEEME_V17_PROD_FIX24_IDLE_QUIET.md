@@ -1,4 +1,4 @@
-# CE v17_prod FIX24 - reposo real / ventilador / longtasks
+# CE v18_prod FIX24 - reposo real / ventilador / longtasks
 
 Partiendo de FIX23.
 
