@@ -1,0 +1,20 @@
+{
+  "version": "ControlEvent v16_prod",
+  "versionFile": "ControlEvent_v16_prod",
+  "base": "ControlEvent_SUPABASE-main_V50_13.zip",
+  "loadedFinalFix": "public/app/features/v50-14-final-fixes.js",
+  "removedFromLoad": [
+    "public/app/features/v50-13-final-fixes.js"
+  ],
+  "preserved": [
+    "Sistema de justificantes dentro de INGRESOS/tickets"
+  ],
+  "changes": [
+    "Retira forzado de selección de evento de v50.13",
+    "Restaura budget-tooltips-lite estable",
+    "Evita apertura automática de primera foto en Resumen Presupuestario móvil/iPad",
+    "Dock móvil Refres/Salir abajo derecha",
+    "Versión/caché v50.14",
+    "Limpieza visual PRODUCTOS sin observadores"
+  ]
+}

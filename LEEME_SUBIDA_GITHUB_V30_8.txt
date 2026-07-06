@@ -1,0 +1,4 @@
+ControlEvent V30.8
+
+Subir el contenido de este ZIP al repositorio, sustituyendo los archivos existentes.
+Especialmente: public/index.html, public/sw.js, public/app/features/*.js, public/app/styles/app.css, public/app/version.js y los legacy v30.8.

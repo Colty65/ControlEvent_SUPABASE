@@ -1,0 +1,14 @@
+ControlEvent v16_prod - HOTFIX9 RESCATE DONACIONES / AVANCE / GLOBOS
+Sin cambio de versión visible.
+
+Cambios principales:
+- Planificación/Zuzu: donaciones en modo ZUZU_TOTAL/ZUZU_PARCIAL solo se aceptan si están escritas en el prompt y relacionadas con el donante correcto.
+- Se eliminan/ocultan donaciones fantasma o inventadas (ej. 0,01 o productos que no correspondan al donante del prompt).
+- Si hay donación fija y necesidad mayor, se mantiene la donación y se crea compra solo por déficit.
+- Si el déficit desaparece, desaparece la compra.
+- Agrupación reforzada por productId real de catálogo.
+- El detalle avanzado ya no debe recibir donaciones suprimidas.
+- AVANCE del evento rediseñado con barras compactas y visuales dentro de DONACION DE PRODUCTO.
+- Resumen Por tienda y Ticket: líneas largas resumidas; detalle completo solo al pulsar en modal/globo centrado.
+
+No hay SQL nuevo.

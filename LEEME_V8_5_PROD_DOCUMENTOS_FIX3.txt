@@ -1,0 +1,10 @@
+ControlEvent v8.5_prod - Documentos FIX3
+
+Correcciones incluidas:
+- La pantalla DOCUMENTOS se mueve justo debajo del selector de pestañas para que ningún repintado de INGRESOS/RESUMEN pueda empujarla hacia abajo.
+- Bloqueo real de DOCUMENTOS como pestaña activa hasta que el usuario pulse otra pestaña.
+- Ocultación de artefactos flotantes de fotos de INGRESOS/TICKETS mientras DOCUMENTOS está activo.
+- En eventos Finalizados se reactivan los botones de ampliación de documentos para permitir consulta en grande, sin habilitar mantenimiento.
+- Cache/service worker actualizado a docfix3.
+
+No se han tocado BACKUP ni INFOEVENTO respecto a la entrega anterior.

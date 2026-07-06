@@ -1,0 +1,35 @@
+ControlEvent v16_prod - HOTFIX37 sin cambio de versión
+
+Correcciones sobre HOTFIX36:
+
+1. Barril AMBAR
+- Se añade override estricto de catálogo.
+- Si el texto contiene CERVEZA + AMBAR + BARRIL/30, se busca un producto de PRODUCTOS que también tenga CERVEZA + AMBAR + BARRIL/30.
+- Esto evita que "Cerveza barril AMBAR de 30l" caiga en "Cerveza 0,0".
+- La regla queda antes de la búsqueda genérica/directa.
+
+2. Otras compras imprevistas
+- Se normaliza para que haya una sola línea.
+- Necesidad calculada = 1.
+- A comprar = 1.
+- Precio = 10% del importe total de compras previstas, excluyendo la propia reserva.
+- Redondeo siempre a decena superior.
+  Ejemplo: compras 576 € => reserva 57,60 € => 60 €.
+- Mínimo 10 €.
+
+3. Stock mínimo de AOVE / Vinagre
+- Si el prompt/donación deja solo 1 unidad de AOVE, se añade compra de 1 unidad de reserva.
+- Si el prompt/donación deja solo 1 unidad de Vinagre, se añade compra de 1 unidad de reserva.
+- Si el evento menciona cocina/paella/ensalada/guiso/aliño y no consta AOVE, se prevé 1 AOVE.
+- Si se menciona vinagre/ensalada/aliño/guiso y no consta vinagre, se prevé 1 Vinagre.
+
+4. Reserva normalizada también al renderizar
+- Si venía una reserva duplicada de una versión anterior, se eliminan duplicados y se reconstruye una sola línea correcta.
+
+5. Cache bust
+- planificacion-inicial.js?v=v16_prod_planificacion_hf37_ambar_imprevistos_stock_minimo
+- Marcador consola:
+  HOTFIX37_AMBAR_IMPREVISTOS_STOCK_MINIMO_ACTIVO
+
+No hay SQL nuevo.
+No cambia versión visible.

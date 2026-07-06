@@ -1,0 +1,18 @@
+{
+  "version": "30.2",
+  "base": "30.1",
+  "date": "2026-05-20",
+  "changes": [
+    "Mapa de productos: apertura robusta en PC/iPad con pointerdown/touchstart/click directo",
+    "Eliminado tooltip/title del botón Mapa de productos para evitar interferencias",
+    "Mantenida optimización LITE/turbo y lógica funcional existente"
+  ],
+  "files_touched": [
+    "public/index.html",
+    "public/app/features/mapa-productos.js",
+    "public/app/version.js",
+    "public/sw.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.2.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.2.js"
+  ]
+}

@@ -1,0 +1,11 @@
+ControlEvent v8.5_prod FIX28
+
+Corrección puntual sobre FIX27:
+- Un evento Finalizado sigue siendo inmutable en datos.
+- La excepción permitida para GD es cambiar SOLO la SITUACIÓN del evento desde Mantenimiento de EVENTOS.
+- Si el evento está Finalizado y pulsas Modificar habiendo cambiado solo la situación, se llama al endpoint específico:
+  PUT /api/crud/eventos/:id/situacion
+- No se envía el registro completo, por lo que no se actualizan título, precio, fechas ni descripción del evento cerrado.
+- Esto evita el bloqueo por diferencias de formato y mantiene la regla de inmutabilidad.
+
+No se han tocado BACKUP, INFOEVENTO, DOCUMENTOS, GLOBOS ni MAPA.

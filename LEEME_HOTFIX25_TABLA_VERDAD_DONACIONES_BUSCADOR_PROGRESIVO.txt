@@ -1,0 +1,60 @@
+ControlEvent v16_prod - HOTFIX25 sin cambio de versión
+
+Cambios incluidos:
+
+1. Tabla verdad de donaciones/existencias del prompt
+- Antes de pintar y antes de generar, se reconstruye una lista determinista solo desde los bloques:
+  PRODUCTO EN LA PEÑA / DONACIONES / DONACION / EXISTENCIAS.
+- Esa lista manda sobre cualquier fila generada por Zuzu.
+- Si un producto del prompt estaba saliendo como COMPRA, pasa a DONACION.
+- Si Zuzu había calculado una compra superior a lo donado, se conserva solo la compra por déficit real.
+- Si la compra era equivalente o inferior a lo donado, se anula.
+
+2. Buscador progresivo sobre todo PRODUCTOS
+- Primero intenta nombre exacto normalizado.
+- Después intenta alias de catálogo.
+- Después intenta coincidencia simplificada sin envases, litros, cl, latas, botellas, packs, kg, unidades, etc.
+- Después intenta búsqueda tipo %cadena%.
+- Después hace recorte progresivo por el final de la cadena.
+- Finalmente usa puntuación por tokens útiles.
+- Todo esto se aplica sobre la tabla PRODUCTOS completa cargada en la app.
+
+3. Alias reforzados
+- Se refuerzan equivalencias para los casos detectados:
+  * COCA COLA ZERO / ZERO-ZERO
+  * FANTA naranja / limón
+  * Sprite
+  * Cerveza SKOL
+  * Tónica Schweppes
+  * Bitter/Beeter KAS
+  * Ron Barceló / Brugal
+  * Whisky J.B / DYC / Jhony Walker
+  * Ginebra Puerto de Indias / Larios / Beefeater
+  * Café normal / descafeinado
+  * Vino tinto / blanco / frizzante
+  * Agua 1l cristal
+  * Baicon/Bacon
+  * Chuleta cerdo
+  * Fairy
+  * Papel higiénico
+  * Rollo papel secamanos
+  * Bolsas basura
+  * Jabón lavamanos
+  * Ambientador
+  * Oreja en salsa
+  * Mejillones
+
+4. Precio, segmento y destino
+- Cuando encuentra producto en PRODUCTOS, arrastra:
+  * nombre oficial
+  * segmento
+  * destino
+  * precio
+- El precio se busca en varios campos posibles del producto.
+
+5. Detalle avanzado y propuesta detallada
+- Se mantiene la sincronización arriba/abajo usando la misma propuesta corregida.
+- En donaciones, abajo sigue apareciendo Donante, no Tienda.
+
+No cambia versión visible.
+No hay SQL nuevo.

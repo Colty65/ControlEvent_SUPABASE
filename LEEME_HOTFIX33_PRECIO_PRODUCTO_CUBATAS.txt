@@ -1,0 +1,46 @@
+ControlEvent v16_prod - HOTFIX33 sin cambio de versión
+
+Cambios sobre HOTFIX32:
+
+1. Precio al cambiar producto en PROPUESTA DETALLADA DEL EVENTO
+- Si se cambia el producto en el desplegable, ahora actualiza también:
+  nombre oficial,
+  segmento,
+  destino,
+  precio de PRODUCTOS.
+- Antes actualizaba segmento/destino pero podía dejar precio 0 o el precio anterior.
+
+2. Gambones para paella
+- La compra sugerida pasa a ser moderada:
+  Gambón plancha (caja 2 kg): 1 unidad/caja.
+- Evita proponer 2 cajas para una paella normal.
+
+3. Hielo para tardeo/cubatas
+- El mínimo se sube y se calcula contando amigos que se incorporan al tardeo.
+- Fórmula base:
+  personas de cubatas + 7 amigos aprox.
+  mínimo de hielo = 20 unidades/bolsas o 0,8 por consumidor efectivo.
+- Si ya hay una compra de hielo menor, se sube al mínimo en vez de duplicarla.
+
+4. Cubatas
+- Ron:
+  Barceló como preferente.
+  Se estima que lo beben la mitad de los que toman cubatas + 6/8 amigos.
+  Barceló pesa más que Brugal.
+- Whisky:
+  Preferencia J.B.
+  Se estima 1/4 de asistentes + 3/4 amigos.
+- Ginebra:
+  Preferencia Beefeater.
+  Se estima 1/5 de asistentes + 3/4 amigos.
+  En verano/calor/gin tonic se aumenta la previsión.
+- Tónica:
+  Se liga también al cálculo de gin tonic, no solo a una proporción baja de asistentes.
+
+5. No cambia versión visible
+- Cache bust:
+  planificacion-inicial.js?v=v16_prod_planificacion_hf33_precio_producto_cubatas
+- Marcador consola:
+  HOTFIX33_PRECIO_PRODUCTO_CUBATAS_ACTIVO
+
+No hay SQL nuevo.

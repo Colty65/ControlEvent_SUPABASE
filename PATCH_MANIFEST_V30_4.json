@@ -1,0 +1,18 @@
+{
+  "version": "v30.4",
+  "base": "v30.3",
+  "changed": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/view-refresh-stabilizer.js",
+    "public/app/performance/low-resource-legacy-patch.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.4.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.4.js",
+    "public/app/diagnostics/build-metrics.json",
+    "package.json",
+    "package-lock.json"
+  ],
+  "notes": "Renombra Pendiente comprar a Compras producto; estabiliza el repintado de Colaboradores/Ingresos, Donaciones y Compras; limpia el click de Mapa para evitar salto visual en iPad."
+}

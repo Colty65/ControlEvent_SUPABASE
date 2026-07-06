@@ -1,0 +1,19 @@
+ControlEvent v16_prod
+
+Objetivo de la versión:
+- Estabilizar el flujo de arranque/login/evento sin volver a tocar los justificantes de INGRESOS que ya funcionan.
+- Evitar capas conflictivas acumuladas de v50.14 y v50.17.
+
+Cambios:
+1. La app vuelve a pedir login al arrancar: se desactiva la reanudación automática de sesión ligera en localStorage.
+2. Tras login correcto se muestra pantalla CE grande y selector EVENTO en "Selecciona evento...".
+3. Solo al elegir evento se cargan los datos y se rehidratan módulos/globos.
+4. Se elimina de la carga v50-14-final-fixes.js y v50-17-final-fixes.js para evitar dobles flujos de evento/globos.
+5. Se añade v50-18-final-fixes.js como única capa final para login, selección de evento, dock móvil y rehidratación de globos.
+6. Globos de Resumen Presupuestario: las miniaturas Just. solo abren foto al pulsarlas expresamente, evitando la apertura automática de la primera foto.
+7. Dock móvil: Refres y Salir, uno encima de otro, abajo a la derecha.
+8. Versión unificada a ControlEvent v16_prod y cache PWA controlevent-shell-v50-24.
+
+No se toca:
+- La gestión de justificantes dentro de INGRESOS.
+- La lógica de guardado de INGRESOS, DONACIONES o COMPRAS.

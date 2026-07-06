@@ -1,0 +1,13 @@
+{
+  "version": "ControlEvent v16_prod",
+  "desde": "ControlEvent v16_prod",
+  "tipo": "parche correctivo",
+  "objetivo": "Eliminar el parpadeo de GRAFICAS y reducir gasto de recursos",
+  "cambios": [
+    "Desactivar render legacy de barras v254/v255 en GRAFICAS",
+    "Eliminar MutationObserver que repintaba el grafico al detectar cambios",
+    "Mantener un único render estable de diagramas de queso + Por destino",
+    "Aumentar anchura de barras Por destino",
+    "Actualizar versión a v43.6"
+  ]
+}

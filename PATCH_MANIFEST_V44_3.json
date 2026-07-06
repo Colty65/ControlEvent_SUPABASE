@@ -1,0 +1,12 @@
+{
+  "version": "ControlEvent v16_prod",
+  "version_file": "ControlEvent_v16_prod",
+  "base": "ControlEvent v16_prod",
+  "changes": [
+    "Render mínimo por ventana activa para evitar recalcular todas las opciones del menú en cada pulsación o cambio de evento.",
+    "GRAFICAS usa directamente el motor estable de queso + Por destino y evita pintar primero las barras antiguas.",
+    "RESUMEN no dispara render de GRAFICAS cuando no está visible.",
+    "PERF corrige el conteo de registros renderizados para contar tarjetas reales, no cada input con data-id.",
+    "Versión unificada a ControlEvent v16_prod / ControlEvent_v16_prod en cabecera, PERF, backup, rutas de exportación, service worker y scripts activos."
+  ]
+}

@@ -1,0 +1,14 @@
+ControlEvent v8.5_prod FIX36 - SOLO MODIFICADOS COMPRAS UI
+
+Incluye únicamente:
+- public/app/features/v8-5-compras-rpc-head-fix36.js
+- public/index.html
+- index.html
+
+Objetivo:
+- COMPRAS sigue usando las RPC ya probadas en BBDD.
+- Tras una BAJA, ya no solo se borra visualmente la ficha: se sincroniza /api/state y se repintan COMPRAS, DONACIONES, RESUMEN y GRAFICAS con el estado filtrado.
+- Evita botones fantasma de Eliminar sobre una compra ya borrada.
+- Alta/modificación mantienen resaltado más tiempo.
+
+Mantener global_write_lock = ON.

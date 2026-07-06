@@ -1,0 +1,16 @@
+{
+  "version": "v16_prod",
+  "base": "v10.2_prod",
+  "changed": [
+    "public/app/features/v10-3-app-fixes.js",
+    "public/app/features/v10-3-ticketauto-compras.js",
+    "index.html",
+    "public/index.html",
+    "public/app/version.js",
+    "routes/export.routes.js",
+    "package.json",
+    "package-lock.json",
+    "services/receipt-ai.service.js",
+    "lib/supabase-normalized.js"
+  ]
+}

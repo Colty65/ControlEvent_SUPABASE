@@ -1,0 +1,18 @@
+ControlEvent v16_prod - HOTFIX26 sin cambio de versión
+
+Corrección incluida:
+
+1. Cache bust real de Planificación inicial
+- Se cambia el parámetro de carga del script:
+  planificacion-inicial.js?v=v16_prod_planificacion_hf26_cache_bust
+- Esto fuerza al navegador/Vercel a descargar el JS nuevo.
+- El HOTFIX25 sí contenía cambios internos, pero el script seguía cargándose con el mismo querystring antiguo:
+  v16_prod_planificacion_sin_cambio_version_hf8
+  y eso podía hacer que el navegador siguiera ejecutando una versión cacheada.
+
+2. Marcador técnico de comprobación
+- Al cargar Planificación inicial se escribe en consola:
+  HOTFIX26_CACHE_BUST_PLANIFICACION_ACTIVO
+- No cambia la versión visible de la app.
+
+No hay SQL nuevo.

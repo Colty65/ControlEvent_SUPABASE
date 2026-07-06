@@ -1,0 +1,49 @@
+ControlEvent v16_prod
+=======================
+
+Versión generada sobre v10.0_prod.
+
+Cambios incluidos:
+
+1. Versión
+- Versión visible y técnica actualizada a v16_prod.
+- package.json / package-lock.json actualizados a 10.3.0-prod.
+- BACKUP e INFOEVENTO actualizados a ControlEvent_v16_prod.
+- Cabecera inicial compacta con miniatura CE + v16_prod.
+
+2. RESUMEN PRESUPUESTARIO / Cálculos por tienda y ticket
+- Botón Adjuntar sustituido visualmente por icono de clip 📎.
+- Botón Eliminar sustituido visualmente por papelera 🗑️.
+- Refuerzo de hidratación de imágenes/botones para que no tarden tanto en aparecer tras entrar o cambiar de evento.
+
+3. Alta asistida de COMPRAS / Ticket IA
+- Antes de procesar se exige Ticket, Tienda y Responsable.
+- Si falta alguno, no se graba nada en COMPRAS.
+- Eliminado el botón flotante de casita dentro de la ventana Ticket IA.
+
+4. Mapa de recursos
+- Clic en TKxx abre detalle contable + imagen del ticket.
+- Botón Cerrar reforzado para funcionar también en eventos Finalizados.
+- La imagen se recarga de forma fresca y acotada al evento seleccionado para evitar mostrar una foto de otro TK/evento por caché.
+- Si el TKxx no tiene imagen, se muestra “No hay imagen del ticket.” en grande.
+
+5. Recarga de datos por evento
+- La carga eventScoped reintenta respuestas aparentemente vacías antes de aplicarlas, para evitar que parezca que los datos desaparecen de la BBDD por una carga parcial.
+
+6. Compartir pantalla
+- El botón 📺 deja de ser solo informativo.
+- Abre un panel con opciones reales disponibles según navegador: pantalla completa, Presentation API si existe, compartir URL, copiar URL y selector nativo de pantalla.
+
+7. COMPRAS
+- Eliminado el texto “Compras normales y otros gastos, con responsable opcional.”
+- En registros Pte.Compra se mantiene el contenido rojo, pero se evita que los botones Modificar/Eliminar hereden el rojo.
+- Corregida la presentación del bloque Buscar compra.
+
+8. GRAFICAS
+- Refuerzo táctil en porciones de queso y leyenda.
+- Las leyendas pasan a ser zonas grandes pulsables para móviles/tablets cuando la porción del gráfico es pequeña.
+
+Validaciones realizadas:
+- node --check en scripts modificados principales.
+- parseo correcto de package.json y package-lock.json.
+- comprobación de integridad ZIP.

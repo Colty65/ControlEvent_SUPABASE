@@ -1,0 +1,21 @@
+{
+  "version": "ControlEvent v8.5_prod",
+  "versionFile": "ControlEvent_v8_5_prod",
+  "phase": "Documentos evento - fase 1, menu y gestion de fotos",
+  "backupInfoevento": "Pendiente para fase 2 por indicacion del usuario",
+  "newFiles": [
+    "public/app/features/v8-5-event-documents.js",
+    "public/modules/views/documentos.js",
+    "LEEME_SUBIDA_GITHUB_V8_5_PROD.txt",
+    "PATCH_MANIFEST_V8_5_PROD.json"
+  ],
+  "mainChanges": [
+    "Nueva pestaña Documentos con icono de carpeta",
+    "DOCXX correlativo por id real de evento",
+    "RW/GD mantienen, RO visualiza",
+    "Visor ampliado de imagen",
+    "Borrado de evento limpia documentos y fotos DOCXX",
+    "Persistencia de metadatos en ce_meta.eventDocuments",
+    "Version unificada v8.5_prod"
+  ]
+}

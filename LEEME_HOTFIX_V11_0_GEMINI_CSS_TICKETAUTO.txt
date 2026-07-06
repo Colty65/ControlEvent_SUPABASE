@@ -1,0 +1,16 @@
+ControlEvent v16_prod - HOTFIX Ticket Auto auto-visible por CSS Zuzu
+
+Causa real encontrada:
+- La nueva ventana Zuzu libre introdujo reglas CSS genéricas para .ce-ai-overlay, .ce-ai-modal, .ce-ai-head, etc.
+- Ticket Auto usa esas mismas clases.
+- Como Zuzu cargaba su CSS al arrancar, convertía .ce-ai-overlay en display:flex y hacía visible Alta asistida de COMPRAS sin que nadie la abriera.
+
+Corrección:
+- El CSS de Zuzu queda acotado al id #ceZuzuLibreOverlay.
+- Ticket Auto recupera su comportamiento: oculto salvo cuando tenga clase .open.
+- No se cambia versión: sigue v16_prod.
+- No se toca backend ni funcionalidad Zuzu.
+
+Archivos tocados:
+- public/app/features/v11-1-gemini-libre-evento.js
+- LEEME_HOTFIX_V11_0_GEMINI_CSS_TICKETAUTO.txt

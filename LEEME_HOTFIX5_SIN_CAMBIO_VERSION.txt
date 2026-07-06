@@ -1,0 +1,37 @@
+ControlEvent v16_prod - HOTFIX5 sin cambio visible de versión
+=============================================================
+
+Este paquete mantiene la versión visible v16_prod y no cambia package.json.
+Solo se han cambiado scripts/código para corregir comportamiento.
+
+Cambios incluidos:
+
+1) Zuzu / Planificación inicial
+- Las donaciones o existencias escritas de forma explícita en el prompt mandan sobre la IA.
+- Líneas tipo "Anchoas: 1", "Papel higiénico: 1" o "Rollo papel secamanos: 1" se detectan como DONACIÓN cuando están dentro de un bloque/contexto de donaciones, existencias o producto en la peña.
+- En modo Encargo total/parcial, Zuzu ya no puede inventar donaciones ni arrastrar donaciones históricas como si estuvieran confirmadas. Si no están confirmadas por prompt, pasan a COMPRA pendiente.
+- Si el prompt fija una donación exacta de un producto, se elimina cualquier otra donación extra de ese mismo producto para evitar duplicados.
+- Se evita el caso de cerveza/refresco con donación + compra mal recalculada: en packs de 24 se redondea la necesidad total y después se resta lo donado.
+- Chorizo/morcilla/montado/panceta dejan de escalarse a cantidades desproporcionadas tipo 17 kg si el prompt no lo pide.
+- Hielo sube ligeramente cuando hay calor/cubatas para no quedarse corto.
+
+2) Propuesta editable tipo Mapa de recursos
+- El campo A COMPRAR escrito por el usuario se respeta: el panel editable tiene prioridad.
+- Al cambiar necesidad, se recalcula compra restando correctamente lo donado.
+- En packs de 24, se evita que A COMPRAR vuelva a 24/48/72 después de restar donaciones.
+- La información editada arriba se mantiene como fuente para crear el evento real y refresca el detalle avanzado.
+
+3) Mantenimiento de tablas
+- Al guardar PERSONAS, TIENDAS o PRODUCTOS desde Mantenimiento, se evita el render global que cerraba la ventana completa.
+- Después de guardar, se mantiene Mantenimiento abierto, en la pestaña activa y con scroll restaurado.
+- Sigue usando las RPC del SQL anterior para sortear CE_BLOQUEO_FINALIZADO en tablas maestras usadas por eventos finalizados.
+
+4) Gráficas de queso
+- Las porciones pequeñas tienen una proporción visual mínima para poder pulsarlas con ratón, iPad o móvil.
+- La leyenda es más grande y fácil de tocar.
+
+SQL
+---
+No hay SQL nuevo en este HOTFIX5.
+Sigue siendo necesario haber ejecutado una vez el SQL del HOTFIX3:
+ControlEvent_SQL_FIX_MAESTROS_CATALOGO_LIBRE.sql

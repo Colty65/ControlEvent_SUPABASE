@@ -1,0 +1,21 @@
+ControlEvent v16_prod - SOLO SUBIR A GITHUB
+
+Sube el contenido de este ZIP al repositorio sustituyendo los archivos existentes.
+
+Cambios incluidos:
+- Nueva version visible: ControlEvent v16_prod.
+- Nuevo cache PWA: controlevent-shell-v50-24.
+- Nueva funcion: public/app/features/budget-tooltips-lite.js.
+- Ajuste de Mapa de productos: etiqueta Compras producto reforzada en escritorio y movil.
+- Globos de INGRESOS EN DINERO y DONACION DE PRODUCTO: nuevo sistema ligero por clic.
+
+Recomendado despues de subir:
+1. Esperar a que Vercel termine el despliegue.
+2. En iPad/Android, cerrar completamente la pestaña anterior.
+3. Abrir de nuevo la app.
+4. Si sigue mostrando textos antiguos, abrir una vez con ?ceDiag=1 o borrar datos/caché del sitio.
+
+Archivos antiguos que pueden quedar en GitHub sin afectar:
+- legacy-bundle-before-modules-v30.4.js
+- legacy-bundle-after-modules-v30.4.js
+La app v30.5 ya referencia los nuevos v30.5.

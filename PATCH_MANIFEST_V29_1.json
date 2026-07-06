@@ -1,0 +1,25 @@
+{
+  "version": "v29.1",
+  "base": "v29.0 sobre v28.6.1",
+  "changed": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/main.js",
+    "public/app/performance/mobile-lite.js",
+    "public/app/legacy/legacy-bundle-before-modules-v29.1.js",
+    "public/app/legacy/legacy-bundle-after-modules-v29.1.js"
+  ],
+  "new": [
+    "README_V29_1.md",
+    "README_V29_1_DELETE_OLD_FILES.txt",
+    "public/app/performance/low-resource-boot.js"
+  ],
+  "delete_if_present": [
+    "public/app/legacy/legacy-bundle-before-modules-v29.0.js",
+    "public/app/legacy/legacy-bundle-after-modules-v29.0.js",
+    "public/app/legacy/legacy-bundle-before-modules-v28.6.1.js",
+    "public/app/legacy/legacy-bundle-after-modules-v28.6.1.js"
+  ],
+  "notes": "V29.1 mantiene la funcionalidad de V29.0 y añade diagnostico visible. En iPad/Android activa LowResourceBoot, muestra ⚡ LITE ON, ralentiza intervalos legacy y anula eventos globales de raton innecesarios en tactil."
+}

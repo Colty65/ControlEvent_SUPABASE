@@ -1,0 +1,18 @@
+ControlEvent v16_prod
+
+Base: v44.3
+
+Objetivo:
+- Optimización más fina del cambio de pantalla/evento.
+- Quitar el barrido DOM agresivo de diagnóstico que se había convertido en carga extra.
+- Mantener el panel PERF actualizado mientras está abierto al cambiar de ventana o evento.
+
+Cambios principales:
+- PERF refresca datos automáticamente mientras está abierto, sin tener que cerrar y abrir.
+- Se desactiva la poda DOM automática del panel PERF; queda como diagnóstico y acción manual.
+- La limpieza de ventanas pesadas pasa a ser selectiva y limitada por ventana/evento.
+- Se reduce la reinstalación repetida de parches al cambiar de módulo.
+- Se mantiene GRAFICAS con motor estable queso + Por destino.
+- Versión actualizada a ControlEvent v16_prod / ControlEvent_v16_prod.
+
+No se ha tocado la lógica de guardado de COMPRAS, DONACIONES, INFOEVENTO ni BACKUP.

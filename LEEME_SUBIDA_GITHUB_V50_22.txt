@@ -1,0 +1,11 @@
+ControlEvent v16_prod
+
+Base efectiva: v50.20 estable.
+
+Cambios:
+- No se carga la capa v50.21 que bloqueaba la carga al elegir evento.
+- Salir limpia usuario y evento anterior antes de volver a Login.
+- Tras login queda CE + Selecciona evento; al elegir evento se libera el flujo normal y carga datos/globos.
+- Version unificada a v50.22 en cabecera, bundles legacy e INFOEVENTO.
+
+No se toca la gestion de justificantes de INGRESOS, GRAFICAS/RESUMEN ni el refresco en sitio v50.20.

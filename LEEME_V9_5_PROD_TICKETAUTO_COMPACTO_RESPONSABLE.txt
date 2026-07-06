@@ -1,0 +1,42 @@
+ControlEvent v16_prod
+
+Cambios aplicados sobre v9.4_prod:
+
+1. Tickets IA / COMPRAS
+- Se elimina MATERIAL como opción proponible del desplegable SEGMENTO.
+- Para material auxiliar tipo carbón, vasos, platos, hielo, bolsas, servilletas, etc., Zuzu recibe instrucción de no proponer MATERIAL y usar INFRAESTRUCTURA si procede o dejarlo vacío.
+- La línea explicativa bajo “Alta asistida de COMPRAS” queda eliminada.
+- Eliminada la frase “Estas indicaciones se envían solo para el análisis de la foto actual”.
+- Los campos SEGMENTO y DESTINO pasan a desplegables reales en la tabla para evitar fallos de datalist y mejorar el despliegue de opciones.
+- La pantalla se compacta: botones de IA/manual/limpieza/proceso/recarga pasan a iconos.
+- El botón Tickets IA de COMPRAS queda como icono compacto 🧾✨ en la cabecera de COMPRAS, al lado derecho del título.
+
+2. Zuzu / indicaciones adicionales
+- Zuzu recibe ahora también la lista de responsables SOCIO y tiendas existentes como contexto.
+- El JSON de respuesta admite campo responsable.
+- Si el usuario indica responsable, encargado o persona concreta, Zuzu debe devolverlo y la pantalla intenta seleccionarlo automáticamente en el desplegable Responsable.
+- Aunque Zuzu no lo devuelva, la pantalla analiza las indicaciones escritas y busca coincidencia con PERSONAS/SOCIO para seleccionar el responsable.
+- Las indicaciones adicionales siguen teniendo prioridad para añadir líneas, aplicar IVA, corregir importes, SEGMENTO y DESTINO.
+
+3. PRODUCTOS / precio
+- Refuerzo de actualización de último precio conocido para productos existentes enviando defaultPrecio y precio.
+- Se mantiene la vía segura __priceRefreshOnly para no tocar nombre, segmento ni destino cuando el producto ya existe.
+
+4. Limpieza y selección de evento
+- Añadido parche v9.5 de limpieza visual del selector tras login para evitar que aparezca seleccionado un evento aparente antes de que el usuario elija uno.
+- Se mantiene selectedEventId vacío hasta selección real del usuario.
+
+5. Mensajes flotantes
+- Se mantiene ocultación de avisos/toasts negros molestos y los avisos internos quedan solo en consola cuando proceda.
+
+Ficheros principales modificados/añadidos:
+- public/app/features/v9-5-ticketauto-compras.js
+- public/app/features/v9-5-login-event-clean.js
+- services/receipt-ai.service.js
+- index.html
+- public/index.html
+- public/app/version.js
+- package.json
+- package-lock.json
+- sw.js
+- public/sw.js

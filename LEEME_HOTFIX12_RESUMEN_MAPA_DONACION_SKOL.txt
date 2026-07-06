@@ -1,0 +1,24 @@
+ControlEvent v16_prod - HOTFIX12 sin cambio de versión
+
+Cambios:
+- Resumen presupuestario / Cálculos por tienda y ticket:
+  * se desactiva el doble tratamiento de globos de hotfixes anteriores para evitar retemblores.
+  * el modal debe cerrar por aspa, fondo y ESC.
+  * la foto del ticket vuelve a abrir el detalle contable con foto asociada cuando existe TKxx.
+  * se evita mostrar la información en bruto mientras se recompone el bloque.
+
+- Mapa de recursos:
+  * orden por defecto: segmento/destino.
+  * botón activo marcado en verde Excel.
+  * botones no activos en negro/negrita.
+
+- Planificación inicial / Encargo total a Zuzu:
+  * lectura estricta de bloques simples de donaciones con subcabeceras:
+    Donaciones:
+    DESPENSA:
+    - Cerveza CON SKOL (Lata 33cl): 24
+  * esas líneas se fuerzan como donación del donante correcto.
+  * si una detección estricta existe para un producto, se eliminan detecciones ambiguas del mismo producto.
+
+No cambia versión visible.
+No hay SQL nuevo.

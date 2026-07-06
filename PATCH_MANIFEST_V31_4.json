@@ -1,0 +1,19 @@
+{
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
+  "changes": [
+    "package.json y package-lock.json regenerados como JSON válido",
+    "Mapa de recursos: buscador limpia el texto al finalizar la búsqueda",
+    "Mantenimientos generales: control de duplicados en PERSONAS, EVENTOS, TIENDAS y PRODUCTOS al añadir y modificar",
+    "Cache actualizado a controlevent-shell-v50-24"
+  ],
+  "files": [
+    "public/app/features/mapa-productos.js",
+    "public/app/features/maintenance-duplicates-v31.8.js",
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

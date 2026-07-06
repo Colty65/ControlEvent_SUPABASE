@@ -1,0 +1,1 @@
+HOTFIX11 sin cambio de versión visible v16_prod. Ajusta cierre de modal de cálculos, foto ticket con info contable, render de resumen más estable y aislamiento de Encargo total a Zuzu sin eventos históricos. No requiere SQL.
