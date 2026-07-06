@@ -1,9 +1,9 @@
-/* ControlEvent v18.10_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.11.2_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.10_prod';
+  var VERSION='v18.11.2_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -103,7 +103,7 @@
   function buildPdfFilename(prompt, data){
     var dp=dateParts((data&&data.meta&&data.meta.generatedAt)||Date.now());
     var subj=slugFile(subjectFromPrompt(prompt,data),70);
-    return 'ControlEvent_v18_10_prod-responde_Zuzu_a_'+subj+'-'+dp.y+dp.m+dp.d+'-'+dp.hh+dp.mm+dp.ss+'.pdf';
+    return 'ControlEvent_v18_11_2_prod-responde_Zuzu_a_'+subj+'-'+dp.y+dp.m+dp.d+'-'+dp.hh+dp.mm+dp.ss+'.pdf';
   }
   function printZuzuPdf(){
     var result=$('ceAiResult');
