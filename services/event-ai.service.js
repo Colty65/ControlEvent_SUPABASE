@@ -1,4 +1,4 @@
-/* ControlEvent v18.5_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v18.6_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -366,6 +366,7 @@ Reglas obligatorias:
 - Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
 - Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
 - Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
+- Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
 - Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
@@ -503,7 +504,7 @@ function directModuleResultIfApplicable(prompt, context) {
   const rows = arr(mods[moduleName]);
   const columns = orderedColumnsForModule(moduleName, rows);
   const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
-  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_5_prod.csv`);
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_6_prod.csv`);
   const tableLimit = 1000;
   const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
@@ -681,8 +682,8 @@ function directAggregateResultIfApplicable(prompt, context) {
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
     ],
     files: [
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
     ],
     provider: 'control-event-local-deterministico',
     model: 'sin-gemini-para-calculos'
@@ -785,7 +786,7 @@ function directComparativeAllDataResultIfApplicable(prompt, context) {
     tables: [
       { title: 'Comparativa general por evento', columns, rows: tableRows }
     ],
-    files: [{ filename: fileSafe(`Comparativa_eventos_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-comparativa-estricta',
     model: 'sin-gemini-para-alcance-ni-calculos'
   };
@@ -870,7 +871,7 @@ function directEventPriceExtremesIfApplicable(prompt, context) {
     ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
   ];
   const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
-  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_5_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_6_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
 }
 function directPersonAppearanceIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -890,7 +891,7 @@ function directPersonAppearanceIfApplicable(prompt, context) {
   donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
   const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
   const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
-  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
 }
 
 function personNeedlesFromPrompt(prompt, context) {
@@ -989,7 +990,7 @@ function directPersonRoleReportIfApplicable(prompt, context) {
       { title: 'Resumen por papel desempeñado', columns: colsRoles, rows: roleRows.map(r=>colsRoles.map(c=>text(r[c]))) },
       { title: 'Detalle de registros localizados', columns: colsDetail, rows: detail.slice(0, 500).map(r=>colsDetail.map(c=>text(r[c]))) }
     ],
-    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
+    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
     provider: 'control-event-local-informe-persona',
     model: 'sin-gemini-para-informes-de-persona'
   };
@@ -1045,7 +1046,7 @@ function directCashEvolutionIfApplicable(prompt, context) {
       ] }
     ],
     tables: [{ title: 'Evolución temporal del saldo de caja', columns: cols, rows: rows.map(r=>cols.map(c=>text(r[c]))) }],
-    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
+    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
     provider: 'control-event-local-saldo-caja',
     model: 'sin-gemini-para-saldo-caja'
   };
@@ -1073,7 +1074,7 @@ function directBoughtDonatedUsageIfApplicable(prompt, context) {
   const eventos = eventNamesFromContext(context).join(', ');
   const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
   const shown = rows.slice(0, limit);
-  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
 }
 function directProductCatalogIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -1095,7 +1096,7 @@ function directProductCatalogIfApplicable(prompt, context) {
     tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
   }
   tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
-  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_5_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_6_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
 }
 function rangosSolicitadosFromPrompt(prompt) {
   const p = norm(prompt);
@@ -1137,7 +1138,7 @@ function directPersonsCatalogIfApplicable(prompt, context) {
     warnings: rows.length ? [] : [`No hay personas con rango ${rangos.join(', ') || 'solicitado'} en la tabla PERSONAS.`],
     charts:grows.length?[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}]:[],
     tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],
-    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_5_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
+    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_6_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
     provider:'control-event-local-personas-catalogo',
     model:'zuzu-planifica-control-event-filtra'
   };
@@ -1153,7 +1154,7 @@ function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
   const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const can=canonicalByEvent.get(norm(ev))||{}; let total; if(moduleName==='INGRESOS') total=round(can['Ingresos total'] ?? rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2); else if(moduleName==='COMPRAS') total=round(can['Compras realizadas'] ?? sumField(rs.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),valueField),2); else if(moduleName==='DONACIONES') total=round(can['Donaciones valor'] ?? sumField(rs,valueField),2); else total=sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
   const cols=['Evento','Registros','Total'];
-  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_5_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_6_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
 }
 
 function uniqueTextList(list) {
@@ -1247,11 +1248,159 @@ function directDonorDonationProductsIfApplicable(prompt, context) {
       ...(prodRows.length ? [{ title: 'Productos donados agrupados', columns: prodColumns, rows: prodRows.map(r=>prodColumns.map(c=>text(r[c])))}] : []),
       ...(detailRows.length ? [{ title: 'Detalle de donaciones', columns: detailColumns, rows: detailRows.slice(0,500)}] : [])
     ],
-    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
+    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
     provider: 'control-event-analitica-donaciones',
     model: 'calculo-local-oficial'
   };
 }
+
+function eventTitleFromRow(row) {
+  return trim(row?.['Titulo del evento'] || row?.Titulo || row?.Evento || row?.EVENTO || row?.titulo || row?.nombre || '');
+}
+function eventMetaRowsChronological(context) {
+  const out = new Map();
+  function merge(row) {
+    const title = eventTitleFromRow(row);
+    if (!title) return;
+    const key = norm(title);
+    const old = out.get(key) || { Evento: title };
+    out.set(key, {
+      ...old,
+      Evento: old.Evento || title,
+      'Fecha inicio': firstNonEmpty(old['Fecha inicio'], row?.['fecha ini'], row?.fechaIni, row?.FechaInicio, row?.fecha_inicio, row?.Fecha),
+      'Fecha fin': firstNonEmpty(old['Fecha fin'], row?.['fecha fin'], row?.fechaFin, row?.FechaFin, row?.fecha_fin),
+      Estado: firstNonEmpty(old.Estado, row?.Estado, row?.situacion, row?.Situacion),
+      Precio: firstNonEmpty(old.Precio, row?.Precio, row?.precio)
+    });
+  }
+  arr(context?.modulosExtraidos?.EVENTOS).forEach(merge);
+  arr(context?.eventosObjetivo).forEach(merge);
+  eventNamesFromContext(context).forEach(name => merge({ Evento: name }));
+  return [...out.values()].sort((a,b) => parseEventDateForSort(a['Fecha inicio']) - parseEventDateForSort(b['Fecha inicio']) || String(a.Evento).localeCompare(String(b.Evento),'es'));
+}
+function topJoined(rows, labelField, valueField, limit = 4, unit = '') {
+  const map = new Map();
+  arr(rows).forEach(r => {
+    const key = trim(r?.[labelField]) || 'Sin clasificar';
+    map.set(key, num(map.get(key)) + (valueField ? num(r?.[valueField]) : 1));
+  });
+  return [...map.entries()]
+    .sort((a,b) => num(b[1]) - num(a[1]) || String(a[0]).localeCompare(String(b[0]), 'es'))
+    .slice(0, limit)
+    .map(([k,v]) => `${k} (${round(v, unit === 'uds' ? 3 : 2)}${unit ? ' ' + unit : ''})`)
+    .join(' | ');
+}
+function formatMoneyText(value) { return `${round(value, 2)} €`; }
+function calcIngresosTotal(rows) { return round(arr(rows).reduce((a,r)=>a + (r?.['Total ingreso'] !== undefined ? num(r?.['Total ingreso']) : num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario'])),0),2); }
+function directChronologicalEventNarrativeIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  const wantsAllRegistered = /\b(eventos\s+registrados|todos\s+los\s+eventos|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento)\b/.test(p);
+  const wantsNarrative = /\b(informe|cuentes|contar|cuenta|relato|cronica|crónica|cosas\s+que\s+ocurrieron|ocurrio|ocurrió|actividad|historial|evolucion|evolución)\b/.test(p);
+  const wantsTimeOrder = /\b(ordenad[oa]s?|ordenalo|ordénalo|tiempo|temporal|cronologic[oa]|cronológic[oa]|fecha\s+inicio|fecha\s+de\s+celebracion|fecha\s+de\s+celebración|celebracion|celebración)\b/.test(p);
+  const eventMeta = eventMetaRowsChronological(context);
+  if (eventMeta.length < 2 || !(wantsNarrative && (wantsAllRegistered || wantsTimeOrder))) return null;
+
+  const mods = context.modulosExtraidos || {};
+  const canonical = arr(context?.metricasCanonicas?.porEvento);
+  const byEvent = new Map(canonical.map(r => [norm(r.Evento), r]));
+  const summaryRows = [];
+  const moduleRows = [];
+  eventMeta.forEach((ev, idx) => {
+    const eventName = ev.Evento;
+    const can = byEvent.get(norm(eventName)) || {};
+    const ing = rowsForEvent(arr(mods.INGRESOS), eventName);
+    const comAll = rowsForEvent(arr(mods.COMPRAS), eventName);
+    const comReal = comAll.filter(r => !/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])) && !/^DONADO\s+/i.test(trim(r?.['Ticket u otros gastos'])));
+    const comPend = comAll.filter(r => /pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])));
+    const don = rowsForEvent(arr(mods.DONACIONES), eventName);
+    const tk = rowsForEvent(arr(mods.TICKETS), eventName);
+    const doc = rowsForEvent(arr(mods.DOCUMENTOS), eventName);
+    const ingresos = round(can['Ingresos total'] ?? calcIngresosTotal(ing), 2);
+    const compras = round(can['Compras realizadas'] ?? sumField(comReal, 'Importe'), 2);
+    const pendientes = round(can['Compras pendientes'] ?? sumField(comPend, 'Importe'), 2);
+    const donaciones = round(can['Donaciones valor'] ?? sumField(don, 'Valor'), 2);
+    const saldo = round(can['Saldo actual'] ?? (ingresos - compras), 2);
+    const asistentes = round(can['Asistentes / Numero'] ?? ing.reduce((a,r)=>a+num(r?.Numero),0), 3);
+    const colaboradores = can['Colaboradores registros'] ?? ing.length;
+    const comprasTop = topJoined(comReal, 'Producto', 'Importe', 4, '€');
+    const tiendasTop = topJoined(comReal, 'Tienda', 'Importe', 3, '€');
+    const donTopProd = topJoined(don, 'Producto', 'Unidades', 4, 'uds');
+    const donTopDonantes = topJoined(don, 'Donante', 'Valor', 4, '€');
+    const docsList = doc.slice(0, 5).map(r => `${trim(r?.DOCxxx) || 'DOC'}${trim(r?.Descripcion) ? ': ' + trim(r?.Descripcion) : ''}`).join(' | ');
+    const tkList = tk.slice(0, 5).map(r => `${trim(r?.TKxx) || 'TK'}${trim(r?.Tienda) ? ' ' + trim(r?.Tienda) : ''}${num(r?.['Total ticket']) ? ' ' + formatMoneyText(r?.['Total ticket']) : ''}`).join(' | ');
+    const facts = [];
+    if (colaboradores || asistentes) facts.push(`${colaboradores} registro(s) de ingresos/colaboradores y ${asistentes} asistente(s)/unidad(es)`);
+    if (ingresos) facts.push(`${formatMoneyText(ingresos)} de ingresos`);
+    if (compras) facts.push(`${formatMoneyText(compras)} en compras realizadas`);
+    if (pendientes) facts.push(`${formatMoneyText(pendientes)} pendiente(s) de compra`);
+    if (don.length || donaciones) facts.push(`${don.length} línea(s) de donación valoradas en ${formatMoneyText(donaciones)}`);
+    if (tk.length) facts.push(`${tk.length} ticket(s)/fototicket(s)`);
+    if (doc.length) facts.push(`${doc.length} documento(s)`);
+    const occurred = facts.length ? facts.join('; ') + '.' : 'No hay actividad operativa registrada en los módulos extraídos.';
+    const highlights = [
+      comprasTop ? `Compras destacadas: ${comprasTop}.` : '',
+      tiendasTop ? `Tiendas principales: ${tiendasTop}.` : '',
+      donTopProd ? `Donaciones destacadas: ${donTopProd}.` : '',
+      donTopDonantes ? `Donantes principales: ${donTopDonantes}.` : '',
+      docsList ? `Documentos: ${docsList}.` : '',
+      tkList ? `Tickets: ${tkList}.` : ''
+    ].filter(Boolean).join(' ');
+    summaryRows.push({
+      Orden: idx + 1,
+      'Fecha inicio': trim(ev['Fecha inicio']),
+      'Fecha fin': trim(ev['Fecha fin']),
+      Evento: eventName,
+      Estado: trim(ev.Estado),
+      'Ingresos (€)': ingresos,
+      'Compras realizadas (€)': compras,
+      'Compras pendientes (€)': pendientes,
+      'Donaciones valoradas (€)': donaciones,
+      'Saldo (€)': saldo,
+      Colaboradores: colaboradores,
+      'Asistentes / número': asistentes,
+      Tickets: tk.length,
+      Documentos: doc.length,
+      'Qué ocurrió': `${occurred} ${highlights}`.trim()
+    });
+    moduleRows.push(
+      { Orden: idx + 1, Evento: eventName, Módulo: 'INGRESOS', Registros: ing.length, Total: ingresos, Detalle: colaboradores || asistentes || ingresos ? `${colaboradores} colaborador(es), ${asistentes} asistente(s)/unidad(es), ${formatMoneyText(ingresos)}. Formas de ingreso: ${topJoined(ing, 'Ingreso', null, 4) || 'sin desglose'}.` : 'Sin ingresos registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'COMPRAS', Registros: comAll.length, Total: compras, Detalle: comAll.length ? `Realizadas ${formatMoneyText(compras)}; pendientes ${formatMoneyText(pendientes)}. ${comprasTop ? 'Productos: ' + comprasTop + '.' : ''} ${tiendasTop ? 'Tiendas: ' + tiendasTop + '.' : ''}`.trim() : 'Sin compras registradas.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'DONACIONES', Registros: don.length, Total: donaciones, Detalle: don.length ? `${don.length} línea(s), ${formatMoneyText(donaciones)} valorado. ${donTopProd ? 'Productos: ' + donTopProd + '.' : ''} ${donTopDonantes ? 'Donantes: ' + donTopDonantes + '.' : ''}`.trim() : 'Sin donaciones registradas.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'TICKETS', Registros: tk.length, Total: round(sumField(tk, 'Total ticket'),2), Detalle: tk.length ? (tkList || `${tk.length} ticket(s) registrados.`) : 'Sin fototickets/tickets registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'DOCUMENTOS', Registros: doc.length, Total: doc.length, Detalle: doc.length ? (docsList || `${doc.length} documento(s) registrados.`) : 'Sin documentos registrados.' }
+    );
+  });
+  const columns = ['Orden','Fecha inicio','Fecha fin','Evento','Estado','Ingresos (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo (€)','Colaboradores','Asistentes / número','Tickets','Documentos','Qué ocurrió'];
+  const moduleColumns = ['Orden','Evento','Módulo','Registros','Total','Detalle'];
+  const labels = summaryRows.map(r => `${r['Fecha inicio'] || '?'} · ${r.Evento}`);
+  return {
+    ok: true,
+    rejected: false,
+    title: 'Informe cronológico de eventos',
+    answer: `He ordenado ${summaryRows.length} evento(s) por fecha de inicio/celebración y he preparado una crónica operativa de lo que ocurrió en cada uno. No uso EVENTOS como respuesta final: EVENTOS solo ordena e identifica; el contenido sale de INGRESOS, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS.`,
+    warnings: arr(context.advertencias),
+    charts: [
+      { title: 'Cronología económica por evento', type: 'stackedBar', labels, values: summaryRows.map(r=>round(r['Ingresos (€)'],2)), unit: '€', series: [
+        { name: 'Ingresos', values: summaryRows.map(r=>round(r['Ingresos (€)'],2)) },
+        { name: 'Compras realizadas', values: summaryRows.map(r=>round(r['Compras realizadas (€)'],2)) },
+        { name: 'Donaciones valoradas', values: summaryRows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
+      ]},
+      { title: 'Actividad registrada por evento', type: 'bar', labels, values: summaryRows.map(r=>num(r.Colaboradores)+num(r.Tickets)+num(r.Documentos)+num(r['Asistentes / número'])), unit: 'registros/unidades' }
+    ],
+    tables: [
+      { title: 'Crónica ordenada por fecha de celebración', columns, rows: summaryRows.map(r=>columns.map(c=>text(r[c]))) },
+      { title: 'Detalle por evento y módulo', columns: moduleColumns, rows: moduleRows.map(r=>moduleColumns.map(c=>text(r[c]))) }
+    ],
+    files: [
+      { filename: fileSafe('Informe_cronologico_eventos_v18_6_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
+      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v18_6_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
+    ],
+    provider: 'control-event-local-cronica-eventos',
+    model: 'zuzu-planifica-control-event-ordena-y-resume'
+  };
+}
+
 function directEventReportIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
@@ -1325,7 +1474,7 @@ function directEventReportIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts,
     tables: [{ title: 'Resumen operativo por evento', columns, rows: rowsTable }, ...detailTables],
-    files: [{ filename: fileSafe(`Informe_eventos_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Informe_eventos_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-informe-eventos',
     model: 'calculo-local-oficial'
   };
@@ -1339,6 +1488,7 @@ function directHighConfidenceResultIfApplicable(prompt, context) {
     || directProductConsumptionResultIfApplicable(prompt, context)
     || directDonorDonationProductsIfApplicable(prompt, context)
     || directBoughtDonatedUsageIfApplicable(prompt, context)
+    || directChronologicalEventNarrativeIfApplicable(prompt, context)
     || directEventReportIfApplicable(prompt, context);
 }
 function isProductConsumptionAnalysisPrompt(prompt) {
@@ -1421,9 +1571,9 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
       { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
     ],
     files: [
-      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
-      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
-      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_5_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_6_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
     ],
     provider: 'control-event-analitica-productos',
     model: 'calculo-local-oficial'
@@ -1491,7 +1641,7 @@ function directDeterministicResultIfApplicable(prompt, context) {
       { title: 'Resumen de extracción', columns: ['Dato','Valor'], rows: auditRows },
       ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
     ],
-    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
     provider: 'control-event-local-consulta-directa',
     model: 'consulta-modulos-sin-gemini'
   };
@@ -1535,7 +1685,7 @@ function directGraphResultIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
-    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_5_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_6_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-graficas'
   };
@@ -1642,7 +1792,7 @@ async function callGeminiEvent(prompt, context) {
           warnings: ['Zuzu no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
           charts: [],
           tables: [],
-          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_5_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_6_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
           provider: 'gemini-rest-json-fallback',
           model
         };
@@ -1839,7 +1989,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return await callGeminiEvent(userPrompt, context);
   } catch (error) {
     const friendly = friendlyZuzuErrorMessage(error);
-    const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
+    const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
     if (fallback) {
       fallback.warnings = arr(fallback.warnings).concat(`${friendly} Se muestra respaldo analítico de ControlEvent basado en los módulos oficiales.`);
       fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
@@ -1862,7 +2012,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
 }
 
 
-// v18.5_prod - Planificación inicial asistida por Zuzu.
+// v18.6_prod - Planificación inicial asistida por Zuzu.
 function planAiSchema() {
   return {
     type: 'OBJECT',
@@ -4998,7 +5148,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v18.5_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
+    version: 'v18.6_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
     provider: aiProvider,
     model: aiModel,
     mode: m,

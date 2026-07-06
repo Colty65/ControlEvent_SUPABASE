@@ -1,4 +1,4 @@
-# ControlEvent v18.5_prod · Zuzu inteligente
+# ControlEvent v18.6_prod · Zuzu inteligente
 
 Versión generada sobre `CE_v18_PROD_ZUZU_PLANIFICADOR_MODULOS.zip`.
 
@@ -15,7 +15,7 @@ Versión generada sobre `CE_v18_PROD_ZUZU_PLANIFICADOR_MODULOS.zip`.
 - Se reduce la extracción innecesaria de INGRESOS/TICKETS/DOCUMENTOS en consultas de productos, bajando volumen y evitando el mensaje de “petición más concreta” en casos manejables.
 - EVENTOS ya no trae DOCxx salvo que se pida explícitamente DOCUMENTOS/documentos/DOCxx.
 - Los listados de respaldo dejan de mostrarse como “fase de diagnóstico” y se presentan como consulta directa.
-- Versión visible actualizada a `ControlEvent v18.5_prod`; exportaciones generadas por Zuzu usan sufijo `v18_5_prod`.
+- Versión visible actualizada a `ControlEvent v18.6_prod`; exportaciones generadas por Zuzu usan sufijo `v18_6_prod`.
 
 ## Pruebas realizadas
 

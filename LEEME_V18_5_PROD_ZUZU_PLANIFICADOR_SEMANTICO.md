@@ -1,4 +1,4 @@
-# ControlEvent v18.5_prod · Zuzu con planificador semántico reforzado
+# ControlEvent v18.6_prod · Zuzu con planificador semántico reforzado
 
 Versión generada sobre `v18.4_prod`.
 

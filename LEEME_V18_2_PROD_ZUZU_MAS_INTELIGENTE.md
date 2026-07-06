@@ -1,4 +1,4 @@
-# ControlEvent v18.5_prod · Zuzu más inteligente
+# ControlEvent v18.6_prod · Zuzu más inteligente
 
 Versión construida sobre `v18.1_prod` para corregir las desviaciones detectadas en las tres pruebas de Zuzu.
 
