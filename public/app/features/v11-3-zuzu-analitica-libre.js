@@ -1,9 +1,9 @@
-/* ControlEvent v18.11.5_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.11.6_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.11.5_prod';
+  var VERSION='v18.11.6_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -39,7 +39,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || data.title || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v18_11_5_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v18_11_6_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -287,7 +287,7 @@
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
     var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
     var usageLine='';
-    if(usage && usage.calls){ usageLine=' · '+usage.calls+' llamada(s) · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. €'+formatNumber(usage.costEurApprox||0); }
+    if(usage && usage.calls){ usageLine=' · '+usage.calls+' llamada(s) · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
     var items=trace.map(function(x){
       var st=String(x.status||'INFO').toUpperCase();
       var extra='';
@@ -295,9 +295,10 @@
       if(x.usage && (x.usage.totalTokens||x.usage.promptTokens)){
         extra+=' Tokens: '+(x.usage.totalTokens||'?')+' total';
         if(x.usage.promptTokens) extra+=' ('+x.usage.promptTokens+' in';
-        if(x.usage.outputTokens||x.usage.candidateTokens) extra+=', '+(x.usage.outputTokens||x.usage.candidateTokens)+' out';
+        if(x.usage.outputTokens||x.usage.candidateTokens) extra+=', '+(x.usage.outputTokens||x.usage.candidateTokens)+' out fact.';
+        if(x.usage.hiddenOutputTokens) extra+=', '+x.usage.hiddenOutputTokens+' ocultos';
         if(x.usage.promptTokens) extra+=')';
-        if(x.usage.costEurApprox!==undefined) extra+=' · € aprox. '+formatNumber(x.usage.costEurApprox);
+        if(x.usage.costEurApprox!==undefined) extra+=' · coste aprox. '+formatCost(x.usage.costEurApprox)+' €';
         extra+='.';
       }
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
@@ -349,6 +350,7 @@
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+  function formatCost(v){ return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:5, maximumFractionDigits:6}); }
   function chartColor(i){ return ['#38bdf8','#fb923c','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;

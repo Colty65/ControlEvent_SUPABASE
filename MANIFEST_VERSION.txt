@@ -1,5 +1,6 @@
-Version app: v18.11.5_prod
-Version file: ControlEvent_v18_11_5_prod
-ZIP: CE_v18_11_5_PROD_ZUZU_MODELOS_COSTES.zip
-Build: 20260706-183000
-Cambios: decisión de modelos por funcionalidad, coste estimado por llamada Gemini, trazabilidad de tokens, políticas para Zuzu libre, Planificación Inicial y Alta asistida/OCR.
+Version app: v18.11.6_prod
+Build: 20260706-190000
+ZIP: CE_v18_11_6_PROD_ZUZU_COSTE_REAL_AHORRO.zip
+Front version: v18.11.6_prod
+Backend version: v18.11.6_prod
+Cambios: coste con 5-6 decimales, salida facturable incluyendo tokens ocultos/thinking, modo ahorro/auto por modelo, filtro relativo año pasado/este año/año que viene.

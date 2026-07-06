@@ -263,12 +263,13 @@ function estimateGeminiCost(model, usage = {}) {
   const promptTokens = Number(usage.promptTokenCount || usage.promptTokens || 0) || 0;
   const candidateTokens = Number(usage.candidatesTokenCount || usage.candidateTokens || 0) || 0;
   const totalTokens = Number(usage.totalTokenCount || usage.totalTokens || 0) || 0;
-  const outputTokens = candidateTokens || Math.max(0, totalTokens - promptTokens);
+  const billableOutputTokens = Math.max(0, candidateTokens, totalTokens ? totalTokens - promptTokens : 0);
+  const hiddenOutputTokens = Math.max(0, billableOutputTokens - candidateTokens);
   let inputUsdPerM = 0.30, outputUsdPerM = 2.50, family = 'gemini-2.5-flash';
   if (/flash-lite/i.test(m)) { inputUsdPerM = 0.10; outputUsdPerM = 0.40; family = 'gemini-2.5-flash-lite'; }
-  const usd = (promptTokens * inputUsdPerM + outputTokens * outputUsdPerM) / 1000000;
+  const usd = (promptTokens * inputUsdPerM + billableOutputTokens * outputUsdPerM) / 1000000;
   const eurRate = Number(process.env.CONTROLEVENT_USD_EUR || '0.92') || 0.92;
-  return { family, promptTokens, outputTokens, totalTokens: totalTokens || promptTokens + outputTokens, costUsd: Number(usd.toFixed(6)), costEurApprox: Number((usd * eurRate).toFixed(6)) };
+  return { family, promptTokens, candidateTokens, visibleOutputTokens:candidateTokens, hiddenOutputTokens, outputTokens: billableOutputTokens, billableOutputTokens, totalTokens: totalTokens || promptTokens + billableOutputTokens, costUsd: Number(usd.toFixed(8)), costEurApprox: Number((usd * eurRate).toFixed(8)) };
 }
 function usageSmall(payload, model) {
   const u = payload?.usageMetadata || {};
@@ -357,7 +358,7 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '', respo
     throw decorateGeminiError(err, model, payload);
   }
   const usage = usageSmall(payload, model);
-  try { console.log(`[ControlEvent v18.11.5_prod Alta IA] OCR ticket · ${model} · prompt=${usage.promptTokens} output=${usage.outputTokens} total=${usage.totalTokens} · coste≈$${usage.costUsd}/€${usage.costEurApprox}`); } catch (_) {}
+  try { console.log(`[ControlEvent v18.11.6_prod Alta IA] OCR ticket · ${model} · prompt=${usage.promptTokens} outputFacturable=${usage.outputTokens} total=${usage.totalTokens} · coste≈$${Number(usage.costUsd||0).toFixed(6)}/€${Number(usage.costEurApprox||0).toFixed(6)}`); } catch (_) {}
   return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest', usoGemini: usage, decisionModelo: /flash-lite/i.test(model) ? 'OCR en modo económico Flash-Lite' : 'OCR con Flash para mejor lectura visual del ticket' };
 }
 async function callGemini({ dataUrl, instrucciones = '', responsables = [], tiendas = [] }) {
@@ -383,7 +384,7 @@ async function callGemini({ dataUrl, instrucciones = '', responsables = [], tien
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v18.11.5_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v18.11.6_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -415,7 +416,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v18.11.5_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v18.11.6_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;
