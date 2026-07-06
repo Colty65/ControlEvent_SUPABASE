@@ -1,4 +1,4 @@
-# ControlEvent v18.8_prod · Zuzu con redacción real y tono humano
+# ControlEvent v18.9_prod · Zuzu con redacción real y tono humano
 
 Esta versión corrige el problema detectado en los informes: los datos salían bien, pero la redacción seguía siendo mecánica.
 
@@ -11,7 +11,7 @@ Esta versión corrige el problema detectado en los informes: los datos salían b
 - El prompt de redacción prohíbe empezar con frases mecánicas tipo “He localizado X registros”.
 - Para informes de participación de personas, se entrega más detalle a Zuzu para que pueda citar productos, papeles, importes y contexto.
 - Si Gemini no responde, se aplica un respaldo local mejorado, pero dejando aviso.
-- Versión visible y exportaciones actualizadas a `v18.8_prod` / `v18_8_prod`.
+- Versión visible y exportaciones actualizadas a `v18.9_prod` / `v18_9_prod`.
 
 ## Validación
 

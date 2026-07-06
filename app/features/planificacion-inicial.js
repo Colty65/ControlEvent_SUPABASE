@@ -1,9 +1,9 @@
-/* ControlEvent v18.8_prod - Planificación inicial con Zuzu.
+/* ControlEvent v18.9_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   console.log('HOTFIX47_LOGO_AVANCE_EVENT_SWITCH_PLAN_DOCS');
   'use strict';
-  const VERSION = 'ControlEvent v18.8_prod';
+  const VERSION = 'ControlEvent v18.9_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -30,7 +30,7 @@
       if(data && Array.isArray(data.tiendas) && data.tiendas.length > rows('tiendas').length) st.tiendas = data.tiendas;
       if(data && Array.isArray(data.eventos) && data.eventos.length > rows('eventos').length) st.eventos = data.eventos;
       if(window.ControlEventApp && window.ControlEventApp.state) window.ControlEventApp.state = st;
-    }catch(error){ console.warn('[ControlEvent v18.8_prod] No se pudo fusionar maestros para planificación:', error); }
+    }catch(error){ console.warn('[ControlEvent v18.9_prod] No se pudo fusionar maestros para planificación:', error); }
   }
   async function ensureMasterRowsForMandatoryIncomes(){
     if(planContent() !== 'INGRESOS_SOCIOS_OBLIGATORIOS') return;
@@ -45,7 +45,7 @@
       const data = await res.json().catch(() => ({}));
       mergeMasterRowsForPlanning(data);
     }catch(error){
-      console.warn('[ControlEvent v18.8_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
+      console.warn('[ControlEvent v18.9_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
     }
   }
   function byId(name, id){ const sid = String(id || ''); return rows(name).find(item => String(item.id || '') === sid) || null; }
@@ -2546,7 +2546,7 @@
       ceHf27BindDiagnostics(box);
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
     }catch(error){
-      console.error('[ControlEvent v18.8_prod] Diagnóstico HF28 falló', error);
+      console.error('[ControlEvent v18.9_prod] Diagnóstico HF28 falló', error);
       box.classList.remove('hidden');
       box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>Diagnóstico no disponible:</strong> '+esc(error?.message || error)+'</div>';
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
@@ -3521,7 +3521,7 @@
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
       activateCreatedEventAndOpenGraficas(newEventId);
     }catch(error){
-      console.error('[ControlEvent v18.8_prod] Error generando evento real desde planificación:', error);
+      console.error('[ControlEvent v18.9_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText; }
@@ -4533,7 +4533,7 @@
       bindPlanDebugTraceCopy(data.debugPlanificacion);
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
-      console.warn('[ControlEvent v18.8_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      console.warn('[ControlEvent v18.9_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
       await ensureMasterRowsForMandatoryIncomes();
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
@@ -4669,7 +4669,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v18.8_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v18.9_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {
@@ -4744,7 +4744,7 @@
       if(event){ event.preventDefault(); event.stopPropagation(); }
       try{ ceHf27RenderDiagnosticsOnly(); }
       catch(error){
-        console.error('[ControlEvent v18.8_prod] Error abriendo diagnóstico HF27/HF28', error);
+        console.error('[ControlEvent v18.9_prod] Error abriendo diagnóstico HF27/HF28', error);
         const box = document.getElementById('planificacionResultado');
         if(box){
           box.classList.remove('hidden');
@@ -4783,7 +4783,7 @@
         event.stopImmediatePropagation();
         try{ ceHf27RenderDiagnosticsOnly(); }
         catch(error){
-          console.error('[ControlEvent v18.8_prod] Error diagnóstico HF28', error);
+          console.error('[ControlEvent v18.9_prod] Error diagnóstico HF28', error);
           const box = document.getElementById('planificacionResultado');
           if(box){
             box.classList.remove('hidden');

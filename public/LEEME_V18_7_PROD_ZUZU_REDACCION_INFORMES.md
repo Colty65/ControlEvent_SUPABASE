@@ -1,4 +1,4 @@
-# ControlEvent v18.8_prod · Zuzu redacta informes con tono
+# ControlEvent v18.9_prod · Zuzu redacta informes con tono
 
 Versión construida sobre `v18.6_prod`.
 
@@ -17,7 +17,7 @@ Los informes ya traían mucho detalle operativo, pero el texto de cabecera era p
 - Si el usuario pide tono técnico, financiero, contable, auditoría o Dirección, la cabecera se redacta en estilo ejecutivo y formal.
 - Si Zuzu/Gemini falla o no hay cuota, ControlEvent aplica una redacción local de respaldo según el tono detectado, sin mostrar errores técnicos al usuario.
 - Reforzado el `systemPrompt` para que las respuestas no sean solo tablas: primero interpretación y conclusiones; después detalle estructurado.
-- Actualizada versión visible, `package.json`, `package-lock.json` y sufijos de exportación a `v18.8_prod` / `v18_8_prod`.
+- Actualizada versión visible, `package.json`, `package-lock.json` y sufijos de exportación a `v18.9_prod` / `v18_9_prod`.
 
 ## Flujo resultante
 

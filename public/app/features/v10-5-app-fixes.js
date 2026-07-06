@@ -1,10 +1,10 @@
-/* ControlEvent v18.8_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
+/* ControlEvent v18.9_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
 (function(){
   'use strict';
   if(window.__ceV105ProdFixes) return; window.__ceV105ProdFixes=true;
-  var VERSION='v18.8_prod';
-  var VERSION_TEXT='ControlEvent v18.8_prod';
-  var VERSION_FILE='ControlEvent_v18_8_prod';
+  var VERSION='v18.9_prod';
+  var VERSION_TEXT='ControlEvent v18.9_prod';
+  var VERSION_FILE='ControlEvent_v18_9_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
