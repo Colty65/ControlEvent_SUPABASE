@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.2_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v18.11.3_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -369,6 +369,7 @@ Reglas obligatorias:
 - Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
+- Si el usuario pregunta por el tiempo/clima/meteorología de un evento, usa infoIndirecta.meteorologia si existe. Devuelve una lectura útil para la organización del evento y al menos una tabla/gráfica meteorológica si hay datos externos.
 - Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
 - Si ControlEvent te entrega COMPRAS/DONACIONES/PRODUCTOS, úsalo como datos operativos; EVENTOS solo sirve para identificar título/fechas, no para construir una gráfica de consumo.
 - Tipos de gráfica disponibles: bar, horizontalBar, pie, donut, line y stackedBar. Para comparativas entre eventos usa bar/stackedBar. Para repartos por tipo usa pie/donut. Para rankings largos usa horizontalBar.
@@ -387,7 +388,8 @@ Reglas obligatorias:
 - No devuelvas una plantilla mecánica repetida. Cambia estructura, vocabulario y enfoque según cada petición y cada persona/evento consultado.
 - Si el usuario pide opinión, informe, valoración, tono cachondo, formal, técnico o coloquial, la parte answer debe ser una redacción humana completa y no una introducción de dos líneas seguida de tablas.
 
-Campos oficiales por módulo:
+Campos oficiales por módulo y datos indirectos:
+- METEOROLOGIA indirecta: Evento; Localidad; Fecha; Cielo; Temp. máx; Temp. mín; Prob. lluvia %; Viento km/h; Fuente. Úsala solo si infoIndirecta.meteorologia está presente.
 - INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
 - DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
 - COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
@@ -510,7 +512,7 @@ function directModuleResultIfApplicable(prompt, context) {
   const rows = arr(mods[moduleName]);
   const columns = orderedColumnsForModule(moduleName, rows);
   const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
-  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_11_2_prod.csv`);
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_11_3_prod.csv`);
   const tableLimit = 1000;
   const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
@@ -688,8 +690,8 @@ function directAggregateResultIfApplicable(prompt, context) {
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
     ],
     files: [
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
     ],
     provider: 'control-event-local-deterministico',
     model: 'sin-gemini-para-calculos'
@@ -792,7 +794,7 @@ function directComparativeAllDataResultIfApplicable(prompt, context) {
     tables: [
       { title: 'Comparativa general por evento', columns, rows: tableRows }
     ],
-    files: [{ filename: fileSafe(`Comparativa_eventos_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-comparativa-estricta',
     model: 'sin-gemini-para-alcance-ni-calculos'
   };
@@ -877,7 +879,7 @@ function directEventPriceExtremesIfApplicable(prompt, context) {
     ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
   ];
   const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
-  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_11_2_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_11_3_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
 }
 function directPersonAppearanceIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -897,7 +899,7 @@ function directPersonAppearanceIfApplicable(prompt, context) {
   donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
   const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
   const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
-  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
 }
 
 function personNeedlesFromPrompt(prompt, context) {
@@ -996,7 +998,7 @@ function directPersonRoleReportIfApplicable(prompt, context) {
       { title: 'Resumen por papel desempeñado', columns: colsRoles, rows: roleRows.map(r=>colsRoles.map(c=>text(r[c]))) },
       { title: 'Detalle de registros localizados', columns: colsDetail, rows: detail.slice(0, 500).map(r=>colsDetail.map(c=>text(r[c]))) }
     ],
-    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
+    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
     provider: 'control-event-local-informe-persona',
     model: 'sin-gemini-para-informes-de-persona'
   };
@@ -1052,7 +1054,7 @@ function directCashEvolutionIfApplicable(prompt, context) {
       ] }
     ],
     tables: [{ title: 'Evolución temporal del saldo de caja', columns: cols, rows: rows.map(r=>cols.map(c=>text(r[c]))) }],
-    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
+    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
     provider: 'control-event-local-saldo-caja',
     model: 'sin-gemini-para-saldo-caja'
   };
@@ -1080,7 +1082,7 @@ function directBoughtDonatedUsageIfApplicable(prompt, context) {
   const eventos = eventNamesFromContext(context).join(', ');
   const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
   const shown = rows.slice(0, limit);
-  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
 }
 function directProductCatalogIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -1102,7 +1104,7 @@ function directProductCatalogIfApplicable(prompt, context) {
     tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
   }
   tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
-  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_11_2_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_11_3_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
 }
 function rangosSolicitadosFromPrompt(prompt) {
   const p = norm(prompt);
@@ -1144,7 +1146,7 @@ function directPersonsCatalogIfApplicable(prompt, context) {
     warnings: rows.length ? [] : [`No hay personas con rango ${rangos.join(', ') || 'solicitado'} en la tabla PERSONAS.`],
     charts:grows.length?[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}]:[],
     tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],
-    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_11_2_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
+    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_11_3_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
     provider:'control-event-local-personas-catalogo',
     model:'zuzu-planifica-control-event-filtra'
   };
@@ -1160,7 +1162,7 @@ function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
   const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const can=canonicalByEvent.get(norm(ev))||{}; let total; if(moduleName==='INGRESOS') total=round(can['Ingresos total'] ?? rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2); else if(moduleName==='COMPRAS') total=round(can['Compras realizadas'] ?? sumField(rs.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),valueField),2); else if(moduleName==='DONACIONES') total=round(can['Donaciones valor'] ?? sumField(rs,valueField),2); else total=sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
   const cols=['Evento','Registros','Total'];
-  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_11_2_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_11_3_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
 }
 
 function uniqueTextList(list) {
@@ -1254,7 +1256,7 @@ function directDonorDonationProductsIfApplicable(prompt, context) {
       ...(prodRows.length ? [{ title: 'Productos donados agrupados', columns: prodColumns, rows: prodRows.map(r=>prodColumns.map(c=>text(r[c])))}] : []),
       ...(detailRows.length ? [{ title: 'Detalle de donaciones', columns: detailColumns, rows: detailRows.slice(0,500)}] : [])
     ],
-    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
+    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
     provider: 'control-event-analitica-donaciones',
     model: 'calculo-local-oficial'
   };
@@ -1399,8 +1401,8 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
       { title: 'Detalle por evento y módulo', columns: moduleColumns, rows: moduleRows.map(r=>moduleColumns.map(c=>text(r[c]))) }
     ],
     files: [
-      { filename: fileSafe('Informe_cronologico_eventos_v18_11_2_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
-      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v18_11_2_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
+      { filename: fileSafe('Informe_cronologico_eventos_v18_11_3_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
+      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v18_11_3_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
     ],
     provider: 'control-event-local-cronica-eventos',
     model: 'zuzu-planifica-control-event-ordena-y-resume'
@@ -1480,7 +1482,7 @@ function directEventReportIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts,
     tables: [{ title: 'Resumen operativo por evento', columns, rows: rowsTable }, ...detailTables],
-    files: [{ filename: fileSafe(`Informe_eventos_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Informe_eventos_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-informe-eventos',
     model: 'calculo-local-oficial'
   };
@@ -1577,9 +1579,9 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
       { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
     ],
     files: [
-      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
-      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
-      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_11_2_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_11_3_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
     ],
     provider: 'control-event-analitica-productos',
     model: 'calculo-local-oficial'
@@ -1647,7 +1649,7 @@ function directDeterministicResultIfApplicable(prompt, context) {
       { title: 'Resumen de extracción', columns: ['Dato','Valor'], rows: auditRows },
       ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
     ],
-    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
     provider: 'control-event-local-consulta-directa',
     model: 'consulta-modulos-sin-gemini'
   };
@@ -1691,7 +1693,7 @@ function directGraphResultIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
-    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_11_2_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_11_3_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-graficas'
   };
@@ -1734,7 +1736,7 @@ function geminiOutText(payload) { return payload?.candidates?.[0]?.content?.part
 function logGeminiUsage(stage, model, payload) {
   try {
     const u = payload?.usageMetadata || {};
-    console.log(`[ControlEvent v18.11.2_prod Zuzu] ${stage} · ${model} · prompt=${u.promptTokenCount ?? ''} candidates=${u.candidatesTokenCount ?? ''} total=${u.totalTokenCount ?? ''}`);
+    console.log(`[ControlEvent v18.11.3_prod Zuzu] ${stage} · ${model} · prompt=${u.promptTokenCount ?? ''} candidates=${u.candidatesTokenCount ?? ''} total=${u.totalTokenCount ?? ''}`);
   } catch (_) {}
 }
 function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|504|aborted|abort|tard[oó] demasiado|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
@@ -1752,6 +1754,33 @@ function memoSet(key, value) {
   if (__zuzuMemo.size > 80) { const first = __zuzuMemo.keys().next().value; if (first) __zuzuMemo.delete(first); }
 }
 
+function zuzuTraceItem(step, status = 'INFO', detail = '', extra = {}) {
+  return {
+    time: new Date().toISOString(),
+    step: trim(step),
+    status: trim(status || 'INFO').toUpperCase(),
+    detail: trim(detail).slice(0, 900),
+    ...extra
+  };
+}
+function zuzuTracePush(trace, step, status = 'INFO', detail = '', extra = {}) {
+  if (!Array.isArray(trace)) return;
+  trace.push(zuzuTraceItem(step, status, detail, extra));
+}
+function usageSmall(payload) {
+  const u = payload?.usageMetadata || payload || {};
+  return {
+    promptTokens: u.promptTokenCount ?? u.promptTokens ?? '',
+    candidateTokens: u.candidatesTokenCount ?? u.candidateTokens ?? '',
+    totalTokens: u.totalTokenCount ?? u.totalTokens ?? ''
+  };
+}
+function cleanGeminiError(error) {
+  const status = error?.status ? `HTTP ${error.status}: ` : '';
+  const raw = text(error?.message || error);
+  const detailMsg = text(error?.details?.error?.message || error?.details?.message || '');
+  return (status + (raw || detailMsg || 'Error desconocido de Zuzu/Gemini')).slice(0, 1200);
+}
 
 async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) {
   const controller = new AbortController();
@@ -1772,11 +1801,12 @@ async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) 
   }
 }
 
-async function callGeminiEvent(prompt, context) {
+async function callGeminiEvent(prompt, context, flowTrace = []) {
   const apiKey = geminiKey();
   if (!apiKey) {
     const err = new Error('Falta GEMINI_API_KEY en Vercel para usar Zuzu / Analítica libre.');
     err.status = 503;
+    zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final', 'KO', err.message);
     throw err;
   }
   let lastError = null;
@@ -1787,7 +1817,8 @@ async function callGeminiEvent(prompt, context) {
       generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2 }
     };
     try {
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 18000);
+      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 36000);
       logGeminiUsage('PASO 2 respuesta final estructurada', model, payload);
       if (!res.ok) {
         const e = new Error(payload?.error?.message || `Zuzu HTTP ${res.status}`);
@@ -1810,6 +1841,7 @@ async function callGeminiEvent(prompt, context) {
           fallback.model = 'formato-local-por-json-invalido';
           return fallback;
         }
+        zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', 'Gemini respondió, pero no en JSON válido. Se adjunta texto crudo como fichero.', { model });
         return {
           ok: true,
           rejected: false,
@@ -1818,14 +1850,18 @@ async function callGeminiEvent(prompt, context) {
           warnings: ['Zuzu no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
           charts: [],
           tables: [],
-          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_11_2_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_11_3_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
           provider: 'gemini-rest-json-fallback',
           model
         };
       }
-      return normalizeResult(parsed, model);
+      const normalized = normalizeResult(parsed, model);
+      normalized.__zuzuGeminiFinal = { ok: true, model, usage: usageSmall(payload), mode: 'structured-json' };
+      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'OK', `Gemini devolvió JSON válido. Tablas=${arr(normalized.tables).length}; gráficas=${arr(normalized.charts).length}; ficheros=${arr(normalized.files).length}.`, { model, usage: usageSmall(payload) });
+      return normalized;
     } catch (error) {
       lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', cleanGeminiError(error), { model });
       if (isQuotaError(error) || !isRetryable(error)) break;
     }
   }
@@ -2041,9 +2077,9 @@ ${trim(userPrompt).slice(0, 3500)}
 DATOS OFICIALES CALCULADOS POR CONTROLEVENT:
 ${ctx}`;
 }
-async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context) {
+async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace = []) {
   const apiKey = geminiKey();
-  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.');
+  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'KO', 'Sin GEMINI_API_KEY para redactar informe con Zuzu.'); throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.'); }
   // v18.11: no se usa caché narrativa; el usuario ha contratado prepago y quiere que Zuzu/Gemini recontextualice cada petición.
   const tone = narrativeToneFromPrompt(userPrompt);
   let lastError = null;
@@ -2054,9 +2090,10 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
       generationConfig: { responseMimeType: 'application/json', responseSchema: narrativeMiniSchema(), temperature: tone.id === 'coloquial-socios' ? 0.82 : 0.28 }
     };
     try {
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, wantsOnePageNarrative(userPrompt) ? 32000 : 24000);
+      zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'RUN', `Modelo ${model}. Gemini recibe prompt original + datos cocinados por CE para redactar con tono.`);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, wantsOnePageNarrative(userPrompt) ? 60000 : 45000);
       logGeminiUsage('PASO 2 redacción humana', model, payload);
-      if (!res.ok) throw new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`);
+      if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Zuzu narrativa no devolvió texto.');
       let parsed;
@@ -2064,22 +2101,25 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
       catch (_) {
         // Si Gemini entendió la intención pero no respetó el JSON, aprovechamos el texto en vez de caer a plantilla local.
         const cleaned = outText.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
-        return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: cleaned, warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model };
+        zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'OK', 'Gemini redactó texto libre no JSON; CE lo presenta sin plantilla local.', { model, usage: usageSmall(payload) });
+        return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: cleaned, warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model, usage: usageSmall(payload) };
       }
-      const finalNarrative = { title: trim(parsed?.title), answer: trim(parsed?.answer), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model };
+      const finalNarrative = { title: trim(parsed?.title), answer: trim(parsed?.answer), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model, usage: usageSmall(payload) };
+      zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'OK', `Gemini redactó answer de ${trim(parsed?.answer).length} caracteres.`, { model, usage: usageSmall(payload) });
       return finalNarrative;
     } catch (error) {
       lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'KO', cleanGeminiError(error), { model });
       if (isQuotaError(error) || !isRetryable(error)) break;
     }
   }
   throw lastError || new Error('Zuzu narrativa no disponible.');
 }
-async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult) {
+async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, flowTrace = []) {
   if (!shouldEnrichLocalResultWithNarrative(userPrompt, localResult)) return localResult;
   const out = { ...localResult, warnings: arr(localResult.warnings).slice() };
   try {
-    const narrative = await callGeminiNarrativeForLocalResult(userPrompt, localResult, context);
+    const narrative = await callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace);
     if (trim(narrative.answer)) {
       const ans = trim(narrative.answer);
       const tone = narrativeToneFromPrompt(userPrompt);
@@ -2090,6 +2130,7 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult) 
       out.warnings = arr(out.warnings).concat(arr(narrative.warnings));
       out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-sentimiento-redaccion`;
       out.model = narrative.model || 'zuzu-redaccion';
+      out.__zuzuGeminiNarrative = { ok: true, model: narrative.model || 'zuzu-redaccion', usage: narrative.usage || null };
       return out;
     }
   } catch (error) {
@@ -2102,6 +2143,7 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult) 
       out.warnings = out.warnings.concat('La petición exigía tono/opinión/redacción humana. Se evita respuesta mecánica de ControlEvent para no dar una falsa impresión de inteligencia.');
       return out;
     }
+    zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'KO', cleanGeminiError(error));
     const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult);
     if (fallback) {
       out.answer = fallback;
@@ -2167,7 +2209,7 @@ Reglas de planificación:
 - Si el usuario pide gráficas/rankings de productos consumidos, incluye COMPRAS + DONACIONES + PRODUCTOS.
 - Si pide fecha, precio o estado técnico de un evento, EVENTOS es suficiente.
 - Si pide datos, información, resumen, dossier, comparativa o “qué ocurrió” en un evento, NO devuelvas solo EVENTOS: incluye INGRESOS, COMPRAS, DONACIONES, TICKETS y DOCUMENTOS.
-- Si pregunta por el tiempo meteorológico de una celebración, incluye EVENTOS y los módulos de actividad del evento; ControlEvent responderá que no hay previsión meteorológica externa si no existe ese dato.
+- Si pregunta por el tiempo meteorológico/clima/previsión de una celebración, incluye EVENTOS para localizar fechas y añade salidaDeseada=["METEOROLOGIA","GRAFICA"]. El dato meteorológico lo buscará ControlEvent como dato indirecto externo, pero siempre ligado a evento(s).
 - Si pregunta dónde ha participado/aparecido una persona, incluye INGRESOS + COMPRAS + DONACIONES + PERSONAS y busca en todos los eventos si no cita un evento concreto.
 - Si pide personas SOCIO/DONANTE/NO SOCIO registradas en el sistema, usa PERSONAS, filtro filters.rangos=[SOCIO/DONANTE/NO SOCIO] y NO lo limites al evento activo.
 - Si pide coste/unidades/tiendas/responsables de compras, incluye COMPRAS y PRODUCTOS; añade TIENDAS/PERSONAS solo si necesita catálogos.
@@ -2195,9 +2237,9 @@ function mergePlannerFilters(...items) {
   }
   return out;
 }
-async function callGeminiPlanner(userPrompt, catalog) {
+async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
   const apiKey = geminiKey();
-  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para Zuzu planificador.');
+  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'KO', 'Sin GEMINI_API_KEY para Zuzu planificador.'); throw new Error('Sin GEMINI_API_KEY para Zuzu planificador.'); }
   // v18.11: siempre se pregunta a Zuzu/Gemini en el Paso 1 para decidir módulos y filtros.
   let lastError = null;
   for (const model of configuredGeminiModels()) {
@@ -2207,15 +2249,20 @@ async function callGeminiPlanner(userPrompt, catalog) {
       generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0.05 }
     };
     try {
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 7500);
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'RUN', `Modelo ${model}. Pidiendo módulos, filtros, eventos y necesidades de datos.`);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 18000);
       logGeminiUsage('PASO 1 planificación de datos', model, payload);
-      if (!res.ok) throw new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`);
+      if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
       const parsed = JSON.parse(stripJsonText(outText));
+      parsed.__zuzuPlannerModel = model;
+      parsed.__zuzuPlannerUsage = usageSmall(payload);
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'OK', `Módulos=${arr(parsed?.modules || parsed?.modulos).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; todos=${parsed?.todosLosEventos === true}`, { model, usage: usageSmall(payload) });
       return parsed;
     } catch (error) {
       lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'KO', cleanGeminiError(error), { model });
       if (isQuotaError(error) || !isRetryable(error)) break;
     }
   }
@@ -2226,8 +2273,9 @@ function shouldUseGeminiPlanner(userPrompt, local) {
   // ControlEvent solo aporta plan local como red de seguridad si Gemini no responde.
   return true;
 }
-async function buildZuzuPlan(userPrompt, state, selectedEventId) {
+async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'OK', `Plan local preventivo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}. No es respuesta final, solo red de seguridad.`);
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
     return {
       ...local,
@@ -2238,7 +2286,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId) {
   }
   try {
     const catalog = buildZuzuPlanningCatalog(state, selectedEventId);
-    const ai = await callGeminiPlanner(userPrompt, catalog);
+    const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
     const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
     const filters = mergePlannerFilters(local.filters, ai?.filters);
     return {
@@ -2253,6 +2301,8 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId) {
       salidaDeseada: arr(ai?.salidaDeseada),
       reasoning: trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.',
       __zuzuPlannerProvider: 'zuzu-planner',
+      __zuzuPlannerModel: ai.__zuzuPlannerModel || '',
+      __zuzuPlannerUsage: ai.__zuzuPlannerUsage || null,
       __zuzuGeminiAllRows: false
     };
   } catch (error) {
@@ -2262,7 +2312,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId) {
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Aviso: Zuzu planificador no respondió (${trim(error?.message || error)}).`,
       __zuzuPlannerProvider: 'local-fallback',
       __zuzuGeminiAllRows: false,
-      plannerWarning: trim(error?.message || error)
+      plannerWarning: cleanGeminiError(error)
     };
   }
 }
@@ -2339,8 +2389,116 @@ function dominantSubjectFromPrompt(prompt, result) {
   if (/cronica|crónica|todos los eventos|cada evento/.test(p)) return 'Cronica_eventos';
   return trim(result?.title || q[0] || prompt).slice(0, 80);
 }
-function finalizeZuzuResult(result, context, userPrompt) {
-  const sorted = sortResultTables(result || {});
+
+function wantsWeatherInfo(prompt) {
+  return /\b(tiempo|meteorolog|meteorología|clima|lluvia|llover|temperatura|calor|fr[ií]o|viento|previsi[oó]n|pron[oó]stico|forecast)\b/i.test(text(prompt));
+}
+function parseCeDateToIso(value) {
+  const s = trim(value);
+  if (!s) return '';
+  const m1 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m1) return `${m1[1]}-${String(m1[2]).padStart(2,'0')}-${String(m1[3]).padStart(2,'0')}`;
+  const m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m2) {
+    const y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
+    return `${y}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
+  }
+  return '';
+}
+function addDaysIso(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (!Number.isFinite(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function daysBetweenIso(a, b) {
+  const da = new Date(`${a}T00:00:00Z`), db = new Date(`${b}T00:00:00Z`);
+  if (!Number.isFinite(da.getTime()) || !Number.isFinite(db.getTime())) return 0;
+  return Math.round((db - da) / 86400000);
+}
+function weatherCodeText(code) {
+  const c = Number(code);
+  if ([0].includes(c)) return 'Despejado';
+  if ([1,2].includes(c)) return 'Poco nuboso';
+  if ([3].includes(c)) return 'Cubierto';
+  if ([45,48].includes(c)) return 'Niebla';
+  if ([51,53,55,56,57].includes(c)) return 'Llovizna';
+  if ([61,63,65,66,67,80,81,82].includes(c)) return 'Lluvia';
+  if ([71,73,75,77,85,86].includes(c)) return 'Nieve';
+  if ([95,96,99].includes(c)) return 'Tormenta';
+  return `Código ${trim(code)}`;
+}
+async function maybeFetchWeatherContext(userPrompt, context, flowTrace = []) {
+  if (!wantsWeatherInfo(userPrompt)) return null;
+  const evs = arr(context?.eventosObjetivo);
+  if (!evs.length) {
+    zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'El usuario pide tiempo/clima, pero no hay evento objetivo con fechas.');
+    return { ok:false, reason:'No hay evento objetivo con fechas para consultar meteorología.' };
+  }
+  const lat = Number(process.env.CONTROLEVENT_WEATHER_LAT || process.env.WEATHER_LAT || '39.743');
+  const lon = Number(process.env.CONTROLEVENT_WEATHER_LON || process.env.WEATHER_LON || '-3.657');
+  const place = trim(process.env.CONTROLEVENT_WEATHER_PLACE || process.env.WEATHER_PLACE || 'Villanueva de Bogas, Toledo');
+  const rows = [];
+  for (const ev of evs.slice(0, 4)) {
+    const title = trim(ev['Titulo del evento'] || ev.titulo || ev.Evento || 'Evento');
+    const start = parseCeDateToIso(ev['fecha ini'] || ev.fechaIni || ev.fecha || '');
+    const end0 = parseCeDateToIso(ev['fecha fin'] || ev.fechaFin || '') || start;
+    if (!start) { rows.push({ Evento:title, Aviso:'Evento sin fecha de inicio legible para meteorología.' }); continue; }
+    const end = daysBetweenIso(start, end0) > 9 ? addDaysIso(start, 9) : end0;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&timezone=Europe%2FMadrid&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+    try {
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'RUN', `Consultando Open-Meteo para ${title} (${start} a ${end}) en ${place}.`);
+      const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+      const payload = await res.json().catch(async () => ({ error: await res.text().catch(() => res.statusText) }));
+      if (!res.ok) throw new Error(payload?.reason || payload?.error || `Open-Meteo HTTP ${res.status}`);
+      const d = payload?.daily || {};
+      arr(d.time).forEach((dia, i) => rows.push({
+        Evento: title,
+        Localidad: place,
+        Fecha: dia,
+        Cielo: weatherCodeText(arr(d.weather_code)[i]),
+        'Temp. máx': round(arr(d.temperature_2m_max)[i], 1),
+        'Temp. mín': round(arr(d.temperature_2m_min)[i], 1),
+        'Prob. lluvia %': round(arr(d.precipitation_probability_max)[i], 0),
+        'Viento km/h': round(arr(d.wind_speed_10m_max)[i], 1),
+        Fuente: 'Open-Meteo'
+      }));
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'OK', `Open-Meteo devolvió ${arr(d.time).length} día(s) para ${title}.`);
+    } catch (error) {
+      rows.push({ Evento:title, Localidad:place, Fecha:start, Aviso:`No se pudo obtener previsión externa: ${cleanGeminiError(error)}` });
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', cleanGeminiError(error));
+    }
+  }
+  return { ok: rows.some(r => !r.Aviso), proveedor: 'Open-Meteo', localidad: place, filas: rows };
+}
+function weatherTableAndCharts(weatherCtx) {
+  const rows = arr(weatherCtx?.filas);
+  if (!rows.length) return { tables: [], charts: [] };
+  const columns = ['Evento','Localidad','Fecha','Cielo','Temp. máx','Temp. mín','Prob. lluvia %','Viento km/h','Aviso'];
+  const tableRows = rows.map(r => columns.map(c => text(r[c])));
+  const okRows = rows.filter(r => !r.Aviso);
+  const charts = okRows.length ? [
+    { title: 'Temperatura prevista por día', type: 'line', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Temp. máx'])), unit: 'ºC' },
+    { title: 'Probabilidad de lluvia por día', type: 'bar', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Prob. lluvia %'])), unit: '%' }
+  ] : [];
+  return { tables: [{ title: `Meteorología prevista · ${trim(weatherCtx?.localidad || '')}`, columns, rows: tableRows }], charts };
+}
+
+function attachWeatherVisualsIfNeeded(result, context, userPrompt) {
+  if (!wantsWeatherInfo(userPrompt)) return result;
+  const weatherCtx = context?.infoIndirecta?.meteorologia;
+  if (!weatherCtx || !arr(weatherCtx.filas).length) return result;
+  const wc = weatherTableAndCharts(weatherCtx);
+  const existingWeather = arr(result?.tables).some(t => /meteorolog|tiempo|clima|lluvia|temperatura/i.test(trim(t?.title || '')));
+  return {
+    ...result,
+    tables: existingWeather ? arr(result?.tables) : arr(result?.tables).concat(wc.tables),
+    charts: arr(result?.charts).concat(wc.charts)
+  };
+}
+function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
+  const withWeather = attachWeatherVisualsIfNeeded(result || {}, context, userPrompt);
+  const sorted = sortResultTables(withWeather || {});
   const meta = scopeMetaFromContext(context);
   return {
     ...sorted,
@@ -2348,14 +2506,19 @@ function finalizeZuzuResult(result, context, userPrompt) {
       ...(sorted.meta || {}),
       ...meta,
       generatedAt: new Date().toISOString(),
-      version: 'v18.11.2_prod',
-      filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, sorted)).slice(0, 70)
-    }
+      version: 'v18.11.3_prod',
+      filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, sorted)).slice(0, 70),
+      debugTrace: arr(flowTrace).slice(0, 80)
+    },
+    debugTrace: arr(flowTrace).slice(0, 80),
+    showDebugTrace: true
   };
 }
 
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
+  const flowTrace = [];
   const userPrompt = trim(prompt);
+  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
   if (!userPrompt) {
     const err = new Error('Escribe una pregunta o petición para Zuzu.');
     err.status = 400;
@@ -2366,19 +2529,35 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     err.status = 413;
     throw err;
   }
-  const forbidden = /(contraseña|password|clave api|api key|token|sql|drop table|delete from|insert into|hack|exfiltra|sistema operativo|receta|chiste|horóscopo|fútbol|politic[ao]s?)/i;
-  const eventish = /(evento|eventos|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar)/i;
-  if (forbidden.test(userPrompt) && !eventish.test(userPrompt)) {
-    return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
-  }
-  const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
-  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
-  const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
 
-  // v11_3_3 hotfix: Zuzu vuelve al flujo en 3 pasos pedido por el usuario:
-  // 1) planificación de módulos, 2) extracción oficial por ControlEvent, 3) respuesta final con Zuzu.
-  // Las respuestas locales quedan solo como respaldo si Zuzu falla.
-  const done = (result) => finalizeZuzuResult(result, context, userPrompt);
+  // v18.11.3: se permiten preguntas indirectas si están vinculadas a eventos.
+  // Solo bloqueamos intentos técnicos peligrosos o secretos; no bloqueamos clima, tono, informes, opiniones, etc.
+  const hardForbidden = /(contraseña|password|clave api|api key|token|sql\b|drop table|delete from|insert into|hack|exfiltra|sistema operativo)/i;
+  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
+  if (hardForbidden.test(userPrompt) && !eventish.test(userPrompt)) {
+    zuzuTracePush(flowTrace, 'Guardia de ámbito', 'KO', 'Petición bloqueada por contenido técnico/peligroso sin relación con eventos.');
+    return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
+  }
+
+  const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
+  zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
+  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
+  const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
+  context.zuzuFlujo = {
+    version: 'v18.11.3_prod',
+    arquitectura: 'Prompt usuario -> Gemini planifica -> ControlEvent extrae datos -> Gemini redacta/contextualiza -> ControlEvent presenta',
+    planificador: trim(plan?.__zuzuPlannerProvider || 'desconocido'),
+    modeloPlanificador: trim(plan?.__zuzuPlannerModel || ''),
+    usoPlanificador: plan?.__zuzuPlannerUsage || null
+  };
+  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
+
+  const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
+  if (weatherCtx) {
+    context.infoIndirecta = { ...(context.infoIndirecta || {}), meteorologia: weatherCtx };
+  }
+
+  const done = (result) => finalizeZuzuResult(result, context, userPrompt, flowTrace);
   if (context?.needsClarification) {
     return done({
       ok: true,
@@ -2395,19 +2574,25 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   const highConfidence = directHighConfidenceResultIfApplicable(userPrompt, context);
-  if (highConfidence) return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, highConfidence));
+  if (highConfidence) {
+    zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE', 'OK', `CE ha cocinado datos con alta confianza (${highConfidence.provider || 'provider local'}). La salida NO se entrega directamente: pasa a Gemini redacción humana.`);
+    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, highConfidence, flowTrace));
+  }
 
   try {
-    const geminiResult = await callGeminiEvent(userPrompt, context);
-    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, geminiResult));
+    const geminiResult = await callGeminiEvent(userPrompt, context, flowTrace);
+    zuzuTracePush(flowTrace, 'Paso 5 · Presentación CE', 'OK', `Respuesta principal viene de ${geminiResult.provider || 'Gemini'} / ${geminiResult.model || 'modelo no informado'}.`);
+    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, geminiResult, flowTrace));
   } catch (error) {
     const friendly = friendlyZuzuErrorMessage(error);
+    zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', cleanGeminiError(error));
     const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
     if (fallback) {
-      fallback.warnings = arr(fallback.warnings).concat(`${friendly} Se muestra respaldo analítico de ControlEvent basado en los módulos oficiales.`);
+      fallback.warnings = arr(fallback.warnings).concat(`${friendly} CE ha cocinado datos de respaldo, pero intentará pasarlos a Gemini como redacción final.`);
       fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
-      fallback.model = 'sin-gemini-por-error';
-      return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback));
+      fallback.model = 'sin-gemini-estructurado-por-error';
+      zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE de respaldo', 'OK', `CE generó datos de respaldo (${fallback.provider}). Ahora se intenta Gemini narrativa.`);
+      return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback, flowTrace));
     }
     return done({
       ok: true,
@@ -2424,8 +2609,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 }
 
-
-// v18.11.2_prod - Planificación inicial asistida por Zuzu.
+// v18.11.3_prod - Planificación inicial asistida por Zuzu.
 function planAiSchema() {
   return {
     type: 'OBJECT',
@@ -5561,7 +5745,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v18.11.2_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
+    version: 'v18.11.3_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
     provider: aiProvider,
     model: aiModel,
     mode: m,

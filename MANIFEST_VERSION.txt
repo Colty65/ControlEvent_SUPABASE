@@ -1,14 +1,15 @@
-Version app: v18.11.2_prod
-Version text: ControlEvent v18.11.2_prod
-Version file: ControlEvent_v18_11_2_prod
-Build: 20260706-140028
-ZIP: CE_v18_11_2_PROD_VERSION_UNICA_DIAGNOSTICO.zip
-Front source: public/app/version.js + public/app/features/v18-11-2-version-sanity.js
+Version app: v18.11.3_prod
+Version text: ControlEvent v18.11.3_prod
+Version file: ControlEvent_v18_11_3_prod
+Build: 20260706-143000
+ZIP: CE_v18_11_3_PROD_TRAZA_GEMINI_EVENTOS_INDIRECTOS.zip
+Front source: public/app/version.js + public/app/features/v18-11-3-version-trace.js
 Backend source: server/paths.js + /api/version
-Objetivo: sanear versionado visible y evitar mezclas de versiones anteriores en pantalla.
+Objetivo: versión única + evidencias visibles del flujo Zuzu/Gemini + consultas indirectas de evento.
 
 Comprobaciones esperadas tras desplegar:
-- Cabecera superior derecha: v18.11.2_prod
-- Ventana bienvenida: v18.11.2_prod
+- Cabecera superior derecha: v18.11.3_prod
+- Ventana bienvenida: v18.11.3_prod
 - DevTools consola: ControlEventVersionCheck() debe devolver front/api ok=true.
-- /api/version debe devolver version=ControlEvent v18.11.2_prod, build=20260706-140028.
+- /api/version debe devolver version=ControlEvent v18.11.3_prod, build=20260706-143000.
+- En cada respuesta de Zuzu debe aparecer la tarjeta “Trazabilidad del flujo Zuzu”.
