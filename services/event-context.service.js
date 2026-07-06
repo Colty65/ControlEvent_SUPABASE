@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.3_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v18.11.4_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -701,7 +701,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v18.11.3_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v18.11.4_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -754,7 +754,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v18.11.3_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v18.11.4_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -1083,30 +1083,74 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
     estado: estados
   };
 }
-export function buildZuzuPlanningCatalog(state, selectedEventId = '') {
-  const events = arr(state?.eventos).map(e => ({ id: trim(e?.id), titulo: trim(e?.titulo), situacion: trim(e?.situacion), fechaInicio: trim(e?.fechaIni), fechaFin: trim(e?.fechaFin), precioEntrada: round(e?.precio, 2) }));
+export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt = '') {
+  const events = arr(state?.eventos).map(e => ({
+    id: trim(e?.id),
+    titulo: trim(e?.titulo),
+    situacion: trim(e?.situacion),
+    fechaInicio: trim(e?.fechaIni),
+    fechaFin: trim(e?.fechaFin),
+    precioEntrada: round(e?.precio, 2)
+  }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
+
+  // v18.11.4: catálogo ultraligero para el PASO 1 de Gemini.
+  // Gemini solo debe decidir módulos/filtros; los datos reales los extrae CE después.
+  // Por eso NO se le envían tablas, compras, donaciones ni catálogos completos.
+  const promptRaw = text(userPrompt || '');
+  const promptNorm = norm(promptRaw);
+  const promptWords = words(promptRaw, { min: 4, keepStop: false }).slice(0, 80);
+  const quoted = [];
+  const quotedRe = /["“”'‘’]([^"“”'‘’]{2,90})["“”'‘’]/g;
+  let m;
+  while ((m = quotedRe.exec(promptRaw))) quoted.push(norm(m[1]));
+  const hints = [...new Set([...quoted, ...promptWords])].filter(Boolean);
+  function matchesName(name) {
+    const n = norm(name);
+    if (!n) return false;
+    return hints.some(h => h.length >= 3 && (n.includes(h) || h.includes(n)));
+  }
+  function candidateRows(rows, mapFn, maxMatch = 40, maxFallback = 12) {
+    const mapped = arr(rows).map(mapFn).filter(x => trim(x?.nombre || x?.titulo));
+    const matched = mapped.filter(x => matchesName(x.nombre || x.titulo));
+    const out = [];
+    [...matched.slice(0, maxMatch), ...mapped.slice(0, maxFallback)].forEach(x => {
+      const key = norm(x.nombre || x.titulo);
+      if (key && !out.some(y => norm(y.nombre || y.titulo) === key)) out.push(x);
+    });
+    return out;
+  }
+  const personas = candidateRows(state?.personas, p => ({ nombre: trim(p?.nombre), rango: trim(p?.rango) }), 60, 15);
+  const productos = candidateRows(state?.productos, p => ({ nombre: trim(p?.nombre), segmento: trim(p?.segmento), destino: trim(p?.destino) }), 80, 18);
+  const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
+
   return {
-    version: 'ControlEvent Zuzu Planner v18.11.3_prod',
+    version: 'ControlEvent Zuzu Planner v18.11.4_prod',
+    finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
-    camposPorModulo: {
-      INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Just.ing'],
-      DONACIONES: ['Evento','Producto','Unidades','Precio','Valor','Tipo de donación','Donante','Responsable'],
-      COMPRAS: ['Evento','Producto','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable','Ticket SI/NO'],
-      EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','DOCxxx','Fecha documento','Descripcion documento'],
-      PRODUCTOS: ['Nombre producto','Segmento','Destino','Precio rfa.'],
-      TIENDAS: ['Nombre tienda'],
-      PERSONAS: ['Nombre persona','Rango'],
-      TICKETS: ['TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
-      DOCUMENTOS: ['DOCxxx','Evento','Fecha','Descripcion','Tiene imagen']
+    resumenModulos: {
+      INGRESOS: 'colaboradores, ingresos, asistentes, socios/no socios, justificantes',
+      DONACIONES: 'productos donados, donantes, responsables de donación, valoraciones',
+      COMPRAS: 'compras/gastos, productos, tiendas, responsables, tickets y pendientes',
+      EVENTOS: 'títulos, fechas, estado, precio y documentos asociados',
+      TICKETS: 'TKxx, facturas/fototickets y totales por ticket',
+      DOCUMENTOS: 'DOCxxx, fecha, descripción e imagen',
+      PRODUCTOS: 'catálogo maestro de productos, segmento, destino y precio referencia',
+      TIENDAS: 'catálogo maestro de tiendas',
+      PERSONAS: 'catálogo maestro de personas y rango'
     },
     eventoActivo: selected,
-    eventos: events,
-    catalogoNombres: {
-      personas: arr(state?.personas).map(p => trim(p?.nombre)).filter(Boolean).slice(0, 500),
-      productos: arr(state?.productos).map(p => trim(p?.nombre)).filter(Boolean).slice(0, 800),
-      tiendas: arr(state?.tiendas).map(t => trim(t?.nombre)).filter(Boolean).slice(0, 300)
-    }
+    eventos,
+    candidatosPorPrompt: { personas, productos, tiendas },
+    conteosSistema: {
+      eventos: arr(state?.eventos).length,
+      personas: arr(state?.personas).length,
+      productos: arr(state?.productos).length,
+      tiendas: arr(state?.tiendas).length,
+      compras: arr(state?.compras).length,
+      ingresos: arr(state?.colaboradores).length
+    },
+    reglaCoste: 'Si necesitas todos los datos de un módulo, pide el módulo; no intentes inferir datos operativos desde este catálogo.'
   };
 }
 export function buildZuzuLocalPlan(state, selectedEventId = '', userPrompt = '') {
@@ -1537,7 +1581,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v18.11.3_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v18.11.4_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Zuzu/Gemini decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),

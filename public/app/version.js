@@ -1,10 +1,10 @@
-// ControlEvent version source of truth - generated 20260706-143000
+// ControlEvent version source of truth - generated 20260706-173000
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v18.11.3_prod';
-export const VERSION_TEXT = 'ControlEvent v18.11.3_prod';
-export const VERSION_FILE = 'ControlEvent_v18_11_3_prod';
-export const BUILD_ID = '20260706-143000';
-export const ZIP_NAME = 'CE_v18_11_3_PROD_TRAZA_GEMINI_EVENTOS_INDIRECTOS.zip';
+export const VERSION_LABEL = 'v18.11.4_prod';
+export const VERSION_TEXT = 'ControlEvent v18.11.4_prod';
+export const VERSION_FILE = 'ControlEvent_v18_11_4_prod';
+export const BUILD_ID = '20260706-173000';
+export const ZIP_NAME = 'CE_v18_11_4_PROD_ZUZU_TOKENS_OPTIMIZADOS.zip';
 export const VERSION = VERSION_TEXT;
 
 if (typeof window !== 'undefined') {

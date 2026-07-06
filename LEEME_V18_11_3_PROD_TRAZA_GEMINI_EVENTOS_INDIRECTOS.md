@@ -1,4 +1,4 @@
-# ControlEvent v18.11.3_prod · Traza Gemini y eventos indirectos
+# ControlEvent v18.11.4_prod · Traza Gemini y eventos indirectos
 
 Esta versión no cambia el objetivo de v18.11: Zuzu/Gemini debe participar siempre en el flujo normal. Añade evidencias visibles para saber exactamente por dónde pasa cada consulta.
 
@@ -11,7 +11,7 @@ Esta versión no cambia el objetivo de v18.11: Zuzu/Gemini debe participar siemp
 - Se eliminan restricciones rígidas para consultas indirectas relacionadas con eventos.
 - Las preguntas de meteorología/clima/tiempo se permiten si están vinculadas a evento(s); CE intenta enriquecer el contexto con Open-Meteo y lo entrega a Gemini para que lo incorpore a la respuesta.
 - Si hay meteorología, CE añade tabla y gráficas de temperatura/lluvia como soporte visual.
-- Se mantiene versión única visible: **v18.11.3_prod**.
+- Se mantiene versión única visible: **v18.11.4_prod**.
 
 ## Variables opcionales para meteorología
 

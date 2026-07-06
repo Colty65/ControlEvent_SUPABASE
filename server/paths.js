@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v18.11.3_prod';
+export const APP_VERSION = 'ControlEvent v18.11.4_prod';
 
-export const APP_VERSION_LABEL = 'v18.11.3_prod';
-export const APP_VERSION_FILE = 'ControlEvent_v18_11_3_prod';
-export const BUILD_ID = '20260706-143000';
-export const ZIP_NAME = 'CE_v18_11_3_PROD_TRAZA_GEMINI_EVENTOS_INDIRECTOS.zip';
+export const APP_VERSION_LABEL = 'v18.11.4_prod';
+export const APP_VERSION_FILE = 'ControlEvent_v18_11_4_prod';
+export const BUILD_ID = '20260706-173000';
+export const ZIP_NAME = 'CE_v18_11_4_PROD_ZUZU_TOKENS_OPTIMIZADOS.zip';

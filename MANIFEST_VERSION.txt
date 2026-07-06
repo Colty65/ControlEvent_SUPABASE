@@ -1,15 +1,16 @@
-Version app: v18.11.3_prod
-Version text: ControlEvent v18.11.3_prod
-Version file: ControlEvent_v18_11_3_prod
-Build: 20260706-143000
-ZIP: CE_v18_11_3_PROD_TRAZA_GEMINI_EVENTOS_INDIRECTOS.zip
-Front source: public/app/version.js + public/app/features/v18-11-3-version-trace.js
+Version app: v18.11.4_prod
+Version text: ControlEvent v18.11.4_prod
+Version file: ControlEvent_v18_11_4_prod
+Build: 20260706-173000
+ZIP: CE_v18_11_4_PROD_ZUZU_TOKENS_OPTIMIZADOS.zip
+Front source: public/app/version.js + public/app/features/v18-11-4-version-trace.js
 Backend source: server/paths.js + /api/version
-Objetivo: versión única + evidencias visibles del flujo Zuzu/Gemini + consultas indirectas de evento.
+Objetivo: mantener Gemini en el flujo, pero optimizar tokens: planificación ultraligera, redacción con resumen cocinado, traza plegada y anexos completos generados por CE.
 
 Comprobaciones esperadas tras desplegar:
-- Cabecera superior derecha: v18.11.3_prod
-- Ventana bienvenida: v18.11.3_prod
+- Cabecera superior derecha: v18.11.4_prod
+- Ventana bienvenida: v18.11.4_prod
 - DevTools consola: ControlEventVersionCheck() debe devolver front/api ok=true.
-- /api/version debe devolver version=ControlEvent v18.11.3_prod, build=20260706-143000.
-- En cada respuesta de Zuzu debe aparecer la tarjeta “Trazabilidad del flujo Zuzu”.
+- /api/version debe devolver version=ControlEvent v18.11.4_prod.
+- En Zuzu, la traza debe mostrar estimación de tokens antes de llamadas y tokens reales si Gemini los devuelve.
+- La traza debe aparecer plegada por defecto.

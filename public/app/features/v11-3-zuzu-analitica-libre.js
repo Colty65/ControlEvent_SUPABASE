@@ -1,9 +1,9 @@
-/* ControlEvent v18.11.3_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.11.4_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.11.3_prod';
+  var VERSION='v18.11.4_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -39,7 +39,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || data.title || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v18_11_3_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v18_11_4_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -260,7 +260,8 @@
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
     var ev=currentEvent();
     var globalAsk=/\b(todos\s+los\s+eventos|eventos\s+registrados|consulta\s+global|cualquier\s+evento|en\s+todos\s+los\s+eventos)\b/i.test(prompt);
-    if(!ev && !globalAsk){ setStatus('Selecciona un evento o pide expresamente una consulta global de eventos.', 'err'); return; }
+    var eventMention=/\b(evento|eventos|jornada|jornadas|celebraci[oó]n|celebraciones|peña|arrastre)\b|[\"“”'‘’][^\"“”'‘’]{3,90}[\"“”'‘’]/i.test(prompt);
+    if(!ev && !globalAsk && !eventMention){ setStatus('Selecciona un evento o menciona claramente el evento/consulta global.', 'err'); return; }
     setStatus('Zuzu está preparando el plan...', 'ok');
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
@@ -291,7 +292,7 @@
       if(x.usage && (x.usage.totalTokens||x.usage.promptTokens)) extra+=' Tokens: '+(x.usage.totalTokens||'?')+' total.';
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
     }).join('');
-    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad del flujo Zuzu</h3><details open><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO</summary>'+items+'</details></div>';
+    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad del flujo Zuzu</h3><details><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO</summary>'+items+'</details></div>';
   }
   function renderResult(data){
     data = data || {};
