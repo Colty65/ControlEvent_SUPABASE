@@ -1,4 +1,4 @@
-# ControlEvent v18.7_prod · Zuzu con crónica cronológica de eventos
+# ControlEvent v18.8_prod · Zuzu con crónica cronológica de eventos
 
 Esta versión refuerza la inteligencia de Zuzu para preguntas humanas del tipo:
 
@@ -18,8 +18,8 @@ Esta versión refuerza la inteligencia de Zuzu para preguntas humanas del tipo:
 - Se añade tabla `Crónica ordenada por fecha de celebración` con una columna `Qué ocurrió` para cada evento.
 - Se añade tabla `Detalle por evento y módulo`, para no mezclar datos y poder auditar qué salió de cada módulo.
 - Se generan dos CSV:
-  - `Informe_cronologico_eventos_v18_7_prod.csv`
-  - `Informe_cronologico_eventos_detalle_modulos_v18_7_prod.csv`
+  - `Informe_cronologico_eventos_v18_8_prod.csv`
+  - `Informe_cronologico_eventos_detalle_modulos_v18_8_prod.csv`
 - El planificador reconoce mejor frases como `cosas que ocurrieron`, `cada uno de los eventos`, `celebración de cada evento`, `ordenado en el tiempo` y fuerza extracción de módulos operativos.
 
 ## Objetivo

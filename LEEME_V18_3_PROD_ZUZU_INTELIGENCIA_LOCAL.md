@@ -1,4 +1,4 @@
-# ControlEvent v18.7_prod — Zuzu con inteligencia local reforzada
+# ControlEvent v18.8_prod — Zuzu con inteligencia local reforzada
 
 Versión preparada a partir de `v18.2_prod` para corregir las desviaciones vistas en las últimas pruebas de Zuzu.
 

@@ -1,1 +1,1 @@
-export const VERSION = 'ControlEvent v18.7_prod';
+export const VERSION = 'ControlEvent v18.8_prod';
