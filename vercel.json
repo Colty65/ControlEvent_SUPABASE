@@ -1,7 +1,0 @@
-{
-  "version": 2,
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index.js" },
-    { "source": "/vendor/exceljs.min.js", "destination": "/api/index.js" }
-  ]
-}

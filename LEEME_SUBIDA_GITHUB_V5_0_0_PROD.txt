@@ -1,8 +1,0 @@
-ControlEvent v16_prod
-
-Cambios quirúrgicos sobre v4.0.1_prod:
-- Cabecera y versión pública: ControlEvent v16_prod.
-- Descargas INFOEVENTO/BACKUP: se refuerza ControlEvent_v16_prod en nombres de archivo aunque existan wrappers antiguos.
-- PC + evento FINALIZADO: al cerrar una foto abierta desde un globo se restaura el globo en la misma posición y scroll.
-
-No se toca lógica de datos, Supabase, login, compras/donaciones ni comportamiento móvil/tablet.

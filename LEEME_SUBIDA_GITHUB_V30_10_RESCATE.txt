@@ -1,8 +1,0 @@
-CONTROL EVENT V30.10 - RESCATE ESTABLE
-
-1) Sube TODOS los archivos de este ZIP sustituyendo los existentes.
-2) Haz commit y espera el despliegue de Vercel.
-3) Abre la app en una pestaña nueva.
-4) Si aparece comportamiento viejo, borra datos del sitio o fuerza recarga.
-
-Esta versión vuelve a la base estable v30.7 y NO carga los scripts problemáticos v30.8/v30.9.
