@@ -1,10 +1,10 @@
 // ControlEvent version source of truth - generated 20260706-173000
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v18.11.4_prod';
-export const VERSION_TEXT = 'ControlEvent v18.11.4_prod';
-export const VERSION_FILE = 'ControlEvent_v18_11_4_prod';
+export const VERSION_LABEL = 'v18.11.5_prod';
+export const VERSION_TEXT = 'ControlEvent v18.11.5_prod';
+export const VERSION_FILE = 'ControlEvent_v18_11_5_prod';
 export const BUILD_ID = '20260706-173000';
-export const ZIP_NAME = 'CE_v18_11_4_PROD_ZUZU_TOKENS_OPTIMIZADOS.zip';
+export const ZIP_NAME = 'CE_v18_11_5_PROD_ZUZU_MODELOS_COSTES.zip';
 export const VERSION = VERSION_TEXT;
 
 if (typeof window !== 'undefined') {

@@ -1,13 +1,13 @@
-/* ControlEvent v18.11.4_prod - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v18.11.5_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v18.11.4_prod';
-  var VERSION_TEXT = 'ControlEvent v18.11.4_prod';
-  var VERSION_FILE = 'ControlEvent_v18_11_4_prod';
+  var VERSION_LABEL = 'v18.11.5_prod';
+  var VERSION_TEXT = 'ControlEvent v18.11.5_prod';
+  var VERSION_FILE = 'ControlEvent_v18_11_5_prod';
   var BUILD_ID = '20260706-173000';
-  var ZIP_NAME = 'CE_v18_11_4_PROD_ZUZU_TOKENS_OPTIMIZADOS.zip';
+  var ZIP_NAME = 'CE_v18_11_5_PROD_ZUZU_MODELOS_COSTES.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;
@@ -19,7 +19,7 @@
       window.__ceVersion = VERSION_TEXT;
       window.VERSION = VERSION_TEXT;
       window.VERSION_FILE = VERSION_FILE;
-      window.ControlEventVersion = {label:VERSION_LABEL, version:VERSION_TEXT, versionFile:VERSION_FILE, build:BUILD_ID, zip:ZIP_NAME, source:'v18-11-4-version-trace.js'};
+      window.ControlEventVersion = {label:VERSION_LABEL, version:VERSION_TEXT, versionFile:VERSION_FILE, build:BUILD_ID, zip:ZIP_NAME, source:'v18-11-5-version-trace.js'};
       if(document.body){
         setAttr(document.body, 'data-ce-version', VERSION_TEXT);
         setAttr(document.body, 'data-ce-build', BUILD_ID);
