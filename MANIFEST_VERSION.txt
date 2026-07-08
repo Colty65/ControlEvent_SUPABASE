@@ -1,0 +1,12 @@
+Version app: v18.11.10_prod
+Version texto: ControlEvent v18.11.10_prod
+Version fichero: ControlEvent_v18_11_10_prod
+Build: 20260708-143000
+ZIP: CE_v18_11_10_PROD_ZUZU_FLUJO_VERSION_LAYOUT.zip
+Objetivo: recuperar evidencias de versión, trazabilidad Zuzu/CE/Gemini, nombre PDF correcto, menú lateral y mejorar interpretación de socios no asistentes + meteorología.
+Comprobaciones:
+- Front final hardlock: public/app/features/v18-11-10-final-hardlock.js
+- /api/version actualiza v18.11.10_prod
+- Zuzu modal muestra badge v18.11.10_prod
+- Traza técnica queda abierta por defecto
+- PDF usa ControlEvent_v18_11_10_prod-responde_Zuzu_a_<asunto>-aaaammdd-hhmmss.pdf
