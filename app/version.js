@@ -1,10 +1,10 @@
-// ControlEvent version source of truth - generated 20260708-143000
+// ControlEvent version source of truth - generated 20260708-170000
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v18.11.10_prod';
-export const VERSION_TEXT = 'ControlEvent v18.11.10_prod';
-export const VERSION_FILE = 'ControlEvent_v18_11_10_prod';
-export const BUILD_ID = '20260708-143000';
-export const ZIP_NAME = 'CE_v18_11_10_PROD_ZUZU_FLUJO_VERSION_LAYOUT.zip';
+export const VERSION_LABEL = 'v19_prod';
+export const VERSION_TEXT = 'ControlEvent v19_prod';
+export const VERSION_FILE = 'ControlEvent_v19_prod';
+export const BUILD_ID = '20260708-170000';
+export const ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL.zip';
 export const VERSION = VERSION_TEXT;
 
 if (typeof window !== 'undefined') {

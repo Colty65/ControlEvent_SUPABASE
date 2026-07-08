@@ -1,12 +1,12 @@
-/* ControlEvent v18_prod - Documentos del evento (fase 1: menú, gestión y foto DOCXX).
+/* ControlEvent v19_prod - Documentos del evento (fase 1: menú, gestión y foto DOCXX).
    - Nueva pantalla "Documentos" con fecha, descripción y foto.
    - RW/GD pueden mantener en eventos En curso; RO visualiza y puede ampliar foto.
    - Las imágenes se codifican como EVENTO_ID|DOCXX, empezando en DOC01 por evento.
    - No toca todavía BACKUP ni INFOEVENTO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v18_prod';
-  const VERSION_FILE = 'ControlEvent_v18_prod';
+  const VERSION = 'ControlEvent v19_prod';
+  const VERSION_FILE = 'ControlEvent_v19_prod';
   const INSTALLED = '__ceV85EventDocuments';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -126,7 +126,7 @@
       if(!s.eventDocumentMeta) s.eventDocumentMeta = {};
       s.eventDocumentMeta[found.id] = {fecha: found.fecha, descripcion: found.descripcion};
       saveNow({skipDocumentPersist:true});
-      persistDocumentsForEvent(found.eventId).catch(error => console.warn('[ControlEvent v18_prod] No se pudo materializar DOC recuperado:', error?.message || error));
+      persistDocumentsForEvent(found.eventId).catch(error => console.warn('[ControlEvent v19_prod] No se pudo materializar DOC recuperado:', error?.message || error));
       return found;
     }
     return null;
@@ -210,7 +210,7 @@
     // Ese guardado completo podía reconstruir el evento desde imágenes y borrar fecha/texto.
     if(typeof fn === 'function' && !options.skipDocumentPersist) safe(() => fn(), null);
     if(!options.skipDocumentPersist){
-      persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v18_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
+      persistDocumentsForEvent().catch(error => console.warn('[ControlEvent v19_prod] No se pudieron persistir metadatos DOC:', error?.message || error));
     }
   }
 
@@ -604,7 +604,7 @@
       imageUrl = uploaded.url || uploaded.public_url || uploaded.pathname || uploaded.path || dataUrl;
       dataUrl = imageUrl;
     }catch(error){
-      console.warn('[ControlEvent v18_prod] No se pudo subir DOC ahora, queda en estado local/protegido:', error?.message || error);
+      console.warn('[ControlEvent v19_prod] No se pudo subir DOC ahora, queda en estado local/protegido:', error?.message || error);
       status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
@@ -648,7 +648,7 @@
       imageUrl = uploaded.url || uploaded.public_url || uploaded.pathname || uploaded.path || dataUrl;
       dataUrl = imageUrl;
     }catch(error){
-      console.warn('[ControlEvent v18_prod] No se pudo subir DOC ahora, queda local:', error?.message || error);
+      console.warn('[ControlEvent v19_prod] No se pudo subir DOC ahora, queda local:', error?.message || error);
       status('No se pudo subir al servidor ahora. Queda guardado localmente y se intentará sincronizar al guardar.', 'warn');
     }
     const s = ensureStateShape();
@@ -674,7 +674,7 @@
     if(!confirm('¿Eliminar solo la foto? Se mantiene la ficha del documento.')) return;
     status('Eliminando foto del documento...', 'working');
     await deleteDocumentImage(doc.eventId, code).catch(error => {
-      console.warn('[ControlEvent v18_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
+      console.warn('[ControlEvent v19_prod] No se pudo eliminar imagen en servidor:', error?.message || error);
       throw error;
     });
     const s = ensureStateShape();
@@ -698,7 +698,7 @@
     if(imageFor(doc)){
       await deleteDocumentImage(doc.eventId, code).catch(error => {
         // HOTFIX40: si el servidor no borra la imagen, no dejamos bloqueado el documento.
-        console.warn('[ControlEvent v18_prod] No se pudo eliminar imagen en servidor; se elimina localmente:', error?.message || error);
+        console.warn('[ControlEvent v19_prod] No se pudo eliminar imagen en servidor; se elimina localmente:', error?.message || error);
       });
     }
     const s = ensureStateShape();

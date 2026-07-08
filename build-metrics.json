@@ -1,8 +1,8 @@
 {
   "version": "15.0.0-prod",
-  "notes": "v18_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
-  "versionLabel": "ControlEvent v18_prod",
+  "notes": "v19_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
+  "versionLabel": "ControlEvent v19_prod",
   "generatedAt": "2026-06-01T00:00:00+02:00",
-  "build": "v18_prod",
-  "versionFile": "ControlEvent_v18_prod"
+  "build": "v19_prod",
+  "versionFile": "ControlEvent_v19_prod"
 }

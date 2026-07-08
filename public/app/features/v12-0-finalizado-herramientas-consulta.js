@@ -1,4 +1,4 @@
-/* ControlEvent v18_prod - desbloqueo real de herramientas de consulta con evento Finalizado.
+/* ControlEvent v19_prod - desbloqueo real de herramientas de consulta con evento Finalizado.
    Permite Zuzu, mantenimientos generales, BACKUP/Excel/importación/descarga. No cambia reglas backend de datos del evento finalizado. */
 (function(){
   'use strict';
@@ -161,7 +161,7 @@
   }
   function downloadBlob(blob, filename){
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename || ('ControlEvent_v18_prod_BACKUP_' + Date.now() + '.xlsx');
+    const a = document.createElement('a'); a.href = url; a.download = filename || ('ControlEvent_v19_prod_BACKUP_' + Date.now() + '.xlsx');
     a.style.display='none'; document.body.appendChild(a); a.click();
     setTimeout(()=>{ try{ a.remove(); URL.revokeObjectURL(url); }catch(_){} }, 1500);
   }
@@ -179,7 +179,7 @@
     if(!res.ok) throw new Error('Servidor no generó BACKUP (' + res.status + ')');
     const blob = await res.blob();
     if(!blob || !blob.size) throw new Error('El BACKUP descargado está vacío.');
-    downloadBlob(blob, fileNameFromDisposition(res.headers.get('content-disposition')) || 'ControlEvent_v18_prod_BACKUP.xlsx');
+    downloadBlob(blob, fileNameFromDisposition(res.headers.get('content-disposition')) || 'ControlEvent_v19_prod_BACKUP.xlsx');
   }
   function openBackupDialogFinalizado(){
     const existing = document.getElementById('ceV120BackupOverlayFix'); if(existing) existing.remove();

@@ -1,4 +1,4 @@
-# CE v18_prod FIX31 - Planificación inicial con Brief estructurado + Zuzu
+# CE v19_prod FIX31 - Planificación inicial con Brief estructurado + Zuzu
 
 Base: FIX30_PLANIFICACION_GEMINI_MENU_LIBRE.
 

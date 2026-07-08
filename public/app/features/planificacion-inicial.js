@@ -1,9 +1,9 @@
-/* ControlEvent v18.11.10_prod - Planificación inicial con Zuzu.
+/* ControlEvent v19_prod - Planificación inicial con Zuzu.
    Permite réplica exacta, encargo total o encargo parcial con módulos históricos y propuesta revisable. */
 (function(){
   console.log('HOTFIX47_LOGO_AVANCE_EVENT_SWITCH_PLAN_DOCS');
   'use strict';
-  const VERSION = 'ControlEvent v18.11.10_prod';
+  const VERSION = 'ControlEvent v19_prod';
   const TAB_BUTTON_ID = 'tabPlanificacionBtn';
   const PANEL_ID = 'tabPlanificacionInicial';
   const KNOWN_BUTTONS = ['tabIngresosBtn','tabDonacionesBtn','tabComprasBtn','tabMapaBtn','tabDocumentosBtn','tabPlanificacionBtn','tabResumenBtn','tabGraficasBtn'];
@@ -30,7 +30,7 @@
       if(data && Array.isArray(data.tiendas) && data.tiendas.length > rows('tiendas').length) st.tiendas = data.tiendas;
       if(data && Array.isArray(data.eventos) && data.eventos.length > rows('eventos').length) st.eventos = data.eventos;
       if(window.ControlEventApp && window.ControlEventApp.state) window.ControlEventApp.state = st;
-    }catch(error){ console.warn('[ControlEvent v18.11.10_prod] No se pudo fusionar maestros para planificación:', error); }
+    }catch(error){ console.warn('[ControlEvent v19_prod] No se pudo fusionar maestros para planificación:', error); }
   }
   async function ensureMasterRowsForMandatoryIncomes(){
     if(planContent() !== 'INGRESOS_SOCIOS_OBLIGATORIOS') return;
@@ -45,7 +45,7 @@
       const data = await res.json().catch(() => ({}));
       mergeMasterRowsForPlanning(data);
     }catch(error){
-      console.warn('[ControlEvent v18.11.10_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
+      console.warn('[ControlEvent v19_prod] No se pudieron refrescar PERSONAS/TIENDAS para ingresos obligatorios:', error?.message || error);
     }
   }
   function byId(name, id){ const sid = String(id || ''); return rows(name).find(item => String(item.id || '') === sid) || null; }
@@ -2499,7 +2499,7 @@
     const donCount = ceHf27PromptBlocks().length;
     const moments = b.momentLines.length ? b.momentLines.map(x => `<li>${esc(x)}</li>`).join('') : '<li>No se han detectado momentos por día; Zuzu deberá proponerlos o pedir datos.</li>';
     return `<section class="ce-hf27-diagnostic ce-fix31-brief">
-      <div class="ce-hf27-head"><div><h3>Brief estructurado que se enviará a Gemini</h3><p>ControlEvent extrae esto antes de generar compras: duración, asistentes, momentos, bebida, cena real, presupuesto y donaciones. El botón de abajo ya no usa compra local: llama a Gemini con este brief.</p></div>
+      <div class="ce-hf27-head"><div><h3>Brief estructurado que se enviará a Zuzu</h3><p>ControlEvent extrae esto antes de generar compras: duración, asistentes, momentos, bebida, cena real, presupuesto y donaciones. El botón de abajo ya no usa compra local: llama a Zuzu con este brief.</p></div>
       <div class="ce-hf27-kpis"><span>Días <b>${esc(b.days)}</b></span><span>Base <b>${esc(b.asistentesBase || b.asistentes || '—')}</b></span><span>Consumo abierto <b>${esc(b.consumoAbiertoAplicado ? b.consumoAbierto : 'NO')}</b></span><span>Cena real <b>${esc(b.cenaMin && b.cenaMax && b.cenaMin !== b.cenaMax ? b.cenaMin + '-' + b.cenaMax : (b.cenaReal || '—'))}</b></span><span>Donaciones <b>${donCount}</b></span></div></div>
       <div style="padding:12px 16px;background:#fff;border-top:1px solid #e5e7eb">
         <p><b>Presupuesto:</b> objetivo ${esc(b.presupuesto || '—')} €/persona · máximo ${esc(b.maximo || '—')} €/persona · <b>sin alcohol/niños:</b> ${esc(b.sinAlcohol || '—')} · <b>cenan realmente:</b> ${esc(b.cenaReal || '—')}</p><p><b>Reglas bebida:</b> cerveza máx. ${esc(b.cervezasMax || '—')} ud/persona/día · cubatas ${esc(b.cubatasPorPersona || '—')} por persona consumidora.</p>
@@ -2546,7 +2546,7 @@
       ceHf27BindDiagnostics(box);
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
     }catch(error){
-      console.error('[ControlEvent v18.11.10_prod] Diagnóstico HF28 falló', error);
+      console.error('[ControlEvent v19_prod] Diagnóstico HF28 falló', error);
       box.classList.remove('hidden');
       box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>Diagnóstico no disponible:</strong> '+esc(error?.message || error)+'</div>';
       try{ box.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){}
@@ -2561,7 +2561,7 @@
         const box = document.getElementById('planificacionResultado');
         if(box){
           box.classList.remove('hidden');
-          box.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note"><strong>Brief aceptado:</strong> se genera propuesta llamando al backend/Gemini con el prompt completo y el brief estructurado; no se usa compra local de diagnóstico.</div>');
+          box.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note"><strong>Brief aceptado:</strong> se genera propuesta llamando al backend/Zuzu con el prompt completo y el brief estructurado; no se usa compra local de diagnóstico.</div>');
         }
         try{ generateProposal(); }
         catch(error){ console.error('[ControlEvent FIX31] No se pudo lanzar Generar propuesta desde diagnóstico', error); }
@@ -2733,7 +2733,7 @@
     const prevResourceSearch = box.querySelector('#planBuscarRecurso')?.value || '';
     if(planMode() === 'ZUZU_TOTAL'){
       // FIX45_REVISION_SALDO_CAPS: en Encargo total no se reconstruye la compra con imaginación local.
-      // El menú, duración y compras deben venir de Gemini/prompt; ControlEvent solo normaliza filas.
+      // El menú, duración y compras deben venir de Zuzu/prompt; ControlEvent solo normaliza filas.
       lastProposal = normalizeProposalRowsForGroups(ceHf27ApplyDiagnosticTruth(lastProposal));
     }else{
       lastProposal = normalizeProposalRowsForGroups(ceHf39FinalizeProposal(ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(lastProposal)))));
@@ -3521,7 +3521,7 @@
       try{ alert('Evento creado correctamente y guardado en la base de datos. Revísalo y adapta lo necesario.'); }catch(_){}
       activateCreatedEventAndOpenGraficas(newEventId);
     }catch(error){
-      console.error('[ControlEvent v18.11.10_prod] Error generando evento real desde planificación:', error);
+      console.error('[ControlEvent v19_prod] Error generando evento real desde planificación:', error);
       try{ alert('No se pudo generar el evento real: ' + (error?.message || error)); }catch(_){ }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = oldText; }
@@ -4430,12 +4430,12 @@
     const phaseHtml = phaseRows ? `<div class="ce-hf27-tablewrap"><table><thead><tr><th>Fase</th><th>Origen/estado</th><th>Compras</th><th>Donaciones</th><th>Total compra</th><th>Detalle</th></tr></thead><tbody>${phaseRows}</tbody></table></div>` : '';
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
-        <div><h3>Trazabilidad FIX47: consumo abierto, fases y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Gemini, filas interpretadas y filas finales.</p></div>
+        <div><h3>Trazabilidad FIX47: consumo abierto, fases y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Zuzu, filas interpretadas y filas finales.</p></div>
         <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
       ${phaseHtml}
-      <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Filas Gemini</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="7">No hay intento Gemini registrado.</td></tr>'}</tbody></table></div>
+      <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Filas Zuzu</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="7">No hay intento Zuzu registrado.</td></tr>'}</tbody></table></div>
       <details style="padding:12px 16px"><summary><b>Ver brief / request / respuesta bruta</b></summary><pre style="white-space:pre-wrap;max-height:460px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px">${esc(JSON.stringify(traceShort, null, 2)).slice(0, 180000)}</pre></details>
     </section>`;
   }
@@ -4507,12 +4507,12 @@
       const data = await res.json();
       lastSourceEvent = data.event && data.event.id ? data.event : null;
       const rawPlanRows = Array.isArray(data.rows) ? data.rows : [];
-      // FIX28 planificación: en Encargo total la compra debe venir de Gemini/prompt.
-      // No se aplica el menú local de seguridad (paella/barbacoa) cuando Gemini solo trae donaciones
+      // FIX28 planificación: en Encargo total la compra debe venir de Zuzu/prompt.
+      // No se aplica el menú local de seguridad (paella/barbacoa) cuando Zuzu solo trae donaciones
       // o no devuelve compras; así evitamos inventar siempre la misma compra.
       if(planMode() === 'ZUZU_TOTAL'){
-        // FIX45_REVISION_SALDO_CAPS: no se filtra la propuesta de Gemini.
-        // Si Gemini propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
+        // FIX45_REVISION_SALDO_CAPS: no se filtra la propuesta de Zuzu.
+        // Si Zuzu propone paella, barbacoa u otra idea razonada, se respeta y se muestra.
         lastProposal = ceHf27ApplyDiagnosticTruth(rawPlanRows);
       }else{
         lastProposal = ceHf36ForcePurchasesIfZero(ceHf32EnsureImaginedPurchases(ceHf27ApplyDiagnosticTruth(ceHf31MaybeAddFallbackPurchases(rawPlanRows))));
@@ -4533,7 +4533,7 @@
       bindPlanDebugTraceCopy(data.debugPlanificacion);
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(error){
-      console.warn('[ControlEvent v18.11.10_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
+      console.warn('[ControlEvent v19_prod] Propuesta Zuzu no disponible; se intenta réplica local.', error);
       await ensureMasterRowsForMandatoryIncomes();
       if(mode === 'REPLICA' || mode === 'ZUZU_PARCIAL'){
         try{
@@ -4547,7 +4547,7 @@
           }
           lastProposal = ceHf46BalancePositiveSurplusOnce(lastProposal);
           renderProposal();
-          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se muestra réplica local del evento modelo.</div>');
+          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Zuzu. Se muestra réplica local del evento modelo.</div>');
           document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
         }catch(_){ try{ alert(error?.message || error); }catch(__){} }
       }else{
@@ -4556,7 +4556,7 @@
           lastProposal = [];
           lastIncomeProposal = buildMandatorySocioIncomeProposal(0);
           renderProposal();
-          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Gemini. Se presenta la propuesta local de ingresos obligatorios de socios.</div>');
+          document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', '<div class="planificacion-note compact-note warning"><strong>Aviso:</strong> Zuzu no pudo consultar el backend/Zuzu. Se presenta la propuesta local de ingresos obligatorios de socios.</div>');
           document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});
         }else if(box){ box.classList.remove('hidden'); box.innerHTML = '<div class="planificacion-note compact-note warning"><strong>No se pudo generar la propuesta:</strong> '+esc(error?.message || error)+'</div>'; }
       }
@@ -4669,7 +4669,7 @@
     setCurrentMainTabPlanificacion();
     ensureReady();
     showOnlyPlanificacionPanel();
-    try{ initForm(); }catch(error){ console.warn('[ControlEvent v18.11.10_prod] No se pudo inicializar el formulario de planificación.', error); }
+    try{ initForm(); }catch(error){ console.warn('[ControlEvent v19_prod] No se pudo inicializar el formulario de planificación.', error); }
     unlockPlanControls();
     // Refuerzo mínimo para móviles: solo revalida esta ventana, sin envolver render() ni afectar a otras pestañas.
     [50, 180].forEach(ms => setTimeout(() => {
@@ -4744,7 +4744,7 @@
       if(event){ event.preventDefault(); event.stopPropagation(); }
       try{ ceHf27RenderDiagnosticsOnly(); }
       catch(error){
-        console.error('[ControlEvent v18.11.10_prod] Error abriendo diagnóstico HF27/HF28', error);
+        console.error('[ControlEvent v19_prod] Error abriendo diagnóstico HF27/HF28', error);
         const box = document.getElementById('planificacionResultado');
         if(box){
           box.classList.remove('hidden');
@@ -4783,7 +4783,7 @@
         event.stopImmediatePropagation();
         try{ ceHf27RenderDiagnosticsOnly(); }
         catch(error){
-          console.error('[ControlEvent v18.11.10_prod] Error diagnóstico HF28', error);
+          console.error('[ControlEvent v19_prod] Error diagnóstico HF28', error);
           const box = document.getElementById('planificacionResultado');
           if(box){
             box.classList.remove('hidden');

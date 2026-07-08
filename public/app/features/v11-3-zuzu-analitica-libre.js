@@ -1,9 +1,9 @@
-/* ControlEvent v18.11.10_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v19_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.11.10_prod';
+  var VERSION='v19_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -39,7 +39,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || data.title || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v18_11_10_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v19_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -103,7 +103,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v18.11.10_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v19_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -314,7 +314,7 @@
       }
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
     }).join('');
-    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad del flujo Zuzu · v18.11.10_prod</h3><details open><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO'+esc(usageLine)+'</summary>'+items+'</details></div>';
+    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad del flujo Zuzu · v19_prod</h3><details open><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO'+esc(usageLine)+'</summary>'+items+'</details></div>';
   }
   function renderResult(data){
     data = data || {};
@@ -323,7 +323,7 @@
     if((!Array.isArray(data.charts) || !data.charts.length) && wantsChart(data.__prompt || '')) data.charts = autoChartsFromTables(data.tables || []);
     var html='';
     var cls=data.rejected?' ce-ai-rejected':'';
-    html+='<div class="ce-ai-card'+cls+'"><h3>'+esc(data.title||'Resultado')+'</h3><div style="font-size:11px;font-weight:900;color:#075985;margin:-4px 0 8px">ControlEvent v18.11.10_prod · flujo Zuzu/Gemini</div><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
+    html+='<div class="ce-ai-card'+cls+'"><h3>'+esc(data.title||'Resultado')+'</h3><div style="font-size:11px;font-weight:900;color:#075985;margin:-4px 0 8px">ControlEvent v19_prod · flujo Zuzu</div><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
     if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && Array.isArray(data.warnings) && data.warnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+data.warnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
     html+=traceHtml(data);
     (data.charts||[]).forEach(function(ch){ html+=chartHtml(ch); });

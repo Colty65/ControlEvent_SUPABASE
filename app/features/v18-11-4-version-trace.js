@@ -1,13 +1,13 @@
-/* ControlEvent v18.11.10_prod - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v19_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v18.11.10_prod';
-  var VERSION_TEXT = 'ControlEvent v18.11.10_prod';
-  var VERSION_FILE = 'ControlEvent_v18_11_10_prod';
+  var VERSION_LABEL = 'v19_prod';
+  var VERSION_TEXT = 'ControlEvent v19_prod';
+  var VERSION_FILE = 'ControlEvent_v19_prod';
   var BUILD_ID = '20260706-173000';
-  var ZIP_NAME = 'CE_v18_11_10_PROD_ZUZU_FLUJO_VERSION_LAYOUT.zip';
+  var ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;

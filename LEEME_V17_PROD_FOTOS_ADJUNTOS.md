@@ -1,10 +1,10 @@
-# ControlEvent v18_prod
+# ControlEvent v19_prod
 
 Base: CE_v16_PROD_OPT2J_GRAFICAS_SIN_SEGUNDO_REFRESCO.zip
 
 Cambios principales:
 
-- Version visible, interna, cache-busters, BACKUP e INFOEVENTO actualizados a `v18_prod`.
+- Version visible, interna, cache-busters, BACKUP e INFOEVENTO actualizados a `v19_prod`.
 - Correccion del mantenimiento de fotos en INGRESOS, RESUMEN PRESUPUESTARIO y DOCUMENTOS DEL EVENTO.
 - DELETE de `/api/ticket-images` usa ahora el mismo scope explicito que POST, evitando borrados locales que luego reaparecian desde servidor.
 - Cada subida de foto genera una ruta nueva en Supabase Storage y URL con cache-buster, para que no vuelva la imagen antigua tras reemplazar.

@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.10_prod - herramientas inferiores movidas a lateral izquierdo. */
+/* ControlEvent v19_prod - herramientas inferiores movidas a lateral izquierdo. */
 (function(){
   'use strict';
   if(window.__ceV18119LeftTools) return; window.__ceV18119LeftTools=true;

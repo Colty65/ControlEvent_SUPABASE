@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.10_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v19_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -712,7 +712,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v18.11.10_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v19_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -765,7 +765,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v18.11.10_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v19_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -882,7 +882,7 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
     && /\b(donacion|donaciones|donado|donados|donante|donantes|ha\s+donado|han\s+donado)\b/.test(p)
     && /\b(evento|eventos|producto|productos|articulo|articulos|donde|lista|listado)\b/.test(p);
   if (donorProductSearch) { out.personas = []; out.responsables = []; out.donantes = []; out.tiendas = []; }
-  // v18.11.10: en preguntas del tipo "socios que no asistirán / que no están registrados en este evento"
+  // v19: en preguntas del tipo "socios que no asistirán / que no están registrados en este evento"
   // las comillas suelen contener exclusiones (Personas..., z_de...), no filtros de nombres.
   // Si mantenemos esos filtros, INGRESOS/COMPRAS/DONACIONES se quedan a cero y Zuzu recibe basura.
   if (zuzuAsksMissingAttendees(prompt)) {
@@ -1125,7 +1125,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
 
-  // v18.11.10: catálogo ultraligero para el PASO 1 de Gemini.
+  // v19: catálogo ultraligero para el PASO 1 de Gemini.
   // Gemini solo debe decidir módulos/filtros; los datos reales los extrae CE después.
   // Por eso NO se le envían tablas, compras, donaciones ni catálogos completos.
   const promptRaw = text(userPrompt || '');
@@ -1156,7 +1156,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v18.11.10_prod',
+    version: 'ControlEvent Zuzu Planner v19_prod',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     resumenModulos: {
@@ -1616,9 +1616,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v18.11.10_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v19_prod',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'Zuzu/Gemini decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
+    seguridad: { modo: 'solo lectura', nota: 'Zuzu decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     planZuzu: { modules, eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO', planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
     eventosObjetivo: eventRows,
@@ -1629,7 +1629,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     instruccionesFuncionalesZuzu: [
       { id: 'EXP-1-ALCANCE-EVENTOS', regla: 'Si el usuario cita eventos entre comillas, solo se usan esos eventos. No se añaden eventos parecidos por ordinal, fecha o palabras comunes.' },
       { id: 'EXP-2-COMPARATIVA-EVENTOS', regla: 'Una comparativa entre eventos debe calcular una fila por evento y por módulo solicitado. Está prohibido mezclar datos de eventos no citados.' },
-      { id: 'EXP-3-FLUJO-ZUZU', regla: 'Primero Zuzu/Gemini planifica módulos y filtros; después ControlEvent extrae datos completos y humanizados; finalmente Zuzu/Gemini cocina/formatea la respuesta usando el prompt original y esos datos.' },
+      { id: 'EXP-3-FLUJO-ZUZU', regla: 'Primero Zuzu planifica módulos y filtros; después ControlEvent extrae datos completos y humanizados; finalmente Zuzu cocina/formatea la respuesta usando el prompt original y esos datos.' },
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' }
     ],

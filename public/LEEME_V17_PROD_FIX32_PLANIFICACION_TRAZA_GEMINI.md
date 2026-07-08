@@ -1,4 +1,4 @@
-# CE v18_prod FIX32 - Planificación con traza Zuzu
+# CE v19_prod FIX32 - Planificación con traza Zuzu
 
 Base: CE_v17_PROD_FIX31_PLANIFICACION_BRIEF_GEMINI.
 

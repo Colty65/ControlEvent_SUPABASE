@@ -1,4 +1,4 @@
-# ControlEvent v18_prod FIX30 — Planificación con Zuzu libre y resumen de menú
+# ControlEvent v19_prod FIX30 — Planificación con Zuzu libre y resumen de menú
 
 Base: `CE_v17_PROD_FIX29_PLANIFICACION_SIN_MENU_FIJO.zip`.
 

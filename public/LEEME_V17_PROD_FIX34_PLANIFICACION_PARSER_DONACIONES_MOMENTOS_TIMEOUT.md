@@ -1,4 +1,4 @@
-# CE v18_prod FIX34 - Planificación: parser donaciones/momentos + timeout Zuzu
+# CE v19_prod FIX34 - Planificación: parser donaciones/momentos + timeout Zuzu
 
 Base: CE_v17_PROD_FIX33_PLANIFICACION_PROMPT_COMPACTO.
 

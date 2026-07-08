@@ -1,11 +1,11 @@
-/* ControlEvent v18_prod OPT2I - antiretemblor visual en GRAFICAS.
+/* ControlEvent v19_prod OPT2I - antiretemblor visual en GRAFICAS.
    Objetivo: durante el cambio de evento, mantener una instantánea estable de la gráfica
    anterior y revelar la nueva solo cuando el render V46 esté asentado.
    No cambia cálculos ni datos; solo evita el salto vertical bajo/alto durante el render.
 */
 (function(){
   'use strict';
-  const VERSION = 'v18_prod_opt_2i';
+  const VERSION = 'v19_prod_opt_2i';
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
   const now = () => Date.now();

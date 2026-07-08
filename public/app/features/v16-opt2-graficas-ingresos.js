@@ -1,4 +1,4 @@
-/* ControlEvent v18_prod OPT2D - Gráficas sin avisos negros y con repintado estabilizado.
+/* ControlEvent v19_prod OPT2D - Gráficas sin avisos negros y con repintado estabilizado.
    Alcance cerrado: GRAFICAS + hidratación de justificantes al cambiar evento.
    Estrategia:
    - No pinta estados intermedios vacíos durante el cambio de evento.
@@ -11,7 +11,7 @@
   if(window.__ceV16Opt2DInstalled) return;
   window.__ceV16Opt2DInstalled = true;
 
-  const VERSION = 'v18_prod_opt_2d';
+  const VERSION = 'v19_prod_opt_2d';
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
@@ -191,7 +191,7 @@
         wrap.classList.add('ce-opt2c-stable');
         metrics.committedStableWrites++;
         cacheCurrentChart();
-      }catch(err){ console.warn('[v18_prod_opt_2c] commit gráficas', err); }
+      }catch(err){ console.warn('[v19_prod_opt_2c] commit gráficas', err); }
     }, Number(delay || 180));
   }
 
@@ -284,7 +284,7 @@
       try{
         const before = currentEventId();
         wrap.classList.add('ce-opt2c-rendering');
-        base.call(ctx || window.ControlEventV434 || window, Object.assign({}, options || {}, {force:true, reason:'v18_prod_opt_2c'}));
+        base.call(ctx || window.ControlEventV434 || window, Object.assign({}, options || {}, {force:true, reason:'v19_prod_opt_2c'}));
         if(before === currentEventId()){
           lastRenderKey = chartKey();
           lastRenderAt = Date.now();
@@ -292,7 +292,7 @@
           metrics.graphRenderRuns++;
           setTimeout(cacheCurrentChart, 30);
         }
-      }catch(err){ console.warn('[v18_prod_opt_2c] render gráficas', err); }
+      }catch(err){ console.warn('[v19_prod_opt_2c] render gráficas', err); }
       finally{
         wrap.classList.remove('ce-opt2c-rendering');
         metrics.lastRenderMs = Math.round((performance.now ? performance.now() : Date.now()) - start);
@@ -365,7 +365,7 @@
     metrics.receiptHydrations++;
     metrics.lastHydratedEventId = ev;
     const race = (p, ms) => Promise.race([Promise.resolve(p), new Promise(resolve => setTimeout(resolve, ms))]);
-    try{ await race(window.ControlEventV469?.hydrateEventReceipts?.(force !== false), 2100); }catch(err){ console.warn('[v18_prod_opt_2c] hidratación justificantes', err); }
+    try{ await race(window.ControlEventV469?.hydrateEventReceipts?.(force !== false), 2100); }catch(err){ console.warn('[v19_prod_opt_2c] hidratación justificantes', err); }
     if(ev !== currentEventId()) return;
     try{ window.ControlEventV469?.compactIngresoReceipts?.(); }catch(_){ }
     try{ window.ControlEventV469?.enrichOpenTooltips?.(); }catch(_){ }
