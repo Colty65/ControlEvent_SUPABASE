@@ -1,7 +1,9 @@
 /* ControlEvent v19_prod - Vista grafica global desde Mapa de recursos.
-   - Boton icono en la cabecera del Mapa de recursos.
-   - Modal ligero: ingresos en queso + recursos comprados/donados por segmento y destino.
-   - Detalles bajo demanda: personas/justificantes y productos A-Z. */
+   FIX2:
+   - Cabecera con estado del evento en vez de texto de version.
+   - Panel izquierdo: INGRESOS + filtros COMPRAS/DONACIONES.
+   - Panel derecho unico para detalle de ingresos o listado de productos filtrado.
+   - Listados compactos, color por situacion y leyendas visibles. */
 (function(){
   'use strict';
   if(window.__ceV19MapaRecursosGlobal) return;
@@ -12,6 +14,8 @@
   const OVERLAY_ID = 'ceMapaGlobalOverlay';
   const DETAIL_ID = 'ceMapaGlobalDetail';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
+  const KNOWN_SEGMENTS = ['Comida','Bebida','Infraestructura'];
+  const KNOWN_DESTINOS = ['Aperitivo','Comida','Cubatas','Cena','Infraestructura'];
   const $ = id => document.getElementById(id);
   const norm = value => String(value ?? '').trim();
   const up = value => norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -23,7 +27,7 @@
     incomeSocioBanco:'#2563eb', incomeSocioBizum:'#16a34a', incomeSocioEfectivo:'#84cc16',
     incomeNoSocioBanco:'#60a5fa', incomeNoSocioBizum:'#34d399', incomeNoSocioEfectivo:'#bef264',
     incomePendiente:'#f59e0b', incomeOther:'#64748b',
-    compra:'#dc2626', corriente:'#111827', pendiente:'#fb7185',
+    compra:'#dc2626', compraOk:'#16a34a', corriente:'#16a34a', pendiente:'#dc2626',
     donTienda:'#fcd34d', donSocio:'#f59e0b', donOtros:'#b45309', neutral:'#e5e7eb'
   };
 
@@ -71,6 +75,7 @@
     const t = up(ticket);
     return !t || t.includes('PTE') || t.includes('PENDIENTE') || t.includes('COMPRA');
   }
+  function isTk(ticket){ return /^TK\s*\d+/i.test(norm(ticket)); }
   function unitPrice(row){
     const p = producto(row?.productoId);
     const candidates = [row?.precio, row?.precioCalc, row?.defaultPrecio, p.precio, p.defaultPrecio];
@@ -92,6 +97,30 @@
     return u > 0 ? t / u : 0;
   }
   function eventTitle(){ return norm(selectedEvent().titulo || selectedEvent().nombre || $('selectedEvent')?.selectedOptions?.[0]?.textContent || 'Evento'); }
+  function eventStatusInfo(){
+    const ev = selectedEvent();
+    const raw = norm(ev.situacion || ev.estado || ev.status || document.querySelector('.event-status,.status-badge,.badge-status')?.textContent || 'En curso');
+    const fin = up(raw).includes('FINAL');
+    return {label: fin ? 'Finalizado' : 'En curso', cls: fin ? 'finalizado' : 'curso'};
+  }
+  function refName(ref){
+    const clean = norm(ref);
+    if(!clean) return '';
+    const parts = clean.split(':');
+    const kind = up(parts.shift() || '');
+    const id = parts.join(':');
+    if((kind === 'P' || kind === 'PERSONA') && id) return norm(persona(id).nombre) || clean;
+    if((kind === 'T' || kind === 'TIENDA') && id) return norm(tienda(id).nombre) || clean;
+    return norm(persona(clean).nombre || tienda(clean).nombre) || clean;
+  }
+  function donorName(row, storeObj){
+    const ref = norm(row?.donorRef || row?.donanteRef || row?.donanteId || '');
+    if(ref) return refName(ref);
+    const direct = norm(row?.donanteNombre || row?.donante || row?.donorLabel || row?.donor || '');
+    if(direct) return direct;
+    if(row?.personaId && isDonation(row?.ticketDonacion || row?.ticket)) return norm(persona(row.personaId).nombre || '');
+    return norm(storeObj?.nombre || tienda(row?.tiendaId).nombre || 'Sin donante');
+  }
 
   function collabRows(){
     const eventId = selectedId();
@@ -118,28 +147,29 @@
       const donation = isDonation(ticket);
       const value = rowValue(row);
       const unidades = Number(row?.unidades || 0);
-      let kind = 'compra', subtype = 'Compras', color = COLORS.compra;
+      let kind = 'compra', subtype = 'Compra', color = COLORS.compraOk, statusClass = 'ok';
       if(donation){
-        kind = 'donacion'; subtype = ticket || 'Donación';
+        kind = 'donacion'; subtype = ticket || 'Donación'; statusClass = 'donacion';
         color = up(ticket) === 'DONADO TIENDA' ? COLORS.donTienda : (up(ticket) === 'DONADO SOCIO' ? COLORS.donSocio : COLORS.donOtros);
-      }else if(isCurrentExpense(ticket)){ subtype = 'Gastos corrientes'; color = COLORS.corriente; }
-      else if(isPendingTicket(ticket)){ subtype = 'Pte.Compra'; color = COLORS.pendiente; }
-      else { subtype = 'Comprado / TK'; color = COLORS.compra; }
+      }else if(isCurrentExpense(ticket)){ subtype = 'GASTOS CORRIENTES'; color = COLORS.corriente; statusClass = 'ok'; }
+      else if(isPendingTicket(ticket)){ subtype = 'Pte.Compra'; color = COLORS.pendiente; statusClass = 'pending'; }
+      else { subtype = isTk(ticket) ? ticket : 'Compra'; color = COLORS.compraOk; statusClass = 'ok'; }
       return {
         ...row,
         productoObj:p, tiendaObj:t, responsableObj:resp,
-        productoNombre:norm(p.nombre || row.producto || 'Producto sin nombre'),
+        productoNombre:norm(p.nombre || row.producto?.nombre || row.productoNombre || row.producto || 'Producto sin nombre'),
         segmento:norm(p.segmento || row.segmento || 'Sin segmento'),
         destino:norm(p.destino || row.destino || 'Sin destino'),
-        tiendaNombre:norm(t.nombre || row.tienda || 'Sin tienda'),
-        responsableNombre:norm(resp.nombre || ''),
-        ticket, donation, kind, subtype, color, value, unidades,
+        tiendaNombre:norm(t.nombre || row.tienda?.nombre || row.tienda || 'Sin tienda'),
+        responsableNombre:norm(resp.nombre || row.responsableNombre || ''),
+        donanteNombre: donorName(row, t),
+        ticket, donation, kind, subtype, color, statusClass, value, unidades,
         precioUnitario: unitPriceFrom(unidades, value) || unitPrice(row)
       };
     });
   }
   function incomePayment(row){
-    const raw = norm(row.situacion || row.ingreso || row.formaPago || row.estadoIngreso || 'Pendiente');
+    const raw = norm(row.situacion || row.estado || row.ingreso || row.formaPago || row.estadoIngreso || 'Pendiente');
     const u = up(raw);
     if(!raw || u.includes('PENDIENTE')) return 'Pendiente';
     if(u.includes('BANCO')) return 'Banco';
@@ -188,31 +218,15 @@
     const map = new Map();
     rows.forEach(row => {
       const label = norm(row[field] || (field === 'segmento' ? 'Sin segmento' : 'Sin destino'));
-      if(!map.has(label)) map.set(label, {key:label, label, compras:0, donaciones:0, total:0, rows:[], products:new Map(), comprasDetalle:{comprado:0,corriente:0,pendiente:0}, donDetalle:{tienda:0,socio:0,otros:0}});
+      if(!map.has(label)) map.set(label, {key:label, label, compras:0, donaciones:0, total:0, rows:[], count:0});
       const group = map.get(label);
       group.rows.push(row);
+      group.count += 1;
       const val = Number(row.value || 0);
       group.total += val;
-      if(row.kind === 'donacion'){
-        group.donaciones += val;
-        const t = up(row.ticket);
-        if(t === 'DONADO TIENDA') group.donDetalle.tienda += val; else if(t === 'DONADO SOCIO') group.donDetalle.socio += val; else group.donDetalle.otros += val;
-      }else{
-        group.compras += val;
-        if(row.subtype === 'Gastos corrientes') group.comprasDetalle.corriente += val; else if(row.subtype === 'Pte.Compra') group.comprasDetalle.pendiente += val; else group.comprasDetalle.comprado += val;
-      }
-      const pid = norm(row.productoId || row.productoNombre);
-      if(!group.products.has(pid)) group.products.set(pid, {id:pid, producto:row.productoNombre, segmento:row.segmento, destino:row.destino, compras:0, donaciones:0, total:0, unidadesCompra:0, unidadesDonadas:0, rows:[]});
-      const product = group.products.get(pid);
-      product.rows.push(row);
-      product.total += val;
-      if(row.kind === 'donacion'){ product.donaciones += val; product.unidadesDonadas += Number(row.unidades || 0); }
-      else { product.compras += val; product.unidadesCompra += Number(row.unidades || 0); }
+      if(row.kind === 'donacion') group.donaciones += val; else group.compras += val;
     });
-    return Array.from(map.values()).map(group => ({
-      ...group,
-      products: Array.from(group.products.values()).sort((a,b) => a.producto.localeCompare(b.producto,'es',{sensitivity:'base'}))
-    })).sort((a,b) => b.total - a.total || a.label.localeCompare(b.label,'es'));
+    return Array.from(map.values()).sort((a,b) => b.total - a.total || a.label.localeCompare(b.label,'es'));
   }
   function buildModel(){
     const ingresos = collabRows();
@@ -226,7 +240,8 @@
     const totalDonaciones = donationRows.reduce((sum,row) => sum + Number(row.value || 0), 0);
     const segmentos = groupResources(resourceRows, 'segmento');
     const destinos = groupResources(resourceRows, 'destino');
-    return {eventId:selectedId(), title:eventTitle(), ingresos, compras:resourceRows, incomeItems, totalIncome, totalCompras, totalDonaciones, totalRecursos:totalCompras + totalDonaciones, segmentos, destinos};
+    const status = eventStatusInfo();
+    return {eventId:selectedId(), title:eventTitle(), statusLabel:status.label, statusCls:status.cls, ingresos, compras:resourceRows, incomeItems, totalIncome, totalCompras, totalDonaciones, totalRecursos:totalCompras + totalDonaciones, segmentos, destinos};
   }
 
   function valueToSrc(value){
@@ -268,25 +283,22 @@
     return valid.map(item => `<button type="button" class="ce-v19-legend-row" data-v19-${type}-key="${esc(item.key)}"><span class="ce-v19-dot" style="background:${esc(item.color)}"></span><span>${esc(item.label)}</span><strong>${esc(money(item.value))}</strong></button>`).join('');
   }
   function metric(label, value, cls){ return `<div class="ce-v19-metric ${cls||''}"><span>${esc(label)}</span><strong>${esc(money(value))}</strong></div>`; }
-  function groupBars(groups, kind){
-    if(!groups.length) return '<div class="ce-v19-empty-small">Sin recursos.</div>';
-    const max = Math.max(1, ...groups.map(g => Number(g.total || 0)));
-    return groups.map(group => {
-      const w = Math.max(5, Number(group.total || 0) / max * 100);
-      const compraPct = group.total > 0 ? group.compras / group.total * 100 : 0;
-      const donPct = group.total > 0 ? group.donaciones / group.total * 100 : 0;
-      return `<button type="button" class="ce-v19-bar-row" data-v19-group-kind="${esc(kind)}" data-v19-group-key="${esc(group.key)}">
-        <div class="ce-v19-bar-top"><span>${esc(group.label)}</span><strong>${esc(money(group.total))}</strong></div>
-        <div class="ce-v19-bar-track"><div class="ce-v19-bar-inner" style="width:${w.toFixed(2)}%"><i class="buy" style="width:${compraPct.toFixed(2)}%"></i><i class="don" style="width:${donPct.toFixed(2)}%"></i></div></div>
-        <div class="ce-v19-bar-foot"><span>Compras ${esc(money(group.compras))}</span><span>Donado ${esc(money(group.donaciones))}</span><span>${group.products.length} producto(s)</span></div>
-      </button>`;
-    }).join('');
+  function orderIndex(list, label){ const key = up(label); const idx = list.map(up).indexOf(key); return idx === -1 ? 999 : idx; }
+  function filterRadios(groups, kind){
+    const known = kind === 'segmento' ? KNOWN_SEGMENTS : KNOWN_DESTINOS;
+    const map = new Map(groups.map(g => [up(g.label), g]));
+    const ordered = [
+      ...known.filter(label => map.has(up(label))).map(label => map.get(up(label))),
+      ...groups.filter(g => !known.map(up).includes(up(g.label))).sort((a,b)=>a.label.localeCompare(b.label,'es',{sensitivity:'base'}))
+    ];
+    if(!ordered.length) return '<div class="ce-v19-empty-small compact">Sin datos.</div>';
+    return ordered.map(group => `<label class="ce-v19-filter-option" title="${esc(group.label)}"><input type="radio" name="ce-v19-resource-filter" data-v19-filter-kind="${esc(kind)}" data-v19-filter-key="${esc(group.key)}"><span>${esc(group.label)}</span><strong>${esc(money(group.total))}</strong></label>`).join('');
   }
   function renderModal(model){
     return `<div class="ce-v19-global-backdrop">
       <div class="ce-v19-global-card" role="dialog" aria-modal="true" aria-label="Vista gráfica completa del evento">
         <div class="ce-v19-global-head">
-          <div><h2>📊 Vista gráfica completa del evento</h2><p>${esc(model.title)} · ${esc(VERSION)}</p></div>
+          <div><h2>📊 Vista gráfica completa del evento</h2><p>${esc(model.title)} · <span class="ce-v19-event-state ${esc(model.statusCls)}">${esc(model.statusLabel)}</span></p></div>
           <button type="button" class="ce-v19-close" data-v19-close="1" aria-label="Cerrar">Cerrar</button>
         </div>
         <div class="ce-v19-metrics">
@@ -296,24 +308,57 @@
           ${metric('COMPRAS + DONACIONES', model.totalRecursos, 'total')}
         </div>
         <div class="ce-v19-global-grid">
-          <section class="ce-v19-panel ce-v19-income-panel">
-            <div class="ce-v19-panel-title"><span>INGRESOS</span><strong>${esc(money(model.totalIncome))}</strong></div>
-            <div class="ce-v19-pie-wrap">${pieSvg(model.incomeItems, model.totalIncome, 'income')}<div class="ce-v19-legend">${legendRows(model.incomeItems, 'income')}</div></div>
-            <div class="ce-v19-hint">Pulsa una porción o una línea para ver personas y justificantes.</div>
-          </section>
-          <section class="ce-v19-panel ce-v19-resources-panel">
-            <div class="ce-v19-panel-title"><span>COMPRAS + DONACIONES</span><strong>${esc(money(model.totalRecursos))}</strong></div>
-            <div class="ce-v19-resource-legend"><span><i class="buy"></i>Compras</span><span><i class="don"></i>Donaciones</span></div>
-            <div class="ce-v19-bars-grid">
-              <div><h3>Por segmento</h3>${groupBars(model.segmentos, 'segmento')}</div>
-              <div><h3>Por destino</h3>${groupBars(model.destinos, 'destino')}</div>
-            </div>
-            <div class="ce-v19-hint">Pulsa un segmento para ver sus productos de todos los destinos combinados. Pulsa un destino para ver sus productos A-Z.</div>
-          </section>
+          <div class="ce-v19-left-col">
+            <section class="ce-v19-panel ce-v19-income-panel">
+              <div class="ce-v19-panel-title"><span>INGRESOS</span><strong>${esc(money(model.totalIncome))}</strong></div>
+              <div class="ce-v19-pie-wrap">${pieSvg(model.incomeItems, model.totalIncome, 'income')}<div class="ce-v19-legend">${legendRows(model.incomeItems, 'income')}</div></div>
+              <div class="ce-v19-hint">Pulsa una porción o una línea para ver personas y justificantes.</div>
+            </section>
+            <section class="ce-v19-panel ce-v19-resources-panel">
+              <div class="ce-v19-panel-title"><span>COMPRAS + DONACIONES</span><strong>${esc(money(model.totalRecursos))}</strong></div>
+              <div class="ce-v19-resource-legend"><span><i class="buy"></i>Compras</span><span><i class="don"></i>Donaciones</span></div>
+              <div class="ce-v19-filter-block"><h3>SEGMENTO</h3>${filterRadios(model.segmentos, 'segmento')}</div>
+              <div class="ce-v19-filter-block"><h3>DESTINO</h3>${filterRadios(model.destinos, 'destino')}</div>
+              <button type="button" class="ce-v19-clear-filter" data-v19-clear-filter="1">Ver todo</button>
+              <div class="ce-v19-hint">Elige solo un segmento o un destino. Con “Ver todo” vuelven a salir todos los productos.</div>
+            </section>
+          </div>
+          <section id="${DETAIL_ID}" class="ce-v19-detail ce-v19-right-detail">${renderProductRowsContent(model.compras, 'Todos los productos', `Compras ${money(model.totalCompras)} · Donado ${money(model.totalDonaciones)}`)}</section>
         </div>
-        <section id="${DETAIL_ID}" class="ce-v19-detail"><div class="ce-v19-detail-empty">Selecciona un ingreso, segmento o destino para ver el detalle ordenado.</div></section>
       </div>
     </div>`;
+  }
+  function rowTicket(row){ return norm(row.ticket || row.ticketDonacion || 'Pte.Compra'); }
+  function productLineClass(row){ if(row.kind === 'donacion') return 'donacion'; return row.statusClass === 'pending' ? 'pending' : 'ok'; }
+  function rowSituacion(row){
+    if(row.kind === 'donacion') return rowTicket(row) || 'DONACIÓN';
+    if(isCurrentExpense(rowTicket(row))) return 'GASTOS CORRIENTES';
+    if(isPendingTicket(rowTicket(row))) return 'Pte.Compra';
+    return rowTicket(row) || row.subtype || 'Compra';
+  }
+  function renderProductRowsContent(rows, title, subtitle){
+    const sorted = (rows || []).slice().sort((a,b) =>
+      a.productoNombre.localeCompare(b.productoNombre,'es',{sensitivity:'base'}) ||
+      a.segmento.localeCompare(b.segmento,'es',{sensitivity:'base'}) ||
+      a.destino.localeCompare(b.destino,'es',{sensitivity:'base'}) ||
+      rowSituacion(a).localeCompare(rowSituacion(b),'es',{sensitivity:'base'})
+    );
+    return `<div class="ce-v19-detail-head"><div><h3>${esc(title)}</h3><p>${esc(subtitle || '')} · ${sorted.length} registro(s)</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
+      <div class="ce-v19-products-table compact">
+        <div class="ce-v19-products-head compact"><span>Producto</span><span>Segmento</span><span>Destino</span><span>Compras</span><span>Tienda</span><span>Donado</span><span>Donante</span><span>Importe</span><span>Situación</span><span>Resp</span></div>
+        ${sorted.map(row => `<article class="ce-v19-product-line compact ${productLineClass(row)}" style="--line-color:${esc(row.color || '')}">
+          <span class="product" title="${esc(row.productoNombre)}">${esc(row.productoNombre)}</span>
+          <span title="${esc(row.segmento)}">${esc(row.segmento)}</span>
+          <span title="${esc(row.destino)}">${esc(row.destino)}</span>
+          <span>${row.kind === 'compra' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—'}</span>
+          <span title="${esc(row.tiendaNombre)}">${esc(row.tiendaNombre)}</span>
+          <span>${row.kind === 'donacion' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—'}</span>
+          <span title="${esc(row.donanteNombre)}">${row.kind === 'donacion' ? esc(row.donanteNombre || 'Sin donante') : '—'}</span>
+          <strong>${esc(money(row.value))}</strong>
+          <span title="${esc(rowSituacion(row))}">${esc(rowSituacion(row))}</span>
+          <span title="${esc(row.responsableNombre)}">${esc(row.responsableNombre || '—')}</span>
+        </article>`).join('') || '<div class="ce-v19-empty-small">Sin productos.</div>'}
+      </div>`;
   }
   function renderIncomeDetail(key){
     const model = buildModel();
@@ -321,27 +366,30 @@
     const detail = $(DETAIL_ID); if(!detail || !item) return;
     const rows = item.rows.slice().sort((a,b) => (a.socio === b.socio ? 0 : (a.socio ? -1 : 1)) || norm(a.persona?.nombre || '').localeCompare(norm(b.persona?.nombre || ''),'es',{sensitivity:'base'}));
     detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>Ingresos · ${esc(item.label)}</h3><p>${rows.length} persona(s) · ${esc(money(item.value))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
-      <div class="ce-v19-income-list">${rows.map(row => {
-        const name = norm(row.persona?.nombre || persona(row.personaId).nombre || 'Sin nombre');
-        const src = receiptSrc(row.id);
-        const thumb = src ? `<button type="button" class="ce-v19-receipt-thumb" data-v19-receipt-id="${esc(row.id)}" data-v19-receipt-src="${esc(src)}" aria-label="Ver justificante de ${esc(name)}"><img src="${esc(src)}" alt="Justificante"></button>` : '<span class="ce-v19-no-receipt">📷</span>';
-        return `<article class="ce-v19-income-row">${thumb}<div><strong>${esc(name)}</strong><span>${esc(row.rango || '—')} · ${esc(incomePayment(row))} · Nº ${esc(qty(row.numero))}</span></div><div class="ce-v19-income-money"><strong>${esc(money(row.total))}</strong><span>Obl. ${esc(money(row.obligatorio))} · Vol. ${esc(money(row.voluntario))}</span></div></article>`;
-      }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}</div>`;
-  }
-  function rowTicket(row){ return norm(row.ticket || row.ticketDonacion || 'Pte.Compra'); }
-  function renderProductDetail(kind, key){
-    const model = buildModel();
-    const groups = kind === 'segmento' ? model.segmentos : model.destinos;
-    const group = groups.find(x => x.key === key);
-    const detail = $(DETAIL_ID); if(!detail || !group) return;
-    detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>${kind === 'segmento' ? 'Segmento' : 'Destino'} · ${esc(group.label)}</h3><p>${group.products.length} producto(s) A-Z · Compras ${esc(money(group.compras))} · Donado ${esc(money(group.donaciones))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
-      <div class="ce-v19-products-table">
-        <div class="ce-v19-products-head"><span>Producto</span><span>Segmento</span><span>Destino</span><span>Compras</span><span>Donado</span><span>Total</span></div>
-        ${group.products.map(product => `<article class="ce-v19-product-line">
-          <strong>${esc(product.producto)}</strong><span>${esc(product.segmento)}</span><span>${esc(product.destino)}</span><span>${esc(qty(product.unidadesCompra))} uds. · ${esc(money(product.compras))}</span><span>${esc(qty(product.unidadesDonadas))} uds. · ${esc(money(product.donaciones))}</span><strong>${esc(money(product.total))}</strong>
-          <details><summary>Ver líneas</summary><div class="ce-v19-product-subrows">${product.rows.slice().sort((a,b)=>a.productoNombre.localeCompare(b.productoNombre,'es')).map(row => `<div><span>${esc(row.kind === 'donacion' ? 'Donación' : 'Compra')}</span><span>${esc(rowTicket(row))}</span><span>${esc(row.tiendaNombre)}</span><span>${esc(qty(row.unidades))} uds.</span><strong>${esc(money(row.value))}</strong></div>`).join('')}</div></details>
-        </article>`).join('') || '<div class="ce-v19-empty-small">Sin productos.</div>'}
+      <div class="ce-v19-income-list compact">
+        <div class="ce-v19-income-head"><span>Just.</span><span>Nombre</span><span>Rango</span><span>Imp. obligado</span><span>Imp. voluntario</span><span>Total</span></div>
+        ${rows.map(row => {
+          const name = norm(row.persona?.nombre || persona(row.personaId).nombre || 'Sin nombre');
+          const src = receiptSrc(row.id);
+          const thumb = src ? `<button type="button" class="ce-v19-receipt-thumb small" data-v19-receipt-id="${esc(row.id)}" data-v19-receipt-src="${esc(src)}" aria-label="Ver justificante de ${esc(name)}"><img src="${esc(src)}" alt="Justificante"></button>` : '<span class="ce-v19-no-receipt small">📷</span>';
+          const paid = incomePayment(row) === 'Pendiente' ? 'pending' : 'paid';
+          return `<article class="ce-v19-income-row compact ${paid}">${thumb}<span title="${esc(name)}">${esc(name)}</span><span>${esc(row.rango || '—')}</span><span>${esc(money(row.obligatorio))}</span><span>${esc(money(row.voluntario))}</span><strong>${esc(money(row.total))}</strong></article>`;
+        }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}
       </div>`;
+  }
+  function renderFilteredProducts(kind, key){
+    const model = buildModel();
+    let rows = model.compras;
+    let title = 'Todos los productos';
+    let subtitle = `Compras ${money(model.totalCompras)} · Donado ${money(model.totalDonaciones)}`;
+    if(kind && key){
+      rows = model.compras.filter(row => norm(row[kind]) === norm(key));
+      const compras = rows.filter(row => row.kind === 'compra').reduce((s,row)=>s+Number(row.value||0),0);
+      const don = rows.filter(row => row.kind === 'donacion').reduce((s,row)=>s+Number(row.value||0),0);
+      title = `${kind === 'segmento' ? 'Segmento' : 'Destino'} · ${key}`;
+      subtitle = `Compras ${money(compras)} · Donado ${money(don)}`;
+    }
+    const detail = $(DETAIL_ID); if(detail) detail.innerHTML = renderProductRowsContent(rows, title, subtitle);
   }
   function showImage(src, title){
     if(!src) return;
@@ -376,10 +424,9 @@
     overlay.addEventListener('click', ev => {
       if(ev.target?.classList?.contains('ce-v19-global-backdrop') || ev.target?.closest?.('.ce-v19-close,[data-v19-close]')){ ev.preventDefault(); close(); return; }
       const income = ev.target?.closest?.('[data-v19-income-key]');
-      if(income){ ev.preventDefault(); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return; }
-      const group = ev.target?.closest?.('[data-v19-group-kind]');
-      if(group){ ev.preventDefault(); renderProductDetail(group.getAttribute('data-v19-group-kind'), group.getAttribute('data-v19-group-key')); return; }
-      if(ev.target?.closest?.('[data-v19-clear-detail]')){ ev.preventDefault(); const d=$(DETAIL_ID); if(d) d.innerHTML='<div class="ce-v19-detail-empty">Selecciona un ingreso, segmento o destino para ver el detalle ordenado.</div>'; return; }
+      if(income){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return; }
+      if(ev.target?.closest?.('[data-v19-clear-filter]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
+      if(ev.target?.closest?.('[data-v19-clear-detail]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
       const receipt = ev.target?.closest?.('[data-v19-receipt-id]');
       if(receipt){
         ev.preventDefault();
@@ -388,8 +435,12 @@
         showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante');
       }
     }, true);
+    overlay.addEventListener('change', ev => {
+      const filter = ev.target?.matches?.('input[data-v19-filter-kind]') ? ev.target : null;
+      if(filter){ renderFilteredProducts(filter.getAttribute('data-v19-filter-kind'), filter.getAttribute('data-v19-filter-key')); }
+    }, true);
     overlay.addEventListener('keydown', ev => {
-      if((ev.key === 'Enter' || ev.key === ' ') && ev.target?.matches?.('[data-v19-income-key],[data-v19-group-kind]')){ ev.preventDefault(); ev.target.click(); }
+      if((ev.key === 'Enter' || ev.key === ' ') && ev.target?.matches?.('[data-v19-income-key]')){ ev.preventDefault(); ev.target.click(); }
     }, true);
     document.addEventListener('keydown', escClose, true);
   }
@@ -406,21 +457,20 @@
       .ce-v19-modal-open{overflow:hidden;}
       #${OVERLAY_ID}{position:fixed;inset:0;z-index:1000003;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
       .ce-v19-global-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:18px;}
-      .ce-v19-global-card{width:min(1320px,96vw);max-height:94vh;overflow:auto;background:#f8fafc;border:1px solid rgba(226,232,240,.95);border-radius:26px;box-shadow:0 32px 100px rgba(15,23,42,.42);padding:18px;color:#0f172a;}
-      .ce-v19-global-head{position:sticky;top:0;z-index:2;margin:-18px -18px 14px;padding:16px 18px;background:rgba(248,250,252,.94);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
-      .ce-v19-global-head h2{margin:0;font-size:22px;font-weight:950;letter-spacing:-.02em;}.ce-v19-global-head p{margin:4px 0 0;color:#64748b;font-size:13px;font-weight:800;}
-      .ce-v19-close,.ce-v19-detail-clear{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:9px 14px;font-weight:950;cursor:pointer;}
+      .ce-v19-global-card{width:min(1400px,96vw);max-height:94vh;overflow:auto;background:#f8fafc;border:1px solid rgba(226,232,240,.95);border-radius:26px;box-shadow:0 32px 100px rgba(15,23,42,.42);padding:18px;color:#0f172a;}
+      .ce-v19-global-head{position:sticky;top:0;z-index:2;margin:-18px -18px 14px;padding:16px 18px;background:rgba(248,250,252,.96);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+      .ce-v19-global-head h2{margin:0;font-size:22px;font-weight:950;letter-spacing:-.02em;}.ce-v19-global-head p{margin:4px 0 0;color:#64748b;font-size:13px;font-weight:800;}.ce-v19-event-state{font-weight:1000;}.ce-v19-event-state.curso{color:#16a34a;}.ce-v19-event-state.finalizado{color:#dc2626;}
+      .ce-v19-close,.ce-v19-detail-clear,.ce-v19-clear-filter{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:8px 13px;font-weight:950;cursor:pointer;}
       .ce-v19-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px;}.ce-v19-metric{border-radius:18px;background:#fff;border:1px solid #e2e8f0;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.06);}.ce-v19-metric span{display:block;font-size:11px;font-weight:950;color:#64748b;letter-spacing:.05em;}.ce-v19-metric strong{display:block;margin-top:5px;font-size:24px;font-weight:1000;}.ce-v19-metric.income strong{color:#0369a1}.ce-v19-metric.buy strong{color:#dc2626}.ce-v19-metric.don strong{color:#b45309}.ce-v19-metric.total strong{color:#0f766e}
-      .ce-v19-global-grid{display:grid;grid-template-columns:minmax(320px,430px) minmax(0,1fr);gap:12px;align-items:start;}.ce-v19-panel{background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:14px;box-shadow:0 8px 26px rgba(15,23,42,.06);}.ce-v19-panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}.ce-v19-panel-title span{font-weight:1000;color:#0f172a;}.ce-v19-panel-title strong{font-size:18px;color:#0f766e;}
-      .ce-v19-pie-wrap{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;align-items:center;}.ce-v19-pie{width:170px;height:170px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;}.ce-v19-legend-row{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-legend-row strong{font-size:12px;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:12px;color:#64748b;font-weight:800;}
-      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-end;margin:-6px 0 8px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-bars-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}.ce-v19-bars-grid h3{font-size:15px;margin:0 0 8px;font-weight:1000;color:#0f172a;}
-      .ce-v19-bar-row{display:block;width:100%;border:1px solid #e2e8f0;background:#fff;border-radius:15px;padding:9px;margin:0 0 8px;text-align:left;cursor:pointer;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-bar-row:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-bar-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:950;}.ce-v19-bar-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.ce-v19-bar-track{height:13px;background:#eef2f7;border-radius:999px;overflow:hidden;margin:7px 0;}.ce-v19-bar-inner{height:100%;display:flex;border-radius:999px;overflow:hidden;min-width:4px;}.ce-v19-bar-inner .buy{background:#dc2626}.ce-v19-bar-inner .don{background:#f59e0b}.ce-v19-bar-foot{display:flex;gap:8px;flex-wrap:wrap;color:#64748b;font-size:11px;font-weight:850;}
-      .ce-v19-detail{margin-top:12px;background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:13px;box-shadow:0 8px 26px rgba(15,23,42,.05);}.ce-v19-detail-empty,.ce-v19-empty-small{color:#64748b;font-weight:900;padding:12px;text-align:center;background:#f8fafc;border-radius:14px;}.ce-v19-detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}.ce-v19-detail-head h3{margin:0;font-size:18px;font-weight:1000;}.ce-v19-detail-head p{margin:4px 0 0;color:#64748b;font-size:12px;font-weight:850;}
-      .ce-v19-income-list{display:flex;flex-direction:column;gap:7px;}.ce-v19-income-row{display:grid;grid-template-columns:48px minmax(0,1fr) minmax(180px,auto);gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:15px;padding:8px;background:#fff;}.ce-v19-income-row strong{font-weight:1000;}.ce-v19-income-row span{display:block;color:#64748b;font-size:12px;font-weight:800;}.ce-v19-income-money{text-align:right;}.ce-v19-receipt-thumb{width:44px;height:44px;border:1px solid #cbd5e1;border-radius:12px;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{width:44px;height:44px;display:flex!important;align-items:center;justify-content:center;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0;}
-      .ce-v19-products-table{display:flex;flex-direction:column;gap:7px;}.ce-v19-products-head,.ce-v19-product-line{display:grid;grid-template-columns:minmax(190px,1.3fr) minmax(110px,.8fr) minmax(110px,.8fr) minmax(120px,.8fr) minmax(120px,.8fr) minmax(100px,.7fr);gap:8px;align-items:center;}.ce-v19-products-head{font-size:11px;font-weight:1000;color:#64748b;padding:0 9px;}.ce-v19-product-line{border:1px solid #e2e8f0;border-radius:15px;padding:9px;background:#fff;font-size:13px;}.ce-v19-product-line > strong:first-child{font-size:14px;}.ce-v19-product-line span{color:#475569;font-weight:850;}.ce-v19-product-line details{grid-column:1/-1;background:#f8fafc;border-radius:12px;padding:6px 8px;}.ce-v19-product-line summary{font-weight:950;cursor:pointer;color:#0369a1;}.ce-v19-product-subrows{display:flex;flex-direction:column;gap:4px;margin-top:7px;}.ce-v19-product-subrows div{display:grid;grid-template-columns:90px 130px 1fr 90px 90px;gap:8px;border-top:1px dashed #e2e8f0;padding-top:4px;}
+      .ce-v19-global-grid{display:grid;grid-template-columns:minmax(330px,430px) minmax(0,1fr);gap:12px;align-items:start;}.ce-v19-left-col{display:flex;flex-direction:column;gap:12px;min-width:0;}.ce-v19-panel,.ce-v19-detail{background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:14px;box-shadow:0 8px 26px rgba(15,23,42,.06);}.ce-v19-panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}.ce-v19-panel-title span{font-weight:1000;color:#0f172a;}.ce-v19-panel-title strong{font-size:18px;color:#0f766e;}
+      .ce-v19-pie-wrap{display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;align-items:center;}.ce-v19-pie{width:160px;height:160px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;min-width:0;}.ce-v19-legend-row{display:grid!important;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #dbe4f0!important;background:#fff!important;color:#0f172a!important;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;min-width:0;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#334155!important;}.ce-v19-legend-row strong{font-size:12px;color:#0f172a!important;white-space:nowrap;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:11px;color:#64748b;font-weight:800;line-height:1.25;}
+      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-filter-block{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;margin-bottom:9px;}.ce-v19-filter-block h3{font-size:12px;margin:0 0 8px;font-weight:1000;color:#0f172a;letter-spacing:.04em;}.ce-v19-filter-option{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:7px 8px;margin:0 0 6px;cursor:pointer;color:#0f172a;}.ce-v19-filter-option:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-filter-option input{margin:0;width:14px;height:14px;}.ce-v19-filter-option span{font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-filter-option strong{font-size:11px;font-weight:950;color:#0f766e;white-space:nowrap;}.ce-v19-clear-filter{width:100%;background:#f8fafc;}
+      .ce-v19-right-detail{margin:0;min-height:560px;overflow:hidden;}.ce-v19-detail-empty,.ce-v19-empty-small{color:#64748b;font-weight:900;padding:12px;text-align:center;background:#f8fafc;border-radius:14px;}.ce-v19-empty-small.compact{font-size:11px;padding:8px;}.ce-v19-detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}.ce-v19-detail-head h3{margin:0;font-size:18px;font-weight:1000;}.ce-v19-detail-head p{margin:4px 0 0;color:#64748b;font-size:12px;font-weight:850;}
+      .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:10px;font-weight:1000;color:#64748b;padding:0 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact.paid{color:#15803d;}.ce-v19-income-row.compact.pending{color:#dc2626;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
+      .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:3px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(150px,1.25fr) minmax(70px,.55fr) minmax(70px,.55fr) minmax(92px,.72fr) minmax(82px,.65fr) minmax(92px,.72fr) minmax(82px,.65fr) minmax(70px,.55fr) minmax(82px,.65fr) minmax(70px,.55fr);gap:4px;align-items:center;min-width:980px;}.ce-v19-products-head.compact{font-size:9px;font-weight:1000;color:#64748b;padding:0 6px;text-transform:uppercase;letter-spacing:.02em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:9px;padding:4px 5px;background:#fff;font-size:10px;font-weight:900;line-height:1.05;color:var(--line-color,#0f172a);}.ce-v19-product-line.compact.ok{color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309);}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}.ce-v19-product-line.compact .product{font-weight:1000;}
       .ce-v19-image-viewer{position:fixed;inset:0;z-index:1000005;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;}.ce-v19-image-card{background:#fff;border-radius:18px;padding:12px;max-width:min(980px,96vw);max-height:94vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 26px 86px rgba(0,0,0,.42);}.ce-v19-image-card>div{display:flex;align-items:center;justify-content:space-between;gap:10px;}.ce-v19-image-card button{border:1px solid #cbd5e1;border-radius:999px;background:#fff;padding:7px 12px;font-weight:950;}.ce-v19-image-card img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px;background:#f8fafc;}
-      @media(max-width:1040px){.ce-v19-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ce-v19-global-grid{grid-template-columns:1fr}.ce-v19-pie-wrap{grid-template-columns:150px 1fr}.ce-v19-pie{width:150px;height:150px}.ce-v19-products-head{display:none}.ce-v19-product-line{grid-template-columns:1fr 1fr}.ce-v19-product-line details{grid-column:1/-1}.ce-v19-product-subrows div{grid-template-columns:1fr 1fr;}}
-      @media(max-width:720px){.ce-v19-global-backdrop{padding:8px;align-items:flex-start}.ce-v19-global-card{width:100vw;max-height:96vh;border-radius:18px;padding:12px}.ce-v19-global-head{margin:-12px -12px 10px;padding:12px}.ce-v19-global-head h2{font-size:18px}.ce-v19-metrics{grid-template-columns:1fr 1fr}.ce-v19-metric{padding:10px}.ce-v19-metric strong{font-size:18px}.ce-v19-pie-wrap{grid-template-columns:1fr}.ce-v19-pie{margin:auto}.ce-v19-bars-grid{grid-template-columns:1fr}.ce-v19-income-row{grid-template-columns:44px 1fr}.ce-v19-income-money{grid-column:2;text-align:left}.ce-v19-product-line{grid-template-columns:1fr}.ce-v19-product-subrows div{grid-template-columns:1fr}.ce-v19-resource-legend{justify-content:flex-start;}}
+      @media(max-width:1120px){.ce-v19-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ce-v19-global-grid{grid-template-columns:1fr}.ce-v19-right-detail{min-height:360px}.ce-v19-pie-wrap{grid-template-columns:150px 1fr}.ce-v19-pie{width:150px;height:150px;}}
+      @media(max-width:720px){.ce-v19-global-backdrop{padding:8px;align-items:flex-start}.ce-v19-global-card{width:100vw;max-height:96vh;border-radius:18px;padding:12px}.ce-v19-global-head{margin:-12px -12px 10px;padding:12px}.ce-v19-global-head h2{font-size:18px}.ce-v19-metrics{grid-template-columns:1fr 1fr}.ce-v19-metric{padding:10px}.ce-v19-metric strong{font-size:18px}.ce-v19-pie-wrap{grid-template-columns:1fr}.ce-v19-pie{margin:auto}.ce-v19-income-head{display:none}.ce-v19-income-row.compact{grid-template-columns:38px 1fr 1fr}.ce-v19-income-row.compact span:nth-child(n+5),.ce-v19-income-row.compact strong{grid-column:auto}.ce-v19-products-head.compact{display:none}.ce-v19-product-line.compact{grid-template-columns:1fr;min-width:0;font-size:11px;}.ce-v19-resource-legend{justify-content:flex-start;}}
     `;
     document.head.appendChild(style);
   }
