@@ -1,7 +1,9 @@
 /* ControlEvent v19_prod - Vista grafica global desde Mapa de recursos.
-   FIX4:
-   - Colores reforzados en registros de INGRESOS y COMPRAS + DONACIONES.
-   - Panel derecho mas ancho para que quepa mejor la linea completa de producto. */
+   FIX5:
+   - PRODUCTO DISPONIBLE sustituye COMPRAS + DONACIONES.
+   - Colores reales en leyendas y registros, sin que el CSS global los pise.
+   - Ver todo en INGRESOS, toque iPad sobre queso y radios protegidos contra scroll.
+   - Donaciones no muestran tienda: el donante queda en Donante. */
 (function(){
   'use strict';
   if(window.__ceV19MapaRecursosGlobal) return;
@@ -287,7 +289,7 @@
     const paths = valid.map(item => {
       const inc = valid.length === 1 ? 360 : Math.max(7, Math.abs(Number(item.value || 0)) / Math.max(0.0001,total) * 360);
       const start = angle; angle += inc;
-      const common = `data-v19-${type}-key="${esc(item.key)}" tabindex="0" role="button" aria-label="${esc(item.label)} ${esc(money(item.value))}"`;
+      const common = `data-v19-${type}-key="${esc(item.key)}" role="button" aria-label="${esc(item.label)} ${esc(money(item.value))}"`;
       if(valid.length === 1 || inc >= 359.9){
         return `<g ${common}><circle class="ce-v19-pie-slice" cx="50" cy="50" r="42" fill="${esc(item.color)}"></circle></g>`;
       }
@@ -298,7 +300,7 @@
   function legendRows(items, type){
     const valid = items.filter(item => Math.abs(Number(item.value || 0)) > 0);
     if(!valid.length) return '<div class="ce-v19-empty-small">Sin datos.</div>';
-    return valid.map(item => `<button type="button" class="ce-v19-legend-row" data-v19-${type}-key="${esc(item.key)}"><span class="ce-v19-dot" style="background:${esc(item.color)}"></span><span>${esc(item.label)}</span><strong>${esc(money(item.value))}</strong></button>`).join('');
+    return valid.map(item => `<button type="button" class="ce-v19-legend-row" style="color:${esc(item.color)}!important" data-v19-${type}-key="${esc(item.key)}"><span class="ce-v19-dot" style="background:${esc(item.color)}"></span><span style="color:${esc(item.color)}!important">${esc(item.label)}</span><strong style="color:${esc(item.color)}!important">${esc(money(item.value))}</strong></button>`).join('');
   }
   function metric(label, value, cls){ return `<div class="ce-v19-metric ${cls||''}"><span>${esc(label)}</span><strong>${esc(money(value))}</strong></div>`; }
   function orderIndex(list, label){ const key = up(label); const idx = list.map(up).indexOf(key); return idx === -1 ? 999 : idx; }
@@ -316,24 +318,25 @@
     return `<div class="ce-v19-global-backdrop">
       <div class="ce-v19-global-card" role="dialog" aria-modal="true" aria-label="Vista gráfica completa del evento">
         <div class="ce-v19-global-head">
-          <div><h2>📊 Vista gráfica completa del evento</h2><p>${esc(model.title)} · <span class="ce-v19-event-state ${esc(model.statusCls)}">${esc(model.statusLabel)}</span></p></div>
+          <div><h2>📊 Vista gráfica completa del evento</h2><p>${esc(model.title)} · <span class="ce-v19-event-state ${esc(model.statusCls)}" style="color:${model.statusCls === 'finalizado' ? '#dc2626' : '#16a34a'}!important">${esc(model.statusLabel)}</span></p></div>
           <button type="button" class="ce-v19-close" data-v19-close="1" aria-label="Cerrar">Cerrar</button>
         </div>
         <div class="ce-v19-metrics">
           ${metric('INGRESOS', model.totalIncome, 'income')}
           ${metric('COMPRAS', model.totalCompras, 'buy')}
           ${metric('DONACIONES', model.totalDonaciones, 'don')}
-          ${metric('COMPRAS + DONACIONES', model.totalRecursos, 'total')}
+          ${metric('PRODUCTO DISPONIBLE', model.totalRecursos, 'total')}
         </div>
         <div class="ce-v19-global-grid">
           <div class="ce-v19-left-col">
             <section class="ce-v19-panel ce-v19-income-panel">
               <div class="ce-v19-panel-title"><span>INGRESOS</span><strong>${esc(money(model.totalIncome))}</strong></div>
+              <button type="button" class="ce-v19-income-all" data-v19-income-all="1">Ver todo</button>
               <div class="ce-v19-pie-wrap">${pieSvg(model.incomeItems, model.totalIncome, 'income')}<div class="ce-v19-legend">${legendRows(model.incomeItems, 'income')}</div></div>
               <div class="ce-v19-hint">Pulsa una porción o una línea para ver personas y justificantes.</div>
             </section>
             <section class="ce-v19-panel ce-v19-resources-panel">
-              <div class="ce-v19-panel-title"><span>COMPRAS + DONACIONES</span><strong>${esc(money(model.totalRecursos))}</strong></div>
+              <div class="ce-v19-panel-title"><span>PRODUCTO DISPONIBLE</span><strong>${esc(money(model.totalRecursos))}</strong></div>
               <div class="ce-v19-resource-legend"><span><i class="buy"></i>Compras</span><span><i class="don"></i>Donaciones</span></div>
               <div class="ce-v19-filter-block"><h3>SEGMENTO</h3>${filterRadios(model.segmentos, 'segmento')}</div>
               <div class="ce-v19-filter-block"><h3>DESTINO</h3>${filterRadios(model.destinos, 'destino')}</div>
@@ -371,7 +374,7 @@
       case 'segmento': return row.segmento;
       case 'destino': return row.destino;
       case 'compras': return row.kind === 'compra' ? Number(row.value || 0) : 0;
-      case 'tienda': return row.tiendaNombre;
+      case 'tienda': return row.kind === 'donacion' ? '' : row.tiendaNombre;
       case 'donado': return row.kind === 'donacion' ? Number(row.value || 0) : 0;
       case 'donante': return row.kind === 'donacion' ? row.donanteNombre : '';
       case 'importe': return Number(row.value || 0);
@@ -420,6 +423,7 @@
   }
   function rerenderCurrentDetail(){
     if(currentView.type === 'income' && currentView.key) renderIncomeDetail(currentView.key);
+    else if(currentView.type === 'incomeAll') renderAllIncomeDetail();
     else renderFilteredProducts(currentView.kind || '', currentView.key || '');
   }
   function renderProductRowsContent(rows, title, subtitle){
@@ -427,18 +431,26 @@
     return `<div class="ce-v19-detail-head"><div><h3>${esc(title)}</h3><p>${esc(subtitle || '')} · ${sorted.length} registro(s)</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
       <div class="ce-v19-products-table compact">
         <div class="ce-v19-products-head compact">${sortButton('products','producto','Producto')}${sortButton('products','segmento','Segmento')}${sortButton('products','destino','Destino')}${sortButton('products','compras','Compras')}${sortButton('products','tienda','Tienda')}${sortButton('products','donado','Donado')}${sortButton('products','donante','Donante')}${sortButton('products','importe','Importe')}${sortButton('products','situacion','Situación')}${sortButton('products','responsable','Resp')}</div>
-        ${sorted.map(row => `<article class="ce-v19-product-line compact ${productLineClass(row)}" style="--line-color:${esc(row.color || productTextColor(row))};--row-text-color:${esc(productTextColor(row))};color:${esc(productTextColor(row))}">
-          <span class="product" title="${esc(row.productoNombre)}">${esc(row.productoNombre)}</span>
-          <span title="${esc(row.segmento)}">${esc(row.segmento)}</span>
-          <span title="${esc(row.destino)}">${esc(row.destino)}</span>
-          <span>${row.kind === 'compra' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—'}</span>
-          <span title="${esc(row.tiendaNombre)}">${esc(row.tiendaNombre)}</span>
-          <span>${row.kind === 'donacion' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—'}</span>
-          <span title="${esc(row.donanteNombre)}">${row.kind === 'donacion' ? esc(row.donanteNombre || 'Sin donante') : '—'}</span>
-          <strong>${esc(money(row.value))}</strong>
-          <span title="${esc(rowSituacion(row))}">${esc(rowSituacion(row))}</span>
-          <span title="${esc(row.responsableNombre)}">${esc(row.responsableNombre || '—')}</span>
-        </article>`).join('') || '<div class="ce-v19-empty-small">Sin productos.</div>'}
+        ${sorted.map(row => {
+          const rowColor = productTextColor(row);
+          const tiendaTexto = row.kind === 'donacion' ? '—' : (row.tiendaNombre || 'Sin tienda');
+          const donanteTexto = row.kind === 'donacion' ? (row.donanteNombre || 'Sin donante') : '—';
+          const compraTexto = row.kind === 'compra' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—';
+          const donadoTexto = row.kind === 'donacion' ? `${esc(qty(row.unidades))} uds · ${esc(money(row.value))}` : '—';
+          const cellStyle = `color:${esc(rowColor)}!important`;
+          return `<article class="ce-v19-product-line compact ${productLineClass(row)}" style="--line-color:${esc(row.color || rowColor)};--row-text-color:${esc(rowColor)};color:${esc(rowColor)}!important">
+          <span class="product" style="${cellStyle}" title="${esc(row.productoNombre)}">${esc(row.productoNombre)}</span>
+          <span style="${cellStyle}" title="${esc(row.segmento)}">${esc(row.segmento)}</span>
+          <span style="${cellStyle}" title="${esc(row.destino)}">${esc(row.destino)}</span>
+          <span style="${cellStyle}">${compraTexto}</span>
+          <span style="${cellStyle}" title="${esc(tiendaTexto)}">${esc(tiendaTexto)}</span>
+          <span style="${cellStyle}">${donadoTexto}</span>
+          <span style="${cellStyle}" title="${esc(donanteTexto)}">${esc(donanteTexto)}</span>
+          <strong style="${cellStyle}">${esc(money(row.value))}</strong>
+          <span style="${cellStyle}" title="${esc(rowSituacion(row))}">${esc(rowSituacion(row))}</span>
+          <span style="${cellStyle}" title="${esc(row.responsableNombre)}">${esc(row.responsableNombre || '—')}</span>
+        </article>`;
+        }).join('') || '<div class="ce-v19-empty-small">Sin productos.</div>'}
       </div>`;
   }
   function renderIncomeDetail(key){
@@ -455,7 +467,29 @@
           const src = receiptSrc(row.id);
           const thumb = src ? `<button type="button" class="ce-v19-receipt-thumb small" data-v19-receipt-id="${esc(row.id)}" data-v19-receipt-src="${esc(src)}" aria-label="Ver justificante de ${esc(name)}"><img src="${esc(src)}" alt="Justificante"></button>` : '<span class="ce-v19-no-receipt small">📷</span>';
           const paid = incomePayment(row) === 'Pendiente' ? 'pending' : 'paid';
-          return `<article class="ce-v19-income-row compact ${paid}" style="--income-row-color:${esc(incomeTextColor(row))};color:${esc(incomeTextColor(row))}">${thumb}<span title="${esc(name)}">${esc(name)}</span><span>${esc(row.rango || '—')}</span><span>${esc(money(row.obligatorio))}</span><span>${esc(money(row.voluntario))}</span><strong>${esc(money(row.total))}</strong></article>`;
+          const rowColor = item.color || incomeColor(incomeKey(row), row) || incomeTextColor(row);
+          const cellStyle = `color:${esc(rowColor)}!important`;
+          return `<article class="ce-v19-income-row compact ${paid}" style="--income-row-color:${esc(rowColor)};color:${esc(rowColor)}!important">${thumb}<span style="${cellStyle}" title="${esc(name)}">${esc(name)}</span><span style="${cellStyle}">${esc(row.rango || '—')}</span><span style="${cellStyle}">${esc(money(row.obligatorio))}</span><span style="${cellStyle}">${esc(money(row.voluntario))}</span><strong style="${cellStyle}">${esc(money(row.total))}</strong></article>`;
+        }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}
+      </div>`;
+  }
+
+  function renderAllIncomeDetail(){
+    const model = buildModel();
+    const detail = $(DETAIL_ID); if(!detail) return;
+    currentView = {type:'incomeAll', kind:'incomeAll', key:''};
+    const rows = sortIncomeRows(model.ingresos || []);
+    detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>Ingresos · Ver todo</h3><p>${rows.length} persona(s) · ${esc(money(model.totalIncome))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
+      <div class="ce-v19-income-list compact">
+        <div class="ce-v19-income-head">${sortButton('income','just','Just.')}${sortButton('income','nombre','Nombre')}${sortButton('income','rango','Rango')}${sortButton('income','obligatorio','Imp. obligado')}${sortButton('income','voluntario','Imp. voluntario')}${sortButton('income','total','Total')}</div>
+        ${rows.map(row => {
+          const name = norm(row.persona?.nombre || persona(row.personaId).nombre || 'Sin nombre');
+          const src = receiptSrc(row.id);
+          const thumb = src ? `<button type="button" class="ce-v19-receipt-thumb small" data-v19-receipt-id="${esc(row.id)}" data-v19-receipt-src="${esc(src)}" aria-label="Ver justificante de ${esc(name)}"><img src="${esc(src)}" alt="Justificante"></button>` : '<span class="ce-v19-no-receipt small">📷</span>';
+          const paid = incomePayment(row) === 'Pendiente' ? 'pending' : 'paid';
+          const rowColor = incomeColor(incomeKey(row), row) || incomeTextColor(row);
+          const cellStyle = `color:${esc(rowColor)}!important`;
+          return `<article class="ce-v19-income-row compact ${paid}" style="--income-row-color:${esc(rowColor)};color:${esc(rowColor)}!important">${thumb}<span style="${cellStyle}" title="${esc(name)}">${esc(name)}</span><span style="${cellStyle}">${esc(row.rango || '—')}</span><span style="${cellStyle}">${esc(money(row.obligatorio))}</span><span style="${cellStyle}">${esc(money(row.voluntario))}</span><strong style="${cellStyle}">${esc(money(row.total))}</strong></article>`;
         }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}
       </div>`;
   }
@@ -519,12 +553,37 @@
       });
     }catch(_){ }
   }
+
+  function closestMatch(el, selector){
+    try{
+      let node = el;
+      while(node && node !== document){
+        try{ if(node.matches && node.matches(selector)) return node; }catch(_){ }
+        node = node.parentElement || node.parentNode || (node.host || null);
+      }
+    }catch(_){ }
+    return null;
+  }
+  function touchPoint(ev){
+    const t = ev?.changedTouches?.[0] || ev?.touches?.[0] || ev;
+    return {x:Number(t?.clientX || 0), y:Number(t?.clientY || 0)};
+  }
+  let __v19Touch = null;
   function handleModalAction(ev, hardStop){
     const target = ev && ev.target;
     const root = modalRootFromTarget(target);
     if(!root) return false;
     markModalSafe(); unlockModalControls(root);
     const type = ev.type;
+    if(type === 'touchstart'){
+      const pt = touchPoint(ev);
+      __v19Touch = {x:pt.x,y:pt.y,moved:false,time:Date.now(),onFilter:!!(closestMatch(target,'.ce-v19-filter-option') || closestMatch(target,'input[data-v19-filter-kind]'))};
+      return stopModalEvent(ev, false);
+    }
+    if(type === 'touchmove'){
+      if(__v19Touch){ const pt = touchPoint(ev); if(Math.abs(pt.x-__v19Touch.x)>10 || Math.abs(pt.y-__v19Touch.y)>10) __v19Touch.moved = true; }
+      return false;
+    }
     if(type === 'keydown'){
       if(ev.key === 'Escape'){
         if(root.id === 'ceV19ImageViewer') root.remove();
@@ -539,29 +598,31 @@
     }
     if(type === 'pointerdown' || type === 'mousedown' || type === 'touchstart') return stopModalEvent(ev, false);
     if(root.id === 'ceV19ImageViewer'){
-      if(target === root || target?.closest?.('[data-v19-image-close]')){ root.remove(); return stopModalEvent(ev, true); }
+      if(target === root || closestMatch(target,'[data-v19-image-close]')){ root.remove(); return stopModalEvent(ev, true); }
       return hardStop ? stopModalEvent(ev, false) : false;
     }
-    if(target?.classList?.contains('ce-v19-global-backdrop') || target?.closest?.('.ce-v19-close,[data-v19-close]')){
+    if(target?.classList?.contains('ce-v19-global-backdrop') || closestMatch(target,'.ce-v19-close,[data-v19-close]')){
       if(root.__ceV19Close) root.__ceV19Close();
       return stopModalEvent(ev, true);
     }
-    const sort = target?.closest?.('[data-v19-sort-mode][data-v19-sort-field]');
+    const sort = closestMatch(target,'[data-v19-sort-mode][data-v19-sort-field]');
     if(sort){ toggleSort(sort.getAttribute('data-v19-sort-mode'), sort.getAttribute('data-v19-sort-field')); rerenderCurrentDetail(); return stopModalEvent(ev, true); }
-    const income = target?.closest?.('[data-v19-income-key]');
+    const income = closestMatch(target,'[data-v19-income-key]');
     if(income){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return stopModalEvent(ev, true); }
-    if(target?.closest?.('[data-v19-clear-filter]') || target?.closest?.('[data-v19-clear-detail]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return stopModalEvent(ev, true); }
-    const filterInput = target?.matches?.('input[data-v19-filter-kind]') ? target : target?.closest?.('.ce-v19-filter-option')?.querySelector?.('input[data-v19-filter-kind]');
-    if(filterInput && (type === 'click' || type === 'touchend' || type === 'change')){
+    if(closestMatch(target,'[data-v19-income-all]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderAllIncomeDetail(); return stopModalEvent(ev, true); }
+    if(closestMatch(target,'[data-v19-clear-filter]') || closestMatch(target,'[data-v19-clear-detail]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return stopModalEvent(ev, true); }
+    const filterInput = target?.matches?.('input[data-v19-filter-kind]') ? target : closestMatch(target,'.ce-v19-filter-option')?.querySelector?.('input[data-v19-filter-kind]');
+    if(filterInput && (type === 'click' || type === 'change')){
+      if(__v19Touch?.onFilter && __v19Touch.moved && Date.now() - __v19Touch.time < 900){ __v19Touch = null; return stopModalEvent(ev, true); }
       filterInput.checked = true;
       renderFilteredProducts(filterInput.getAttribute('data-v19-filter-kind'), filterInput.getAttribute('data-v19-filter-key'));
       return stopModalEvent(ev, true);
     }
-    const receipt = target?.closest?.('[data-v19-receipt-id]');
+    const receipt = closestMatch(target,'[data-v19-receipt-id]');
     if(receipt){ showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante'); return stopModalEvent(ev, true); }
     return hardStop ? stopModalEvent(ev, false) : false;
   }
-  ['pointerdown','mousedown','touchstart','click','touchend','change','keydown'].forEach(evt => {
+  ['pointerdown','mousedown','touchstart','touchmove','click','touchend','change','keydown'].forEach(evt => {
     try{ window.addEventListener(evt, function(ev){ handleModalAction(ev, true); }, {capture:true, passive:false}); }catch(_){ }
   });
   let __lastSafeOpenAt = 0;
@@ -592,12 +653,14 @@
     const escClose = ev => { if(ev.key === 'Escape') close(); };
     overlay.__ceV19Close = close;
     overlay.addEventListener('click', ev => {
-      if(ev.target?.classList?.contains('ce-v19-global-backdrop') || ev.target?.closest?.('.ce-v19-close,[data-v19-close]')){ ev.preventDefault(); close(); return; }
-      const income = ev.target?.closest?.('[data-v19-income-key]');
+      const target = ev.target;
+      if(target?.classList?.contains('ce-v19-global-backdrop') || closestMatch(target,'.ce-v19-close,[data-v19-close]')){ ev.preventDefault(); close(); return; }
+      const income = closestMatch(target,'[data-v19-income-key]');
       if(income){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return; }
-      if(ev.target?.closest?.('[data-v19-clear-filter]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
-      if(ev.target?.closest?.('[data-v19-clear-detail]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
-      const receipt = ev.target?.closest?.('[data-v19-receipt-id]');
+      if(closestMatch(target,'[data-v19-income-all]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderAllIncomeDetail(); return; }
+      if(closestMatch(target,'[data-v19-clear-filter]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
+      if(closestMatch(target,'[data-v19-clear-detail]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
+      const receipt = closestMatch(target,'[data-v19-receipt-id]');
       if(receipt){
         ev.preventDefault();
         showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante');
@@ -629,16 +692,17 @@
       .ce-v19-global-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:12px;}
       .ce-v19-global-card{width:min(1580px,98vw);max-height:94vh;overflow:auto;background:#f8fafc;border:1px solid rgba(226,232,240,.95);border-radius:26px;box-shadow:0 32px 100px rgba(15,23,42,.42);padding:18px;color:#0f172a;}
       .ce-v19-global-head{position:sticky;top:0;z-index:2;margin:-18px -18px 14px;padding:16px 18px;background:rgba(248,250,252,.96);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
-      .ce-v19-global-head h2{margin:0;font-size:22px;font-weight:950;letter-spacing:-.02em;}.ce-v19-global-head p{margin:4px 0 0;color:#64748b;font-size:13px;font-weight:800;}.ce-v19-event-state{font-weight:1000;}.ce-v19-event-state.curso{color:#16a34a;}.ce-v19-event-state.finalizado{color:#dc2626;}
-      .ce-v19-close,.ce-v19-detail-clear,.ce-v19-clear-filter{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:8px 13px;font-weight:950;cursor:pointer;}
+      .ce-v19-global-head h2{margin:0;font-size:22px;font-weight:950;letter-spacing:-.02em;}.ce-v19-global-head p{margin:4px 0 0;color:#64748b;font-size:13px;font-weight:800;}.ce-v19-event-state{font-weight:1000!important;}.ce-v19-event-state.curso{color:#16a34a!important;}.ce-v19-event-state.finalizado{color:#dc2626!important;}
+      .ce-v19-close,.ce-v19-detail-clear,.ce-v19-clear-filter,.ce-v19-income-all{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:8px 13px;font-weight:950;cursor:pointer;}
       .ce-v19-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px;}.ce-v19-metric{border-radius:18px;background:#fff;border:1px solid #e2e8f0;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.06);}.ce-v19-metric span{display:block;font-size:11px;font-weight:950;color:#64748b;letter-spacing:.05em;}.ce-v19-metric strong{display:block;margin-top:5px;font-size:24px;font-weight:1000;}.ce-v19-metric.income strong{color:#0369a1!important}.ce-v19-metric.buy strong{color:#dc2626!important}.ce-v19-metric.don strong{color:#b45309!important}.ce-v19-metric.total strong{color:#0f766e!important}
       .ce-v19-global-grid{display:grid;grid-template-columns:minmax(315px,385px) minmax(0,1fr);gap:10px;align-items:start;}.ce-v19-left-col{display:flex;flex-direction:column;gap:12px;min-width:0;}.ce-v19-panel,.ce-v19-detail{background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:12px;box-shadow:0 8px 26px rgba(15,23,42,.06);min-width:0;}.ce-v19-panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}.ce-v19-panel-title span{font-weight:1000;color:#0f172a;}.ce-v19-panel-title strong{font-size:18px;color:#0f766e;}
-      .ce-v19-pie-wrap{display:grid;grid-template-columns:148px minmax(0,1fr);gap:10px;align-items:center;}.ce-v19-pie{width:148px;height:148px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;min-width:0;}.ce-v19-legend-row{display:grid!important;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #dbe4f0!important;background:#fff!important;color:#0f172a!important;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;min-width:0;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#334155!important;}.ce-v19-legend-row strong{font-size:12px;color:#0f172a!important;white-space:nowrap;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:11px;color:#64748b;font-weight:800;line-height:1.25;}
-      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-filter-block{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;margin-bottom:9px;}.ce-v19-filter-block h3{font-size:12px;margin:0 0 8px;font-weight:1000;color:#0f172a;letter-spacing:.04em;}.ce-v19-filter-option{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:7px 8px;margin:0 0 6px;cursor:pointer;color:#0f172a;}.ce-v19-filter-option:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-filter-option input{margin:0;width:14px;height:14px;}.ce-v19-filter-option span{font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-filter-option strong{font-size:11px;font-weight:950;color:#0f766e;white-space:nowrap;}.ce-v19-clear-filter{width:100%;background:#f8fafc;}
+      .ce-v19-pie-wrap{display:grid;grid-template-columns:148px minmax(0,1fr);gap:10px;align-items:center;}.ce-v19-pie{width:148px;height:148px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie,.ce-v19-pie *{outline:none!important;-webkit-tap-highlight-color:transparent!important;}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;min-width:0;}.ce-v19-legend-row{display:grid!important;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #dbe4f0!important;background:#fff!important;color:#0f172a!important;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;min-width:0;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit!important;}.ce-v19-legend-row strong{font-size:12px;color:inherit!important;white-space:nowrap;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:11px;color:#64748b;font-weight:800;line-height:1.25;}
+      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-filter-block{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:8px;margin-bottom:8px;}.ce-v19-filter-block h3{font-size:10.5px;margin:0 0 6px;font-weight:1000;color:#0f172a;letter-spacing:.04em;}.ce-v19-filter-option{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:5px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:5px 6px;margin:0 0 5px;cursor:pointer;color:#0f172a;-webkit-tap-highlight-color:transparent;touch-action:pan-y;}.ce-v19-filter-option:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-filter-option input{margin:0;width:11px;height:11px;}.ce-v19-filter-option span{font-size:10.5px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-filter-option strong{font-size:10px;font-weight:950;color:#0f766e;white-space:nowrap;}.ce-v19-clear-filter,.ce-v19-income-all{width:100%;background:#f8fafc;font-size:11px;padding:6px 10px;margin:0 0 8px;}
       .ce-v19-right-detail{margin:0;min-height:560px;overflow:hidden;min-width:0;}.ce-v19-detail-empty,.ce-v19-empty-small{color:#64748b;font-weight:900;padding:12px;text-align:center;background:#f8fafc;border-radius:14px;}.ce-v19-empty-small.compact{font-size:11px;padding:8px;}.ce-v19-detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}.ce-v19-detail-head h3{margin:0;font-size:18px;font-weight:1000;}.ce-v19-detail-head p{margin:4px 0 0;color:#64748b;font-size:12px;font-weight:850;}
       .ce-v19-sort-head{border:0!important;background:transparent!important;color:#64748b!important;font:inherit!important;font-weight:1000!important;text-align:left!important;padding:0!important;margin:0!important;min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;cursor:pointer!important;box-shadow:none!important;line-height:1.1!important;}.ce-v19-sort-head:hover,.ce-v19-sort-head.active{color:#0f172a!important;text-decoration:underline!important;}
-      .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:10px;font-weight:1000;color:#64748b;padding:0 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact.paid{color:#15803d!important;}.ce-v19-income-row.compact.pending{color:#dc2626!important;}.ce-v19-income-row.compact.paid span,.ce-v19-income-row.compact.paid strong{color:#15803d!important;}.ce-v19-income-row.compact.pending span,.ce-v19-income-row.compact.pending strong{color:#dc2626!important;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
-      .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:2px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(190px,1.55fr) minmax(72px,.52fr) minmax(72px,.52fr) minmax(94px,.68fr) minmax(100px,.72fr) minmax(94px,.68fr) minmax(112px,.78fr) minmax(72px,.52fr) minmax(94px,.66fr) minmax(68px,.48fr);gap:3px;align-items:center;min-width:1070px;}.ce-v19-products-head.compact{font-size:8.5px;font-weight:1000;color:#64748b;padding:0 5px;text-transform:uppercase;letter-spacing:.01em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:8px;padding:3px 4px;background:#fff;font-size:9.4px;font-weight:950;line-height:1.03;color:var(--row-text-color,var(--line-color,#0f172a))!important;}.ce-v19-product-line.compact.ok{color:#15803d!important;--row-text-color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626!important;--row-text-color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309)!important;--row-text-color:var(--line-color,#b45309);}.ce-v19-product-line.compact.ok span,.ce-v19-product-line.compact.ok strong{color:#15803d!important;}.ce-v19-product-line.compact.pending span,.ce-v19-product-line.compact.pending strong{color:#dc2626!important;}.ce-v19-product-line.compact.donacion span,.ce-v19-product-line.compact.donacion strong{color:var(--line-color,#b45309)!important;}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:inherit!important;}.ce-v19-product-line.compact .product{font-weight:1000;}
+      .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:11px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span,.ce-v19-income-row.compact strong{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
+      .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:2px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(190px,1.55fr) minmax(72px,.52fr) minmax(72px,.52fr) minmax(94px,.68fr) minmax(100px,.72fr) minmax(94px,.68fr) minmax(112px,.78fr) minmax(72px,.52fr) minmax(94px,.66fr) minmax(68px,.48fr);gap:3px;align-items:center;min-width:1070px;}.ce-v19-products-head.compact{font-size:9.8px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px;text-transform:uppercase;letter-spacing:.01em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:8px;padding:3px 4px;background:#fff;font-size:9.4px;font-weight:950;line-height:1.03;color:var(--row-text-color,var(--line-color,#0f172a))!important;}.ce-v19-product-line.compact.ok{color:#15803d!important;--row-text-color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626!important;--row-text-color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309)!important;--row-text-color:var(--line-color,#b45309);}.ce-v19-product-line.compact.ok span,.ce-v19-product-line.compact.ok strong{color:#15803d!important;}.ce-v19-product-line.compact.pending span,.ce-v19-product-line.compact.pending strong{color:#dc2626!important;}.ce-v19-product-line.compact.donacion span,.ce-v19-product-line.compact.donacion strong{color:var(--line-color,#b45309)!important;}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:inherit!important;}.ce-v19-product-line.compact .product{font-weight:1000;}
+      #${OVERLAY_ID} .ce-v19-product-line.compact span,#${OVERLAY_ID} .ce-v19-product-line.compact strong,#${OVERLAY_ID} .ce-v19-income-row.compact span,#${OVERLAY_ID} .ce-v19-income-row.compact strong{color:inherit!important;}
       .ce-v19-image-viewer{position:fixed;inset:0;z-index:1000005;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;}.ce-v19-image-card{background:#fff;border-radius:18px;padding:12px;max-width:min(980px,96vw);max-height:94vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 26px 86px rgba(0,0,0,.42);}.ce-v19-image-card>div{display:flex;align-items:center;justify-content:space-between;gap:10px;}.ce-v19-image-card button{border:1px solid #cbd5e1;border-radius:999px;background:#fff;padding:7px 12px;font-weight:950;}.ce-v19-image-card img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px;background:#f8fafc;}
       @media(max-width:1120px){.ce-v19-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ce-v19-global-grid{grid-template-columns:1fr}.ce-v19-right-detail{min-height:360px}.ce-v19-pie-wrap{grid-template-columns:150px 1fr}.ce-v19-pie{width:150px;height:150px;}}
       @media(max-width:720px){.ce-v19-global-backdrop{padding:8px;align-items:flex-start}.ce-v19-global-card{width:100vw;max-height:96vh;border-radius:18px;padding:12px}.ce-v19-global-head{margin:-12px -12px 10px;padding:12px}.ce-v19-global-head h2{font-size:18px}.ce-v19-metrics{grid-template-columns:1fr 1fr}.ce-v19-metric{padding:10px}.ce-v19-metric strong{font-size:18px}.ce-v19-pie-wrap{grid-template-columns:1fr}.ce-v19-pie{margin:auto}.ce-v19-income-head{display:none}.ce-v19-income-row.compact{grid-template-columns:38px 1fr 1fr}.ce-v19-income-row.compact span:nth-child(n+5),.ce-v19-income-row.compact strong{grid-column:auto}.ce-v19-products-head.compact{display:none}.ce-v19-product-line.compact{grid-template-columns:1fr;min-width:0;font-size:11px;}.ce-v19-resource-legend{justify-content:flex-start;}}
