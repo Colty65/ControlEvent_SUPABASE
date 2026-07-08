@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.6_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v18.11.7_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -712,7 +712,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v18.11.6_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v18.11.7_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -765,7 +765,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v18.11.6_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v18.11.7_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -1105,7 +1105,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
 
-  // v18.11.6: catálogo ultraligero para el PASO 1 de Gemini.
+  // v18.11.7: catálogo ultraligero para el PASO 1 de Gemini.
   // Gemini solo debe decidir módulos/filtros; los datos reales los extrae CE después.
   // Por eso NO se le envían tablas, compras, donaciones ni catálogos completos.
   const promptRaw = text(userPrompt || '');
@@ -1136,7 +1136,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v18.11.6_prod',
+    version: 'ControlEvent Zuzu Planner v18.11.7_prod',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     resumenModulos: {
@@ -1592,7 +1592,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v18.11.6_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v18.11.7_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Zuzu/Gemini decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),

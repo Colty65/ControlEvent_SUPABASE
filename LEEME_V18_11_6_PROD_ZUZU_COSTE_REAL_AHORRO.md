@@ -1,4 +1,4 @@
-# ControlEvent v18.11.6_prod · Zuzu coste real y ahorro
+# ControlEvent v18.11.7_prod · Zuzu coste real y ahorro
 
 ## Cambios
 

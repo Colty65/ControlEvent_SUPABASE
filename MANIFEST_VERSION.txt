@@ -1,6 +1,6 @@
-Version app: v18.11.6_prod
-Build: 20260706-190000
-ZIP: CE_v18_11_6_PROD_ZUZU_COSTE_REAL_AHORRO.zip
-Front version: v18.11.6_prod
-Backend version: v18.11.6_prod
-Cambios: coste con 5-6 decimales, salida facturable incluyendo tokens ocultos/thinking, modo ahorro/auto por modelo, filtro relativo año pasado/este año/año que viene.
+Version app: v18.11.7_prod
+Build: 20260708-011500
+ZIP: CE_v18_11_7_PROD_ZUZU_INDIRECTOS_GEMINI.zip
+Front version: v18.11.7_prod
+Backend version: v18.11.7_prod
+Cambios: Gemini recibe contexto temporal y datos indirectos; meteorología se integra en la redacción principal; validación/reintento Gemini si omite clima o usa pasado para evento futuro; Flash para informes con meteo/datos de evento; sin redacción local para corregir estos casos.

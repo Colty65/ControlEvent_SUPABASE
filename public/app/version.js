@@ -1,10 +1,10 @@
-// ControlEvent version source of truth - generated 20260706-183000
+// ControlEvent version source of truth - generated 20260708-011500
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v18.11.6_prod';
-export const VERSION_TEXT = 'ControlEvent v18.11.6_prod';
-export const VERSION_FILE = 'ControlEvent_v18_11_6_prod';
-export const BUILD_ID = '20260706-183000';
-export const ZIP_NAME = 'CE_v18_11_6_PROD_ZUZU_COSTE_REAL_AHORRO.zip';
+export const VERSION_LABEL = 'v18.11.7_prod';
+export const VERSION_TEXT = 'ControlEvent v18.11.7_prod';
+export const VERSION_FILE = 'ControlEvent_v18_11_7_prod';
+export const BUILD_ID = '20260708-011500';
+export const ZIP_NAME = 'CE_v18_11_7_PROD_ZUZU_INDIRECTOS_GEMINI.zip';
 export const VERSION = VERSION_TEXT;
 
 if (typeof window !== 'undefined') {
