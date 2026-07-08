@@ -1,6 +1,0 @@
-Version app: v18.11.8_prod
-Build: 20260708-113000
-ZIP: CE_v18_11_8_PROD_ZUZU_CONTEXTO_Y_GRAFICAS.zip
-Front version: v18.11.8_prod
-Backend version: v18.11.8_prod
-Objetivo: corregir consultas mixtas de evento/personas/meteorología y mejorar gráficas meteorológicas.

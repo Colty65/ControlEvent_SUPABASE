@@ -238,42 +238,20 @@ async function callOpenAI({ dataUrl, instrucciones = '', responsables = [], tien
   }
   return { ...parseJsonStrictish(outText, 'OpenAI'), modelo: model, proveedorIa: 'openai' };
 }
-function splitModels(value) { return text(value).split(/[;,\s]+/).map(x => x.replace(/^models\//, '').trim()).filter(Boolean); }
-function pushCleanModel(out, model) {
-  const m = text(model).replace(/^models\//, '').trim();
-  if (!m) return;
-  if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
-  if (!out.includes(m)) out.push(m);
-}
 function configuredGeminiModels() {
+  // v11.1: no volver a llamar a Zuzu 1.5 desde v1beta.
+  // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
+  const configuredRaw = text(process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
+  const configured = configuredRaw.split(/[;,\s]+/).map(x => x.replace(/^models\//, '').trim()).filter(Boolean);
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
   const out = [];
-  // Alta asistida/OCR de fotos: por defecto usamos Flash primero porque la lectura visual exacta del ticket vale más que el pequeño ahorro.
-  // Si se quiere modo económico, CONTROLEVENT_TICKET_AI_TIER=lite pone Flash-Lite primero.
-  splitModels(process.env.CONTROLEVENT_TICKET_AI_MODEL || '').forEach(m => pushCleanModel(out, m));
-  splitModels(process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '').forEach(m => pushCleanModel(out, m));
-  const tier = text(process.env.CONTROLEVENT_TICKET_AI_TIER || '').trim().toLowerCase();
-  const fallback = tier === 'lite' || tier === 'economico' || tier === 'económico'
-    ? ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash']
-    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
-  fallback.forEach(m => pushCleanModel(out, m));
+  [...configured, ...fallback].forEach(model => {
+    const m = text(model).replace(/^models\//, '').trim();
+    if (!m) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m)) return;
+    if (!out.includes(m)) out.push(m);
+  });
   return out;
-}
-function estimateGeminiCost(model, usage = {}) {
-  const m = text(model).toLowerCase();
-  const promptTokens = Number(usage.promptTokenCount || usage.promptTokens || 0) || 0;
-  const candidateTokens = Number(usage.candidatesTokenCount || usage.candidateTokens || 0) || 0;
-  const totalTokens = Number(usage.totalTokenCount || usage.totalTokens || 0) || 0;
-  const billableOutputTokens = Math.max(0, candidateTokens, totalTokens ? totalTokens - promptTokens : 0);
-  const hiddenOutputTokens = Math.max(0, billableOutputTokens - candidateTokens);
-  let inputUsdPerM = 0.30, outputUsdPerM = 2.50, family = 'gemini-2.5-flash';
-  if (/flash-lite/i.test(m)) { inputUsdPerM = 0.10; outputUsdPerM = 0.40; family = 'gemini-2.5-flash-lite'; }
-  const usd = (promptTokens * inputUsdPerM + billableOutputTokens * outputUsdPerM) / 1000000;
-  const eurRate = Number(process.env.CONTROLEVENT_USD_EUR || '0.92') || 0.92;
-  return { family, promptTokens, candidateTokens, visibleOutputTokens:candidateTokens, hiddenOutputTokens, outputTokens: billableOutputTokens, billableOutputTokens, totalTokens: totalTokens || promptTokens + billableOutputTokens, costUsd: Number(usd.toFixed(8)), costEurApprox: Number((usd * eurRate).toFixed(8)) };
-}
-function usageSmall(payload, model) {
-  const u = payload?.usageMetadata || {};
-  return { ...estimateGeminiCost(model, u), candidateTokens: u.candidatesTokenCount ?? '' };
 }
 function ticketSchemaRest() {
   return {
@@ -357,9 +335,7 @@ async function callGeminiModel({ model, parts, apiKey, instrucciones = '', respo
     err.status = 502;
     throw decorateGeminiError(err, model, payload);
   }
-  const usage = usageSmall(payload, model);
-  try { console.log(`[ControlEvent v18.11.8_prod Alta IA] OCR ticket · ${model} · prompt=${usage.promptTokens} outputFacturable=${usage.outputTokens} total=${usage.totalTokens} · coste≈$${Number(usage.costUsd||0).toFixed(6)}/€${Number(usage.costEurApprox||0).toFixed(6)}`); } catch (_) {}
-  return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest', usoGemini: usage, decisionModelo: /flash-lite/i.test(model) ? 'OCR en modo económico Flash-Lite' : 'OCR con Flash para mejor lectura visual del ticket' };
+  return { ...parseJsonStrictish(outText, 'Gemini'), modelo: model, proveedorIa: 'gemini-rest' };
 }
 async function callGemini({ dataUrl, instrucciones = '', responsables = [], tiendas = [] }) {
   const apiKey = geminiKey();
@@ -384,7 +360,7 @@ async function callGemini({ dataUrl, instrucciones = '', responsables = [], tien
     } catch (error) {
       lastError = decorateGeminiError(error, model, error?.details);
       if (!isRetryableGeminiError(error)) throw lastError;
-      try { console.warn(`[ControlEvent v18.11.8_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
+      try { console.warn(`[ControlEvent v18_prod Alta IA] Gemini REST falló con ${model}; se probará otro modelo si queda disponible.`, error?.message || error); } catch (_) {}
     }
   }
   if (lastError) {
@@ -416,7 +392,7 @@ export async function analyzeReceiptImage({ dataUrl, instrucciones, indicaciones
       return await callOpenAI({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
     } catch (error) {
       if (geminiKey()) {
-        try { console.warn('[ControlEvent v18.11.8_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
+        try { console.warn('[ControlEvent v18_prod Alta IA] OpenAI falló; se reintenta con Gemini REST.', error?.message || error); } catch (_) {}
         return await callGemini({ dataUrl: src, instrucciones: extraInstructions, responsables, tiendas });
       }
       throw error;

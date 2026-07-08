@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.8_prod - Zuzu / Analítica libre sobre datos del evento.
+/* ControlEvent v18.9_prod - Zuzu / Analítica libre sobre datos del evento.
    Solo lectura: no modifica BBDD ni estado. */
 import { getState } from './state.service.js';
 import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
@@ -61,53 +61,35 @@ function geminiKey() {
   const maybeOpenAiVar = process.env.OPENAI_API_KEY || '';
   return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
 }
-function splitModels(value) { return trim(value).split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean); }
-function pushCleanModel(out, model) {
-  const m = trim(model).replace(/^models\//, '');
-  if (!m) return;
-  if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
-  if (!out.includes(m)) out.push(m);
-}
-function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
-  const t = trim(task).toLowerCase();
-  const explicitByTask = {
-    'zuzu-planner': process.env.CONTROLEVENT_ZUZU_PLANNER_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL,
-    'zuzu-structured': process.env.CONTROLEVENT_ZUZU_STRUCTURED_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL,
-    'zuzu-narrative': process.env.CONTROLEVENT_ZUZU_NARRATIVE_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL,
-    'initial-planning-full': process.env.CONTROLEVENT_INITIAL_PLAN_AI_MODEL || process.env.CONTROLEVENT_PLANIFICACION_AI_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL,
-    'initial-planning-partial': process.env.CONTROLEVENT_INITIAL_PLAN_AI_MODEL || process.env.CONTROLEVENT_PLANIFICACION_AI_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL
-  };
-  const globalConfigured = process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '';
+function configuredGeminiModels() {
+  // v11.1: no volver a llamar a Zuzu 1.5 desde v1beta.
+  // Algunas claves/regiones ya no aceptan gemini-1.5-flash para generateContent y provocan errores intermitentes.
+  const configuredRaw = trim(process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.CONTROLEVENT_TICKET_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
+  const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
   const out = [];
-  splitModels(explicitByTask[t] || '').forEach(m => pushCleanModel(out, m));
-  // Decisión por funcionalidad:
-  // - Planificador Zuzu: Flash-Lite primero (JSON corto y barato).
-  // - Redacción/informes: Flash primero (calidad humana).
-  // - Planificación inicial TOTAL: Flash primero (razonamiento + propuesta de compra compleja).
-  // - Planificación inicial PARCIAL: Flash-Lite primero, con Flash de respaldo.
-  // Si solo hay GEMINI_MODEL global, se respeta antes de los fallback.
-  splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
-  let fallback;
-  if (t === 'zuzu-planner' || t === 'initial-planning-partial') {
-    fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
-  } else if (t === 'zuzu-narrative') {
-    const tier = trim(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIER || process.env.CONTROLEVENT_ZUZU_COST_MODE || 'auto').toLowerCase();
-    const prompt = trim(opts?.prompt || opts?.userPrompt || '');
-    const premium = /(exhaustiv|opini[oó]n|cachond|chascarr|coloquial|simp[aá]tic|direcci[oó]n|financier|t[eé]cnic|auditor|alegato|dos\s+p[aá]gin|una\s+p[aá]gina|informe\s+completo|datos\s+del\s+evento|info(?:rmaci[oó]n)?\s+del\s+evento|temperatura|tiempo|meteorolog|clima|lluvia|viento|previsi[oó]n)/i.test(prompt);
-    if (/^(lite|ahorro|econ[oó]mico|barato|low)$/i.test(tier)) fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
-    else if (/^(flash|calidad|premium|alta)$/i.test(tier)) fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-    else fallback = premium ? ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
-  } else {
-    fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
-  }
-  fallback.forEach(m => pushCleanModel(out, m));
+  [...configured, ...fallback].forEach(model => {
+    const m = trim(model).replace(/^models\//, '');
+    if (!m) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
+    if (!out.includes(m)) out.push(m);
+  });
   return out;
 }
-function configuredGeminiModels() { return configuredGeminiModelsForTask('zuzu-structured'); }
-function configuredGeminiPlanningModels(formOrMode = '') {
-  const mode = typeof formOrMode === 'string' ? formOrMode : trim(formOrMode?.mode || '');
-  const task = trim(mode).toUpperCase() === 'ZUZU_TOTAL' ? 'initial-planning-full' : 'initial-planning-partial';
-  return configuredGeminiModelsForTask(task);
+
+function configuredGeminiPlanningModels() {
+  // FIX44: planificación pide array de necesidades teóricas a Zuzu; ControlEvent calcula déficit y saldo.
+  const configuredRaw = trim(process.env.CONTROLEVENT_PLAN_AI_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL || process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '');
+  const configured = configuredRaw.split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean);
+  const fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  const out = [];
+  [...configured, ...fallback].forEach(model => {
+    const m = trim(model).replace(/^models\//, '');
+    if (!m) return;
+    if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
+    if (!out.includes(m)) out.push(m);
+  });
+  return out;
 }
 
 function compactState(state, selectedEventId = '') {
@@ -387,9 +369,6 @@ Reglas obligatorias:
 - Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
-- Si el usuario pregunta por el tiempo/clima/meteorología de un evento, usa infoIndirecta.meteorologia si existe. Devuelve una lectura útil para la organización del evento y al menos una tabla/gráfica meteorológica si hay datos externos.
-- Usa fechaActualControlEvent junto con EVENTOS.fecha ini/fecha fin para elegir tiempo verbal: futuro si el evento no ha llegado, pasado si ya terminó, presente si es hoy/en curso. No hables en pasado para eventos futuros.
-- Si infoIndirecta.meteorologia existe, integra esos datos en la respuesta principal; no digas que no dispones de temperatura o clima.
 - Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
 - Si ControlEvent te entrega COMPRAS/DONACIONES/PRODUCTOS, úsalo como datos operativos; EVENTOS solo sirve para identificar título/fechas, no para construir una gráfica de consumo.
 - Tipos de gráfica disponibles: bar, horizontalBar, pie, donut, line y stackedBar. Para comparativas entre eventos usa bar/stackedBar. Para repartos por tipo usa pie/donut. Para rankings largos usa horizontalBar.
@@ -404,12 +383,7 @@ Reglas obligatorias:
 - Respeta el tono solicitado por el usuario. Si pide informe coloquial, informal, simpático, con chascarrillos o para socios, escribe una lectura cercana y humana antes de las tablas, con humor ligero y sin perder rigor. Si pide informe técnico, financiero, auditoría, Dirección o justificación formal, escribe en tono ejecutivo, preciso y sobrio, con conclusiones, salvedades y criterios de cálculo.
 - No entregues solo datos crudos cuando el usuario pida un informe: primero redacta un texto de interpretación que explique las líneas generales y responda con el estilo pedido; después deja tablas, gráficas y ficheros como soporte.
 
-- En v18.11 TODA respuesta final debe parecer escrita por Zuzu/Gemini: interpreta el prompt completo del usuario, su intención, tono y destinatario. ControlEvent solo te ha preparado los datos; no copies su carcasa.
-- No devuelvas una plantilla mecánica repetida. Cambia estructura, vocabulario y enfoque según cada petición y cada persona/evento consultado.
-- Si el usuario pide opinión, informe, valoración, tono cachondo, formal, técnico o coloquial, la parte answer debe ser una redacción humana completa y no una introducción de dos líneas seguida de tablas.
-
-Campos oficiales por módulo y datos indirectos:
-- METEOROLOGIA indirecta: Evento; Localidad; Fecha; Cielo; Temp. máx; Temp. mín; Prob. lluvia %; Viento km/h; Fuente. Úsala solo si infoIndirecta.meteorologia está presente.
+Campos oficiales por módulo:
 - INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
 - DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
 - COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
@@ -532,7 +506,7 @@ function directModuleResultIfApplicable(prompt, context) {
   const rows = arr(mods[moduleName]);
   const columns = orderedColumnsForModule(moduleName, rows);
   const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
-  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_11_8_prod.csv`);
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v18_9_prod.csv`);
   const tableLimit = 1000;
   const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
     const v = row?.[c];
@@ -710,8 +684,8 @@ function directAggregateResultIfApplicable(prompt, context) {
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
     ],
     files: [
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
-      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
     ],
     provider: 'control-event-local-deterministico',
     model: 'sin-gemini-para-calculos'
@@ -814,7 +788,7 @@ function directComparativeAllDataResultIfApplicable(prompt, context) {
     tables: [
       { title: 'Comparativa general por evento', columns, rows: tableRows }
     ],
-    files: [{ filename: fileSafe(`Comparativa_eventos_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-comparativa-estricta',
     model: 'sin-gemini-para-alcance-ni-calculos'
   };
@@ -899,7 +873,7 @@ function directEventPriceExtremesIfApplicable(prompt, context) {
     ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
   ];
   const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
-  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_11_8_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v18_9_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
 }
 function directPersonAppearanceIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -919,7 +893,7 @@ function directPersonAppearanceIfApplicable(prompt, context) {
   donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
   const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
   const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
-  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
 }
 
 function personNeedlesFromPrompt(prompt, context) {
@@ -1018,7 +992,7 @@ function directPersonRoleReportIfApplicable(prompt, context) {
       { title: 'Resumen por papel desempeñado', columns: colsRoles, rows: roleRows.map(r=>colsRoles.map(c=>text(r[c]))) },
       { title: 'Detalle de registros localizados', columns: colsDetail, rows: detail.slice(0, 500).map(r=>colsDetail.map(c=>text(r[c]))) }
     ],
-    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
+    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
     provider: 'control-event-local-informe-persona',
     model: 'sin-gemini-para-informes-de-persona'
   };
@@ -1074,7 +1048,7 @@ function directCashEvolutionIfApplicable(prompt, context) {
       ] }
     ],
     tables: [{ title: 'Evolución temporal del saldo de caja', columns: cols, rows: rows.map(r=>cols.map(c=>text(r[c]))) }],
-    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
+    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
     provider: 'control-event-local-saldo-caja',
     model: 'sin-gemini-para-saldo-caja'
   };
@@ -1102,7 +1076,7 @@ function directBoughtDonatedUsageIfApplicable(prompt, context) {
   const eventos = eventNamesFromContext(context).join(', ');
   const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
   const shown = rows.slice(0, limit);
-  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
 }
 function directProductCatalogIfApplicable(prompt, context) {
   const p = norm(prompt);
@@ -1124,7 +1098,7 @@ function directProductCatalogIfApplicable(prompt, context) {
     tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
   }
   tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
-  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_11_8_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v18_9_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
 }
 function rangosSolicitadosFromPrompt(prompt) {
   const p = norm(prompt);
@@ -1134,53 +1108,8 @@ function rangosSolicitadosFromPrompt(prompt) {
   if (/\bdonantes?\b/.test(p)) out.push('DONANTE');
   return out;
 }
-
-function asksMissingAttendees(prompt) {
-  const p = norm(prompt);
-  return /\b(no\s+asistir|no\s+asistiran|no\s+asistir[aá]n|no\s+asisten|no\s+asistentes|no\s+esten\s+registrad|no\s+est[eé]n\s+registrad|no\s+figuran|no\s+aparecen|faltan\s+socios|socios?\s+que\s+faltan)\b/.test(p)
-    || (/\bsocios?\b/.test(p) && /\b(no\s+est[eé]n|no\s+esten|exceptuando|excluyendo)\b/.test(p) && /\b(evento|ingresos|asist)\b/.test(p));
-}
-function excludedFromAttendanceName(name) {
-  const n = norm(name);
-  return !n || /^personas\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
-}
-function nameAppearsInRegisteredPerson(personName, registeredNames) {
-  const n = norm(personName);
-  if (!n) return false;
-  return arr(registeredNames).some(x => {
-    const r = norm(x);
-    return r && (r === n || r.includes(n) || n.includes(r));
-  });
-}
-function missingAttendeesTablesAndCharts(context) {
-  const mods = context?.modulosExtraidos || {};
-  const persons = arr(mods.PERSONAS).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
-  const incomes = arr(mods.INGRESOS);
-  const events = eventNamesFromContext(context);
-  if (!persons.length || !events.length) return { tables: [], charts: [], resumenTexto: '', warnings: persons.length ? [] : ['No hay PERSONAS con rango SOCIO disponibles para calcular socios no asistentes.'] };
-  const detail = [];
-  const summary = [];
-  events.forEach(ev => {
-    const regNames = rowsForEvent(incomes, ev).map(r => trim(r.Nombre));
-    const missing = persons.filter(p => !nameAppearsInRegisteredPerson(p['Nombre persona'], regNames));
-    missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Motivo: 'Está en PERSONAS como SOCIO y no figura en INGRESOS del evento' }));
-    summary.push({ Evento: ev, 'Socios en PERSONAS': persons.length, 'Socios con ingreso/asistencia registrada': persons.length - missing.length, 'Socios no registrados en este evento': missing.length });
-  });
-  const summaryCols = ['Evento','Socios en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento'];
-  const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Motivo'];
-  const tables = [
-    { title: 'Resumen de socios no registrados/asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
-    { title: `Socios de PERSONAS que NO figuran en INGRESOS del evento (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
-  ];
-  const charts = summary.length === 1 ? [{ title: 'Socios con y sin asistencia registrada', type: 'donut', labels: ['Con ingreso/asistencia registrada','No registrados en el evento'], values: [num(summary[0]['Socios con ingreso/asistencia registrada']), num(summary[0]['Socios no registrados en este evento'])], unit: 'personas' }]
-    : [{ title: 'Socios no registrados por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no registrados en este evento'])), unit: 'personas' }];
-  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios no registrados en este evento']} socio(s) de PERSONAS no figuran en INGRESOS, de ${r['Socios en PERSONAS']} socio(s) válidos`).join(' | ');
-  return { tables, charts, resumenTexto, warnings: [] };
-}
-
 function directPersonsCatalogIfApplicable(prompt, context) {
   const p = norm(prompt);
-  if (asksMissingAttendees(prompt)) return null;
   const rows0 = arr(context?.modulosExtraidos?.PERSONAS);
   if (!rows0.length && !Array.isArray(context?.modulosExtraidos?.PERSONAS)) return null;
   if (!/\b(persona|personas|socios?|donantes?)\b/.test(p)) return null;
@@ -1211,7 +1140,7 @@ function directPersonsCatalogIfApplicable(prompt, context) {
     warnings: rows.length ? [] : [`No hay personas con rango ${rangos.join(', ') || 'solicitado'} en la tabla PERSONAS.`],
     charts:grows.length?[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}]:[],
     tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],
-    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_11_8_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
+    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v18_9_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
     provider:'control-event-local-personas-catalogo',
     model:'zuzu-planifica-control-event-filtra'
   };
@@ -1227,7 +1156,7 @@ function directComparativeModuleTotalsIfApplicable(prompt, context) {
   const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
   const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const can=canonicalByEvent.get(norm(ev))||{}; let total; if(moduleName==='INGRESOS') total=round(can['Ingresos total'] ?? rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2); else if(moduleName==='COMPRAS') total=round(can['Compras realizadas'] ?? sumField(rs.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),valueField),2); else if(moduleName==='DONACIONES') total=round(can['Donaciones valor'] ?? sumField(rs,valueField),2); else total=sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
   const cols=['Evento','Registros','Total'];
-  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_11_8_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v18_9_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
 }
 
 function uniqueTextList(list) {
@@ -1321,7 +1250,7 @@ function directDonorDonationProductsIfApplicable(prompt, context) {
       ...(prodRows.length ? [{ title: 'Productos donados agrupados', columns: prodColumns, rows: prodRows.map(r=>prodColumns.map(c=>text(r[c])))}] : []),
       ...(detailRows.length ? [{ title: 'Detalle de donaciones', columns: detailColumns, rows: detailRows.slice(0,500)}] : [])
     ],
-    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
+    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
     provider: 'control-event-analitica-donaciones',
     model: 'calculo-local-oficial'
   };
@@ -1466,8 +1395,8 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
       { title: 'Detalle por evento y módulo', columns: moduleColumns, rows: moduleRows.map(r=>moduleColumns.map(c=>text(r[c]))) }
     ],
     files: [
-      { filename: fileSafe('Informe_cronologico_eventos_v18_11_8_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
-      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v18_11_8_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
+      { filename: fileSafe('Informe_cronologico_eventos_v18_9_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
+      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v18_9_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
     ],
     provider: 'control-event-local-cronica-eventos',
     model: 'zuzu-planifica-control-event-ordena-y-resume'
@@ -1526,8 +1455,7 @@ function directEventReportIfApplicable(prompt, context) {
     { title: 'Saldo por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Saldo ingresos - compras (€)'],2)), unit: '€' },
     { title: 'Volumen de registros por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>num(r['Líneas compras'])+num(r['Líneas donaciones'])+num(r.Colaboradores)), unit: 'registros' }
   ];
-  const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|parte\s+meteorolog|parte\s+metereolog|meteorolog|metereolog|previsi[oó]n|lluvia|temperatura|calor|fr[ií]o|viento)\b/.test(p);
-  const missingAttendeesAsked = asksMissingAttendees(prompt);
+  const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog|previsi[oó]n|lluvia|calor|fr[ií]o)\b/.test(p);
   const detailTables = [];
   function addModuleDetail(moduleName, title, limit = 120) {
     const data = arr(mods[moduleName]);
@@ -1540,18 +1468,15 @@ function directEventReportIfApplicable(prompt, context) {
   addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
   addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
   addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
-  const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
-  if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
-  if (missingPack.charts.length) charts.push(...missingPack.charts);
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones, tickets/fototickets, documentos y saldo${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más la meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo = ingresos - compras realizadas; las donaciones se valoran aparte y no se suman al saldo financiero.`;
+  const answer = `${weatherAsked ? 'ControlEvent no dispone de previsión meteorológica externa ni consulta AEMET desde Zuzu; por eso no invento el tiempo. ' : ''}Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones, tickets/fototickets, documentos y saldo. EVENTOS solo se usa para identificar título, fechas y estado. Saldo = ingresos - compras realizadas; las donaciones se valoran aparte y no se suman al saldo financiero.`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
     answer,
-    warnings: arr(context.advertencias).concat(arr(missingPack.warnings)),
+    warnings: arr(context.advertencias),
     charts,
     tables: [{ title: 'Resumen operativo por evento', columns, rows: rowsTable }, ...detailTables],
-    files: [{ filename: fileSafe(`Informe_eventos_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`Informe_eventos_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-local-informe-eventos',
     model: 'calculo-local-oficial'
   };
@@ -1559,14 +1484,14 @@ function directEventReportIfApplicable(prompt, context) {
 
 function directHighConfidenceResultIfApplicable(prompt, context) {
   return directCashEvolutionIfApplicable(prompt, context)
-    || directEventReportIfApplicable(prompt, context)
     || directPersonsCatalogIfApplicable(prompt, context)
     || directPersonRoleReportIfApplicable(prompt, context)
     || directPersonAppearanceIfApplicable(prompt, context)
     || directProductConsumptionResultIfApplicable(prompt, context)
     || directDonorDonationProductsIfApplicable(prompt, context)
     || directBoughtDonatedUsageIfApplicable(prompt, context)
-    || directChronologicalEventNarrativeIfApplicable(prompt, context);
+    || directChronologicalEventNarrativeIfApplicable(prompt, context)
+    || directEventReportIfApplicable(prompt, context);
 }
 function isProductConsumptionAnalysisPrompt(prompt) {
   const p = norm(prompt);
@@ -1648,9 +1573,9 @@ function directProductConsumptionResultIfApplicable(prompt, context) {
       { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
     ],
     files: [
-      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
-      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
-      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_11_8_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v18_9_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
     ],
     provider: 'control-event-analitica-productos',
     model: 'calculo-local-oficial'
@@ -1718,7 +1643,7 @@ function directDeterministicResultIfApplicable(prompt, context) {
       { title: 'Resumen de extracción', columns: ['Dato','Valor'], rows: auditRows },
       ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
     ],
-    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
     provider: 'control-event-local-consulta-directa',
     model: 'consulta-modulos-sin-gemini'
   };
@@ -1762,7 +1687,7 @@ function directGraphResultIfApplicable(prompt, context) {
     warnings: arr(context.advertencias),
     charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
-    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_11_8_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v18_9_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
     model: 'sin-gemini-para-graficas'
   };
@@ -1802,124 +1727,8 @@ function normalizeResult(raw, model) {
   };
 }
 function geminiOutText(payload) { return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || ''; }
-function estimateGeminiCost(model, usage = {}) {
-  const m = trim(model).toLowerCase();
-  const promptTokens = num(usage.promptTokenCount ?? usage.promptTokens ?? usage.prompt_tokens ?? 0);
-  const candidateTokens = num(usage.candidatesTokenCount ?? usage.candidateTokens ?? usage.outputTokens ?? usage.output_tokens ?? 0);
-  const totalTokens = num(usage.totalTokenCount ?? usage.totalTokens ?? 0);
-  // Gemini factura la salida incluyendo posibles thinking tokens. En usageMetadata a veces
-  // candidatesTokenCount solo representa texto visible, mientras totalTokenCount incluye tokens internos.
-  // Por eso el coste debe usar el mayor entre candidates y (total - prompt).
-  const billableOutputTokens = Math.max(0, candidateTokens, totalTokens ? totalTokens - promptTokens : 0);
-  const hiddenOutputTokens = Math.max(0, billableOutputTokens - candidateTokens);
-  let inputUsdPerM = 0.30, outputUsdPerM = 2.50, family = 'gemini-2.5-flash';
-  if (/flash-lite/i.test(m)) { inputUsdPerM = 0.10; outputUsdPerM = 0.40; family = 'gemini-2.5-flash-lite'; }
-  else if (/2\.0-flash|flash-latest/i.test(m)) { inputUsdPerM = 0.30; outputUsdPerM = 2.50; family = 'gemini-flash'; }
-  const usd = (promptTokens * inputUsdPerM + billableOutputTokens * outputUsdPerM) / 1000000;
-  const eurRate = num(process.env.CONTROLEVENT_USD_EUR || '0.92') || 0.92;
-  return {
-    family,
-    promptTokens,
-    candidateTokens,
-    visibleOutputTokens: candidateTokens,
-    hiddenOutputTokens,
-    outputTokens: billableOutputTokens,
-    billableOutputTokens,
-    totalTokens: totalTokens || (promptTokens + billableOutputTokens),
-    inputUsdPerM,
-    outputUsdPerM,
-    costUsd: Number(usd.toFixed(8)),
-    costEurApprox: Number((usd * eurRate).toFixed(8))
-  };
-}
-function logGeminiUsage(stage, model, payload) {
-  try {
-    const u = payload?.usageMetadata || {};
-    const c = estimateGeminiCost(model, u);
-    console.log(`[ControlEvent v18.11.8_prod Zuzu] ${stage} · ${model} · prompt=${u.promptTokenCount ?? ''} candidates=${u.candidatesTokenCount ?? ''} total=${u.totalTokenCount ?? ''} billableOut=${c.billableOutputTokens ?? c.outputTokens} · coste≈$${Number(c.costUsd||0).toFixed(6)}/€${Number(c.costEurApprox||0).toFixed(6)}`);
-  } catch (_) {}
-}
 function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|504|aborted|abort|tard[oó] demasiado|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
-function isQuotaError(err) { return /429|quota|RESOURCE_EXHAUSTED|rate limit|rate-limit|free_tier|free tier|retry in/i.test(text(err?.message || '') + ' ' + text(err?.details?.error?.status || '')); }
-const __zuzuMemo = new Map();
-function memoKey(prefix, value) {
-  const raw = prefix + ':' + text(value);
-  let h = 2166136261;
-  for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return prefix + ':' + (h >>> 0).toString(36);
-}
-function memoGet(key) { const x = __zuzuMemo.get(key); return x && (Date.now() - x.t < 10 * 60 * 1000) ? x.v : null; }
-function memoSet(key, value) {
-  __zuzuMemo.set(key, { t: Date.now(), v: value });
-  if (__zuzuMemo.size > 80) { const first = __zuzuMemo.keys().next().value; if (first) __zuzuMemo.delete(first); }
-}
 
-function zuzuTraceItem(step, status = 'INFO', detail = '', extra = {}) {
-  return {
-    time: new Date().toISOString(),
-    step: trim(step),
-    status: trim(status || 'INFO').toUpperCase(),
-    detail: trim(detail).slice(0, 900),
-    ...extra
-  };
-}
-function zuzuTracePush(trace, step, status = 'INFO', detail = '', extra = {}) {
-  if (!Array.isArray(trace)) return;
-  trace.push(zuzuTraceItem(step, status, detail, extra));
-}
-function usageSmall(payload, model = '') {
-  const u = payload?.usageMetadata || payload || {};
-  const base = {
-    promptTokens: u.promptTokenCount ?? u.promptTokens ?? '',
-    candidateTokens: u.candidatesTokenCount ?? u.candidateTokens ?? '',
-    totalTokens: u.totalTokenCount ?? u.totalTokens ?? ''
-  };
-  if (model) {
-    const cost = estimateGeminiCost(model, u);
-    base.outputTokens = cost.outputTokens;
-    base.costUsd = cost.costUsd;
-    base.costEurApprox = cost.costEurApprox;
-    base.pricingFamily = cost.family;
-  }
-  return base;
-}
-function summarizeGeminiUsageFromTrace(trace = []) {
-  const items = arr(trace).filter(x => x?.usage && (x.usage.promptTokens || x.usage.totalTokens));
-  const total = items.reduce((acc, x) => {
-    acc.promptTokens += num(x.usage.promptTokens);
-    acc.candidateTokens += num(x.usage.candidateTokens);
-    acc.outputTokens += num(x.usage.outputTokens || x.usage.billableOutputTokens);
-    acc.hiddenOutputTokens += num(x.usage.hiddenOutputTokens);
-    acc.totalTokens += num(x.usage.totalTokens);
-    acc.costUsd += num(x.usage.costUsd);
-    acc.costEurApprox += num(x.usage.costEurApprox);
-    return acc;
-  }, { promptTokens:0, candidateTokens:0, outputTokens:0, hiddenOutputTokens:0, totalTokens:0, costUsd:0, costEurApprox:0 });
-  total.costUsd = Number(total.costUsd.toFixed(6));
-  total.costEurApprox = Number(total.costEurApprox.toFixed(6));
-  return { calls: items.length, ...total, note: 'Coste estimado por ControlEvent usando output facturable = max(candidatesTokenCount, totalTokenCount - promptTokenCount). La factura real puede variar por caché, región, impuestos o cambios de tarifa.' };
-}
-
-function estimateTokensFromText(value) {
-  // Estimación local barata: Gemini usa tokenización propia; para traza y decisiones de compactado basta aproximar.
-  const chars = text(value).length;
-  return Math.max(1, Math.ceil(chars / 4));
-}
-function sizeTrace(trace, step, label, payloadText) {
-  if (!Array.isArray(trace)) return;
-  const chars = text(payloadText).length;
-  zuzuTracePush(trace, step, 'INFO', `${label}: ${chars} caracteres aprox.; ~${estimateTokensFromText(payloadText)} tokens de entrada estimados antes de Gemini.`);
-}
-function compactJson(value, maxChars = 12000) {
-  return JSON.stringify(value ?? null).replace(/\s+/g, ' ').slice(0, maxChars);
-}
-
-function cleanGeminiError(error) {
-  const status = error?.status ? `HTTP ${error.status}: ` : '';
-  const raw = text(error?.message || error);
-  const detailMsg = text(error?.details?.error?.message || error?.details?.message || '');
-  return (status + (raw || detailMsg || 'Error desconocido de Zuzu/Gemini')).slice(0, 1200);
-}
 
 async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) {
   const controller = new AbortController();
@@ -1940,25 +1749,22 @@ async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) 
   }
 }
 
-async function callGeminiEvent(prompt, context, flowTrace = []) {
+async function callGeminiEvent(prompt, context) {
   const apiKey = geminiKey();
   if (!apiKey) {
     const err = new Error('Falta GEMINI_API_KEY en Vercel para usar Zuzu / Analítica libre.');
     err.status = 503;
-    zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final', 'KO', err.message);
     throw err;
   }
   let lastError = null;
-  for (const model of configuredGeminiModelsForTask('zuzu-structured')) {
+  for (const model of configuredGeminiModels().slice(0, 2)) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: systemPrompt(prompt, context) }] }],
       generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2 }
     };
     try {
-      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 36000);
-      logGeminiUsage('PASO 2 respuesta final estructurada', model, payload);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 18000);
       if (!res.ok) {
         const e = new Error(payload?.error?.message || `Zuzu HTTP ${res.status}`);
         e.status = Number(res.status || 502);
@@ -1980,7 +1786,6 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
           fallback.model = 'formato-local-por-json-invalido';
           return fallback;
         }
-        zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', 'Gemini respondió, pero no en JSON válido. Se adjunta texto crudo como fichero.', { model });
         return {
           ok: true,
           rejected: false,
@@ -1989,19 +1794,15 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
           warnings: ['Zuzu no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
           charts: [],
           tables: [],
-          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_11_8_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v18_9_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
           provider: 'gemini-rest-json-fallback',
           model
         };
       }
-      const normalized = normalizeResult(parsed, model);
-      normalized.__zuzuGeminiFinal = { ok: true, model, usage: usageSmall(payload, model), mode: 'structured-json' };
-      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'OK', `Gemini devolvió JSON válido. Tablas=${arr(normalized.tables).length}; gráficas=${arr(normalized.charts).length}; ficheros=${arr(normalized.files).length}.`, { model, usage: usageSmall(payload, model) });
-      return normalized;
+      return normalizeResult(parsed, model);
     } catch (error) {
       lastError = error;
-      zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', cleanGeminiError(error), { model });
-      if (isQuotaError(error) || !isRetryable(error)) break;
+      if (!isRetryable(error)) break;
     }
   }
   lastError.status = lastError.status || 502;
@@ -2045,13 +1846,14 @@ function requiresGeminiNarrativeStrict(prompt) {
 }
 function shouldEnrichLocalResultWithNarrative(prompt, result) {
   if (!result || result.rejected === true || result.ok === false) return false;
+  if (!wantsNarrativeReport(prompt)) return false;
   const hasData = arr(result.tables).length || arr(result.charts).length || trim(result.answer);
   if (!hasData) return false;
   const provider = trim(result.provider || '');
-  // v18.11: toda salida cocinada localmente por CE debe pasar por Zuzu/Gemini como capa final de contexto y redacción.
-  // Si ya viene de Gemini REST estructurado o de la capa de redacción, no se fuerza una segunda llamada.
-  if (/^gemini-rest/i.test(provider) || /zuzu-redaccion|zuzu-sentimiento|zuzu-gemini-final|redaccion-local/i.test(provider)) return false;
-  return !!geminiKey();
+  if (/zuzu-redaccion|zuzu-sentimiento|redaccion-local/i.test(provider)) return false;
+  // v18.9: si el usuario pide tono, opinión, texto o informe, Zuzu debe escribir siempre la capa humana,
+  // aunque el cálculo sea local o aunque la respuesta anterior venga de Gemini en modo analítico.
+  return true;
 }
 function tableObjects(table, maxRows = 30) {
   const columns = arr(table?.columns).map(c => trim(c));
@@ -2073,110 +1875,23 @@ function pickNarrativeTables(result) {
   }).sort((a,b)=>b.score-a.score || a.idx-b.idx);
   return scored.slice(0, 4).map(x => x.tb);
 }
-function narrativeFactsFromResult(result) {
-  const roles = objectsFromResultTable(result, /resumen.*papel/, 50);
-  const eventos = objectsFromResultTable(result, /resumen.*evento.*papel|resumen.*evento/, 50);
-  const detalle = objectsFromResultTable(result, /detalle.*registros|registros.*localizados|detalle/, 240);
-  const topProducto = new Map();
-  const topImporte = new Map();
-  const tiendas = new Map();
-  const donantes = new Map();
-  detalle.forEach(r => {
-    const prod = trim(r.Producto || r.producto || r['Nombre producto']);
-    const imp = num(r['Importe/valor (€)'] || r.Importe || r.Valor || r.valor || r['Importe (€)']);
-    const uds = num(r.Unidades || r.unidades);
-    if (prod) addQtyCost(topProducto, prod, uds, imp);
-    if (prod) add(topImporte, prod, imp);
-    const det = trim(r.Detalle || r.detalle || '');
-    const t = (det.match(/tienda:\s*([^;]+)/i) || [,''])[1];
-    const d = (det.match(/donante:\s*([^;]+)/i) || [,''])[1] || (det.match(/responsable:\s*([^;]+)/i) || [,''])[1];
-    if (t) add(tiendas, t, imp || 1);
-    if (d) add(donantes, d, imp || 1);
-  });
-  const examples = detalle.slice(0, 22).map(r => ({
-    evento: trim(r.Evento), papel: trim(r.Papel), producto: trim(r.Producto), unidades: trim(r.Unidades), importe: trim(r['Importe/valor (€)'] || r.Importe || r.Valor), detalle: trim(r.Detalle), relacionado: trim(r.Relacionado)
+function compactResultForNarrative(result) {
+  const tables = pickNarrativeTables(result).map(tb => ({
+    title: trim(tb?.title),
+    columns: arr(tb?.columns).map(c => trim(c)).slice(0, 16),
+    rows: tableObjects(tb, wantsOnePageNarrative(result?.__userPrompt || '') ? 90 : 45)
   }));
-  return {
-    titulo: trim(result?.title),
-    resumenEventos: eventos.slice(0, 20),
-    resumenPapeles: roles.slice(0, 25),
-    registrosDetalleTotal: detalle.length,
-    productosDestacadosPorImporte: [...topImporte.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 16).map(([nombre, valor]) => ({ nombre, valor: round(valor,2) })),
-    productosDestacadosPorUnidades: [...topProducto.entries()].sort((a,b)=>num(b[1]?.unidades)-num(a[1]?.unidades)).slice(0, 16).map(([nombre, v]) => ({ nombre, unidades: round(v.unidades,3), valor: round(v.coste,2) })),
-    tiendasDetectadas: topN(tiendas, 12),
-    donantesOResponsablesDetectados: topN(donantes, 12),
-    ejemplosRepresentativos: examples,
-    notaAnexo: 'El detalle completo queda en tablas/anexos generados por CE; Gemini recibe resumen y ejemplos para ahorrar tokens.'
-  };
-}
-function narrativeTemporalContext(context) {
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0,10);
-  const events = arr(context?.eventosObjetivo).map(ev => {
-    const title = trim(ev?.['Titulo del evento'] || ev?.Titulo || ev?.Evento || ev?.EVENTO || '');
-    const startIso = parseCeDateToIso(ev?.['fecha ini'] || ev?.fechaIni || ev?.Fecha || ev?.fecha || '');
-    const endIso = parseCeDateToIso(ev?.['fecha fin'] || ev?.fechaFin || ev?.FechaFin || ev?.fecha_fin || '') || startIso;
-    const estado = trim(ev?.Estado || ev?.estado || '');
-    let relacionTemporal = 'sin_fecha';
-    if (startIso) {
-      if (startIso > todayIso) relacionTemporal = 'futuro';
-      else if (endIso && endIso < todayIso) relacionTemporal = 'pasado';
-      else relacionTemporal = 'en_curso_o_hoy';
-    }
-    return { titulo:title, fechaInicio:startIso, fechaFin:endIso, estado, relacionTemporal };
-  }).filter(e => e.titulo || e.fechaInicio);
-  return { hoy: todayIso, eventos: events };
-}
-function compactIndirectContextForNarrative(context) {
-  const weather = context?.infoIndirecta?.meteorologia;
-  const out = {};
-  if (weather) {
-    out.meteorologia = {
-      ok: !!weather.ok,
-      proveedor: trim(weather.proveedor || 'Open-Meteo'),
-      localidad: trim(weather.localidad || ''),
-      filas: arr(weather.filas).slice(0, 14).map(r => ({
-        Evento: trim(r.Evento),
-        Localidad: trim(r.Localidad),
-        Fecha: trim(r.Fecha),
-        Cielo: trim(r.Cielo),
-        'Temp. max': r['Temp. máx'],
-        'Temp. min': r['Temp. mín'],
-        'Prob. lluvia %': r['Prob. lluvia %'],
-        'Viento km/h': r['Viento km/h'],
-        Aviso: trim(r.Aviso || '')
-      }))
-    };
-  }
-  return out;
-}
-function compactResultForNarrative(result, narrativeContext = {}) {
-  const onePage = wantsOnePageNarrative(result?.__userPrompt || '');
-  const tables = pickNarrativeTables(result).map(tb => {
-    const t = norm(tb?.title || '');
-    const isDetail = /detalle/.test(t);
-    const isWeather = /meteorolog|tiempo|clima|lluvia|temperatura/.test(t);
-    const maxRows = isWeather ? 14 : (isDetail ? (onePage ? 28 : 18) : (onePage ? 40 : 24));
-    return {
-      title: trim(tb?.title),
-      columns: arr(tb?.columns).map(c => trim(c)).slice(0, 12),
-      rows: tableObjects(tb, maxRows)
-    };
-  });
   const charts = arr(result?.charts).slice(0, 6).map(ch => ({
     title: trim(ch?.title),
     type: trim(ch?.type),
     labels: arr(ch?.labels).map(x => trim(x)).slice(0, 12),
     values: arr(ch?.values).map(x => round(x, 3)).slice(0, 12),
-    series: arr(ch?.series).slice(0, 4).map(s => ({ name: trim(s?.name), values: arr(s?.values).map(x => round(x, 3)).slice(0, 12) })),
+    series: arr(ch?.series).slice(0, 5).map(s => ({ name: trim(s?.name), values: arr(s?.values).map(x => round(x, 3)).slice(0, 12) })),
     unit: trim(ch?.unit)
   }));
   return {
     title: trim(result?.title),
-    contextoTemporal: narrativeTemporalContext(narrativeContext),
-    datosIndirectos: compactIndirectContextForNarrative(narrativeContext),
-    resumenCocinado: narrativeFactsFromResult(result),
-    answerBase: trim(result?.answer).slice(0, 600),
+    answerBase: trim(result?.answer).slice(0, 1200),
     charts,
     tables,
     warnings: arr(result?.warnings).map(w => trim(w)).filter(Boolean).slice(0, 5)
@@ -2278,10 +1993,10 @@ function narrativePrompt(userPrompt, localResult, context) {
   const tone = narrativeToneFromPrompt(userPrompt);
   const onePage = wantsOnePageNarrative(userPrompt);
   const enriched = { ...localResult, __userPrompt: userPrompt };
-  const compact = compactResultForNarrative(enriched, context);
-  const ctx = compactJson({ tono: tone.label, instruccionesTono: tone.instruction, modoTextoLargo: onePage, resultadoControlEvent: compact }, onePage ? 20000 : 13000);
+  const compact = compactResultForNarrative(enriched);
+  const ctx = JSON.stringify({ tono: tone.label, instruccionesTono: tone.instruction, modoTextoLargo: onePage, resultadoControlEvent: compact }).slice(0, onePage ? 32000 : 22000);
   const limit = onePage ? 'entre 5 y 8 párrafos, con aspecto de una página de texto, hasta 6500 caracteres' : 'entre 3 y 5 párrafos, hasta 3200 caracteres';
-  return `Eres Zuzu/Gemini, la voz final de ControlEvent. ControlEvent ya ha hecho la parte fría: cálculos, tablas, gráficas y CSV. Tu trabajo NO es rellenar una plantilla: debes leer el prompt completo, captar intención, destinatario, tono y contexto, y escribir una respuesta humana, bonita y útil como si realmente te hubieran encargado a ti el informe.
+  return `Eres Zuzu, redactora humana de informes de ControlEvent. ControlEvent ya ha hecho la parte fría: cálculos, tablas, gráficas y CSV. Tu trabajo es la parte que falta: entender la intención emocional del usuario y escribir el texto como lo habría pedido una persona.
 
 Reglas obligatorias:
 - NO respondas como ControlEvent. No empieces con frases mecánicas tipo "He localizado X registros", "Informe operativo" o "Separado por papeles". Puedes usar los números, pero integrados en una explicación humana.
@@ -2292,14 +2007,8 @@ Reglas obligatorias:
 - Si el usuario dice "déjate de ControlEvent", debe notarse que habla Zuzu: usa primera persona con naturalidad, pero sin inventar datos.
 - Usa nombres, productos y cifras reales que aparecen en los datos resumidos. No inventes personas, importes, fechas ni incidencias.
 - Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
-- Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer: datos del evento, socios/no asistentes, meteorología, compras, ingresos, etc. No dejes una parte fuera porque aparezca en tablas.
-- Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio: PERSONAS con rango SOCIO que no figuran en INGRESOS del evento, excluyendo patrones internos Personas... y z_de....
 - ${limit}.
 - No uses markdown, no devuelvas tablas, no pegues JSON.
-- Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo" ni "se celebró" para eventos futuros.
-- Si contextoTemporal indica que el evento ya pasó, habla en pasado. Si es hoy o está en curso, usa presente: "está previsto", "hay registrado", "se está organizando".
-- Si el usuario pide temperatura/tiempo/clima/lluvia/viento y datosIndirectos.meteorologia contiene filas, debes incluir en answer los datos concretos de meteorología: temperatura máxima y mínima, probabilidad de lluvia, viento y cielo. Prohibido decir que no dispones de esa información.
-- Si se han obtenido datos indirectos relacionados con el evento, intégralos en la respuesta principal con naturalidad. No los relegues solo a tablas.
 - Si aparecen saldo/caja/donaciones, aclara con naturalidad que el saldo financiero no suma donaciones si procede.
 - Devuelve SOLO JSON válido con title, answer, warnings.
 
@@ -2309,128 +2018,42 @@ ${trim(userPrompt).slice(0, 3500)}
 DATOS OFICIALES CALCULADOS POR CONTROLEVENT:
 ${ctx}`;
 }
-
-function narrativeMaxOutputTokens(userPrompt) {
-  const p = norm(userPrompt);
-  const mode = trim(process.env.CONTROLEVENT_ZUZU_COST_MODE || '').toLowerCase();
-  if (/ultra|ahorro|max/i.test(mode)) return /dos\s+p[aá]gin|exhaustiv|completo/.test(p) ? 3200 : 1800;
-  if (wantsOnePageNarrative(userPrompt)) return 5200;
-  if (/exhaustiv|informe\s+completo|direcci[oó]n|financier|t[eé]cnic/.test(p)) return 3600;
-  return 2400;
-}
-function cleanGeminiLooseText(outText) {
-  const raw = trim(outText).replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
-  if (!raw) return raw;
-  if (/^\{\s*"(?:title|answer)"\s*:/i.test(raw)) {
-    try { const obj = JSON.parse(stripJsonText(raw)); return trim(obj.answer || obj.text || raw); } catch (_) {}
-    const m = raw.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"warnings"|"\s*\}|$)/i);
-    if (m) return m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
-  }
-  return raw;
-}
-function goodWeatherRowsFromContext(context) {
-  return arr(context?.infoIndirecta?.meteorologia?.filas).filter(r => !trim(r?.Aviso));
-}
-function narrativeViolatesWeatherRequest(userPrompt, context, answer) {
-  if (!wantsWeatherInfo(userPrompt)) return false;
-  const rows = goodWeatherRowsFromContext(context);
-  if (!rows.length) return false;
-  const a = norm(answer);
-  const denies = /(no dispongo|no tengo|no cuento|no hay informacion|no hay información|mis datos se centran|no puedo consultar|no aparece.*temperatura|no se ha podido obtener)/i.test(answer || '');
-  const mentions = /(temperatura|grados|º|°|lluvia|viento|cubierto|despejado|nuboso|llovizna|tormenta|probabilidad)/i.test(answer || '');
-  return denies || !mentions;
-}
-function narrativeViolatesTemporalContext(userPrompt, context, answer) {
-  const events = arr(narrativeTemporalContext(context).eventos);
-  if (!events.some(e => e.relacionTemporal === 'futuro')) return false;
-  if (!/(temperatura|tiempo|clima|datos del evento|informe|evento)/i.test(userPrompt || '')) return false;
-  return /(c[oó]mo fue|tuvimos|contamos con|se celebr[oó]|el evento fue|hizo el d[ií]a|durante el evento tuvimos)/i.test(answer || '');
-}
-
-function narrativeLooksTruncated(answer, userPrompt) {
-  const a = trim(answer);
-  if (!a) return true;
-  const p = norm(userPrompt);
-  const asksMany = /\b(tambien|también|ademas|además| y )\b/.test(p) || (wantsWeatherInfo(userPrompt) && /\b(datos\s+del\s+evento|socios?|asist)/.test(p));
-  if (asksMany && a.length < 650) return true;
-  if (/[,:;\-–—(]$/.test(a)) return true;
-  if (/\b(el|la|los|las|de|del|con|para|por|que|como|cómo|va|van|mirando|seg[uú]n|tambien|también|adem[aá]s)\s*$/i.test(a)) return true;
-  return false;
-}
-function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
-  const a = norm(answer);
-  const p = norm(userPrompt);
-  if (wantsWeatherInfo(userPrompt) && goodWeatherRowsFromContext(context).length && !/\b(temperatura|maxima|maxima|mínima|minima|lluvia|viento|cielo|meteorolog|tiempo)\b/.test(a)) return true;
-  if (asksMissingAttendees(userPrompt) && !/\b(no\s+registrad|no\s+figuran|no\s+asist|socios?\s+no|faltan)\b/.test(a)) return true;
-  if (/\b(datos\s+del\s+evento|info\s+del\s+evento)\b/.test(p) && !/\b(ingresos|compras|donaciones|saldo|colaboradores|asistentes)\b/.test(a)) return true;
-  return false;
-}
-
-function narrativeCorrectionInstruction(userPrompt, context) {
-  const rows = goodWeatherRowsFromContext(context);
-  const weather = rows.length ? `Meteorología disponible: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)}: ${trim(r.Cielo)}, máxima ${r['Temp. máx']} ºC, mínima ${r['Temp. mín']} ºC, lluvia ${r['Prob. lluvia %']} %, viento ${r['Viento km/h']} km/h`).join(' | ')}.` : '';
-  const temporal = narrativeTemporalContext(context);
-  return `\n\nCORRECCIÓN OBLIGATORIA DE CONTROLEVENT ANTES DE RESPONDER: ${weather} Contexto temporal: ${JSON.stringify(temporal)}. Si el evento es futuro, redacta en futuro. Si hay meteorología disponible, inclúyela en el texto principal y no digas que no dispones de ella. Si el usuario pidió varias cosas, contesta todas. Si la respuesta anterior quedó cortada, reházla completa y cerrada.`;
-}
-async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace = []) {
+async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context) {
   const apiKey = geminiKey();
-  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'KO', 'Sin GEMINI_API_KEY para redactar informe con Zuzu.'); throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.'); }
-  // v18.11: no se usa caché narrativa; el usuario ha contratado prepago y quiere que Zuzu/Gemini recontextualice cada petición.
+  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.');
   const tone = narrativeToneFromPrompt(userPrompt);
   let lastError = null;
-  for (const model of configuredGeminiModelsForTask('zuzu-narrative', { prompt: userPrompt, localResult })) {
+  for (const model of configuredGeminiModels().slice(0, 2)) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    let correction = '';
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: narrativePrompt(userPrompt, localResult, context) }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: narrativeMiniSchema(), temperature: tone.id === 'coloquial-socios' ? 0.82 : 0.28 }
+    };
     try {
-      let payload, res, outText, parsed;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const narrativeText = narrativePrompt(userPrompt, localResult, context) + correction;
-        const body = {
-          contents: [{ role: 'user', parts: [{ text: narrativeText }] }],
-          generationConfig: { responseMimeType: 'application/json', responseSchema: narrativeMiniSchema(), temperature: tone.id === 'coloquial-socios' ? 0.68 : 0.22, maxOutputTokens: narrativeMaxOutputTokens(userPrompt) }
-        };
-        zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'RUN', `Modelo ${model}${attempt ? ' · reintento guiado' : ''}. Gemini recibe prompt original + resumen cocinado por CE para redactar con tono.`);
-        sizeTrace(flowTrace, 'Paso 4 · Gemini redacción humana', attempt ? 'Contexto corregido enviado a redacción' : 'Contexto compacto enviado a redacción', narrativeText);
-        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, wantsOnePageNarrative(userPrompt) ? 60000 : 45000));
-        logGeminiUsage('PASO 2 redacción humana', model, payload);
-        if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
-        outText = trim(geminiOutText(payload));
-        if (!outText) throw new Error('Zuzu narrativa no devolvió texto.');
-        try { parsed = JSON.parse(stripJsonText(outText)); }
-        catch (_) {
-          const cleaned = cleanGeminiLooseText(outText);
-          if ((narrativeViolatesWeatherRequest(userPrompt, context, cleaned) || narrativeViolatesTemporalContext(userPrompt, context, cleaned) || narrativeLooksTruncated(cleaned, userPrompt) || narrativeMissingRequestedBlocks(cleaned, userPrompt, context)) && attempt === 0) {
-            correction = narrativeCorrectionInstruction(userPrompt, context);
-            zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'INFO', 'Gemini omitió datos indirectos o usó tiempo verbal incorrecto; ControlEvent reenvía a Gemini con corrección, sin redactar localmente.');
-            continue;
-          }
-          zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'OK', 'Gemini redactó texto libre no JSON; CE lo presenta sin plantilla local.', { model, usage: usageSmall(payload, model) });
-          return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: cleaned, warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model, usage: usageSmall(payload, model) };
-        }
-        const answerCandidate = trim(parsed?.answer);
-        if ((narrativeViolatesWeatherRequest(userPrompt, context, answerCandidate) || narrativeViolatesTemporalContext(userPrompt, context, answerCandidate) || narrativeLooksTruncated(answerCandidate, userPrompt) || narrativeMissingRequestedBlocks(answerCandidate, userPrompt, context)) && attempt === 0) {
-          correction = narrativeCorrectionInstruction(userPrompt, context);
-          zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'INFO', 'Gemini omitió datos indirectos o usó tiempo verbal incorrecto; ControlEvent reenvía a Gemini con corrección, sin redactar localmente.');
-          continue;
-        }
-        break;
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, wantsOnePageNarrative(userPrompt) ? 32000 : 24000);
+      if (!res.ok) throw new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`);
+      const outText = trim(geminiOutText(payload));
+      if (!outText) throw new Error('Zuzu narrativa no devolvió texto.');
+      let parsed;
+      try { parsed = JSON.parse(stripJsonText(outText)); }
+      catch (_) {
+        // Si Gemini entendió la intención pero no respetó el JSON, aprovechamos el texto en vez de caer a plantilla local.
+        const cleaned = outText.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+        return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: cleaned, warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model };
       }
-      const finalNarrative = { title: trim(parsed?.title), answer: trim(parsed?.answer), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model, usage: usageSmall(payload, model) };
-      zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'OK', `Gemini redactó answer de ${trim(parsed?.answer).length} caracteres.`, { model, usage: usageSmall(payload, model) });
-      return finalNarrative;
+      return { title: trim(parsed?.title), answer: trim(parsed?.answer), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model };
     } catch (error) {
       lastError = error;
-      zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'KO', cleanGeminiError(error), { model });
-      if (isQuotaError(error) || !isRetryable(error)) break;
+      if (!isRetryable(error)) break;
     }
   }
   throw lastError || new Error('Zuzu narrativa no disponible.');
 }
-async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, flowTrace = []) {
+async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult) {
   if (!shouldEnrichLocalResultWithNarrative(userPrompt, localResult)) return localResult;
   const out = { ...localResult, warnings: arr(localResult.warnings).slice() };
   try {
-    const narrative = await callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace);
+    const narrative = await callGeminiNarrativeForLocalResult(userPrompt, localResult, context);
     if (trim(narrative.answer)) {
       const ans = trim(narrative.answer);
       const tone = narrativeToneFromPrompt(userPrompt);
@@ -2441,7 +2064,6 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       out.warnings = arr(out.warnings).concat(arr(narrative.warnings));
       out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-sentimiento-redaccion`;
       out.model = narrative.model || 'zuzu-redaccion';
-      out.__zuzuGeminiNarrative = { ok: true, model: narrative.model || 'zuzu-redaccion', usage: narrative.usage || null };
       return out;
     }
   } catch (error) {
@@ -2454,7 +2076,6 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       out.warnings = out.warnings.concat('La petición exigía tono/opinión/redacción humana. Se evita respuesta mecánica de ControlEvent para no dar una falsa impresión de inteligencia.');
       return out;
     }
-    zuzuTracePush(flowTrace, 'Paso 4 · Gemini redacción humana', 'KO', cleanGeminiError(error));
     const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult);
     if (fallback) {
       out.answer = fallback;
@@ -2500,28 +2121,43 @@ function plannerSchema() {
   };
 }
 function plannerPrompt(userPrompt, catalog) {
-  const ctx = compactJson(catalog, 6500);
-  return `PLANIFICADOR DE DATOS DE CONTROLEVENT. No respondas al usuario: devuelve SOLO JSON.
+  const ctx = JSON.stringify(catalog).slice(0, 42000);
+  return `Eres Zuzu en modo PLANIFICADOR DE MÓDULOS de ControlEvent. En esta primera llamada NO respondas al usuario.
+Tu única tarea es leer el prompt y devolver qué módulos necesitas y con qué filtros para que ControlEvent extraiga SOLO la información necesaria.
 
-Objetivo: leer la petición y decir qué módulos/filtros necesita CE para extraer datos. No inventes datos ni redactes informe.
+Módulos disponibles:
+- INGRESOS: colaboradores, ingresos, recaudación, asistentes, socios/no socios, justificantes de ingreso.
+- DONACIONES: donaciones de producto, productos donados, donantes.
+- COMPRAS: compras, gastos, productos comprados, tiendas, responsables, Pte. Compra.
+- EVENTOS: eventos, título, precio, fechas, estado, documentos asociados.
+- TICKETS: TKxx, tickets, facturas, resumen por ticket.
+- DOCUMENTOS: DOCxxx, documentos adjuntos del evento.
+- PRODUCTOS: catálogo de productos, segmento, destino, precio de referencia.
+- TIENDAS: catálogo de tiendas.
+- PERSONAS: catálogo de personas, rango.
 
-Módulos: INGRESOS(colaboradores/recaudación/asistentes), DONACIONES(productos donados/donantes/responsables), COMPRAS(gastos/productos/tiendas/responsables/tickets), EVENTOS(título/fechas/estado/precio/DOC), TICKETS(TK/fototickets/totales), DOCUMENTOS(DOC/adjuntos), PRODUCTOS(catálogo), TIENDAS(catálogo), PERSONAS(maestro/rango).
+Reglas de planificación:
+- Devuelve módulos y filtros. Ejemplo: para "productos consumidos en SySA 2025" pide EVENTOS, COMPRAS, DONACIONES y PRODUCTOS; filtro evento=SySA 2025, año=2025, agrupación producto.
+- Si el usuario pide gráficas/rankings de productos consumidos, incluye COMPRAS + DONACIONES + PRODUCTOS.
+- Si pide fecha, precio o estado técnico de un evento, EVENTOS es suficiente.
+- Si pide datos, información, resumen, dossier, comparativa o “qué ocurrió” en un evento, NO devuelvas solo EVENTOS: incluye INGRESOS, COMPRAS, DONACIONES, TICKETS y DOCUMENTOS.
+- Si pregunta por el tiempo meteorológico de una celebración, incluye EVENTOS y los módulos de actividad del evento; ControlEvent responderá que no hay previsión meteorológica externa si no existe ese dato.
+- Si pregunta dónde ha participado/aparecido una persona, incluye INGRESOS + COMPRAS + DONACIONES + PERSONAS y busca en todos los eventos si no cita un evento concreto.
+- Si pide personas SOCIO/DONANTE/NO SOCIO registradas en el sistema, usa PERSONAS, filtro filters.rangos=[SOCIO/DONANTE/NO SOCIO] y NO lo limites al evento activo.
+- Si pide coste/unidades/tiendas/responsables de compras, incluye COMPRAS y PRODUCTOS; añade TIENDAS/PERSONAS solo si necesita catálogos.
+- Si cita eventos entre comillas, pon sus títulos en eventos. Si menciona año, añade filters.anios.
+- Si dice todos los eventos/eventos registrados/celebraciones, todosLosEventos=true.
+- Propón filtros seguros: productos, tiendas, personas, responsables, donantes, tickets, segmentos, destinos, anios, fechaDesde/fechaHasta. No inventes IDs. Usa nombres humanos.
+- Si no hay filtro claro para producto/persona/tienda, deja ese filtro vacío. No filtres por palabras comunes del nombre de evento.
+- dataRequests debe explicar por módulo qué debe extraer ControlEvent y por qué.
+- needsClarification=true solo si no puedes identificar ningún módulo útil o falta un evento imprescindible.
+- Devuelve SOLO JSON con el esquema.
 
-Reglas rápidas:
-- "datos/info/resumen/dossier/qué ocurrió" de un evento => EVENTOS+INGRESOS+COMPRAS+DONACIONES+TICKETS+DOCUMENTOS.
-- participación/papel de persona => INGRESOS+COMPRAS+DONACIONES+PERSONAS; si no cita evento, buscar todos.
-- productos consumidos/ranking => COMPRAS+DONACIONES+PRODUCTOS+EVENTOS.
-- personas SOCIO/DONANTE/NO SOCIO del sistema => PERSONAS global, no evento activo.
-- tiempo/clima/previsión de evento => EVENTOS + salidaDeseada METEOROLOGIA y GRAFICA.
-- todos los eventos/eventos registrados/celebraciones => todosLosEventos=true.
-- eventos entre comillas => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
-- needsClarification=true solo si no hay ningún módulo útil.
-
-Catálogo mínimo:
+CATÁLOGO RESUMIDO CONTROL EVENT:
 ${ctx}
 
-Prompt usuario:
-${trim(userPrompt).replace(/\s+/g,' ').slice(0, 2200)}`;
+PROMPT DEL USUARIO:
+${trim(userPrompt).slice(0, 2600)}`;
 }
 function mergePlannerFilters(...items) {
   const out = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
@@ -2533,58 +2169,34 @@ function mergePlannerFilters(...items) {
   }
   return out;
 }
-async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
+async function callGeminiPlanner(userPrompt, catalog) {
   const apiKey = geminiKey();
-  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'KO', 'Sin GEMINI_API_KEY para Zuzu planificador.'); throw new Error('Sin GEMINI_API_KEY para Zuzu planificador.'); }
-  // v18.11: siempre se pregunta a Zuzu/Gemini en el Paso 1 para decidir módulos y filtros.
+  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para Zuzu planificador.');
   let lastError = null;
-  for (const model of configuredGeminiModelsForTask('zuzu-planner')) {
+  for (const model of configuredGeminiModels().slice(0, 2)) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const plannerText = plannerPrompt(userPrompt, catalog);
     const body = {
-      contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0.05, maxOutputTokens: 700 }
+      contents: [{ role: 'user', parts: [{ text: plannerPrompt(userPrompt, catalog) }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0.05 }
     };
     try {
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'RUN', `Modelo ${model}. Pidiendo módulos, filtros, eventos y necesidades de datos.`);
-      sizeTrace(flowTrace, 'Paso 1 · Gemini planificador', 'Contexto ultraligero enviado al planificador', plannerText);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 18000);
-      logGeminiUsage('PASO 1 planificación de datos', model, payload);
-      if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 7500);
+      if (!res.ok) throw new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`);
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
-      const parsed = JSON.parse(stripJsonText(outText));
-      parsed.__zuzuPlannerModel = model;
-      parsed.__zuzuPlannerUsage = usageSmall(payload, model);
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'OK', `Módulos=${arr(parsed?.modules || parsed?.modulos).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; todos=${parsed?.todosLosEventos === true}`, { model, usage: usageSmall(payload, model) });
-      return parsed;
+      return JSON.parse(stripJsonText(outText));
     } catch (error) {
       lastError = error;
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini planificador', 'KO', cleanGeminiError(error), { model });
-      if (isQuotaError(error) || !isRetryable(error)) break;
+      if (!isRetryable(error)) break;
     }
   }
   throw lastError || new Error('Planificador Zuzu no disponible.');
 }
-function shouldUseGeminiPlanner(userPrompt, local) {
-  // v18.11: flujo pedido por el usuario: SIEMPRE Paso 1 con Zuzu/Gemini.
-  // ControlEvent solo aporta plan local como red de seguridad si Gemini no responde.
-  return true;
-}
-async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
+async function buildZuzuPlan(userPrompt, state, selectedEventId) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
-  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'OK', `Plan local preventivo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}. No es respuesta final, solo red de seguridad.`);
-  if (!shouldUseGeminiPlanner(userPrompt, local)) {
-    return {
-      ...local,
-      reasoning: `${local.reasoning || 'Plan local de respaldo.'} Zuzu planificador no se ha usado solo por ausencia/fallo; en v18.11 la ruta normal siempre es Gemini para planificar.`,
-      __zuzuPlannerProvider: 'local-solo-si-gemini-no-disponible',
-      __zuzuGeminiAllRows: false
-    };
-  }
   try {
-    const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
-    const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
+    const catalog = buildZuzuPlanningCatalog(state, selectedEventId);
+    const ai = await callGeminiPlanner(userPrompt, catalog);
     const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
     const filters = mergePlannerFilters(local.filters, ai?.filters);
     return {
@@ -2599,8 +2211,6 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
       salidaDeseada: arr(ai?.salidaDeseada),
       reasoning: trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.',
       __zuzuPlannerProvider: 'zuzu-planner',
-      __zuzuPlannerModel: ai.__zuzuPlannerModel || '',
-      __zuzuPlannerUsage: ai.__zuzuPlannerUsage || null,
       __zuzuGeminiAllRows: false
     };
   } catch (error) {
@@ -2610,232 +2220,13 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Aviso: Zuzu planificador no respondió (${trim(error?.message || error)}).`,
       __zuzuPlannerProvider: 'local-fallback',
       __zuzuGeminiAllRows: false,
-      plannerWarning: cleanGeminiError(error)
+      plannerWarning: trim(error?.message || error)
     };
   }
 }
 
-
-function tableColIndex(cols, re) {
-  return arr(cols).findIndex(c => re.test(norm(c)));
-}
-function sortKeyValue(v) {
-  const raw = trim(v);
-  const n = Number(raw.replace(',', '.').replace(/[^0-9.-]/g, ''));
-  if (raw && Number.isFinite(n) && /^-?\d+(?:[,.]\d+)?\s*(?:€|uds?|reg\.?|)?$/i.test(raw)) return { n, s: '' };
-  return { n: null, s: norm(raw) };
-}
-function compareCell(a, b) {
-  const va = sortKeyValue(a), vb = sortKeyValue(b);
-  if (va.n !== null || vb.n !== null) return (va.n ?? 0) - (vb.n ?? 0);
-  return va.s.localeCompare(vb.s, 'es', { numeric: true, sensitivity: 'base' });
-}
-function sortRowsByColumns(rows, cols, order) {
-  const idxs = order.map(re => tableColIndex(cols, re)).filter(i => i >= 0);
-  if (!idxs.length) return rows;
-  return arr(rows).slice().sort((a,b) => {
-    for (const i of idxs) {
-      const c = compareCell(arr(a)[i], arr(b)[i]);
-      if (c) return c;
-    }
-    return 0;
-  });
-}
-function sortOneTable(tb) {
-  const cols = arr(tb?.columns).map(c => trim(c));
-  const title = norm(tb?.title || '');
-  if (!cols.length || !arr(tb?.rows).length) return tb;
-  let order = [];
-  if (/donaciones|donados|donantes/.test(title) || cols.some(c => /donante/i.test(c))) {
-    order = [/^evento$/i, /donante/i, /tipo.*donaci/i, /producto/i, /responsable/i, /tienda/i, /ticket|tk/i];
-  } else if (/compras|gastos|tickets|fototickets/.test(title) || cols.some(c => /tienda/i.test(c))) {
-    order = [/^evento$/i, /tienda/i, /ticket|tk/i, /producto/i, /responsable/i, /importe|valor|total/i];
-  } else if (/participaci|papel|registros localizados|apariciones/.test(title) || cols.some(c => /papel/i.test(c))) {
-    order = [/^evento$/i, /papel/i, /relacionado|nombre|persona|donante/i, /producto/i, /tienda/i];
-  } else if (/ingresos|colaboradores|personas/.test(title) || cols.some(c => /nombre/i.test(c))) {
-    order = [/^evento$/i, /rango/i, /nombre|persona/i, /ingreso|forma/i];
-  } else if (/producto|ranking|catalogo|catálogo/.test(title)) {
-    order = [/^evento$/i, /producto|nombre producto/i, /segmento/i, /destino/i];
-  } else if (/cronica|crónica|resumen|comparativa|saldo/.test(title)) {
-    order = [/fecha ini|fecha inicio|fecha|fecha celebración|evento/i, /^evento$/i];
-  } else {
-    order = [/^evento$/i, /tienda/i, /donante/i, /producto/i, /nombre/i];
-  }
-  return { ...tb, rows: sortRowsByColumns(tb.rows, cols, order) };
-}
-function sortResultTables(result) {
-  if (!result || !Array.isArray(result.tables)) return result;
-  return { ...result, tables: result.tables.map(sortOneTable) };
-}
-function scopeMetaFromContext(context) {
-  const evs = arr(context?.eventosObjetivo);
-  if (evs.length === 1) {
-    const e = evs[0] || {};
-    const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
-    const estado = trim(e.Estado || e.situacion || '');
-    return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
-  }
-  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
-  return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
-}
-function dominantSubjectFromPrompt(prompt, result) {
-  const q = [...text(prompt).matchAll(/["“”'‘’]([^"“”'‘’]{2,80})["“”'‘’]/g)].map(m => trim(m[1])).filter(Boolean);
-  const p = norm(prompt);
-  if (/participaci|opini|papel|aparece|colabor/.test(p) && q[0]) return `Informe_opinion_${q[0]}`;
-  if (/donaci/.test(p) && q[0]) return `Donaciones_${q[0]}`;
-  if (/compar/.test(p)) return 'Comparativa_eventos';
-  if (/cronica|crónica|todos los eventos|cada evento/.test(p)) return 'Cronica_eventos';
-  return trim(result?.title || q[0] || prompt).slice(0, 80);
-}
-
-function wantsWeatherInfo(prompt) {
-  return /\b(tiempo|meteorolog|meteorología|clima|lluvia|llover|temperatura|calor|fr[ií]o|viento|previsi[oó]n|pron[oó]stico|forecast)\b/i.test(text(prompt));
-}
-function parseCeDateToIso(value) {
-  const s = trim(value);
-  if (!s) return '';
-  const m1 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m1) return `${m1[1]}-${String(m1[2]).padStart(2,'0')}-${String(m1[3]).padStart(2,'0')}`;
-  const m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m2) {
-    const y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
-    return `${y}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
-  }
-  return '';
-}
-function addDaysIso(iso, days) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  if (!Number.isFinite(d.getTime())) return iso;
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0,10);
-}
-function daysBetweenIso(a, b) {
-  const da = new Date(`${a}T00:00:00Z`), db = new Date(`${b}T00:00:00Z`);
-  if (!Number.isFinite(da.getTime()) || !Number.isFinite(db.getTime())) return 0;
-  return Math.round((db - da) / 86400000);
-}
-function weatherCodeText(code) {
-  const c = Number(code);
-  if ([0].includes(c)) return 'Despejado';
-  if ([1,2].includes(c)) return 'Poco nuboso';
-  if ([3].includes(c)) return 'Cubierto';
-  if ([45,48].includes(c)) return 'Niebla';
-  if ([51,53,55,56,57].includes(c)) return 'Llovizna';
-  if ([61,63,65,66,67,80,81,82].includes(c)) return 'Lluvia';
-  if ([71,73,75,77,85,86].includes(c)) return 'Nieve';
-  if ([95,96,99].includes(c)) return 'Tormenta';
-  return `Código ${trim(code)}`;
-}
-async function maybeFetchWeatherContext(userPrompt, context, flowTrace = []) {
-  if (!wantsWeatherInfo(userPrompt)) return null;
-  const evs = arr(context?.eventosObjetivo);
-  if (!evs.length) {
-    zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'El usuario pide tiempo/clima, pero no hay evento objetivo con fechas.');
-    return { ok:false, reason:'No hay evento objetivo con fechas para consultar meteorología.' };
-  }
-  const lat = Number(process.env.CONTROLEVENT_WEATHER_LAT || process.env.WEATHER_LAT || '39.743');
-  const lon = Number(process.env.CONTROLEVENT_WEATHER_LON || process.env.WEATHER_LON || '-3.657');
-  const place = trim(process.env.CONTROLEVENT_WEATHER_PLACE || process.env.WEATHER_PLACE || 'Villanueva de Bogas, Toledo');
-  const rows = [];
-  for (const ev of evs.slice(0, 4)) {
-    const title = trim(ev['Titulo del evento'] || ev.titulo || ev.Evento || 'Evento');
-    const start = parseCeDateToIso(ev['fecha ini'] || ev.fechaIni || ev.fecha || '');
-    const end0 = parseCeDateToIso(ev['fecha fin'] || ev.fechaFin || '') || start;
-    if (!start) { rows.push({ Evento:title, Aviso:'Evento sin fecha de inicio legible para meteorología.' }); continue; }
-    const end = daysBetweenIso(start, end0) > 9 ? addDaysIso(start, 9) : end0;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&timezone=Europe%2FMadrid&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
-    try {
-      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'RUN', `Consultando Open-Meteo para ${title} (${start} a ${end}) en ${place}.`);
-      const res = await fetch(url, { headers: { 'accept': 'application/json' } });
-      const payload = await res.json().catch(async () => ({ error: await res.text().catch(() => res.statusText) }));
-      if (!res.ok) throw new Error(payload?.reason || payload?.error || `Open-Meteo HTTP ${res.status}`);
-      const d = payload?.daily || {};
-      arr(d.time).forEach((dia, i) => rows.push({
-        Evento: title,
-        Localidad: place,
-        Fecha: dia,
-        Cielo: weatherCodeText(arr(d.weather_code)[i]),
-        'Temp. máx': round(arr(d.temperature_2m_max)[i], 1),
-        'Temp. mín': round(arr(d.temperature_2m_min)[i], 1),
-        'Prob. lluvia %': round(arr(d.precipitation_probability_max)[i], 0),
-        'Viento km/h': round(arr(d.wind_speed_10m_max)[i], 1),
-        Fuente: 'Open-Meteo'
-      }));
-      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'OK', `Open-Meteo devolvió ${arr(d.time).length} día(s) para ${title}.`);
-    } catch (error) {
-      rows.push({ Evento:title, Localidad:place, Fecha:start, Aviso:`No se pudo obtener previsión externa: ${cleanGeminiError(error)}` });
-      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', cleanGeminiError(error));
-    }
-  }
-  return { ok: rows.some(r => !r.Aviso), proveedor: 'Open-Meteo', localidad: place, filas: rows };
-}
-function weatherTableAndCharts(weatherCtx) {
-  const rows = arr(weatherCtx?.filas);
-  if (!rows.length) return { tables: [], charts: [] };
-  const columns = ['Evento','Localidad','Fecha','Cielo','Temp. máx','Temp. mín','Prob. lluvia %','Viento km/h','Aviso'];
-  const tableRows = rows.map(r => columns.map(c => text(r[c])));
-  const okRows = rows.filter(r => !r.Aviso);
-  const titleKind = arr(rows).some(r => trim(r.Fecha) && trim(r.Fecha) < new Date().toISOString().slice(0,10)) ? 'Meteorología registrada' : 'Meteorología prevista';
-  const charts = [];
-  if (okRows.length) {
-    charts.push({
-      title: `${titleKind} · resumen meteorológico`,
-      type: 'weather',
-      unit: '',
-      weatherRows: okRows.map(r => ({
-        evento: trim(r.Evento), fecha: trim(r.Fecha), cielo: trim(r.Cielo),
-        tmax: num(r['Temp. máx']), tmin: num(r['Temp. mín']), lluvia: num(r['Prob. lluvia %']), viento: num(r['Viento km/h']), localidad: trim(r.Localidad)
-      }))
-    });
-    if (okRows.length > 1) {
-      charts.push({ title: 'Temperatura máxima y mínima por día', type: 'line', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Temp. máx'])), unit: 'ºC', series: [
-        { name: 'Máxima', values: okRows.map(r => num(r['Temp. máx'])) },
-        { name: 'Mínima', values: okRows.map(r => num(r['Temp. mín'])) }
-      ] });
-      charts.push({ title: 'Probabilidad de lluvia por día', type: 'bar', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Prob. lluvia %'])), unit: '%' });
-    }
-  }
-  return { tables: [{ title: `${titleKind} · ${trim(weatherCtx?.localidad || '')}`, columns, rows: tableRows }], charts };
-}
-
-function attachWeatherVisualsIfNeeded(result, context, userPrompt) {
-  if (!wantsWeatherInfo(userPrompt)) return result;
-  const weatherCtx = context?.infoIndirecta?.meteorologia;
-  if (!weatherCtx || !arr(weatherCtx.filas).length) return result;
-  const wc = weatherTableAndCharts(weatherCtx);
-  const existingWeather = arr(result?.tables).some(t => /meteorolog|tiempo|clima|lluvia|temperatura/i.test(trim(t?.title || '')));
-  const existingChartTitles = new Set(arr(result?.charts).map(c => norm(c?.title || '')));
-  const extraCharts = arr(wc.charts).filter(c => !existingChartTitles.has(norm(c?.title || '')));
-  return {
-    ...result,
-    tables: existingWeather ? arr(result?.tables) : arr(result?.tables).concat(wc.tables),
-    charts: arr(result?.charts).concat(extraCharts)
-  };
-}
-function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
-  const withWeather = attachWeatherVisualsIfNeeded(result || {}, context, userPrompt);
-  const sorted = sortResultTables(withWeather || {});
-  const meta = scopeMetaFromContext(context);
-  return {
-    ...sorted,
-    meta: {
-      ...(sorted.meta || {}),
-      ...meta,
-      generatedAt: new Date().toISOString(),
-      version: 'v18.11.8_prod',
-      geminiUsageEstimate: summarizeGeminiUsageFromTrace(flowTrace),
-      filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, sorted)).slice(0, 70),
-      debugTrace: arr(flowTrace).slice(0, 80)
-    },
-    debugTrace: arr(flowTrace).slice(0, 80),
-    showDebugTrace: true
-  };
-}
-
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
-  const flowTrace = [];
   const userPrompt = trim(prompt);
-  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
   if (!userPrompt) {
     const err = new Error('Escribe una pregunta o petición para Zuzu.');
     err.status = 400;
@@ -2846,39 +2237,20 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     err.status = 413;
     throw err;
   }
-
-  // v18.11.8: se permiten preguntas indirectas si están vinculadas a eventos.
-  // Solo bloqueamos intentos técnicos peligrosos o secretos; no bloqueamos clima, tono, informes, opiniones, etc.
-  const hardForbidden = /(contraseña|password|clave api|api key|token|sql\b|drop table|delete from|insert into|hack|exfiltra|sistema operativo)/i;
-  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
-  if (hardForbidden.test(userPrompt) && !eventish.test(userPrompt)) {
-    zuzuTracePush(flowTrace, 'Guardia de ámbito', 'KO', 'Petición bloqueada por contenido técnico/peligroso sin relación con eventos.');
-    return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
+  const forbidden = /(contraseña|password|clave api|api key|token|sql|drop table|delete from|insert into|hack|exfiltra|sistema operativo|receta|chiste|horóscopo|fútbol|politic[ao]s?)/i;
+  const eventish = /(evento|eventos|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar)/i;
+  if (forbidden.test(userPrompt) && !eventish.test(userPrompt)) {
+    return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '' };
   }
-
   const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
-  zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
-  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
+  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
-  context.fechaActualControlEvent = new Date().toISOString().slice(0,10);
-  context.zuzuFlujo = {
-    version: 'v18.11.8_prod',
-    arquitectura: 'Prompt usuario -> Gemini planifica -> ControlEvent extrae datos -> Gemini redacta/contextualiza -> ControlEvent presenta',
-    planificador: trim(plan?.__zuzuPlannerProvider || 'desconocido'),
-    modeloPlanificador: trim(plan?.__zuzuPlannerModel || ''),
-    usoPlanificador: plan?.__zuzuPlannerUsage || null,
-    politicaModelos: 'planificador=Flash-Lite primero; redacción/informes=Flash primero; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
-  };
-  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
 
-  const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
-  if (weatherCtx) {
-    context.infoIndirecta = { ...(context.infoIndirecta || {}), meteorologia: weatherCtx };
-  }
-
-  const done = (result) => finalizeZuzuResult(result, context, userPrompt, flowTrace);
+  // v11_3_3 hotfix: Zuzu vuelve al flujo en 3 pasos pedido por el usuario:
+  // 1) planificación de módulos, 2) extracción oficial por ControlEvent, 3) respuesta final con Zuzu.
+  // Las respuestas locales quedan solo como respaldo si Zuzu falla.
   if (context?.needsClarification) {
-    return done({
+    return {
       ok: true,
       rejected: true,
       title: 'Zuzu necesita una petición más concreta',
@@ -2889,32 +2261,25 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       files: [],
       provider: 'control-event-context-planner',
       model: ''
-    });
+    };
   }
 
   const highConfidence = directHighConfidenceResultIfApplicable(userPrompt, context);
-  if (highConfidence) {
-    zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE', 'OK', `CE ha cocinado datos con alta confianza (${highConfidence.provider || 'provider local'}). La salida NO se entrega directamente: pasa a Gemini redacción humana.`);
-    const highConfidenceWithIndirect = attachWeatherVisualsIfNeeded(highConfidence, context, userPrompt);
-    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, highConfidenceWithIndirect, flowTrace));
-  }
+  if (highConfidence) return await maybeEnrichLocalResultWithZuzu(userPrompt, context, highConfidence);
 
   try {
-    const geminiResult = await callGeminiEvent(userPrompt, context, flowTrace);
-    zuzuTracePush(flowTrace, 'Paso 5 · Presentación CE', 'OK', `Respuesta principal viene de ${geminiResult.provider || 'Gemini'} / ${geminiResult.model || 'modelo no informado'}.`);
-    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, geminiResult, flowTrace));
+    const geminiResult = await callGeminiEvent(userPrompt, context);
+    return await maybeEnrichLocalResultWithZuzu(userPrompt, context, geminiResult);
   } catch (error) {
     const friendly = friendlyZuzuErrorMessage(error);
-    zuzuTracePush(flowTrace, 'Paso 3 · Gemini respuesta final estructurada', 'KO', cleanGeminiError(error));
     const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
     if (fallback) {
-      fallback.warnings = arr(fallback.warnings).concat(`${friendly} CE ha cocinado datos de respaldo, pero intentará pasarlos a Gemini como redacción final.`);
+      fallback.warnings = arr(fallback.warnings).concat(`${friendly} Se muestra respaldo analítico de ControlEvent basado en los módulos oficiales.`);
       fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
-      fallback.model = 'sin-gemini-estructurado-por-error';
-      zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE de respaldo', 'OK', `CE generó datos de respaldo (${fallback.provider}). Ahora se intenta Gemini narrativa.`);
-      return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback, flowTrace));
+      fallback.model = 'sin-gemini-por-error';
+      return await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback);
     }
-    return done({
+    return {
       ok: true,
       rejected: true,
       title: 'Zuzu no disponible temporalmente',
@@ -2925,11 +2290,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       files: [],
       provider: 'control-event-zuzu-error-sanitizado',
       model: ''
-    });
+    };
   }
 }
 
-// v18.11.8_prod - Planificación inicial asistida por Zuzu.
+
+// v18.9_prod - Planificación inicial asistida por Zuzu.
 function planAiSchema() {
   return {
     type: 'OBJECT',
@@ -5424,7 +4790,7 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
     attempts: []
   };
   let lastError = null;
-  for (const model of configuredGeminiPlanningModels(form)) {
+  for (const model of configuredGeminiPlanningModels()) {
     const attemptStart = Date.now();
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const totalPlanMode = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL';
@@ -5503,8 +4869,6 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
         elapsedMs,
         httpStatus:res.status,
         rawChars:outText.length,
-        usage: usageSmall(payload, model),
-        costEstimate: estimateGeminiCost(model, payload?.usageMetadata || {}),
         necesidadesTeoricasGemini: parsed.__directCounts38?.necesidadesTeoricas || 0,
         menuResumenGemini: arr(parsed.menuResumen).length,
         rowsGemini: arr(parsed.rows).length,
@@ -5516,7 +4880,6 @@ async function callGeminiPlanificacion(form, baseRows, incomeRows, state, source
       });
       trace.elapsedMs = Date.now() - started;
       trace.selectedModel = model;
-      trace.costEstimate = summarizeGeminiUsageFromTrace(trace.attempts.map(a => ({ usage:a.usage })).filter(Boolean));
       trace.geminiRawTextPreview = outText.slice(0, 60000);
       trace.geminiParsedCounts = {
         necesidadesTeoricas: parsed.__directCounts38?.necesidadesTeoricas || 0,
@@ -6068,7 +5431,7 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
   }
   return {
     ok: true,
-    version: 'v18.11.8_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
+    version: 'v18.9_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
     provider: aiProvider,
     model: aiModel,
     mode: m,
