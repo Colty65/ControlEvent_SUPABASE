@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.7_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v18.11.8_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -712,7 +712,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v18.11.7_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v18.11.8_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -765,7 +765,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v18.11.7_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v18.11.8_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
@@ -882,6 +882,15 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
     && /\b(donacion|donaciones|donado|donados|donante|donantes|ha\s+donado|han\s+donado)\b/.test(p)
     && /\b(evento|eventos|producto|productos|articulo|articulos|donde|lista|listado)\b/.test(p);
   if (donorProductSearch) { out.personas = []; out.responsables = []; out.donantes = []; out.tiendas = []; }
+  // v18.11.8: en preguntas del tipo "socios que no asistirán / que no están registrados en este evento"
+  // las comillas suelen contener exclusiones (Personas..., z_de...), no filtros de nombres.
+  // Si mantenemos esos filtros, INGRESOS/COMPRAS/DONACIONES se quedan a cero y Zuzu recibe basura.
+  if (zuzuAsksMissingAttendees(prompt)) {
+    out.personas = [];
+    out.responsables = [];
+    out.donantes = [];
+    if (/\bsocios?\b|rango\s*[=:]\s*['"]?socio['"]?/i.test(text(prompt))) out.rangos = ['SOCIO'];
+  }
   return out;
 }
 
@@ -991,6 +1000,13 @@ function zuzuLocalSafeAnalyticPrompt(prompt) {
     || (/\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && /\b(evento|eventos|jornada|jornadas)\b/.test(p))
     || /\b(toda\s+la\s+info|informacion\s+del\s+evento|información\s+del\s+evento|datos\s+del\s+evento|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|cronica|crónica|ordenad[oa]s?.*evento|evento.*ordenad[oa]s?|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
 }
+
+function zuzuAsksMissingAttendees(prompt) {
+  const p = norm(prompt);
+  return /\b(no\s+asistir|no\s+asistiran|no\s+asistir[aá]n|no\s+asisten|no\s+asistentes|no\s+esten\s+registrad|no\s+est[eé]n\s+registrad|no\s+figuran|no\s+aparecen|faltan\s+socios|socios?\s+que\s+faltan)\b/.test(p)
+    || (/\bsocios?\b/.test(p) && /\b(no\s+est[eé]n|no\s+esten|exceptuando|excluyendo)\b/.test(p) && /\b(evento|ingresos|asist)\b/.test(p));
+}
+
 function zuzuOnlyGlobalMasterModules(modules) {
   const masters = new Set(['EVENTOS','PRODUCTOS','TIENDAS','PERSONAS']);
   return arr(modules).length > 0 && arr(modules).every(m => masters.has(m));
@@ -1005,11 +1021,13 @@ function zuzuInferModulesLocal(prompt) {
   const personRoleAnalytic = /\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria)\b/.test(p) && (/\b(responsable|responsables|donante|donantes|colaborador|colaboradores|persona)\b/.test(p) || quotedFragmentsCount > 0);
   const participationAnalytic = /\b(participa|participan|participo|participó|participado|participacion|participación|aparece|aparecen|intervino|interviene|colabora|colaboro|colaboró|papel)\b/.test(p) && (quotedFragmentsCount > 0 || /\b(persona|colaborador|responsable|donante)\b/.test(p));
   const eventComparisonAnalytic = /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && (/\b(evento|eventos|jornada|jornadas|sysa|celebracion|celebración)\b/.test(p) || quotedFragmentsCount >= 2);
-  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|actividad\s+del\s+evento|cronica|crónica|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
+  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|actividad\s+del\s+evento|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
+  const missingAttendeesAnalytic = zuzuAsksMissingAttendees(prompt);
 
   if (cashAnalytic) { mods.add('EVENTOS'); mods.add('INGRESOS'); mods.add('COMPRAS'); }
   if (personRoleAnalytic || participationAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
   if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
+  if (missingAttendeesAnalytic) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m=>mods.add(m));
   if (/\b(ingreso|ingresos|recaudacion|recaudado|asistente|asistentes|entrada|entradas|banco|bizum|efectivo)\b/.test(p)) mods.add('INGRESOS');
   if (/\b(colaborador|colaboradores)\b/.test(p)) mods.add('INGRESOS');
   if (/\b(donacion|donaciones|donado|donados|donante|donantes|donar|donaron)\b/.test(p)) mods.add('DONACIONES');
@@ -1067,6 +1085,8 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
   if (/\bfinalizad[oa]s?|cerrad[oa]s?|terminad[oa]s?\b/.test(p)) estados.push('Finalizado');
   if (/\ben\s+curso|activo|activa|abiert[oa]\b/.test(p)) estados.push('En curso');
   const rangos = [];
+  const missingAttendeesAsk = zuzuAsksMissingAttendees(prompt);
+  if (missingAttendeesAsk && (/\bsocios?\b/.test(p) || /rango\s*[=:]\s*['"]?socio['"]?/.test(p))) rangos.push('SOCIO');
   const globalPersonaCatalogAsk = /\b(persona|personas)\b/.test(p) && /\b(sistema|registrad[ao]s?|maestro|tabla|catalogo|catálogo|rango|socios?|donantes?)\b/.test(p)
     && !/\b(participa|participan|participado|papel|responsable|colaborador|evento|eventos|donado|donaciones?)\b/.test(p);
   if (globalPersonaCatalogAsk) {
@@ -1105,7 +1125,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   }));
   const selected = events.find(e => e.id === trim(selectedEventId)) || null;
 
-  // v18.11.7: catálogo ultraligero para el PASO 1 de Gemini.
+  // v18.11.8: catálogo ultraligero para el PASO 1 de Gemini.
   // Gemini solo debe decidir módulos/filtros; los datos reales los extrae CE después.
   // Por eso NO se le envían tablas, compras, donaciones ni catálogos completos.
   const promptRaw = text(userPrompt || '');
@@ -1136,7 +1156,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v18.11.7_prod',
+    version: 'ControlEvent Zuzu Planner v18.11.8_prod',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     resumenModulos: {
@@ -1592,7 +1612,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v18.11.7_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v18.11.8_prod',
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Zuzu/Gemini decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),

@@ -1,10 +1,10 @@
 // ControlEvent version source of truth - generated 20260708-011500
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v18.11.7_prod';
-export const VERSION_TEXT = 'ControlEvent v18.11.7_prod';
-export const VERSION_FILE = 'ControlEvent_v18_11_7_prod';
+export const VERSION_LABEL = 'v18.11.8_prod';
+export const VERSION_TEXT = 'ControlEvent v18.11.8_prod';
+export const VERSION_FILE = 'ControlEvent_v18_11_8_prod';
 export const BUILD_ID = '20260708-011500';
-export const ZIP_NAME = 'CE_v18_11_7_PROD_ZUZU_INDIRECTOS_GEMINI.zip';
+export const ZIP_NAME = 'CE_v18_11_8_PROD_ZUZU_CONTEXTO_Y_GRAFICAS.zip';
 export const VERSION = VERSION_TEXT;
 
 if (typeof window !== 'undefined') {

@@ -1,4 +1,4 @@
-/* ControlEvent v18.11.7_prod FIX48_SALDO_ACTUAL_REALIZADO
+/* ControlEvent v18.11.8_prod FIX48_SALDO_ACTUAL_REALIZADO
    Corrección mínima: SALDO ACTUAL = ingresos realmente cobrados - gastos realizados.
    Solo se considera ingreso realizado si la situación es Banco, Bizum o Efectivo.
    El resto queda como pendiente para este cálculo. */
@@ -9,7 +9,7 @@
 
   const PAID = new Set(['BANCO','BIZUM','EFECTIVO']);
   const DONATION_TYPES = new Set(['DONADO TIENDA','DONADO SOCIO','DONADO OTROS']);
-  const VERSION = 'v18.11.7_prod_FIX48_SALDO_ACTUAL_REALIZADO';
+  const VERSION = 'v18.11.8_prod_FIX48_SALDO_ACTUAL_REALIZADO';
 
   const text = value => String(value ?? '').trim();
   const up = value => text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();

@@ -1,4 +1,4 @@
-# ControlEvent v18.11.7_prod · Zuzu indirectos y contexto temporal Gemini
+# ControlEvent v18.11.8_prod · Zuzu indirectos y contexto temporal Gemini
 
 Versión centrada en corregir informes de evento donde se solicitaban datos indirectos, especialmente meteorología.
 
@@ -24,6 +24,6 @@ Versión centrada en corregir informes de evento donde se solicitaban datos indi
 - `node --check services/event-ai.service.js`
 - `node --check services/event-context.service.js`
 - `node --check public/app/features/v11-3-zuzu-analitica-libre.js`
-- `node --check public/app/features/v18-11-7-version-trace.js`
+- `node --check public/app/features/v18-11-8-version-trace.js`
 - Búsqueda de restos funcionales v18.11.6 / v18_11_6.
 - `unzip -t` del ZIP final.

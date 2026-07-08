@@ -1,9 +1,9 @@
-/* ControlEvent v18.11.7_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v18.11.8_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v18.11.7_prod';
+  var VERSION='v18.11.8_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -39,7 +39,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || data.title || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v18_11_7_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v18_11_8_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -342,8 +342,9 @@
   function chartHtml(ch){
     var labels=(ch.labels||[]).map(String), values=(ch.values||[]).map(Number); var max=Math.max.apply(null, values.concat([1]));
     var type=String(ch.type||'bar').toLowerCase();
+    if(type==='weather') return weatherChartHtml(ch);
     if(type==='pie' || type==='donut') return pieChartHtml(ch, labels, values, type==='donut');
-    if(type==='line') return lineChartHtml(ch, labels, values);
+    if(type==='line') return labels.length<2 ? singleMetricChartHtml(ch, labels, values) : lineChartHtml(ch, labels, values);
     if(type==='stackedbar' || (Array.isArray(ch.series) && ch.series.length)) return stackedChartHtml(ch);
     if(type==='bar' || type==='verticalbar') return verticalChartHtml(ch, labels, values);
     var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.8, Math.min(100, raw)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
@@ -352,6 +353,40 @@
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function formatCost(v){ return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:5, maximumFractionDigits:6}); }
   function chartColor(i){ return ['#38bdf8','#fb923c','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
+
+  function weatherIcon(cielo){
+    var c=String(cielo||'').toLowerCase();
+    if(/tormenta/.test(c)) return '⛈️';
+    if(/lluvia|llovizna/.test(c)) return '🌧️';
+    if(/nieve/.test(c)) return '❄️';
+    if(/niebla/.test(c)) return '🌫️';
+    if(/cubierto|nuboso/.test(c)) return '☁️';
+    if(/despejado|soleado/.test(c)) return '☀️';
+    return '🌤️';
+  }
+  function weatherChartHtml(ch){
+    var rows=Array.isArray(ch.weatherRows)?ch.weatherRows:[];
+    if(!rows.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Meteorología')+'</h3><div class="ce-ai-answer">Sin datos meteorológicos disponibles.</div></div>';
+    var cards=rows.map(function(r){
+      var fecha=esc(r.fecha||''), cielo=esc(r.cielo||''), loc=esc(r.localidad||'');
+      return '<div style="border:1px solid #dbeafe;border-radius:16px;padding:14px;background:linear-gradient(180deg,#ffffff,#f8fafc);box-shadow:0 3px 10px rgba(15,23,42,.06);min-width:210px;flex:1">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px"><div style="font-weight:900;color:#075985">'+fecha+'</div><div style="font-size:30px">'+weatherIcon(r.cielo)+'</div></div>'
+        +'<div style="font-weight:850;color:#0f172a;margin-bottom:6px">'+cielo+'</div>'
+        +(loc?'<div style="font-size:12px;color:#64748b;margin-bottom:10px">'+loc+'</div>':'')
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+        +'<div style="background:#eff6ff;border-radius:12px;padding:8px"><b style="color:#075985">Máx.</b><br><span style="font-size:20px;font-weight:950">'+esc(formatNumber(r.tmax))+' ºC</span></div>'
+        +'<div style="background:#f0f9ff;border-radius:12px;padding:8px"><b style="color:#075985">Mín.</b><br><span style="font-size:20px;font-weight:950">'+esc(formatNumber(r.tmin))+' ºC</span></div>'
+        +'<div style="background:#f7fee7;border-radius:12px;padding:8px"><b style="color:#3f6212">Lluvia</b><br><span style="font-size:20px;font-weight:950">'+esc(formatNumber(r.lluvia))+' %</span></div>'
+        +'<div style="background:#fff7ed;border-radius:12px;padding:8px"><b style="color:#9a3412">Viento</b><br><span style="font-size:20px;font-weight:950">'+esc(formatNumber(r.viento))+' km/h</span></div>'
+        +'</div></div>';
+    }).join('');
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Meteorología')+'</h3><div style="display:flex;gap:12px;flex-wrap:wrap">'+cards+'</div></div>';
+  }
+  function singleMetricChartHtml(ch, labels, values){
+    var l=labels[0]||''; var v=Number(values[0]||0);
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Dato')+'</h3><div style="border:1px solid #dbeafe;border-radius:16px;background:linear-gradient(180deg,#ffffff,#f8fafc);padding:18px;text-align:center"><div style="font-weight:850;color:#475569;margin-bottom:8px">'+esc(l)+'</div><div style="font-size:34px;font-weight:950;color:#075985">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div></div>';
+  }
+
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
     var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartColor(i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
