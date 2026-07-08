@@ -1,9 +1,9 @@
-/* ControlEvent v19_prod - Vista grafica global desde Mapa de recursos.
-   FIX5:
-   - PRODUCTO DISPONIBLE sustituye COMPRAS + DONACIONES.
-   - Colores reales en leyendas y registros, sin que el CSS global los pise.
-   - Ver todo en INGRESOS, toque iPad sobre queso y radios protegidos contra scroll.
-   - Donaciones no muestran tienda: el donante queda en Donante. */
+/* ControlEvent v19_prod - Vista aerea desde Mapa de recursos.
+   FIX6:
+   - Sustituye RadioButton por grafica de barras SEGMENTO + DESTINO.
+   - Añade SALDO ACTUAL y SALDO OPERATIVO en cabecera.
+   - Titulo Vista aerea, evento coloreado por estado y auto-scroll a registros.
+   - Cabeceras de registros en gris claro y mas legibles. */
 (function(){
   'use strict';
   if(window.__ceV19MapaRecursosGlobal) return;
@@ -256,12 +256,16 @@
     const compraRows = resourceRows.filter(row => row.kind === 'compra');
     const donationRows = resourceRows.filter(row => row.kind === 'donacion');
     const totalIncome = incomeItems.reduce((sum,item) => sum + Number(item.value || 0), 0);
+    const totalIncomeRealizado = ingresos.filter(row => incomePayment(row) !== 'Pendiente').reduce((sum,row) => sum + Number(row.total || 0), 0);
     const totalCompras = compraRows.reduce((sum,row) => sum + Number(row.value || 0), 0);
     const totalDonaciones = donationRows.reduce((sum,row) => sum + Number(row.value || 0), 0);
+    const totalGastoRealizado = compraRows.filter(row => !isPendingTicket(rowTicket(row))).reduce((sum,row) => sum + Number(row.value || 0), 0);
+    const saldoActual = totalIncomeRealizado - totalGastoRealizado;
+    const saldoOperativo = totalIncome - totalCompras;
     const segmentos = groupResources(resourceRows, 'segmento');
     const destinos = groupResources(resourceRows, 'destino');
     const status = eventStatusInfo();
-    return {eventId:selectedId(), title:eventTitle(), statusLabel:status.label, statusCls:status.cls, ingresos, compras:resourceRows, incomeItems, totalIncome, totalCompras, totalDonaciones, totalRecursos:totalCompras + totalDonaciones, segmentos, destinos};
+    return {eventId:selectedId(), title:eventTitle(), statusLabel:status.label, statusCls:status.cls, ingresos, compras:resourceRows, incomeItems, totalIncome, totalIncomeRealizado, totalCompras, totalDonaciones, totalGastoRealizado, saldoActual, saldoOperativo, totalRecursos:totalCompras + totalDonaciones, segmentos, destinos};
   }
 
   function valueToSrc(value){
@@ -304,26 +308,47 @@
   }
   function metric(label, value, cls){ return `<div class="ce-v19-metric ${cls||''}"><span>${esc(label)}</span><strong>${esc(money(value))}</strong></div>`; }
   function orderIndex(list, label){ const key = up(label); const idx = list.map(up).indexOf(key); return idx === -1 ? 999 : idx; }
-  function filterRadios(groups, kind){
+  function orderedGroups(groups, kind){
     const known = kind === 'segmento' ? KNOWN_SEGMENTS : KNOWN_DESTINOS;
     const map = new Map(groups.map(g => [up(g.label), g]));
-    const ordered = [
-      ...known.filter(label => map.has(up(label))).map(label => map.get(up(label))),
+    return [
+      ...known.map(label => map.get(up(label)) || {key:label, label, compras:0, donaciones:0, total:0, rows:[], count:0}),
       ...groups.filter(g => !known.map(up).includes(up(g.label))).sort((a,b)=>a.label.localeCompare(b.label,'es',{sensitivity:'base'}))
     ];
-    if(!ordered.length) return '<div class="ce-v19-empty-small compact">Sin datos.</div>';
-    return ordered.map(group => `<label class="ce-v19-filter-option" title="${esc(group.label)}"><input type="radio" name="ce-v19-resource-filter" data-v19-filter-kind="${esc(kind)}" data-v19-filter-key="${esc(group.key)}"><span>${esc(group.label)}</span><strong>${esc(money(group.total))}</strong></label>`).join('');
+  }
+  function resourceBars(segmentos, destinos){
+    const segs = orderedGroups(segmentos || [], 'segmento');
+    const dests = orderedGroups(destinos || [], 'destino');
+    const all = [
+      ...segs.map(group => ({...group, kind:'segmento', prefix:'SEG'})),
+      ...dests.map(group => ({...group, kind:'destino', prefix:'DEST'}))
+    ];
+    const max = Math.max(1, ...all.map(group => Number(group.total || 0)));
+    if(!all.length) return '<div class="ce-v19-empty-small compact">Sin datos.</div>';
+    return `<div class="ce-v19-resource-bars" role="list" aria-label="Gráfica de barras por segmento y destino">${all.map(group => {
+      const pct = Number(group.total || 0) > 0 ? Math.max(2, Number(group.total || 0) / max * 100) : 0;
+      const compPct = group.total ? Math.max(0, Number(group.compras || 0) / Number(group.total || 1) * 100) : 0;
+      const donPct = group.total ? Math.max(0, 100 - compPct) : 0;
+      return `<button type="button" class="ce-v19-resource-bar" role="listitem" data-v19-filter-kind="${esc(group.kind)}" data-v19-filter-key="${esc(group.key)}" title="${esc(group.prefix)} · ${esc(group.label)} · ${esc(money(group.total))}">
+        <span class="ce-v19-bar-top"><em>${esc(group.prefix)}</em><strong>${esc(group.label)}</strong><b>${esc(money(group.total))}</b></span>
+        <span class="ce-v19-bar-track"><span class="ce-v19-bar-fill" style="width:${pct.toFixed(2)}%"><i class="buy" style="width:${compPct.toFixed(2)}%"></i><i class="don" style="width:${donPct.toFixed(2)}%"></i></span></span>
+        <span class="ce-v19-bar-sub">Compras ${esc(money(group.compras))} · Donado ${esc(money(group.donaciones))} · ${esc(String(group.count || 0))} reg.</span>
+      </button>`;
+    }).join('')}</div>`;
   }
   function renderModal(model){
+    const statusColor = model.statusCls === 'finalizado' ? '#dc2626' : '#16a34a';
     return `<div class="ce-v19-global-backdrop">
-      <div class="ce-v19-global-card" role="dialog" aria-modal="true" aria-label="Vista gráfica completa del evento">
+      <div class="ce-v19-global-card" role="dialog" aria-modal="true" aria-label="Vista aérea del evento">
         <div class="ce-v19-global-head">
-          <div><h2>📊 Vista gráfica completa del evento</h2><p>${esc(model.title)} · <span class="ce-v19-event-state ${esc(model.statusCls)}" style="color:${model.statusCls === 'finalizado' ? '#dc2626' : '#16a34a'}!important">${esc(model.statusLabel)}</span></p></div>
+          <div><h2>📊 Vista aérea</h2><p><span class="ce-v19-event-title ${esc(model.statusCls)}" style="color:${statusColor}!important">${esc(model.title)}</span> · <span class="ce-v19-event-state ${esc(model.statusCls)}" style="color:${statusColor}!important">${esc(model.statusLabel)}</span></p></div>
           <button type="button" class="ce-v19-close" data-v19-close="1" aria-label="Cerrar">Cerrar</button>
         </div>
         <div class="ce-v19-metrics">
           ${metric('INGRESOS', model.totalIncome, 'income')}
           ${metric('COMPRAS', model.totalCompras, 'buy')}
+          ${metric('SALDO ACTUAL', model.saldoActual, model.saldoActual >= 0 ? 'saldo saldo-ok' : 'saldo saldo-bad')}
+          ${metric('SALDO OPERATIVO', model.saldoOperativo, model.saldoOperativo >= 0 ? 'operativo saldo-ok' : 'operativo saldo-bad')}
           ${metric('DONACIONES', model.totalDonaciones, 'don')}
           ${metric('PRODUCTO DISPONIBLE', model.totalRecursos, 'total')}
         </div>
@@ -338,10 +363,9 @@
             <section class="ce-v19-panel ce-v19-resources-panel">
               <div class="ce-v19-panel-title"><span>PRODUCTO DISPONIBLE</span><strong>${esc(money(model.totalRecursos))}</strong></div>
               <div class="ce-v19-resource-legend"><span><i class="buy"></i>Compras</span><span><i class="don"></i>Donaciones</span></div>
-              <div class="ce-v19-filter-block"><h3>SEGMENTO</h3>${filterRadios(model.segmentos, 'segmento')}</div>
-              <div class="ce-v19-filter-block"><h3>DESTINO</h3>${filterRadios(model.destinos, 'destino')}</div>
+              ${resourceBars(model.segmentos, model.destinos)}
               <button type="button" class="ce-v19-clear-filter" data-v19-clear-filter="1">Ver todo</button>
-              <div class="ce-v19-hint">Elige solo un segmento o un destino. Con “Ver todo” vuelven a salir todos los productos.</div>
+              <div class="ce-v19-hint">Pulsa una barra de segmento o destino. Con “Ver todo” vuelven a salir todos los productos.</div>
             </section>
           </div>
           <section id="${DETAIL_ID}" class="ce-v19-detail ce-v19-right-detail">${renderProductRowsContent(model.compras, 'Todos los productos', `Compras ${money(model.totalCompras)} · Donado ${money(model.totalDonaciones)}`)}</section>
@@ -422,9 +446,26 @@
     else sortState[mode] = {field, dir:'asc'};
   }
   function rerenderCurrentDetail(){
-    if(currentView.type === 'income' && currentView.key) renderIncomeDetail(currentView.key);
-    else if(currentView.type === 'incomeAll') renderAllIncomeDetail();
-    else renderFilteredProducts(currentView.kind || '', currentView.key || '');
+    if(currentView.type === 'income' && currentView.key) renderIncomeDetail(currentView.key, false);
+    else if(currentView.type === 'incomeAll') renderAllIncomeDetail(false);
+    else renderFilteredProducts(currentView.kind || '', currentView.key || '', false);
+  }
+  function markSelectedBar(kind, key){
+    const root = $(OVERLAY_ID);
+    if(!root) return;
+    root.querySelectorAll('.ce-v19-resource-bar.is-selected').forEach(btn => btn.classList.remove('is-selected'));
+    if(kind && key){
+      const btn = Array.from(root.querySelectorAll('.ce-v19-resource-bar[data-v19-filter-kind]')).find(item => item.getAttribute('data-v19-filter-kind') === kind && item.getAttribute('data-v19-filter-key') === key);
+      if(btn) btn.classList.add('is-selected');
+    }
+  }
+  function clearResourceSelection(){ const root = $(OVERLAY_ID); if(root) root.querySelectorAll('.ce-v19-resource-bar.is-selected').forEach(btn => btn.classList.remove('is-selected')); }
+  function scrollDetailIntoView(force){
+    const detail = $(DETAIL_ID);
+    if(!detail) return;
+    const mobileLike = force || (window.matchMedia && window.matchMedia('(max-width:1120px)').matches);
+    if(!mobileLike) return;
+    setTimeout(() => { try{ detail.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ detail.scrollIntoView(true); } }, 60);
   }
   function renderProductRowsContent(rows, title, subtitle){
     const sorted = sortProductRows(rows || []);
@@ -453,11 +494,12 @@
         }).join('') || '<div class="ce-v19-empty-small">Sin productos.</div>'}
       </div>`;
   }
-  function renderIncomeDetail(key){
+  function renderIncomeDetail(key, doScroll){
     const model = buildModel();
     const item = model.incomeItems.find(x => x.key === key);
     const detail = $(DETAIL_ID); if(!detail || !item) return;
     currentView = {type:'income', kind:'income', key};
+    clearResourceSelection();
     const rows = sortIncomeRows(item.rows || []);
     detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>Ingresos · ${esc(item.label)}</h3><p>${rows.length} persona(s) · ${esc(money(item.value))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
       <div class="ce-v19-income-list compact">
@@ -472,12 +514,14 @@
           return `<article class="ce-v19-income-row compact ${paid}" style="--income-row-color:${esc(rowColor)};color:${esc(rowColor)}!important">${thumb}<span style="${cellStyle}" title="${esc(name)}">${esc(name)}</span><span style="${cellStyle}">${esc(row.rango || '—')}</span><span style="${cellStyle}">${esc(money(row.obligatorio))}</span><span style="${cellStyle}">${esc(money(row.voluntario))}</span><strong style="${cellStyle}">${esc(money(row.total))}</strong></article>`;
         }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}
       </div>`;
+    scrollDetailIntoView(doScroll !== false);
   }
 
-  function renderAllIncomeDetail(){
+  function renderAllIncomeDetail(doScroll){
     const model = buildModel();
     const detail = $(DETAIL_ID); if(!detail) return;
     currentView = {type:'incomeAll', kind:'incomeAll', key:''};
+    clearResourceSelection();
     const rows = sortIncomeRows(model.ingresos || []);
     detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>Ingresos · Ver todo</h3><p>${rows.length} persona(s) · ${esc(money(model.totalIncome))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
       <div class="ce-v19-income-list compact">
@@ -492,8 +536,9 @@
           return `<article class="ce-v19-income-row compact ${paid}" style="--income-row-color:${esc(rowColor)};color:${esc(rowColor)}!important">${thumb}<span style="${cellStyle}" title="${esc(name)}">${esc(name)}</span><span style="${cellStyle}">${esc(row.rango || '—')}</span><span style="${cellStyle}">${esc(money(row.obligatorio))}</span><span style="${cellStyle}">${esc(money(row.voluntario))}</span><strong style="${cellStyle}">${esc(money(row.total))}</strong></article>`;
         }).join('') || '<div class="ce-v19-empty-small">Sin registros.</div>'}
       </div>`;
+    scrollDetailIntoView(doScroll !== false);
   }
-  function renderFilteredProducts(kind, key){
+  function renderFilteredProducts(kind, key, doScroll){
     const model = buildModel();
     let rows = model.compras;
     let title = 'Todos los productos';
@@ -506,7 +551,9 @@
       subtitle = `Compras ${money(compras)} · Donado ${money(don)}`;
     }
     currentView = {type:'products', kind:kind || '', key:key || ''};
+    markSelectedBar(kind || '', key || '');
     const detail = $(DETAIL_ID); if(detail) detail.innerHTML = renderProductRowsContent(rows, title, subtitle);
+    scrollDetailIntoView(doScroll !== false && !!(kind || key));
   }
   function showImage(src, title){
     if(!src) return;
@@ -577,7 +624,7 @@
     const type = ev.type;
     if(type === 'touchstart'){
       const pt = touchPoint(ev);
-      __v19Touch = {x:pt.x,y:pt.y,moved:false,time:Date.now(),onFilter:!!(closestMatch(target,'.ce-v19-filter-option') || closestMatch(target,'input[data-v19-filter-kind]'))};
+      __v19Touch = {x:pt.x,y:pt.y,moved:false,time:Date.now(),onFilter:!!closestMatch(target,'.ce-v19-resource-bar[data-v19-filter-kind]')};
       return stopModalEvent(ev, false);
     }
     if(type === 'touchmove'){
@@ -608,21 +655,20 @@
     const sort = closestMatch(target,'[data-v19-sort-mode][data-v19-sort-field]');
     if(sort){ toggleSort(sort.getAttribute('data-v19-sort-mode'), sort.getAttribute('data-v19-sort-field')); rerenderCurrentDetail(); return stopModalEvent(ev, true); }
     const income = closestMatch(target,'[data-v19-income-key]');
-    if(income){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return stopModalEvent(ev, true); }
-    if(closestMatch(target,'[data-v19-income-all]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderAllIncomeDetail(); return stopModalEvent(ev, true); }
-    if(closestMatch(target,'[data-v19-clear-filter]') || closestMatch(target,'[data-v19-clear-detail]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return stopModalEvent(ev, true); }
-    const filterInput = target?.matches?.('input[data-v19-filter-kind]') ? target : closestMatch(target,'.ce-v19-filter-option')?.querySelector?.('input[data-v19-filter-kind]');
-    if(filterInput && (type === 'click' || type === 'change')){
+    if(income){ clearResourceSelection(); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return stopModalEvent(ev, true); }
+    if(closestMatch(target,'[data-v19-income-all]')){ clearResourceSelection(); renderAllIncomeDetail(); return stopModalEvent(ev, true); }
+    if(closestMatch(target,'[data-v19-clear-filter]') || closestMatch(target,'[data-v19-clear-detail]')){ clearResourceSelection(); renderFilteredProducts('', '', false); return stopModalEvent(ev, true); }
+    const filterBar = closestMatch(target,'.ce-v19-resource-bar[data-v19-filter-kind]');
+    if(filterBar && (type === 'click' || type === 'touchend' || type === 'pointerup')){
       if(__v19Touch?.onFilter && __v19Touch.moved && Date.now() - __v19Touch.time < 900){ __v19Touch = null; return stopModalEvent(ev, true); }
-      filterInput.checked = true;
-      renderFilteredProducts(filterInput.getAttribute('data-v19-filter-kind'), filterInput.getAttribute('data-v19-filter-key'));
+      renderFilteredProducts(filterBar.getAttribute('data-v19-filter-kind'), filterBar.getAttribute('data-v19-filter-key'));
       return stopModalEvent(ev, true);
     }
     const receipt = closestMatch(target,'[data-v19-receipt-id]');
     if(receipt){ showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante'); return stopModalEvent(ev, true); }
     return hardStop ? stopModalEvent(ev, false) : false;
   }
-  ['pointerdown','mousedown','touchstart','touchmove','click','touchend','change','keydown'].forEach(evt => {
+  ['pointerdown','pointerup','mousedown','touchstart','touchmove','click','touchend','change','keydown'].forEach(evt => {
     try{ window.addEventListener(evt, function(ev){ handleModalAction(ev, true); }, {capture:true, passive:false}); }catch(_){ }
   });
   let __lastSafeOpenAt = 0;
@@ -632,8 +678,8 @@
     if(now - __lastSafeOpenAt < 450) return false;
     __lastSafeOpenAt = now;
     try{ openModal(); }catch(err){
-      try{ console.error('[ControlEvent v19_prod] Error abriendo vista gráfica completa', err); }catch(_){ }
-      try{ alert('No he podido abrir la vista gráfica completa. Revisa la consola para ver el error.'); }catch(_){ }
+      try{ console.error('[ControlEvent v19_prod] Error abriendo vista aérea', err); }catch(_){ }
+      try{ alert('No he podido abrir la vista aérea. Revisa la consola para ver el error.'); }catch(_){ }
     }
     return false;
   }
@@ -656,20 +702,22 @@
       const target = ev.target;
       if(target?.classList?.contains('ce-v19-global-backdrop') || closestMatch(target,'.ce-v19-close,[data-v19-close]')){ ev.preventDefault(); close(); return; }
       const income = closestMatch(target,'[data-v19-income-key]');
-      if(income){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return; }
-      if(closestMatch(target,'[data-v19-income-all]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderAllIncomeDetail(); return; }
-      if(closestMatch(target,'[data-v19-clear-filter]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
-      if(closestMatch(target,'[data-v19-clear-detail]')){ ev.preventDefault(); overlay.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return; }
+      if(income){ ev.preventDefault(); clearResourceSelection(); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return; }
+      if(closestMatch(target,'[data-v19-income-all]')){ ev.preventDefault(); clearResourceSelection(); renderAllIncomeDetail(); return; }
+      if(closestMatch(target,'[data-v19-clear-filter]')){ ev.preventDefault(); clearResourceSelection(); renderFilteredProducts('', '', false); return; }
+      if(closestMatch(target,'[data-v19-clear-detail]')){ ev.preventDefault(); clearResourceSelection(); renderFilteredProducts('', '', false); return; }
+      const bar = closestMatch(target,'.ce-v19-resource-bar[data-v19-filter-kind]');
+      if(bar){ ev.preventDefault(); renderFilteredProducts(bar.getAttribute('data-v19-filter-kind'), bar.getAttribute('data-v19-filter-key')); return; }
       const receipt = closestMatch(target,'[data-v19-receipt-id]');
       if(receipt){
         ev.preventDefault();
         showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante');
       }
     }, true);
-    overlay.addEventListener('change', ev => {
-      const filter = ev.target?.matches?.('input[data-v19-filter-kind]') ? ev.target : null;
-      if(filter){ renderFilteredProducts(filter.getAttribute('data-v19-filter-kind'), filter.getAttribute('data-v19-filter-key')); }
-    }, true);
+    overlay.addEventListener('touchend', ev => {
+      const bar = closestMatch(ev.target,'.ce-v19-resource-bar[data-v19-filter-kind]');
+      if(bar){ ev.preventDefault(); renderFilteredProducts(bar.getAttribute('data-v19-filter-kind'), bar.getAttribute('data-v19-filter-key')); }
+    }, {capture:true, passive:false});
     overlay.addEventListener('keydown', ev => {
       if((ev.key === 'Enter' || ev.key === ' ') && ev.target?.matches?.('[data-v19-income-key]')){ ev.preventDefault(); ev.target.click(); }
     }, true);
@@ -694,17 +742,17 @@
       .ce-v19-global-head{position:sticky;top:0;z-index:2;margin:-18px -18px 14px;padding:16px 18px;background:rgba(248,250,252,.96);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
       .ce-v19-global-head h2{margin:0;font-size:22px;font-weight:950;letter-spacing:-.02em;}.ce-v19-global-head p{margin:4px 0 0;color:#64748b;font-size:13px;font-weight:800;}.ce-v19-event-state{font-weight:1000!important;}.ce-v19-event-state.curso{color:#16a34a!important;}.ce-v19-event-state.finalizado{color:#dc2626!important;}
       .ce-v19-close,.ce-v19-detail-clear,.ce-v19-clear-filter,.ce-v19-income-all{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:8px 13px;font-weight:950;cursor:pointer;}
-      .ce-v19-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px;}.ce-v19-metric{border-radius:18px;background:#fff;border:1px solid #e2e8f0;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.06);}.ce-v19-metric span{display:block;font-size:11px;font-weight:950;color:#64748b;letter-spacing:.05em;}.ce-v19-metric strong{display:block;margin-top:5px;font-size:24px;font-weight:1000;}.ce-v19-metric.income strong{color:#0369a1!important}.ce-v19-metric.buy strong{color:#dc2626!important}.ce-v19-metric.don strong{color:#b45309!important}.ce-v19-metric.total strong{color:#0f766e!important}
+      .ce-v19-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:12px;}.ce-v19-metric{border-radius:18px;background:#fff;border:1px solid #e2e8f0;padding:13px;box-shadow:0 8px 24px rgba(15,23,42,.06);}.ce-v19-metric span{display:block;font-size:11px;font-weight:950;color:#64748b;letter-spacing:.05em;}.ce-v19-metric strong{display:block;margin-top:5px;font-size:24px;font-weight:1000;}.ce-v19-metric.income strong{color:#0369a1!important}.ce-v19-metric.buy strong{color:#dc2626!important}.ce-v19-metric.don strong{color:#b45309!important}.ce-v19-metric.total strong{color:#0f766e!important}.ce-v19-metric.income{background:#eff6ff;border-color:#bfdbfe}.ce-v19-metric.buy{background:#fef2f2;border-color:#fecaca}.ce-v19-metric.don{background:#fff7ed;border-color:#fed7aa}.ce-v19-metric.total{background:#ecfdf5;border-color:#a7f3d0}.ce-v19-metric.saldo{background:#f0fdf4;border-color:#bbf7d0}.ce-v19-metric.operativo{background:#f0fdfa;border-color:#99f6e4}.ce-v19-metric.saldo-bad{background:#fef2f2!important;border-color:#fecaca!important}.ce-v19-metric.saldo-ok strong,.ce-v19-metric.operativo.saldo-ok strong{color:#15803d!important}.ce-v19-metric.saldo-bad strong,.ce-v19-metric.operativo.saldo-bad strong{color:#dc2626!important}
       .ce-v19-global-grid{display:grid;grid-template-columns:minmax(315px,385px) minmax(0,1fr);gap:10px;align-items:start;}.ce-v19-left-col{display:flex;flex-direction:column;gap:12px;min-width:0;}.ce-v19-panel,.ce-v19-detail{background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:12px;box-shadow:0 8px 26px rgba(15,23,42,.06);min-width:0;}.ce-v19-panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}.ce-v19-panel-title span{font-weight:1000;color:#0f172a;}.ce-v19-panel-title strong{font-size:18px;color:#0f766e;}
       .ce-v19-pie-wrap{display:grid;grid-template-columns:148px minmax(0,1fr);gap:10px;align-items:center;}.ce-v19-pie{width:148px;height:148px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie,.ce-v19-pie *{outline:none!important;-webkit-tap-highlight-color:transparent!important;}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;min-width:0;}.ce-v19-legend-row{display:grid!important;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #dbe4f0!important;background:#fff!important;color:#0f172a!important;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;min-width:0;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit!important;}.ce-v19-legend-row strong{font-size:12px;color:inherit!important;white-space:nowrap;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:11px;color:#64748b;font-weight:800;line-height:1.25;}
-      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-filter-block{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:8px;margin-bottom:8px;}.ce-v19-filter-block h3{font-size:10.5px;margin:0 0 6px;font-weight:1000;color:#0f172a;letter-spacing:.04em;}.ce-v19-filter-option{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:5px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:5px 6px;margin:0 0 5px;cursor:pointer;color:#0f172a;-webkit-tap-highlight-color:transparent;touch-action:pan-y;}.ce-v19-filter-option:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-filter-option input{margin:0;width:11px;height:11px;}.ce-v19-filter-option span{font-size:10.5px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-filter-option strong{font-size:10px;font-weight:950;color:#0f766e;white-space:nowrap;}.ce-v19-clear-filter,.ce-v19-income-all{width:100%;background:#f8fafc;font-size:11px;padding:6px 10px;margin:0 0 8px;}
+      .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-resource-bars{display:flex;flex-direction:column;gap:6px;margin:0 0 8px;}.ce-v19-resource-bar{display:block;width:100%;border:1px solid #e2e8f0!important;background:#fff!important;border-radius:12px!important;padding:6px 7px!important;text-align:left!important;cursor:pointer!important;box-shadow:0 3px 10px rgba(15,23,42,.035)!important;-webkit-tap-highlight-color:transparent;touch-action:manipulation;color:#0f172a!important;}.ce-v19-resource-bar:hover,.ce-v19-resource-bar.is-selected{border-color:#60a5fa!important;background:#f8fbff!important;box-shadow:0 8px 18px rgba(37,99,235,.12)!important}.ce-v19-bar-top{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:6px;margin-bottom:4px;}.ce-v19-bar-top em{font-style:normal;font-size:9px;font-weight:1000;color:#64748b;}.ce-v19-bar-top strong{font-size:10.5px;font-weight:1000;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-bar-top b{font-size:10px;font-weight:1000;color:#0f766e;white-space:nowrap;}.ce-v19-bar-track{display:block;height:11px;border-radius:999px;background:#e2e8f0;overflow:hidden;}.ce-v19-bar-fill{display:flex;height:100%;border-radius:999px;overflow:hidden;min-width:8px;}.ce-v19-bar-fill .buy{display:block;height:100%;background:#dc2626;}.ce-v19-bar-fill .don{display:block;height:100%;background:#f59e0b;}.ce-v19-bar-sub{display:block;margin-top:3px;font-size:8.8px;line-height:1.05;font-weight:900;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-clear-filter,.ce-v19-income-all{width:100%;background:#f8fafc;font-size:11px;padding:6px 10px;margin:0 0 8px;}
       .ce-v19-right-detail{margin:0;min-height:560px;overflow:hidden;min-width:0;}.ce-v19-detail-empty,.ce-v19-empty-small{color:#64748b;font-weight:900;padding:12px;text-align:center;background:#f8fafc;border-radius:14px;}.ce-v19-empty-small.compact{font-size:11px;padding:8px;}.ce-v19-detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}.ce-v19-detail-head h3{margin:0;font-size:18px;font-weight:1000;}.ce-v19-detail-head p{margin:4px 0 0;color:#64748b;font-size:12px;font-weight:850;}
       .ce-v19-sort-head{border:0!important;background:transparent!important;color:#64748b!important;font:inherit!important;font-weight:1000!important;text-align:left!important;padding:0!important;margin:0!important;min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;cursor:pointer!important;box-shadow:none!important;line-height:1.1!important;}.ce-v19-sort-head:hover,.ce-v19-sort-head.active{color:#0f172a!important;text-decoration:underline!important;}
-      .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:11px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span,.ce-v19-income-row.compact strong{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
-      .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:2px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(190px,1.55fr) minmax(72px,.52fr) minmax(72px,.52fr) minmax(94px,.68fr) minmax(100px,.72fr) minmax(94px,.68fr) minmax(112px,.78fr) minmax(72px,.52fr) minmax(94px,.66fr) minmax(68px,.48fr);gap:3px;align-items:center;min-width:1070px;}.ce-v19-products-head.compact{font-size:9.8px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px;text-transform:uppercase;letter-spacing:.01em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:8px;padding:3px 4px;background:#fff;font-size:9.4px;font-weight:950;line-height:1.03;color:var(--row-text-color,var(--line-color,#0f172a))!important;}.ce-v19-product-line.compact.ok{color:#15803d!important;--row-text-color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626!important;--row-text-color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309)!important;--row-text-color:var(--line-color,#b45309);}.ce-v19-product-line.compact.ok span,.ce-v19-product-line.compact.ok strong{color:#15803d!important;}.ce-v19-product-line.compact.pending span,.ce-v19-product-line.compact.pending strong{color:#dc2626!important;}.ce-v19-product-line.compact.donacion span,.ce-v19-product-line.compact.donacion strong{color:var(--line-color,#b45309)!important;}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:inherit!important;}.ce-v19-product-line.compact .product{font-weight:1000;}
+      .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:12.2px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span,.ce-v19-income-row.compact strong{color:var(--income-row-color,#0f172a)!important;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
+      .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:2px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(190px,1.55fr) minmax(72px,.52fr) minmax(72px,.52fr) minmax(94px,.68fr) minmax(100px,.72fr) minmax(94px,.68fr) minmax(112px,.78fr) minmax(72px,.52fr) minmax(94px,.66fr) minmax(68px,.48fr);gap:3px;align-items:center;min-width:1070px;}.ce-v19-products-head.compact{font-size:11px;font-weight:1000;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:5px;text-transform:uppercase;letter-spacing:.01em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:8px;padding:3px 4px;background:#fff;font-size:9.4px;font-weight:950;line-height:1.03;color:var(--row-text-color,var(--line-color,#0f172a))!important;}.ce-v19-product-line.compact.ok{color:#15803d!important;--row-text-color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626!important;--row-text-color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309)!important;--row-text-color:var(--line-color,#b45309);}.ce-v19-product-line.compact.ok span,.ce-v19-product-line.compact.ok strong{color:#15803d!important;}.ce-v19-product-line.compact.pending span,.ce-v19-product-line.compact.pending strong{color:#dc2626!important;}.ce-v19-product-line.compact.donacion span,.ce-v19-product-line.compact.donacion strong{color:var(--line-color,#b45309)!important;}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:inherit!important;}.ce-v19-product-line.compact .product{font-weight:1000;}
       #${OVERLAY_ID} .ce-v19-product-line.compact span,#${OVERLAY_ID} .ce-v19-product-line.compact strong,#${OVERLAY_ID} .ce-v19-income-row.compact span,#${OVERLAY_ID} .ce-v19-income-row.compact strong{color:inherit!important;}
       .ce-v19-image-viewer{position:fixed;inset:0;z-index:1000005;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;}.ce-v19-image-card{background:#fff;border-radius:18px;padding:12px;max-width:min(980px,96vw);max-height:94vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 26px 86px rgba(0,0,0,.42);}.ce-v19-image-card>div{display:flex;align-items:center;justify-content:space-between;gap:10px;}.ce-v19-image-card button{border:1px solid #cbd5e1;border-radius:999px;background:#fff;padding:7px 12px;font-weight:950;}.ce-v19-image-card img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px;background:#f8fafc;}
-      @media(max-width:1120px){.ce-v19-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ce-v19-global-grid{grid-template-columns:1fr}.ce-v19-right-detail{min-height:360px}.ce-v19-pie-wrap{grid-template-columns:150px 1fr}.ce-v19-pie{width:150px;height:150px;}}
+      @media(max-width:1120px){.ce-v19-metrics{grid-template-columns:repeat(3,minmax(0,1fr));}.ce-v19-global-grid{grid-template-columns:1fr}.ce-v19-right-detail{min-height:360px}.ce-v19-pie-wrap{grid-template-columns:150px 1fr}.ce-v19-pie{width:150px;height:150px;}}
       @media(max-width:720px){.ce-v19-global-backdrop{padding:8px;align-items:flex-start}.ce-v19-global-card{width:100vw;max-height:96vh;border-radius:18px;padding:12px}.ce-v19-global-head{margin:-12px -12px 10px;padding:12px}.ce-v19-global-head h2{font-size:18px}.ce-v19-metrics{grid-template-columns:1fr 1fr}.ce-v19-metric{padding:10px}.ce-v19-metric strong{font-size:18px}.ce-v19-pie-wrap{grid-template-columns:1fr}.ce-v19-pie{margin:auto}.ce-v19-income-head{display:none}.ce-v19-income-row.compact{grid-template-columns:38px 1fr 1fr}.ce-v19-income-row.compact span:nth-child(n+5),.ce-v19-income-row.compact strong{grid-column:auto}.ce-v19-products-head.compact{display:none}.ce-v19-product-line.compact{grid-template-columns:1fr;min-width:0;font-size:11px;}.ce-v19-resource-legend{justify-content:flex-start;}}
     `;
     document.head.appendChild(style);
@@ -719,8 +767,8 @@
     let btn = $(BUTTON_ID);
     if(!btn){
       btn = document.createElement('button'); btn.type = 'button'; btn.id = BUTTON_ID; btn.className = 'ce-mapa-global-btn'; btn.textContent = '📊';
-      btn.setAttribute('aria-label','Vista gráfica completa de ingresos, compras y donaciones');
-      btn.title = 'Vista gráfica completa';
+      btn.setAttribute('aria-label','Vista aérea de ingresos, compras y donaciones');
+      btn.title = 'Vista aérea';
       section.appendChild(btn);
     }
     if(!btn.__ceV19Bound){
