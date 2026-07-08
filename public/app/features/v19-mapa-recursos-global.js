@@ -351,6 +351,18 @@
     viewer.addEventListener('click', ev => { if(ev.target === viewer || ev.target.closest('[data-v19-image-close]')) viewer.remove(); });
     document.body.appendChild(viewer);
   }
+  let __lastSafeOpenAt = 0;
+  function safeOpen(ev){
+    try{ if(ev){ ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } }catch(_){ }
+    const now = Date.now();
+    if(now - __lastSafeOpenAt < 450) return false;
+    __lastSafeOpenAt = now;
+    try{ openModal(); }catch(err){
+      try{ console.error('[ControlEvent v19_prod] Error abriendo vista gráfica completa', err); }catch(_){ }
+      try{ alert('No he podido abrir la vista gráfica completa. Revisa la consola para ver el error.'); }catch(_){ }
+    }
+    return false;
+  }
   function openModal(){
     if(!selectedId()){ alert('Selecciona un evento para ver la vista gráfica.'); return; }
     const old = $(OVERLAY_ID); if(old) old.remove();
@@ -426,12 +438,28 @@
       btn.title = 'Vista gráfica completa';
       section.appendChild(btn);
     }
-    if(!btn.__ceV19Bound){ btn.__ceV19Bound = true; btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); openModal(); }, true); }
+    if(!btn.__ceV19Bound){
+      btn.__ceV19Bound = true;
+      btn.onclick = safeOpen;
+      ['pointerdown','mousedown','click','touchend'].forEach(evt => {
+        btn.addEventListener(evt, safeOpen, {capture:true, passive:false});
+      });
+    }
     return true;
   }
+
+  function delegatedOpen(ev){
+    try{
+      const target = ev.target && ev.target.closest ? ev.target.closest('#' + BUTTON_ID) : null;
+      if(target) safeOpen(ev);
+    }catch(_){ }
+  }
+  ['pointerdown','mousedown','click','touchend'].forEach(evt => {
+    window.addEventListener(evt, delegatedOpen, {capture:true, passive:false});
+  });
 
   function scheduleEnsure(){ [0,80,260,800,1600].forEach(ms => setTimeout(ensureButton, ms)); }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleEnsure, {once:true}); else scheduleEnsure();
   ['load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:event-loaded','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, scheduleEnsure));
-  window.ControlEventMapaGlobalV19 = {version:VERSION, ensureButton, open:openModal, build:buildModel};
+  window.ControlEventMapaGlobalV19 = {version:VERSION, ensureButton, open:safeOpen, openRaw:openModal, build:buildModel};
 })();
