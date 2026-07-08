@@ -16,5 +16,5 @@ export const APP_VERSION = 'ControlEvent v19_prod';
 
 export const APP_VERSION_LABEL = 'v19_prod';
 export const APP_VERSION_FILE = 'ControlEvent_v19_prod';
-export const BUILD_ID = '20260708-170000';
-export const ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL.zip';
+export const BUILD_ID = '20260708-200500';
+export const ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';

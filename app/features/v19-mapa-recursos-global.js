@@ -1,9 +1,8 @@
 /* ControlEvent v19_prod - Vista grafica global desde Mapa de recursos.
-   FIX2:
-   - Cabecera con estado del evento en vez de texto de version.
-   - Panel izquierdo: INGRESOS + filtros COMPRAS/DONACIONES.
-   - Panel derecho unico para detalle de ingresos o listado de productos filtrado.
-   - Listados compactos, color por situacion y leyendas visibles. */
+   FIX3:
+   - La ventana grafica queda operativa tambien en eventos Finalizados porque solo es consulta.
+   - Justificantes de ingresos ampliables desde visor propio.
+   - Ordenacion por cabeceras en INGRESOS y COMPRAS + DONACIONES. */
 (function(){
   'use strict';
   if(window.__ceV19MapaRecursosGlobal) return;
@@ -30,6 +29,26 @@
     compra:'#dc2626', compraOk:'#16a34a', corriente:'#16a34a', pendiente:'#dc2626',
     donTienda:'#fcd34d', donSocio:'#f59e0b', donOtros:'#b45309', neutral:'#e5e7eb'
   };
+
+  let currentView = {type:'products', kind:'', key:''};
+  const sortState = {
+    products:{field:'producto', dir:'asc'},
+    income:{field:'nombre', dir:'asc'}
+  };
+  const NUMERIC_SORTS = new Set(['compras','donado','importe','obligatorio','voluntario','total','just']);
+  function sortButton(mode, field, label){
+    const st = sortState[mode] || {};
+    const active = st.field === field;
+    const arrow = active ? (st.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<button type="button" class="ce-v19-sort-head${active ? ' active' : ''}" data-v19-sort-mode="${esc(mode)}" data-v19-sort-field="${esc(field)}" title="Ordenar por ${esc(label)}">${esc(label)}${arrow}</button>`;
+  }
+  function cmpValues(a,b, numeric){
+    if(numeric){
+      const na = Number(a || 0), nb = Number(b || 0);
+      return na === nb ? 0 : (na < nb ? -1 : 1);
+    }
+    return String(a ?? '').localeCompare(String(b ?? ''),'es',{sensitivity:'base', numeric:true});
+  }
 
   function state(){
     try{ if(typeof window.state !== 'undefined' && window.state) return window.state; }catch(_){ }
@@ -336,16 +355,69 @@
     if(isPendingTicket(rowTicket(row))) return 'Pte.Compra';
     return rowTicket(row) || row.subtype || 'Compra';
   }
+
+  function productSortValue(row, field){
+    switch(field){
+      case 'producto': return row.productoNombre;
+      case 'segmento': return row.segmento;
+      case 'destino': return row.destino;
+      case 'compras': return row.kind === 'compra' ? Number(row.value || 0) : 0;
+      case 'tienda': return row.tiendaNombre;
+      case 'donado': return row.kind === 'donacion' ? Number(row.value || 0) : 0;
+      case 'donante': return row.kind === 'donacion' ? row.donanteNombre : '';
+      case 'importe': return Number(row.value || 0);
+      case 'situacion': return rowSituacion(row);
+      case 'responsable': return row.responsableNombre;
+      default: return row.productoNombre;
+    }
+  }
+  function sortProductRows(rows){
+    const st = sortState.products || {field:'producto', dir:'asc'};
+    const dir = st.dir === 'desc' ? -1 : 1;
+    const numeric = NUMERIC_SORTS.has(st.field);
+    return (rows || []).slice().sort((a,b) => {
+      const primary = cmpValues(productSortValue(a, st.field), productSortValue(b, st.field), numeric) * dir;
+      if(primary) return primary;
+      return cmpValues(a.productoNombre,b.productoNombre,false) || cmpValues(a.segmento,b.segmento,false) || cmpValues(a.destino,b.destino,false) || cmpValues(rowSituacion(a),rowSituacion(b),false);
+    });
+  }
+  function incomeSortValue(row, field){
+    const name = norm(row.persona?.nombre || persona(row.personaId).nombre || 'Sin nombre');
+    switch(field){
+      case 'just': return receiptSrc(row.id) ? 1 : 0;
+      case 'nombre': return name;
+      case 'rango': return row.rango || '';
+      case 'obligatorio': return Number(row.obligatorio || 0);
+      case 'voluntario': return Number(row.voluntario || 0);
+      case 'total': return Number(row.total || 0);
+      case 'estado': return incomePayment(row);
+      default: return name;
+    }
+  }
+  function sortIncomeRows(rows){
+    const st = sortState.income || {field:'nombre', dir:'asc'};
+    const dir = st.dir === 'desc' ? -1 : 1;
+    const numeric = NUMERIC_SORTS.has(st.field);
+    return (rows || []).slice().sort((a,b) => {
+      const primary = cmpValues(incomeSortValue(a, st.field), incomeSortValue(b, st.field), numeric) * dir;
+      if(primary) return primary;
+      return cmpValues(incomeSortValue(a,'nombre'), incomeSortValue(b,'nombre'), false);
+    });
+  }
+  function toggleSort(mode, field){
+    if(!sortState[mode]) sortState[mode] = {field, dir:'asc'};
+    else if(sortState[mode].field === field) sortState[mode].dir = sortState[mode].dir === 'asc' ? 'desc' : 'asc';
+    else sortState[mode] = {field, dir:'asc'};
+  }
+  function rerenderCurrentDetail(){
+    if(currentView.type === 'income' && currentView.key) renderIncomeDetail(currentView.key);
+    else renderFilteredProducts(currentView.kind || '', currentView.key || '');
+  }
   function renderProductRowsContent(rows, title, subtitle){
-    const sorted = (rows || []).slice().sort((a,b) =>
-      a.productoNombre.localeCompare(b.productoNombre,'es',{sensitivity:'base'}) ||
-      a.segmento.localeCompare(b.segmento,'es',{sensitivity:'base'}) ||
-      a.destino.localeCompare(b.destino,'es',{sensitivity:'base'}) ||
-      rowSituacion(a).localeCompare(rowSituacion(b),'es',{sensitivity:'base'})
-    );
+    const sorted = sortProductRows(rows || []);
     return `<div class="ce-v19-detail-head"><div><h3>${esc(title)}</h3><p>${esc(subtitle || '')} · ${sorted.length} registro(s)</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
       <div class="ce-v19-products-table compact">
-        <div class="ce-v19-products-head compact"><span>Producto</span><span>Segmento</span><span>Destino</span><span>Compras</span><span>Tienda</span><span>Donado</span><span>Donante</span><span>Importe</span><span>Situación</span><span>Resp</span></div>
+        <div class="ce-v19-products-head compact">${sortButton('products','producto','Producto')}${sortButton('products','segmento','Segmento')}${sortButton('products','destino','Destino')}${sortButton('products','compras','Compras')}${sortButton('products','tienda','Tienda')}${sortButton('products','donado','Donado')}${sortButton('products','donante','Donante')}${sortButton('products','importe','Importe')}${sortButton('products','situacion','Situación')}${sortButton('products','responsable','Resp')}</div>
         ${sorted.map(row => `<article class="ce-v19-product-line compact ${productLineClass(row)}" style="--line-color:${esc(row.color || '')}">
           <span class="product" title="${esc(row.productoNombre)}">${esc(row.productoNombre)}</span>
           <span title="${esc(row.segmento)}">${esc(row.segmento)}</span>
@@ -364,10 +436,11 @@
     const model = buildModel();
     const item = model.incomeItems.find(x => x.key === key);
     const detail = $(DETAIL_ID); if(!detail || !item) return;
-    const rows = item.rows.slice().sort((a,b) => (a.socio === b.socio ? 0 : (a.socio ? -1 : 1)) || norm(a.persona?.nombre || '').localeCompare(norm(b.persona?.nombre || ''),'es',{sensitivity:'base'}));
+    currentView = {type:'income', kind:'income', key};
+    const rows = sortIncomeRows(item.rows || []);
     detail.innerHTML = `<div class="ce-v19-detail-head"><div><h3>Ingresos · ${esc(item.label)}</h3><p>${rows.length} persona(s) · ${esc(money(item.value))}</p></div><button type="button" class="ce-v19-detail-clear" data-v19-clear-detail="1">Limpiar</button></div>
       <div class="ce-v19-income-list compact">
-        <div class="ce-v19-income-head"><span>Just.</span><span>Nombre</span><span>Rango</span><span>Imp. obligado</span><span>Imp. voluntario</span><span>Total</span></div>
+        <div class="ce-v19-income-head">${sortButton('income','just','Just.')}${sortButton('income','nombre','Nombre')}${sortButton('income','rango','Rango')}${sortButton('income','obligatorio','Imp. obligado')}${sortButton('income','voluntario','Imp. voluntario')}${sortButton('income','total','Total')}</div>
         ${rows.map(row => {
           const name = norm(row.persona?.nombre || persona(row.personaId).nombre || 'Sin nombre');
           const src = receiptSrc(row.id);
@@ -389,6 +462,7 @@
       title = `${kind === 'segmento' ? 'Segmento' : 'Destino'} · ${key}`;
       subtitle = `Compras ${money(compras)} · Donado ${money(don)}`;
     }
+    currentView = {type:'products', kind:kind || '', key:key || ''};
     const detail = $(DETAIL_ID); if(detail) detail.innerHTML = renderProductRowsContent(rows, title, subtitle);
   }
   function showImage(src, title){
@@ -398,7 +472,89 @@
     viewer.innerHTML = `<div class="ce-v19-image-card"><div><strong>${esc(title || 'Justificante')}</strong><button type="button" data-v19-image-close="1">Cerrar</button></div><img src="${esc(src)}" alt="${esc(title || 'Justificante')}"></div>`;
     viewer.addEventListener('click', ev => { if(ev.target === viewer || ev.target.closest('[data-v19-image-close]')) viewer.remove(); });
     document.body.appendChild(viewer);
+    markModalSafe(); unlockModalControls(viewer);
   }
+
+  let __v19SafeUntil = 0;
+  function modalRootFromTarget(target){
+    try{ return target?.closest?.('#' + OVERLAY_ID + ',#ceV19ImageViewer'); }catch(_){ return null; }
+  }
+  function stopModalEvent(ev, prevent){
+    try{ if(prevent) ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }catch(_){ }
+    return false;
+  }
+  function markModalSafe(){ __v19SafeUntil = Date.now() + 2500; patchFinalizadoLocks(); }
+  function isModalSafeElement(el){ try{ return !!(el && el.closest && el.closest('#' + OVERLAY_ID + ',#ceV19ImageViewer')); }catch(_){ return false; } }
+  function patchFinalizadoLocks(){
+    try{
+      const old = (typeof window.isLocked === 'function') ? window.isLocked : (typeof isLocked === 'function' ? isLocked : null);
+      if(old && !old.__ceV19MapaGlobalConsulta){
+        const wrapped = function(){
+          try{ if(Date.now() < __v19SafeUntil || isModalSafeElement(document.activeElement)) return false; }catch(_){ }
+          return old.apply(this, arguments);
+        };
+        wrapped.__ceV19MapaGlobalConsulta = true; wrapped.__ceOriginal = old;
+        window.isLocked = wrapped; try{ isLocked = wrapped; }catch(_){ }
+      }
+    }catch(_){ }
+  }
+  function unlockModalControls(root){
+    try{
+      const base = root || $(OVERLAY_ID) || $('ceV19ImageViewer');
+      if(!base) return;
+      [base, ...Array.from(base.querySelectorAll('button,input,select,textarea,[role="button"],[tabindex]'))].forEach(el => {
+        try{ el.disabled = false; el.readOnly = false; el.inert = false; }catch(_){ }
+        try{ el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled'); el.removeAttribute('inert'); }catch(_){ }
+        try{ el.classList.remove('locked','app-disabled','disabled','is-locked','readonly','read-only','ce-v225-ro-disabled'); }catch(_){ }
+        try{ el.style.setProperty('pointer-events','auto','important'); el.style.setProperty('opacity','1','important'); el.style.setProperty('filter','none','important'); el.style.setProperty('visibility','visible','important'); }catch(_){ }
+      });
+    }catch(_){ }
+  }
+  function handleModalAction(ev, hardStop){
+    const target = ev && ev.target;
+    const root = modalRootFromTarget(target);
+    if(!root) return false;
+    markModalSafe(); unlockModalControls(root);
+    const type = ev.type;
+    if(type === 'keydown'){
+      if(ev.key === 'Escape'){
+        if(root.id === 'ceV19ImageViewer') root.remove();
+        else if(root.id === OVERLAY_ID && root.__ceV19Close) root.__ceV19Close();
+        return stopModalEvent(ev, true);
+      }
+      if((ev.key === 'Enter' || ev.key === ' ') && target?.matches?.('[data-v19-income-key]')){
+        renderIncomeDetail(target.getAttribute('data-v19-income-key'));
+        return stopModalEvent(ev, true);
+      }
+      return hardStop ? stopModalEvent(ev, false) : false;
+    }
+    if(type === 'pointerdown' || type === 'mousedown' || type === 'touchstart') return stopModalEvent(ev, false);
+    if(root.id === 'ceV19ImageViewer'){
+      if(target === root || target?.closest?.('[data-v19-image-close]')){ root.remove(); return stopModalEvent(ev, true); }
+      return hardStop ? stopModalEvent(ev, false) : false;
+    }
+    if(target?.classList?.contains('ce-v19-global-backdrop') || target?.closest?.('.ce-v19-close,[data-v19-close]')){
+      if(root.__ceV19Close) root.__ceV19Close();
+      return stopModalEvent(ev, true);
+    }
+    const sort = target?.closest?.('[data-v19-sort-mode][data-v19-sort-field]');
+    if(sort){ toggleSort(sort.getAttribute('data-v19-sort-mode'), sort.getAttribute('data-v19-sort-field')); rerenderCurrentDetail(); return stopModalEvent(ev, true); }
+    const income = target?.closest?.('[data-v19-income-key]');
+    if(income){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderIncomeDetail(income.getAttribute('data-v19-income-key')); return stopModalEvent(ev, true); }
+    if(target?.closest?.('[data-v19-clear-filter]') || target?.closest?.('[data-v19-clear-detail]')){ root.querySelectorAll('input[name="ce-v19-resource-filter"]').forEach(input => { input.checked = false; }); renderFilteredProducts('', ''); return stopModalEvent(ev, true); }
+    const filterInput = target?.matches?.('input[data-v19-filter-kind]') ? target : target?.closest?.('.ce-v19-filter-option')?.querySelector?.('input[data-v19-filter-kind]');
+    if(filterInput && (type === 'click' || type === 'touchend' || type === 'change')){
+      filterInput.checked = true;
+      renderFilteredProducts(filterInput.getAttribute('data-v19-filter-kind'), filterInput.getAttribute('data-v19-filter-key'));
+      return stopModalEvent(ev, true);
+    }
+    const receipt = target?.closest?.('[data-v19-receipt-id]');
+    if(receipt){ showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante'); return stopModalEvent(ev, true); }
+    return hardStop ? stopModalEvent(ev, false) : false;
+  }
+  ['pointerdown','mousedown','touchstart','click','touchend','change','keydown'].forEach(evt => {
+    try{ window.addEventListener(evt, function(ev){ handleModalAction(ev, true); }, {capture:true, passive:false}); }catch(_){ }
+  });
   let __lastSafeOpenAt = 0;
   function safeOpen(ev){
     try{ if(ev){ ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } }catch(_){ }
@@ -414,11 +570,16 @@
   function openModal(){
     if(!selectedId()){ alert('Selecciona un evento para ver la vista gráfica.'); return; }
     const old = $(OVERLAY_ID); if(old) old.remove();
+    currentView = {type:'products', kind:'', key:''};
     const model = buildModel();
     const overlay = document.createElement('div'); overlay.id = OVERLAY_ID; overlay.innerHTML = renderModal(model);
+    patchFinalizadoLocks(); markModalSafe();
     document.body.appendChild(overlay);
-    try{ document.body.classList.add('ce-v19-modal-open'); }catch(_){ }
-    const close = () => { overlay.remove(); document.body.classList.remove('ce-v19-modal-open'); document.removeEventListener('keydown', escClose, true); };
+    try{ document.body.classList.add('ce-v19-modal-open','ce-v19-modal-safe-finalizado'); }catch(_){ }
+    const unlockTimer = setInterval(() => unlockModalControls(overlay), 450);
+    try{ new MutationObserver(() => unlockModalControls(overlay)).observe(overlay,{subtree:true,childList:true,attributes:true}); }catch(_){ }
+    unlockModalControls(overlay);
+    const close = () => { clearInterval(unlockTimer); overlay.remove(); document.body.classList.remove('ce-v19-modal-open','ce-v19-modal-safe-finalizado'); document.removeEventListener('keydown', escClose, true); };
     const escClose = ev => { if(ev.key === 'Escape') close(); };
     overlay.__ceV19Close = close;
     overlay.addEventListener('click', ev => {
@@ -430,8 +591,6 @@
       const receipt = ev.target?.closest?.('[data-v19-receipt-id]');
       if(receipt){
         ev.preventDefault();
-        const id = receipt.getAttribute('data-v19-receipt-id');
-        try{ if(window.ControlEventV469?.showReceiptModal){ window.ControlEventV469.showReceiptModal(id); return; } }catch(_){ }
         showImage(receipt.getAttribute('data-v19-receipt-src'), 'Justificante');
       }
     }, true);
@@ -455,7 +614,9 @@
       #${BUTTON_ID}.ce-mapa-global-btn{margin-left:auto;width:44px;height:44px;min-width:44px;border-radius:16px;border:1px solid rgba(14,165,233,.35);background:linear-gradient(135deg,#eff6ff,#e0f2fe);box-shadow:0 10px 24px rgba(2,132,199,.12);display:inline-flex;align-items:center;justify-content:center;font-size:23px;line-height:1;padding:0;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;}
       #${BUTTON_ID}.ce-mapa-global-btn:hover{transform:translateY(-1px);box-shadow:0 16px 34px rgba(2,132,199,.2);}
       .ce-v19-modal-open{overflow:hidden;}
-      #${OVERLAY_ID}{position:fixed;inset:0;z-index:1000003;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+      #${OVERLAY_ID}{position:fixed;inset:0;z-index:1000003;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;pointer-events:auto!important;}
+      #${OVERLAY_ID} *,#ceV19ImageViewer,#ceV19ImageViewer *{pointer-events:auto!important;opacity:1!important;filter:none!important;visibility:visible!important;}
+      body.ce-v19-modal-safe-finalizado #${OVERLAY_ID},body.ce-v19-modal-safe-finalizado #${OVERLAY_ID} *,body.ce-v120-finalizado-tools #${OVERLAY_ID},body.ce-v120-finalizado-tools #${OVERLAY_ID} *{pointer-events:auto!important;opacity:1!important;filter:none!important;visibility:visible!important;}
       .ce-v19-global-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:18px;}
       .ce-v19-global-card{width:min(1400px,96vw);max-height:94vh;overflow:auto;background:#f8fafc;border:1px solid rgba(226,232,240,.95);border-radius:26px;box-shadow:0 32px 100px rgba(15,23,42,.42);padding:18px;color:#0f172a;}
       .ce-v19-global-head{position:sticky;top:0;z-index:2;margin:-18px -18px 14px;padding:16px 18px;background:rgba(248,250,252,.96);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
@@ -466,6 +627,7 @@
       .ce-v19-pie-wrap{display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;align-items:center;}.ce-v19-pie{width:160px;height:160px;filter:drop-shadow(0 14px 22px rgba(15,23,42,.12));}.ce-v19-pie-slice{cursor:pointer;transition:filter .15s ease,transform .15s ease;transform-origin:50% 50%;}.ce-v19-pie g:hover .ce-v19-pie-slice{filter:brightness(1.06);transform:scale(1.018);}.ce-v19-legend{display:flex;flex-direction:column;gap:6px;min-width:0;}.ce-v19-legend-row{display:grid!important;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #dbe4f0!important;background:#fff!important;color:#0f172a!important;border-radius:12px;padding:7px 8px;text-align:left;cursor:pointer;min-width:0;box-shadow:0 3px 10px rgba(15,23,42,.04);}.ce-v19-legend-row span:nth-child(2){font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#334155!important;}.ce-v19-legend-row strong{font-size:12px;color:#0f172a!important;white-space:nowrap;}.ce-v19-dot,.ce-v19-resource-legend i{width:11px;height:11px;border-radius:999px;display:inline-block;}.ce-v19-hint{margin-top:10px;font-size:11px;color:#64748b;font-weight:800;line-height:1.25;}
       .ce-v19-resource-legend{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:-4px 0 10px;font-size:12px;font-weight:950;color:#475569;}.ce-v19-resource-legend span{display:inline-flex;align-items:center;gap:5px;}.ce-v19-resource-legend .buy{background:#dc2626}.ce-v19-resource-legend .don{background:#f59e0b}.ce-v19-filter-block{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;margin-bottom:9px;}.ce-v19-filter-block h3{font-size:12px;margin:0 0 8px;font-weight:1000;color:#0f172a;letter-spacing:.04em;}.ce-v19-filter-option{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:7px 8px;margin:0 0 6px;cursor:pointer;color:#0f172a;}.ce-v19-filter-option:hover{border-color:#93c5fd;background:#f8fbff}.ce-v19-filter-option input{margin:0;width:14px;height:14px;}.ce-v19-filter-option span{font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-filter-option strong{font-size:11px;font-weight:950;color:#0f766e;white-space:nowrap;}.ce-v19-clear-filter{width:100%;background:#f8fafc;}
       .ce-v19-right-detail{margin:0;min-height:560px;overflow:hidden;}.ce-v19-detail-empty,.ce-v19-empty-small{color:#64748b;font-weight:900;padding:12px;text-align:center;background:#f8fafc;border-radius:14px;}.ce-v19-empty-small.compact{font-size:11px;padding:8px;}.ce-v19-detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}.ce-v19-detail-head h3{margin:0;font-size:18px;font-weight:1000;}.ce-v19-detail-head p{margin:4px 0 0;color:#64748b;font-size:12px;font-weight:850;}
+      .ce-v19-sort-head{border:0!important;background:transparent!important;color:#64748b!important;font:inherit!important;font-weight:1000!important;text-align:left!important;padding:0!important;margin:0!important;min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;cursor:pointer!important;box-shadow:none!important;line-height:1.1!important;}.ce-v19-sort-head:hover,.ce-v19-sort-head.active{color:#0f172a!important;text-decoration:underline!important;}
       .ce-v19-income-list.compact{display:flex;flex-direction:column;gap:4px;}.ce-v19-income-head,.ce-v19-income-row.compact{display:grid;grid-template-columns:42px minmax(170px,1.5fr) minmax(70px,.6fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(80px,.6fr);gap:5px;align-items:center;}.ce-v19-income-head{font-size:10px;font-weight:1000;color:#64748b;padding:0 6px;}.ce-v19-income-row.compact{border:1px solid #e2e8f0;border-radius:11px;padding:5px 6px;background:#fff;font-size:11px;font-weight:900;line-height:1.05;}.ce-v19-income-row.compact.paid{color:#15803d;}.ce-v19-income-row.compact.pending{color:#dc2626;}.ce-v19-income-row.compact span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ce-v19-receipt-thumb.small,.ce-v19-no-receipt.small{width:34px;height:30px;border-radius:9px;}.ce-v19-receipt-thumb{border:1px solid #cbd5e1;padding:0;overflow:hidden;background:#f8fafc;cursor:pointer;}.ce-v19-receipt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}.ce-v19-no-receipt{display:flex!important;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;}
       .ce-v19-products-table.compact{display:flex;flex-direction:column;gap:3px;overflow:auto;padding-bottom:4px;}.ce-v19-products-head.compact,.ce-v19-product-line.compact{display:grid;grid-template-columns:minmax(150px,1.25fr) minmax(70px,.55fr) minmax(70px,.55fr) minmax(92px,.72fr) minmax(82px,.65fr) minmax(92px,.72fr) minmax(82px,.65fr) minmax(70px,.55fr) minmax(82px,.65fr) minmax(70px,.55fr);gap:4px;align-items:center;min-width:980px;}.ce-v19-products-head.compact{font-size:9px;font-weight:1000;color:#64748b;padding:0 6px;text-transform:uppercase;letter-spacing:.02em;}.ce-v19-product-line.compact{border:1px solid #e2e8f0;border-left:4px solid var(--line-color,#64748b);border-radius:9px;padding:4px 5px;background:#fff;font-size:10px;font-weight:900;line-height:1.05;color:var(--line-color,#0f172a);}.ce-v19-product-line.compact.ok{color:#15803d;}.ce-v19-product-line.compact.pending{color:#dc2626;}.ce-v19-product-line.compact.donacion{color:var(--line-color,#b45309);}.ce-v19-product-line.compact span,.ce-v19-product-line.compact strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}.ce-v19-product-line.compact .product{font-weight:1000;}
       .ce-v19-image-viewer{position:fixed;inset:0;z-index:1000005;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;}.ce-v19-image-card{background:#fff;border-radius:18px;padding:12px;max-width:min(980px,96vw);max-height:94vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 26px 86px rgba(0,0,0,.42);}.ce-v19-image-card>div{display:flex;align-items:center;justify-content:space-between;gap:10px;}.ce-v19-image-card button{border:1px solid #cbd5e1;border-radius:999px;background:#fff;padding:7px 12px;font-weight:950;}.ce-v19-image-card img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px;background:#f8fafc;}

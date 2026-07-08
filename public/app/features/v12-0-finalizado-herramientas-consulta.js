@@ -9,12 +9,12 @@
   const SAFE_ROOT_SEL = [
     '#ceGeminiLibreOverlay', '#tabPlanificacionInicial', '.planificacion-card', '#planificacionResultado',
     '#maintenanceWrapper', '#maintenancePanel', '#mtPersonas', '#mtEventos', '#mtTiendas', '#mtProductos', '#mtAcceso', '#mtImportar',
-    '#backupPanel', '#excelPanel', '#importPanel', '#downloadPanel', '.ce-backup-overlay-v181', '.ce-backup-modal-v181', '#ceV120BackupScopeFix', '#ceBackupScopeV40', '#ceBackupScopeV257', '#ceBackupScopeSelectV841Id'
+    '#backupPanel', '#excelPanel', '#importPanel', '#downloadPanel', '.ce-backup-overlay-v181', '.ce-backup-modal-v181', '#ceV120BackupScopeFix', '#ceBackupScopeV40', '#ceBackupScopeV257', '#ceBackupScopeSelectV841Id', '#ceMapaGlobalOverlay', '#ceMapaGlobalOverlay *', '#ceV19ImageViewer', '#ceV19ImageViewer *'
   ].join(',');
   const SAFE_BUTTON_SEL = [
     '#ceGeminiLibreBtn', '#tabPlanificacionBtn', '#btnGenerarPlanificacion', '#btnPlanApplyReplica', '.ce-zuzu-open', '#btnToggleMaintenance', '#btnExportSeed', '#btnExportExcel', '#btnOpenImport',
     '#btnStartImport', '#btnClearImportStatus', '#mtPersonasBtn', '#mtEventosBtn', '#mtTiendasBtn', '#mtProductosBtn', '#mtAccesoBtn',
-    '#btnBackup', '#btnDownloadBackup', '#btnDownloadInfoEvento', '#btnInfoEvento', '#btnExportData', '#btnImportData'
+    '#btnBackup', '#btnDownloadBackup', '#btnDownloadInfoEvento', '#btnInfoEvento', '#btnExportData', '#btnImportData', '#ceMapaGlobalBtn'
   ].join(',');
   const SAFE_SEL = SAFE_ROOT_SEL + ',' + SAFE_BUTTON_SEL;
   function $(id){ return document.getElementById(id); }

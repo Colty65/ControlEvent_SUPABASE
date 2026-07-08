@@ -5,8 +5,8 @@
   var VERSION_LABEL='v19_prod';
   var VERSION_TEXT='ControlEvent v19_prod';
   var VERSION_FILE='ControlEvent_v19_prod';
-  var BUILD_ID='20260708-170000';
-  var ZIP_NAME='CE_v19_PROD_MAPA_GLOBAL.zip';
+  var BUILD_ID='20260708-200500';
+  var ZIP_NAME='CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
