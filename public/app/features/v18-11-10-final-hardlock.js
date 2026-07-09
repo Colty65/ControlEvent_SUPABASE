@@ -66,11 +66,7 @@
         var span=document.createElement('span'); span.className='ce-ai-version-badge'; span.textContent=VERSION_LABEL; span.title=ZIP_NAME;
         var h2=head.querySelector('h2'); if(h2 && h2.nextSibling) head.insertBefore(span,h2.nextSibling); else head.appendChild(span);
       }
-      var res=document.querySelector('#ceAiResult .ce-ai-card:first-child');
-      if(res && !res.querySelector('.ce-ai-runtime-proof')){
-        var div=document.createElement('div'); div.className='ce-ai-runtime-proof'; div.textContent=VERSION_TEXT+' · flujo visible'; div.style.cssText='font-size:11px;font-weight:900;color:#075985;margin:0 0 8px';
-        var h3=res.querySelector('h3'); if(h3 && h3.nextSibling) res.insertBefore(div,h3.nextSibling); else res.insertBefore(div,res.firstChild);
-      }
+      // FIX10: se elimina la etiqueta técnica visible del informe Zuzu.
     });
   }
   function apply(){ installStyle(); setGlobals(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }

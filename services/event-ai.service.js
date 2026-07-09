@@ -2840,6 +2840,22 @@ function attachWeatherVisualsIfNeeded(result, context, userPrompt) {
     charts: arr(result?.charts).concat(extraCharts)
   };
 }
+
+function normalizeLoggedUserFix10(payload = {}) {
+  const raw = payload?.usuarioLogado || payload?.user || payload?.authUser || payload?.ce_acceso || payload?.ceAcceso || payload?.loggedUser || null;
+  if (!raw || typeof raw !== 'object') return null;
+  const identificacion = trim(raw.Identificacion ?? raw.identificacion ?? raw.IDENTIFICACION ?? raw.usuario ?? raw.user ?? '');
+  const nombre = trim(raw.Nombre ?? raw.nombre ?? raw.NOMBRE ?? raw.name ?? '');
+  const nivel = trim(raw.Nivel ?? raw.nivel ?? raw.NIVEL ?? '');
+  if (!identificacion && !nombre) return null;
+  return { identificacion, nombre, nivel, Identificacion: identificacion, Nombre: nombre, Nivel: nivel };
+}
+function attachLoggedUserFix10(state, payload = {}) {
+  const user = normalizeLoggedUserFix10(payload);
+  if (!user) return state;
+  return { ...(state || {}), usuarioLogado: user, ce_acceso_usuario_logado: { Identificacion: user.Identificacion, Nombre: user.Nombre, Nivel: user.Nivel } };
+}
+
 function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
   const withWeather = attachWeatherVisualsIfNeeded(result || {}, context, userPrompt);
   const sorted = sortResultTables(withWeather || {});
@@ -2861,7 +2877,7 @@ function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
   };
 }
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
   zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
@@ -2885,7 +2901,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
   }
 
-  const state = stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState();
+  const state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
   zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
@@ -5921,8 +5937,8 @@ function planOptionSummaryFix46(form) {
   };
 }
 
-export async function planificacionInicialZuzu({ mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info, applySaldoAjuste, applyProductCaps } = {}) {
-  const state = await getState();
+export async function planificacionInicialZuzu({ mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info, applySaldoAjuste, applyProductCaps, usuarioLogado, user, authUser, ce_acceso } = {}) {
+  const state = attachLoggedUserFix10(await getState(), { usuarioLogado, user, authUser, ce_acceso });
   const maps = planBuildMaps(state);
   const modules = planContentModules(content);
   const rawForm = { mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info, applySaldoAjuste, applyProductCaps };

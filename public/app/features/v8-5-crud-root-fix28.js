@@ -271,12 +271,21 @@
       await upsert('colaboradores',row);
       replaceLocal('colaboradores',row);
       const fresh = await refreshFromDb();
-      // Si el refresco llegara con una copia antigua, mantenemos en local la fila ya guardada y re-renderizamos ingresos.
+      // FIX10: si el refresco devuelve una copia antigua, se mantiene en local TODO el ingreso guardado.
+      // Antes solo se comparaba Situación; por eso algunos cambios (importe, número, colaborador) exigían guardar dos veces.
       try{
         const saved = Array.isArray(fresh?.colaboradores) ? fresh.colaboradores.find(x=>String(x.id||'')===String(id)) : null;
-        if(!saved || String(saved.situacion||'') !== String(row.situacion||'')){
+        const sameSaved = saved
+          && String(saved.personaId||'') === String(row.personaId||'')
+          && String(saved.situacion||'') === String(row.situacion||'')
+          && Number(saved.numero||0) === Number(row.numero||0)
+          && Math.abs(Number(money(saved.importe||0)) - Number(money(row.importe||0))) < 0.005
+          && String(saved.eventoId||'') === String(row.eventoId||'');
+        if(!sameSaved){
           replaceLocal('colaboradores',row);
           renderNow();
+          try{ if(typeof renderIngresosSummary==='function') renderIngresosSummary(); }catch(__){}
+          try{ if(typeof renderColabs==='function') renderColabs(); }catch(__){}
         }
       }catch(_){ }
       return;

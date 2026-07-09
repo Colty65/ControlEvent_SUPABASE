@@ -25,11 +25,20 @@ export async function fallbackUsers() {
 }
 
 export function publicUser(user) {
+  const identificacion = user?.Identificacion ?? user?.identificacion ?? user?.IDENTIFICACION ?? '';
+  const nombre = user?.Nombre ?? user?.nombre ?? user?.NOMBRE ?? '';
+  const nivel = user?.Nivel ?? user?.nivel ?? user?.NIVEL ?? 'RO';
+  const clave = user?.Clave ?? user?.clave ?? user?.CLAVE ?? '';
   return {
-    identificacion: user?.identificacion || '',
-    nombre: user?.nombre || '',
-    nivel: user?.nivel || 'RO',
-    clave: user?.clave || ''
+    identificacion,
+    nombre,
+    nivel,
+    clave,
+    // FIX10: conservar también los nombres reales de ce_acceso para Zuzu y Planificación Inicial.
+    Identificacion: identificacion,
+    Nombre: nombre,
+    Nivel: nivel,
+    ce_acceso: { Identificacion: identificacion, Nombre: nombre, Nivel: nivel }
   };
 }
 

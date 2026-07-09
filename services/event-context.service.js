@@ -936,6 +936,11 @@ function zuzuBuildFilterMatcher(plan, prompt, state, helpers) {
   }
   return { filterPeople, filterProducts, filterStores, filterTickets, filterSegments, filterDestinos, filterRangos, promptProductHints, peopleMatches, productMatches, storeMatches, ticketMatches, segmentMatches, destinoMatches, rangoMatches, lineMatchesCommon };
 }
+function zuzuActiveEventCue(prompt) {
+  const p = norm(prompt);
+  return /\b(este\s+evento|evento\s+activo|evento\s+en\s+pantalla|evento\s+actual|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|lo\s+que\s+hay\s+preparado)\b/.test(p);
+}
+
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
@@ -943,12 +948,15 @@ function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const allRequested = plan?.todosLosEventos === true || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x)) || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos)\b/i.test(prompt);
   if (allRequested) { arr(events).forEach(e => push(trim(e?.id))); return out; }
 
+  // FIX10: las referencias deícticas siempre son el evento activo de la pantalla.
+  if (zuzuActiveEventCue(prompt) && selectedId) push(selectedId);
+
   // Primero manda el texto real del usuario. El planificador IA no puede cambiar el evento si el prompt ya lo nombra.
   findExplicitReferencedEventIds(events, prompt).forEach(push);
   if (out.length) return out;
 
   // Peticiones relativas: último/más reciente. Si dice celebrado, se priorizan Finalizados.
-  if (/\b(mas\s+reciente|ultimo|ultima|reciente|actual|celebrado|celebrada)\b/.test(norm(prompt))) {
+  if (!zuzuActiveEventCue(prompt) && /\b(mas\s+reciente|ultimo|ultima|reciente|actual|celebrado|celebrada)\b/.test(norm(prompt))) {
     const celebrated = /\b(celebrado|celebrada)\b/.test(norm(prompt));
     mostRecentEventIds(events, 1, { celebrated }).forEach(push);
     if (out.length) return out;
@@ -980,6 +988,7 @@ function zuzuAllEventsRequested(prompt, plan = {}) {
 }
 function zuzuCrossEventSearchRequested(prompt, modules = []) {
   const p = norm(prompt);
+  if (zuzuActiveEventCue(prompt)) return false;
   const hasScopedData = arr(modules).some(m => ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'].includes(zuzuUpperModule(m)));
   if (!hasScopedData) return false;
   if (/\b(en\s+que\s+eventos|en\s+cuales\s+eventos|que\s+eventos|cuales\s+eventos|eventos\s+y\s+productos|eventos\s+donde|eventos\s+en\s+los\s+que)\b/.test(p)) return true;
@@ -1013,6 +1022,7 @@ function zuzuOnlyGlobalMasterModules(modules) {
 }
 function zuzuInferModulesLocal(prompt) {
   const p = norm(prompt);
+  const activeEventCue = zuzuActiveEventCue(prompt);
   const mods = new Set();
   const asksBoughtDonated = /\b(comprado\s*\/\s*donado|comprado\s+y\s+donado|compras?\s+y\s+donaciones?|donaciones?\s+y\s+compras?|separa\s+comprado\s*\/\s*donado)\b/.test(p);
   const asksCatalogProduct = /\b(ce_productos|tabla\s+de\s+productos|tabla\s+ce\s*productos|catalogo|catálogo|precio\s+rfa|precio\s+referencia|productos?\s+mas\s+caros|productos?\s+m[aá]s\s+caros|segmento\s*[=:]|destino\s*[=:])\b/.test(p);
@@ -1021,9 +1031,10 @@ function zuzuInferModulesLocal(prompt) {
   const personRoleAnalytic = /\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria)\b/.test(p) && (/\b(responsable|responsables|donante|donantes|colaborador|colaboradores|persona)\b/.test(p) || quotedFragmentsCount > 0);
   const participationAnalytic = /\b(participa|participan|participo|participó|participado|participacion|participación|aparece|aparecen|intervino|interviene|colabora|colaboro|colaboró|papel)\b/.test(p) && (quotedFragmentsCount > 0 || /\b(persona|colaborador|responsable|donante)\b/.test(p));
   const eventComparisonAnalytic = /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && (/\b(evento|eventos|jornada|jornadas|sysa|celebracion|celebración)\b/.test(p) || quotedFragmentsCount >= 2);
-  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|actividad\s+del\s+evento|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
+  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|actividad\s+del\s+evento|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
   const missingAttendeesAnalytic = zuzuAsksMissingAttendees(prompt);
 
+  if (activeEventCue) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m => mods.add(m));
   if (cashAnalytic) { mods.add('EVENTOS'); mods.add('INGRESOS'); mods.add('COMPRAS'); }
   if (personRoleAnalytic || participationAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
   if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
@@ -1083,7 +1094,7 @@ function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
   const anios = zuzuPromptYearFilters(prompt);
   const estados = [];
   if (/\bfinalizad[oa]s?|cerrad[oa]s?|terminad[oa]s?\b/.test(p)) estados.push('Finalizado');
-  if (/\ben\s+curso|activo|activa|abiert[oa]\b/.test(p)) estados.push('En curso');
+  if (!zuzuActiveEventCue(prompt) && /\ben\s+curso|activo|activa|abiert[oa]\b/.test(p)) estados.push('En curso');
   const rangos = [];
   const missingAttendeesAsk = zuzuAsksMissingAttendees(prompt);
   if (missingAttendeesAsk && (/\bsocios?\b/.test(p) || /rango\s*[=:]\s*['"]?socio['"]?/.test(p))) rangos.push('SOCIO');
@@ -1159,6 +1170,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
     version: 'ControlEvent Zuzu Planner v19_prod',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
+    usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null,
     resumenModulos: {
       INGRESOS: 'colaboradores, ingresos, asistentes, socios/no socios, justificantes',
       DONACIONES: 'productos donados, donantes, responsables de donación, valoraciones',
@@ -1620,6 +1632,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     generatedAt: new Date().toISOString(),
     seguridad: { modo: 'solo lectura', nota: 'Zuzu decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
+    usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
     planZuzu: { modules, eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO', planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
