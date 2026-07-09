@@ -1,4 +1,4 @@
-// ControlEvent v19_prod · FIX13
+// ControlEvent v19_prod · FIX13 base + FIX14 login guard
 // Refuerzos: desplegable eventos completo, refresco real de INGRESOS/fotos, Vista aérea legible y estados activos.
 (function(){
   'use strict';
@@ -14,6 +14,8 @@
   const cssEsc = v => { try{ return CSS && CSS.escape ? CSS.escape(String(v)) : String(v).replace(/[^a-zA-Z0-9_-]/g, '\\$&'); }catch(_){ return String(v).replace(/[^a-zA-Z0-9_-]/g, '\\$&'); } };
   const setState = st => { try{ if(window.state && st) Object.assign(window.state, st); }catch(_){ } try{ if(window.ControlEventApp && st) window.ControlEventApp.state = window.state || st; }catch(_){ } };
   const selectedEventId = () => trim(state().selectedEventId || $('selectedEvent')?.value || (typeof window.selectedEventId === 'function' ? window.selectedEventId() : '') || window.selectedEventId || '');
+  function isAuthOverlayVisible(){ const o=$('authOverlay'); return !!(o && !o.classList.contains('hidden') && getComputedStyle(o).display !== 'none' && getComputedStyle(o).visibility !== 'hidden'); }
+  function isLoggedIn(){ return !!(window.authUser || window.ControlEventLoginUser || window.__CONTROL_EVENT_LOGIN_USER__ || window.ControlEventApp?.authUser) && !isAuthOverlayVisible(); }
   const eventRows = () => arr(state().eventos || window.eventos || window.CE_EVENTOS);
   const eventTitle = ev => trim(ev?.titulo || ev?.nombre || ev?.Evento || ev?.title || 'Evento');
   const eventDate = ev => trim(ev?.fechaIni || ev?.fecha_ini || ev?.Fecha || '');
@@ -95,6 +97,9 @@
   }
   let bootPromise = null;
   async function ensureBootEventsLoaded(reason){
+    // FIX14: no hacer /api/state?boot=1 mientras la pantalla de login está abierta.
+    // En FIX13 esa precarga podía dejar el flujo de acceso atrapado en algunos despliegues.
+    if(!isLoggedIn()) return false;
     if(bootPromise) return bootPromise;
     const before = eventRows().length;
     bootPromise = fetch('/api/state?boot=1&fix13=' + encodeURIComponent(reason || '') + '&ts=' + Date.now(), {cache:'no-store',headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}})
@@ -115,7 +120,7 @@
   }
   function installDropdownFix(){
     syncEventDropdownFromState();
-    [120,500,1200,2500].forEach(ms => setTimeout(() => { syncEventDropdownFromState(); ensureBootEventsLoaded('startup-'+ms); }, ms));
+    [120,500,1200,2500].forEach(ms => setTimeout(() => { syncEventDropdownFromState(); if(isLoggedIn()) ensureBootEventsLoaded('startup-'+ms); }, ms));
     ['pointerdown','mousedown','focus','click'].forEach(evt => document.addEventListener(evt, ev => {
       if(ev.target && ev.target.id === 'selectedEvent'){
         syncEventDropdownFromState();
