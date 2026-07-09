@@ -389,6 +389,8 @@ Reglas obligatorias:
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
 - Si el usuario pregunta por el tiempo/clima/meteorología de un evento, usa infoIndirecta.meteorologia si existe. Devuelve una lectura útil para la organización del evento y al menos una tabla/gráfica meteorológica si hay datos externos.
 - Usa fechaActualControlEvent junto con EVENTOS.fecha ini/fecha fin para elegir tiempo verbal: futuro si el evento no ha llegado, pasado si ya terminó, presente si es hoy/en curso. No hables en pasado para eventos futuros.
+- FECHA REAL HOY en ControlEvent: ${trim(context?.fechaActualControlEvent || '') || todayIsoMadrid()}. Si el usuario dice que 10/07/2026 es mañana y fechaActualControlEvent es 2026-07-09, respétalo: NO digas "hoy 10 de julio", di "mañana 10 de julio" o "el 10 de julio".
+- El estado "En curso" no significa que el evento ya haya ocurrido: puede ser preparación/organización abierta. Si la fecha del evento es futura, habla en futuro aunque Estado sea En curso.
 - Si infoIndirecta.meteorologia existe, integra esos datos en la respuesta principal; no digas que no dispones de temperatura o clima.
 - Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
 - Si ControlEvent te entrega COMPRAS/DONACIONES/PRODUCTOS, úsalo como datos operativos; EVENTOS solo sirve para identificar título/fechas, no para construir una gráfica de consumo.
@@ -2015,6 +2017,13 @@ function sizeTrace(trace, step, label, payloadText) {
 function compactJson(value, maxChars = 12000) {
   return JSON.stringify(value ?? null).replace(/\s+/g, ' ').slice(0, maxChars);
 }
+function todayIsoMadrid() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
 
 function cleanGeminiError(error) {
   const status = error?.status ? `HTTP ${error.status}: ` : '';
@@ -2059,7 +2068,7 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_EVENT_TIMEOUT_MS || 16000));
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_EVENT_TIMEOUT_MS || 24000));
       logGeminiUsage('PASO 2 respuesta final estructurada', model, payload);
       if (!res.ok) {
         const e = new Error(payload?.error?.message || `Zuzu HTTP ${res.status}`);
@@ -2097,6 +2106,7 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
         };
       }
       const normalized = normalizeResult(parsed, model);
+      normalized.answer = sanitizeTemporalAnswerForContext(normalized.answer, context);
       normalized.__zuzuGeminiFinal = { ok: true, model, usage: usageSmall(payload, model), mode: 'structured-json' };
       zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'OK', `Zuzu devolvió JSON válido. Tablas=${arr(normalized.tables).length}; gráficas=${arr(normalized.charts).length}; ficheros=${arr(normalized.files).length}.`, { model, usage: usageSmall(payload, model) });
       return normalized;
@@ -2212,8 +2222,7 @@ function narrativeFactsFromResult(result) {
   };
 }
 function narrativeTemporalContext(context) {
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0,10);
+  const todayIso = trim(context?.fechaActualControlEvent || '') || todayIsoMadrid();
   const events = arr(context?.eventosObjetivo).map(ev => {
     const title = trim(ev?.['Titulo del evento'] || ev?.Titulo || ev?.Evento || ev?.EVENTO || '');
     const startIso = parseCeDateToIso(ev?.['fecha ini'] || ev?.fechaIni || ev?.Fecha || ev?.fecha || '');
@@ -2298,7 +2307,7 @@ function objectsFromResultTable(result, titleRe, maxRows = 200) {
   const tb = arr(result?.tables).find(t => titleRe.test(norm(t?.title || '')));
   return tb ? tableObjects(tb, maxRows) : [];
 }
-function fallbackPersonNarrativeForLocalReport(prompt, result) {
+function fallbackPersonNarrativeForLocalReport(prompt, result, context = {}) {
   const p = norm(prompt);
   const title = trim(result?.title || '');
   if (!/participaci|papel/.test(norm(title))) return '';
@@ -2338,8 +2347,10 @@ Conclusión: los datos permiten considerar a ${who} como participante significat
 Mi valoración es positiva: no parece una presencia testimonial, sino una colaboración efectiva y con peso dentro de la organización del evento. Debajo queda el detalle para revisar cada línea sin perder trazabilidad.`;
 }
 
-function fallbackNarrativeForLocalReport(prompt, result) {
-  const personFallback = fallbackPersonNarrativeForLocalReport(prompt, result);
+function fallbackNarrativeForLocalReport(prompt, result, context = {}) {
+  const temporal = narrativeTemporalContext(context);
+  const hasFutureEvent = arr(temporal.eventos).some(e => e.relacionTemporal === 'futuro');
+  const personFallback = fallbackPersonNarrativeForLocalReport(prompt, result, context);
   if (personFallback) return personFallback;
   const tone = narrativeToneFromPrompt(prompt);
   const one = firstSummaryObject(result);
@@ -2362,7 +2373,7 @@ function fallbackNarrativeForLocalReport(prompt, result) {
     return `Lectura ejecutiva de Zuzu: el informe de ${evento} presenta ${cifras}. El análisis separa la caja financiera de las donaciones valoradas: el saldo se interpreta como ingresos menos compras realizadas, mientras que las donaciones se muestran como aportación operativa adicional.\n\nConclusión: el detalle de tablas y ficheros permite justificar ingresos/colaboradores, gasto por compras, aportaciones donadas, tickets/fototickets y documentación soporte. Conviene revisar cualquier línea negativa o de ajuste antes de entregar el informe como cierre definitivo.`;
   }
   if (tone.id === 'coloquial-socios') {
-    return `Lectura de Zuzu para contar a los socios: en ${evento} hubo movimiento del bueno: ${cifras}. Traducido a cristiano, aquí no solo hay números; hay gente que colaboró, compras que sostuvieron la celebración y donaciones que ayudaron a que la cosa saliera adelante sin que la caja tuviera que cargar con todo.\n\nEl resumen detallado viene debajo con pelos y señales: colaboradores${colaboradores ? ` (${colaboradores})` : ''}, asistentes${asistentes ? ` (${asistentes})` : ''}, tickets${tickets ? ` (${tickets})` : ''} y documentos${documentos ? ` (${documentos})` : ''}. Vamos, que si alguien pregunta “¿y esto de dónde sale?”, hay papeles y números para aburrir a una oveja, pero contado bonito.`;
+    return `Lectura de Zuzu para contar a los socios: en ${evento} ${hasFutureEvent ? 'hay movimiento previsto y preparado' : 'hubo movimiento del bueno'}: ${cifras}. Traducido a cristiano, aquí no solo hay números; hay gente que colaboró, compras que sostuvieron la celebración y donaciones que ayudaron a que la cosa saliera adelante sin que la caja tuviera que cargar con todo.\n\nEl resumen detallado viene debajo con pelos y señales: colaboradores${colaboradores ? ` (${colaboradores})` : ''}, asistentes${asistentes ? ` (${asistentes})` : ''}, tickets${tickets ? ` (${tickets})` : ''} y documentos${documentos ? ` (${documentos})` : ''}. Vamos, que si alguien pregunta “¿y esto de dónde sale?”, hay papeles y números para aburrir a una oveja, pero contado bonito.`;
   }
   return `Lectura general de Zuzu: el informe de ${evento} resume ${cifras}. Las tablas siguientes dejan trazabilidad por ingresos/colaboradores, compras, donaciones, tickets/fototickets y documentos.\n\nLa idea principal es separar la visión financiera de caja de la actividad real del evento: la caja se mide por ingresos menos compras realizadas, y las donaciones explican valor recibido aunque no entren como ingreso monetario.`;
 }
@@ -2400,7 +2411,8 @@ Reglas obligatorias:
 - Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio completo: PERSONAS con rango SOCIO; si el usuario pidió Numero=1, aplica y menciona Numero=1; no figuran en INGRESOS del evento; se excluyen patrones internos Grupo..., Personas..., z_de... y z_DEV....
 - ${limit}.
 - No uses markdown, no devuelvas tablas, no pegues JSON.
-- Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo" ni "se celebró" para eventos futuros.
+- Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo", "se celebró", "se celebra hoy" ni "hoy 10 de julio" para eventos futuros.
+- contextoTemporal.hoy es la fecha real de ControlEvent en Madrid. Tiene prioridad sobre la fecha del evento y sobre cualquier frase ambigua del modelo.
 - Si contextoTemporal indica que el evento ya pasó, habla en pasado. Si es hoy o está en curso, usa presente: "está previsto", "hay registrado", "se está organizando".
 - Si el usuario pide temperatura/tiempo/clima/lluvia/viento y datosIndirectos.meteorologia contiene filas, debes incluir en answer los datos concretos de meteorología: temperatura máxima y mínima, probabilidad de lluvia, viento y cielo. Prohibido decir que no dispones de esa información.
 - Si se han obtenido datos indirectos relacionados con el evento, intégralos en la respuesta principal con naturalidad. No los relegues solo a tablas.
@@ -2449,7 +2461,35 @@ function narrativeViolatesTemporalContext(userPrompt, context, answer) {
   const events = arr(narrativeTemporalContext(context).eventos);
   if (!events.some(e => e.relacionTemporal === 'futuro')) return false;
   if (!/(temperatura|tiempo|clima|datos del evento|informe|evento)/i.test(userPrompt || '')) return false;
-  return /(c[oó]mo fue|tuvimos|contamos con|se celebr[oó]|el evento fue|hizo el d[ií]a|durante el evento tuvimos)/i.test(answer || '');
+  const a = answer || '';
+  return /(c[oó]mo fue|tuvimos|contamos con|se celebr[oó]|se celebra hoy|celebra hoy|el evento fue|hizo el d[ií]a|durante el evento tuvimos|para hoy\s+10|hoy\s+(?:mismo,?\s*)?10\s+de\s+julio|hoy\s+10\/07\/2026)/i.test(a);
+}
+function prettyIsoEs(iso) {
+  const s = trim(iso);
+  if (!s) return '';
+  try {
+    return new Intl.DateTimeFormat('es-ES', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${s}T00:00:00Z`));
+  } catch (_) {
+    return s;
+  }
+}
+function sanitizeTemporalAnswerForContext(answer, context) {
+  let out = trim(answer);
+  const temporal = narrativeTemporalContext(context);
+  const future = arr(temporal.eventos).find(e => e.relacionTemporal === 'futuro' && e.fechaInicio);
+  if (!future || !out) return out;
+  const today = trim(temporal.hoy);
+  const start = trim(future.fechaInicio);
+  const label = daysBetweenIso(today, start) === 1 ? 'mañana' : `el ${prettyIsoEs(start)}`;
+  const pretty = prettyIsoEs(start);
+  out = out
+    .replace(/que\s+se\s+celebra\s+hoy\s+mismo,?\s*10\s+de\s+julio\s+de\s+2026/ig, `que está previsto para ${label}${pretty ? `, ${pretty}` : ''}`)
+    .replace(/que\s+se\s+celebra\s+hoy/ig, `que está previsto para ${label}`)
+    .replace(/para\s+hoy\s+10\s+de\s+julio/ig, `para ${label} 10 de julio`)
+    .replace(/para\s+hoy\s+10\/07\/2026/ig, `para ${label} 10/07/2026`)
+    .replace(/hoy\s+mismo,?\s*10\s+de\s+julio\s+de\s+2026/ig, `${label}, ${pretty || start}`)
+    .replace(/hoy\s+10\/07\/2026/ig, `${label} 10/07/2026`);
+  return out;
 }
 
 function narrativeLooksTruncated(answer, userPrompt) {
@@ -2497,7 +2537,7 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
         };
         zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'RUN', `Modelo ${model}${attempt ? ' · reintento guiado' : ''}. Zuzu recibe prompt original + resumen cocinado por CE para redactar con tono.`);
         sizeTrace(flowTrace, 'Paso 4 · Zuzu redacción humana', attempt ? 'Contexto corregido enviado a redacción' : 'Contexto compacto enviado a redacción', narrativeText);
-        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 12000 : 8000))));
+        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 30000 : 22000))));
         logGeminiUsage('PASO 2 redacción humana', model, payload);
         if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
         outText = trim(geminiOutText(payload));
@@ -2513,7 +2553,7 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
           }
           if (badLoose) throw new Error('Zuzu devolvió texto libre incompleto o sin cubrir todas las partes pedidas.');
           zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'OK', 'Zuzu redactó texto libre no JSON; CE lo presenta sin plantilla local.', { model, usage: usageSmall(payload, model) });
-          return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: cleaned, warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model, usage: usageSmall(payload, model) };
+          return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: sanitizeTemporalAnswerForContext(cleaned, context), warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model, usage: usageSmall(payload, model) };
         }
         const answerCandidate = trim(parsed?.answer);
         const badNarrative = narrativeViolatesWeatherRequest(userPrompt, context, answerCandidate) || narrativeViolatesTemporalContext(userPrompt, context, answerCandidate) || narrativeLooksTruncated(answerCandidate, userPrompt) || narrativeMissingRequestedBlocks(answerCandidate, userPrompt, context);
@@ -2527,7 +2567,7 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
         }
         break;
       }
-      const finalNarrative = { title: trim(parsed?.title), answer: trim(parsed?.answer), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model, usage: usageSmall(payload, model) };
+      const finalNarrative = { title: trim(parsed?.title), answer: sanitizeTemporalAnswerForContext(parsed?.answer, context), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model, usage: usageSmall(payload, model) };
       zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'OK', `Zuzu redactó answer de ${trim(parsed?.answer).length} caracteres.`, { model, usage: usageSmall(payload, model) });
       return finalNarrative;
     } catch (error) {
@@ -2549,7 +2589,7 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       const mechanical = tone.id === 'coloquial-socios' && /^he localizado\s+\d+\s+registro/i.test(ans);
       if (mechanical) throw new Error('Zuzu devolvió una redacción demasiado mecánica para el tono pedido.');
       out.title = trim(narrative.title) || out.title;
-      out.answer = ans;
+      out.answer = sanitizeTemporalAnswerForContext(ans, context);
       out.warnings = arr(out.warnings).concat(arr(narrative.warnings));
       out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-sentimiento-redaccion`;
       out.model = narrative.model || 'zuzu-redaccion';
@@ -2557,7 +2597,8 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       return out;
     }
   } catch (error) {
-    const strict = requiresGeminiNarrativeStrict(userPrompt);
+    const timeoutLike = /timeout|abort|tard[oó] demasiado|504/i.test(trim(error?.message || error));
+    const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike;
     if (strict) {
       out.answer = `Zuzu no ha podido redactar todavía la parte humana del informe. Los datos calculados por ControlEvent quedan debajo para no perder el trabajo, pero no voy a disfrazar una plantilla local como si fuera una respuesta de Zuzu. Motivo: ${friendlyZuzuErrorMessage(error)}`;
       out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-redaccion-no-disponible`;
@@ -2567,9 +2608,9 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       return out;
     }
     zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error));
-    const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult);
+    const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
     if (fallback) {
-      out.answer = fallback;
+      out.answer = sanitizeTemporalAnswerForContext(fallback, context);
       out.provider = `${trim(out.provider || 'control-event-local')}+redaccion-local`;
       out.model = 'redaccion-local-por-fallo-zuzu';
       out.showWarnings = true;
@@ -2993,7 +3034,8 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
-  context.fechaActualControlEvent = new Date().toISOString().slice(0,10);
+  context.fechaActualControlEvent = todayIsoMadrid();
+  context.contextoTemporal = narrativeTemporalContext(context);
   context.zuzuFlujo = {
     version: 'v19_prod',
     arquitectura: 'Prompt usuario -> Zuzu planifica -> ControlEvent extrae datos -> Zuzu redacta/contextualiza -> ControlEvent presenta',
