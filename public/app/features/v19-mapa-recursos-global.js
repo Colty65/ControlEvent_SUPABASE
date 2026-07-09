@@ -350,14 +350,14 @@
   function metricStyle(label, value, cls){
     const key = up(label);
     const bad = Number(value || 0) < 0;
-    const soft = (color, bg) => `--ce-v19-metric-color:${color};background:${bg}!important;border-color:rgba(255,255,255,.42)!important;box-shadow:0 4px 14px rgba(15,23,42,.035)!important`;
-    if(key === 'INGRESOS') return soft('#1d4ed8','rgba(37,99,235,.075)');
-    if(key === 'COMPRAS') return soft('#b91c1c','rgba(220,38,38,.070)');
-    if(key === 'DONACIONES') return soft('#b45309','rgba(245,158,11,.085)');
-    if(key === 'PRODUCTO DISPONIBLE') return soft('#0f766e','rgba(15,118,110,.075)');
-    if(key === 'SALDO ACTUAL') return bad ? soft('#b91c1c','rgba(220,38,38,.070)') : soft('#15803d','rgba(22,163,74,.075)');
-    if(key === 'SALDO OPERATIVO') return bad ? soft('#b91c1c','rgba(220,38,38,.070)') : soft('#0e7490','rgba(8,145,178,.075)');
-    return soft('#475569','rgba(100,116,139,.065)');
+    const soft = (color, bg) => `--ce-v19-metric-color:${color};background:${bg}!important;border-color:rgba(148,163,184,.34)!important;box-shadow:0 6px 18px rgba(15,23,42,.055)!important`;
+    if(key === 'INGRESOS') return soft('#1d4ed8','rgba(37,99,235,.18)');
+    if(key === 'COMPRAS') return soft('#b91c1c','rgba(220,38,38,.16)');
+    if(key === 'DONACIONES') return soft('#b45309','rgba(245,158,11,.20)');
+    if(key === 'PRODUCTO DISPONIBLE') return soft('#0f766e','rgba(15,118,110,.18)');
+    if(key === 'SALDO ACTUAL') return bad ? soft('#b91c1c','rgba(220,38,38,.16)') : soft('#15803d','rgba(22,163,74,.18)');
+    if(key === 'SALDO OPERATIVO') return bad ? soft('#b91c1c','rgba(220,38,38,.16)') : soft('#0e7490','rgba(8,145,178,.18)');
+    return soft('#475569','rgba(100,116,139,.16)');
   }
   function metric(label, value, cls){ return `<div class="ce-v19-metric ${cls||''}" data-v19-metric-label="${esc(label)}" style="${metricStyle(label,value,cls)}"><span>${esc(label)}</span><strong>${esc(money(value))}</strong></div>`; }
   function orderIndex(list, label){ const key = up(label); const idx = list.map(up).indexOf(key); return idx === -1 ? 999 : idx; }

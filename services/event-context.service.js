@@ -941,6 +941,12 @@ function zuzuActiveEventCue(prompt) {
   return /\b(este\s+evento|evento\s+activo|evento\s+en\s+pantalla|evento\s+actual|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|lo\s+que\s+hay\s+preparado)\b/.test(p);
 }
 
+function zuzuPersonIdentityCue(prompt) {
+  const p = norm(prompt);
+  return /\b(quien\s+es|quién\s+es|sabes\s+quien\s+es|sabes\s+quién\s+es|conoces\s+a|datos\s+de|datos\s+del|datos\s+sobre|ficha\s+de|informacion\s+de|información\s+de|info\s+de|dime\s+sus\s+datos)\b/.test(p)
+    || (/\b(sabes|conoces|identifica|identificar)\b/.test(p) && /\b(persona|colaborador|socio|usuario)\b/.test(p));
+}
+
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
@@ -990,6 +996,7 @@ function zuzuCrossEventSearchRequested(prompt, modules = []) {
   const p = norm(prompt);
   if (zuzuActiveEventCue(prompt)) return false;
   const hasScopedData = arr(modules).some(m => ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS'].includes(zuzuUpperModule(m)));
+  if (zuzuPersonIdentityCue(prompt) && hasScopedData) return true;
   if (!hasScopedData) return false;
   if (/\b(en\s+que\s+eventos|en\s+cuales\s+eventos|que\s+eventos|cuales\s+eventos|eventos\s+y\s+productos|eventos\s+donde|eventos\s+en\s+los\s+que)\b/.test(p)) return true;
   if (/\b(eventos?)\b/.test(p) && /\b(ha[n]?\s+donado|donado|donados|aparece|aparecen|participa|participan|participo|participado|participacion|participación|papel|desempeñad[oa]|desempenad[oa])\b/.test(p)) return true;
@@ -1033,10 +1040,11 @@ function zuzuInferModulesLocal(prompt) {
   const eventComparisonAnalytic = /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && (/\b(evento|eventos|jornada|jornadas|sysa|celebracion|celebración)\b/.test(p) || quotedFragmentsCount >= 2);
   const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|cositas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|dime\s+cositas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|dime\s+cosas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|cuentame\s+(?:cosas?\s+)?(?:sobre|de)\s+(?:este|el)?\s*evento|cuéntame\s+(?:cosas?\s+)?(?:sobre|de)\s+(?:este|el)?\s*evento|hablame\s+(?:sobre|de)\s+(?:este|el)?\s*evento|háblame\s+(?:sobre|de)\s+(?:este|el)?\s*evento|que\s+tal\s+fue(?:\s+el)?\s+evento|qué\s+tal\s+fue(?:\s+el)?\s+evento|como\s+fue(?:\s+el)?\s+evento|cómo\s+fue(?:\s+el)?\s+evento|valoracion\s+(?:del|de\s+este|de\s+el)\s+evento|valoración\s+(?:del|de\s+este|de\s+el)\s+evento|balance\s+(?:del|de\s+este|de\s+el)\s+evento|resumen\s+(?:del|de\s+este|de\s+el)\s+evento|informe\s+(?:del|de\s+este|de\s+el)\s+evento|que\s+ocurri[oó]|actividad\s+del\s+evento|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
   const missingAttendeesAnalytic = zuzuAsksMissingAttendees(prompt);
+  const personIdentityAnalytic = zuzuPersonIdentityCue(prompt);
 
   if (activeEventCue) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m => mods.add(m));
   if (cashAnalytic) { mods.add('EVENTOS'); mods.add('INGRESOS'); mods.add('COMPRAS'); }
-  if (personRoleAnalytic || participationAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
+  if (personRoleAnalytic || participationAnalytic || personIdentityAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
   if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
   // FIX11: preguntar "qué tal fue el evento X", "háblame del evento X" o "dime cosas de este evento" no es una consulta de COMPRAS.
   // Es una valoración del evento completo: siempre debe entrar INGRESOS + DONACIONES además de COMPRAS.
@@ -1072,7 +1080,8 @@ function zuzuInferModulesLocal(prompt) {
 function zuzuDetectNamedFilters(prompt, state, eventIds = []) {
   const p = norm(prompt);
   const pf = zuzuPromptWithoutEventTitles(prompt, state, eventIds);
-  const hasPersonCue = zuzuHasCue(prompt, ['persona','personas','colaborador','colaboradores','socio','socios','donante','donantes','responsable','responsables','ingreso','ingresos','recaudacion','recaudado','donado','donados','donacion','donaciones']);
+  const hasIdentityCue = zuzuPersonIdentityCue(prompt);
+  const hasPersonCue = hasIdentityCue || zuzuHasCue(prompt, ['persona','personas','colaborador','colaboradores','socio','socios','usuario','usuarios','donante','donantes','responsable','responsables','ingreso','ingresos','recaudacion','recaudado','donado','donados','donacion','donaciones']);
   const hasProductCue = zuzuHasCue(prompt, ['producto','productos','articulo','articulos','compra','compras','comprado','donacion','donaciones','donado','precio','coste','unidades']);
   const hasStoreCue = zuzuHasCue(prompt, ['tienda','tiendas','almacen','almacén','supermercado','bar','proveedor']);
   function explicitValueAfter(label) {
@@ -1649,7 +1658,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-2-COMPARATIVA-EVENTOS', regla: 'Una comparativa entre eventos debe calcular una fila por evento y por módulo solicitado. Está prohibido mezclar datos de eventos no citados.' },
       { id: 'EXP-3-FLUJO-ZUZU', regla: 'Primero Zuzu planifica módulos y filtros; después ControlEvent extrae datos completos y humanizados; finalmente Zuzu cocina/formatea la respuesta usando el prompt original y esos datos.' },
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
-      { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' }
+      { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
+      { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' }
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',
@@ -1658,7 +1668,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       donaciones: 'DONACIONES usa la salida probada: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable. El donante se resuelve por P:/T:/id contra personas o tiendas y nunca debe mostrarse como código técnico.',
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
-      metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.'
+      metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',
+      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado.'
     },
     advertencias: advertenciasAuditoria
   };

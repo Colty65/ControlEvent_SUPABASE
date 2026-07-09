@@ -402,6 +402,7 @@ Reglas obligatorias:
 - Si necesitas más datos de ControlEvent para responder con precisión, no completes por intuición: responde con una solicitud concreta de información adicional y qué módulo/eventos deberían extraerse.
 - Responde siempre en español.
 - Respeta el tono solicitado por el usuario. Si pide informe coloquial, informal, simpático, con chascarrillos o para socios, escribe una lectura cercana y humana antes de las tablas, con humor ligero y sin perder rigor. Si pide informe técnico, financiero, auditoría, Dirección o justificación formal, escribe en tono ejecutivo, preciso y sobrio, con conclusiones, salvedades y criterios de cálculo.
+- Personaliza la respuesta con usuarioLogado si está en el contexto: usa Identificacion/apodo en conversación informal y Nombre en informes serios o formales. Si el usuario pregunta por una persona, revisa también usuarioLogado además de PERSONAS, INGRESOS, COMPRAS y DONACIONES.
 - No entregues solo datos crudos cuando el usuario pida un informe: primero redacta un texto de interpretación que explique las líneas generales y responda con el estilo pedido; después deja tablas, gráficas y ficheros como soporte.
 
 - En v19 TODA respuesta final debe parecer escrita por Zuzu: interpreta el prompt completo del usuario, su intención, tono y destinatario. ControlEvent solo te ha preparado los datos; no copies su carcasa.
@@ -942,6 +943,87 @@ function personNeedlesFromPrompt(prompt, context) {
   if (people.length === 1) return uniqueTextList([people[0]?.['Nombre persona']]);
   return [];
 }
+
+function zuzuPersonIdentityPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(quien\s+es|quién\s+es|sabes\s+quien\s+es|sabes\s+quién\s+es|conoces\s+a|datos\s+de|datos\s+del|datos\s+sobre|ficha\s+de|informacion\s+de|información\s+de|info\s+de|dime\s+sus\s+datos)\b/.test(p);
+}
+function cleanPersonNeedle(value) {
+  return trim(value)
+    .replace(/^['"“”]+|['"“”]+$/g, '')
+    .replace(/\b(dime|sus|datos|por\s+favor|porfa|sabes|conoces|quien|quién|es|de|del|sobre|info|informacion|información|ficha)\b/ig, ' ')
+    .replace(/[?¿!¡.,;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function identityNeedlesFromPrompt(prompt, context) {
+  const out = personNeedlesFromPrompt(prompt, context).slice();
+  const raw = text(prompt);
+  const patterns = [
+    /\b(?:quien|quién)\s+es\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i,
+    /\b(?:sabes\s+(?:quien|quién)\s+es|conoces\s+a)\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i,
+    /\b(?:datos|ficha|info|informacion|información)\s+(?:de|del|sobre)\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    if (m && trim(m[1])) out.push(cleanPersonNeedle(m[1]));
+  }
+  const q = quotedNames(prompt).map(cleanPersonNeedle).filter(Boolean);
+  q.forEach(x => out.push(x));
+  return uniqueTextList(out.filter(x => trim(x).length >= 2));
+}
+function loggedUserFromContext(context) {
+  const u = context?.usuarioLogado || context?.user || context?.ce_acceso || context?.ceAcceso || null;
+  if (!u || typeof u !== 'object') return null;
+  const identificacion = firstNonEmpty(u.Identificacion, u.identificacion, u.usuario, u.user, u.apodo);
+  const nombre = firstNonEmpty(u.Nombre, u.nombre, u.name);
+  const nivel = firstNonEmpty(u.Nivel, u.nivel, u.rol, u.Rol);
+  if (!identificacion && !nombre) return null;
+  return { Identificacion: identificacion, Nombre: nombre, Nivel: nivel };
+}
+function loggedUserMatchesNeedle(user, needle) {
+  if (!user || !needle) return false;
+  return nameMatches(user.Identificacion, needle) || nameMatches(user.Nombre, needle);
+}
+function directPersonIdentityIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!zuzuPersonIdentityPrompt(prompt)) return null;
+  const needles = identityNeedlesFromPrompt(prompt, context);
+  const needle = needles[0] || '';
+  if (!needle) return null;
+  const mods = context.modulosExtraidos || {};
+  const user = loggedUserFromContext(context);
+  const loginMatch = loggedUserMatchesNeedle(user, needle);
+  const people = arr(mods.PERSONAS).filter(r => nameMatches(r?.['Nombre persona'] || r?.Nombre || r?.nombre, needle));
+  const ingresos = arr(mods.INGRESOS).filter(r => nameMatches(r?.Nombre, needle));
+  const comprasResp = arr(mods.COMPRAS).filter(r => nameMatches(r?.Responsable, needle));
+  const donResp = arr(mods.DONACIONES).filter(r => nameMatches(r?.Responsable, needle));
+  const donDonante = arr(mods.DONACIONES).filter(r => nameMatches(r?.Donante, needle));
+  const ficha = [];
+  people.slice(0, 20).forEach(r => ficha.push({ Origen: 'PERSONAS', Nombre: trim(r?.['Nombre persona'] || r?.Nombre || ''), Identificacion: trim(r?.Identificacion || r?.identificacion || r?.Apodo || ''), Rango: trim(r?.Rango || r?.rango || ''), Telefono: trim(r?.Telefono || r?.telefono || ''), Email: trim(r?.Email || r?.email || '') }));
+  if (loginMatch) ficha.unshift({ Origen: 'USUARIO LOGADO', Nombre: trim(user.Nombre), Identificacion: trim(user.Identificacion), Rango: trim(user.Nivel), Telefono: '', Email: '' });
+  const actividad = [];
+  ingresos.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Colaborador / ingreso', Producto: '', Unidades: '', 'Importe/valor (€)': round(num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario']), 2), Detalle: `Ingreso: ${trim(r.Ingreso || '')}; rango: ${trim(r.Rango || '')}; número: ${trim(r.Numero || '')}` }));
+  comprasResp.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Responsable de compra/gasto', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Importe, 2), Detalle: `${trim(r['Ticket u otros gastos'] || '')}; tienda: ${trim(r.Tienda || '')}` }));
+  donResp.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Responsable de donación', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; donante: ${trim(r.Donante || '')}` }));
+  donDonante.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Donante', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; responsable: ${trim(r.Responsable || '')}` }));
+  actividad.sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es') || String(a.Papel).localeCompare(String(b.Papel),'es'));
+  const colsFicha = ['Origen','Nombre','Identificacion','Rango','Telefono','Email'];
+  const colsAct = ['Evento','Papel','Producto','Unidades','Importe/valor (€)','Detalle'];
+  const displayName = loginMatch && trim(user.Identificacion) ? trim(user.Identificacion) : needle;
+  const total = actividad.length + ficha.length;
+  const answer = total
+    ? `He buscado a “${needle}” en PERSONAS, en el usuario logado actual y en su actividad de INGRESOS, COMPRAS y DONACIONES. ${loginMatch ? `Además coincide con el usuario conectado: ${trim(user.Identificacion) || trim(user.Nombre)}.` : ''} Actividad encontrada: ${actividad.length} línea(s).`
+    : `No he encontrado a “${needle}” en PERSONAS, usuario logado ni en la actividad de INGRESOS, COMPRAS o DONACIONES de los datos extraídos.`;
+  const tables = [];
+  if (ficha.length) tables.push({ title: `Ficha / identidad de ${displayName}`, columns: colsFicha, rows: ficha.map(r => colsFicha.map(c => text(r[c]))) });
+  if (actividad.length) tables.push({ title: `Participación de ${displayName}`, columns: colsAct, rows: actividad.map(r => colsAct.map(c => text(r[c]))) });
+  const files = [];
+  if (ficha.length) files.push({ filename: fileSafe(`PERSONA_${displayName}_ficha_v19_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(colsFicha, ficha) });
+  if (actividad.length) files.push({ filename: fileSafe(`PERSONA_${displayName}_actividad_v19_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(colsAct, actividad) });
+  return { ok:true, rejected:false, title:`Datos de ${displayName}`, answer, warnings: total ? [] : [`Se han revisado PERSONAS, usuarioLogado, INGRESOS, COMPRAS y DONACIONES dentro del contexto entregado.`], charts:[], tables, files, provider:'control-event-local-persona-identidad', model:'sin-gemini-para-identidad-persona' };
+}
+
 function directPersonRoleReportIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
@@ -1579,6 +1661,7 @@ function directEventReportIfApplicable(prompt, context) {
 function directHighConfidenceResultIfApplicable(prompt, context) {
   return directCashEvolutionIfApplicable(prompt, context)
     || directEventReportIfApplicable(prompt, context)
+    || directPersonIdentityIfApplicable(prompt, context)
     || directPersonsCatalogIfApplicable(prompt, context)
     || directPersonRoleReportIfApplicable(prompt, context)
     || directPersonAppearanceIfApplicable(prompt, context)
@@ -2193,6 +2276,7 @@ function compactResultForNarrative(result, narrativeContext = {}) {
   return {
     title: trim(result?.title),
     contextoTemporal: narrativeTemporalContext(narrativeContext),
+    usuarioLogado: narrativeContext?.usuarioLogado || null,
     datosIndirectos: compactIndirectContextForNarrative(narrativeContext),
     resumenCocinado: narrativeFactsFromResult(result),
     answerBase: trim(result?.answer).slice(0, 600),
@@ -2307,6 +2391,7 @@ Reglas obligatorias:
 - Esta redacción debe ser ORIGINAL para esta petición concreta. Prohibido reutilizar plantillas o coletillas de otros informes.
 - No menciones nombres que no vengan en la petición original o en los datos oficiales de abajo. Si el usuario pregunta por Colty, no acabes hablando de Pocholo; si pregunta por Pocholo, no cambies a Colty.
 - Respeta exactamente el tono pedido: si el usuario pide cachondeo, socios, chascarrillos o palabras cercanas, escribe con gracia y complicidad; si pide Dirección/financiero/técnico, escribe sobrio, ejecutivo y justificable.
+- Si el resumen/contexto incluye usuarioLogado, haz que Zuzu parezca cercana al usuario conectado: en tono informal trátalo por Identificacion/apodo; en informe serio usa Nombre. No fuerces el saludo si queda raro, pero sí úsalo cuando aporte cercanía.
 - Si el usuario pide opinión, da una opinión explícita de Zuzu, prudente y apoyada en datos. No digas que no puedes opinar si los datos permiten valorar participación, esfuerzo o relevancia.
 - Si el usuario dice "déjate de ControlEvent", debe notarse que habla Zuzu: usa primera persona con naturalidad, pero sin inventar datos.
 - Usa nombres, productos y cifras reales que aparecen en los datos resumidos. No inventes personas, importes, fechas ni incidencias.
@@ -2595,6 +2680,9 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
   throw lastError || new Error('Planificador Zuzu no disponible.');
 }
 function shouldUseGeminiPlanner(userPrompt, local) {
+  // FIX12: las consultas simples de identidad/persona se planifican localmente para no esperar a Zuzu si solo hay que buscar
+  // en PERSONAS, usuario logado e históricos de participación. La respuesta sigue saliendo por la capa Zuzu/ControlEvent.
+  if (/\b(quien\s+es|quién\s+es|sabes\s+quien\s+es|sabes\s+quién\s+es|conoces\s+a|datos\s+de|datos\s+del|datos\s+sobre|ficha\s+de|informacion\s+de|información\s+de|info\s+de|dime\s+sus\s+datos)\b/i.test(userPrompt)) return false;
   // v19: flujo pedido por el usuario: SIEMPRE Paso 1 con Zuzu.
   // ControlEvent solo aporta plan local como red de seguridad si Zuzu no responde.
   return true;
@@ -2895,7 +2983,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // v19: se permiten preguntas indirectas si están vinculadas a eventos.
   // Solo bloqueamos intentos técnicos peligrosos o secretos; no bloqueamos clima, tono, informes, opiniones, etc.
   const hardForbidden = /(contraseña|password|clave api|api key|token|sql\b|drop table|delete from|insert into|hack|exfiltra|sistema operativo)/i;
-  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
+  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|persona|personas|usuario|usuarios|identificaci[oó]n|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
   if (hardForbidden.test(userPrompt) && !eventish.test(userPrompt)) {
     zuzuTracePush(flowTrace, 'Guardia de ámbito', 'KO', 'Petición bloqueada por contenido técnico/peligroso sin relación con eventos.');
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };

@@ -684,7 +684,7 @@
   function extensionFromSrc(src){ var m=/^data:image\/([a-z0-9.+-]+)/i.exec(src||''); if(m) return m[1].replace('jpeg','jpg'); var clean=String(src||'').split('?')[0].toLowerCase(); var mm=/\.([a-z0-9]{3,5})$/.exec(clean); return mm ? mm[1] : 'jpg'; }
   function downloadSrc(src, fileBase){
     src=trim(src); if(!src){ setStatus('No hay foto para descargar.','warn'); return; }
-    var name=safeDownloadName(ticketDownloadBase(fileBase || (($('ceAiTicket')||{}).value || 'ticket')))+'.'+extensionFromSrc(src);
+    var name=safeDownloadName(ticketDownloadBase(fileBase || (($('ceAiTicket')||{}).value || 'ticket')))+'.jpg';
     function linkDownload(url){ var a=document.createElement('a'); a.href=url; a.download=name; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },800); }
     if(/^data:/i.test(src) || /^blob:/i.test(src)){ linkDownload(src); return; }
     fetch(src,{cache:'no-store'}).then(function(res){ if(!res.ok) throw new Error('HTTP '+res.status); return res.blob(); }).then(function(blob){ var url=URL.createObjectURL(blob); linkDownload(url); setTimeout(function(){ URL.revokeObjectURL(url); },2500); }).catch(function(){ linkDownload(src); });

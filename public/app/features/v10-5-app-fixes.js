@@ -15,7 +15,7 @@
   function fold(v){ var s=text(v); return (s.normalize?s.normalize('NFD').replace(/[\u0300-\u036f]/g,''):s).toUpperCase(); }
   function esc(v){ return text(v).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];}); }
   function stop(ev){ if(ev){ ev.preventDefault&&ev.preventDefault(); ev.stopPropagation&&ev.stopPropagation(); ev.stopImmediatePropagation&&ev.stopImmediatePropagation(); } return false; }
-  function safeFile(base){ return trim(base||'foto').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').slice(0,90)||'foto'; }
+  function safeFile(base){ return trim(base||'foto').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').slice(0,150)||'foto'; }
   function srcOf(v){ if(!v) return ''; if(typeof v==='string') return trim(v); if(typeof v==='object') return trim(v.url||v.public_url||v.publicUrl||v.pathname||v.path||v.storage_path||v.dataUrl||v.base64||v.src||''); return trim(v); }
   function safePart(v, fallback){ return safeFile(trim(v) || fallback || 'sin_dato'); }
   function currentEvent(){ var id=selectedEventId(); var ev=arr('eventos').find(function(e){ return trim(e && e.id)===id; }); return ev || {}; }
@@ -34,15 +34,19 @@
     var persona=personaNameById(row.personaId) || trim(row.persona || row.colaborador || row.nombre || 'Colaborador');
     return 'ING-'+safePart(currentEventTitle(),'Evento')+'-'+safePart(persona,'Colaborador');
   }
+  function formatDocDate(value){
+    var v=trim(value); var m=v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/); if(m){ var y=m[3]; if(y.length===2) y='20'+y; return ('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2)+'-'+y; }
+    m=v.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/); if(m){ return ('0'+m[3]).slice(-2)+'-'+('0'+m[2]).slice(-2)+'-'+m[1]; }
+    return 'DD-MM-AAAA';
+  }
   function docDownloadName(card, idx){
     var txt=trim(card && card.textContent);
-    var date=(txt.match(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/)||[])[0] || trim(card && card.getAttribute && (card.getAttribute('data-date')||card.getAttribute('data-fecha')));
-    if(date) date=date.replace(/[\/]/g,'-');
-    var desc=txt.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,' ')
+    var date=(txt.match(/\b\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}\b/)||[])[0] || trim(card && card.getAttribute && (card.getAttribute('data-date')||card.getAttribute('data-fecha')));
+    var desc=txt.replace(/\b\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}\b/g,' ')
       .replace(/\b(ver|descargar|documento|adjuntar|eliminar|cerrar|abrir|foto|imagen|doc\d*)\b/ig,' ')
       .replace(/\s+/g,' ').trim();
-    if(desc.length>48) desc=desc.slice(0,48).trim();
-    return 'DOC-'+safePart(date,'fechaDOC')+'-'+safePart(desc || ('texto_'+(idx+1)),'texto');
+    if(desc.length>20) desc=desc.slice(0,20).trim();
+    return 'DOC-'+safePart(formatDocDate(date),'DD-MM-AAAA')+'-'+safePart(currentEventTitle(),'Evento')+'-'+safePart(desc || ('texto_'+(idx+1)),'texto');
   }
   function downloadSrc(src, name){
     src=trim(src); if(!src) return false;
