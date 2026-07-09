@@ -97,6 +97,28 @@
       && String(row.situacion||'').trim() !== '';
   }
 
+  function sameCollabRows(a,b){
+    if(!a || !b) return false;
+    return String(a.id||'') === String(b.id||'')
+      && String(a.personaId||'') === String(b.personaId||'')
+      && String(a.situacion||'') === String(b.situacion||'')
+      && Number(a.numero||0) === Number(b.numero||0)
+      && Math.abs(Number(money(a.importe||0)) - Number(money(b.importe||0))) < 0.005
+      && String(a.eventId || a.eventoId || '') === String(b.eventId || b.eventoId || '');
+  }
+  function keepPendingCollabInState(s){
+    try{
+      const pend=window.__ceFix11PendingCollabSave;
+      if(!pend || !pend.row || Number(pend.until||0)<Date.now()) return;
+      if(!Array.isArray(s.colaboradores)) s.colaboradores=[];
+      const row=pend.row;
+      const idx=s.colaboradores.findIndex(x=>String(x.id||'')===String(row.id||''));
+      const saved=idx>=0 ? s.colaboradores[idx] : null;
+      if(sameCollabRows(row, saved)){ try{ delete window.__ceFix11PendingCollabSave; }catch(_){} return; }
+      if(idx>=0) s.colaboradores[idx]={...saved,...row}; else s.colaboradores.push(row);
+    }catch(_){ }
+  }
+
   async function apiJson(url, init){
     const res=await fetch(url, init||{});
     const data=await res.json().catch(async()=>({error:await res.text().catch(()=>res.statusText)}));
@@ -177,6 +199,7 @@
     }
     if(selected && Array.isArray(s.eventos) && s.eventos.some(e=>String(e.id)===String(selected))) s.selectedEventId=selected;
     else if(Array.isArray(s.eventos)) s.selectedEventId=s.eventos[0]?.id||'';
+    keepPendingCollabInState(s);
     localStore();
   }
   async function refreshFromDb(collection){
@@ -266,28 +289,27 @@
       return;
     }
     if(action==='save-collab'){
-      const scope = sourceBtn?.closest?.('.rowline.collab,.itemcard,.card') || null;
+      const scope = sourceBtn?.closest?.('.rowline.collab,.itemcard,.card,.ce-v5011-pending-row,.red-row') || null;
       const row=rowCollabFromForm(id, scope);
+      window.__ceFix11PendingCollabSave={row, until:Date.now()+8000};
       await upsert('colaboradores',row);
+      // FIX11: el usuario debe ver el ingreso modificado con UN solo guardado.
+      // No se deja que un refresco inmediato/stale de /api/state vuelva a pintar la versión antigua.
       replaceLocal('colaboradores',row);
-      const fresh = await refreshFromDb();
-      // FIX10: si el refresco devuelve una copia antigua, se mantiene en local TODO el ingreso guardado.
-      // Antes solo se comparaba Situación; por eso algunos cambios (importe, número, colaborador) exigían guardar dos veces.
-      try{
-        const saved = Array.isArray(fresh?.colaboradores) ? fresh.colaboradores.find(x=>String(x.id||'')===String(id)) : null;
-        const sameSaved = saved
-          && String(saved.personaId||'') === String(row.personaId||'')
-          && String(saved.situacion||'') === String(row.situacion||'')
-          && Number(saved.numero||0) === Number(row.numero||0)
-          && Math.abs(Number(money(saved.importe||0)) - Number(money(row.importe||0))) < 0.005
-          && String(saved.eventoId||'') === String(row.eventoId||'');
-        if(!sameSaved){
-          replaceLocal('colaboradores',row);
+      renderNow();
+      try{ if(typeof renderIngresosSummary==='function') renderIngresosSummary(); }catch(__){}
+      try{ if(typeof renderColabs==='function') renderColabs(); }catch(__){}
+      setTimeout(async()=>{
+        try{
+          const fresh=await readFreshState();
+          const keep=selectedEventId();
+          replaceLocalState(fresh, keep);
+          keepPendingCollabInState(getState());
           renderNow();
           try{ if(typeof renderIngresosSummary==='function') renderIngresosSummary(); }catch(__){}
           try{ if(typeof renderColabs==='function') renderColabs(); }catch(__){}
-        }
-      }catch(_){ }
+        }catch(e){ log('verificación diferida ingreso falló', e); }
+      },900);
       return;
     }
     if(action==='delete-collab'){ await del('colaboradores',id); removeLocal('colaboradores',id); await refreshFromDb(); if(arr('colaboradores').some(x=>String(x.id||'')===String(id))){ throw new Error('La baja de ingreso NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); } return; }

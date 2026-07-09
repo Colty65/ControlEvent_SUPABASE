@@ -1,8 +1,9 @@
-// ControlEvent v19_prod · FIX10
+// ControlEvent v19_prod · FIX11
 // Ajustes: usuario ce_acceso en sesión, casa estándar Vista aérea, nombres de descarga y blindajes ligeros.
 (function(){
   'use strict';
-  if (window.__CE_V19_FIX10_APPLIED__) return;
+  if (window.__CE_V19_FIX11_APPLIED__) return;
+  window.__CE_V19_FIX11_APPLIED__ = true;
   window.__CE_V19_FIX10_APPLIED__ = true;
   var STORAGE_USER = 'ControlEvent_v19_prod_login_user';
   var STORAGE_ACCESS = 'ControlEvent_ce_acceso_usuario';
@@ -115,7 +116,7 @@
     var st=state(), ev=currentEvent(), evId=trim(ev && ev.id), rows=arr(st.colaboradores || window.colaboradores || []);
     var text=trim(ctxEl && ctxEl.textContent);
     var byText = rows.find(function(r){ var n=personNameById(r.personaId) || trim(r.persona || r.colaborador || r.nombre); return n && text && text.indexOf(n) !== -1; });
-    var r = byText || rows.filter(function(x){ return !evId || trim(x.eventoId)===evId; }).slice(-1)[0] || {};
+    var r = byText || rows.filter(function(x){ return !evId || trim(x.eventId || x.eventoId)===evId; }).slice(-1)[0] || {};
     return personNameById(r.personaId) || trim(r.persona || r.colaborador || r.nombre || 'Colaborador');
   }
   function guessDoc(ctxEl){
@@ -129,15 +130,15 @@
     var text=trim((ctxEl && ctxEl.textContent) || '') + ' ' + trim(oldName || '');
     var tk = (text.match(/\bTK\s*\d+\b/i) || [])[0];
     if(tk) tk = tk.toUpperCase().replace(/\s+/g,'');
-    var row = (tk && rows.find(function(r){ return trim(r.tk || r.ticket || r.ticketTipo).toUpperCase() === tk; })) || rows.filter(function(x){ return !evId || trim(x.eventoId)===evId; }).slice(-1)[0] || {};
-    return { tk: tk || trim(row.tk || row.ticket || row.ticketTipo || 'TKxx').toUpperCase().replace(/\s+/g,''), tienda: storeNameById(row.tiendaId) || trim(row.tienda || row.Tienda || 'Tienda') };
+    var row = (tk && rows.find(function(r){ return trim(r.ticketDonacion || r.tk || r.ticket || r.ticketTipo || r.ticketOtrosGastos || r.ticket_otros_gastos).toUpperCase().replace(/\s+/g,'') === tk; })) || rows.filter(function(x){ return !evId || trim(x.eventId || x.eventoId)===evId; }).slice(-1)[0] || {};
+    return { tk: tk || trim(row.ticketDonacion || row.tk || row.ticket || row.ticketTipo || row.ticketOtrosGastos || row.ticket_otros_gastos || 'TKxx').toUpperCase().replace(/\s+/g,''), tienda: storeNameById(row.tiendaId) || trim(row.tienda || row.Tienda || 'Tienda') };
   }
   window.__ceFix10DownloadContext = null;
   function captureDownloadContext(ev){
     var t=ev.target && ev.target.closest && ev.target.closest('button,a,[role="button"],img'); if(!t) return;
     var label=trim((t.getAttribute('title')||'')+' '+(t.getAttribute('aria-label')||'')+' '+t.textContent+' '+(t.className||''));
     if(!/(descargar|download|bajar|foto|justificante|ticket|documento|doc|tk)/i.test(label)) return;
-    var ctxEl=t.closest('.rowline,.itemcard,.card,.ce-v19-income-row,.ce-v19-product-line,.ce-v19-image-card,#eventDocsList,#collabList,#ceAiTicket,.modal,.dialog') || t;
+    var ctxEl=t.closest('.rowline,.itemcard,.card,.ce-v19-income-row,.ce-v19-product-line,.ce-v19-image-card,#eventDocsList,#collabList,#ceAiTicketPanel,#ceAiTicket,.modal,.dialog') || t;
     var txt=trim(ctxEl.textContent);
     if(/ingreso|justificante|colaborador/i.test(txt+' '+label)) window.__ceFix10DownloadContext={ type:'ING', evento:eventTitle(), colaborador:guessIncome(ctxEl) };
     else if(/documento|doc\d*/i.test(txt+' '+label)) window.__ceFix10DownloadContext=Object.assign({ type:'DOC' }, guessDoc(ctxEl));
@@ -167,13 +168,13 @@
     return btn;
   }
   function updateHome(){
-    var modal=document.getElementById('ceV19MapaGlobalOverlay');
+    var modal=document.getElementById('ceMapaGlobalOverlay');
     if(modal){ document.body.classList.add('ce-v19-modal-open'); ensureStandardHome(); }
     else document.body.classList.remove('ce-v19-modal-open');
   }
   document.addEventListener('click', function(ev){
     var btn=ev.target && ev.target.closest && ev.target.closest('#ceMapaFloatingHomeButton'); if(!btn) return;
-    var modal=document.getElementById('ceV19MapaGlobalOverlay'); if(!modal) return;
+    var modal=document.getElementById('ceMapaGlobalOverlay'); if(!modal) return;
     ev.preventDefault(); ev.stopPropagation();
     var card=modal.querySelector('.ce-v19-global-card') || modal;
     try{ card.scrollTo({ top:0, behavior:'smooth' }); }catch(_){ card.scrollTop=0; }

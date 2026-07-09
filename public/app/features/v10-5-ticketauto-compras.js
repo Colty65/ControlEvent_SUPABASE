@@ -19,6 +19,21 @@
   function arr(name){ var s=stateObj(); return Array.isArray(s[name]) ? s[name] : []; }
   function selectedEventId(){ var s=stateObj(); if(trim(s.selectedEventId)) return trim(s.selectedEventId); var el=$('selectedEvent'); return el ? trim(el.value) : ''; }
   function selectedEvent(){ var id=selectedEventId(); var evs=arr('eventos'); for(var i=0;i<evs.length;i++){ if(trim(evs[i].id)===id) return evs[i]; } return null; }
+  function selectedEventTitle(){ var ev=selectedEvent()||{}; var el=document.querySelector('.event-title,.ce-event-title,#currentEventTitle'); return trim(ev.titulo || ev.Titulo || ev.Evento || ev.nombre || ev.title || (el && el.textContent) || 'Evento'); }
+  function ticketCodeFromAny(v){ var m=/\bTK\s*\d+\b/i.exec(text(v)||''); return m ? m[0].toUpperCase().replace(/\s+/g,'') : ''; }
+  function currentTicketForDownload(fileBase){
+    var tk=ticketCodeFromAny(fileBase) || ticketCodeFromAny(($('ceAiTicket')||{}).value);
+    var evId=selectedEventId();
+    var rows=arr('compras').filter(function(r){ return !evId || trim(r.eventId || r.eventoId)===evId; });
+    if(!tk){ var last=rows.slice(-1)[0] || {}; tk=trim(last.ticketDonacion || last.tk || last.ticket || last.ticketTipo || 'TKxx').toUpperCase().replace(/\s+/g,''); }
+    var row=rows.find(function(r){ return trim(r.ticketDonacion || r.tk || r.ticket || r.ticketTipo || r.ticketOtrosGastos || r.ticket_otros_gastos).toUpperCase().replace(/\s+/g,'')===tk; }) || {};
+    var sel=$('ceAiTienda');
+    var tienda='';
+    try{ tienda=trim(sel && sel.options && sel.selectedIndex>=0 && sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].textContent); }catch(_){ }
+    tienda=tienda || tiendaNameById(row.tiendaId) || trim(row.tienda || row.Tienda || 'Tienda');
+    return {tk:tk||'TKxx', evento:selectedEventTitle(), tienda:tienda||'Tienda'};
+  }
+  function ticketDownloadBase(fileBase){ var d=currentTicketForDownload(fileBase); return d.tk+'-'+d.evento+'-'+d.tienda; }
   function isFinalizado(){ return trim((selectedEvent()||{}).situacion).toLowerCase()==='finalizado'; }
   function uid(){ return 'id-'+Math.random().toString(36).slice(2)+Date.now().toString(36); }
   function normalizeName(v){ return trim(v).replace(/\s+/g,' ').toUpperCase(); }
@@ -669,7 +684,7 @@
   function extensionFromSrc(src){ var m=/^data:image\/([a-z0-9.+-]+)/i.exec(src||''); if(m) return m[1].replace('jpeg','jpg'); var clean=String(src||'').split('?')[0].toLowerCase(); var mm=/\.([a-z0-9]{3,5})$/.exec(clean); return mm ? mm[1] : 'jpg'; }
   function downloadSrc(src, fileBase){
     src=trim(src); if(!src){ setStatus('No hay foto para descargar.','warn'); return; }
-    var name=safeDownloadName(fileBase || (($('ceAiTicket')||{}).value || 'ticket'))+'.'+extensionFromSrc(src);
+    var name=safeDownloadName(ticketDownloadBase(fileBase || (($('ceAiTicket')||{}).value || 'ticket')))+'.'+extensionFromSrc(src);
     function linkDownload(url){ var a=document.createElement('a'); a.href=url; a.download=name; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },800); }
     if(/^data:/i.test(src) || /^blob:/i.test(src)){ linkDownload(src); return; }
     fetch(src,{cache:'no-store'}).then(function(res){ if(!res.ok) throw new Error('HTTP '+res.status); return res.blob(); }).then(function(blob){ var url=URL.createObjectURL(blob); linkDownload(url); setTimeout(function(){ URL.revokeObjectURL(url); },2500); }).catch(function(){ linkDownload(src); });

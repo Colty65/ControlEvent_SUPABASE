@@ -128,11 +128,11 @@ function parseEventDate(ev) {
 function zuzuPromptYearFilters(prompt) {
   const raw = text(prompt);
   const p = norm(raw);
-  const years = zuzuUnique((raw.match(/(?:19|20)\d{2}/g) || []));
+  const years = zuzuUnique((raw.match(/\b(?:19|20)\d{2}\b/g) || []));
   const nowYear = new Date().getFullYear();
-  if (/(a[nñ]o\s+pasado|el\s+pasado\s+a[nñ]o|pasado\s+a[nñ]o)/.test(p)) years.push(String(nowYear - 1));
-  if (/(este\s+a[nñ]o|a[nñ]o\s+actual)/.test(p)) years.push(String(nowYear));
-  if (/(a[nñ]o\s+que\s+viene|pr[oó]ximo\s+a[nñ]o|proximo\s+a[nñ]o)/.test(p)) years.push(String(nowYear + 1));
+  if (/\b(a[nñ]o\s+pasado|el\s+pasado\s+a[nñ]o|pasado\s+a[nñ]o)\b/.test(p)) years.push(String(nowYear - 1));
+  if (/\b(este\s+a[nñ]o|a[nñ]o\s+actual)\b/.test(p)) years.push(String(nowYear));
+  if (/\b(a[nñ]o\s+que\s+viene|pr[oó]ximo\s+a[nñ]o|proximo\s+a[nñ]o)\b/.test(p)) years.push(String(nowYear + 1));
   return zuzuUnique(years.filter(Boolean));
 }
 function makeHelpers(state) {
@@ -1031,13 +1031,18 @@ function zuzuInferModulesLocal(prompt) {
   const personRoleAnalytic = /\b(informe|papel|participacion|participación|desempenad[oa]|historial|trayectoria)\b/.test(p) && (/\b(responsable|responsables|donante|donantes|colaborador|colaboradores|persona)\b/.test(p) || quotedFragmentsCount > 0);
   const participationAnalytic = /\b(participa|participan|participo|participó|participado|participacion|participación|aparece|aparecen|intervino|interviene|colabora|colaboro|colaboró|papel)\b/.test(p) && (quotedFragmentsCount > 0 || /\b(persona|colaborador|responsable|donante)\b/.test(p));
   const eventComparisonAnalytic = /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p) && (/\b(evento|eventos|jornada|jornadas|sysa|celebracion|celebración)\b/.test(p) || quotedFragmentsCount >= 2);
-  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|que\s+ocurri[oó]|actividad\s+del\s+evento|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
+  const eventDossierAnalytic = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento|cosas\s+que\s+ocurrieron|cositas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|dime\s+cositas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|dime\s+cosas?\s+(?:sobre|de)\s+(?:este|el)?\s*evento|cuentame\s+(?:cosas?\s+)?(?:sobre|de)\s+(?:este|el)?\s*evento|cuéntame\s+(?:cosas?\s+)?(?:sobre|de)\s+(?:este|el)?\s*evento|hablame\s+(?:sobre|de)\s+(?:este|el)?\s*evento|háblame\s+(?:sobre|de)\s+(?:este|el)?\s*evento|que\s+tal\s+fue(?:\s+el)?\s+evento|qué\s+tal\s+fue(?:\s+el)?\s+evento|como\s+fue(?:\s+el)?\s+evento|cómo\s+fue(?:\s+el)?\s+evento|valoracion\s+(?:del|de\s+este|de\s+el)\s+evento|valoración\s+(?:del|de\s+este|de\s+el)\s+evento|balance\s+(?:del|de\s+este|de\s+el)\s+evento|resumen\s+(?:del|de\s+este|de\s+el)\s+evento|informe\s+(?:del|de\s+este|de\s+el)\s+evento|que\s+ocurri[oó]|actividad\s+del\s+evento|lo\s+que\s+hemos\s+preparado|lo\s+que\s+tenemos\s+preparado|lo\s+preparad[oa]|cronica|crónica|parte\s+meteorolog|parte\s+metereolog|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog)\b/.test(p);
   const missingAttendeesAnalytic = zuzuAsksMissingAttendees(prompt);
 
   if (activeEventCue) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m => mods.add(m));
   if (cashAnalytic) { mods.add('EVENTOS'); mods.add('INGRESOS'); mods.add('COMPRAS'); }
   if (personRoleAnalytic || participationAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
   if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
+  // FIX11: preguntar "qué tal fue el evento X", "háblame del evento X" o "dime cosas de este evento" no es una consulta de COMPRAS.
+  // Es una valoración del evento completo: siempre debe entrar INGRESOS + DONACIONES además de COMPRAS.
+  if ((/\b(evento|celebracion|celebración|jornada)\b/.test(p) || quotedFragmentsCount > 0) && /\b(que\s+tal\s+fue|qué\s+tal\s+fue|como\s+fue|cómo\s+fue|cuentame|cuéntame|hablame|háblame|dime\s+cositas?|dime\s+cosas?|valoracion|valoración|balance|resumen|informe)\b/.test(p)) {
+    ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].forEach(m=>mods.add(m));
+  }
   if (missingAttendeesAnalytic) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m=>mods.add(m));
   if (/\b(ingreso|ingresos|recaudacion|recaudado|asistente|asistentes|entrada|entradas|banco|bizum|efectivo)\b/.test(p)) mods.add('INGRESOS');
   if (/\b(colaborador|colaboradores)\b/.test(p)) mods.add('INGRESOS');

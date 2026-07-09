@@ -1976,7 +1976,7 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 36000);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_EVENT_TIMEOUT_MS || 16000));
       logGeminiUsage('PASO 2 respuesta final estructurada', model, payload);
       if (!res.ok) {
         const e = new Error(payload?.error?.message || `Zuzu HTTP ${res.status}`);
@@ -2412,7 +2412,7 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
         };
         zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'RUN', `Modelo ${model}${attempt ? ' · reintento guiado' : ''}. Zuzu recibe prompt original + resumen cocinado por CE para redactar con tono.`);
         sizeTrace(flowTrace, 'Paso 4 · Zuzu redacción humana', attempt ? 'Contexto corregido enviado a redacción' : 'Contexto compacto enviado a redacción', narrativeText);
-        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, wantsOnePageNarrative(userPrompt) ? 60000 : 45000));
+        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 12000 : 8000))));
         logGeminiUsage('PASO 2 redacción humana', model, payload);
         if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
         outText = trim(geminiOutText(payload));

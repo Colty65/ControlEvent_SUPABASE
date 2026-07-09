@@ -17,6 +17,33 @@
   function stop(ev){ if(ev){ ev.preventDefault&&ev.preventDefault(); ev.stopPropagation&&ev.stopPropagation(); ev.stopImmediatePropagation&&ev.stopImmediatePropagation(); } return false; }
   function safeFile(base){ return trim(base||'foto').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').slice(0,90)||'foto'; }
   function srcOf(v){ if(!v) return ''; if(typeof v==='string') return trim(v); if(typeof v==='object') return trim(v.url||v.public_url||v.publicUrl||v.pathname||v.path||v.storage_path||v.dataUrl||v.base64||v.src||''); return trim(v); }
+  function safePart(v, fallback){ return safeFile(trim(v) || fallback || 'sin_dato'); }
+  function currentEvent(){ var id=selectedEventId(); var ev=arr('eventos').find(function(e){ return trim(e && e.id)===id; }); return ev || {}; }
+  function currentEventTitle(){ var ev=currentEvent(); var el=document.querySelector('.event-title,.ce-event-title,#currentEventTitle'); return trim(ev.titulo || ev.Titulo || ev.Evento || ev.nombre || ev.title || (el && el.textContent) || 'Evento'); }
+  function personaNameById(id){ var p=arr('personas').find(function(x){ return trim(x && x.id)===trim(id); }); return trim(p && (p.nombre || p.Nombre || p.persona || p.name)); }
+  function nodeRowId(node){ var n=node; for(var i=0;n && i<7;i++,n=n.parentElement){ var id=trim(n.getAttribute && (n.getAttribute('data-id') || n.dataset && n.dataset.id)); if(id) return id; var b=n.querySelector && n.querySelector('[data-action="save-collab"][data-id],button[data-id]'); if(b){ id=trim(b.getAttribute('data-id') || (b.dataset && b.dataset.id)); if(id) return id; } } return ''; }
+  function ingresoDownloadName(strip, idx){
+    var card=strip && (strip.closest('.rowline.collab,.itemcard,.card,.ce-v5011-pending-row,.red-row') || strip.parentElement || strip);
+    var id=nodeRowId(card);
+    var evId=selectedEventId();
+    var rows=arr('colaboradores').filter(function(r){ return !evId || trim(r.eventId || r.eventoId)===evId; });
+    var row=(id && rows.find(function(r){ return trim(r.id)===id; })) || null;
+    var txt=trim(card && card.textContent);
+    if(!row && txt){ row=rows.find(function(r){ var n=personaNameById(r.personaId) || trim(r.persona || r.colaborador || r.nombre); return n && txt.indexOf(n)>=0; }) || null; }
+    row=row || rows[idx] || rows.slice(-1)[0] || {};
+    var persona=personaNameById(row.personaId) || trim(row.persona || row.colaborador || row.nombre || 'Colaborador');
+    return 'ING-'+safePart(currentEventTitle(),'Evento')+'-'+safePart(persona,'Colaborador');
+  }
+  function docDownloadName(card, idx){
+    var txt=trim(card && card.textContent);
+    var date=(txt.match(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/)||[])[0] || trim(card && card.getAttribute && (card.getAttribute('data-date')||card.getAttribute('data-fecha')));
+    if(date) date=date.replace(/[\/]/g,'-');
+    var desc=txt.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,' ')
+      .replace(/\b(ver|descargar|documento|adjuntar|eliminar|cerrar|abrir|foto|imagen|doc\d*)\b/ig,' ')
+      .replace(/\s+/g,' ').trim();
+    if(desc.length>48) desc=desc.slice(0,48).trim();
+    return 'DOC-'+safePart(date,'fechaDOC')+'-'+safePart(desc || ('texto_'+(idx+1)),'texto');
+  }
   function downloadSrc(src, name){
     src=trim(src); if(!src) return false;
     var fname=safeFile(name)+'.jpg';
@@ -52,7 +79,7 @@
       '.ce-v105-download{width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:0!important;border-radius:10px!important;font-size:17px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-left:5px!important;vertical-align:middle!important;background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;box-shadow:0 1px 3px rgba(15,23,42,.12)!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important}\n'+
       '#collabList .ce-v105-ingreso-download{background:#fff!important;color:#0f172a!important}\n'+
       '#eventDocsList .ce-v105-doc-download{background:#fff!important;color:#0f172a!important}\n'+
-      '#tabResumen .ce-ticket-download-v95,#tabResumen .ce-v1047-download,#tabResumen .ce-v1046-download,#tabResumen .ce-v1045-download,#summaryTiendaTicket .ce-ticket-download-v95,#summaryTiendaTicket .ce-v1047-download{display:none!important}\n'+
+      '#tabResumen .ce-ticket-download-v95,#tabResumen .ce-v1047-download,#tabResumen .ce-v1046-download,#tabResumen .ce-v1045-download,#summaryTiendaTicket .ce-ticket-download-v95,#summaryTiendaTicket .ce-v1047-download,#collabList .ce-v104-download-btn,#collabList .ce-v103-download-btn,#tabDocumentos .ce-v104-download-btn,#tabDocumentos .ce-v103-download-btn{display:none!important}\n'+
       '@media (min-width:768px) and (max-width:1180px){#mapaResponsablesFilter summary,#mapaResponsablesFilterV309 summary{font-size:10px!important;padding:3px 5px!important;min-height:0!important}#mapaResponsablesFilter .mapa-filter-option,#mapaResponsablesFilterV309 .mapa-filter-option,.mapa-filter-option{font-size:9px!important;line-height:1!important;padding:2px 4px!important;min-height:0!important;border-radius:6px!important}#mapaResponsablesFilter input[type="checkbox"],#mapaResponsablesFilterV309 input[type="checkbox"],.mapa-filter-option input[type="checkbox"]{width:12px!important;height:12px!important;min-width:12px!important;min-height:12px!important;margin:0 3px 0 0!important;transform:none!important}}\n';
     document.head.appendChild(st);
   }
@@ -107,7 +134,7 @@
     var root=$('collabList') || $('tabIngresos'); if(!root) return;
     if(window.ControlEventV509 && typeof window.ControlEventV509.normalizeReceiptFields==='function') safe(function(){ window.ControlEventV509.normalizeReceiptFields(); });
     // Quitar duplicados de descargas antiguas, conservando solo la nuestra por strip.
-    Array.prototype.slice.call(root.querySelectorAll('.ce-v1047-ingreso-download,.ce-v1046-ingreso-download,.ce-v1045-ingreso-download')).forEach(function(b){ try{ b.remove(); }catch(_){ } });
+    Array.prototype.slice.call(root.querySelectorAll('.ce-v1047-ingreso-download,.ce-v1046-ingreso-download,.ce-v1045-ingreso-download,.ce-v104-ingreso-download,.ce-v103-ingreso-download,.ce-v104-download-btn,.ce-v103-download-btn')).forEach(function(b){ try{ b.remove(); }catch(_){ } });
     Array.prototype.slice.call(root.querySelectorAll('.ce-v509-receipt-strip')).forEach(function(strip,idx){
       var own=Array.prototype.slice.call(strip.querySelectorAll(':scope > .ce-v105-ingreso-download'));
       own.slice(1).forEach(function(b){ try{ b.remove(); }catch(_){ } });
@@ -115,14 +142,14 @@
       var img=strip.querySelector('.ce-v509-receipt-thumb img,img[src^="data:image/"],img[src^="blob:"],img[src*="ticket-images"],img[src*="storage"]');
       if(!img) return;
       var src=function(){ return img.currentSrc || img.src || img.getAttribute('src') || ''; };
-      var btn=makeDownloadButton('ce-v105-ingreso-download', src, 'justificante_ingreso_'+(idx+1));
+      var btn=makeDownloadButton('ce-v105-ingreso-download', src, function(){ return ingresoDownloadName(strip, idx); });
       strip.appendChild(btn);
     });
   }
   function patchDocumentDownloads(){
     var root=$('eventDocsList') || $('tabDocumentos'); if(!root) return;
     // Quitar flechas pegadas a miniatura o duplicadas antiguas.
-    Array.prototype.slice.call(root.querySelectorAll('.ce-v1047-doc-download,.ce-v1046-doc-download,.ce-v1045-doc-download')).forEach(function(b){ try{ b.remove(); }catch(_){ } });
+    Array.prototype.slice.call(root.querySelectorAll('.ce-v1047-doc-download,.ce-v1046-doc-download,.ce-v1045-doc-download,.ce-v104-doc-download,.ce-v103-doc-download,.ce-v104-download-btn,.ce-v103-download-btn')).forEach(function(b){ try{ b.remove(); }catch(_){ } });
     Array.prototype.slice.call(root.querySelectorAll('.ce-doc-item')).forEach(function(card,idx){
       var img=card.querySelector('.ce-doc-thumb-link-v85 img,.ce-doc-media img,img.ce-doc-thumb,img[src^="data:image/"],img[src^="blob:"],img[src*="ticket-images"],img[src*="storage"]');
       if(!img) return;
@@ -132,7 +159,7 @@
       var own=Array.prototype.slice.call(actions.querySelectorAll(':scope > .ce-v105-doc-download'));
       own.slice(1).forEach(function(b){ try{ b.remove(); }catch(_){ } });
       if(own.length) return;
-      var btn=makeDownloadButton('ce-v105-doc-download', function(){ return img.currentSrc || img.src || img.getAttribute('src') || ''; }, 'documento_evento_'+(idx+1));
+      var btn=makeDownloadButton('ce-v105-doc-download', function(){ return img.currentSrc || img.src || img.getAttribute('src') || ''; }, function(){ return docDownloadName(card, idx); });
       actions.appendChild(btn);
     });
   }
