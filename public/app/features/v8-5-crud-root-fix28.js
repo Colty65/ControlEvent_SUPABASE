@@ -90,6 +90,22 @@
       });
     }catch(_){ }
   }
+  function paintCollabDom(row){
+    try{
+      if(!row || !row.id) return;
+      const id=String(row.id||'').replace(/"/g,'\"');
+      const set=(action,value)=>{
+        document.querySelectorAll('[data-action="'+action+'"][data-id="'+id+'"]').forEach(el=>{
+          if(el && 'value' in el){ el.value=String(value ?? ''); try{ el.dispatchEvent(new Event('input',{bubbles:false})); }catch(_){} }
+        });
+      };
+      set('edit-collab-persona', row.personaId || '');
+      set('edit-collab-numero', row.numero ?? 0);
+      set('edit-collab-situacion', row.situacion || 'Pendiente');
+      set('edit-collab-importe', typeof row.importe === 'number' ? row.importe.toFixed(2).replace('.',',')+' €' : (row.importe || '0,00 €'));
+      markCollabRecent(row.id);
+    }catch(_){ }
+  }
   function refreshMaintenanceAfterSync(collection, opts){
     const col=String(collection||'').trim();
     try{
@@ -262,7 +278,7 @@
   async function addPersona(){ if(!requireWrite())return; const nombre=elVal('newPersonaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre,rango:elVal('newPersonaRango','SOCIO')}; await upsert('personas',row); replaceLocal('personas',row); setVal('newPersonaNombre',''); await refreshFromDb('personas'); }
   async function addTienda(){ if(!requireWrite())return; const nombre=elVal('newTiendaNombre').trim(); if(!nombre)return; const row={id:uid(),nombre}; await upsert('tiendas',row); replaceLocal('tiendas',row); setVal('newTiendaNombre',''); await refreshFromDb('tiendas'); }
   async function addProducto(){ if(!requireWrite())return; const nombre=elVal('newProductoNombre').trim(); if(!nombre)return; const precio=money(elVal('newProductoPrecio','0')); const tienda=elVal('newProductoTienda',''); const row={id:uid(),nombre,segmento:elVal('newProductoSegmento'),destino:elVal('newProductoDestino'),precio,defaultPrecio:precio,tiendaId:tienda,defaultTiendaId:tienda}; await upsert('productos',row); replaceLocal('productos',row); setVal('newProductoNombre',''); setVal('newProductoPrecio','0,00 €'); await refreshFromDb('productos'); }
-  async function addCollab(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir ingresos'))return; const personaId=elVal('collabPersona'); if(!personaId)return; const row={id:uid(),eventId:selectedEventId(),personaId,numero:Number(elVal('collabNumero','0')||0),situacion:elVal('collabSituacion','Pendiente'),importe:money(elVal('collabImporte','0'))}; const result=await upsert('colaboradores',row); const saved=result?.item||row; replaceLocal('colaboradores',saved); setVal('collabPersona',''); setVal('collabNumero','1'); setVal('collabSituacion','Pendiente'); setVal('collabImporte','0,00 €'); window.__ceFix15LastCollabWrite={row:saved,until:Date.now()+15000}; renderIngresosFast(); markCollabRecent(saved.id||row.id); }
+  async function addCollab(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir ingresos'))return; const personaId=elVal('collabPersona'); if(!personaId)return; const row={id:uid(),eventId:selectedEventId(),personaId,numero:Number(elVal('collabNumero','0')||0),situacion:elVal('collabSituacion','Pendiente'),importe:money(elVal('collabImporte','0'))}; const pending={row,until:Date.now()+30000}; window.__ceFix11PendingCollabSave=pending; window.__ceFix13PendingCollab=pending; await upsert('colaboradores',row); replaceLocal('colaboradores',row); setVal('collabPersona',''); setVal('collabNumero','1'); setVal('collabSituacion','Pendiente'); setVal('collabImporte','0,00 €'); window.__ceFix15LastCollabWrite={row,until:Date.now()+30000}; renderIngresosFast(); [0,80,180,420].forEach(ms=>setTimeout(()=>paintCollabDom(row),ms)); }
   async function addCompra(donacion){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir compras/donaciones'))return; const pId=elVal(donacion?'donProducto':'buyProducto'); if(!pId)return; const p=productById(pId); const row={id:uid(),eventId:selectedEventId(),productoId:pId,unidades:Number(elVal(donacion?'donUnidades':'buyUnidades','0')||0),precio:money(elVal(donacion?'donPrecio':'buyPrecio',p.precio??p.defaultPrecio??0)),ticketDonacion:elVal(donacion?'donTicket':'buyTicket'),donorRef:donacion?elVal('donDonante'):'',responsableId:elVal(donacion?'donResponsable':'buyResponsable'),tiendaId:donacion?(p.tiendaId||p.defaultTiendaId||''):elVal('buyTienda',p.tiendaId||p.defaultTiendaId||'')}; await upsert('compras',row); replaceLocal('compras',row); if(donacion){ clear(['donProducto','donDonante','donResponsable']); setVal('donUnidades','1.00'); setVal('donPrecio','0,00 €'); } else { clear(['buyProducto','buyTienda','buyResponsable']); setVal('buyUnidades','1.00'); setVal('buyPrecio','0,00 €'); setVal('buyTicket',''); } await refreshFromDb(); }
 
   async function handleMaintenance(action,id,sourceBtn){
@@ -308,13 +324,16 @@
     if(action==='save-collab'){
       const scope = sourceBtn?.closest?.('.rowline.collab,.itemcard,.card,.ce-v5011-pending-row,.red-row') || null;
       const row=rowCollabFromForm(id, scope);
-      window.__ceFix11PendingCollabSave={row, until:Date.now()+12000};
-      const result=await upsert('colaboradores',row);
-      const saved=result?.item||row;
-      replaceLocal('colaboradores',saved);
-      window.__ceFix15LastCollabWrite={row:saved,until:Date.now()+15000};
+      // FIX16: la BBDD guarda bien; el problema era que la pantalla se repintaba con una copia antigua.
+      // Por eso la fila capturada desde el formulario manda durante unos segundos sobre cualquier /api/state stale.
+      const pending={row, until:Date.now()+30000};
+      window.__ceFix11PendingCollabSave=pending;
+      window.__ceFix13PendingCollab=pending;
+      await upsert('colaboradores',row);
+      replaceLocal('colaboradores',row);
+      window.__ceFix15LastCollabWrite={row,until:Date.now()+30000};
       renderIngresosFast();
-      markCollabRecent(saved.id||row.id);
+      [0,80,180,420,900].forEach(ms=>setTimeout(()=>paintCollabDom(row), ms));
       return;
     }
     if(action==='delete-collab'){ await del('colaboradores',id); removeLocal('colaboradores',id); window.__ceFix15LastCollabDelete={id:String(id),until:Date.now()+15000}; renderIngresosFast(); return; }

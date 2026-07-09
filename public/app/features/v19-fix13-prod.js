@@ -119,16 +119,15 @@
     return bootPromise;
   }
   function installDropdownFix(){
+    // FIX16: selector ligero. No hacemos precargas repetidas /api/state?boot=1 al abrir el desplegable.
+    // El estado ya se carga en el login y en el cambio de evento; aquí solo reconstruimos opciones locales.
     syncEventDropdownFromState();
-    [120,500,1200,2500].forEach(ms => setTimeout(() => { syncEventDropdownFromState(); if(isLoggedIn()) ensureBootEventsLoaded('startup-'+ms); }, ms));
+    [180,900].forEach(ms => setTimeout(() => { syncEventDropdownFromState(); }, ms));
     ['pointerdown','mousedown','focus','click'].forEach(evt => document.addEventListener(evt, ev => {
-      if(ev.target && ev.target.id === 'selectedEvent'){
-        syncEventDropdownFromState();
-        if(!eventRows().length && (ev.target.options || []).length < 2) ensureBootEventsLoaded(evt);
-      }
+      if(ev.target && ev.target.id === 'selectedEvent') syncEventDropdownFromState();
     }, true));
-    window.addEventListener('controlevent:app-ready', () => ensureBootEventsLoaded('app-ready'), true);
-    window.addEventListener('controlevent:login-ok', () => ensureBootEventsLoaded('login-ok'), true);
+    window.addEventListener('controlevent:app-ready', () => syncEventDropdownFromState(), true);
+    window.addEventListener('controlevent:login-ok', () => syncEventDropdownFromState(), true);
   }
 
   function mergeEventState(fresh, evId){
