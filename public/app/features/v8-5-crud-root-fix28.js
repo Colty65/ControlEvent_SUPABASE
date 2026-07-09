@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod FIX29 - CRUD raíz fila-a-fila con baja por firma
+/* ControlEvent v19_prod FIX30 - CRUD raíz fila-a-fila con baja por firma
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.
@@ -8,7 +8,7 @@
 */
 (function(){
   'use strict';
-  const TAG='__ceV85CrudRootFix29';
+  const TAG='__ceV85CrudRootFix30';
   if(window[TAG]) return; window[TAG]=true;
 
   const WRITE_SCOPE='row-crud-v8-5-fix29';
@@ -38,9 +38,10 @@
   function isFinalized(ev){ return String(ev?.situacion||'').trim().toLowerCase()==='finalizado'; }
   function canWrite(){ const u=getAuth(); return !!u && ['RW','GD'].includes(String(u.nivel||'').toUpperCase()); }
   function isGD(){ const u=getAuth(); return !!u && String(u.nivel||'').toUpperCase()==='GD'; }
-  function val(action,id,fallback=''){
+  function val(action,id,fallback='',scope){
     const selector=`[data-action="${action}"][data-id="${css(id)}"]`;
-    const nodes=Array.from(document.querySelectorAll(selector));
+    const scopedNodes = scope && scope.querySelectorAll ? Array.from(scope.querySelectorAll(selector)) : [];
+    const nodes=scopedNodes.length ? scopedNodes : Array.from(document.querySelectorAll(selector));
     if(!nodes.length) return String(fallback ?? '');
     const active=document.activeElement;
     if(active && nodes.includes(active)) return String(active.value ?? fallback ?? '');
@@ -206,7 +207,12 @@
   function removeLocal(collection,id){ const s=getState(); s[collection]=arr(collection).filter(x=>String(x.id||'')!==String(id)); }
 
   function rowEventoFromForm(id){ const old=eventById(id)||{}; return {...old,id:String(id),titulo:val('edit-evento-titulo',id,old.titulo||'').trim(),precio:money(val('edit-evento-precio',id,old.precio||0)),fechaIni:val('edit-evento-fechaini',id,old.fechaIni||'').trim(),fechaFin:val('edit-evento-fechafin',id,old.fechaFin||'').trim(),descripcion:val('edit-evento-descripcion',id,old.descripcion||'').trim(),situacion:val('edit-evento-situacion',id,old.situacion||'En curso')}; }
-  function rowCollabFromForm(id){ const old=arr('colaboradores').find(x=>String(x.id)===String(id))||{}; return {...old,id:String(id),eventId:String(old.eventId||selectedEventId()),personaId:val('edit-collab-persona',id,old.personaId||''),numero:Number(val('edit-collab-numero',id,old.numero||0)||0),situacion:val('edit-collab-situacion',id,old.situacion||'Pendiente'),importe:money(val('edit-collab-importe',id,old.importe||0))}; }
+  function rowCollabFromForm(id,scope){
+    const old=arr('colaboradores').find(x=>String(x.id)===String(id))||{};
+    const row={...old,id:String(id),eventId:String(old.eventId||selectedEventId()),personaId:val('edit-collab-persona',id,old.personaId||'',scope),numero:Number(val('edit-collab-numero',id,old.numero||0,scope)||0),situacion:val('edit-collab-situacion',id,old.situacion||'Pendiente',scope),importe:money(val('edit-collab-importe',id,old.importe||0,scope))};
+    row.situacion = String(row.situacion || 'Pendiente').trim() || 'Pendiente';
+    return row;
+  }
   function rowCompraFromForm(id,donacion){ const old=arr('compras').find(x=>String(x.id)===String(id))||{}; const pref=donacion?'donacion':'compra'; const pId=val('edit-'+pref+'-producto',id,old.productoId||''); const p=productById(pId); return {...old,id:String(id),eventId:String(old.eventId||selectedEventId()),productoId:pId,unidades:Number(val('edit-'+pref+'-unidades',id,old.unidades||0)||0),precio:money(val('edit-'+pref+'-precio',id,old.precio??p.precio??p.defaultPrecio??0)),ticketDonacion:val('edit-'+pref+'-ticket',id,old.ticketDonacion||''),donorRef:donacion?val('edit-donacion-donante',id,old.donorRef||''):val('edit-compra-donante',id,old.donorRef||''),responsableId:val('edit-'+pref+'-responsable',id,old.responsableId||''),tiendaId:donacion?(old.tiendaId||p.tiendaId||p.defaultTiendaId||''):val('edit-compra-tienda',id,old.tiendaId||p.tiendaId||p.defaultTiendaId||'')}; }
   function rowPersonaFromForm(id){ const old=arr('personas').find(x=>String(x.id)===String(id))||{}; return {...old,id:String(id),nombre:val('edit-persona-nombre',id,old.nombre||'').trim(),rango:val('edit-persona-rango',id,old.rango||'SOCIO')}; }
   function rowTiendaFromForm(id){ const old=arr('tiendas').find(x=>String(x.id)===String(id))||{}; return {...old,id:String(id),nombre:val('edit-tienda-nombre',id,old.nombre||'').trim()}; }
@@ -219,7 +225,7 @@
   async function addCollab(){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir ingresos'))return; const personaId=elVal('collabPersona'); if(!personaId)return; const row={id:uid(),eventId:selectedEventId(),personaId,numero:Number(elVal('collabNumero','0')||0),situacion:elVal('collabSituacion','Pendiente'),importe:money(elVal('collabImporte','0'))}; await upsert('colaboradores',row); replaceLocal('colaboradores',row); setVal('collabPersona',''); setVal('collabNumero','1'); setVal('collabSituacion','Pendiente'); setVal('collabImporte','0,00 €'); await refreshFromDb(); }
   async function addCompra(donacion){ if(!requireWrite())return; if(blockIfFinalized(selectedEvent(),'añadir compras/donaciones'))return; const pId=elVal(donacion?'donProducto':'buyProducto'); if(!pId)return; const p=productById(pId); const row={id:uid(),eventId:selectedEventId(),productoId:pId,unidades:Number(elVal(donacion?'donUnidades':'buyUnidades','0')||0),precio:money(elVal(donacion?'donPrecio':'buyPrecio',p.precio??p.defaultPrecio??0)),ticketDonacion:elVal(donacion?'donTicket':'buyTicket'),donorRef:donacion?elVal('donDonante'):'',responsableId:elVal(donacion?'donResponsable':'buyResponsable'),tiendaId:donacion?(p.tiendaId||p.defaultTiendaId||''):elVal('buyTienda',p.tiendaId||p.defaultTiendaId||'')}; await upsert('compras',row); replaceLocal('compras',row); if(donacion){ clear(['donProducto','donDonante','donResponsable']); setVal('donUnidades','1.00'); setVal('donPrecio','0,00 €'); } else { clear(['buyProducto','buyTienda','buyResponsable']); setVal('buyUnidades','1.00'); setVal('buyPrecio','0,00 €'); setVal('buyTicket',''); } await refreshFromDb(); }
 
-  async function handleMaintenance(action,id){
+  async function handleMaintenance(action,id,sourceBtn){
     if(action==='save-evento'){
       if(!requireGD())return;
       const old=eventById(id);
@@ -259,7 +265,22 @@
       if(stillById || stillByActual){ throw new Error('La baja de compra NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); }
       return;
     }
-    if(action==='save-collab'){ const row=rowCollabFromForm(id); await upsert('colaboradores',row); replaceLocal('colaboradores',row); await refreshFromDb(); return; }
+    if(action==='save-collab'){
+      const scope = sourceBtn?.closest?.('.rowline.collab,.itemcard,.card') || null;
+      const row=rowCollabFromForm(id, scope);
+      await upsert('colaboradores',row);
+      replaceLocal('colaboradores',row);
+      const fresh = await refreshFromDb();
+      // Si el refresco llegara con una copia antigua, mantenemos en local la fila ya guardada y re-renderizamos ingresos.
+      try{
+        const saved = Array.isArray(fresh?.colaboradores) ? fresh.colaboradores.find(x=>String(x.id||'')===String(id)) : null;
+        if(!saved || String(saved.situacion||'') !== String(row.situacion||'')){
+          replaceLocal('colaboradores',row);
+          renderNow();
+        }
+      }catch(_){ }
+      return;
+    }
     if(action==='delete-collab'){ await del('colaboradores',id); removeLocal('colaboradores',id); await refreshFromDb(); if(arr('colaboradores').some(x=>String(x.id||'')===String(id))){ throw new Error('La baja de ingreso NO ha quedado en BBDD. Registro sigue existiendo tras DELETE: '+id); } return; }
     if(action==='save-persona'){ const row=rowPersonaFromForm(id); await upsert('personas',row); replaceLocal('personas',row); await refreshFromDb('personas'); return; }
     if(action==='delete-persona'){ await del('personas',id); removeLocal('personas',id); await refreshFromDb('personas'); return; }
@@ -296,7 +317,7 @@
         if(bid==='btnAddColab') return await addCollab();
         if(bid==='btnAddCompra') return await addCompra(false);
         if(bid==='btnAddDonacion') return await addCompra(true);
-        return await handleMaintenance(action,id);
+        return await handleMaintenance(action,id,btn);
       }catch(err){ console.error('[FIX28 CRUD RAIZ]',err); alert(err.message||String(err)); }
     })();
     return false;
