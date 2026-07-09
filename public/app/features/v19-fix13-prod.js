@@ -57,7 +57,7 @@
       #ceMapaGlobalOverlay .ce-v19-product-line.compact{grid-template-columns:minmax(156px,1.18fr) minmax(124px,.90fr) minmax(92px,.66fr) minmax(96px,.70fr) minmax(112px,.78fr) minmax(98px,.70fr) minmax(124px,.86fr) minmax(78px,.54fr) minmax(100px,.68fr) minmax(70px,.48fr)!important;min-width:1088px!important;}
       #ceMapaGlobalOverlay .ce-v19-product-line.compact{font-size:11.35px!important;line-height:1.13!important;padding:4px 5px!important;}
       #ceMapaGlobalOverlay .ce-v19-products-head.compact>*:nth-child(2),
-      #ceMapaGlobalOverlay .ce-v19-product-line.compact>*:nth-child(2){transform:translateX(-8ch)!important;width:calc(100% + 8ch)!important;}
+      #ceMapaGlobalOverlay .ce-v19-product-line.compact>*:nth-child(2){transform:translateX(6ch)!important;width:calc(100% - 6ch)!important;}
       #ceMapaGlobalOverlay .ce-v19-product-line.compact span,
       #ceMapaGlobalOverlay .ce-v19-product-line.compact strong{letter-spacing:-.01em!important;}
       #ceMapaGlobalOverlay .ce-v19-detail-head h3{font-size:20px!important;}
@@ -124,7 +124,7 @@
     ['pointerdown','mousedown','focus','click'].forEach(evt => document.addEventListener(evt, ev => {
       if(ev.target && ev.target.id === 'selectedEvent'){
         syncEventDropdownFromState();
-        if((ev.target.options || []).length < Math.max(3, eventRows().length)) ensureBootEventsLoaded(evt);
+        if(!eventRows().length && (ev.target.options || []).length < 2) ensureBootEventsLoaded(evt);
       }
     }, true));
     window.addEventListener('controlevent:app-ready', () => ensureBootEventsLoaded('app-ready'), true);
@@ -246,7 +246,7 @@
       const url = typeof input === 'string' ? input : (input && input.url) || '';
       const method = trim(init?.method || (input && input.method) || 'GET').toUpperCase();
       let collabRow = null;
-      let isCollabCrud = /\/api\/crud\/colaboradores(?:\/|$)/i.test(url) && /^(POST|PUT|DELETE)$/i.test(method);
+      let isCollabCrud = false; // FIX15: INGRESOS los gestiona v8-5 directamente, sin refrescos repetidos.
       let isImageWrite = /\/api\/ticket-images(?:\?|$)/i.test(url) && /^(POST|DELETE)$/i.test(method);
       if(isCollabCrud && method !== 'DELETE'){
         try{ const body = parseJsonBody(init); collabRow = body && typeof body === 'object' ? Object.assign({}, body, {id: trim(body.id || (url.match(/\/colaboradores\/([^/?#]+)/)||[])[1] || '')}) : null; if(collabRow && collabRow.id){ collabRow.eventId = collabRow.eventId || selectedEventId(); mergePendingCollab(collabRow); } }catch(_){ }
@@ -323,7 +323,7 @@
     }, true);
     const mo = new MutationObserver(() => {
       const root = $('ceMapaGlobalOverlay'); if(!root) return;
-      if(root.querySelector('.ce-v19-detail-head h3')?.textContent?.toLowerCase().includes('todos los productos')) applyVistaSelectionState('products-all');
+      const h=(root.querySelector('.ce-v19-detail-head h3')?.textContent||'').toLowerCase(); if(h.includes('todos los productos')) applyVistaSelectionState('products-all'); else if(h.includes('ingresos')) applyVistaSelectionState('income-all');
     });
     try{ mo.observe(document.body, {childList:true,subtree:true}); }catch(_){ }
   }

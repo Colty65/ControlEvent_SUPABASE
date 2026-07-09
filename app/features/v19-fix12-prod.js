@@ -97,7 +97,7 @@
       +'#ceMapaGlobalOverlay .ce-v19-products-head.compact,#ceMapaGlobalOverlay .ce-v19-product-line.compact{grid-template-columns:minmax(150px,1.20fr) minmax(116px,.72fr) minmax(78px,.54fr) minmax(94px,.68fr) minmax(100px,.72fr) minmax(94px,.68fr) minmax(112px,.78fr) minmax(72px,.52fr) minmax(94px,.66fr) minmax(68px,.48fr)!important;min-width:1045px!important;}'
       +'#ceMapaGlobalOverlay .ce-v19-products-head.compact{font-size:11.8px!important;}'
       +'#ceMapaGlobalOverlay .ce-v19-product-line.compact{font-size:10.6px!important;line-height:1.08!important;}'
-      +'#ceMapaGlobalOverlay .ce-v19-products-head.compact>*:nth-child(2),#ceMapaGlobalOverlay .ce-v19-product-line.compact>*:nth-child(2){transform:translateX(-8ch)!important;width:calc(100% + 8ch)!important;}'
+      +'#ceMapaGlobalOverlay .ce-v19-products-head.compact>*:nth-child(2),#ceMapaGlobalOverlay .ce-v19-product-line.compact>*:nth-child(2){transform:translateX(6ch)!important;width:calc(100% - 6ch)!important;}'
       +'#ceMapaGlobalOverlay .ce-v19-metric{filter:saturate(1.08)!important;}'
       +'@media(max-width:720px){#ceMapaGlobalOverlay .ce-v19-product-line.compact{font-size:11px!important;min-width:0!important;transform:none!important;}#ceMapaGlobalOverlay .ce-v19-product-line.compact>*{transform:none!important;width:auto!important;}}';
     var st=document.createElement('style'); st.id='ce-v19-fix12-style'; st.textContent=css; document.head.appendChild(st);
@@ -154,12 +154,9 @@
     }catch(_){ }
     [40,150,350,750,1400,2600,4200].forEach(function(ms){ setTimeout(function(){ highlightCollab(row.id); try{ if(typeof window.renderNow==='function') window.renderNow(); }catch(_){ } }, ms); });
   }
-  document.addEventListener('click', function(ev){
-    var btn=ev.target && ev.target.closest && ev.target.closest('button[data-action="save-collab"],button.save-collab,.save-collab');
-    if(btn) rememberPending(btn);
-  }, true);
+  /* FIX15: se desactiva el optimismo antiguo de INGRESOS porque repintaba datos stale y provocaba temblor. */
 
-  if(window.fetch && !window.fetch.__ceFix12Wrapped){
+  if(false && window.fetch && !window.fetch.__ceFix12Wrapped){
     var oldFetch=window.fetch;
     var wrappedFetch=function(input, init){
       var url=typeof input==='string' ? input : (input && input.url) || '';
