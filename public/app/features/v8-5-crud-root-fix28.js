@@ -38,7 +38,32 @@
   function isFinalized(ev){ return String(ev?.situacion||'').trim().toLowerCase()==='finalizado'; }
   function canWrite(){ const u=getAuth(); return !!u && ['RW','GD'].includes(String(u.nivel||'').toUpperCase()); }
   function isGD(){ const u=getAuth(); return !!u && String(u.nivel||'').toUpperCase()==='GD'; }
-  function val(action,id,fallback=''){ const el=document.querySelector(`[data-action="${action}"][data-id="${css(id)}"]`); return el ? String(el.value ?? '') : String(fallback ?? ''); }
+  function val(action,id,fallback=''){
+    const selector=`[data-action="${action}"][data-id="${css(id)}"]`;
+    const nodes=Array.from(document.querySelectorAll(selector));
+    if(!nodes.length) return String(fallback ?? '');
+    const active=document.activeElement;
+    if(active && nodes.includes(active)) return String(active.value ?? fallback ?? '');
+    const isVisible=el=>{
+      try{
+        if(el.disabled) return false;
+        if(el.closest('[hidden],.hidden,[aria-hidden="true"]')) return false;
+        const cs=getComputedStyle(el);
+        if(cs.display==='none' || cs.visibility==='hidden') return false;
+        return !!(el.offsetParent || el.getClientRects().length || cs.position==='fixed');
+      }catch(_){ return true; }
+    };
+    const root=$('collabList');
+    let candidates=nodes.filter(isVisible);
+    if(root){
+      const inRoot=candidates.filter(el=>root.contains(el));
+      if(inRoot.length) candidates=inRoot;
+    }
+    // En algunas vistas quedan controles duplicados/stale con el mismo data-id.
+    // Para guardar ingresos tomamos el control visible mas reciente, no el primero oculto.
+    const el=(candidates.length ? candidates[candidates.length-1] : nodes[nodes.length-1]);
+    return String(el.value ?? fallback ?? '');
+  }
   function elVal(id,fallback=''){ const el=$(id); return el ? String(el.value ?? '') : String(fallback ?? ''); }
   function setVal(id,value){ const el=$(id); if(el) el.value=value; }
   function clear(ids){ ids.forEach(id=>{ const el=$(id); if(el) el.value=''; }); }

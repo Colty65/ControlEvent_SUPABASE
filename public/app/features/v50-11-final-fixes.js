@@ -81,7 +81,8 @@
       #comprasList .itemcard.ce-v5011-ok-row input,
       #comprasList .itemcard.ce-v5011-ok-row select,
       #comprasList .itemcard.ce-v5011-ok-row textarea{color:#111827!important;}
-      #collabList .ce-v5011-pending-row button,#comprasList .ce-v5011-pending-row button{color:inherit;}
+      #collabList .ce-v5011-pending-row button[data-action="save-collab"],#collabList .ce-v5011-pending-row button[data-action="delete-collab"]{color:#fff!important;text-shadow:0 1px 1px rgba(0,0,0,.25)!important;}
+      #comprasList .ce-v5011-pending-row button{color:inherit;}
     `;
     document.head.appendChild(style);
   }
