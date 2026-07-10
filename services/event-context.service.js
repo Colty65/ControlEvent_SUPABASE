@@ -106,15 +106,7 @@ function unitPriceForRow(row, productId, helpers) {
   return round(productPriceById(productId, helpers), 4);
 }
 function valueForPurchaseRow(row, productId, helpers) {
-  if (rowHasNumber(row, ['valor','importe','total'])) {
-    const direct = firstNumber(row, ['valor','importe','total'], 0);
-    // FIX18: algunos descuentos se guardan como línea con importe 0 y precio negativo.
-    // Para que saldos y Vista aérea coincidan, si el importe directo es 0 pero el precio es negativo, calculamos unidades * precio.
-    const unit = unitPriceForRow(row, productId, helpers);
-    if (direct === 0 && unit < 0) return round(num(row?.unidades || 1) * unit, 2);
-    return round(direct, 2);
-  }
-  if (rowHasNumber(row, ['descuento','importeDescuento','discount','amount'])) return round(firstNumber(row, ['descuento','importeDescuento','discount','amount'], 0), 2);
+  if (rowHasNumber(row, ['valor','importe','total'])) return round(firstNumber(row, ['valor','importe','total'], 0), 2);
   return round(num(row?.unidades) * unitPriceForRow(row, productId, helpers), 2);
 }
 function parseEventDate(ev) {
@@ -1408,8 +1400,7 @@ function zuzuModuleEventos(state, eventIds, ticketImages, options = {}) {
       Precio: round(ev?.precio, 2),
       'fecha ini': trim(ev?.fechaIni),
       'fecha fin': trim(ev?.fechaFin),
-      Estado: trim(ev?.situacion || 'En curso'),
-      'Descripción': trim(ev?.descripcion || '')
+      Estado: trim(ev?.situacion || 'En curso')
     };
     if (!includeDocuments) {
       rows.push(base);
@@ -1644,7 +1635,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (modules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (modules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (modules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
-  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
+  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);

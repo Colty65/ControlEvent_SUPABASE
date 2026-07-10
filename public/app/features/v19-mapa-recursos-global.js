@@ -140,11 +140,11 @@
   function unitPrice(row){
     const p = producto(row?.productoId);
     const candidates = [row?.precio, row?.precioCalc, row?.defaultPrecio, p.precio, p.defaultPrecio];
-    for(const item of candidates){ const n = parseAmount(item); if(Number.isFinite(n) && Math.abs(n) > 0) return n; }
+    for(const item of candidates){ const n = parseAmount(item); if(Number.isFinite(n) && n > 0) return n; }
     return 0;
   }
   function rowValue(row){
-    const directKeys = ['importe','valor','total','importeCompra','importeTotal','descuento','importeDescuento','discount','amount'];
+    const directKeys = ['importe','valor','total','importeCompra','importeTotal'];
     for(const key of directKeys){
       if(row && row[key] !== undefined && row[key] !== null && row[key] !== ''){
         const n = parseAmount(row[key]);
