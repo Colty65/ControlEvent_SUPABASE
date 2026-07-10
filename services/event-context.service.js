@@ -100,38 +100,14 @@ function productPriceById(id, helpers) {
   const p = helpers?.products?.get?.(trim(id)) || {};
   return firstNumber(p, ['defaultPrecio','precio','precioRfa','precio_rfa','precioReferencia','precio_referencia'], 0);
 }
-function looksDiscountRow(row, productId, helpers) {
-  const product = helpers?.products?.get?.(trim(productId)) || {};
-  const raw = [row?.productoNombre, row?.producto, row?.nombre, row?.descripcion, row?.concepto, row?.detalle, product?.nombre, product?.descripcion]
-    .map(trim).filter(Boolean).join(' ');
-  return /\b(DESCUENTO|DTO|ABONO|DEVOLUCI[OÓ]N|BONIFICACI[OÓ]N)\b/i.test(raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
-}
 function unitPriceForRow(row, productId, helpers) {
-  const product = helpers?.products?.get?.(trim(productId)) || {};
-  const productNegative = ['precio','defaultPrecio','precioReferencia','importeReferencia']
-    .map(k => num(product?.[k])).find(n => Number.isFinite(n) && n < 0);
-  if (rowHasNumber(row, ['precio'])) {
-    const directPrice = num(row?.precio);
-    // FIX20: si el ticket guardó la línea de descuento con precio 0, pero el producto de catálogo conserva el precio negativo, manda el negativo.
-    const aliasNegative = ['precioCalc','precio_calc','precioUnitario','precio_unitario','precioUnidad','unitPrice','price']
-      .map(k => num(row?.[k])).find(n => Number.isFinite(n) && n < 0);
-    if (directPrice === 0 && looksDiscountRow(row, productId, helpers) && (productNegative < 0 || aliasNegative < 0)) return round(aliasNegative < 0 ? aliasNegative : productNegative, 4);
-    if (directPrice !== 0) return round(directPrice, 4);
-    return 0;
-  }
-  if (rowHasNumber(row, ['precioCalc','precio_calc','precioUnitario','precio_unitario','precioUnidad','unitPrice','price'])) return round(firstNumber(row, ['precioCalc','precio_calc','precioUnitario','precio_unitario','precioUnidad','unitPrice','price'], 0), 4);
+  if (rowHasNumber(row, ['precio'])) return round(row?.precio, 4);
+  if (rowHasNumber(row, ['precioCalc','precio_calc'])) return round(row?.precioCalc ?? row?.precio_calc, 4);
   return round(productPriceById(productId, helpers), 4);
 }
 function valueForPurchaseRow(row, productId, helpers) {
-  const unit = unitPriceForRow(row, productId, helpers);
-  if (rowHasNumber(row, ['valor','importe','total','totalLinea','total_linea','importeLinea','importe_linea'])) {
-    const direct = firstNumber(row, ['valor','importe','total','totalLinea','total_linea','importeLinea','importe_linea'], 0);
-    // FIX20: descuentos con importe directo 0 y precio efectivo negativo no pueden convertirse en 0 €.
-    if (direct === 0 && unit < 0 && looksDiscountRow(row, productId, helpers)) return round(num(row?.unidades || 1) * unit, 2);
-    return round(direct, 2);
-  }
-  if (rowHasNumber(row, ['descuento','importeDescuento','importe_descuento','discount','amount'])) return round(firstNumber(row, ['descuento','importeDescuento','importe_descuento','discount','amount'], 0), 2);
-  return round(num(row?.unidades) * unit, 2);
+  if (rowHasNumber(row, ['valor','importe','total'])) return round(firstNumber(row, ['valor','importe','total'], 0), 2);
+  return round(num(row?.unidades) * unitPriceForRow(row, productId, helpers), 2);
 }
 function parseEventDate(ev) {
   const candidates = [ev?.fechaFin, ev?.fecha_fin, ev?.fechaIni, ev?.fecha_ini, ev?.createdAt, ev?.created_at].map(trim).filter(Boolean);
@@ -1424,8 +1400,7 @@ function zuzuModuleEventos(state, eventIds, ticketImages, options = {}) {
       Precio: round(ev?.precio, 2),
       'fecha ini': trim(ev?.fechaIni),
       'fecha fin': trim(ev?.fechaFin),
-      Estado: trim(ev?.situacion || 'En curso'),
-      'Descripción': trim(ev?.descripcion || '')
+      Estado: trim(ev?.situacion || 'En curso')
     };
     if (!includeDocuments) {
       rows.push(base);
@@ -1660,7 +1635,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (modules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (modules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (modules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
-  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
+  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);

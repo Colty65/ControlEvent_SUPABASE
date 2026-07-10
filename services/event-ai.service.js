@@ -416,7 +416,7 @@ Campos oficiales por módulo y datos indirectos:
 - INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
 - DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
 - COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
-- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; Descripción; DOCxxx. Usa Descripción para entender el objetivo del evento y enriquecer informes/valoraciones, no como dato decorativo.
+- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; DOCxxx.
 - TICKETS: Evento; TKxx; Tienda; Responsable; Total ticket; Nº líneas; Ticket SI/NO; Líneas contables.
 - DOCUMENTOS: DOCxxx; Evento; Fecha; Descripcion; Tiene imagen.
 - PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
@@ -489,7 +489,7 @@ function orderedColumnsForModule(moduleName, rows) {
     INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Rango','Just.ing'],
     TICKETS: ['Evento','TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
     DOCUMENTOS: ['DOCxxx','Evento','Fecha','Descripcion','Tiene imagen'],
-    EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','Descripción','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
+    EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
     PRODUCTOS: ['Nombre producto','Segmento','Destino','Precio rfa.'],
     TIENDAS: ['Nombre tienda'],
     PERSONAS: ['Nombre persona','Rango']
@@ -2406,7 +2406,6 @@ Reglas obligatorias:
 - Si el usuario pide opinión, da una opinión explícita de Zuzu, prudente y apoyada en datos. No digas que no puedes opinar si los datos permiten valorar participación, esfuerzo o relevancia.
 - Si el usuario dice "déjate de ControlEvent", debe notarse que habla Zuzu: usa primera persona con naturalidad, pero sin inventar datos.
 - Usa nombres, productos y cifras reales que aparecen en los datos resumidos. No inventes personas, importes, fechas ni incidencias.
-- Si los datos del módulo EVENTOS incluyen Descripción, úsala como objetivo/contexto del evento: compárala con ingresos, compras, donaciones y organización para enriquecer la valoración. No la ignores como si fuera un campo decorativo.
 - Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
 - Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer y usa subtítulos cortos dentro del texto: Datos del evento, Socios que no asistirán/no registrados, Parte meteorológico. No dejes una parte fuera porque aparezca en tablas.
 - Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio completo: PERSONAS con rango SOCIO; si el usuario pidió Numero=1, aplica y menciona Numero=1; no figuran en INGRESOS del evento; se excluyen patrones internos Grupo..., Personas..., z_de... y z_DEV....
@@ -2659,7 +2658,7 @@ function plannerPrompt(userPrompt, catalog) {
 
 Objetivo: leer la petición y decir qué módulos/filtros necesita CE para extraer datos. No inventes datos ni redactes informe.
 
-Módulos: INGRESOS(colaboradores/recaudación/asistentes), DONACIONES(productos donados/donantes/responsables), COMPRAS(gastos/productos/tiendas/responsables/tickets), EVENTOS(título/fechas/estado/precio/descripción objetivo/DOC), TICKETS(TK/fototickets/totales), DOCUMENTOS(DOC/adjuntos), PRODUCTOS(catálogo), TIENDAS(catálogo), PERSONAS(maestro/rango).
+Módulos: INGRESOS(colaboradores/recaudación/asistentes), DONACIONES(productos donados/donantes/responsables), COMPRAS(gastos/productos/tiendas/responsables/tickets), EVENTOS(título/fechas/estado/precio/DOC), TICKETS(TK/fototickets/totales), DOCUMENTOS(DOC/adjuntos), PRODUCTOS(catálogo), TIENDAS(catálogo), PERSONAS(maestro/rango).
 
 Reglas rápidas:
 - "datos/info/resumen/dossier/qué ocurrió" de un evento => EVENTOS+INGRESOS+COMPRAS+DONACIONES+TICKETS+DOCUMENTOS.
