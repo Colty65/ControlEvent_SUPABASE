@@ -18,7 +18,44 @@
   function isLoggedIn(){ return !!(window.authUser || window.ControlEventLoginUser || window.__CONTROL_EVENT_LOGIN_USER__ || window.ControlEventApp?.authUser) && !isAuthOverlayVisible(); }
   const eventRows = () => arr(state().eventos || window.eventos || window.CE_EVENTOS);
   const eventTitle = ev => trim(ev?.titulo || ev?.nombre || ev?.Evento || ev?.title || 'Evento');
-  const eventDate = ev => trim(ev?.fechaIni || ev?.fecha_ini || ev?.Fecha || '');
+  const eventDate = ev => trim(ev?.fechaIni || ev?.fecha_ini || ev?.fechaInicio || ev?.Fecha || ev?.startDate || ev?.fecha || '');
+  const up = v => trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  function parseDateKey(value){
+    const raw = trim(value);
+    if(!raw) return 99999999;
+    let m = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if(m){
+      let y = Number(m[3]); if(y < 100) y += (y >= 70 ? 1900 : 2000);
+      return Number(String(y).padStart(4,'0') + String(Number(m[2])).padStart(2,'0') + String(Number(m[1])).padStart(2,'0')) || 99999999;
+    }
+    m = raw.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if(m) return Number(m[1] + String(Number(m[2])).padStart(2,'0') + String(Number(m[3])).padStart(2,'0')) || 99999999;
+    const d = new Date(raw);
+    if(!Number.isNaN(d.getTime())) return Number(String(d.getFullYear()) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0'));
+    return 99999999;
+  }
+  function isFinal(ev){ return up(ev?.situacion || ev?.estado || ev?.status || '').includes('FINAL'); }
+  function isCurso(ev){ return up(ev?.situacion || ev?.estado || ev?.status || '').includes('EN CURSO'); }
+  const eventMetaCache = new Map();
+  function rememberEventMeta(rows){
+    arr(rows).forEach(ev => {
+      const id = trim(ev?.id); if(!id) return;
+      const old = eventMetaCache.get(id) || {};
+      eventMetaCache.set(id, {
+        ...old,
+        id,
+        titulo: eventTitle(ev) || old.titulo || '',
+        fecha: eventDate(ev) || old.fecha || '',
+        situacion: trim(ev?.situacion || ev?.estado || ev?.status || '') || old.situacion || ''
+      });
+    });
+  }
+  function hydratedEvent(ev){
+    const id = trim(ev?.id);
+    const cached = id ? eventMetaCache.get(id) : null;
+    if(!cached) return ev || {};
+    return { ...cached, ...(ev || {}), fechaIni: eventDate(ev) || cached.fecha, situacion: trim(ev?.situacion || ev?.estado || ev?.status || '') || cached.situacion };
+  }
   function callName(name, arg){
     try{ const fn = window[name]; if(typeof fn === 'function') return fn(arg); }catch(_){ }
     try{ const fn = Function('return (typeof '+name+'==="function") ? '+name+' : null')(); if(typeof fn === 'function') return fn(arg); }catch(_){ }
@@ -71,6 +108,8 @@
       #ceMapaGlobalOverlay .ce-v19-resource-bar.ce-fix13-active .ce-v19-bar-top strong{color:#1d4ed8!important;}
       .ce-fix13-recent-collab{background:#fff7ed!important;border-color:#fb923c!important;box-shadow:0 0 0 3px rgba(249,115,22,.30),0 8px 24px rgba(15,23,42,.12)!important;transition:all .25s ease!important;}
       .ce-fix13-saving-pulse{outline:3px solid rgba(37,99,235,.22)!important;}
+      #selectedEvent option.ce-event-finalizado,#selectedEvent option[data-finalizado="1"]{color:#b91c1c!important;font-weight:900!important;}
+      #selectedEvent option.ce-event-curso,#selectedEvent option[data-curso="1"]{color:#16a34a!important;font-weight:900!important;}
       @media(max-width:720px){#ceMapaGlobalOverlay .ce-v19-products-head.compact,#ceMapaGlobalOverlay .ce-v19-product-line.compact{min-width:0!important;grid-template-columns:1fr!important;}#ceMapaGlobalOverlay .ce-v19-products-head.compact>*:nth-child(2),#ceMapaGlobalOverlay .ce-v19-product-line.compact>*:nth-child(2){transform:none!important;width:auto!important;}}
     `;
     const st = document.createElement('style'); st.id = 'ce-v19-fix13-style'; st.textContent = css; document.head.appendChild(st);
@@ -80,16 +119,42 @@
     const sel = $('selectedEvent'); if(!sel) return false;
     const rows = eventRows().filter(ev => trim(ev?.id) && eventTitle(ev));
     if(!rows.length) return false;
+    rememberEventMeta(rows);
     const oldValue = trim(sel.value || state().selectedEventId || '');
-    const rowsSorted = rows.slice().sort((a,b) => (eventDate(a)||'').localeCompare(eventDate(b)||'') || eventTitle(a).localeCompare(eventTitle(b),'es',{numeric:true,sensitivity:'base'}));
-    const knownIds = Array.from(sel.options || []).map(o => trim(o.value)).filter(Boolean);
-    const sameCount = knownIds.length === rowsSorted.length && rowsSorted.every(ev => knownIds.includes(trim(ev.id)));
-    if(sameCount && sel.querySelector('option[value=""]')) return true;
+    const rowsSorted = rows.map(hydratedEvent).slice().sort((a,b) => {
+      const da = parseDateKey(eventDate(a));
+      const db = parseDateKey(eventDate(b));
+      if(da !== db) return da - db;
+      return eventTitle(a).localeCompare(eventTitle(b),'es',{numeric:true,sensitivity:'base'});
+    });
+    const wanted = rowsSorted.map(ev => trim(ev.id));
+    const currentOrder = Array.from(sel.options || []).map(o => trim(o.value)).filter(Boolean);
+    const alreadyOrdered = currentOrder.length === wanted.length && wanted.every((id,idx) => currentOrder[idx] === id);
+    const currentColorsOk = Array.from(sel.options || []).every(o => {
+      const id = trim(o.value); if(!id) return true;
+      const ev = rowsSorted.find(r => trim(r.id) === id) || {};
+      if(isFinal(ev)) return o.classList.contains('ce-event-finalizado') && o.dataset.finalizado === '1';
+      if(isCurso(ev)) return o.classList.contains('ce-event-curso') && o.dataset.curso === '1';
+      return !o.classList.contains('ce-event-finalizado') && !o.classList.contains('ce-event-curso');
+    });
+    if(alreadyOrdered && currentColorsOk && sel.querySelector('option[value=""]')){
+      const finalValue = oldValue && wanted.includes(oldValue) ? oldValue : '';
+      if(sel.value !== finalValue) sel.value = finalValue;
+      sel.disabled = false;
+      return true;
+    }
     const frag = document.createDocumentFragment();
     const ph = document.createElement('option'); ph.value=''; ph.textContent='Selecciona evento...'; frag.appendChild(ph);
-    rowsSorted.forEach(ev => { const opt=document.createElement('option'); opt.value=trim(ev.id); opt.textContent=eventTitle(ev); frag.appendChild(opt); });
+    rowsSorted.forEach(ev => {
+      const opt=document.createElement('option');
+      opt.value=trim(ev.id);
+      opt.textContent=eventTitle(ev);
+      if(isFinal(ev)){ opt.className='ce-event-finalizado'; opt.dataset.finalizado='1'; opt.style.color='#b91c1c'; opt.style.fontWeight='900'; }
+      else if(isCurso(ev)){ opt.className='ce-event-curso'; opt.dataset.curso='1'; opt.style.color='#16a34a'; opt.style.fontWeight='900'; }
+      frag.appendChild(opt);
+    });
     sel.innerHTML=''; sel.appendChild(frag);
-    const finalValue = oldValue && rowsSorted.some(ev => trim(ev.id)===oldValue) ? oldValue : '';
+    const finalValue = oldValue && wanted.includes(oldValue) ? oldValue : '';
     sel.value = finalValue;
     sel.disabled = false;
     if(finalValue) { try{ state().selectedEventId = finalValue; }catch(_){ } }
