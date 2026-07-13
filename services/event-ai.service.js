@@ -2668,7 +2668,9 @@ Reglas rápidas:
 - socios que no asistirán/no figuran/no están registrados en un evento => EVENTOS+INGRESOS+PERSONAS, filtro rangos=[SOCIO]; si el usuario dice numero=1, no lo trates como nombre sino como criterio de cálculo.
 - tiempo/clima/previsión/parte meteorológico/metereológico de evento => EVENTOS + salidaDeseada METEOROLOGIA y GRAFICA.
 - todos los eventos/eventos registrados/celebraciones => todosLosEventos=true.
-- eventos entre comillas => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
+- eventos entre comillas o listados por nombre exacto => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
+- Si el usuario dice SOLO, EXACTOS, no analices otro evento, no consulta global, lista 2-5 títulos concretos, o nombra eventos concretos: todosLosEventos=false y eventos debe ser una lista cerrada.
+- Nunca devuelvas todosLosEventos=true si el prompt restringe el alcance a eventos concretos aunque también use palabras como comparativa, eventos o asistentes.
 - needsClarification=true solo si no hay ningún módulo útil.
 
 Catálogo mínimo:
@@ -2742,19 +2744,32 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   try {
     const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
     const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
-    const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
-    const filters = mergePlannerFilters(local.filters, ai?.filters);
+    const aiModules = arr(ai?.modules || ai?.modulos).map(x => trim(x).toUpperCase()).filter(Boolean);
+    const modules = [...new Set((aiModules.length ? aiModules : arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
+    const aiEventos = arr(ai?.eventos).map(trim).filter(Boolean);
+    const aiHasClosedEventList = aiEventos.some(x => !/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x));
+    const promptRestrictsScope = /\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(userPrompt);
+    const hardClosedScope = local.strictEventScope === true || (promptRestrictsScope && aiHasClosedEventList);
+    const filters = mergePlannerFilters(hardClosedScope ? local.filters : {}, ai?.filters);
+    const eventos = hardClosedScope && arr(local.eventos).length ? arr(local.eventos) : (aiEventos.length ? aiEventos : arr(local.eventos));
+    const todosLosEventos = hardClosedScope ? false : (ai?.todosLosEventos === true && !aiHasClosedEventList);
+    if ((hardClosedScope || aiHasClosedEventList) && ai?.todosLosEventos === true) {
+      zuzuTracePush(flowTrace, 'Paso 1b · Control de alcance CE', 'INFO', 'Zuzu planificador propuso todosLosEventos=true con eventos concretos/restricción de alcance. CE impone lista cerrada y bloquea consulta global.');
+    }
     return {
       ...ai,
       ok: ai?.ok !== false,
       needsClarification: ai?.needsClarification === true && !modules.length,
       modules: modules.length ? modules : local.modules,
-      eventos: arr(ai?.eventos).length ? arr(ai.eventos) : arr(local.eventos),
-      todosLosEventos: ai?.todosLosEventos === true || local.todosLosEventos === true,
+      eventos,
+      todosLosEventos,
+      strictEventScope: hardClosedScope,
       filters,
       dataRequests: arr(ai?.dataRequests),
       salidaDeseada: arr(ai?.salidaDeseada),
-      reasoning: trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.',
+      reasoning: local.strictEventScope
+        ? 'Zuzu ha planificado módulos/filtros, pero ControlEvent impone alcance cerrado por eventos explícitos del prompt.'
+        : (trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.'),
       __zuzuPlannerProvider: 'zuzu-planner',
       __zuzuPlannerModel: ai.__zuzuPlannerModel || '',
       __zuzuPlannerUsage: ai.__zuzuPlannerUsage || null,
