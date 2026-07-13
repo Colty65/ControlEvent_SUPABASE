@@ -16,7 +16,8 @@
   const selectedEventId = () => trim(state().selectedEventId || $('selectedEvent')?.value || (typeof window.selectedEventId === 'function' ? window.selectedEventId() : '') || window.selectedEventId || '');
   function isAuthOverlayVisible(){ const o=$('authOverlay'); return !!(o && !o.classList.contains('hidden') && getComputedStyle(o).display !== 'none' && getComputedStyle(o).visibility !== 'hidden'); }
   function isLoggedIn(){ return !!(window.authUser || window.ControlEventLoginUser || window.__CONTROL_EVENT_LOGIN_USER__ || window.ControlEventApp?.authUser) && !isAuthOverlayVisible(); }
-  const eventRows = () => arr(state().eventos || window.eventos || window.CE_EVENTOS);
+  function isExampleEvent(ev){ const t=up(eventTitle(ev)); return t==='CENA VERANO' || t==='COMIDA PRIMAVERA'; }
+  const eventRows = () => arr(state().eventos || window.eventos || window.CE_EVENTOS).filter(ev => !isExampleEvent(ev));
   const eventTitle = ev => trim(ev?.titulo || ev?.nombre || ev?.Evento || ev?.title || 'Evento');
   const eventDate = ev => trim(ev?.fechaIni || ev?.fecha_ini || ev?.fechaInicio || ev?.Fecha || ev?.startDate || ev?.fecha || '');
   const up = v => trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();

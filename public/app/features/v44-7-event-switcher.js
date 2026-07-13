@@ -396,9 +396,18 @@
   async function doLoginFast(){
     if(loginBusyV447) return false;
     const ident = String($('loginIdentificacion')?.value || '').trim();
-    const clave = String($('loginClave')?.value || '');
+    let clave = String($('loginClave')?.value || '');
     const error = $('authError');
     if(error) error.textContent = '';
+    // FIX7: si el gestor de claves de Windows/Chrome rellena la clave justo al pulsar, esperamos unas décimas.
+    // Solo se hace si el usuario pulsa Entrar con el campo vacío; no actúa durante el arranque.
+    if(ident && !clave){
+      for(const wait of [60,120,220,360]){
+        await new Promise(resolve => setTimeout(resolve, wait));
+        clave = String($('loginClave')?.value || '');
+        if(clave) break;
+      }
+    }
     if(!ident || !clave){ if(error) error.textContent = 'Introduce identificación y clave.'; return false; }
     loginBusyV447 = true;
     setLoginLoading(true);

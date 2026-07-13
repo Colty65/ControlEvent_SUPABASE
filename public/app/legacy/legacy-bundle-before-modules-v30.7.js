@@ -378,10 +378,7 @@ function defaultState(){
       {id:uid(), nombre:'Ana', rango:'SOCIO'},
       {id:uid(), nombre:'Fundación amiga', rango:'DONANTE'}
     ],
-    eventos: [
-      {id:uid(), titulo:'Comida Primavera', precio:15, fechaIni:'01/05/25', fechaFin:'02/05/25', situacion:'En curso', descripcion:'Evento de ejemplo para organizar compras y colaboración económica.'},
-      {id:uid(), titulo:'Cena Verano', precio:20, fechaIni:'15/08/25', fechaFin:'16/08/25', situacion:'En curso', descripcion:'Segundo evento de ejemplo.'}
-    ],
+    eventos: [],
     tiendas: [
       {id:uid(), nombre:'Leroy Merlin'},
       {id:uid(), nombre:'Mercadona'}
@@ -15919,6 +15916,36 @@ window.addCellNote = addCellNote;
   }
   function enrichIncome(r){ const p = incomeParts(r); return Object.assign({}, r, { persona: r?.persona || persona(r?.personaId), base:p.obligatorio, donation:p.voluntario, importe:p.voluntario, total:p.total, __ceTotalReal:p.total, __ceVolReal:p.voluntario, __ceSocioReal:p.obligatorio }); }
   function incomeRows(){ return collabRowsRaw().map(enrichIncome); }
+  function nameKey(v){ return up(v).replace(/[^A-Z0-9Ñ ]+/g,' ').replace(/\s+/g,' ').trim(); }
+  function isCatalogSocio(p){
+    const n = norm(p?.nombre || p?.Nombre || '');
+    if(up(p?.rango || p?.Rango || '') !== 'SOCIO') return false;
+    if(/^z_DEV/i.test(n) || /^Grupo/i.test(n) || /^Peña/i.test(n)) return false;
+    return !!n;
+  }
+  function splitYName(n){ return norm(n).split(/\s+y\s+/i).map(x=>norm(x)).filter(Boolean); }
+  function canonicalSociosCatalog(){
+    const base = arr('personas').filter(isCatalogSocio);
+    const groups = base.filter(p=>/\s+y\s+/i.test(norm(p.nombre||p.Nombre||''))).map(p=>{ const name=norm(p.nombre||p.Nombre||''); const parts=splitYName(name); return {kind:'group', name, key:nameKey(name), parts, size:Math.max(2, parts.length||2)}; });
+    const out = groups.slice();
+    base.forEach(p=>{ const name=norm(p.nombre||p.Nombre||''); if(/\s+y\s+/i.test(name)) return; const k=nameKey(name); if(groups.some(g=>g.parts.some(part=>nameKey(part)===k))) return; out.push({kind:'single', name, key:k, parts:[name], size:1}); });
+    return out;
+  }
+  function canonicalSocioAttendanceCount(rows){
+    const catalog = canonicalSociosCatalog();
+    const socRows = rows.filter(isSocio).map(r=>({name:personName(r), key:nameKey(personName(r)), num:incomeParts(r).numero})).filter(x=>x.key);
+    if(!catalog.length) return sum(rows.filter(isSocio), r=>incomeParts(r).numero);
+    let total = 0;
+    catalog.forEach(item=>{
+      if(item.kind === 'group'){
+        if(socRows.some(r=>r.key===item.key && r.num>=item.size)){ total += item.size; return; }
+        item.parts.forEach(part=>{ if(socRows.some(r=>r.key===nameKey(part))) total += 1; });
+      }else{
+        if(socRows.some(r=>r.key===item.key)) total += 1;
+      }
+    });
+    return total;
+  }
   function sum(list, fn){ return list.reduce((a,x)=>a + parseNum(fn(x)), 0); }
   function incomeLine(r){ const p = incomeParts(r); return `${personName(r)} | ${numTxt(p.numero)} | ${money(p.obligatorio)} | ${money(p.voluntario)} | ${money(p.total)}`; }
   function makeIncomeItems(rows){
@@ -16011,8 +16038,8 @@ window.addCellNote = addCellNote;
           const paid = list => total(list.filter(r => situ(r) !== 'PENDIENTE'));
           const pend = list => total(list.filter(r => situ(r) === 'PENDIENTE'));
           b.ingresosDinero = b.ingresosDinero || {};
-          b.ingresosDinero.socios = Object.assign({}, b.ingresosDinero.socios || {}, {importe:total(socios), ingresado:paid(socios), pendiente:pend(socios)});
-          b.ingresosDinero.noSocios = Object.assign({}, b.ingresosDinero.noSocios || b.ingresosDinero.donantes || {}, {importe:total(noSocios), ingresado:paid(noSocios), pendiente:pend(noSocios)});
+          b.ingresosDinero.socios = Object.assign({}, b.ingresosDinero.socios || {}, {count:canonicalSocioAttendanceCount(rows), importe:total(socios), ingresado:paid(socios), pendiente:pend(socios)});
+          b.ingresosDinero.noSocios = Object.assign({}, b.ingresosDinero.noSocios || b.ingresosDinero.donantes || {}, {count:sum(noSocios, r=>incomeParts(r).numero), importe:total(noSocios), ingresado:paid(noSocios), pendiente:pend(noSocios)});
           b.ingresosDinero.donantes = b.ingresosDinero.noSocios;
           b.ingresosDinero.totalIngresado = paid(rows);
           b.ingresosDinero.totalComprometido = total(rows);

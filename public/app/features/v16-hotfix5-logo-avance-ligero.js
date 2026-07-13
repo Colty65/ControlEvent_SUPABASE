@@ -1,7 +1,7 @@
 /* ControlEvent v21_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
-   FIX6: avance + info socios, sin tocar logon ni selector.
-   - Mantiene el arranque original de FIX4.
-   - Todo el cálculo nuevo se ejecuta solo al abrir AVANCE DEL EVENTO. */
+   FIX7: asistencia ampliada + no socios, y no actuar durante logon.
+   - Mantiene selector/orden de FIX4.
+   - La lógica de avance se ejecuta solo con sesión activa. */
 (function(){
   'use strict';
   if(window.__ceV16Hotfix5LogoAvanceLigero) return;
@@ -24,6 +24,14 @@
   }
   function title(){ return txt(selectedEvent().titulo || $('selectedEvent')?.selectedOptions?.[0]?.textContent || 'Evento'); }
   function finalizado(){ return up(selectedEvent().situacion||selectedEvent().estado||'')==='FINALIZADO'; }
+  function authVisible(){
+    const ov=$('authOverlay');
+    if(!ov) return false;
+    try{
+      const logged=!!(window.authUser || window.ControlEventApp?.authUser || window.__CONTROL_EVENT_USER__);
+      return !logged && !ov.classList.contains('hidden') && getComputedStyle(ov).display!=='none' && getComputedStyle(ov).visibility!=='hidden';
+    }catch(_){ return !ov.classList.contains('hidden'); }
+  }
   function imageKeyPresent(key){
     const s=st(); const raw=String(key||''); const compact=raw.replace(/\s+/g,'');
     return !!(s.ticketImages?.[raw]||s.ticketImageRefs?.[raw]||s.ticketImages?.[compact]||s.ticketImageRefs?.[compact]);
@@ -31,12 +39,14 @@
   function docCode(value){ const m=String(value||'').toUpperCase().match(/DOC\s*(\d+)/); return m?'DOC'+String(Number(m[1])).padStart(2,'0'):''; }
   function rowEventId(row){return txt(row?.eventId||row?.event_id||row?.eventoId||row?.evento_id||row?.EVENTO_ID||'');}
   function rowPersonaId(row){return txt(row?.personaId||row?.persona_id||row?.persona||row?.persona_id_fk||row?.PERSONA_ID||'');}
+  function rowNumero(row){ const n=num(row?.numero ?? row?.num ?? row?.personas ?? row?.cantidad ?? 1); return n>0?n:1; }
   function personOfId(id){ return id?arr('personas').find(p=>String(p?.id||p?.ID||'')===String(id)):null; }
   function personName(p){ return txt(p?.nombre||p?.Nombre||p?.NOMBRE||''); }
+  function rowPersona(row){ return row?.persona || personOfId(rowPersonaId(row)) || {}; }
+  function rowRango(row){ const p=rowPersona(row); return up(p?.rango||p?.Rango||p?.RANGO||row?.rango||row?.Rango||row?.personaRango||''); }
   function rowName(row){
-    const pid=rowPersonaId(row);
-    const p=personOfId(pid);
-    return txt(p?.nombre||row?.nombre||row?.personaNombre||row?.persona||row?.colaborador||row?.donante||row?.responsable||'');
+    const p=rowPersona(row);
+    return txt(p?.nombre||row?.nombre||row?.personaNombre||row?.personaNombreCompleto||row?.persona||row?.colaborador||row?.donante||row?.responsable||'');
   }
   function rowProducto(row){ const id=txt(row?.productoId||row?.producto_id||''); return id?arr('productos').find(p=>String(p?.id||'')===id):null; }
   function ticketText(row){return up([row?.ticketDonacion,row?.ticket,row?.ticket_donacion,row?.ticketOtrosGastos,row?.situacion,row?.estado,row?.tipo,row?.tipoCompra,row?.categoria].filter(Boolean).join(' '));}
@@ -90,13 +100,17 @@
   }
   function colaboradoresSocioEvento(col){
     // Solo nombres/rangos que encajan con el catálogo canónico de socios; no hacemos coincidencias ambiguas por "contiene".
-    return col.map(c=>({row:c,name:rowName(c),norm:norm(rowName(c)),pid:rowPersonaId(c)})).filter(x=>!!x.name);
+    return col.filter(c=>rowRango(c)==='SOCIO').map(c=>({row:c,name:rowName(c),norm:norm(rowName(c)),pid:rowPersonaId(c),numero:rowNumero(c)})).filter(x=>!!x.name);
   }
   function directGroupAttend(group, colNames){
-    return colNames.some(c=>sameNorm(c.name,group.name) || (c.pid && String(c.pid)===String(group.id)));
+    // Una pareja solo se muestra como pareja si el registro del evento representa la pareja completa.
+    return colNames.some(c=>(sameNorm(c.name,group.name) || (c.pid && String(c.pid)===String(group.id))) && rowNumero(c.row)>=group.size);
   }
   function directSingleAttend(name, personId, colNames){
     return colNames.some(c=>sameNorm(c.name,name) || (personId && c.pid && String(c.pid)===String(personId)));
+  }
+  function noSociosAsistentes(col){
+    return col.filter(c=>rowRango(c)!=='SOCIO').map(c=>({name:rowName(c),size:rowNumero(c)})).filter(x=>!!x.name).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
   }
   function socioDisplay(canonicos, colaboradores){
     const colNames=colaboradoresSocioEvento(colaboradores);
@@ -121,16 +135,18 @@
     });
     asistentes.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
     noAsisten.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+    const noSocios=noSociosAsistentes(colaboradores);
     const total=canonicos.reduce((s,x)=>s+x.size,0);
     const totalAs=asistentes.reduce((s,x)=>s+x.size,0);
     const totalNo=noAsisten.reduce((s,x)=>s+x.size,0);
-    return {asistentes,noAsisten,total,totalAs,totalNo};
+    const totalNoSocios=noSocios.reduce((s,x)=>s+x.size,0);
+    return {asistentes,noAsisten,noSocios,total,totalAs,totalNo,totalNoSocios};
   }
   function socioChip(x,kind){
     return `<span class="ce-v21-socio-chip ${kind}">${esc(x.name)}${x.size>1?` (${x.size})`:''}</span>`;
   }
   function infoSociosHtml(info){
-    return `<div class="ce-v21-socios-grid"><div><b>Asistentes</b><div class="ce-v21-socios-scroll">${info.asistentes.map(x=>socioChip(x,'asiste')).join('')||'<small>Sin asistentes</small>'}</div></div><div><b>No asistentes</b><div class="ce-v21-socios-scroll">${info.noAsisten.map(x=>socioChip(x,'no-asiste')).join('')||'<small>Sin no asistentes</small>'}</div></div></div>`;
+    return `<div class="ce-v21-socios-grid three"><div><b>SOCIOS asistentes</b><div class="ce-v21-socios-scroll">${info.asistentes.map(x=>socioChip(x,'asiste')).join('')||'<small>Sin socios asistentes</small>'}</div></div><div><b>NO SOCIOS asistentes</b><div class="ce-v21-socios-scroll">${info.noSocios.map(x=>socioChip(x,'nosocio')).join('')||'<small>Sin no socios asistentes</small>'}</div></div><div><b>SOCIOS no asistentes</b><div class="ce-v21-socios-scroll">${info.noAsisten.map(x=>socioChip(x,'no-asiste')).join('')||'<small>Sin socios no asistentes</small>'}</div></div></div>`;
   }
 
   function budgetIncome(){
@@ -187,7 +203,7 @@
       {t:'COMPRAS',color:'red',p:comp.length?tkGastos.length/comp.length*100:0,d:`TKxx/gastos corrientes: ${tkGastos.length} · ${eur(totalTk)} · Pte. compra: ${ptes.length} · ${eur(totalPte)} · Total líneas: ${comp.length} · ${eur(totalComp)}`},
       {t:'JUSTIFICANTES DE COMPRA',color:'purple',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`},
       {t:'DOCUMENTOS',color:'green',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`},
-      {t:'INFO SOCIOS',color:'slate',p:socios.total?socios.totalAs/socios.total*100:0,d:`Socios: ${socios.total} · Asistentes: ${socios.totalAs} · No asistentes: ${socios.totalNo}`,html:infoSociosHtml(socios)}
+      {t:'ASISTENCIA',color:'slate',p:socios.total?socios.totalAs/socios.total*100:0,d:`Socios: ${socios.total} · No socios: ${socios.totalNoSocios} · Socios asistentes: ${socios.totalAs} · Socios no asistentes: ${socios.totalNo}`,html:infoSociosHtml(socios)}
     ];
   }
 
@@ -205,8 +221,8 @@
       .ce-v16hf5-close{position:absolute!important;right:12px!important;top:10px!important;width:42px!important;height:42px!important;border-radius:999px!important;border:2px solid #0f172a!important;background:#fff!important;color:#0f172a!important;font-size:30px!important;font-weight:950!important;line-height:32px!important;cursor:pointer!important;z-index:5!important;box-shadow:0 3px 10px rgba(15,23,42,.18)!important;}
       .ce-v16hf5-title{text-align:center!important;margin:4px 48px 16px!important;line-height:1.15!important}.ce-v16hf5-title span{display:block!important;font-size:14px!important;letter-spacing:.15em!important;color:#64748b!important;font-weight:950!important}.ce-v16hf5-title strong{display:block!important;font-size:clamp(22px,4vw,31px)!important;font-weight:950!important}.ce-v16hf5-bubble.finalizado .ce-v16hf5-title strong{color:#991b1b!important}.ce-v16hf5-bubble.curso .ce-v16hf5-title strong{color:#15803d!important}
       .ce-v16hf5-rows{display:grid!important;gap:10px!important}.ce-v16hf5-row{display:grid!important;grid-template-columns:1fr 76px minmax(130px,.75fr)!important;gap:10px!important;align-items:center!important;border:2px solid var(--ce-av-color)!important;background:var(--ce-av-bg)!important;border-radius:16px!important;padding:11px!important}.ce-v16hf5-row b{font-size:16px!important;font-weight:950!important}.ce-v16hf5-row small{display:block!important;font-size:13px!important;color:#334155!important;font-weight:800!important;margin-top:3px!important}.ce-v16hf5-row>strong{text-align:right!important;font-size:15px!important}.ce-v16hf5-bar{height:12px!important;background:#e5e7eb!important;border-radius:999px!important;overflow:hidden!important}.ce-v16hf5-bar i{display:block!important;height:100%!important;border-radius:999px!important;background:var(--ce-av-color)!important}
-      .ce-v21-socios-grid{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;margin-top:6px!important}.ce-v21-socios-grid>div{background:rgba(255,255,255,.72)!important;border:1px solid #dbe4ef!important;border-radius:14px!important;padding:9px!important;min-width:0!important}.ce-v21-socios-grid b{display:block!important;font-size:14px!important;margin-bottom:6px!important}.ce-v21-socios-scroll{display:flex!important;flex-wrap:wrap!important;gap:5px 7px!important;max-height:170px!important;overflow:auto!important;padding-right:4px!important}.ce-v21-socio-chip{display:inline-flex!important;border-radius:999px!important;padding:3px 9px!important;font-size:12px!important;font-weight:900!important;border:1px solid currentColor!important;background:#fff!important}.ce-v21-socio-chip.asiste{color:#15803d!important;background:#ecfdf5!important}.ce-v21-socio-chip.no-asiste{color:#b91c1c!important;background:#fef2f2!important}
-      @media(max-width:680px){.ce-v16hf5-bubble{border-radius:18px!important;padding:14px!important}.ce-v16hf5-row{grid-template-columns:1fr 58px!important}.ce-v16hf5-bar{grid-column:1/-1!important}.ce-v21-socios-grid{grid-template-columns:1fr!important}.ce-v21-socios-scroll{max-height:130px!important}}
+      .ce-v21-socios-grid{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;margin-top:6px!important}.ce-v21-socios-grid.three{grid-template-columns:1fr 1fr 1fr!important}.ce-v21-socios-grid>div{background:rgba(255,255,255,.72)!important;border:1px solid #dbe4ef!important;border-radius:14px!important;padding:9px!important;min-width:0!important}.ce-v21-socios-grid b{display:block!important;font-size:14px!important;margin-bottom:6px!important}.ce-v21-socios-scroll{display:flex!important;flex-wrap:wrap!important;gap:5px 7px!important;max-height:170px!important;overflow:auto!important;padding-right:4px!important}.ce-v21-socio-chip{display:inline-flex!important;border-radius:999px!important;padding:3px 9px!important;font-size:12px!important;font-weight:900!important;border:1px solid currentColor!important;background:#fff!important}.ce-v21-socio-chip.asiste{color:#15803d!important;background:#ecfdf5!important}.ce-v21-socio-chip.nosocio{color:#1d4ed8!important;background:#eff6ff!important}.ce-v21-socio-chip.no-asiste{color:#b91c1c!important;background:#fef2f2!important}
+      @media(max-width:860px){.ce-v21-socios-grid.three{grid-template-columns:1fr!important}}@media(max-width:680px){.ce-v16hf5-bubble{border-radius:18px!important;padding:14px!important}.ce-v16hf5-row{grid-template-columns:1fr 58px!important}.ce-v16hf5-bar{grid-column:1/-1!important}.ce-v21-socios-grid{grid-template-columns:1fr!important}.ce-v21-socios-scroll{max-height:130px!important}}
     `;
     document.head.appendChild(s);
   }
@@ -274,12 +290,10 @@
     document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') closeAvance(); }, true);
   }
 
-  function run(){ rewireLogo(); bindGlobalClose(); }
+  function run(){ if(authVisible()) return; rewireLogo(); bindGlobalClose(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run,{once:true}); else run();
-  window.addEventListener('load',run,{once:true});
   window.addEventListener('controlevent:event-ready',()=>setTimeout(run,80));
   window.addEventListener('controlevent:event-loaded',()=>setTimeout(run,80));
-  [100,500,1500,3000].forEach(ms=>setTimeout(run,ms));
 
   window.ControlEventV16Hf5Avance={show:showAvance, close:closeAvance, rewireLogo};
 })();
