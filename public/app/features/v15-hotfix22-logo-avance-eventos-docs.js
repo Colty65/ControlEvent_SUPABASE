@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod - HOTFIX47: avance en logo, carga scoped estable, documentos/mantenimiento. */
+/* ControlEvent v20_prod - HOTFIX47: avance en logo, carga scoped estable, documentos/mantenimiento. */
 (function(){
   'use strict';
   const INSTALLED = '__ceV15Hotfix22LogoAvanceEventosDocs';
@@ -83,7 +83,7 @@
         try{ window.dispatchEvent(new CustomEvent('controlevent:event-loaded', {detail:{eventId:id, reason:'hf47-scoped-switch'}})); }catch(_){ }
         return true;
       }catch(error){
-        if(attempt >= 3) console.warn('[ControlEvent v19_prod HF47] carga scoped de evento fallida:', error?.message || error);
+        if(attempt >= 3) console.warn('[ControlEvent v20_prod HF47] carga scoped de evento fallida:', error?.message || error);
         else await new Promise(r => setTimeout(r, 160 + attempt * 220));
       }
     }

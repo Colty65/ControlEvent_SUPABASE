@@ -1,4 +1,4 @@
-# ControlEvent v19_prod · Zuzu con tokens optimizados
+# ControlEvent v20_prod · Zuzu con tokens optimizados
 
 Versión centrada en mantener el flujo completo con Gemini, pero reduciendo tokens inútiles y dejando la traza más limpia.
 
@@ -19,7 +19,7 @@ Versión centrada en mantener el flujo completo con Gemini, pero reduciendo toke
 - Añadida estimación local de caracteres/tokens antes de llamar a Gemini, visible en la traza.
 - La traza queda plegada por defecto para no invadir la respuesta.
 - Se permite preguntar por información indirecta ligada a eventos, como tiempo/clima/previsión, sin bloquear la consulta.
-- Versionado único actualizado a `v19_prod` y cache-busting nuevo.
+- Versionado único actualizado a `v20_prod` y cache-busting nuevo.
 
 ## Validaciones realizadas
 

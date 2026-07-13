@@ -1,4 +1,4 @@
-# ControlEvent v19_prod — FIX5 colores, iPad y claridad en donaciones
+# ControlEvent v20_prod — FIX5 colores, iPad y claridad en donaciones
 
 ## Cambios aplicados
 

@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod - FIX13 puntual (cargado realmente desde index):
+/* ControlEvent v20_prod - FIX13 puntual (cargado realmente desde index):
    1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas;
    3) visor ticket con detalle a la izquierda y Cerrar abajo derecha;
    4) título del evento en visor: verde En curso, rojo Finalizado.
@@ -336,5 +336,5 @@
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_){ }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,900,1800].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v19_prod_fix13_titulo_evento_color_estado'};
+  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v20_prod_fix13_titulo_evento_color_estado'};
 })();

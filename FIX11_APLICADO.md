@@ -1,4 +1,4 @@
-# ControlEvent v19_prod · FIX11 aplicado
+# ControlEvent v20_prod · FIX11 aplicado
 
 Correcciones aplicadas sobre FIX10 tras validación en pantalla:
 

@@ -1,4 +1,4 @@
-# ControlEvent v19_prod - Fix 1 Mapa global + iconos laterales
+# ControlEvent v20_prod - Fix 1 Mapa global + iconos laterales
 
 Cambios aplicados:
 

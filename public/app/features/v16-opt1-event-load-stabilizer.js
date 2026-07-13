@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod OPT1 - estabilizador de carga/cambio de evento.
+/* ControlEvent v20_prod OPT1 - estabilizador de carga/cambio de evento.
    Objetivo: una sola selección efectiva, sin guardados globales, sin renders duplicados
    y con protección del desplegable principal. No modifica cálculos ni ventanas. */
 (function(){
@@ -6,7 +6,7 @@
   if(window.__ceV16Opt1Installed) return;
   window.__ceV16Opt1Installed = true;
 
-  const VERSION = 'v19_prod_opt_1';
+  const VERSION = 'v20_prod_opt_1';
   const SELECT_KEYS = [
     'controlevent_v229_selected_event_id',
     'controlevent_selected_event_id',
@@ -68,7 +68,7 @@
   }
 
   function notice(msg, ms){
-    // v19_prod_opt_2D: sin avisos negros de carga. El cambio de evento debe ser silencioso.
+    // v20_prod_opt_2D: sin avisos negros de carga. El cambio de evento debe ser silencioso.
     try{ const box = $('ceOpt1Notice'); if(box) box.remove(); }catch(_){ }
   }
 
@@ -165,7 +165,7 @@
         }
       }
     }catch(err){
-      console.warn('[v19_prod_opt_1] cambio de evento', err);
+      console.warn('[v20_prod_opt_1] cambio de evento', err);
     }finally{
       if(my === token){
         metrics.lastDurationMs = Math.round((performance.now ? performance.now() : Date.now()) - start);

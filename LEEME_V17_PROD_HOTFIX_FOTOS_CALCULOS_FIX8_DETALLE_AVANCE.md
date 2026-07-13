@@ -1,6 +1,6 @@
-# ControlEvent v19_prod - FIX8 Detalle completo / cierre abajo / avance fijo
+# ControlEvent v20_prod - FIX8 Detalle completo / cierre abajo / avance fijo
 
-No cambia la versión visible: sigue siendo v19_prod.
+No cambia la versión visible: sigue siendo v20_prod.
 
 Base: FIX7_DETALLE_SIN_I.
 

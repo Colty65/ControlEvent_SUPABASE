@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod - HOTFIX mínimo: Ticket Auto no debe abrirse solo.
+/* ControlEvent v20_prod - HOTFIX mínimo: Ticket Auto no debe abrirse solo.
    Motivo: tras v11.1 algunos arranques dejaban visible Alta asistida de COMPRAS antes de elegir evento.
    Este parche no cambia versión ni funcionalidad; solo cierra el panel si no procede. */
 (function(){

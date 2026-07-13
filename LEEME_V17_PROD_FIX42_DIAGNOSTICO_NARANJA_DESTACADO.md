@@ -1,4 +1,4 @@
-# ControlEvent v19_prod - FIX42 Diagnóstico naranja destacado
+# ControlEvent v20_prod - FIX42 Diagnóstico naranja destacado
 
 ## Cambios realizados
 - Los productos/líneas que en el diagnóstico HF27/HF28 aparecen en color naranja (`REVISAR`) ahora se arrastran visualmente a:

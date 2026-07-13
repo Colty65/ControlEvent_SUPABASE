@@ -1,4 +1,4 @@
-# ControlEvent v19_prod · Zuzu contexto completo y gráficas útiles
+# ControlEvent v20_prod · Zuzu contexto completo y gráficas útiles
 
 Cambios principales:
 
@@ -10,7 +10,7 @@ Cambios principales:
 - La meteorología se empaqueta como contexto indirecto visible para Gemini y como tarjeta gráfica meteorológica.
 - Para eventos de un solo día ya no se pinta una línea con un punto “en el aire”: se muestra una tarjeta funcional con máxima, mínima, lluvia, viento y cielo.
 - Añadida validación de respuesta narrativa truncada o incompleta: si Gemini corta el texto o no contesta todas las partes pedidas, ControlEvent reintenta con una corrección guiada.
-- Versión única actualizada a v19_prod.
+- Versión única actualizada a v20_prod.
 
 Validación:
 

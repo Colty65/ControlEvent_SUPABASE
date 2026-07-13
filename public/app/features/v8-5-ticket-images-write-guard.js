@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod FIX13 - guardia de escritura ce_ticket_images.
+/* ControlEvent v20_prod FIX13 - guardia de escritura ce_ticket_images.
    Evita que migraciones antiguas/locales suban fotos al abrir la pantalla de login
    con un selectedEventId obsoleto y creen event_id huérfanos. */
 (function(){
@@ -64,7 +64,7 @@
         const payload = requestPayload(url, init || {});
         const check = shouldBlockWrite(payload);
         if(check.block){
-          try{ console.warn('[ControlEvent v19_prod] Escritura /api/ticket-images bloqueada:', method, check); }catch(_){ }
+          try{ console.warn('[ControlEvent v20_prod] Escritura /api/ticket-images bloqueada:', method, check); }catch(_){ }
           return Promise.resolve(jsonResponse(409, {ok:false, blocked:true, error:'Operacion de foto bloqueada: evento no valido o usuario no autenticado.', detail:check}));
         }
         const headers = (()=>{ try{ return init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : {...(init?.headers||{})}; }catch(_){ return {}; } })();
@@ -77,5 +77,5 @@
     window.fetch = wrapped;
   }
 
-  window.ControlEventV85TicketImagesWriteGuard = {version:'v19_prod ticket-images write guard', authenticated, liveEventIds, selectedEventId};
+  window.ControlEventV85TicketImagesWriteGuard = {version:'v20_prod ticket-images write guard', authenticated, liveEventIds, selectedEventId};
 })();

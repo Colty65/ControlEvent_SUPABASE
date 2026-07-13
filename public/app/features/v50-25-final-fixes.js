@@ -1,11 +1,11 @@
-/* ControlEvent v19_prod - parche mínimo sobre v50.24.
+/* ControlEvent v20_prod - parche mínimo sobre v50.24.
    - Cambio de usuario tras Salir: al elegir evento se fuerza estado de evento listo y globos rehidratados.
-   - Versión única visible y en descargas: ControlEvent v19_prod.
+   - Versión única visible y en descargas: ControlEvent v20_prod.
    - Sin MutationObserver global ni bucles permanentes. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v19_prod';
-  const VERSION_FILE = 'ControlEvent_v19_prod';
+  const VERSION = 'ControlEvent v20_prod';
+  const VERSION_FILE = 'ControlEvent_v20_prod';
   const INSTALLED = '__ceV5025FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -16,7 +16,7 @@
     'ce-v5019-logged-out','ce-v5022-logged-out'
   ];
   const HAS_EVENT_CLASSES = ['ce-v5019-authenticated','ce-v5020-has-event','ce-v5022-has-event','ce-v5025-has-event'];
-  const SESSION_KEYS_TO_CLEAR_ON_LOGOUT = ['ControlEvent_v19_prod_session','ControlEvent_v3_0_prod_session'];
+  const SESSION_KEYS_TO_CLEAR_ON_LOGOUT = ['ControlEvent_v20_prod_session','ControlEvent_v3_0_prod_session'];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
   const getLexical = name => safe(() => Function('return (typeof '+name+' !== "undefined") ? '+name+' : undefined;')(), undefined);

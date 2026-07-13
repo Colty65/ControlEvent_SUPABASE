@@ -1,4 +1,4 @@
-# ControlEvent v19_prod · Zuzu socios, meteo y layout lateral
+# ControlEvent v20_prod · Zuzu socios, meteo y layout lateral
 
 ## Motivo
 
@@ -76,5 +76,5 @@ Las herramientas que estaban flotando abajo pasan a mostrarse en una barra later
 
 ## Versión
 
-- App: `v19_prod`
+- App: `v20_prod`
 - ZIP: `CE_v19_PROD_MAPA_GLOBAL.zip`
