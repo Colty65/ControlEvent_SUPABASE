@@ -421,7 +421,7 @@ Campos oficiales por módulo y datos indirectos:
 - DOCUMENTOS: DOCxxx; Evento; Fecha; Descripcion; Tiene imagen.
 - PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
 - TIENDAS: Nombre tienda.
-- PERSONAS: Nombre persona; Rango.
+- PERSONAS: Nombre persona; Rango; Numero. Para SOCIOS, Numero indica personas representadas: las parejas con " y " cuentan como 2 y sustituyen a sus miembros individuales.
 
 Formato de salida: SOLO JSON válido con el esquema indicado. Evita respuestas excesivamente largas: usa tablas y ficheros para detalle cuando sea necesario.
 Límites de presentación: answer <= 2500 caracteres; máximo 8 tablas; máximo 80 filas por tabla; máximo 8 gráficas. Si necesitas devolver más detalle, usa files en CSV.
@@ -492,7 +492,7 @@ function orderedColumnsForModule(moduleName, rows) {
     EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','Descripción','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
     PRODUCTOS: ['Nombre producto','Segmento','Destino','Precio rfa.'],
     TIENDAS: ['Nombre tienda'],
-    PERSONAS: ['Nombre persona','Rango']
+    PERSONAS: ['Nombre persona','Rango','Numero']
   };
   const seen = new Set();
   const cols = [];
@@ -1210,6 +1210,19 @@ function directProductCatalogIfApplicable(prompt, context) {
   tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
   return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v21_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
 }
+
+function personaNumeroRepresentada(row) {
+  const v = num(row?.Numero ?? row?.numero ?? row?.['Personas representadas'] ?? row?.personas ?? row?.cantidad);
+  return v > 0 ? v : 1;
+}
+function personaRowsParecenCanonicosSocio(rows) {
+  const r = arr(rows);
+  return r.length > 0 && r.every(x => norm(x?.Rango) === 'socio') && r.some(x => personaNumeroRepresentada(x) >= 2);
+}
+function personasRepresentadasTotal(rows) {
+  return round(arr(rows).reduce((sum, row) => sum + personaNumeroRepresentada(row), 0), 3);
+}
+
 function rangosSolicitadosFromPrompt(prompt) {
   const p = norm(prompt);
   const out = [];
@@ -1242,6 +1255,32 @@ function nameAppearsInRegisteredPerson(personName, registeredNames) {
     return r && (r === n || r.includes(n) || n.includes(r));
   });
 }
+function socioCatalogParts(name) { return norm(name).toUpperCase().split(/\s+Y\s+/).map(x => trim(x)).filter(Boolean); }
+function registeredMatchesPart(part, registeredNames) {
+  const p = norm(part);
+  if (!p) return false;
+  return arr(registeredNames).some(x => {
+    const r = norm(x);
+    if (!r) return false;
+    if (r === p || r.includes(p) || p.includes(r)) return true;
+    const rf = r.split(' ')[0] || '';
+    const pf = p.split(' ')[0] || '';
+    return rf.length >= 4 && pf.length >= 4 && rf === pf;
+  });
+}
+function socioAttendanceCountFromRegistered(personRow, registeredNames) {
+  const name = trim(personRow?.['Nombre persona'] || personRow?.Nombre || personRow?.nombre);
+  const size = personaNumeroRepresentada(personRow);
+  if (!name) return 0;
+  if (nameAppearsInRegisteredPerson(name, registeredNames)) return size;
+  if (size > 1 || /\s+y\s+/i.test(name)) {
+    const parts = socioCatalogParts(name);
+    let count = 0;
+    parts.forEach(part => { if (registeredMatchesPart(part, registeredNames)) count += 1; });
+    return Math.min(size, count);
+  }
+  return registeredMatchesPart(name, registeredNames) ? 1 : 0;
+}
 function missingAttendeesTablesAndCharts(context, prompt = '') {
   const mods = context?.modulosExtraidos || {};
   const requireNumeroUno = promptRequiresNumeroUno(prompt);
@@ -1265,9 +1304,16 @@ function missingAttendeesTablesAndCharts(context, prompt = '') {
   const summary = [];
   events.forEach(ev => {
     const regNames = rowsForEvent(incomes, ev).map(r => trim(r.Nombre));
-    const missing = persons.filter(p => !nameAppearsInRegisteredPerson(p['Nombre persona'], regNames));
-    missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: personaNumero(p) || '', Motivo: `Está en PERSONAS como SOCIO${requireNumeroUno ? ' con Numero=1' : ''} y no figura en INGRESOS del evento` }));
-    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': persons.length, 'Socios con ingreso/asistencia registrada': persons.length - missing.length, 'Socios no registrados en este evento': missing.length, Criterio: requireNumeroUno ? (hasNumeroData ? 'Rango=SOCIO, Numero=1, excluyendo Grupo..., Personas..., z_de... y z_DEV...' : 'Rango=SOCIO e interpretación Numero=1 como socio individual; excluye nombres con y/e, Grupo..., Personas..., z_de... y z_DEV...') : 'Rango=SOCIO, excluyendo Grupo..., Personas..., z_de... y z_DEV...' });
+    let validTotal = 0, registeredTotal = 0, missingTotal = 0;
+    persons.forEach(p => {
+      const size = personaNumeroRepresentada(p);
+      const count = socioAttendanceCountFromRegistered(p, regNames);
+      validTotal += size;
+      registeredTotal += count;
+      missingTotal += Math.max(0, size - count);
+      if (count < size) detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: size, Motivo: count > 0 ? `Asistencia parcial: figura ${count} de ${size}` : `Está en PERSONAS como SOCIO y no figura en INGRESOS del evento` });
+    });
+    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': validTotal, 'Socios con ingreso/asistencia registrada': registeredTotal, 'Socios no registrados en este evento': missingTotal, Criterio: requireNumeroUno ? (hasNumeroData ? 'Rango=SOCIO, Numero=1, excluyendo Grupo..., Personas..., z_de... y z_DEV...' : 'Rango=SOCIO e interpretación Numero=1 como socio individual; excluye nombres con y/e, Grupo..., Personas..., z_de... y z_DEV...') : 'Rango=SOCIO canónico: excluye z_DEV%, Grupo% y Peña%; parejas con " y " sustituyen a individuales y cuentan como 2' });
   });
   const summaryCols = ['Evento','Socios válidos en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento','Criterio'];
   const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Numero','Motivo'];
@@ -1297,14 +1343,26 @@ function directPersonsCatalogIfApplicable(prompt, context) {
   rows.sort((a,b)=>String(a.Rango).localeCompare(String(b.Rango),'es') || String(a['Nombre persona']).localeCompare(String(b['Nombre persona']),'es'));
   const allRows = rows0.slice().sort((a,b)=>String(a.Rango).localeCompare(String(b.Rango),'es') || String(a['Nombre persona']).localeCompare(String(b['Nombre persona']),'es'));
   const baseForGroups = rangos.length ? rows : allRows;
+  const canonSocios = rangos.map(norm).includes('socio') && !rangos.map(norm).includes('no socio');
   const groups = new Map();
-  baseForGroups.forEach(r=>{ const k=trim(r.Rango)||'Sin rango'; groups.set(k,(groups.get(k)||0)+1); });
-  const gcols=['Rango','Personas'];
-  const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>[k,String(v)]);
-  const cols=['Nombre persona','Rango'];
+  baseForGroups.forEach(r=>{
+    const k=trim(r.Rango)||'Sin rango';
+    const old=groups.get(k)||{registros:0,personas:0};
+    old.registros += 1;
+    old.personas += canonSocios && norm(k)==='socio' ? personaNumeroRepresentada(r) : 1;
+    groups.set(k,old);
+  });
+  const gcols=canonSocios?['Rango','Registros canónicos','Personas representadas']:['Rango','Personas'];
+  const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>canonSocios?[k,String(v.registros),String(round(v.personas,3))]:[k,String(v.registros)]);
+  const hasNumero = rows.some(r => personaNumeroRepresentada(r) !== 1);
+  const cols=hasNumero?['Nombre persona','Rango','Numero']:['Nombre persona','Rango'];
+  const rowsForTable = rows.map(r => ({...r, Numero: personaNumeroRepresentada(r)}));
+  const representadas = personasRepresentadasTotal(rows);
   const title = rangos.length ? `PERSONAS ${rangos.join(' / ')} registradas en el sistema` : 'PERSONAS registradas en el sistema';
   const answer = rangos.length
-    ? `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Filtro de rango aplicado: ${rangos.join(', ')}. Registros encontrados: ${rows.length}.`
+    ? (canonSocios
+      ? `ControlEvent ha consultado PERSONAS con el criterio canónico de socios: rango=SOCIO, excluyendo z_DEV%, Grupo% y Peña%; las parejas con " y " sustituyen a sus individuales. Registros canónicos encontrados: ${rows.length}. Personas representadas: ${representadas}.`
+      : `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Filtro de rango aplicado: ${rangos.join(', ')}. Registros encontrados: ${rows.length}.`)
     : `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Registros encontrados: ${rows.length}.`;
   return {
     ok:true,
@@ -1313,8 +1371,8 @@ function directPersonsCatalogIfApplicable(prompt, context) {
     answer,
     warnings: rows.length ? [] : [`No hay personas con rango ${rangos.join(', ') || 'solicitado'} en la tabla PERSONAS.`],
     charts:grows.length?[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}]:[],
-    tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],
-    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v21_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
+    tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rowsForTable.map(r=>cols.map(c=>text(r[c])))}],
+    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v21_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rowsForTable)}],
     provider:'control-event-local-personas-catalogo',
     model:'zuzu-planifica-control-event-filtra'
   };

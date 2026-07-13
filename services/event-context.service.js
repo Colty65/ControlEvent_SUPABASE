@@ -133,6 +133,70 @@ function parseEventDate(ev) {
 }
 
 
+function socioNombre(row) { return trim(row?.nombre || row?.Nombre || row?.NOMBRE || row?.['Nombre persona'] || ''); }
+function socioRango(row) { return trim(row?.rango || row?.Rango || row?.RANGO || row?.Rango || ''); }
+function socioCanonicoPermitido(row) {
+  const n = socioNombre(row);
+  if (norm(socioRango(row)) !== 'socio') return false;
+  if (/^z_DEV/i.test(n)) return false;
+  if (/^Grupo/i.test(n)) return false;
+  if (/^Peña/i.test(n)) return false;
+  return !!n;
+}
+function socioEsGrupoY(row) { return /\s+y\s+/i.test(socioNombre(row)); }
+function socioPartesGrupoY(name) { return norm(name).toUpperCase().split(/\s+Y\s+/).map(x => trim(x)).filter(Boolean); }
+function socioIndividualCubiertoPorGrupo(singleName, groupName, parts = []) {
+  const s = norm(singleName).toUpperCase();
+  const g = norm(groupName).toUpperCase();
+  if (!s || s.length < 3) return false;
+  if (g.includes(s)) return true;
+  return arr(parts).some(part => {
+    const p = norm(part).toUpperCase();
+    if (!p || p.length < 3) return false;
+    if (p === s || p.includes(s) || s.includes(p)) return true;
+    const pf = p.split(' ')[0] || '';
+    const sf = s.split(' ')[0] || '';
+    return pf.length >= 4 && sf.length >= 4 && pf === sf;
+  });
+}
+function sociosCanonicosDesdePersonas(personas) {
+  const base = arr(personas).filter(socioCanonicoPermitido);
+  const grupos = base.filter(socioEsGrupoY).map(p => ({ row: p, nombre: socioNombre(p), partes: socioPartesGrupoY(socioNombre(p)) }));
+  const out = [];
+  const seen = new Set();
+  grupos.forEach(g => {
+    const key = trim(g.row?.id) || norm(g.nombre);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push({ ...g.row, nombre: g.nombre, rango: 'SOCIO', Numero: Math.max(2, g.partes.length || 2), __ceSocioCanonico: true });
+  });
+  base.forEach(p => {
+    const nombre = socioNombre(p);
+    if (socioEsGrupoY(p)) return;
+    if (grupos.some(g => socioIndividualCubiertoPorGrupo(nombre, g.nombre, g.partes))) return;
+    const key = trim(p?.id) || norm(nombre);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push({ ...p, nombre, rango: 'SOCIO', Numero: 1, __ceSocioCanonico: true });
+  });
+  return out.sort((a,b) => socioNombre(a).localeCompare(socioNombre(b), 'es', { sensitivity:'base' }));
+}
+function sociosCanonicosZuzuRows(state) {
+  return sociosCanonicosDesdePersonas(state?.personas).map(p => ({
+    'Nombre persona': socioNombre(p),
+    Rango: 'SOCIO',
+    Numero: round(p?.Numero || 1, 3)
+  }));
+}
+function filtroSoloSociosCanonicos(filters) {
+  const rangos = zuzuUnique(arr(filters?.rangos || filters?.rango).map(norm).filter(Boolean));
+  return rangos.includes('socio') && !rangos.includes('no socio') && !rangos.includes('donante');
+}
+function totalPersonasRepresentadas(rows) {
+  return round(arr(rows).reduce((sum, row) => sum + (num(row?.Numero || row?.numero) || 1), 0), 3);
+}
+
+
 function zuzuPromptYearFilters(prompt) {
   const raw = text(prompt);
   const p = norm(raw);
@@ -1184,7 +1248,9 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
     });
     return out;
   }
-  const personas = candidateRows(state?.personas, p => ({ nombre: trim(p?.nombre), rango: trim(p?.rango) }), 60, 15);
+  const sociosCanonicos = sociosCanonicosDesdePersonas(state?.personas);
+  const personasFuente = /\bsocios?\b/.test(promptNorm) ? sociosCanonicos : state?.personas;
+  const personas = candidateRows(personasFuente, p => ({ nombre: trim(p?.nombre), rango: trim(p?.rango), numero: round(p?.Numero ?? p?.numero ?? 1, 3) }), 60, 15);
   const productos = candidateRows(state?.productos, p => ({ nombre: trim(p?.nombre), segmento: trim(p?.segmento), destino: trim(p?.destino) }), 80, 18);
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
@@ -1210,11 +1276,14 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
     conteosSistema: {
       eventos: arr(state?.eventos).length,
       personas: arr(state?.personas).length,
+      sociosCanonicosRegistros: sociosCanonicos.length,
+      sociosCanonicosPersonasRepresentadas: totalPersonasRepresentadas(sociosCanonicos),
       productos: arr(state?.productos).length,
       tiendas: arr(state?.tiendas).length,
       compras: arr(state?.compras).length,
       ingresos: arr(state?.colaboradores).length
     },
+    reglaSociosCanonicos: 'SOCIOS canónicos = rango SOCIO, excluyendo z_DEV%, Grupo% y Peña%; las parejas con " y " sustituyen a sus individuales y cuentan por Numero=2.',
     reglaCoste: 'Si necesitas todos los datos de un módulo, pide el módulo; no intentes inferir datos operativos desde este catálogo.'
   };
 }
@@ -1462,11 +1531,13 @@ function zuzuModuleTiendas(state, filters, helpers) {
 }
 function zuzuModulePersonas(state, filters, helpers) {
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
-  const rows = arr(state?.personas).map(p => ({
-    'Nombre persona': trim(p?.nombre),
-    Rango: trim(p?.rango || '').toUpperCase(),
-    Numero: round(p?.numero ?? p?.Numero ?? p?.número ?? p?.num ?? p?.personas ?? p?.cantidad, 3)
-  })).filter(p => p['Nombre persona']);
+  const rows = filtroSoloSociosCanonicos(filters)
+    ? sociosCanonicosZuzuRows(state)
+    : arr(state?.personas).map(p => ({
+        'Nombre persona': trim(p?.nombre),
+        Rango: trim(p?.rango || '').toUpperCase(),
+        Numero: round(p?.numero ?? p?.Numero ?? p?.número ?? p?.num ?? p?.personas ?? p?.cantidad, 3)
+      })).filter(p => p['Nombre persona']);
   return zuzuQueryFilterRows(rows, filters, matcher, 'PERSONAS');
 }
 
