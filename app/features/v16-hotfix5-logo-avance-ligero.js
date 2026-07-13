@@ -33,26 +33,46 @@
   function rowEventId(row){return txt(row?.eventId||row?.event_id||row?.eventoId||row?.evento_id||row?.EVENTO_ID||'');}
   function rowPersonaId(row){return txt(row?.personaId||row?.persona_id||row?.persona||row?.persona_id_fk||row?.PERSONA_ID||'');}
   function rowName(row){return txt(row?.nombre||row?.personaNombre||row?.persona||row?.colaborador||row?.donante||row?.responsable||'');}
+  function ticketText(row){
+    return up([row?.ticketDonacion,row?.ticket,row?.ticket_donacion,row?.situacion,row?.estado,row?.tipo,row?.tipoCompra,row?.categoria].filter(Boolean).join(' '));
+  }
   function isPteCompra(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
-    return /PTE|PENDIENTE/.test(t) && /COMPRA/.test(t);
+    const t=ticketText(row);
+    if(/DONADO|DONACION/.test(t)) return false;
+    if(/TK\s*\d+/.test(t) || (/GASTO/.test(t)&&/CORRIENTE/.test(t))) return false;
+    if(/PTE|PENDIENTE/.test(t) || /COMPRA/.test(t)) return true;
+    // En ControlEvent, si una compra no tiene TKxx ni gasto corriente ni donación, operativamente es Pte. compra.
+    return true;
   }
   function isGastoCorriente(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
+    const t=ticketText(row);
     return /GASTO/.test(t) && /CORRIENTE/.test(t);
   }
   function isTk(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
-    return /TK\s*\d+/i.test(t);
+    const t=ticketText(row);
+    return /TK\s*\d+/.test(t);
   }
-  function socioPermitido(p){
+  function socioBasePermitido(p){
     const n=txt(p?.nombre||p?.Nombre||p?.NOMBRE||'');
     if(up(p?.rango||p?.Rango||p?.RANGO||'')!=='SOCIO') return false;
     if(/^z_DEV/i.test(n)) return false;
     if(/^Grupo/i.test(n)) return false;
     if(/^Peña/i.test(n)) return false;
-    if(/\s+y\s+/i.test(n)) return false;
     return !!n;
+  }
+  function normName(v){ return up(v).replace(/[^A-Z0-9Ñ ]+/g,' ').replace(/\s+/g,' ').trim(); }
+  function isSocioGrupoY(p){ return /\s+y\s+/i.test(txt(p?.nombre||p?.Nombre||p?.NOMBRE||'')); }
+  function partsGrupoY(name){ return normName(name).split(/\s+Y\s+/).map(x=>x.trim()).filter(Boolean); }
+  function sociosFiltrados(){
+    const base=arr('personas').filter(socioBasePermitido);
+    const grupos=base.filter(isSocioGrupoY);
+    const partes=new Set();
+    grupos.forEach(g=>partsGrupoY(g.nombre||g.Nombre||g.NOMBRE||'').forEach(x=>partes.add(x)));
+    return base.filter(p=>{
+      const n=txt(p?.nombre||p?.Nombre||p?.NOMBRE||'');
+      if(isSocioGrupoY(p)) return true;
+      return !partes.has(normName(n));
+    }).slice().sort((a,b)=>txt(a.nombre||a.Nombre||'').localeCompare(txt(b.nombre||b.Nombre||''),'es',{sensitivity:'base'}));
   }
   function socioAsiste(p, colaboradores){
     const pid=txt(p?.id||p?.ID||p?.personaId||'');
@@ -109,7 +129,7 @@
     Object.keys(st().ticketImages||{}).forEach(k=>{ if(k.startsWith(id+'|') && /DOC\s*\d+/i.test(k)) docKeys.add(k); });
     const tickets=[...new Set(comp.map(c=>txt(c.ticket||c.ticketDonacion||c.ticket_donacion||'').toUpperCase()).filter(v=>/TK\s*\d+/i.test(v)))];
     const ticketPhotos=tickets.filter(tk=>Object.keys(st().ticketImages||{}).some(k=>k.startsWith(id+'|')&&k.toUpperCase().includes(tk))).length;
-    const socios=arr('personas').filter(socioPermitido).slice().sort((a,b)=>txt(a.nombre||a.Nombre||'').localeCompare(txt(b.nombre||b.Nombre||''),'es',{sensitivity:'base'}));
+    const socios=sociosFiltrados();
     const sociosAsistentes=socios.filter(p=>socioAsiste(p,col));
     const sociosNo=socios.filter(p=>!socioAsiste(p,col));
     const socioList=socios.map(p=>{
