@@ -1263,12 +1263,17 @@
       return pf.length >= 4 && sf.length >= 4 && pf === sf;
     });
   }
+  function cePlanSocioCanonicoBase(p){
+    const n = String(p?.nombre || p?.Nombre || '').trim();
+    if(!n || /^z_DEV/i.test(n) || /^Grupo/i.test(n) || /^Peña/i.test(n)) return false;
+    return up(p?.rango || p?.Rango || '') === 'SOCIO';
+  }
   function sociosParaIngresosIniciales(){
     // Regla v13.0 hotfix: para "Ingresos obligatorios de todos los socios" se usan
     // parejas/grupos SOCIO escritos con "y/e/+" como numero=2, y solo los socios
     // individuales que no estén ya contenidos en una pareja. Esto evita duplicar
     // Colty+Esther como pareja y además Colty y Esther por separado.
-    const list = socios();
+    const list = socios().filter(cePlanSocioCanonicoBase);
     const selected = new Map();
     const couples = [];
     list.forEach(p => {
