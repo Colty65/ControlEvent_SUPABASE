@@ -1298,19 +1298,14 @@ function directPersonsCatalogIfApplicable(prompt, context) {
   const allRows = rows0.slice().sort((a,b)=>String(a.Rango).localeCompare(String(b.Rango),'es') || String(a['Nombre persona']).localeCompare(String(b['Nombre persona']),'es'));
   const baseForGroups = rangos.length ? rows : allRows;
   const groups = new Map();
-  baseForGroups.forEach(r=>{
-    const k=trim(r.Rango)||'Sin rango';
-    const peso = /^SOCIO$/i.test(k) ? Math.max(1, num(r['Cuenta socios'] || r.Numero || 1)) : 1;
-    groups.set(k,(groups.get(k)||0)+peso);
-  });
+  baseForGroups.forEach(r=>{ const k=trim(r.Rango)||'Sin rango'; groups.set(k,(groups.get(k)||0)+1); });
   const gcols=['Rango','Personas'];
   const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>[k,String(v)]);
-  const cols=rows.some(r => r['Cuenta socios'] != null) ? ['Nombre persona','Rango','Cuenta socios','Tipo registro socio'] : ['Nombre persona','Rango'];
+  const cols=['Nombre persona','Rango'];
   const title = rangos.length ? `PERSONAS ${rangos.join(' / ')} registradas en el sistema` : 'PERSONAS registradas en el sistema';
-  const totalPersonasCanonico = rows.reduce((a,r)=>a + (/^SOCIO$/i.test(trim(r.Rango)) ? Math.max(1, num(r['Cuenta socios'] || r.Numero || 1)) : 1), 0);
   const answer = rangos.length
-    ? `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Filtro de rango aplicado: ${rangos.join(', ')}. Registros encontrados: ${rows.length}. Personas/socios contabilizados: ${totalPersonasCanonico}. Si el rango es SOCIO se aplica el filtro canónico de socios: parejas con " y " cuentan como 2 y sustituyen a sus miembros individuales.`
-    : `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Registros encontrados: ${rows.length}. Personas contabilizadas: ${totalPersonasCanonico}.`;
+    ? `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Filtro de rango aplicado: ${rangos.join(', ')}. Registros encontrados: ${rows.length}.`
+    : `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Registros encontrados: ${rows.length}.`;
   return {
     ok:true,
     rejected:false,

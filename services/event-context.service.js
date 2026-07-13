@@ -1476,56 +1476,8 @@ function zuzuModuleTiendas(state, filters, helpers) {
   const rows = arr(state?.tiendas).map(t => ({ 'Nombre tienda': trim(t?.nombre) })).filter(t => t['Nombre tienda']);
   return zuzuQueryFilterRows(rows, filters, matcher, 'TIENDAS');
 }
-
-function zuzuNormSocioName(value) {
-  return trim(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9Ñ ]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-function zuzuIsSocioBasePermitido(p) {
-  const n = trim(p?.nombre || p?.Nombre || p?.NOMBRE || '');
-  if (!n) return false;
-  if (!/^SOCIO$/i.test(trim(p?.rango || p?.Rango || p?.RANGO || ''))) return false;
-  if (/^z_DEV/i.test(n)) return false;
-  if (/^Grupo/i.test(n)) return false;
-  if (/^Peña/i.test(n)) return false;
-  return true;
-}
-function zuzuIsSocioGrupoY(p) { return /\s+y\s+/i.test(trim(p?.nombre || p?.Nombre || p?.NOMBRE || '')); }
-function zuzuSocioPeso(p) { return zuzuIsSocioGrupoY(p) ? 2 : 1; }
-function zuzuSocioParts(name) { return zuzuNormSocioName(name).split(/\s+Y\s+/).map(x => x.trim()).filter(Boolean); }
-function zuzuSociosCanonicos(state) {
-  const base = arr(state?.personas).filter(zuzuIsSocioBasePermitido);
-  const grupos = base.filter(zuzuIsSocioGrupoY);
-  const partes = new Set();
-  grupos.forEach(g => zuzuSocioParts(g?.nombre || g?.Nombre || g?.NOMBRE || '').forEach(x => partes.add(x)));
-  const rows = base.filter(p => {
-    const n = trim(p?.nombre || p?.Nombre || p?.NOMBRE || '');
-    if (zuzuIsSocioGrupoY(p)) return true;
-    return !partes.has(zuzuNormSocioName(n));
-  }).slice().sort((a,b)=>trim(a?.nombre||a?.Nombre||'').localeCompare(trim(b?.nombre||b?.Nombre||''),'es',{sensitivity:'base'}));
-  return {
-    rows,
-    totalSocios: rows.reduce((a,p)=>a+zuzuSocioPeso(p),0),
-    grupos: rows.filter(zuzuIsSocioGrupoY).length,
-    individuales: rows.filter(p=>!zuzuIsSocioGrupoY(p)).length,
-    criterio: "rango='SOCIO', excluye z_DEV%, Grupo%, Peña%; las parejas/grupos con ' y ' sustituyen a sus componentes individuales y cuentan como 2 socios"
-  };
-}
-
 function zuzuModulePersonas(state, filters, helpers) {
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
-  const rangos = [].concat(filters?.rangos || filters?.rango || []).map(norm);
-  const pideSocios = rangos.includes('socio') && !rangos.includes('no socio');
-  if (pideSocios) {
-    const canon = zuzuSociosCanonicos(state);
-    return canon.rows.map(p => ({
-      'Nombre persona': trim(p?.nombre || p?.Nombre || p?.NOMBRE || ''),
-      Rango: 'SOCIO',
-      'Cuenta socios': zuzuSocioPeso(p),
-      'Tipo registro socio': zuzuIsSocioGrupoY(p) ? 'PAREJA/GRUPO (cuenta 2)' : 'INDIVIDUAL (cuenta 1)',
-      'Criterio aplicado': canon.criterio,
-      'Total socios canonico': canon.totalSocios
-    }));
-  }
   const rows = arr(state?.personas).map(p => ({
     'Nombre persona': trim(p?.nombre),
     Rango: trim(p?.rango || '').toUpperCase(),
@@ -1742,11 +1694,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',
-      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado.',
-      sociosCanonicos: 'Cuando el usuario pida socios/lista de socios o planificación por socios, aplica SIEMPRE el criterio canónico de ControlEvent: rango SOCIO; excluir z_DEV%, Grupo% y Peña%; si existe una pareja/grupo con " y ", ese registro sustituye a sus componentes individuales y cuenta como 2 socios. No cuentes a la vez pareja e individuos.'
+      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado.'
     },
-    advertencias: advertenciasAuditoria,
-    sociosCanonicos: zuzuSociosCanonicos(safeState)
+    advertencias: advertenciasAuditoria
   };
   const bytes = estimateContextSize(context);
   context.planZuzu.contextoEstimadoBytes = bytes;
