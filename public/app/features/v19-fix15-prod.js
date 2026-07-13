@@ -53,11 +53,6 @@
       else if(!root.querySelector('.ce-fix15-active')) clearVistaActive(root);
     },80);
   }
-  function attachVistaObserver(){
-    var root=$('ceMapaGlobalOverlay');
-    if(!root){ setTimeout(attachVistaObserver,1200); return; }
-    try{ new MutationObserver(inferActive).observe(root,{childList:true,subtree:true,characterData:true}); }catch(_){ }
-  }
-  setTimeout(attachVistaObserver,1200);
+  try{ new MutationObserver(inferActive).observe(document.body,{childList:true,subtree:true,characterData:true}); }catch(_){ }
   injectCss();
 })();

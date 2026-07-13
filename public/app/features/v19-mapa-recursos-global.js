@@ -137,50 +137,21 @@
     return !t || t.includes('PTE') || t.includes('PENDIENTE') || t.includes('COMPRA');
   }
   function isTk(ticket){ return /^TK\s*\d+/i.test(norm(ticket)); }
-  function looksDiscountRow(row, productObj){
-    const text = up([
-      row?.productoNombre, row?.producto, row?.nombre, row?.descripcion, row?.concepto, row?.detalle,
-      productObj?.nombre, productObj?.descripcion
-    ].filter(Boolean).join(' '));
-    return /\b(DESCUENTO|DTO|ABONO|DEVOLUCION|DEVOLUCIÓN|BONIFICACION|BONIFICACIÓN)\b/.test(text);
-  }
   function unitPrice(row){
     const p = producto(row?.productoId);
-    const productNegative = [p.precio, p.defaultPrecio, p.precioReferencia, p.importeReferencia]
-      .map(parseAmount).find(n => Number.isFinite(n) && n < 0);
-    const rowPricePresent = row?.precio !== undefined && row?.precio !== null && row?.precio !== '';
-    if(rowPricePresent){
-      const n = parseAmount(row.precio);
-      // FIX20: algunos descuentos llegan como row.precio=0 pero el producto catalogado tiene precio negativo.
-      // En ese caso debe mandar el precio negativo, porque si no Vista aérea convierte el descuento en 0 €.
-      const aliasNegative = [row?.precioCalc, row?.precio_calc, row?.precioUnitario, row?.precio_unitario, row?.precioUnidad, row?.unitPrice, row?.price]
-        .map(parseAmount).find(x => Number.isFinite(x) && x < 0);
-      if(Number.isFinite(n) && n === 0 && looksDiscountRow(row, p) && (productNegative < 0 || aliasNegative < 0)) return (aliasNegative < 0 ? aliasNegative : productNegative);
-      if(Number.isFinite(n) && Math.abs(n) > 0) return n;
-      if(Number.isFinite(n) && n === 0) return 0;
-    }
-    const candidates = [
-      row?.precioCalc, row?.precio_calc, row?.precioUnitario, row?.precio_unitario, row?.precioUnidad,
-      row?.unitPrice, row?.price, row?.defaultPrecio, row?.precioReferencia, row?.importeReferencia,
-      p.precio, p.defaultPrecio, p.precioReferencia, p.importeReferencia
-    ];
+    const candidates = [row?.precio, row?.precioCalc, row?.defaultPrecio, p.precio, p.defaultPrecio];
     for(const item of candidates){ const n = parseAmount(item); if(Number.isFinite(n) && Math.abs(n) > 0) return n; }
     return 0;
   }
   function rowValue(row){
-    const p = producto(row?.productoId);
-    const units = Number(row?.unidades || 0) || 0;
-    const price = unitPrice(row);
-    const directKeys = ['importe','valor','total','importeCompra','importeTotal','totalLinea','total_linea','importeLinea','importe_linea','lineTotal','line_total','descuento','importeDescuento','importe_descuento','discount','amount'];
+    const directKeys = ['importe','valor','total','importeCompra','importeTotal','descuento','importeDescuento','discount','amount'];
     for(const key of directKeys){
       if(row && row[key] !== undefined && row[key] !== null && row[key] !== ''){
         const n = parseAmount(row[key]);
         if(Number.isFinite(n) && Math.abs(n) > 0) return n;
-        // FIX20: si el importe guardado viene a 0 pero la línea es descuento y el precio efectivo es negativo, no lo machacamos a cero.
-        if(Number.isFinite(n) && n === 0 && price < 0 && looksDiscountRow(row, p)) return units ? units * price : price;
       }
     }
-    return units * price;
+    return Number(row?.unidades || 0) * unitPrice(row);
   }
   function unitPriceFrom(unidades, total){
     const u = Number(unidades || 0), t = Number(total || 0);

@@ -83,46 +83,13 @@
   function responsibleId(row){ return String(row?.responsableId || row?.responsable || row?.socioResponsableId || ''); }
   function responsibleName(row){ return personName(responsibleId(row)) || ''; }
   function isSocioResponsable(id){ return up(personOf(id)?.rango || '') === 'SOCIO'; }
-  function isDiscountRow(row){
-    const txt = up([
-      row?.producto, row?.descripcion, row?.concepto, row?.detalle, row?.texto,
-      productOf(row)?.nombre, productOf(row)?.descripcion
-    ].filter(Boolean).join(' '));
-    return /\b(DESCUENTO|DTO|ABONO|DEVOLUCION|DEVOLUCIÓN|BONIFICACION|BONIFICACIÓN|REBAJA|RAPPEL)\b/.test(txt);
-  }
-  function explicitLineAmount(row){
-    const candidates = [
-      row?.importe, row?.importeTotal, row?.total, row?.totalLinea, row?.valor,
-      row?.lineaImporte, row?.importeLinea, row?.precioTotal
-    ];
-    for(const item of candidates){
-      if(item === undefined || item === null || item === '') continue;
-      const n = parseAmount(item);
-      if(Number.isFinite(n) && (n !== 0 || String(item).includes('-'))) return n;
-    }
-    return null;
-  }
   function unitPrice(row){
     const p = productOf(row) || {};
-    const rowPrice = parseAmount(row?.precio);
-    if(Number.isFinite(rowPrice) && rowPrice < 0) return rowPrice;
-    if(isDiscountRow(row)){
-      const line = explicitLineAmount(row);
-      const units = Number(row?.unidades || 0) || 1;
-      if(Number.isFinite(line) && line < 0) return line / units;
-    }
     const candidates = [row?.precio, p.precio, p.defaultPrecio];
-    for(const item of candidates){ const n = parseAmount(item); if(Number.isFinite(n) && n > 0) return n; }
+    for(const item of candidates){ const n = Number(item || 0); if(Number.isFinite(n) && n > 0) return n; }
     return 0;
   }
-  function rowValue(row){
-    const units = Number(row?.unidades || 0) || 0;
-    const explicit = explicitLineAmount(row);
-    if(isDiscountRow(row) && Number.isFinite(explicit) && explicit < 0) return explicit;
-    const price = unitPrice(row);
-    if(isDiscountRow(row) && price < 0) return (units || 1) * price;
-    return units * price;
-  }
+  function rowValue(row){ return Number(row?.unidades || 0) * unitPrice(row); }
   function unitPriceFrom(unidades, importe){
     const u = Number(unidades || 0), v = Number(importe || 0);
     return u > 0 ? (v / u) : 0;

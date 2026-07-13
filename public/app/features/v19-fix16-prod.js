@@ -83,12 +83,7 @@
       const bar=ev.target?.closest?.('#ceMapaGlobalOverlay .ce-v19-resource-bar[data-v19-filter-kind]');
       if(bar){ [0,60,180,320].forEach(ms=>setTimeout(()=>setVistaActive('bar',bar),ms)); return; }
     }, true);
-    function attachVistaObserver(){
-      const root=vistaRoot();
-      if(!root){ setTimeout(attachVistaObserver,1200); return; }
-      try{ new MutationObserver(()=>setTimeout(preserveVistaActive,40)).observe(root,{childList:true,subtree:true}); }catch(_){ }
-    }
-    setTimeout(attachVistaObserver,1200);
+    try{ new MutationObserver(()=>setTimeout(preserveVistaActive,40)).observe(document.body,{childList:true,subtree:true}); }catch(_){ }
   }
 
   function normalizeTicketNameFromContext(el, oldName){
