@@ -119,9 +119,15 @@
     return bootPromise;
   }
   function installDropdownFix(){
-    // FIX26: neutralizado. El selector de eventos lo controla v20-fix26-prod.js.
-    // Evitamos reconstrucciones antiguas que desordenaban el desplegable después de elegir evento
-    // y quitamos cualquier trabajo innecesario durante entrada/login.
+    // FIX16: selector ligero. No hacemos precargas repetidas /api/state?boot=1 al abrir el desplegable.
+    // El estado ya se carga en el login y en el cambio de evento; aquí solo reconstruimos opciones locales.
+    syncEventDropdownFromState();
+    [180,900].forEach(ms => setTimeout(() => { syncEventDropdownFromState(); }, ms));
+    ['pointerdown','mousedown','focus','click'].forEach(evt => document.addEventListener(evt, ev => {
+      if(ev.target && ev.target.id === 'selectedEvent') syncEventDropdownFromState();
+    }, true));
+    window.addEventListener('controlevent:app-ready', () => syncEventDropdownFromState(), true);
+    window.addEventListener('controlevent:login-ok', () => syncEventDropdownFromState(), true);
   }
 
   function mergeEventState(fresh, evId){
@@ -301,9 +307,24 @@
     if(kind === 'products-all') root.querySelector('.ce-v19-clear-filter')?.classList.add('is-active','ce-fix13-active');
   }
   function installVistaActions(){
-    // FIX26: sin MutationObserver sobre document.body. Ese observador ensuciaba la entrada/login
-    // y podía hacer trabajar de más al navegador. Las marcas activas de Vista aérea las gestionan
-    // los scripts v19-fix19/v20 posteriores, solo por clic real del usuario.
+    document.addEventListener('click', ev => {
+      if(ev.target?.closest?.('#ceMapaGlobalOverlay [data-v19-income-all]')) setTimeout(()=>applyVistaSelectionState('income-all'), 30);
+      if(ev.target?.closest?.('#ceMapaGlobalOverlay [data-v19-clear-filter]')) setTimeout(()=>applyVistaSelectionState('products-all'), 30);
+      const bar = ev.target?.closest?.('#ceMapaGlobalOverlay .ce-v19-resource-bar[data-v19-filter-kind]');
+      if(bar){
+        setTimeout(()=>{
+          const root=$('ceMapaGlobalOverlay'); if(!root) return;
+          root.querySelectorAll('.ce-v19-income-all,.ce-v19-clear-filter').forEach(b => b.classList.remove('is-active','ce-fix13-active'));
+          root.querySelectorAll('.ce-v19-resource-bar.ce-fix13-active').forEach(b => b.classList.remove('ce-fix13-active'));
+          bar.classList.add('ce-fix13-active');
+        }, 30);
+      }
+    }, true);
+    const mo = new MutationObserver(() => {
+      const root = $('ceMapaGlobalOverlay'); if(!root) return;
+      const h=(root.querySelector('.ce-v19-detail-head h3')?.textContent||'').toLowerCase(); if(h.includes('todos los productos')) applyVistaSelectionState('products-all'); else if(h.includes('ingresos')) applyVistaSelectionState('income-all');
+    });
+    try{ mo.observe(document.body, {childList:true,subtree:true}); }catch(_){ }
   }
   function install(){
     injectCss();

@@ -1218,7 +1218,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       DOCUMENTOS: 'DOCxxx, fecha, descripción e imagen',
       PRODUCTOS: 'catálogo maestro de productos, segmento, destino y precio referencia',
       TIENDAS: 'catálogo maestro de tiendas',
-      PERSONAS: 'catálogo maestro de personas y rango. Para socios ControlEvent: rango=SOCIO, excluye z_DEV, Grupo y Peña; nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales'
+      PERSONAS: 'catálogo maestro de personas y rango'
     },
     eventoActivo: selected,
     eventos,
@@ -1478,23 +1478,11 @@ function zuzuModuleTiendas(state, filters, helpers) {
 }
 function zuzuModulePersonas(state, filters, helpers) {
   const matcher = zuzuBuildFilterMatcher({ filters }, '', state, helpers);
-  const baseRaw = arr(state?.personas).map(p => ({
+  const rows = arr(state?.personas).map(p => ({
     'Nombre persona': trim(p?.nombre),
     Rango: trim(p?.rango || '').toUpperCase(),
     Numero: round(p?.numero ?? p?.Numero ?? p?.número ?? p?.num ?? p?.personas ?? p?.cantidad, 3)
   })).filter(p => p['Nombre persona']);
-  const normLocal = v => trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9Ñ ]+/g,' ').replace(/\s+/g,' ').trim();
-  const isGrupoY = name => /\s+y\s+/i.test(trim(name));
-  const baseSocios = baseRaw.filter(p => p.Rango === 'SOCIO' && !/^z_DEV/i.test(p['Nombre persona']) && !/^Grupo/i.test(p['Nombre persona']) && !/^Peña/i.test(p['Nombre persona']));
-  const partes = new Set();
-  baseSocios.filter(p => isGrupoY(p['Nombre persona'])).forEach(p => normLocal(p['Nombre persona']).split(/\s+Y\s+/).filter(Boolean).forEach(x => partes.add(x)));
-  const rows = baseRaw.map(p => {
-    const isSocio = p.Rango === 'SOCIO';
-    const esGrupo = isGrupoY(p['Nombre persona']);
-    const esComponenteDeGrupo = isSocio && !esGrupo && partes.has(normLocal(p['Nombre persona']));
-    const socioCE = isSocio && !/^z_DEV/i.test(p['Nombre persona']) && !/^Grupo/i.test(p['Nombre persona']) && !/^Peña/i.test(p['Nombre persona']) && (esGrupo || !esComponenteDeGrupo);
-    return { ...p, 'Socio ControlEvent': socioCE ? 'SI' : 'NO', 'Personas computadas': socioCE ? (esGrupo ? 2 : 1) : 0, 'Grupo y': esGrupo ? 'SI' : 'NO' };
-  });
   return zuzuQueryFilterRows(rows, filters, matcher, 'PERSONAS');
 }
 
@@ -1706,7 +1694,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',
-      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado. Para SOCIOS usa el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, nombres con " y " cuentan como 2 y sustituyen a los componentes individuales; si solo asiste uno de los miembros, cuenta como 1 asistente.'
+      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado.'
     },
     advertencias: advertenciasAuditoria
   };

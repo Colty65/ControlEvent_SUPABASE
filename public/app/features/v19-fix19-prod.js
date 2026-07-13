@@ -105,7 +105,9 @@
     if(installed || !isAuthReady()) return;
     installed = true;
     injectCss();
-    // FIX26: no tocar el selector desde este script; lo controla v20-fix26-prod.js.
+    setTimeout(sortAndColorEventSelect,80);
+    document.addEventListener('mousedown', ev=>{ if(ev.target && ev.target.id === 'selectedEvent') setTimeout(sortAndColorEventSelect,0); }, true);
+    document.addEventListener('focusin', ev=>{ if(ev.target && ev.target.id === 'selectedEvent') setTimeout(sortAndColorEventSelect,0); }, true);
     document.addEventListener('click', ev=>{
       const income = ev.target?.closest?.('#ceMapaGlobalOverlay [data-v19-income-all],#ceMapaGlobalOverlay .ce-v19-income-all');
       if(income){ setTimeout(()=>setVistaActive('income'),0); setTimeout(()=>setVistaActive('income'),120); return; }

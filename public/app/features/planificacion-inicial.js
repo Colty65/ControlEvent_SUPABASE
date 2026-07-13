@@ -137,22 +137,7 @@
       if(el.id !== 'btnPlanApplyDisabled') el.classList.remove('app-disabled','disabled','locked','is-locked');
     });
   }
-  function normSocioName(v){ return up(v).replace(/[^A-Z0-9Ñ ]+/g,' ').replace(/\s+/g,' ').trim(); }
-  function socioBaseValido(p){
-    const n=String(p?.nombre||p?.Nombre||'').trim();
-    if(up(p?.rango||p?.Rango||'')!=='SOCIO') return false;
-    if(/^z_DEV/i.test(n) || /^Grupo/i.test(n) || /^Peña/i.test(n)) return false;
-    return !!n;
-  }
-  function socioGrupoY(p){ return /\s+y\s+/i.test(String(p?.nombre||p?.Nombre||'')); }
-  function partesSocioGrupoY(n){ return normSocioName(n).split(/\s+Y\s+/).map(x=>x.trim()).filter(Boolean); }
-  function socios(){
-    const base=rows('personas').filter(socioBaseValido);
-    const partes=new Set();
-    base.filter(socioGrupoY).forEach(g=>partesSocioGrupoY(g.nombre||g.Nombre||'').forEach(x=>partes.add(x)));
-    return base.filter(p=>socioGrupoY(p) || !partes.has(normSocioName(p.nombre||p.Nombre||'')))
-      .slice().sort((a,b)=>String(a.nombre||a.Nombre||'').localeCompare(String(b.nombre||b.Nombre||''),'es'));
-  }
+  function socios(){ return rows('personas').filter(p => up(p.rango || '') === 'SOCIO').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function tiendas(){ return rows('tiendas').slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')); }
   function finalizados(){ return rows('eventos').filter(e => up(e.situacion || '') === 'FINALIZADO').slice().sort((a,b)=>dateKey(b)-dateKey(a)); }
   function planMode(){ return String(document.getElementById('planFuenteHistorica')?.value || 'REPLICA').toUpperCase(); }
