@@ -91,6 +91,12 @@
 
   let bubbleTimer=0;
   function showAvanceBubble(){
+    // FIX10 v21: el avance oficial es v16-hotfix5 (ASISTENCIA, importes y diseño nuevo).
+    // Este hotfix antiguo solo queda para títulos/modales. Si alguien pulsa el logo por este handler,
+    // delegamos en el avance oficial y evitamos pintar la ficha vieja con numeración/FOTOS INGRESOS.
+    if(window.ControlEventV16Hf5Avance && typeof window.ControlEventV16Hf5Avance.show==='function'){
+      try{ cleanupInlineAvance(); window.ControlEventV16Hf5Avance.show(); return; }catch(_){ }
+    }
     cleanupInlineAvance();
     let layer=$('ceHf48AvanceLayer');
     if(!layer){ layer=document.createElement('div'); layer.id='ceHf48AvanceLayer'; document.body.appendChild(layer); }

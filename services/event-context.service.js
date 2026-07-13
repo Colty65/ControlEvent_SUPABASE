@@ -490,9 +490,27 @@ function findReferencedEventIds(events, prompt, selectedId) {
   }
   return selectedId ? [selectedId] : [];
 }
+function promptExactEventTitleIds(events, prompt) {
+  const out = [];
+  const p = ` ${norm(prompt)} `;
+  function push(id) { if (id && !out.includes(id)) out.push(id); }
+  arr(events).forEach(ev => {
+    const id = trim(ev?.id);
+    const title = norm(ev?.titulo || '');
+    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
+    if (!id || !title) return;
+    if (p.includes(` ${title} `)) return push(id);
+    // Títulos cortos tipo "SySA 2024" o "FUNCION 2025" deben contar como mención exacta,
+    // pero no usamos palabras sueltas/año para arrastrar otros eventos.
+    if (shortTitle && shortTitle.length >= 6 && shortTitle !== title && p.includes(` ${shortTitle} `)) return push(id);
+  });
+  return out;
+}
 function findExplicitReferencedEventIds(events, prompt) {
   const out = [];
   function push(id) { if (id && !out.includes(id)) out.push(id); }
+  const exact = promptExactEventTitleIds(events, prompt);
+  if (exact.length) return exact;
   const quoted = quotedFragments(prompt);
   if (quoted.length) {
     // Si el usuario ha entrecomillado eventos, el alcance queda cerrado a esos textos.
@@ -1001,6 +1019,8 @@ function zuzuPromptHasExplicitEventScope(events, prompt) {
 function zuzuAllEventsRequested(prompt, plan = {}) {
   const p = norm(prompt);
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim);
+  if (requested.some(x => !/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))) return false;
+  if (/\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(prompt)) return false;
   return plan?.todosLosEventos === true
     || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))
     || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos|cualquier(?:a)?\s+de\s+los\s+eventos|en\s+cualquier(?:a)?\s+evento|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos|celebraciones|los\s+\d+\s+eventos|las\s+\d+\s+celebraciones|a[nñ]o\s+20\d{2}|durante\s+20\d{2})\b/i.test(prompt);

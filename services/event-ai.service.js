@@ -2732,8 +2732,8 @@ function shouldUseGeminiPlanner(userPrompt, local) {
 }
 async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
-  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'OK', `Plan local preventivo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}. No es respuesta final, solo red de seguridad.`);
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
+    zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', `Consulta simple resuelta con plan local mínimo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Zuzu planificador no se ha usado solo por ausencia/fallo; en v19 la ruta normal siempre es Zuzu para planificar.`,
@@ -2776,6 +2776,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
       __zuzuGeminiAllRows: false
     };
   } catch (error) {
+    zuzuTracePush(flowTrace, 'Paso 1b · Plan local CE de respaldo', 'OK', `Zuzu planificador no disponible. CE usa SOLO plan de seguridad: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       filters: local.filters || {},
@@ -2841,13 +2842,14 @@ function sortResultTables(result) {
 }
 function scopeMetaFromContext(context) {
   const evs = arr(context?.eventosObjetivo);
+  const closed = context?.planZuzu?.alcanceCerrado === true || context?.planExtraccionControlEvent?.alcanceCerrado === true;
   if (evs.length === 1) {
     const e = evs[0] || {};
     const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
+  if (evs.length > 1) return { eventHeader: `${closed ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: closed ? 'restricted-multi-event' : 'multi-event', eventCount: evs.length };
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {
@@ -3059,7 +3061,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     usoPlanificador: plan?.__zuzuPlannerUsage || null,
     politicaModelos: 'planificador=Flash-Lite primero; redacción/informes=Flash primero; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
   };
-  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
+  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}; alcance=${context?.planZuzu?.alcanceCerrado ? 'CERRADO' : 'abierto'}; planificador=${trim(context?.planZuzu?.planificador || 'desconocido')}.`);
 
   const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
   if (weatherCtx) {
