@@ -1,4 +1,4 @@
-# ControlEvent v20_prod - FIX7 detalle Cálculos sin botón (i)
+# ControlEvent v19_prod - FIX7 detalle Cálculos sin botón (i)
 
 Base: FIX6_VISOR, sin cambiar versión visible.
 
@@ -12,4 +12,4 @@ Cambios acotados:
   - Donado socios/no socios/otros.
 - El detalle se abre al pulsar la fila, no depende del icono `(i)` ni de la foto.
 - No llama a `renderBudget()` al adjuntar/eliminar fotos.
-- No cambia la versión visible: sigue v20_prod.
+- No cambia la versión visible: sigue v19_prod.

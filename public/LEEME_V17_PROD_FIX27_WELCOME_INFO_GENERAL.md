@@ -1,4 +1,4 @@
-# ControlEvent v20_prod FIX27 — ColtyLAB bienvenida general
+# ControlEvent v19_prod FIX27 — ColtyLAB bienvenida general
 
 Base: `CE_v17_PROD_FIX26_MOBILE_RESUMEN_WELCOME_INFO.zip`.
 

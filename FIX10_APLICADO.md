@@ -1,4 +1,4 @@
-# ControlEvent v20_prod · FIX10 aplicado
+# ControlEvent v19_prod · FIX10 aplicado
 
 Cambios aplicados sobre CE_v19_PROD_MAPA_GLOBAL_FIX9:
 

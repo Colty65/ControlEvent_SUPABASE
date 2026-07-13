@@ -1,10 +1,10 @@
-/* ControlEvent v20_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v19_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
    FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v20_prod';
+  const VERSION = 'ControlEvent v19_prod';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',

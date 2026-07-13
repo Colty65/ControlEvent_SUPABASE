@@ -1,4 +1,4 @@
-# CE v20_prod FIX36 - Planificación: corrige llamada Zuzu ultracorta
+# CE v19_prod FIX36 - Planificación: corrige llamada Zuzu ultracorta
 
 Base: FIX35_GEMINI_ULTRACORTO.
 
@@ -9,4 +9,4 @@ Cambio único funcional:
 
 No se han tocado gráficas, resumen, globos, compras normales ni fotos.
 
-Version visible: v20_prod_FIX36_PLANIFICACION_GEMINI_FIX_MOMENTOS.
+Version visible: v19_prod_FIX36_PLANIFICACION_GEMINI_FIX_MOMENTOS.

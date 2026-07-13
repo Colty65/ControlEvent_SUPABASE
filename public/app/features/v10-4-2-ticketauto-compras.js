@@ -1,4 +1,4 @@
-/* ControlEvent v20_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v19_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';

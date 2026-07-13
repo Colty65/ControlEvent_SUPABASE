@@ -1,4 +1,4 @@
-/* ControlEvent v20_prod - Vista aerea desde Mapa de recursos.
+/* ControlEvent v19_prod - Vista aerea desde Mapa de recursos.
    FIX9:
    - Casita flotante para volver a cabecera.
    - Fichas de cabecera con color forzado por tipo.
@@ -16,7 +16,7 @@
   if(window.__ceV19MapaRecursosGlobal) return;
   window.__ceV19MapaRecursosGlobal = true;
 
-  const VERSION = 'ControlEvent v20_prod';
+  const VERSION = 'ControlEvent v19_prod';
   const BUTTON_ID = 'ceMapaGlobalBtn';
   const OVERLAY_ID = 'ceMapaGlobalOverlay';
   const DETAIL_ID = 'ceMapaGlobalDetail';
@@ -753,7 +753,7 @@
     if(now - __lastSafeOpenAt < 450) return false;
     __lastSafeOpenAt = now;
     try{ openModal(); }catch(err){
-      try{ console.error('[ControlEvent v20_prod] Error abriendo vista aérea', err); }catch(_){ }
+      try{ console.error('[ControlEvent v19_prod] Error abriendo vista aérea', err); }catch(_){ }
       try{ alert('No he podido abrir la vista aérea. Revisa la consola para ver el error.'); }catch(_){ }
     }
     return false;

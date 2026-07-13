@@ -1,4 +1,4 @@
-# ControlEvent v20_prod FIX25 - bienvenida Peña El Arrastre
+# ControlEvent v19_prod FIX25 - bienvenida Peña El Arrastre
 
 Cambio aplicado sobre `CE_v17_PROD_FIX24_IDLE_QUIET.zip`.
 

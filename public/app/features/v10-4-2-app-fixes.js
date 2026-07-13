@@ -1,8 +1,8 @@
-/* ControlEvent v20_prod - estabilización: menos refrescos, arranque limpio, bienvenida festiva y duplicar pantalla claro. */
+/* ControlEvent v19_prod - estabilización: menos refrescos, arranque limpio, bienvenida festiva y duplicar pantalla claro. */
 (function(){
   'use strict';
   if(window.__ceV1042AppFixes) return; window.__ceV1042AppFixes=true;
-  var VERSION='v20_prod';
+  var VERSION='v19_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

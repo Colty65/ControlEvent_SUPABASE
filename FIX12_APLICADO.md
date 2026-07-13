@@ -1,4 +1,4 @@
-# ControlEvent v20_prod · FIX12 aplicado
+# ControlEvent v19_prod · FIX12 aplicado
 
 Cambios aplicados sobre FIX11:
 

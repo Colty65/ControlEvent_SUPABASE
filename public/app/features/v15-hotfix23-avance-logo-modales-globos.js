@@ -1,4 +1,4 @@
-/* ControlEvent v20_prod - HOTFIX48: avance solo en logo, modales/títulos, globos A-Z, mantenimiento desde documentos. */
+/* ControlEvent v19_prod - HOTFIX48: avance solo en logo, modales/títulos, globos A-Z, mantenimiento desde documentos. */
 (function(){
   'use strict';
   const INSTALLED='__ceV15Hotfix23AvanceLogoModalesGlobos';
@@ -38,14 +38,7 @@
       .ce-hf48-bubble{position:relative!important;width:min(620px,94vw)!important;max-height:min(78vh,640px)!important;overflow:auto!important;background:rgba(255,255,255,.985)!important;border:2px solid #0f172a!important;border-radius:24px!important;box-shadow:0 24px 80px rgba(15,23,42,.32)!important;padding:14px!important;pointer-events:auto!important;animation:ceHf48Pop .16s ease-out!important;}
       .ce-hf48-bubble.curso{border-color:#16a34a!important}.ce-hf48-bubble.finalizado{border-color:#dc2626!important}
       .ce-hf48-bubble-title{text-align:center!important;margin:2px 38px 12px!important;line-height:1.16!important}.ce-hf48-bubble-title span{display:block!important;font-size:12px!important;font-weight:950!important;letter-spacing:.15em!important;color:#64748b!important}.ce-hf48-bubble-title strong{display:block!important;font-size:clamp(17px,3.8vw,24px)!important;font-weight:950!important}.ce-hf48-bubble.curso .ce-hf48-bubble-title strong{color:#15803d!important}.ce-hf48-bubble.finalizado .ce-hf48-bubble-title strong{color:#991b1b!important}
-      .ce-hf48-close{position:absolute!important;right:10px!important;top:8px!important;width:34px!important;height:34px!important;border-radius:999px!important;border:1px solid #cbd5e1!important;background:#fff!important;font-size:24px!important;font-weight:950!important;line-height:28px!important;cursor:pointer!important}.ce-hf48-rows{display:grid!important;gap:6px!important}.ce-hf48-row{display:grid!important;grid-template-columns:1fr 62px minmax(96px,.8fr)!important;gap:8px!important;align-items:center!important;background:#f8fafc!important;border:1px solid #dbe4ee!important;border-radius:14px!important;padding:8px!important}.ce-hf48-row b{font-size:13px!important;font-weight:950!important}.ce-hf48-row small{display:block!important;color:#475569!important;font-size:11px!important;font-weight:750!important;margin-top:2px!important}.ce-hf48-row>strong{text-align:right!important;font-size:13px!important}.ce-hf48-bar{height:10px!important;background:#e5e7eb!important;border-radius:999px!important;overflow:hidden!important}.ce-hf48-bar i{display:block!important;height:100%!important;background:#2563eb!important;border-radius:999px!important}
-      #ceHf48AvanceLayer .ce-hf48-row:nth-child(7){background:#f8fafc!important;border-color:#64748b!important;}
-      #ceHf48AvanceLayer .ce-hf48-row:nth-child(7) .ce-hf48-bar i{background:#64748b!important;}
-      #ceHf48AvanceLayer .ce-v20-socios-row{grid-template-columns:1fr 62px minmax(96px,.8fr)!important;}
-      #ceHf48AvanceLayer .ce-v20-socios-list{display:flex!important;flex-wrap:wrap!important;gap:4px 6px!important;margin-top:6px!important;max-height:76px!important;overflow:auto!important;padding-right:4px!important;}
-      #ceHf48AvanceLayer .ce-v20-socio{display:inline-flex!important;border-radius:999px!important;padding:2px 7px!important;font-size:10px!important;font-weight:850!important;border:1px solid currentColor!important;background:#fff!important;}
-      #ceHf48AvanceLayer .ce-v20-socio.asiste{color:#15803d!important;background:#ecfdf5!important;}
-      #ceHf48AvanceLayer .ce-v20-socio.no-asiste{color:#b91c1c!important;background:#fef2f2!important;}@media(max-width:560px){.ce-hf48-row{grid-template-columns:1fr 52px!important}.ce-hf48-bar{grid-column:1/-1!important}.ce-hf48-bubble{border-radius:20px!important;padding:12px!important}}
+      .ce-hf48-close{position:absolute!important;right:10px!important;top:8px!important;width:34px!important;height:34px!important;border-radius:999px!important;border:1px solid #cbd5e1!important;background:#fff!important;font-size:24px!important;font-weight:950!important;line-height:28px!important;cursor:pointer!important}.ce-hf48-rows{display:grid!important;gap:6px!important}.ce-hf48-row{display:grid!important;grid-template-columns:1fr 62px minmax(96px,.8fr)!important;gap:8px!important;align-items:center!important;background:#f8fafc!important;border:1px solid #dbe4ee!important;border-radius:14px!important;padding:8px!important}.ce-hf48-row b{font-size:13px!important;font-weight:950!important}.ce-hf48-row small{display:block!important;color:#475569!important;font-size:11px!important;font-weight:750!important;margin-top:2px!important}.ce-hf48-row>strong{text-align:right!important;font-size:13px!important}.ce-hf48-bar{height:10px!important;background:#e5e7eb!important;border-radius:999px!important;overflow:hidden!important}.ce-hf48-bar i{display:block!important;height:100%!important;background:#2563eb!important;border-radius:999px!important}@media(max-width:560px){.ce-hf48-row{grid-template-columns:1fr 52px!important}.ce-hf48-bar{grid-column:1/-1!important}.ce-hf48-bubble{border-radius:20px!important;padding:12px!important}}
       @keyframes ceHf48Pop{from{transform:scale(.96);opacity:.25}to{transform:scale(1);opacity:1}}
       .ce-hf48-event-modal-title{display:block!important;text-align:center!important;font-weight:950!important;line-height:1.18!important;white-space:normal!important;}
       .ce-hf48-event-modal-title.is-curso{color:#15803d!important}.ce-hf48-event-modal-title.is-finalizado{color:#991b1b!important}
@@ -72,76 +65,27 @@
     const t=up(row?.ticketDonacion||row?.ticket||row?.donacion||'');
     return t.startsWith('DONADO') || t.includes('DONACION');
   }
-  function rowEventId(row){return text(row?.eventId||row?.event_id||row?.eventoId||row?.evento_id||row?.EVENTO_ID||'');}
-  function rowPersonaId(row){return text(row?.personaId||row?.persona_id||row?.persona||row?.persona_id_fk||row?.PERSONA_ID||'');}
-  function rowName(row){return text(row?.nombre||row?.personaNombre||row?.persona||row?.colaborador||row?.donante||row?.responsable||'');}
-  function isPteCompra(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
-    return /PTE|PENDIENTE/.test(t) && /COMPRA/.test(t);
-  }
-  function isGastoCorriente(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
-    return /GASTO/.test(t) && /CORRIENTE/.test(t);
-  }
-  function isTk(row){
-    const t=up(row?.ticketDonacion||row?.ticket||row?.ticket_donacion||row?.situacion||'');
-    return /TK\s*\d+/i.test(t);
-  }
-  function socioPermitido(p){
-    const n=text(p?.nombre||p?.Nombre||p?.NOMBRE||'');
-    if(up(p?.rango||p?.Rango||p?.RANGO||'')!=='SOCIO') return false;
-    if(/^z_DEV/i.test(n)) return false;
-    if(/^Grupo/i.test(n)) return false;
-    if(/^Peña/i.test(n)) return false;
-    if(/\s+y\s+/i.test(n)) return false;
-    return !!n;
-  }
-  function socioAsiste(p, colaboradores){
-    const pid=text(p?.id||p?.ID||p?.personaId||'');
-    const pn=up(p?.nombre||p?.Nombre||p?.NOMBRE||'');
-    if(!pn) return false;
-    return colaboradores.some(c=>{
-      const cid=rowPersonaId(c);
-      if(pid && cid && String(pid)===String(cid)) return true;
-      const cn=up(rowName(c));
-      if(!cn) return false;
-      // Coincidencia flexible para casos tipo "Cito y Maria Jose".
-      return cn===pn || cn.includes(pn) || pn.includes(cn);
-    });
-  }
   function computeAvance(){
     const ev=selectedEventObj(); const evId=selId(); const precio=Number(ev.precio||0);
-    const allCols=arr('colaboradores').length?arr('colaboradores'):arr('ingresos');
-    const col=allCols.filter(c=>rowEventId(c)===evId || (!rowEventId(c) && String(c?.eventId||'')===evId));
+    const col=arr('colaboradores').filter(c=>String(c.eventId||c.event_id||'')===evId);
     const previsto=col.reduce((sum,c)=>sum+(Number(c.obligatorio??0)||(Number(c.numero||0)*precio))+Number(c.importeVoluntario??c.voluntario??c.importe??0),0);
-    const ingresado=col.filter(c=>up(c.situacion||c.formaPago||c.ingreso||'Pendiente')!=='PENDIENTE').reduce((sum,c)=>sum+(Number(c.obligatorio??0)||(Number(c.numero||0)*precio))+Number(c.importeVoluntario??c.voluntario??c.importe??0),0);
+    const ingresado=col.filter(c=>up(c.situacion||c.formaPago||'Pendiente')!=='PENDIENTE').reduce((sum,c)=>sum+(Number(c.obligatorio??0)||(Number(c.numero||0)*precio))+Number(c.importeVoluntario??c.voluntario??c.importe??0),0);
     const fotosIng=col.filter(c=>imageKeyPresent(`${evId}|INGRESO:${c.id}`)||imageKeyPresent(`${evId}|INGRESO|${c.id}`)).length;
-    const compras=arr('compras').filter(c=>rowEventId(c)===evId || (!rowEventId(c) && String(c?.eventId||'')===evId));
+    const compras=arr('compras').filter(c=>String(c.eventId||c.event_id||'')===evId);
     const don=compras.filter(isDonation);
     const comp=compras.filter(c=>!isDonation(c));
-    const tkGastos=comp.filter(c=>isTk(c)||isGastoCorriente(c));
-    const ptes=comp.filter(isPteCompra);
-    const docs=(Array.isArray(st().eventDocuments)?st().eventDocuments:[]).filter(d=>rowEventId(d)===evId || String(d.eventId||d.event_id||'')===evId);
+    const docs=(Array.isArray(st().eventDocuments)?st().eventDocuments:[]).filter(d=>String(d.eventId||d.event_id||'')===evId);
     const docKeys=new Set(docs.map(d=>`${evId}|${docCode(d.codigo||d.imageKey||d.id)}`).filter(k=>!k.endsWith('|')));
     Object.keys(st().ticketImages||{}).forEach(k=>{if(k.startsWith(evId+'|')&&/DOC\s*\d+/i.test(k)) docKeys.add(k);});
-    const tickets=[...new Set(comp.map(c=>text(c.ticket||c.ticketDonacion||c.ticket_donacion||'').toUpperCase()).filter(v=>/TK\s*\d+/i.test(v)))];
+    const tickets=[...new Set(comp.map(c=>text(c.ticket||c.ticketDonacion||c.ticket_donacion||'').toUpperCase()).filter(v=>/TK\d+/i.test(v)))];
     const ticketPhotos=tickets.filter(tk=>Object.keys(st().ticketImages||{}).some(k=>k.startsWith(evId+'|')&&k.toUpperCase().includes(tk))).length;
-    const socios=arr('personas').filter(socioPermitido).slice().sort((a,b)=>text(a.nombre||a.Nombre||'').localeCompare(text(b.nombre||b.Nombre||''),'es',{sensitivity:'base'}));
-    const sociosAsistentes=socios.filter(p=>socioAsiste(p,col));
-    const sociosNo=socios.filter(p=>!socioAsiste(p,col));
-    const socioList=socios.map(p=>{
-      const n=text(p.nombre||p.Nombre||p.NOMBRE||'');
-      const ok=socioAsiste(p,col);
-      return `<span class="ce-v20-socio ${ok?'asiste':'no-asiste'}">${esc(n)}</span>`;
-    }).join('');
     return [
-      {t:'INGRESOS',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${euro(ingresado)} de ${euro(previsto)} ingresados`},
-      {t:'JUSTIFICANTES DE INGRESOS',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos con justificante`},
-      {t:'DONACIONES',p:don.length?100:0,d:`Donaciones registradas: ${don.length}`},
-      {t:'COMPRAS',p:comp.length?100:0,d:`TKxx/gastos corrientes: ${tkGastos.length} · Pte. compra: ${ptes.length} · Total líneas: ${comp.length}`},
-      {t:'JUSTIFICANTES DE COMPRA',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`},
-      {t:'DOCUMENTOS',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`},
-      {t:'INFO SOCIOS',p:socios.length?sociosAsistentes.length/socios.length*100:0,d:`Socios: ${socios.length} · Asistentes: ${sociosAsistentes.length} · No asistentes: ${sociosNo.length}`,html:socioList}
+      {n:1,t:'INGRESOS',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${euro(ingresado)} de ${euro(previsto)} ingresados`},
+      {n:2,t:'FOTOS INGRESOS',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos realizados con justificante`},
+      {n:3,t:'DONACIONES',p:don.length?100:0,d:`Donaciones registradas: ${don.length}`},
+      {n:4,t:'COMPRAS',p:comp.length?100:0,d:`${comp.length} líneas asignadas a TKxx o gastos corrientes`},
+      {n:5,t:'DOCUMENTOS',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`},
+      {n:6,t:'FOTOS TICKETS',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`}
     ];
   }
 
@@ -154,7 +98,7 @@
     layer.innerHTML=`<div class="ce-hf48-bubble ${cls}" role="dialog" aria-live="polite">
       <button type="button" class="ce-hf48-close" aria-label="Cerrar">×</button>
       <div class="ce-hf48-bubble-title"><span>AVANCE DEL EVENTO</span><strong>${esc(eventTitle())}</strong></div>
-      <div class="ce-hf48-rows">${rows.map(r=>`<div class="ce-hf48-row ${r.html?'ce-v20-socios-row':''}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small>${r.html?`<div class="ce-v20-socios-list">${r.html}</div>`:''}</div><strong>${Number(r.p||0).toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-hf48-bar"><i style="width:${Math.max(0,Math.min(100,Number(r.p||0)))}%"></i></span></div>`).join('')}</div>
+      <div class="ce-hf48-rows">${rows.map(r=>`<div class="ce-hf48-row"><div><b>${r.n} · ${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${Number(r.p||0).toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-hf48-bar"><i style="width:${Math.max(0,Math.min(100,Number(r.p||0)))}%"></i></span></div>`).join('')}</div>
     </div>`;
     layer.classList.add('visible');
     const close=()=>{try{layer.classList.remove('visible');}catch(_){}};

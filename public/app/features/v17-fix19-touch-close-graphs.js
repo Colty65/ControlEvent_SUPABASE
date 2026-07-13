@@ -1,4 +1,4 @@
-/* ControlEvent v20_prod FIX22 - menú oculto desde login hasta elegir evento,
+/* ControlEvent v19_prod FIX22 - menú oculto desde login hasta elegir evento,
    doble toque real móvil en Por tienda y Ticket, cierre visor a la izquierda, deduplicación de miniaturas
    y bloqueo visual de gráficas antiguas. No cambia cálculos ni datos. */
 (function(){
@@ -422,5 +422,5 @@
   }catch(_){}
   [120,600,1400,3000].forEach(ms => setTimeout(run, ms));
 
-  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, setEventMenuGate, version:'v20_prod_fix22_menu_inicio_doubletap_movil'};
+  window.ControlEventFix19 = {run, closeAvance, dedupeTicketThumbs, removeVisibleOldGraphs, setEventMenuGate, version:'v19_prod_fix22_menu_inicio_doubletap_movil'};
 })();

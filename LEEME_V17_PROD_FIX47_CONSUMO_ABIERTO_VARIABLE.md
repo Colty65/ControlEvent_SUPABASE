@@ -1,4 +1,4 @@
-# v20_prod FIX47 - consumo abierto variable
+# v19_prod FIX47 - consumo abierto variable
 
 Cambios aplicados sobre FIX46:
 
@@ -21,4 +21,4 @@ Cambios aplicados sobre FIX46:
 
 5. La traza añade Base / Consumo abierto / Cena real en la fase de opciones.
 
-Versión visible: `v20_prod_FIX47_CONSUMO_ABIERTO_VARIABLE`.
+Versión visible: `v19_prod_FIX47_CONSUMO_ABIERTO_VARIABLE`.

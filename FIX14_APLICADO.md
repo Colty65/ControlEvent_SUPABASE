@@ -1,4 +1,4 @@
-# FIX14 aplicado sobre ControlEvent v20_prod FIX13
+# FIX14 aplicado sobre ControlEvent v19_prod FIX13
 
 Corrección urgente del bloqueo de login detectado en FIX13.
 

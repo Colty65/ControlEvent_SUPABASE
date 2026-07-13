@@ -1,4 +1,4 @@
-/* ControlEvent v20_prod - HOTFIX45: documentos persistentes, espera visible, titulos y avance estable. */
+/* ControlEvent v19_prod - HOTFIX45: documentos persistentes, espera visible, titulos y avance estable. */
 (function(){
   'use strict';
   const INSTALLED = '__ceV15Hotfix20DocsWaitTitlesAdvance';

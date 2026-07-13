@@ -1,4 +1,4 @@
-# ControlEvent v20_prod - FIX13 aplicado
+# ControlEvent v19_prod - FIX13 aplicado
 
 Fecha: 09/07/2026
 

@@ -1,4 +1,4 @@
-# CE v20_prod FIX37 - Planificación: JSON Zuzu y barril exacto
+# CE v19_prod FIX37 - Planificación: JSON Zuzu y barril exacto
 
 Base: CE_v17_PROD_FIX36_PLANIFICACION_GEMINI_FIX_MOMENTOS.
 
@@ -15,4 +15,4 @@ Cambios acotados:
 
 No se ha tocado gráficas, resumen, globos, fotos ni compras normales.
 
-Versión visible: v20_prod_FIX37_PLANIFICACION_JSON_BARRIL_EXACTO.
+Versión visible: v19_prod_FIX37_PLANIFICACION_JSON_BARRIL_EXACTO.

@@ -1,4 +1,4 @@
-// ControlEvent v20_prod · FIX19 anti-bloqueo login
+// ControlEvent v19_prod · FIX19 anti-bloqueo login
 // No toca login ni hace fetch. Solo activa ajustes visuales DESPUÉS de entrar.
 (function(){
   'use strict';
