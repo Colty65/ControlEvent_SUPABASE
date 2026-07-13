@@ -1,4 +1,4 @@
-# ControlEvent v19_prod · Zuzu modelos por funcionalidad y costes
+# ControlEvent v21_prod · Zuzu modelos por funcionalidad y costes
 
 Esta versión mantiene el flujo completo con Gemini pero añade decisión de modelo por tarea y trazabilidad de tokens/coste.
 

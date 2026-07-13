@@ -1,4 +1,4 @@
-# v19_prod FIX39 - Planificación: donaciones locales + Zuzu solo menú/compras + saldo
+# v21_prod FIX39 - Planificación: donaciones locales + Zuzu solo menú/compras + saldo
 
 Base: CE_v17_PROD_FIX38_PLANIFICACION_JSON_DIRECTO_Y_SALDO.zip
 

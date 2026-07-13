@@ -1,4 +1,4 @@
-// ControlEvent v19_prod · FIX18 mínimo
+// ControlEvent v21_prod · FIX18 mínimo
 // Solo: Vista aérea (saldo descuentos, activo único y ancho), selector eventos por fecha/color, descripción para Zuzu ya va en backend.
 (function(){
   'use strict';
@@ -27,7 +27,7 @@
     return 99999999;
   }
   function isFinal(ev){ return up(ev?.situacion || ev?.estado || '').includes('FINAL'); }
-  function isCurso(ev){ return !isFinal(ev); }
+  function isCurso(ev){ return up(ev?.situacion || ev?.estado || '').includes('EN CURSO') || (!isFinal(ev) && !trim(ev?.situacion || ev?.estado || '')); }
   function eventTitle(ev){ return trim(ev?.titulo || ev?.nombre || ev?.Evento || ev?.title || ev?.id || 'Evento'); }
 
   function injectCss(){
@@ -69,6 +69,9 @@
     const style=document.createElement('style'); style.id='ce-v19-fix18-style'; style.textContent=css; document.head.appendChild(style);
   }
 
+  function optionDateKey(ev){
+    return parseDateKey(ev?.fechaIni || ev?.fecha_ini || ev?.fechaInicio || ev?.startDate || ev?.fecha || '');
+  }
   function sortAndColorEventSelect(){
     const sel = $('selectedEvent');
     const st = state();
@@ -76,24 +79,31 @@
     if(!sel || !eventos.length) return;
     const current = trim(sel.value || st.selectedEventId || '');
     const focused = document.activeElement === sel;
+    const opened = focused || sel.matches?.(':focus');
     const ordered = eventos.slice().sort((a,b)=>{
-      const da = parseDateKey(a?.fechaIni || a?.fecha_ini || a?.fechaInicio || a?.startDate);
-      const db = parseDateKey(b?.fechaIni || b?.fecha_ini || b?.fechaInicio || b?.startDate);
+      const da = optionDateKey(a);
+      const db = optionDateKey(b);
       if(da !== db) return da - db;
       return eventTitle(a).localeCompare(eventTitle(b),'es',{sensitivity:'base',numeric:true});
     });
-    const signature = ordered.map(e => `${trim(e.id)}:${parseDateKey(e?.fechaIni || e?.fecha_ini || '')}:${trim(e?.situacion || '')}`).join('|') + '|sel=' + current;
-    if(sel.dataset.ceFix18Signature !== signature){
-      sel.innerHTML = ordered.map(e => {
-        const curso = isCurso(e), finalizado = isFinal(e);
-        const cls = finalizado ? 'ce-event-finalizado' : 'ce-event-curso';
-        const style = finalizado ? 'color:#b91c1c;font-weight:900;' : 'color:#16a34a;font-weight:900;';
-        return `<option value="${esc(e.id)}" class="${cls}" ${finalizado?'data-finalizado="1"':'data-curso="1"'} style="${style}" ${trim(e.id)===current?'selected':''}>${esc(eventTitle(e))}</option>`;
-      }).join('');
-      if(current) sel.value = current;
-      sel.dataset.ceFix18Signature = signature;
-      if(focused) try{ sel.focus({preventScroll:true}); }catch(_){ }
-    }
+    const existingEmpty = Array.from(sel.options || []).find(o => !trim(o.value));
+    const placeholderText = trim(existingEmpty?.textContent || 'Selecciona evento...');
+    const signature = ordered.map(e => `${trim(e.id)}:${optionDateKey(e)}:${trim(e?.situacion || e?.estado || '')}:${eventTitle(e)}`).join('|') + '|sel=' + current + '|ph=' + placeholderText;
+    if(sel.dataset.ceFix18Signature === signature) return;
+    const rows = [];
+    rows.push(`<option value="" ${current ? '' : 'selected'}>${esc(placeholderText || 'Selecciona evento...')}</option>`);
+    rows.push(...ordered.map(e => {
+      const finalizado = isFinal(e);
+      const curso = isCurso(e);
+      const cls = finalizado ? 'ce-event-finalizado' : (curso ? 'ce-event-curso' : '');
+      const attrs = finalizado ? 'data-finalizado="1"' : (curso ? 'data-curso="1"' : '');
+      const style = finalizado ? 'color:#b91c1c;font-weight:900;' : (curso ? 'color:#16a34a;font-weight:900;' : '');
+      return `<option value="${esc(e.id)}" class="${cls}" ${attrs} style="${style}" ${trim(e.id)===current?'selected':''}>${esc(eventTitle(e))}</option>`;
+    }));
+    sel.innerHTML = rows.join('');
+    if(current) sel.value = current;
+    sel.dataset.ceFix18Signature = signature;
+    if(opened || focused) try{ sel.focus({preventScroll:true}); }catch(_){ }
   }
 
   function clearVistaActive(root){
@@ -158,5 +168,5 @@
 
   function install(){ injectCss(); installVistaHandlers(); installRenderHook(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
-  window.ControlEventV19Fix18={version:'v19_prod_FIX18'};
+  window.ControlEventV19Fix18={version:'v21_prod_FIX18'};
 })();

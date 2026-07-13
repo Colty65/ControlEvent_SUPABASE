@@ -1,4 +1,4 @@
-# ControlEvent v19_prod - FIX6 Vista aérea / barras
+# ControlEvent v21_prod - FIX6 Vista aérea / barras
 
 Partiendo del ZIP anterior `CE_v19_PROD_MAPA_GLOBAL_FIX5.zip`.
 
@@ -22,7 +22,7 @@ Cambios aplicados:
   - Ingresos, Compras, Saldo Actual, Saldo Operativo, Donaciones, Producto Disponible.
 - Fichas superiores pintadas según tradición visual de la app.
 - Cabeceras de registros de Ingresos y Producto Disponible con fondo gris claro y letra algo mayor.
-- Cache-bust actualizado a `v19_prod_20260709001000_FIX6`.
+- Cache-bust actualizado a `v21_prod_20260709001000_FIX6`.
 
 Validación realizada:
 

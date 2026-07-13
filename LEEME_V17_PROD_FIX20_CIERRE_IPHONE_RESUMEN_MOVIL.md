@@ -1,4 +1,4 @@
-# ControlEvent v19_prod - FIX20 cierre iPhone + resumen móvil
+# ControlEvent v21_prod - FIX20 cierre iPhone + resumen móvil
 
 Base: CE_v17_PROD_FIX19_CIERRE_MOVIL_GRAFICAS.zip
 
@@ -21,4 +21,4 @@ Cambios puntuales:
    - Bloqueo de gráficas antiguas de barras durante la entrada a GRAFICAS.
 
 No se han tocado cálculos, datos, permisos, fotos ni visor de detalle.
-Versión visible: v19_prod.
+Versión visible: v21_prod.

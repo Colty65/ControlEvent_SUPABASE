@@ -1,4 +1,4 @@
-# CE v19_prod FIX48 - Saldo actual realizado
+# CE v21_prod FIX48 - Saldo actual realizado
 
 Cambio mínimo aplicado sobre FIX47.
 

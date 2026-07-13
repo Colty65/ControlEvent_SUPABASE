@@ -1,13 +1,13 @@
-# ControlEvent v19_prod · Zuzu flujo, versión y layout
+# ControlEvent v21_prod · Zuzu flujo, versión y layout
 
-Corrección de saneamiento después de detectar que en pruebas seguían apareciendo síntomas de versión vieja: título `ControlEvent v19_prod`, botones inferiores sin mover, PDF con nombre antiguo `ControlEvent - Respuesta de Zuzu.pdf`, pérdida de traza y error visual `HTTP 200`.
+Corrección de saneamiento después de detectar que en pruebas seguían apareciendo síntomas de versión vieja: título `ControlEvent v21_prod`, botones inferiores sin mover, PDF con nombre antiguo `ControlEvent - Respuesta de Zuzu.pdf`, pérdida de traza y error visual `HTTP 200`.
 
 ## Cambios
 
-- Badge visible fijo en pantalla: `v19_prod · build`.
+- Badge visible fijo en pantalla: `v21_prod · build`.
 - Badge visible dentro de la ventana de Zuzu.
 - Hardlock final cargado al final de `index.html` para que ningún script viejo pise versión ni layout.
-- `/api/version` queda alineado con `v19_prod`.
+- `/api/version` queda alineado con `v21_prod`.
 - `ControlEventVersionCheck()` compara front y API.
 - Herramientas inferiores Excel / Carga / Descarga / Mantenimiento se fuerzan a columna lateral izquierda.
 - Zuzu ya no convierte una respuesta `ok=false` con HTTP 200 en el mensaje inútil `HTTP 200`; pinta la respuesta y la traza si existen.
@@ -19,7 +19,7 @@ Corrección de saneamiento después de detectar que en pruebas seguían aparecie
 
 ## Prueba rápida tras desplegar
 
-1. Abrir la app y confirmar que arriba aparece el badge `v19_prod`.
+1. Abrir la app y confirmar que arriba aparece el badge `v21_prod`.
 2. Ejecutar en consola:
 
 ```js
@@ -28,6 +28,6 @@ ControlEventVersionCheck()
 
 Debe devolver `ok: true`.
 
-3. Abrir Zuzu y comprobar que en el modal aparece `v19_prod`.
+3. Abrir Zuzu y comprobar que en el modal aparece `v21_prod`.
 4. Preguntar por datos + socios que no estarán + parte meteorológico.
-5. Confirmar que aparece traza técnica y que el PDF se nombra con `ControlEvent_v19_prod-responde_Zuzu_a_...`.
+5. Confirmar que aparece traza técnica y que el PDF se nombra con `ControlEvent_v21_prod-responde_Zuzu_a_...`.

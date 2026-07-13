@@ -1,4 +1,4 @@
--- ControlEvent v19_prod - FIX MAESTROS CATALOGO LIBRE SIN CAMBIO DE VERSION
+-- ControlEvent v21_prod - FIX MAESTROS CATALOGO LIBRE SIN CAMBIO DE VERSION
 -- Ejecutar UNA VEZ en Supabase SQL Editor antes de probar los mantenimientos.
 -- Objetivo: permitir guardar PERSONAS, TIENDAS y PRODUCTOS existentes desde MANTO aunque
 -- aparezcan usados en eventos Finalizados. No modifica COMPRAS/DONACIONES historicas;

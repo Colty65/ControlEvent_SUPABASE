@@ -9,5 +9,5 @@ Cambio mínimo solicitado. No se toca login, rendimiento, mantenimiento de INGRE
 - Se estrecha la tabla de PRODUCTO DISPONIBLE para que quepa en la ficha sin barra horizontal, conservando el tamaño de letra.
 
 ## Zuzu
-- Se oculta la chapa flotante `v19_prod` dentro de la ventana de Zuzu.
+- Se oculta la chapa flotante `v21_prod` dentro de la ventana de Zuzu.
 - El texto principal de respuesta de Zuzu pasa a peso normal tanto en pantalla como en PDF imprimible.

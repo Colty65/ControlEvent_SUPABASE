@@ -1,12 +1,12 @@
-Version app: v19_prod
-Version texto: ControlEvent v19_prod
-Version fichero: ControlEvent_v19_prod
+Version app: v21_prod
+Version texto: ControlEvent v21_prod
+Version fichero: ControlEvent_v21_prod
 Build: 20260708-200500
 ZIP: CE_v19_PROD_MAPA_GLOBAL_FIX3.zip
 Objetivo: recuperar evidencias de versión, trazabilidad Zuzu/CE, nombre PDF correcto, menú lateral y mejorar interpretación de socios no asistentes + meteorología.
 Comprobaciones:
-- Front final hardlock: public/app/features/v18-11-10-final-hardlock.js (hardlock v19_prod, sin versión emergente)
-- /api/version actualiza v19_prod
-- Zuzu modal muestra badge v19_prod
+- Front final hardlock: public/app/features/v18-11-10-final-hardlock.js (hardlock v21_prod, sin versión emergente)
+- /api/version actualiza v21_prod
+- Zuzu modal muestra badge v21_prod
 - Traza técnica queda abierta por defecto
-- PDF usa ControlEvent_v19_prod-responde_Zuzu_a_<asunto>-aaaammdd-hhmmss.pdf
+- PDF usa ControlEvent_v21_prod-responde_Zuzu_a_<asunto>-aaaammdd-hhmmss.pdf

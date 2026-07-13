@@ -1,9 +1,9 @@
-# ControlEvent v19_prod FIX2 - Mapa global detalle
+# ControlEvent v21_prod FIX2 - Mapa global detalle
 
 Cambios aplicados sobre `CE_v19_PROD_MAPA_GLOBAL_FIX1.zip`:
 
 1. Ventana `Vista gráfica completa del evento`:
-   - Se quita el texto `ControlEvent v19_prod` del subtítulo de la ventana.
+   - Se quita el texto `ControlEvent v21_prod` del subtítulo de la ventana.
    - En su lugar aparece el estado del evento: `En curso` en verde o `Finalizado` en rojo.
 
 2. INGRESOS:

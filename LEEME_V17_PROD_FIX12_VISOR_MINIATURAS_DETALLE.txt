@@ -1,4 +1,4 @@
-ControlEvent v19_prod - FIX12 visor de miniaturas de tickets
+ControlEvent v21_prod - FIX12 visor de miniaturas de tickets
 
 Partiendo de CE_v17_PROD_FIX11_CARGA_REAL_VISOR_MINIATURAS.zip.
 
@@ -7,7 +7,7 @@ Cambios realizados:
 2. Al pulsar la miniatura se abre el visor propio v17, con el detalle del ticket a la izquierda y la foto a la derecha.
 3. Se evita que los visores antiguos v10.x intercepten el clic de la miniatura antes que el visor nuevo.
 4. El botón Cerrar del visor queda dentro de la zona de foto, abajo a la derecha, separado del botón general [Salir].
-5. Se mantiene la versión visible como ControlEvent v19_prod; solo se cambia el querystring de caché de los scripts afectados.
+5. Se mantiene la versión visible como ControlEvent v21_prod; solo se cambia el querystring de caché de los scripts afectados.
 
 Archivos modificados:
 - public/app/features/v17-hotfix-calculos-fotos-ingresos-style.js

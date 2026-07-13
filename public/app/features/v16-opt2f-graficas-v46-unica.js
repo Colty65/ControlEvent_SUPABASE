@@ -1,4 +1,4 @@
-/* ControlEvent v19_prod OPT2F - GRAFICAS: renderer único v46 / 3 quesos de ancho.
+/* ControlEvent v21_prod OPT2F - GRAFICAS: renderer único v46 / 3 quesos de ancho.
    Alcance cerrado: solo estabilización visual de GRAFICAS.
    Objetivo: bloquear la gráfica antigua de 4 quesos / 2 columnas que se pintaba antes
    y dejar un único pintado final con la gráfica v46 (6 quesos / 3 columnas).
@@ -8,7 +8,7 @@
   if(window.__ceV16Opt2FInstalled) return;
   window.__ceV16Opt2FInstalled = true;
 
-  const VERSION = 'v19_prod_opt_2f';
+  const VERSION = 'v21_prod_opt_2f';
   const $ = id => document.getElementById(id);
   const txt = v => String(v == null ? '' : v).trim();
   const now = () => Date.now();
@@ -208,9 +208,9 @@
     metrics.lastReason = reason || 'final';
     allowCommit = true;
     try{
-      fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v19_prod_opt_2f_' + (reason || 'final')});
+      fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v21_prod_opt_2f_' + (reason || 'final')});
     }catch(err){
-      console.warn('[v19_prod_opt_2f] render final gráficas', err);
+      console.warn('[v21_prod_opt_2f] render final gráficas', err);
     }finally{
       allowCommit = false;
     }

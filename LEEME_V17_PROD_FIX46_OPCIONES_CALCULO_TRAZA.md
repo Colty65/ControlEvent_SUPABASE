@@ -1,4 +1,4 @@
-# v19_prod FIX46 - opciones de cálculo y traza por fases
+# v21_prod FIX46 - opciones de cálculo y traza por fases
 
 Cambios aplicados sobre FIX45:
 
@@ -20,6 +20,6 @@ Cambios aplicados sobre FIX45:
      - Compra final presentada.
 
 3. Versionado
-   - Versión visible: v19_prod_FIX46_OPCIONES_CALCULO_TRAZA.
+   - Versión visible: v21_prod_FIX46_OPCIONES_CALCULO_TRAZA.
 
 No se han tocado gráficas, resumen presupuestario, globos ni fotos.

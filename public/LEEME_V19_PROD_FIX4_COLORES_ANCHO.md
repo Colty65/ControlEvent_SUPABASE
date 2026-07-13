@@ -1,4 +1,4 @@
-# ControlEvent v19_prod - FIX4 Colores y ancho vista gráfica
+# ControlEvent v21_prod - FIX4 Colores y ancho vista gráfica
 
 Cambios aplicados sobre `CE_v19_PROD_MAPA_GLOBAL_FIX3.zip`:
 
