@@ -85,25 +85,11 @@
   function isSocioResponsable(id){ return up(personOf(id)?.rango || '') === 'SOCIO'; }
   function unitPrice(row){
     const p = productOf(row) || {};
-    const candidates = [row?.precio, row?.precioCalc, row?.precio_calc, p.precio, p.defaultPrecio, p.precioRfa, p.precioReferencia];
-    for(const item of candidates){
-      if(item !== undefined && item !== null && String(item).trim() !== ''){
-        const n = parseAmount(item);
-        if(Number.isFinite(n) && n !== 0) return n;
-      }
-    }
+    const candidates = [row?.precio, p.precio, p.defaultPrecio];
+    for(const item of candidates){ const n = Number(item || 0); if(Number.isFinite(n) && n > 0) return n; }
     return 0;
   }
-  function rowValue(row){
-    const directKeys = ['importe','valor','total','importeCompra','importeTotal','descuento','importeDescuento','discount','amount'];
-    for(const key of directKeys){
-      if(row && row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== ''){
-        const n = parseAmount(row[key]);
-        if(Number.isFinite(n) && n !== 0) return n;
-      }
-    }
-    return Number(row?.unidades || 1) * unitPrice(row);
-  }
+  function rowValue(row){ return Number(row?.unidades || 0) * unitPrice(row); }
   function unitPriceFrom(unidades, importe){
     const u = Number(unidades || 0), v = Number(importe || 0);
     return u > 0 ? (v / u) : 0;

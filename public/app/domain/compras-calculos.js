@@ -58,14 +58,8 @@ export function unitPrice(app, row){
 }
 
 export function purchaseValue(app, row){
-  const directKeys = ['valor','importe','total','importeCompra','importeTotal','descuento','importeDescuento','discount','amount'];
-  for(const key of directKeys){
-    if(row?.[key] !== undefined && row?.[key] !== null && text(row[key]) !== ''){
-      const value = number(row[key]);
-      if(Number.isFinite(value) && value !== 0) return value;
-    }
-  }
-  return unitPrice(app, row) * number(row?.unidades || 1);
+  if(row?.valor !== undefined && row?.valor !== null && text(row.valor) !== '') return number(row.valor);
+  return unitPrice(app, row) * number(row?.unidades);
 }
 
 export function ticketLabel(row){
