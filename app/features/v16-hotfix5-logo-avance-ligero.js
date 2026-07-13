@@ -52,6 +52,17 @@
     const t=ticketText(row);
     return /TK\s*\d+/.test(t);
   }
+  function compraImporte(row){
+    const direct = row?.importe ?? row?.Importe ?? row?.valor ?? row?.Valor ?? row?.total ?? row?.Total ?? row?.importeTotal ?? row?.importe_total;
+    const rawDirect = String(direct ?? '').trim();
+    let v = num(direct);
+    if(rawDirect && (v !== 0 || /(^|[^0-9])-/.test(rawDirect))) return Math.round(v*100)/100;
+    const u = num(row?.unidades ?? row?.Unidades ?? row?.uds ?? row?.cantidad);
+    const pr = num(row?.precio ?? row?.Precio ?? row?.precioUnitario ?? row?.defaultPrecio);
+    return Math.round((u*pr)*100)/100;
+  }
+  function sumImporte(rows){ return (Array.isArray(rows)?rows:[]).reduce((a,r)=>a+compraImporte(r),0); }
+  function sumPositivo(rows){ return (Array.isArray(rows)?rows:[]).reduce((a,r)=>a+Math.max(0,compraImporte(r)),0); }
   function socioBasePermitido(p){
     const n=txt(p?.nombre||p?.Nombre||p?.NOMBRE||'');
     if(up(p?.rango||p?.Rango||p?.RANGO||'')!=='SOCIO') return false;
@@ -62,6 +73,7 @@
   }
   function normName(v){ return up(v).replace(/[^A-Z0-9Ñ ]+/g,' ').replace(/\s+/g,' ').trim(); }
   function isSocioGrupoY(p){ return /\s+y\s+/i.test(txt(p?.nombre||p?.Nombre||p?.NOMBRE||'')); }
+  function socioPeso(p){ return isSocioGrupoY(p) ? 2 : 1; }
   function partsGrupoY(name){ return normName(name).split(/\s+Y\s+/).map(x=>x.trim()).filter(Boolean); }
   function sociosFiltrados(){
     const base=arr('personas').filter(socioBasePermitido);
@@ -74,18 +86,43 @@
       return !partes.has(normName(n));
     }).slice().sort((a,b)=>txt(a.nombre||a.Nombre||'').localeCompare(txt(b.nombre||b.Nombre||''),'es',{sensitivity:'base'}));
   }
-  function socioAsiste(p, colaboradores){
-    const pid=txt(p?.id||p?.ID||p?.personaId||'');
-    const pn=up(p?.nombre||p?.Nombre||p?.NOMBRE||'');
+  function socioParteAsiste(nombreParte, colaboradores){
+    const pn=up(nombreParte);
     if(!pn) return false;
+    return colaboradores.some(c=>{
+      const cn=up(rowName(c));
+      if(!cn) return false;
+      return cn===pn || cn.includes(pn) || pn.includes(cn);
+    });
+  }
+  function socioAsisteCount(p, colaboradores){
+    const pid=txt(p?.id||p?.ID||p?.personaId||'');
+    const nombre=txt(p?.nombre||p?.Nombre||p?.NOMBRE||'');
+    const pn=up(nombre);
+    if(!pn) return 0;
+    // Si es pareja/grupo con " y ", puede asistir la pareja completa o solo uno de sus miembros.
+    if(isSocioGrupoY(p)){
+      const full = colaboradores.some(c=>{
+        const cid=rowPersonaId(c);
+        if(pid && cid && String(pid)===String(cid)) return true;
+        const cn=up(rowName(c));
+        return cn && (cn===pn || cn.includes(pn) || pn.includes(cn));
+      });
+      if(full) return socioPeso(p);
+      const parts=partsGrupoY(nombre);
+      const seen=new Set();
+      parts.forEach(part=>{ if(socioParteAsiste(part,colaboradores)) seen.add(part); });
+      return Math.min(socioPeso(p), seen.size);
+    }
     return colaboradores.some(c=>{
       const cid=rowPersonaId(c);
       if(pid && cid && String(pid)===String(cid)) return true;
       const cn=up(rowName(c));
       if(!cn) return false;
       return cn===pn || cn.includes(pn) || pn.includes(cn);
-    });
+    }) ? 1 : 0;
   }
+  function socioAsiste(p, colaboradores){ return socioAsisteCount(p,colaboradores) > 0; }
 
   function budgetIncome(){
     const app=window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
@@ -124,27 +161,37 @@
     const comp=compras.filter(c=>!isDonation(c));
     const tkGastos=comp.filter(c=>isTk(c)||isGastoCorriente(c));
     const ptes=comp.filter(isPteCompra);
+    const donValue=sumImporte(don);
+    const tkGastosValue=sumImporte(tkGastos);
+    const ptesValue=sumImporte(ptes);
+    const compValue=sumImporte(comp);
+    const completedPositive=sumPositivo(tkGastos);
+    const totalPositive=sumPositivo(comp);
+    const comprasPct=totalPositive>0 ? Math.max(0,Math.min(100,completedPositive/totalPositive*100)) : (comp.length?tkGastos.length/comp.length*100:0);
     const docs=(Array.isArray(st().eventDocuments)?st().eventDocuments:[]).filter(d=>rowEventId(d)===id || String(d.eventId||d.event_id||'')===id);
     const docKeys=new Set(docs.map(d=>`${id}|${docCode(d.codigo||d.imageKey||d.id)}`).filter(k=>!k.endsWith('|')));
     Object.keys(st().ticketImages||{}).forEach(k=>{ if(k.startsWith(id+'|') && /DOC\s*\d+/i.test(k)) docKeys.add(k); });
     const tickets=[...new Set(comp.map(c=>txt(c.ticket||c.ticketDonacion||c.ticket_donacion||'').toUpperCase()).filter(v=>/TK\s*\d+/i.test(v)))];
     const ticketPhotos=tickets.filter(tk=>Object.keys(st().ticketImages||{}).some(k=>k.startsWith(id+'|')&&k.toUpperCase().includes(tk))).length;
     const socios=sociosFiltrados();
-    const sociosAsistentes=socios.filter(p=>socioAsiste(p,col));
-    const sociosNo=socios.filter(p=>!socioAsiste(p,col));
-    const socioList=socios.map(p=>{
-      const n=txt(p.nombre||p.Nombre||p.NOMBRE||'');
-      const ok=socioAsiste(p,col);
-      return `<span class="ce-v20-socio ${ok?'asiste':'no-asiste'}">${esc(n)}</span>`;
+    const socioInfos=socios.map(p=>{ const peso=socioPeso(p); const count=Math.max(0,Math.min(peso,socioAsisteCount(p,col))); return {p,peso,count}; });
+    const totalSocios=socioInfos.reduce((a,x)=>a+x.peso,0);
+    const totalAsistentes=socioInfos.reduce((a,x)=>a+x.count,0);
+    const totalNoAsistentes=Math.max(0,totalSocios-totalAsistentes);
+    const socioList=socioInfos.map(x=>{
+      const p=x.p, n=txt(p.nombre||p.Nombre||p.NOMBRE||'');
+      const ok=x.count>0;
+      const suffix=x.peso>1 ? (x.count>0 && x.count<x.peso ? ` (${x.count}/${x.peso})` : ` (${x.peso})`) : '';
+      return `<span class="ce-v20-socio ${ok?'asiste':'no-asiste'}" title="Asisten ${x.count} de ${x.peso}">${esc(n)}${suffix}</span>`;
     }).join('');
     return [
       {t:'INGRESOS',color:'blue',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${eur(ingresado)} de ${eur(previsto)} ingresados`},
       {t:'JUSTIFICANTES DE INGRESOS',color:'green',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos con justificante`},
-      {t:'DONACIONES',color:'orange',p:don.length?100:0,d:`Donaciones registradas: ${don.length}`},
-      {t:'COMPRAS',color:'red',p:comp.length?100:0,d:`TKxx/gastos corrientes: ${tkGastos.length} · Pte. compra: ${ptes.length} · Total líneas: ${comp.length}`},
+      {t:'DONACIONES',color:'orange',p:don.length?100:0,d:`Donaciones registradas: ${don.length} · Valor estimado: ${eur(donValue)}`},
+      {t:'COMPRAS',color:'red',p:comprasPct,d:`TKxx/gastos corrientes: ${tkGastos.length} · ${eur(tkGastosValue)} · Pte. compra: ${ptes.length} · ${eur(ptesValue)} · Total líneas: ${comp.length} · ${eur(compValue)}`},
       {t:'JUSTIFICANTES DE COMPRA',color:'purple',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`},
       {t:'DOCUMENTOS',color:'green',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`},
-      {t:'INFO SOCIOS',color:'slate',p:socios.length?sociosAsistentes.length/socios.length*100:0,d:`Socios: ${socios.length} · Asistentes: ${sociosAsistentes.length} · No asistentes: ${sociosNo.length}`,html:socioList}
+      {t:'INFO SOCIOS',color:'slate',p:totalSocios?totalAsistentes/totalSocios*100:0,d:`Socios: ${totalSocios} · Asistentes: ${totalAsistentes} · No asistentes: ${totalNoAsistentes}`,html:socioList}
     ];
   }
 

@@ -404,7 +404,7 @@ Reglas obligatorias:
 - Si necesitas más datos de ControlEvent para responder con precisión, no completes por intuición: responde con una solicitud concreta de información adicional y qué módulo/eventos deberían extraerse.
 - Responde siempre en español.
 - Respeta el tono solicitado por el usuario. Si pide informe coloquial, informal, simpático, con chascarrillos o para socios, escribe una lectura cercana y humana antes de las tablas, con humor ligero y sin perder rigor. Si pide informe técnico, financiero, auditoría, Dirección o justificación formal, escribe en tono ejecutivo, preciso y sobrio, con conclusiones, salvedades y criterios de cálculo.
-- Personaliza la respuesta con usuarioLogado si está en el contexto: usa Identificacion/apodo en conversación informal y Nombre en informes serios o formales. Si el usuario pregunta por una persona, revisa también usuarioLogado además de PERSONAS, INGRESOS, COMPRAS y DONACIONES. Para socios, aplica el criterio ControlEvent: rango=SOCIO, excluir z_DEV/Grupo/Peña, los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales.
+- Personaliza la respuesta con usuarioLogado si está en el contexto: usa Identificacion/apodo en conversación informal y Nombre en informes serios o formales. Si el usuario pregunta por una persona, revisa también usuarioLogado además de PERSONAS, INGRESOS, COMPRAS y DONACIONES. Para socios, aplica el criterio ControlEvent: rango=SOCIO, excluir z_DEV/Grupo/Peña, los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales; si en un evento aparece solo uno de los miembros de esa pareja/grupo, cuenta como 1 asistente de ese grupo.
 - No entregues solo datos crudos cuando el usuario pida un informe: primero redacta un texto de interpretación que explique las líneas generales y responda con el estilo pedido; después deja tablas, gráficas y ficheros como soporte.
 
 - En v19 TODA respuesta final debe parecer escrita por Zuzu: interpreta el prompt completo del usuario, su intención, tono y destinatario. ControlEvent solo te ha preparado los datos; no copies su carcasa.
@@ -421,7 +421,7 @@ Campos oficiales por módulo y datos indirectos:
 - DOCUMENTOS: DOCxxx; Evento; Fecha; Descripcion; Tiene imagen.
 - PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
 - TIENDAS: Nombre tienda.
-- PERSONAS: Nombre persona; Rango; Socio ControlEvent; Personas computadas; Grupo y. Para contar socios ControlEvent: rango=SOCIO, excluir z_DEV/Grupo/Peña; los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales.
+- PERSONAS: Nombre persona; Rango; Socio ControlEvent; Personas computadas; Grupo y. Para contar socios ControlEvent: rango=SOCIO, excluir z_DEV/Grupo/Peña; los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales; si en un evento aparece solo uno de los miembros de esa pareja/grupo, cuenta como 1 asistente de ese grupo.
 
 Formato de salida: SOLO JSON válido con el esquema indicado. Evita respuestas excesivamente largas: usa tablas y ficheros para detalle cuando sea necesario.
 Límites de presentación: answer <= 2500 caracteres; máximo 8 tablas; máximo 80 filas por tabla; máximo 8 gráficas. Si necesitas devolver más detalle, usa files en CSV.
@@ -1288,7 +1288,7 @@ function missingAttendeesTablesAndCharts(context, prompt = '') {
     missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: personaNumero(p) || '', 'Personas computadas': num(p.__ceSocioPeso || ceSocioPeso(p)), Motivo: `Está en PERSONAS como SOCIO ControlEvent${ceIsGroupSocioYName(p['Nombre persona']) ? ' y cuenta como 2' : ''} y no figura en INGRESOS del evento` }));
     const totalSociosCE = ceSociosWeight(persons);
     const missingSociosCE = ceSociosWeight(missing);
-    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': totalSociosCE, 'Socios con ingreso/asistencia registrada': totalSociosCE - missingSociosCE, 'Socios no registrados en este evento': missingSociosCE, Criterio: 'Rango=SOCIO, excluyendo z_DEV..., Grupo... y Peña...; los nombres con " y " cuentan como 2 y sustituyen a los componentes individuales' });
+    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': totalSociosCE, 'Socios con ingreso/asistencia registrada': totalSociosCE - missingSociosCE, 'Socios no registrados en este evento': missingSociosCE, Criterio: 'Rango=SOCIO, excluyendo z_DEV..., Grupo... y Peña...; los nombres con " y " cuentan como 2 y sustituyen a los componentes individuales; si solo asiste uno de los miembros, cuenta como 1 asistente' });
   });
   const summaryCols = ['Evento','Socios válidos en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento','Criterio'];
   const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Numero','Personas computadas','Motivo'];
@@ -2430,7 +2430,7 @@ Reglas obligatorias:
 - Si los datos del módulo EVENTOS incluyen Descripción, úsala como objetivo/contexto del evento: compárala con ingresos, compras, donaciones y organización para enriquecer la valoración. No la ignores como si fuera un campo decorativo.
 - Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
 - Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer y usa subtítulos cortos dentro del texto: Datos del evento, Socios que no asistirán/no registrados, Parte meteorológico. No dejes una parte fuera porque aparezca en tablas.
-- Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio completo: PERSONAS con rango SOCIO; se excluyen patrones internos z_DEV..., Grupo... y Peña...; los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales; no figuran en INGRESOS del evento.
+- Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio completo: PERSONAS con rango SOCIO; se excluyen patrones internos z_DEV..., Grupo... y Peña...; los nombres con " y " cuentan como 2 y sustituyen a sus componentes individuales; si en un evento aparece solo uno de los miembros de esa pareja/grupo, cuenta como 1 asistente de ese grupo; no figuran en INGRESOS del evento.
 - ${limit}.
 - No uses markdown, no devuelvas tablas, no pegues JSON.
 - Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo", "se celebró", "se celebra hoy" ni "hoy 10 de julio" para eventos futuros.
@@ -5411,7 +5411,7 @@ function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
   const totalMode = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL';
   if (!totalMode) {
     const ctxJson = JSON.stringify(planPromptContextForGemini(ctx, false));
-    return `Eres Zuzu, planificador de eventos dentro de ControlEvent. Devuelve SOLO JSON válido. Para socios, usa siempre el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, los nombres con ' y ' cuentan como 2 y sustituyen a sus componentes individuales.
+    return `Eres Zuzu, planificador de eventos dentro de ControlEvent. Devuelve SOLO JSON válido. Para socios, usa siempre el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, los nombres con ' y ' cuentan como 2 y sustituyen a sus componentes individuales; si aparece solo uno de los miembros de esa pareja/grupo, cuenta como 1 asistente de ese grupo.
 SALIDA: {"menuResumen":[{"dia":"dia_1","momento":"aperitivo","resumen":"Será a base de ..."}],"rows":[{"tipo":"COMPRA","producto":"...","unidades":1,"precio":0,"necesidadTotal":1,"reason":"..."}],"notes":[],"preguntasPendientes":[]}
 CONTEXTO:
 ${ctxJson}`;
@@ -5420,7 +5420,7 @@ ${ctxJson}`;
   const needJson = JSON.stringify(needCtx);
   return `Devuelve SOLO un ARRAY JSON válido, sin markdown y sin texto fuera.
 Cada elemento debe ser una necesidad teórica total del evento, NO una compra final.
-No descuentes donaciones. ControlEvent descontará después con equivalencias locales. Para socios/personas, usa siempre el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, los nombres con ' y ' cuentan como 2 y sustituyen a sus componentes individuales.
+No descuentes donaciones. ControlEvent descontará después con equivalencias locales. Para socios/personas, usa siempre el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, los nombres con ' y ' cuentan como 2 y sustituyen a sus componentes individuales; si aparece solo uno de los miembros de esa pareja/grupo, cuenta como 1 asistente de ese grupo.
 Máximo 18 elementos. Prioriza bebida, hielo, agua, comida indicada, menaje e infraestructura básica.
 Formato exacto: [{"producto":"Cerveza lata 33cl","cantidadTotal":375,"unidad":"ud","motivo":"25 consumidores x 5 ud x 3 días"}]
 Usa nombres parecidos al catálogo si encajan, sin cambiar formato/capacidad.

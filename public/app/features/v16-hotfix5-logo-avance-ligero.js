@@ -86,18 +86,43 @@
       return !partes.has(normName(n));
     }).slice().sort((a,b)=>txt(a.nombre||a.Nombre||'').localeCompare(txt(b.nombre||b.Nombre||''),'es',{sensitivity:'base'}));
   }
-  function socioAsiste(p, colaboradores){
-    const pid=txt(p?.id||p?.ID||p?.personaId||'');
-    const pn=up(p?.nombre||p?.Nombre||p?.NOMBRE||'');
+  function socioParteAsiste(nombreParte, colaboradores){
+    const pn=up(nombreParte);
     if(!pn) return false;
+    return colaboradores.some(c=>{
+      const cn=up(rowName(c));
+      if(!cn) return false;
+      return cn===pn || cn.includes(pn) || pn.includes(cn);
+    });
+  }
+  function socioAsisteCount(p, colaboradores){
+    const pid=txt(p?.id||p?.ID||p?.personaId||'');
+    const nombre=txt(p?.nombre||p?.Nombre||p?.NOMBRE||'');
+    const pn=up(nombre);
+    if(!pn) return 0;
+    // Si es pareja/grupo con " y ", puede asistir la pareja completa o solo uno de sus miembros.
+    if(isSocioGrupoY(p)){
+      const full = colaboradores.some(c=>{
+        const cid=rowPersonaId(c);
+        if(pid && cid && String(pid)===String(cid)) return true;
+        const cn=up(rowName(c));
+        return cn && (cn===pn || cn.includes(pn) || pn.includes(cn));
+      });
+      if(full) return socioPeso(p);
+      const parts=partsGrupoY(nombre);
+      const seen=new Set();
+      parts.forEach(part=>{ if(socioParteAsiste(part,colaboradores)) seen.add(part); });
+      return Math.min(socioPeso(p), seen.size);
+    }
     return colaboradores.some(c=>{
       const cid=rowPersonaId(c);
       if(pid && cid && String(pid)===String(cid)) return true;
       const cn=up(rowName(c));
       if(!cn) return false;
       return cn===pn || cn.includes(pn) || pn.includes(cn);
-    });
+    }) ? 1 : 0;
   }
+  function socioAsiste(p, colaboradores){ return socioAsisteCount(p,colaboradores) > 0; }
 
   function budgetIncome(){
     const app=window.ControlEventApp || window.__CONTROL_EVENT_APP__ || window;
@@ -149,16 +174,15 @@
     const tickets=[...new Set(comp.map(c=>txt(c.ticket||c.ticketDonacion||c.ticket_donacion||'').toUpperCase()).filter(v=>/TK\s*\d+/i.test(v)))];
     const ticketPhotos=tickets.filter(tk=>Object.keys(st().ticketImages||{}).some(k=>k.startsWith(id+'|')&&k.toUpperCase().includes(tk))).length;
     const socios=sociosFiltrados();
-    const sociosAsistentes=socios.filter(p=>socioAsiste(p,col));
-    const sociosNo=socios.filter(p=>!socioAsiste(p,col));
-    const totalSocios=socios.reduce((a,p)=>a+socioPeso(p),0);
-    const totalAsistentes=sociosAsistentes.reduce((a,p)=>a+socioPeso(p),0);
-    const totalNoAsistentes=sociosNo.reduce((a,p)=>a+socioPeso(p),0);
-    const socioList=socios.map(p=>{
-      const n=txt(p.nombre||p.Nombre||p.NOMBRE||'');
-      const ok=socioAsiste(p,col);
-      const peso=socioPeso(p);
-      return `<span class="ce-v20-socio ${ok?'asiste':'no-asiste'}" title="${peso} socio${peso===1?'':'s'}">${esc(n)}${peso>1?' (2)':''}</span>`;
+    const socioInfos=socios.map(p=>{ const peso=socioPeso(p); const count=Math.max(0,Math.min(peso,socioAsisteCount(p,col))); return {p,peso,count}; });
+    const totalSocios=socioInfos.reduce((a,x)=>a+x.peso,0);
+    const totalAsistentes=socioInfos.reduce((a,x)=>a+x.count,0);
+    const totalNoAsistentes=Math.max(0,totalSocios-totalAsistentes);
+    const socioList=socioInfos.map(x=>{
+      const p=x.p, n=txt(p.nombre||p.Nombre||p.NOMBRE||'');
+      const ok=x.count>0;
+      const suffix=x.peso>1 ? (x.count>0 && x.count<x.peso ? ` (${x.count}/${x.peso})` : ` (${x.peso})`) : '';
+      return `<span class="ce-v20-socio ${ok?'asiste':'no-asiste'}" title="Asisten ${x.count} de ${x.peso}">${esc(n)}${suffix}</span>`;
     }).join('');
     return [
       {t:'INGRESOS',color:'blue',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${eur(ingresado)} de ${eur(previsto)} ingresados`},

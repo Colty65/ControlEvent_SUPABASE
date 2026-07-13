@@ -1706,7 +1706,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',
-      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado. Para SOCIOS usa el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, nombres con " y " cuentan como 2 y sustituyen a los componentes individuales.'
+      usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado. Para SOCIOS usa el criterio ControlEvent: rango=SOCIO, excluye z_DEV/Grupo/Peña, nombres con " y " cuentan como 2 y sustituyen a los componentes individuales; si solo asiste uno de los miembros, cuenta como 1 asistente.'
     },
     advertencias: advertenciasAuditoria
   };
