@@ -124,7 +124,7 @@
     const rowsSorted = rows.map(hydratedEvent).slice().sort((a,b) => {
       const da = parseDateKey(eventDate(a));
       const db = parseDateKey(eventDate(b));
-      if(da !== db) return da - db;
+      if(da !== db) return db - da;
       return eventTitle(a).localeCompare(eventTitle(b),'es',{numeric:true,sensitivity:'base'});
     });
     const wanted = rowsSorted.map(ev => trim(ev.id));
