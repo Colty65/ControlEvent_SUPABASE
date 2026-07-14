@@ -776,7 +776,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
 /* ControlEvent v21_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
-const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS'];
+const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','PRODUCTOS','PERSONAS','METEO','TICKETS','DOCUMENTOS','TIENDAS'];
 function zuzuUpperModule(value) {
   const raw = trim(value).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const map = { RECAUDACION: 'INGRESOS', RECAUDACIÓN: 'INGRESOS', ASISTENTES: 'INGRESOS', ENTRADAS: 'INGRESOS', DONACION: 'DONACIONES', DONACIONES_PRODUCTO: 'DONACIONES', GASTOS: 'COMPRAS', TICKET: 'TICKETS', DOCUMENTO: 'DOCUMENTOS', CATALOGOS: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS' };
@@ -1202,7 +1202,8 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       DOCUMENTOS: 'DOCxxx, fecha, descripción e imagen',
       PRODUCTOS: 'catálogo maestro de productos, segmento, destino y precio referencia',
       TIENDAS: 'catálogo maestro de tiendas',
-      PERSONAS: 'catálogo maestro de personas y rango'
+      PERSONAS: 'catálogo maestro de personas y rango',
+      METEO: 'parte meteorológico/previsión para fechas de eventos'
     },
     eventoActivo: selected,
     eventos,
@@ -1603,6 +1604,13 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const selectedId = trim(selectedEventId || safeState.selectedEventId);
   const localPlan = buildZuzuLocalPlan(safeState, selectedId, userPrompt);
   const p = plan && typeof plan === 'object' ? plan : localPlan;
+  if (p.__zuzuPlannerProvider === 'zuzu-planner-failed-safe-stop') {
+    return {
+      needsClarification: true,
+      clarification: p.clarification || 'Zuzu planificador no ha podido decidir módulos y filtros con seguridad. ControlEvent no extrae datos para evitar un informe falso.',
+      warnings: [p.plannerWarning || 'Planificador no disponible']
+    };
+  }
   const allRowsMode = p.__zuzuGeminiAllRows === true;
   if (p.needsClarification && !localPlan.modules?.length && !arr(p.modules || p.modulos).length) return { needsClarification: true, clarification: p.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.' };
   const modules = zuzuUnique([].concat(arr(p.modules || p.modulos), arr(localPlan.modules)).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
