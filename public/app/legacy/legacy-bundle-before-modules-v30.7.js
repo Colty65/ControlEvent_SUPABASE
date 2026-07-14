@@ -392,7 +392,7 @@ function defaultState(){
     summaryTiendaSort: 'tienda',
     selectedEventId: ''
   };
-  defaults.selectedEventId = defaults.eventos[0].id;
+  defaults.selectedEventId = defaults.eventos[0]?.id || '';
   defaults.productos = [
     {id:uid(), nombre:'Refresco', segmento:'BEBIDA', destino:'APERITIVO'},
     {id:uid(), nombre:'Carbón', segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'}
