@@ -89,7 +89,8 @@ function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
   splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
   let fallback;
   if (t === 'zuzu-planner') {
-    // Para planificar módulos prima la latencia real: Flash primero. Lite estaba tardando/agotando Vercel en producción.
+    // FIX22: el planificador es una llamada corta de razonamiento/selección de módulos.
+    // Flash primero + thinkingBudget=0 en la llamada evita respuestas truncadas por tokens internos.
     fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
   } else if (t === 'initial-planning-partial') {
     fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
@@ -1229,84 +1230,58 @@ function asksMissingAttendees(prompt) {
 }
 function excludedFromAttendanceName(name) {
   const n = norm(name);
-  return !n || /^personas/.test(n) || /^grupo/.test(n) || /^pena/.test(n) || /^z/.test(n) || /^z_?dev/.test(n);
+  return !n || /^personas\b/.test(n) || /^grupo\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
+}
+function promptRequiresNumeroUno(prompt) {
+  return /\b(?:numero|n[uú]mero|num)\s*[=:]?\s*['\"]?1['\"]?\b/i.test(text(prompt));
 }
 function personaNumero(row) {
   return num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
 }
-function isPairName(name) { return /(y|e)/i.test(` ${trim(name)} `) && /(y|e)/.test(norm(name)); }
-function splitPairName(name) { return trim(name).split(/(?:y|e)/i).map(x => trim(x)).filter(Boolean); }
-function buildCanonicalSocios(personRows) {
-  const base = arr(personRows).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
-  const pairs = [];
-  const out = [];
-  const seen = new Set();
-  base.forEach(p => {
-    const name = trim(p['Nombre persona']);
-    if (!isPairName(name)) return;
-    const parts = splitPairName(name);
-    const item = { name, size: Math.max(2, parts.length || 2), parts, n: norm(name), kind: 'pair' };
-    pairs.push(item);
-    if (!seen.has(item.n)) { seen.add(item.n); out.push(item); }
+function nameAppearsInRegisteredPerson(personName, registeredNames) {
+  const n = norm(personName);
+  if (!n) return false;
+  return arr(registeredNames).some(x => {
+    const r = norm(x);
+    return r && (r === n || r.includes(n) || n.includes(r));
   });
-  base.forEach(p => {
-    const name = trim(p['Nombre persona']);
-    if (!name || isPairName(name)) return;
-    const n = norm(name);
-    if (pairs.some(pair => pair.parts.some(part => norm(part) === n))) return;
-    if (!seen.has(n)) { seen.add(n); out.push({ name, size: 1, parts: [name], n, kind: 'single' }); }
-  });
-  return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 }
-function attendanceForEventCanonical(canon, ingresosEvento) {
-  const rows = arr(ingresosEvento).filter(r => norm(r.Rango) === 'socio' && num(r.Numero) > 0).map(r => ({ name: trim(r.Nombre), n: norm(r.Nombre), numero: num(r.Numero) })).filter(r => r.name);
-  const asistentes = [];
-  const noAsistentes = [];
-  function hasExact(name) { const n = norm(name); return rows.some(r => r.n === n); }
-  function numberForExact(name) { const n = norm(name); return rows.find(r => r.n === n)?.numero || 0; }
-  canon.forEach(item => {
-    if (item.kind === 'pair') {
-      if (hasExact(item.name) && numberForExact(item.name) >= item.size) { asistentes.push({ name: item.name, size: item.size }); return; }
-      const present = [], missing = [];
-      item.parts.forEach(part => { if (hasExact(part)) present.push(part); else missing.push(part); });
-      if (!present.length) { noAsistentes.push({ name: item.name, size: item.size }); return; }
-      present.forEach(part => asistentes.push({ name: part, size: 1 }));
-      missing.forEach(part => noAsistentes.push({ name: part, size: 1 }));
-      return;
-    }
-    if (hasExact(item.name)) asistentes.push({ name: item.name, size: 1 });
-    else noAsistentes.push({ name: item.name, size: 1 });
-  });
-  asistentes.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
-  noAsistentes.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
-  return { asistentes, noAsistentes, total: canon.reduce((a,x)=>a+x.size,0), totalAsistentes: asistentes.reduce((a,x)=>a+x.size,0), totalNoAsistentes: noAsistentes.reduce((a,x)=>a+x.size,0) };
-}
-function displayAttendanceList(rows) { return arr(rows).map(x => `${x.name}${x.size > 1 ? ` (${x.size})` : ''}`).join(' | '); }
 function missingAttendeesTablesAndCharts(context, prompt = '') {
   const mods = context?.modulosExtraidos || {};
-  const persons = arr(mods.PERSONAS);
-  const canon = buildCanonicalSocios(persons);
+  const requireNumeroUno = promptRequiresNumeroUno(prompt);
+  let persons = arr(mods.PERSONAS).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
+  const personsBeforeNumero = persons.length;
+  const hasNumeroData = persons.some(p => personaNumero(p) > 0);
+  if (requireNumeroUno) {
+    persons = hasNumeroData
+      ? persons.filter(p => personaNumero(p) === 1)
+      : persons.filter(p => !/\s+y\s+|\s+e\s+/i.test(trim(p['Nombre persona'])));
+  }
   const incomes = arr(mods.INGRESOS);
   const events = eventNamesFromContext(context);
-  if (!canon.length || !events.length) {
-    return { tables: [], charts: [], resumenTexto: '', warnings: canon.length ? [] : ['No hay PERSONAS con rango SOCIO disponibles para calcular asistencia canónica.'] };
+  if (!persons.length || !events.length) {
+    const reason = requireNumeroUno
+      ? `No hay PERSONAS con rango SOCIO y Numero=1 disponibles para calcular socios no asistentes. Candidatos SOCIO antes de aplicar Numero=1: ${personsBeforeNumero}. Si PERSONAS no tiene campo Numero, ControlEvent intenta interpretar Numero=1 como socio individual, excluyendo nombres compuestos con y/e.`
+      : 'No hay PERSONAS con rango SOCIO disponibles para calcular socios no asistentes.';
+    return { tables: [], charts: [], resumenTexto: '', warnings: persons.length ? [] : [reason] };
   }
-  const summary = [];
   const detail = [];
+  const summary = [];
   events.forEach(ev => {
-    const info = attendanceForEventCanonical(canon, rowsForEvent(incomes, ev));
-    summary.push({ Evento: ev, 'Socios canónicos': info.total, 'SOCIOS asistentes': info.totalAsistentes, 'SOCIOS no asistentes': info.totalNoAsistentes, Criterio: 'Rango=SOCIO; excluye z_DEV/z_*, Grupo* y Peña*; parejas con y/e cuentan como 2; asistentes = colaboradores del evento con Numero > 0 aunque el ingreso esté Pendiente.' });
-    detail.push({ Evento: ev, 'SOCIOS asistentes': displayAttendanceList(info.asistentes), 'SOCIOS no asistentes': displayAttendanceList(info.noAsistentes) });
+    const regNames = rowsForEvent(incomes, ev).map(r => trim(r.Nombre));
+    const missing = persons.filter(p => !nameAppearsInRegisteredPerson(p['Nombre persona'], regNames));
+    missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: personaNumero(p) || '', Motivo: `Está en PERSONAS como SOCIO${requireNumeroUno ? ' con Numero=1' : ''} y no figura en INGRESOS del evento` }));
+    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': persons.length, 'Socios con ingreso/asistencia registrada': persons.length - missing.length, 'Socios no registrados en este evento': missing.length, Criterio: requireNumeroUno ? (hasNumeroData ? 'Rango=SOCIO, Numero=1, excluyendo Grupo..., Personas..., z_de... y z_DEV...' : 'Rango=SOCIO e interpretación Numero=1 como socio individual; excluye nombres con y/e, Grupo..., Personas..., z_de... y z_DEV...') : 'Rango=SOCIO, excluyendo Grupo..., Personas..., z_de... y z_DEV...' });
   });
-  const summaryCols = ['Evento','Socios canónicos','SOCIOS asistentes','SOCIOS no asistentes','Criterio'];
-  const detailCols = ['Evento','SOCIOS asistentes','SOCIOS no asistentes'];
+  const summaryCols = ['Evento','Socios válidos en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento','Criterio'];
+  const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Numero','Motivo'];
   const tables = [
-    { title: 'Comparativa canónica de SOCIOS asistentes/no asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
-    { title: 'Detalle canónico de asistencia de SOCIOS', columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
+    { title: 'Resumen de socios no registrados/asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
+    { title: `Socios de PERSONAS que NO figuran en INGRESOS del evento (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
   ];
-  const charts = summary.length === 1 ? [{ title: 'SOCIOS asistentes vs no asistentes', type: 'donut', labels: ['SOCIOS asistentes','SOCIOS no asistentes'], values: [num(summary[0]['SOCIOS asistentes']), num(summary[0]['SOCIOS no asistentes'])], unit: 'personas' }]
-    : [{ title: 'SOCIOS no asistentes por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['SOCIOS no asistentes'])), unit: 'personas' }];
-  const resumenTexto = summary.map(r => `${r.Evento}: ${r['SOCIOS asistentes']} asistentes y ${r['SOCIOS no asistentes']} no asistentes de ${r['Socios canónicos']} socios canónicos`).join(' | ');
+  const charts = summary.length === 1 ? [{ title: 'Socios con y sin asistencia registrada', type: 'donut', labels: ['Con ingreso/asistencia registrada','No registrados en el evento'], values: [num(summary[0]['Socios con ingreso/asistencia registrada']), num(summary[0]['Socios no registrados en este evento'])], unit: 'personas' }]
+    : [{ title: 'Socios no registrados por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no registrados en este evento'])), unit: 'personas' }];
+  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios no registrados en este evento']} socio(s) no figuran en INGRESOS de ${r['Socios válidos en PERSONAS']} socio(s) válidos (${r.Criterio})`).join(' | ');
   return { tables, charts, resumenTexto, warnings: [] };
 }
 
@@ -2764,7 +2739,6 @@ function parsePlannerPlainText(raw, userPrompt, catalog) {
     const found = rawText.match(/\b(EVENTOS|INGRESOS|COMPRAS|DONACIONES|PERSONAS|PRODUCTOS|METEO|DOCUMENTOS|TICKETS)\b/gi) || [];
     modules = [...new Set(found.map(normalizePlannerModule).filter(Boolean))];
   }
-  // En respuestas explicativas puede mencionar módulos no necesarios. Si hay bloque explícito, lo restamos.
   const modulosNoNecesarios = splitPlannerList(noModsTxt).map(normalizePlannerModule).filter(Boolean);
   if (modulosNoNecesarios.length) modules = modules.filter(m => !modulosNoNecesarios.includes(m));
   let eventos = splitPlannerList(eventosTxt).filter(x => !/^(ninguno|sin evento|no aplica|n\/a)$/i.test(x));
@@ -2772,12 +2746,11 @@ function parsePlannerPlainText(raw, userPrompt, catalog) {
   const pnorm = norm(userPrompt);
   const explicitlyMentioned = eventTitles.filter(t => pnorm.includes(norm(t)));
   if (!eventos.length) eventos = explicitlyMentioned;
-  // Si el prompt contiene títulos exactos, esos mandan sobre lo que haya escrito Zuzu.
   if (explicitlyMentioned.length) eventos = explicitlyMentioned;
   const globalNorm = norm(globalTxt);
   const promptClosed = /\b(solo|exactos?|no\s+hagas\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos)\b/i.test(userPrompt);
   const todosLosEventos = !promptClosed && /\b(si|s[ií]|true|todos|global)\b/.test(globalNorm);
-  if (!modules.length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${trim(rawText).slice(0, 600)}`);
+  if (!modules.length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${trim(rawText).slice(0, 900)}`);
   return {
     ok: true,
     needsClarification: false,
@@ -2809,24 +2782,30 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
   const plannerText = plannerPrompt(userPrompt, catalog);
   for (const model of configuredGeminiModelsForTask('zuzu-planner')) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const body = {
-      contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { temperature: 0.05, maxOutputTokens: 450 }
-    };
+    const generationConfig = { temperature: 0.05, maxOutputTokens: 1024 };
+    // Gemini 2.5 puede gastar tokens internos de razonamiento y dejar la salida visible cortada
+    // (se observó "EVENTOS_SOLICITADOS: SySA 2026 MODULOS_"). Para este paso solo queremos
+    // clasificación de módulos, así que desactivamos thinking y damos margen de salida.
+    if (/gemini-2\.5/i.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    const body = { contents: [{ role: 'user', parts: [{ text: plannerText }] }], generationConfig };
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Petición ultraligera: solo módulos, eventos y alcance; sin datos operativos.`);
       sizeTrace(flowTrace, 'Paso 1 · Zuzu planificador', 'Contexto ultraligero enviado al planificador', plannerText);
-      const plannerTimeout = Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 8000);
+      const plannerTimeout = Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 18000);
       const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, plannerTimeout);
       logGeminiUsage('PASO 1 planificación ultraligera de módulos', model, payload);
       if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
+      const finish = trim(payload?.candidates?.[0]?.finishReason || '');
+      if (/MAX_TOKENS/i.test(finish)) {
+        throw new Error(`Zuzu planificador devolvió salida truncada por MAX_TOKENS. Respuesta parcial: ${outText.slice(0, 900)}`);
+      }
       const parsed = parsePlannerPlainText(outText, userPrompt, catalog);
       parsed.__zuzuPlannerModel = model;
       parsed.__zuzuPlannerUsage = usageSmall(payload, model);
       parsed.__zuzuPlannerRaw = outText.slice(0, 2500);
-      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Módulos=${arr(parsed?.modules).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed?.todosLosEventos === true ? 'SI' : 'NO'}`, { model, usage: usageSmall(payload, model) });
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Módulos=${arr(parsed?.modules).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed?.todosLosEventos === true ? 'SI' : 'NO'}; respuesta=${outText.slice(0, 500)}`, { model, usage: usageSmall(payload, model) });
       return parsed;
     } catch (error) {
       lastError = error;
@@ -2859,7 +2838,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
     const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
     const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
     let modules = [...new Set(arr(ai?.modules || ai?.modulos).map(x => trim(x).toUpperCase()).filter(Boolean))];
-    // ControlEvent solo completa dependencias técnicas obvias; no añade DOCUMENTOS/TICKETS por su cuenta.
+    // Dependencias técnicas obvias, pero sin abrir DOCUMENTOS/TICKETS si no se pidieron.
     const hasSocios = /\b(socio|socios|asistente|asistentes|no\s+asistentes|personas)\b/i.test(userPrompt);
     const hasProductoDisponible = /\b(producto\s+disponible|compras?\s+realizadas?|compras?\s+pendientes?|donaciones?\s+de\s+producto)\b/i.test(userPrompt);
     const hasMeteo = /\b(meteo|meteorolog|metereolog|tiempo|clima|previsi[oó]n|pron[oó]stico)\b/i.test(userPrompt);
@@ -2875,7 +2854,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
       ...ai,
       ok: ai?.ok !== false,
       needsClarification: ai?.needsClarification === true && !modules.length,
-      modules: modules.length ? modules : local.modules,
+      modules,
       eventos,
       todosLosEventos: closedScope ? false : ai?.todosLosEventos === true,
       filters,
@@ -2965,10 +2944,7 @@ function scopeMetaFromContext(context) {
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) {
-    const closed = context?.planZuzu?.alcanceCerrado === true || context?.planZuzu?.consultaGlobal === false;
-    return { eventHeader: `${closed ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: closed ? 'restricted-multi-event' : 'multi-event', eventCount: evs.length };
-  }
+  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {

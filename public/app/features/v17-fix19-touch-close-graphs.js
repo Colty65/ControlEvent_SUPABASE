@@ -21,8 +21,7 @@
   }
   function validSelectedEvent(){
     const sel = $('selectedEvent');
-    // Si hay selector y está vacío, estamos realmente en "Selecciona evento...".
-    // No usar selectedEventId viejo del estado porque abre el AVANCE vacío y el botón fantasma Cerrar.
+    // Si el selector ya está en pantalla y está vacío, estamos en bienvenida aunque quede un selectedEventId viejo en memoria.
     const id = sel ? norm(sel.value || '') : norm(st().selectedEventId || '');
     if(!id) return false;
     const evs = arr('eventos');
@@ -66,6 +65,15 @@
       #ceV16Hf5AvanceLayer .ce-v16hf5-close{
         z-index:2147483647!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
         cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;
+      }
+      /* Sin evento seleccionado: no puede quedar ningún avance viejo ni botón fantasma de cierre. */
+      body.ce-v17-fix22-no-event #ceHf48AvanceLayer,
+      body.ce-v17-fix21-awaiting-event #ceHf48AvanceLayer,
+      body.ce-v17-fix22-no-event #ceV16Hf5AvanceLayer,
+      body.ce-v17-fix21-awaiting-event #ceV16Hf5AvanceLayer,
+      body.ce-v17-fix22-no-event .ce-v17-fix20-avance-close-float,
+      body.ce-v17-fix21-awaiting-event .ce-v17-fix20-avance-close-float{
+        display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
       }
       /* Hasta que se elige evento, no se muestran menús ni secciones. */
       body.ce-v17-fix22-no-event #mainTabs,
@@ -249,12 +257,15 @@
     const loginActive = !!(overlay && !overlay.classList.contains('hidden'));
     const hasEvent = validSelectedEvent();
     const waiting = loginActive || !hasEvent;
-    if(waiting){
-      try{ $('ceHf48AvanceLayer')?.classList?.remove('visible'); $('ceV16Hf5AvanceLayer')?.classList?.remove('visible'); }catch(_){}
-    }
     document.body.classList.toggle('ce-v17-fix21-awaiting-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-no-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-event-ready', !waiting);
+    if(waiting){
+      try{ $('ceHf47AvanceBubbleLayer')?.remove(); }catch(_){ }
+      try{ $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
+      try{ $('ceV16Hf5AvanceLayer')?.classList?.remove('visible'); }catch(_){ }
+      try{ document.querySelectorAll('.ce-v17-fix20-avance-close-float').forEach(b=>b.remove()); }catch(_){ }
+    }
   }
   function bindEventMenuGate(){
     if(window.__ceV17Fix21MenuGateBound) return;
