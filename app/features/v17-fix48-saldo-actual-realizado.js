@@ -71,16 +71,47 @@
       pendiente: money(pending.reduce((a,r) => a + incomeTotal(r), 0))
     };
   }
-  function isDonationTicket(value){ return DONATION_TYPES.has(up(value)); }
+  function isDonationTicket(value){ const t = up(value).replace(/\s+/g, ' ').trim(); return DONATION_TYPES.has(t) || t.startsWith('DONADO '); }
   function isCurrentExpenseTicket(value){ const t = up(value); return t.includes('GASTOS CORRIENTES') || t.includes('GASTOS DE ORGANIZACION') || t.includes('GASTOS DE ORGANIZACIÓN'); }
   function productPrice(row){
     const prod = byId('productos', row?.productoId || row?.producto_id) || {};
     return num(row?.precio ?? row?.precioCalc ?? row?.precioUnitario ?? prod.defaultPrecio ?? prod.precio ?? 0);
   }
   function purchaseValue(row){
-    const direct = num(row?.valor ?? row?.importe ?? '');
-    if(direct) return money(direct);
+    const rawDirect = row?.valor ?? row?.importe;
+    const directText = text(rawDirect);
+    if(directText !== '') return money(rawDirect);
     return money(num(row?.unidades ?? row?.uds ?? row?.cantidad ?? 0) * productPrice(row));
+  }
+  function ticketText(row){ return text(row?.ticketDonacion || row?.ticket || row?.ticket_donacion || ''); }
+  function isPendingPurchaseTicket(row){ const t = up(ticketText(row)); return !t || t.includes('PTE.COMPRA') || t.includes('PTE COMPRA') || t.includes('PENDIENTE'); }
+  function purchaseProduct(row){ return row?.producto || byId('productos', row?.productoId || row?.producto_id) || {}; }
+  function rowSegment(row){ return text(row?.segmento || purchaseProduct(row)?.segmento || ''); }
+  function rowDestino(row){ return text(row?.destino || purchaseProduct(row)?.destino || ''); }
+  function eventPurchases(){ return rowsForEvent('compras'); }
+  function donationBuckets(compras){
+    const rows = Array.isArray(compras) ? compras : eventPurchases();
+    const sum = code => money(rows.filter(row => up(ticketText(row)) === code).reduce((a,r) => a + purchaseValue(r), 0));
+    const donadoTienda = sum('DONADO TIENDA');
+    const donadoSocio = sum('DONADO SOCIO');
+    const donadoOtros = sum('DONADO OTROS');
+    return {donadoTienda, donadoSocio, donadoOtros, valorDonado: money(donadoTienda + donadoSocio + donadoOtros)};
+  }
+  function summaryRowsBy(field){
+    const rows = eventPurchases();
+    const opts = field === 'segmento'
+      ? (window.SEGMENT_OPTIONS || ['COMIDA','BEBIDA','INFRAESTRUCTURA'])
+      : (window.DESTINO_OPTIONS || ['APERITIVO','COMIDA','CENA','CUBATAS','INFRAESTRUCTURA']);
+    return (Array.isArray(opts) ? opts : []).flatMap(label => {
+      const bought = rows.filter(r => up(field === 'segmento' ? rowSegment(r) : rowDestino(r)) === up(label) && !isPendingPurchaseTicket(r));
+      const pending = rows.filter(r => up(field === 'segmento' ? rowSegment(r) : rowDestino(r)) === up(label) && isPendingPurchaseTicket(r) && !isDonationTicket(ticketText(r)));
+      const comprado = money(bought.reduce((a,r) => a + purchaseValue(r), 0));
+      const pdte = money(pending.reduce((a,r) => a + purchaseValue(r), 0));
+      return [
+        {k: `${label} Comprado o donado`, v: comprado, pending:false, donated:false},
+        {k: `${label} Pte.Compra u otros gastos`, v: pdte, pending:true, donated:false}
+      ];
+    });
   }
 
   function recomputeBudget(raw){
@@ -93,16 +124,14 @@
     const ingresosRealizados = money(socios.ingresado + noSocios.ingresado);
     const ingresosPrevistos = money(socios.importe + noSocios.importe);
 
-    const compras = rowsForEvent('compras');
+    const compras = eventPurchases();
+    const donacionProducto = donationBuckets(compras);
     const gastoCompras = money(compras.filter(row => {
-      const tk = text(row?.ticketDonacion || row?.ticket || '');
-      return tk && !isDonationTicket(tk) && !isCurrentExpenseTicket(tk);
+      const tk = ticketText(row);
+      return tk && !isPendingPurchaseTicket(row) && !isDonationTicket(tk) && !isCurrentExpenseTicket(tk);
     }).reduce((a,r) => a + purchaseValue(r), 0));
-    const gastosOrganizacion = money(compras.filter(row => isCurrentExpenseTicket(row?.ticketDonacion || row?.ticket || '')).reduce((a,r) => a + purchaseValue(r), 0));
-    const pendiente = money(compras.filter(row => {
-      const tk = text(row?.ticketDonacion || row?.ticket || '');
-      return !tk && !isDonationTicket(tk);
-    }).reduce((a,r) => a + purchaseValue(r), 0));
+    const gastosOrganizacion = money(compras.filter(row => isCurrentExpenseTicket(ticketText(row))).reduce((a,r) => a + purchaseValue(r), 0));
+    const pendiente = money(compras.filter(row => !isDonationTicket(ticketText(row)) && isPendingPurchaseTicket(row)).reduce((a,r) => a + purchaseValue(r), 0));
     const gastosRealizados = money(gastoCompras + gastosOrganizacion);
     const gastosPrevistos = money(gastosRealizados + pendiente);
     const saldoActual = money(ingresosRealizados - gastosRealizados);
@@ -126,14 +155,32 @@
     budget.operativa.gastosPrevistos = gastosPrevistos;
     budget.operativa.saldoActual = saldoActual;
     budget.operativa.saldoOperativo = money(ingresosPrevistos - gastosPrevistos);
+    budget.operativa.valorDonado = donacionProducto.valorDonado;
+    budget.operativa.valoracionEvento = money(gastosPrevistos + donacionProducto.valorDonado);
 
+    budget.donacionProducto = Object.assign({}, budget.donacionProducto || {}, donacionProducto);
     budget.compras = budget.compras || {};
     budget.compras.resueltas = gastoCompras;
     budget.compras.gastosCorrientes = gastosOrganizacion;
     budget.compras.pendientes = pendiente;
+    budget.compras.valorDonado = donacionProducto.valorDonado;
+    budget.compras.total = money(gastoCompras + gastosOrganizacion + pendiente + donacionProducto.valorDonado);
     budget.compras.saldoReal = saldoActual;
-    budget.__ceFix48SaldoActual = {version:VERSION, ingresosRealizados, gastosRealizados, saldoActual};
+    budget.__ceFix48SaldoActual = {version:VERSION, ingresosRealizados, gastosRealizados, saldoActual, donacionProducto};
     return budget;
+  }
+
+  function patchSummaryFunction(name, builder){
+    const current = getLexical(name);
+    if(typeof current !== 'function' || current.__ceFix48EventoStrict) return false;
+    const wrapped = function(){
+      const rows = builder();
+      if(rows && rows.length) return rows;
+      return current.apply(this, arguments);
+    };
+    wrapped.__ceFix48EventoStrict = true;
+    setLexical(name, wrapped);
+    return true;
   }
 
   function patchBudgetFunction(name){
@@ -183,6 +230,8 @@
 
   function apply(){
     patchBudgetFunction('budgetSummary');
+    patchSummaryFunction('summaryBySegmento', () => summaryRowsBy('segmento'));
+    patchSummaryFunction('summaryByDestino', () => summaryRowsBy('destino'));
     patchDomainApi();
     wrapRender('renderBudget');
     wrapRender('renderResumen');
