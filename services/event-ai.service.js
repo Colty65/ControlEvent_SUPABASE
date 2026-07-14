@@ -2668,9 +2668,7 @@ Reglas rápidas:
 - socios que no asistirán/no figuran/no están registrados en un evento => EVENTOS+INGRESOS+PERSONAS, filtro rangos=[SOCIO]; si el usuario dice numero=1, no lo trates como nombre sino como criterio de cálculo.
 - tiempo/clima/previsión/parte meteorológico/metereológico de evento => EVENTOS + salidaDeseada METEOROLOGIA y GRAFICA.
 - todos los eventos/eventos registrados/celebraciones => todosLosEventos=true.
-- eventos entre comillas o listados por nombre exacto => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
-- Si el usuario dice SOLO, EXACTOS, no analices otro evento, no consulta global, lista 2-5 títulos concretos, o nombra eventos concretos: todosLosEventos=false y eventos debe ser una lista cerrada.
-- Nunca devuelvas todosLosEventos=true si el prompt restringe el alcance a eventos concretos aunque también use palabras como comparativa, eventos o asistentes.
+- eventos entre comillas => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
 - needsClarification=true solo si no hay ningún módulo útil.
 
 Catálogo mínimo:
@@ -2732,8 +2730,8 @@ function shouldUseGeminiPlanner(userPrompt, local) {
 }
 async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'OK', `Plan local preventivo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}. No es respuesta final, solo red de seguridad.`);
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
-    zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', `Consulta simple resuelta con plan local mínimo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Zuzu planificador no se ha usado solo por ausencia/fallo; en v19 la ruta normal siempre es Zuzu para planificar.`,
@@ -2744,39 +2742,25 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   try {
     const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
     const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
-    const aiModules = arr(ai?.modules || ai?.modulos).map(x => trim(x).toUpperCase()).filter(Boolean);
-    const modules = [...new Set((aiModules.length ? aiModules : arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
-    const aiEventos = arr(ai?.eventos).map(trim).filter(Boolean);
-    const aiHasClosedEventList = aiEventos.some(x => !/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x));
-    const promptRestrictsScope = /\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(userPrompt);
-    const hardClosedScope = local.strictEventScope === true || (promptRestrictsScope && aiHasClosedEventList);
-    const filters = mergePlannerFilters(hardClosedScope ? local.filters : {}, ai?.filters);
-    const eventos = hardClosedScope && arr(local.eventos).length ? arr(local.eventos) : (aiEventos.length ? aiEventos : arr(local.eventos));
-    const todosLosEventos = hardClosedScope ? false : (ai?.todosLosEventos === true && !aiHasClosedEventList);
-    if ((hardClosedScope || aiHasClosedEventList) && ai?.todosLosEventos === true) {
-      zuzuTracePush(flowTrace, 'Paso 1b · Control de alcance CE', 'INFO', 'Zuzu planificador propuso todosLosEventos=true con eventos concretos/restricción de alcance. CE impone lista cerrada y bloquea consulta global.');
-    }
+    const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
+    const filters = mergePlannerFilters(local.filters, ai?.filters);
     return {
       ...ai,
       ok: ai?.ok !== false,
       needsClarification: ai?.needsClarification === true && !modules.length,
       modules: modules.length ? modules : local.modules,
-      eventos,
-      todosLosEventos,
-      strictEventScope: hardClosedScope,
+      eventos: arr(ai?.eventos).length ? arr(ai.eventos) : arr(local.eventos),
+      todosLosEventos: ai?.todosLosEventos === true || local.todosLosEventos === true,
       filters,
       dataRequests: arr(ai?.dataRequests),
       salidaDeseada: arr(ai?.salidaDeseada),
-      reasoning: local.strictEventScope
-        ? 'Zuzu ha planificado módulos/filtros, pero ControlEvent impone alcance cerrado por eventos explícitos del prompt.'
-        : (trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.'),
+      reasoning: trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.',
       __zuzuPlannerProvider: 'zuzu-planner',
       __zuzuPlannerModel: ai.__zuzuPlannerModel || '',
       __zuzuPlannerUsage: ai.__zuzuPlannerUsage || null,
       __zuzuGeminiAllRows: false
     };
   } catch (error) {
-    zuzuTracePush(flowTrace, 'Paso 1b · Plan local CE de respaldo', 'OK', `Zuzu planificador no disponible. CE usa SOLO plan de seguridad: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       filters: local.filters || {},
@@ -2842,14 +2826,13 @@ function sortResultTables(result) {
 }
 function scopeMetaFromContext(context) {
   const evs = arr(context?.eventosObjetivo);
-  const closed = context?.planZuzu?.alcanceCerrado === true || context?.planExtraccionControlEvent?.alcanceCerrado === true;
   if (evs.length === 1) {
     const e = evs[0] || {};
     const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) return { eventHeader: `${closed ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: closed ? 'restricted-multi-event' : 'multi-event', eventCount: evs.length };
+  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {
@@ -3061,7 +3044,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     usoPlanificador: plan?.__zuzuPlannerUsage || null,
     politicaModelos: 'planificador=Flash-Lite primero; redacción/informes=Flash primero; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
   };
-  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}; alcance=${context?.planZuzu?.alcanceCerrado ? 'CERRADO' : 'abierto'}; planificador=${trim(context?.planZuzu?.planificador || 'desconocido')}.`);
+  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
 
   const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
   if (weatherCtx) {
