@@ -452,29 +452,53 @@ function parsePlanJsonLenientHf37(value) {
   const original = stripJsonText(value);
   try { return { parsed: JSON.parse(original), repaired: false, text: original }; } catch (firstError) {
     let s = original;
-    // Reparaciones prudentes para respuestas Zuzu casi JSON: comas faltantes entre objetos/arrays
-    // y comas colgantes. No intenta interpretar texto libre como propuesta.
+    // Reparaciones prudentes para respuestas Zuzu casi JSON: comas faltantes entre objetos/arrays,
+    // comas colgantes y salidas truncadas con el último cierre recuperable. No interpreta texto libre.
     const repairers = [
+      x => x.replace(/[\u0000-\u001f]+/g, ' '),
       x => x.replace(/,\s*([}\]])/g, '$1'),
       x => x.replace(/}\s*(?=\{)/g, '},'),
       x => x.replace(/]\s*(?=\")/g, '],'),
       x => x.replace(/}\s*(?=\")/g, '},'),
-      // Respuestas Gemini casi-JSON: faltan comas entre elementos de arrays de strings
-      // o entre una propiedad string y la siguiente propiedad.
+      x => x.replace(/\]\s*(?=\{)/g, '],'),
       x => x.replace(/\"\s*\n\s*(?=\")/g, '\",\n'),
       x => x.replace(/\"\s+(?=\"[A-ZÁÉÍÓÚÜÑ0-9_ .\\/-]+\"\s*(?:,|\]))/g, '\", '),
-      x => x.replace(/\"\s*(?=\"(?:modules|modulos|eventos|todosLosEventos|filters|dataRequests|salidaDeseada|reasoning|clarification|needsClarification|ok|menuResumen|rows|donaciones|compras|avisos|notes|preguntasPendientes|title)\"\s*:)/g, '\",')
+      x => x.replace(/\"\s*(?=\"(?:modules|modulos|eventos|todosLosEventos|filters|dataRequests|salidaDeseada|reasoning|clarification|needsClarification|ok|menuResumen|rows|donaciones|compras|avisos|notes|preguntasPendientes|title)\"\s*:)/g, '\",'),
+      // Listas tipo "A" "B" dentro de arrays: faltaba coma entre strings.
+      x => x.replace(/(\"[^\"\n]*\")\s+(?=\"[^\"\n]*\"\s*(?:,|\]))/g, '$1, '),
+      // Propiedad seguida de propiedad en línea nueva sin coma.
+      x => x.replace(/(true|false|null|\d+(?:\.\d+)?|\"[^\"]*\")\s*(?=\"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ_][^\"]*\"\s*:)/g, '$1,')
     ];
-    for (const fn of repairers) s = fn(s);
-    // Segunda pasada por si el primer arreglo reveló otro separador entre objetos.
-    s = s.replace(/}\s*(?=\{)/g, '},').replace(/,\s*([}\]])/g, '$1');
-    try { return { parsed: JSON.parse(s), repaired: true, text: s, firstError }; } catch (secondError) {
-      secondError.firstError = firstError;
-      secondError.repairedText = s;
-      secondError.originalText = original;
-      throw secondError;
+    for (let pass = 0; pass < 3; pass += 1) {
+      for (const fn of repairers) s = fn(s);
+      s = s.replace(/}\s*(?=\{)/g, '},').replace(/,\s*([}\]])/g, '$1');
+      try { return { parsed: JSON.parse(s), repaired: true, text: s, firstError }; } catch (_) {}
     }
+    const secondError = new Error(firstError.message);
+    secondError.firstError = firstError;
+    secondError.repairedText = s;
+    secondError.originalText = original;
+    throw secondError;
   }
+}
+
+function plannerMinimalRetryPrompt(userPrompt, catalog, previousError = '') {
+  const ctx = compactJson(catalog, 5200);
+  return `PLANIFICADOR DE DATOS DE CONTROLEVENT · REINTENTO JSON MÍNIMO.
+Devuelve SOLO JSON válido. No markdown. No explicación fuera del JSON.
+El intento anterior produjo JSON inválido (${trim(previousError).slice(0, 220)}).
+
+Esquema obligatorio exacto:
+{"ok":true,"needsClarification":false,"clarification":"","modules":["EVENTOS"],"eventos":[],"todosLosEventos":false,"filters":{"personas":[],"productos":[],"tiendas":[],"responsables":[],"donantes":[],"tickets":[],"segmentos":[],"destinos":[],"rangos":[],"anios":[],"estado":[]},"dataRequests":[],"salidaDeseada":[],"reasoning":""}
+
+Reglas: si el usuario enumera eventos exactos, pon SOLO esos títulos en eventos y todosLosEventos=false. Si pide producto disponible, usa COMPRAS, DONACIONES, PRODUCTOS y EVENTOS. Si pide socios/asistencia, añade INGRESOS y PERSONAS. Si pide meteorología, añade METEO o EVENTOS y salidaDeseada METEOROLOGIA. Máximo 8 módulos, máximo 5 eventos, dataRequests vacío si no es imprescindible.
+Fecha real ControlEvent Europe/Madrid: ${todayIsoMadrid()}.
+
+Catálogo mínimo:
+${ctx}
+
+Prompt usuario:
+${trim(userPrompt).replace(/\s+/g,' ').slice(0, 2200)}`;
 }
 
 function csvEscape(value) {
@@ -2752,8 +2776,10 @@ function plannerPrompt(userPrompt, catalog) {
   return `PLANIFICADOR DE DATOS DE CONTROLEVENT. No respondas al usuario: devuelve SOLO JSON.
 
 Objetivo: leer la petición y decir qué módulos/filtros necesita CE para extraer datos. No inventes datos ni redactes informe.
+Fecha real de ControlEvent en Europe/Madrid: ${todayIsoMadrid()}. Usa esta fecha para decidir pasado/presente/futuro y para pedir meteorología histórica o prevista según corresponda.
+Devuelve JSON corto y válido: no rellenes dataRequests con detalle si no es imprescindible; máximo 8 dataRequests.
 
-Módulos: INGRESOS(colaboradores/recaudación/asistentes), DONACIONES(productos donados/donantes/responsables), COMPRAS(gastos/productos/tiendas/responsables/tickets), EVENTOS(título/fechas/estado/precio/descripción objetivo/DOC), TICKETS(TK/fototickets/totales), DOCUMENTOS(DOC/adjuntos), PRODUCTOS(catálogo), TIENDAS(catálogo), PERSONAS(maestro/rango).
+Módulos: INGRESOS(colaboradores/recaudación/asistentes), DONACIONES(productos donados/donantes/responsables), COMPRAS(gastos/productos/tiendas/responsables/tickets), EVENTOS(título/fechas/estado/precio/descripción objetivo/DOC), TICKETS(TK/fototickets/totales), DOCUMENTOS(DOC/adjuntos), PRODUCTOS(catálogo), TIENDAS(catálogo), PERSONAS(maestro/rango), METEO(fecha/temperatura/lluvia/viento si se pide parte meteorológico).
 
 Reglas rápidas:
 - "datos/info/resumen/dossier/qué ocurrió" de un evento => EVENTOS+INGRESOS+COMPRAS+DONACIONES+TICKETS+DOCUMENTOS.
@@ -2794,7 +2820,7 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
     const plannerText = plannerPrompt(userPrompt, catalog);
     const body = {
       contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0.05, maxOutputTokens: 700 }
+      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1600) }
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Pidiendo módulos, filtros, eventos y necesidades de datos.`);
@@ -2804,14 +2830,31 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
       if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
-      const parsedInfo = parsePlanJsonLenientHf37(outText);
+      let parsedInfo;
+      let plannerUsage = usageSmall(payload, model);
+      try {
+        parsedInfo = parsePlanJsonLenientHf37(outText);
+      } catch (parseError) {
+        zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', `JSON inicial inválido; reintentando con Zuzu en modo JSON mínimo. Error: ${cleanGeminiError(parseError)}`, { model });
+        const retryBody = {
+          contents: [{ role: 'user', parts: [{ text: plannerMinimalRetryPrompt(userPrompt, catalog, cleanGeminiError(parseError)) }] }],
+          generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1600) }
+        };
+        const retry = await geminiFetchJsonWithTimeout(url, retryBody, apiKey, 18000);
+        if (!retry.res.ok) { const e = new Error(retry.payload?.error?.message || `Zuzu planner retry HTTP ${retry.res.status}`); e.status = Number(retry.res.status || 502); e.details = retry.payload; throw e; }
+        const retryText = trim(geminiOutText(retry.payload));
+        if (!retryText) throw parseError;
+        parsedInfo = parsePlanJsonLenientHf37(retryText);
+        plannerUsage = usageSmall(retry.payload, model);
+        zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', 'Reintento JSON mínimo aceptado por Zuzu planificador.', { model, usage: plannerUsage });
+      }
       const parsed = parsedInfo.parsed;
       if (parsedInfo.repaired) {
         zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', 'JSON del planificador reparado de forma prudente antes de validar módulos/filtros.', { model });
       }
       parsed.__zuzuPlannerModel = model;
-      parsed.__zuzuPlannerUsage = usageSmall(payload, model);
-      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Módulos=${arr(parsed?.modules || parsed?.modulos).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; todos=${parsed?.todosLosEventos === true}`, { model, usage: usageSmall(payload, model) });
+      parsed.__zuzuPlannerUsage = plannerUsage;
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Módulos=${arr(parsed?.modules || parsed?.modulos).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; todos=${parsed?.todosLosEventos === true}`, { model, usage: plannerUsage });
       return parsed;
     } catch (error) {
       lastError = error;
