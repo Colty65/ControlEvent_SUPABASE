@@ -21,8 +21,10 @@
   }
   function validSelectedEvent(){
     const sel = $('selectedEvent');
-    // Si el selector ya está en pantalla y está vacío, estamos en bienvenida aunque quede un selectedEventId viejo en memoria.
-    const id = sel ? norm(sel.value || '') : norm(st().selectedEventId || '');
+    // FIX23 PARTE 1: el DOM manda. Si el selector está vacío, no hay evento, aunque
+    // state.selectedEventId conserve uno anterior.
+    if(sel && !norm(sel.value || '')) return false;
+    const id = norm((sel && sel.value) || st().selectedEventId || '');
     if(!id) return false;
     const evs = arr('eventos');
     return !evs.length || evs.some(e => norm(e && e.id) === id);
@@ -41,7 +43,13 @@
       }
       /* Avance del evento: cierre grande abajo a la izquierda en móvil/tablet. */
       #ceHf48AvanceLayer{pointer-events:auto!important;}
-      #ceHf48AvanceLayer.visible{display:flex!important;}
+      body.ce-v17-fix22-event-ready #ceHf48AvanceLayer.visible{display:flex!important;}
+      body.ce-v17-fix22-no-event #ceHf48AvanceLayer,
+      body.ce-v17-fix21-awaiting-event #ceHf48AvanceLayer,
+      body.ce-v17-fix22-no-event #ceV16Hf5AvanceLayer,
+      body.ce-v17-fix21-awaiting-event #ceV16Hf5AvanceLayer{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      body.ce-v17-fix22-no-event .ce-v17-fix20-avance-close-float,
+      body.ce-v17-fix21-awaiting-event .ce-v17-fix20-avance-close-float{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       #ceHf48AvanceLayer .ce-hf48-bubble{padding-bottom:62px!important;}
       #ceHf48AvanceLayer .ce-hf48-close{
         position:sticky!important;left:8px!important;right:auto!important;bottom:8px!important;top:auto!important;
@@ -65,15 +73,6 @@
       #ceV16Hf5AvanceLayer .ce-v16hf5-close{
         z-index:2147483647!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
         cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;
-      }
-      /* Sin evento seleccionado: no puede quedar ningún avance viejo ni botón fantasma de cierre. */
-      body.ce-v17-fix22-no-event #ceHf48AvanceLayer,
-      body.ce-v17-fix21-awaiting-event #ceHf48AvanceLayer,
-      body.ce-v17-fix22-no-event #ceV16Hf5AvanceLayer,
-      body.ce-v17-fix21-awaiting-event #ceV16Hf5AvanceLayer,
-      body.ce-v17-fix22-no-event .ce-v17-fix20-avance-close-float,
-      body.ce-v17-fix21-awaiting-event .ce-v17-fix20-avance-close-float{
-        display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
       }
       /* Hasta que se elige evento, no se muestran menús ni secciones. */
       body.ce-v17-fix22-no-event #mainTabs,
@@ -170,6 +169,11 @@
   function normalizeAvanceClose(){
     const layer = $('ceHf48AvanceLayer');
     if(!layer) return;
+    if(!validSelectedEvent()){
+      try{ layer.classList.remove('visible'); layer.setAttribute('aria-hidden','true'); }catch(_){}
+      try{ layer.querySelectorAll('.ce-v17-fix20-avance-close-float').forEach(el=>el.remove()); }catch(_){}
+      return;
+    }
     const btn = layer.querySelector('.ce-hf48-close');
     if(btn){
       try{
@@ -260,12 +264,6 @@
     document.body.classList.toggle('ce-v17-fix21-awaiting-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-no-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-event-ready', !waiting);
-    if(waiting){
-      try{ $('ceHf47AvanceBubbleLayer')?.remove(); }catch(_){ }
-      try{ $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
-      try{ $('ceV16Hf5AvanceLayer')?.classList?.remove('visible'); }catch(_){ }
-      try{ document.querySelectorAll('.ce-v17-fix20-avance-close-float').forEach(b=>b.remove()); }catch(_){ }
-    }
   }
   function bindEventMenuGate(){
     if(window.__ceV17Fix21MenuGateBound) return;

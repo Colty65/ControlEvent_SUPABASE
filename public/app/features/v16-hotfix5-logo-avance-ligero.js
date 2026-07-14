@@ -17,12 +17,14 @@
   const safe=(fn,fb)=>{try{const v=fn(); return v===undefined?fb:v;}catch(_){return fb;}};
   const st=()=>safe(()=> (typeof state!=='undefined'&&state)||window.state||window.ControlEventApp?.state||{}, window.state||window.ControlEventApp?.state||{});
   const arr=name=>Array.isArray(st()[name])?st()[name]:[];
-  function evId(){
+  const evId=()=>{
     const sel=$('selectedEvent');
-    // Si el desplegable existe y está en placeholder, NO reutilizar selectedEventId viejo del estado.
+    // FIX23 PARTE 1: si existe selector y está vacío, NO usamos selectedEventId
+    // arrastrado en memoria. Ese arrastre era el que abría AVANCE al pulsar ColtyLAB
+    // antes de seleccionar evento.
     if(sel) return txt(sel.value || '');
     return txt(st().selectedEventId || '');
-  }
+  };
   function selectedEvent(){
     const id=evId();
     return arr('eventos').find(e=>String(e?.id||'')===id) || safe(()=> typeof window.selectedEvent==='function'?window.selectedEvent():null,null) || {};
@@ -237,27 +239,28 @@
   };
   let timer=0;
   let lastToggle=0;
-  function selectedEventReal(){ return !!evId(); }
-  function removeOldAvanceLayers(){
-    try{ $('ceHf47AvanceBubbleLayer')?.remove(); }catch(_){ }
-    try{ $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
-    try{ document.querySelectorAll('.ce-v17-fix20-avance-close-float').forEach(b=>b.remove()); }catch(_){ }
-  }
-  function showWelcomeInfoFromLogo(){
-    removeOldAvanceLayers();
-    closeAvance();
-    try{
-      if(window.ControlEventV17Fix27WelcomeInfoGeneral?.showInfo){ window.ControlEventV17Fix27WelcomeInfoGeneral.showInfo(); return true; }
-    }catch(_){ }
-    return false;
-  }
   function closeAvance(){
     const layer=$('ceV16Hf5AvanceLayer'); if(layer) layer.classList.remove('visible');
     clearTimeout(timer);
   }
+  function noSelectedEvent(){
+    const sel=$('selectedEvent');
+    return !!(sel && !txt(sel.value || ''));
+  }
+  function openWelcomeInfoInstead(){
+    try{ closeAvance(); }catch(_){ }
+    try{ $('ceHf47AvanceBubbleLayer')?.classList?.remove('visible'); }catch(_){ }
+    try{ $('ceHf48AvanceLayer')?.classList?.remove('visible'); }catch(_){ }
+    try{ document.querySelectorAll('.ce-v17-fix20-avance-close-float').forEach(el=>el.remove()); }catch(_){ }
+    try{
+      const api=window.ControlEventV17Fix27WelcomeInfoGeneral;
+      if(api && typeof api.showInfo==='function'){ api.showInfo(); return true; }
+    }catch(_){ }
+    return false;
+  }
   function toggleAvance(ev){
     if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
-    if(!selectedEventReal()) { showWelcomeInfoFromLogo(); return false; }
+    if(noSelectedEvent()){ openWelcomeInfoInstead(); return false; }
     const now=Date.now();
     if(now-lastToggle<260) return false;
     lastToggle=now;
@@ -266,9 +269,8 @@
     return false;
   }
   function showAvance(){
-    if(!selectedEventReal()) { showWelcomeInfoFromLogo(); return; }
     // Por si algún handler antiguo se ha disparado, limpiamos sus capas sin tocar el resto.
-    removeOldAvanceLayers();
+    try{ $('ceHf47AvanceBubbleLayer')?.remove(); $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
     let layer=$('ceV16Hf5AvanceLayer');
     if(!layer){ layer=document.createElement('div'); layer.id='ceV16Hf5AvanceLayer'; document.body.appendChild(layer); }
     const rows=avanceRows(); const cls=finalizado()?'finalizado':'curso';
@@ -291,7 +293,7 @@
       const clone=old.cloneNode(true);
       clone.className='ce-brand-logo-safe';
       clone.alt='Logo';
-      clone.title='Información ColtyLAB / avance del evento';
+      clone.title=noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento';
       try{ clone.style.cssText=(old.getAttribute('style')||'')+';cursor:pointer;'; }catch(_){ }
       old.replaceWith(clone);
     }
