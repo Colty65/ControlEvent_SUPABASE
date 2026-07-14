@@ -1261,7 +1261,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       PERSONAS: 'catálogo maestro de personas y rango'
     },
     eventoActivo: selected,
-    eventos: events,
+    eventos,
     candidatosPorPrompt: { personas, productos, tiendas },
     conteosSistema: {
       eventos: arr(state?.eventos).length,
