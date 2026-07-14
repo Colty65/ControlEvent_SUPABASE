@@ -1226,58 +1226,84 @@ function asksMissingAttendees(prompt) {
 }
 function excludedFromAttendanceName(name) {
   const n = norm(name);
-  return !n || /^personas\b/.test(n) || /^grupo\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
-}
-function promptRequiresNumeroUno(prompt) {
-  return /\b(?:numero|n[uú]mero|num)\s*[=:]?\s*['\"]?1['\"]?\b/i.test(text(prompt));
+  return !n || /^personas/.test(n) || /^grupo/.test(n) || /^pena/.test(n) || /^z/.test(n) || /^z_?dev/.test(n);
 }
 function personaNumero(row) {
   return num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
 }
-function nameAppearsInRegisteredPerson(personName, registeredNames) {
-  const n = norm(personName);
-  if (!n) return false;
-  return arr(registeredNames).some(x => {
-    const r = norm(x);
-    return r && (r === n || r.includes(n) || n.includes(r));
+function isPairName(name) { return /(y|e)/i.test(` ${trim(name)} `) && /(y|e)/.test(norm(name)); }
+function splitPairName(name) { return trim(name).split(/(?:y|e)/i).map(x => trim(x)).filter(Boolean); }
+function buildCanonicalSocios(personRows) {
+  const base = arr(personRows).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
+  const pairs = [];
+  const out = [];
+  const seen = new Set();
+  base.forEach(p => {
+    const name = trim(p['Nombre persona']);
+    if (!isPairName(name)) return;
+    const parts = splitPairName(name);
+    const item = { name, size: Math.max(2, parts.length || 2), parts, n: norm(name), kind: 'pair' };
+    pairs.push(item);
+    if (!seen.has(item.n)) { seen.add(item.n); out.push(item); }
   });
+  base.forEach(p => {
+    const name = trim(p['Nombre persona']);
+    if (!name || isPairName(name)) return;
+    const n = norm(name);
+    if (pairs.some(pair => pair.parts.some(part => norm(part) === n))) return;
+    if (!seen.has(n)) { seen.add(n); out.push({ name, size: 1, parts: [name], n, kind: 'single' }); }
+  });
+  return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 }
+function attendanceForEventCanonical(canon, ingresosEvento) {
+  const rows = arr(ingresosEvento).filter(r => norm(r.Rango) === 'socio' && num(r.Numero) > 0).map(r => ({ name: trim(r.Nombre), n: norm(r.Nombre), numero: num(r.Numero) })).filter(r => r.name);
+  const asistentes = [];
+  const noAsistentes = [];
+  function hasExact(name) { const n = norm(name); return rows.some(r => r.n === n); }
+  function numberForExact(name) { const n = norm(name); return rows.find(r => r.n === n)?.numero || 0; }
+  canon.forEach(item => {
+    if (item.kind === 'pair') {
+      if (hasExact(item.name) && numberForExact(item.name) >= item.size) { asistentes.push({ name: item.name, size: item.size }); return; }
+      const present = [], missing = [];
+      item.parts.forEach(part => { if (hasExact(part)) present.push(part); else missing.push(part); });
+      if (!present.length) { noAsistentes.push({ name: item.name, size: item.size }); return; }
+      present.forEach(part => asistentes.push({ name: part, size: 1 }));
+      missing.forEach(part => noAsistentes.push({ name: part, size: 1 }));
+      return;
+    }
+    if (hasExact(item.name)) asistentes.push({ name: item.name, size: 1 });
+    else noAsistentes.push({ name: item.name, size: 1 });
+  });
+  asistentes.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  noAsistentes.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  return { asistentes, noAsistentes, total: canon.reduce((a,x)=>a+x.size,0), totalAsistentes: asistentes.reduce((a,x)=>a+x.size,0), totalNoAsistentes: noAsistentes.reduce((a,x)=>a+x.size,0) };
+}
+function displayAttendanceList(rows) { return arr(rows).map(x => `${x.name}${x.size > 1 ? ` (${x.size})` : ''}`).join(' | '); }
 function missingAttendeesTablesAndCharts(context, prompt = '') {
   const mods = context?.modulosExtraidos || {};
-  const requireNumeroUno = promptRequiresNumeroUno(prompt);
-  let persons = arr(mods.PERSONAS).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
-  const personsBeforeNumero = persons.length;
-  const hasNumeroData = persons.some(p => personaNumero(p) > 0);
-  if (requireNumeroUno) {
-    persons = hasNumeroData
-      ? persons.filter(p => personaNumero(p) === 1)
-      : persons.filter(p => !/\s+y\s+|\s+e\s+/i.test(trim(p['Nombre persona'])));
-  }
+  const persons = arr(mods.PERSONAS);
+  const canon = buildCanonicalSocios(persons);
   const incomes = arr(mods.INGRESOS);
   const events = eventNamesFromContext(context);
-  if (!persons.length || !events.length) {
-    const reason = requireNumeroUno
-      ? `No hay PERSONAS con rango SOCIO y Numero=1 disponibles para calcular socios no asistentes. Candidatos SOCIO antes de aplicar Numero=1: ${personsBeforeNumero}. Si PERSONAS no tiene campo Numero, ControlEvent intenta interpretar Numero=1 como socio individual, excluyendo nombres compuestos con y/e.`
-      : 'No hay PERSONAS con rango SOCIO disponibles para calcular socios no asistentes.';
-    return { tables: [], charts: [], resumenTexto: '', warnings: persons.length ? [] : [reason] };
+  if (!canon.length || !events.length) {
+    return { tables: [], charts: [], resumenTexto: '', warnings: canon.length ? [] : ['No hay PERSONAS con rango SOCIO disponibles para calcular asistencia canónica.'] };
   }
-  const detail = [];
   const summary = [];
+  const detail = [];
   events.forEach(ev => {
-    const regNames = rowsForEvent(incomes, ev).map(r => trim(r.Nombre));
-    const missing = persons.filter(p => !nameAppearsInRegisteredPerson(p['Nombre persona'], regNames));
-    missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: personaNumero(p) || '', Motivo: `Está en PERSONAS como SOCIO${requireNumeroUno ? ' con Numero=1' : ''} y no figura en INGRESOS del evento` }));
-    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': persons.length, 'Socios con ingreso/asistencia registrada': persons.length - missing.length, 'Socios no registrados en este evento': missing.length, Criterio: requireNumeroUno ? (hasNumeroData ? 'Rango=SOCIO, Numero=1, excluyendo Grupo..., Personas..., z_de... y z_DEV...' : 'Rango=SOCIO e interpretación Numero=1 como socio individual; excluye nombres con y/e, Grupo..., Personas..., z_de... y z_DEV...') : 'Rango=SOCIO, excluyendo Grupo..., Personas..., z_de... y z_DEV...' });
+    const info = attendanceForEventCanonical(canon, rowsForEvent(incomes, ev));
+    summary.push({ Evento: ev, 'Socios canónicos': info.total, 'SOCIOS asistentes': info.totalAsistentes, 'SOCIOS no asistentes': info.totalNoAsistentes, Criterio: 'Rango=SOCIO; excluye z_DEV/z_*, Grupo* y Peña*; parejas con y/e cuentan como 2; asistentes = colaboradores del evento con Numero > 0 aunque el ingreso esté Pendiente.' });
+    detail.push({ Evento: ev, 'SOCIOS asistentes': displayAttendanceList(info.asistentes), 'SOCIOS no asistentes': displayAttendanceList(info.noAsistentes) });
   });
-  const summaryCols = ['Evento','Socios válidos en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento','Criterio'];
-  const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Numero','Motivo'];
+  const summaryCols = ['Evento','Socios canónicos','SOCIOS asistentes','SOCIOS no asistentes','Criterio'];
+  const detailCols = ['Evento','SOCIOS asistentes','SOCIOS no asistentes'];
   const tables = [
-    { title: 'Resumen de socios no registrados/asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
-    { title: `Socios de PERSONAS que NO figuran en INGRESOS del evento (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
+    { title: 'Comparativa canónica de SOCIOS asistentes/no asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
+    { title: 'Detalle canónico de asistencia de SOCIOS', columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
   ];
-  const charts = summary.length === 1 ? [{ title: 'Socios con y sin asistencia registrada', type: 'donut', labels: ['Con ingreso/asistencia registrada','No registrados en el evento'], values: [num(summary[0]['Socios con ingreso/asistencia registrada']), num(summary[0]['Socios no registrados en este evento'])], unit: 'personas' }]
-    : [{ title: 'Socios no registrados por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no registrados en este evento'])), unit: 'personas' }];
-  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios no registrados en este evento']} socio(s) no figuran en INGRESOS de ${r['Socios válidos en PERSONAS']} socio(s) válidos (${r.Criterio})`).join(' | ');
+  const charts = summary.length === 1 ? [{ title: 'SOCIOS asistentes vs no asistentes', type: 'donut', labels: ['SOCIOS asistentes','SOCIOS no asistentes'], values: [num(summary[0]['SOCIOS asistentes']), num(summary[0]['SOCIOS no asistentes'])], unit: 'personas' }]
+    : [{ title: 'SOCIOS no asistentes por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['SOCIOS no asistentes'])), unit: 'personas' }];
+  const resumenTexto = summary.map(r => `${r.Evento}: ${r['SOCIOS asistentes']} asistentes y ${r['SOCIOS no asistentes']} no asistentes de ${r['Socios canónicos']} socios canónicos`).join(' | ');
   return { tables, charts, resumenTexto, warnings: [] };
 }
 
@@ -2928,7 +2954,10 @@ function scopeMetaFromContext(context) {
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
+  if (evs.length > 1) {
+    const closed = context?.planZuzu?.alcanceCerrado === true || context?.planZuzu?.consultaGlobal === false;
+    return { eventHeader: `${closed ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: closed ? 'restricted-multi-event' : 'multi-event', eventCount: evs.length };
+  }
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {

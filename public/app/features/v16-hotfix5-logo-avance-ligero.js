@@ -22,6 +22,11 @@
     const id=evId();
     return arr('eventos').find(e=>String(e?.id||'')===id) || safe(()=> typeof window.selectedEvent==='function'?window.selectedEvent():null,null) || {};
   }
+  function hasRealSelectedEvent(){
+    const id=evId();
+    if(!id) return false;
+    return arr('eventos').some(e=>String(e?.id||'')===String(id));
+  }
   function title(){ return txt(selectedEvent().titulo || $('selectedEvent')?.selectedOptions?.[0]?.textContent || 'Evento'); }
   function finalizado(){ return up(selectedEvent().situacion||selectedEvent().estado||'')==='FINALIZADO'; }
   function authVisible(){
@@ -242,20 +247,26 @@
     if(info && typeof info.showInfo==='function'){
       try{ info.showInfo(); return true; }catch(_){ }
     }
-    return false;
+    // Respaldo propio por si el script de bienvenida se carga después: nunca mostrar AVANCE vacío.
+    let layer=$('ceV17Fix26WelcomeInfoLayer');
+    if(!layer){ layer=document.createElement('div'); layer.id='ceV17Fix26WelcomeInfoLayer'; document.body.appendChild(layer); }
+    layer.innerHTML=`<div class="ce-v17fix26-card" role="dialog" aria-live="polite"><button type="button" class="ce-v17fix26-close" aria-label="Cerrar">×</button><div class="ce-v17fix26-title">Control_Event_App</div><div class="ce-v17fix26-body"><div>- Creada para la fabricacion y control de eventos,</div><div>sirviendo en cada momento la informacion que se le pueda ocurrir saber al usuario,</div><div>Plug &amp; Play, lo quiero, lo tengo.</div><div style="height:8px"></div><div>- Asistida por IA (Zuzu) en tickets, informacion de eventos y planificacion inicial.</div></div><div class="ce-v17fix26-foot">** (c)oltyLAB '26 - v21_prod **</div></div>`;
+    layer.classList.add('visible');
+    layer.querySelector('.ce-v17fix26-close')?.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();layer.classList.remove('visible');},{once:true});
+    return true;
   }
   function toggleAvance(ev){
     if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
     const now=Date.now();
     if(now-lastToggle<260) return false;
     lastToggle=now;
-    if(!evId()) { showWelcomeInfoInstead(); return false; }
+    if(!hasRealSelectedEvent()) { showWelcomeInfoInstead(); return false; }
     const layer=$('ceV16Hf5AvanceLayer');
     if(layer?.classList?.contains('visible')) closeAvance(); else showAvance();
     return false;
   }
   function showAvance(){
-    if(!evId()) { showWelcomeInfoInstead(); return; }
+    if(!hasRealSelectedEvent()) { showWelcomeInfoInstead(); return; }
     // Por si algún handler antiguo se ha disparado, limpiamos sus capas sin tocar el resto.
     try{ $('ceHf47AvanceBubbleLayer')?.remove(); $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
     let layer=$('ceV16Hf5AvanceLayer');
