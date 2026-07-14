@@ -2641,7 +2641,8 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
     let correction = '';
     try {
       let payload, res, outText, parsed;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      const maxNarrativeAttempts = localResult?.__allowLocalPresentationAfterZuzuPlan === true ? 1 : 2;
+      for (let attempt = 0; attempt < maxNarrativeAttempts; attempt++) {
         const narrativeText = narrativePrompt(userPrompt, localResult, context) + correction;
         const body = {
           contents: [{ role: 'user', parts: [{ text: narrativeText }] }],
@@ -2649,7 +2650,7 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
         };
         zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'RUN', `Modelo ${model}${attempt ? ' · reintento guiado' : ''}. Zuzu recibe prompt original + resumen cocinado por CE para redactar con tono.`);
         sizeTrace(flowTrace, 'Paso 4 · Zuzu redacción humana', attempt ? 'Contexto corregido enviado a redacción' : 'Contexto compacto enviado a redacción', narrativeText);
-        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 30000 : 22000))));
+        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 9000 : 7000))));
         logGeminiUsage('PASO 2 redacción humana', model, payload);
         if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
         outText = trim(geminiOutText(payload));
@@ -2710,7 +2711,8 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
     }
   } catch (error) {
     const timeoutLike = /timeout|abort|tard[oó] demasiado|504/i.test(trim(error?.message || error));
-    const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike;
+    const allowPlannedLocal = out.__allowLocalPresentationAfterZuzuPlan === true || out.allowLocalPresentationAfterZuzuPlan === true;
+    const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike && !allowPlannedLocal;
     if (strict) {
       return {
         ok: true,
@@ -2727,6 +2729,13 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       };
     }
     zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error));
+    if (allowPlannedLocal) {
+      out.warnings = arr(out.warnings).concat(`Zuzu planificó el alcance, pero la redacción final no llegó a tiempo o falló (${friendlyZuzuErrorMessage(error)}). Se muestran los datos oficiales extraídos por ControlEvent solo para los eventos/módulos autorizados por el planificador.`);
+      out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-planificador-ok-redaccion-no-disponible`;
+      out.model = out.model || 'datos-oficiales-ce-tras-plan-zuzu';
+      out.showWarnings = true;
+      return out;
+    }
     const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
     if (fallback) {
       out.answer = sanitizeTemporalAnswerForContext(fallback, context);
@@ -2820,12 +2829,12 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
     const plannerText = plannerPrompt(userPrompt, catalog);
     const body = {
       contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1600) }
+      generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1200) }
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Pidiendo módulos, filtros, eventos y necesidades de datos.`);
       sizeTrace(flowTrace, 'Paso 1 · Zuzu planificador', 'Contexto ultraligero enviado al planificador', plannerText);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 18000);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 6500));
       logGeminiUsage('PASO 1 planificación de datos', model, payload);
       if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
@@ -2838,9 +2847,9 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
         zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', `JSON inicial inválido; reintentando con Zuzu en modo JSON mínimo. Error: ${cleanGeminiError(parseError)}`, { model });
         const retryBody = {
           contents: [{ role: 'user', parts: [{ text: plannerMinimalRetryPrompt(userPrompt, catalog, cleanGeminiError(parseError)) }] }],
-          generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1600) }
+          generationConfig: { responseMimeType: 'application/json', responseSchema: plannerSchema(), temperature: 0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_OUTPUT_TOKENS || 1200) }
         };
-        const retry = await geminiFetchJsonWithTimeout(url, retryBody, apiKey, 18000);
+        const retry = await geminiFetchJsonWithTimeout(url, retryBody, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_RETRY_TIMEOUT_MS || 5000));
         if (!retry.res.ok) { const e = new Error(retry.payload?.error?.message || `Zuzu planner retry HTTP ${retry.res.status}`); e.status = Number(retry.res.status || 502); e.details = retry.payload; throw e; }
         const retryText = trim(geminiOutText(retry.payload));
         if (!retryText) throw parseError;
@@ -2859,6 +2868,7 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
     } catch (error) {
       lastError = error;
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'KO', cleanGeminiError(error), { model });
+      if (/tard[oó] demasiado|abort|timeout|504/i.test(cleanGeminiError(error))) break;
       if (isQuotaError(error) || !isRetryable(error)) break;
     }
   }
@@ -3235,6 +3245,24 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   const done = (result) => finalizeZuzuResult(result, context, userPrompt, flowTrace);
+
+  // FIX17: en consultas complejas de alcance cerrado, Zuzu decide primero los módulos/filtros,
+  // pero no obligamos a Gemini a fabricar tablas enormes. ControlEvent ejecuta el plan con datos reales
+  // y solo pide a Zuzu una redacción breve; si esa redacción no llega a tiempo, se muestran datos oficiales,
+  // no una respuesta inventada ni una consulta global.
+  if (requiresZuzuPlannerStrict(userPrompt) && plan?.__zuzuPlannerProvider === 'zuzu-planner') {
+    const plannedLocal = directProductConsumptionResultIfApplicable(userPrompt, context)
+      || directEventReportIfApplicable(userPrompt, context)
+      || directComparativeAllDataResultIfApplicable(userPrompt, context)
+      || directDeterministicResultIfApplicable(userPrompt, context);
+    if (plannedLocal) {
+      plannedLocal.__allowLocalPresentationAfterZuzuPlan = true;
+      plannedLocal.warnings = arr(plannedLocal.warnings).concat('Flujo FIX17: Zuzu ha decidido módulos/filtros; ControlEvent solo ejecuta la extracción y cálculos con alcance cerrado.');
+      plannedLocal.provider = `${trim(plannedLocal.provider || 'control-event-local')}+zuzu-planificador`;
+      zuzuTracePush(flowTrace, 'Paso 3 · Ejecución CE tras plan Zuzu', 'OK', `ControlEvent genera tablas/cálculos oficiales tras planificación Zuzu. Tablas=${arr(plannedLocal.tables).length}; gráficas=${arr(plannedLocal.charts).length}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ')}.`);
+      return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, plannedLocal, flowTrace));
+    }
+  }
   if (context?.needsClarification) {
     return done({
       ok: true,
