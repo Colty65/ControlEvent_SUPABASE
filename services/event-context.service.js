@@ -506,6 +506,30 @@ function promptExactEventTitleIds(events, prompt) {
   });
   return out;
 }
+
+function promptHardExactEventTitleIds(events, prompt) {
+  const out = [];
+  function push(id) { if (id && !out.includes(id)) out.push(id); }
+  const raw = text(prompt || '');
+  const fragments = [];
+  // Captura listas explícitas: "1. SySA 2024", "- SySA 2025", etc.
+  raw.split(/\r?\n/).forEach(line => {
+    const m = line.match(/^\s*(?:\d+[.)]|[-*•])\s*(.{3,120}?)\s*$/);
+    if (m) fragments.push(trim(m[1]));
+  });
+  const nPrompt = ` ${norm(raw)} `;
+  arr(events).forEach(ev => {
+    const id = trim(ev?.id);
+    const title = norm(ev?.titulo || '');
+    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
+    if (!id || !title) return;
+    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
+    const hitInList = fragments.some(f => aliases.some(a => norm(f) === a || norm(f).startsWith(a + ' ') || a.startsWith(norm(f) + ' ')));
+    const hitInPrompt = aliases.some(a => nPrompt.includes(` ${a} `));
+    if (hitInList || hitInPrompt) push(id);
+  });
+  return out;
+}
 function findExplicitReferencedEventIds(events, prompt) {
   const out = [];
   function push(id) { if (id && !out.includes(id)) out.push(id); }
@@ -976,6 +1000,13 @@ function zuzuPersonIdentityCue(prompt) {
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
+
+  // FIX11: una lista literal de eventos o títulos exactos escritos en el prompt manda por encima
+  // de cualquier pista global. Nunca puede convertirse en "todos los eventos" por contener
+  // palabras como comparativa, eventos, asistentes o total general.
+  promptHardExactEventTitleIds(events, prompt).forEach(push);
+  if (out.length) return out;
+
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim).filter(Boolean);
   const allRequested = plan?.todosLosEventos === true || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x)) || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos)\b/i.test(prompt);
   if (allRequested) { arr(events).forEach(e => push(trim(e?.id))); return out; }
@@ -1678,7 +1709,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (modules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (modules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (modules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
-  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
+  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ id: trim(e?.id), 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);

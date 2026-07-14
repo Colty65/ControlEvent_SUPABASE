@@ -1,28 +1,28 @@
-# ControlEvent v21_prod · FIX11 aplicado
+# ControlEvent v21_prod · FIX11
 
-Correcciones aplicadas sobre FIX10 tras validación en pantalla:
+Corrección centrada solo en Zuzu / informes para evitar información falsa:
 
-1. Zuzu / extracción de contexto:
-   - Las preguntas de valoración o relato de un evento (“qué tal fue el evento…”, “cómo fue…”, “dime cositas…”, “háblame de este evento”, “resumen/balance/informe del evento”) fuerzan contexto completo del evento: EVENTOS, INGRESOS, COMPRAS, DONACIONES, TICKETS y DOCUMENTOS.
-   - Evita que una pregunta por gastos del evento se responda sin INGRESOS por no haberlos extraído.
-   - Se acortan los tiempos máximos de llamada narrativa para que Vercel pueda devolver fallback antes de un FUNCTION_INVOCATION_TIMEOUT.
+1. Si el prompt nombra eventos exactos en lista, por ejemplo:
+   - SySA 2024
+   - SySA 2025
+   - SySA 2026
 
-2. Vista aérea:
-   - La casa estándar apunta al overlay real ceMapaGlobalOverlay y vuelve al inicio del modal.
-   - Las fichas superiores quedan con fondo más translúcido y borde/sombra más finos.
+   ControlEvent bloquea el alcance a esos eventos y no puede convertirlo en consulta global.
 
-3. Descargas:
-   - Ingresos: ING-Evento-Colaborador.jpg.
-   - Documentos: DOC-fechaDOC-texto.jpg.
-   - Tickets: TKxx-Evento-Tienda.jpg.
-   - Se ha cambiado en los módulos que crean la descarga, no solo interceptando el click del enlace.
+2. Si Zuzu planificador no responde en informes, comparativas, tablas complejas o alcance cerrado:
+   - ControlEvent no usa plan local de respaldo.
+   - No extrae todos los eventos.
+   - No muestra tablas locales.
+   - Devuelve un corte de seguridad indicando que no se genera informe para no sacar datos erróneos.
 
-4. INGRESOS:
-   - Guardado de modificación de ingreso con protección local durante el refresco de /api/state, para que no vuelva a pintarse la versión antigua y no haya que guardar dos veces.
+3. Si Zuzu respuesta final no devuelve JSON válido o falla en informes/comparativas:
+   - No se sustituye por tablas locales.
+   - No se muestran gráficos ni ficheros de respaldo.
+   - Se informa de que la respuesta no es segura.
 
-5. Caché navegador:
-   - index.html y public/index.html actualizados con sufijo FIX11 en los scripts tocados.
+4. La salida compleja sigue el flujo:
+   Prompt usuario -> Zuzu planificador -> CE extrae módulos -> Zuzu respuesta final.
 
-Comprobaciones realizadas:
-- node --check en servicios y scripts modificados.
-- Verificación local de plan Zuzu: “QUE TAL FUE EL EVENTO …” devuelve módulos EVENTOS, INGRESOS, COMPRAS, DONACIONES, TICKETS y DOCUMENTOS.
+Validación:
+- node --check services/event-context.service.js
+- node --check services/event-ai.service.js
