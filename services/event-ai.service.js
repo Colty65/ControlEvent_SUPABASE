@@ -459,7 +459,11 @@ function parsePlanJsonLenientHf37(value) {
       x => x.replace(/}\s*(?=\{)/g, '},'),
       x => x.replace(/]\s*(?=\")/g, '],'),
       x => x.replace(/}\s*(?=\")/g, '},'),
-      x => x.replace(/\"\s*(?=\"(?:menuResumen|rows|donaciones|compras|avisos|notes|preguntasPendientes|ok|title)\"\s*:)/g, '\",')
+      // Respuestas Gemini casi-JSON: faltan comas entre elementos de arrays de strings
+      // o entre una propiedad string y la siguiente propiedad.
+      x => x.replace(/\"\s*\n\s*(?=\")/g, '\",\n'),
+      x => x.replace(/\"\s+(?=\"[A-ZÁÉÍÓÚÜÑ0-9_ .\\/-]+\"\s*(?:,|\]))/g, '\", '),
+      x => x.replace(/\"\s*(?=\"(?:modules|modulos|eventos|todosLosEventos|filters|dataRequests|salidaDeseada|reasoning|clarification|needsClarification|ok|menuResumen|rows|donaciones|compras|avisos|notes|preguntasPendientes|title)\"\s*:)/g, '\",')
     ];
     for (const fn of repairers) s = fn(s);
     // Segunda pasada por si el primer arreglo reveló otro separador entre objetos.
@@ -2800,7 +2804,11 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
       if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
-      const parsed = JSON.parse(stripJsonText(outText));
+      const parsedInfo = parsePlanJsonLenientHf37(outText);
+      const parsed = parsedInfo.parsed;
+      if (parsedInfo.repaired) {
+        zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', 'JSON del planificador reparado de forma prudente antes de validar módulos/filtros.', { model });
+      }
       parsed.__zuzuPlannerModel = model;
       parsed.__zuzuPlannerUsage = usageSmall(payload, model);
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Módulos=${arr(parsed?.modules || parsed?.modulos).join(', ') || 'sin módulos'}; eventos=${arr(parsed?.eventos).join(' | ') || 'sin evento explícito'}; todos=${parsed?.todosLosEventos === true}`, { model, usage: usageSmall(payload, model) });

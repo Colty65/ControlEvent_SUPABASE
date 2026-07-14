@@ -41,11 +41,13 @@
     return !!String((sel && sel.value) || '').trim();
   }
   function welcomeActive(){
-    // FIX27: la ficha informativa ColtyLAB debe funcionar también en PC e iPad.
-    // La restricción "solo móvil" queda únicamente para el doble toque de globos del Resumen.
+    // FIX15: si no hay evento seleccionado, el logo ColtyLAB debe abrir SIEMPRE
+    // la ficha informativa de presentación/version, no el AVANCE vacío antiguo.
+    // No depende de clases de bienvenida ni de noEventMessage, porque en algunas rutas
+    // esas marcas no están visibles aunque selectedEvent esté vacío.
     if(loginVisible()) return false;
     if(hasSelectedEvent()) return false;
-    return document.body.classList.contains('ce-v17-fix25-welcome-ready') || visible($('noEventMessage'));
+    return true;
   }
   function isColtyLogo(target){
     return !!target?.closest?.('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large');
