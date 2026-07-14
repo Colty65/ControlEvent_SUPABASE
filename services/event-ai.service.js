@@ -860,6 +860,41 @@ function parseEventDateForSort(value) {
 function eventNamesFromContext(context) {
   return arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.Evento || e?.EVENTO)).filter(Boolean);
 }
+function eventMetaByNameFromContext(context) {
+  const out = new Map();
+  const merge = row => {
+    const title = trim(row?.['Titulo del evento'] || row?.Titulo || row?.Evento || row?.EVENTO || row?.titulo || row?.nombre || '');
+    if (!title) return;
+    const key = norm(title);
+    const old = out.get(key) || { Evento: title };
+    out.set(key, {
+      ...old,
+      Evento: old.Evento || title,
+      Estado: firstNonEmpty(old.Estado, row?.Estado, row?.estado, row?.situacion, row?.Situacion),
+      'Fecha inicio': firstNonEmpty(old['Fecha inicio'], row?.['fecha ini'], row?.fechaIni, row?.fecha_inicio, row?.FechaInicio, row?.Fecha),
+      'Fecha fin': firstNonEmpty(old['Fecha fin'], row?.['fecha fin'], row?.fechaFin, row?.fecha_fin, row?.FechaFin)
+    });
+  };
+  arr(context?.modulosExtraidos?.EVENTOS).forEach(merge);
+  arr(context?.eventosObjetivo).forEach(merge);
+  return out;
+}
+function isEventInProgressValue(value) {
+  return /en\s*curso|abiert|activo|preparaci[oó]n/i.test(trim(value));
+}
+function eventLabelWithState(name, metaMap) {
+  const meta = metaMap?.get?.(norm(name)) || {};
+  const state = trim(meta.Estado);
+  return state && isEventInProgressValue(state) ? `${name} · En curso` : name;
+}
+function eventStateNoteForRow(name, metaMap) {
+  const meta = metaMap?.get?.(norm(name)) || {};
+  const state = trim(meta.Estado);
+  if (!state) return '';
+  if (isEventInProgressValue(state)) return 'Evento En curso: cifras provisionales; ingresos, compras, donaciones y saldo pueden variar hasta el cierre.';
+  if (/finalizad|cerrad/i.test(state)) return 'Evento cerrado/finalizado: cifras comparables como cierre.';
+  return '';
+}
 function normEq(a, b) { return norm(a) === norm(b); }
 function nameMatches(value, needle) {
   const v = norm(value), n = norm(needle);
@@ -1261,16 +1296,18 @@ function buildCanonicalSocioCensus(personRows) {
   return out.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 }
 function canonicalIncomeNumber(row) {
-  const n = num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
-  return n > 0 ? n : 0;
+  const raw = row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad;
+  if (raw === undefined || raw === null || trim(raw) === '') return null;
+  const n = num(raw);
+  return Number.isFinite(n) ? n : null;
 }
 function buildCanonicalSocioAttendanceForEvent(census, incomesForEvent) {
   const socioIncome = arr(incomesForEvent)
     .filter(r => norm(r.Rango || r.rango || '') === 'socio')
     .map(r => ({ row: r, name: trim(r.Nombre || r.nombre || r['Nombre persona'] || ''), key: canonicalNameKey(r.Nombre || r.nombre || r['Nombre persona'] || ''), numero: canonicalIncomeNumber(r) }))
-    .filter(r => r.name && !excludedFromAttendanceName(r.name) && r.numero > 0);
+    .filter(r => r.name && !excludedFromAttendanceName(r.name) && r.numero !== null && r.numero >= 0);
   function directPair(pair) {
-    return socioIncome.some(r => (r.key === pair.key) && r.numero >= pair.size);
+    return socioIncome.some(r => (r.key === pair.key) && (r.numero === 0 || r.numero >= pair.size));
   }
   function directSingle(name) {
     const key = canonicalNameKey(name);
@@ -1340,10 +1377,10 @@ function missingAttendeesTablesAndCharts(context, prompt = '') {
       'Socios canónicos': pack.totalSocios,
       'Socios asistentes': pack.totalAsistentes,
       'Socios no asistentes': pack.totalNoAsisten,
-      Criterio: 'Rango=SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero > 0, aunque estén Pendiente.'
+      Criterio: 'Rango=SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero >= 0 (incluye exentos de pago con Numero=0), aunque estén Pendiente.'
     });
     pack.asistentes.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO asistente', Socio: x.name, Personas: x.size, Motivo: x.size > 1 ? 'Pareja/grupo canónico registrado como colaborador del evento' : 'Socio canónico registrado como colaborador del evento' }));
-    pack.noAsisten.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO no asistente', Socio: x.name, Personas: x.size, Motivo: 'Socio canónico que no figura como colaborador SOCIO con Numero > 0 en el evento' }));
+    pack.noAsisten.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO no asistente', Socio: x.name, Personas: x.size, Motivo: 'Socio canónico que no figura como colaborador SOCIO con Numero >= 0 en el evento' }));
   });
   const summaryCols = ['Evento','Socios canónicos','Socios asistentes','Socios no asistentes','Criterio'];
   const detailCols = ['Evento','Tipo','Socio','Personas','Motivo'];
@@ -1665,6 +1702,7 @@ function directEventReportIfApplicable(prompt, context) {
   const canonical = arr(context?.metricasCanonicas?.porEvento);
   const byEvent = new Map(canonical.map(r => [norm(r.Evento), r]));
   const mods = context.modulosExtraidos || {};
+  const metaByEvent = eventMetaByNameFromContext(context);
   const canonicalAttendance = canonicalAttendanceSummaryFromContext(context);
   const canonicalAttendanceByEvent = new Map(canonicalAttendance.map(r => [norm(r.Evento), r]));
   const rows = events.map(ev => {
@@ -1681,8 +1719,11 @@ function directEventReportIfApplicable(prompt, context) {
     const donaciones = round(can['Donaciones valor'] ?? sumField(don,'Valor'),2);
     const saldo = round(can['Saldo actual'] ?? (ingresos-compras),2);
     const valoracion = round(can['Valoracion con donaciones'] ?? (compras+donaciones),2);
+    const estadoEvento = firstNonEmpty(can.Estado, metaByEvent.get(norm(ev))?.Estado);
     return {
       Evento: ev,
+      Estado: estadoEvento,
+      'Nota estado': eventStateNoteForRow(ev, metaByEvent),
       'Ingresos total (€)': ingresos,
       'Compras realizadas (€)': compras,
       'Compras pendientes (€)': pendientes,
@@ -1700,16 +1741,18 @@ function directEventReportIfApplicable(prompt, context) {
       'Documentos': can['Documentos numero'] ?? doc.length
     };
   });
-  const columns = ['Evento','Ingresos total (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo ingresos - compras (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
+  const columns = ['Evento','Estado','Nota estado','Ingresos total (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo ingresos - compras (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
   const rowsTable = rows.map(r => columns.map(c => text(r[c])));
+  const chartLabels = rows.map(r => eventLabelWithState(r.Evento, metaByEvent));
+  const hasInProgressEvents = rows.some(r => isEventInProgressValue(r.Estado));
   const charts = [
-    { title: 'Ingresos, compras y donaciones por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Ingresos total (€)'],2)), unit: '€', series: [
+    { title: `Ingresos, compras y donaciones por evento${hasInProgressEvents ? ' · En curso marcado' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Ingresos total (€)'],2)), unit: '€', series: [
       { name: 'Ingresos', values: rows.map(r=>round(r['Ingresos total (€)'],2)) },
       { name: 'Compras realizadas', values: rows.map(r=>round(r['Compras realizadas (€)'],2)) },
       { name: 'Donaciones valoradas', values: rows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
     ] },
-    { title: 'Saldo por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Saldo ingresos - compras (€)'],2)), unit: '€' },
-    { title: 'Volumen de registros por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>num(r['Líneas compras'])+num(r['Líneas donaciones'])+num(r.Colaboradores)), unit: 'registros' }
+    { title: `Saldo por evento${hasInProgressEvents ? ' · provisional si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo ingresos - compras (€)'],2)), unit: '€' },
+    { title: `Volumen de registros por evento${hasInProgressEvents ? ' · En curso abierto' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>num(r['Líneas compras'])+num(r['Líneas donaciones'])+num(r.Colaboradores)), unit: 'registros' }
   ];
   const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|parte\s+meteorolog|parte\s+metereolog|meteorolog|metereolog|meteo|previsi[oó]n|lluvia|temperatura|calor|fr[ií]o|viento)\b/.test(p);
   const missingAttendeesAsked = asksMissingAttendees(prompt);
@@ -1723,12 +1766,13 @@ function directEventReportIfApplicable(prompt, context) {
   addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
   addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
   addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
-  if (/(ticket|tickets|fototicket|fototickets|tk\s*\d*)/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
-  if (/(documento|documentos|doc\s*\d+|adjunto|adjuntos)/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
+  if (/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
+  if (/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
   const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context, prompt) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones, tickets/fototickets, documentos y saldo${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más la meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo = ingresos - compras realizadas; las donaciones se valoran aparte y no se suman al saldo financiero.`;
+  const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones, tickets/fototickets, documentos y saldo${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más la meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo = ingresos - compras realizadas; las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
@@ -2492,7 +2536,7 @@ Reglas obligatorias:
 - No metas listas de ejemplos sueltos de compras/productos salvo que el usuario pida expresamente ranking, top o ejemplos. Para producto disponible, resume totales y remite la comparativa a las tablas; evita frases tipo "Producto: X, Uds: Y" en el texto narrativo.
 - Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
 - Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer y usa subtítulos cortos dentro del texto: Datos del evento, Socios que no asistirán/no registrados, Parte meteorológico. No dejes una parte fuera porque aparezca en tablas.
-- Si resultadoControlEvent incluye tablas de socios asistentes/no asistentes, menciona cuántos son y explica el criterio canónico: PERSONAS con rango SOCIO; se excluyen Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero > 0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes canónicos.
+- Si resultadoControlEvent incluye tablas de socios asistentes/no asistentes, menciona cuántos son y explica el criterio canónico: PERSONAS con rango SOCIO; se excluyen Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero >= 0, incluyendo exentos de pago con Numero=0, aunque estén Pendiente; no asistentes = censo canónico menos asistentes canónicos.
 - ${limit}.
 - No uses markdown, no devuelvas tablas, no pegues JSON.
 - Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo", "se celebró", "se celebra hoy" ni "hoy 10 de julio" para eventos futuros.
@@ -2501,6 +2545,7 @@ Reglas obligatorias:
 - Si el usuario pide temperatura/tiempo/clima/lluvia/viento y datosIndirectos.meteorologia contiene filas, debes incluir en answer los datos concretos de meteorología: temperatura máxima y mínima, probabilidad de lluvia, viento y cielo. Prohibido decir que no dispones de esa información.
 - Si se han obtenido datos indirectos relacionados con el evento, intégralos en la respuesta principal con naturalidad. No los relegues solo a tablas.
 - Si aparecen saldo/caja/donaciones, aclara con naturalidad que el saldo financiero no suma donaciones si procede.
+- Si algún evento está marcado como En curso/abierto/preparación, deja claro que sus cifras son provisionales y evolucionan hasta el cierre; no lo compares como si fuera un evento finalizado.
 - Devuelve SOLO JSON válido con title, answer, warnings.
 
 PETICIÓN ORIGINAL DEL USUARIO:
@@ -2966,8 +3011,8 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   let modules = ensurePlannerDependencies(arr(ai?.modules).length ? arr(ai.modules) : inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
   // FIX25: aunque Zuzu o el detector local sugieran módulos accesorios, no se extraen TICKETS/DOCUMENTOS
   // salvo petición explícita. Evita anexos gigantes y datos que no venían a cuento en comparativas.
-  if (!/(ticket|tickets|fototicket|fototickets|tk\s*\d*)/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
-  if (!/(documento|documentos|doc\s*\d+|adjunto|adjuntos)/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
+  if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
+  if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
   const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
 
   if (!ai && !chosenIds.length && strictRequested) {

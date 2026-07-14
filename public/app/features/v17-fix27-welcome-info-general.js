@@ -50,6 +50,14 @@
   function isColtyLogo(target){
     return !!target?.closest?.('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large');
   }
+  function syncLogoTitle(){
+    try{
+      const title = welcomeActive() ? 'Ver información de ControlEvent' : 'Ver avance del evento';
+      document.querySelectorAll('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large').forEach(el => {
+        try{ el.title = title; el.setAttribute('title', title); }catch(_){ }
+      });
+    }catch(_){ }
+  }
   function stopEvent(ev){
     try{ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }catch(_){ }
   }
@@ -77,6 +85,7 @@
   function showInfo(){
     injectStyle();
     try{ $('ceV16Hf5AvanceLayer')?.classList?.remove('visible'); }catch(_){ }
+    try{ $('ceHf47AvanceBubbleLayer')?.classList?.remove('visible'); $('ceHf48AvanceLayer')?.classList?.remove('visible'); }catch(_){ }
     let layer = $(LAYER_ID);
     if(!layer){
       layer = document.createElement('div');
@@ -101,6 +110,18 @@
     layer.classList.add('visible');
     layer.querySelector('.ce-v17fix26-close')?.addEventListener('click', ev => { stopEvent(ev); closeInfo(); }, {once:true});
     layer.querySelector('.ce-v17fix26-card')?.addEventListener('click', ev => ev.stopPropagation());
+  }
+
+  let autoShownAfterLogin = false;
+  function maybeAutoShowInfo(){
+    injectStyle();
+    syncLogoTitle();
+    if(loginVisible()){ autoShownAfterLogin = false; return false; }
+    if(!welcomeActive()) return false;
+    if(autoShownAfterLogin) return false;
+    autoShownAfterLogin = true;
+    showInfo();
+    return true;
   }
 
   let lastLogoAction = 0;
@@ -130,5 +151,21 @@
   });
   document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeInfo(); }, true);
 
-  window.ControlEventV17Fix27WelcomeInfoGeneral = {version:VERSION_LABEL, showInfo, closeInfo, isPhoneOnly, welcomeActive};
+  function bindAutoWelcome(){
+    const runLater = delay => setTimeout(() => { try{ maybeAutoShowInfo(); }catch(_){ } }, delay);
+    ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-loaded','controlevent:event-ready'].forEach(evt => {
+      window.addEventListener(evt, () => { runLater(120); runLater(600); }, true);
+    });
+    document.addEventListener('click', ev => {
+      if(ev.target?.closest?.('#btnLogin,#btnLogout,#selectedEvent')) { runLater(250); runLater(900); }
+    }, true);
+    const overlay = $('authOverlay');
+    if(overlay && window.MutationObserver){
+      try{ new MutationObserver(() => { runLater(120); runLater(700); }).observe(overlay, {attributes:true, attributeFilter:['class','style','hidden','aria-hidden']}); }catch(_){ }
+    }
+    runLater(300); runLater(1200);
+  }
+  bindAutoWelcome();
+
+  window.ControlEventV17Fix27WelcomeInfoGeneral = {version:VERSION_LABEL, showInfo, closeInfo, isPhoneOnly, welcomeActive, maybeAutoShowInfo, syncLogoTitle};
 })();

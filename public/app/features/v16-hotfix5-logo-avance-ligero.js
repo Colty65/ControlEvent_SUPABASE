@@ -46,7 +46,13 @@
   function docCode(value){ const m=String(value||'').toUpperCase().match(/DOC\s*(\d+)/); return m?'DOC'+String(Number(m[1])).padStart(2,'0'):''; }
   function rowEventId(row){return txt(row?.eventId||row?.event_id||row?.eventoId||row?.evento_id||row?.EVENTO_ID||'');}
   function rowPersonaId(row){return txt(row?.personaId||row?.persona_id||row?.persona||row?.persona_id_fk||row?.PERSONA_ID||'');}
-  function rowNumero(row){ const n=num(row?.numero ?? row?.num ?? row?.personas ?? row?.cantidad ?? 1); return n>0?n:1; }
+  function rowNumeroRaw(row){
+    const raw = row?.numero ?? row?.num ?? row?.personas ?? row?.cantidad;
+    if(raw === undefined || raw === null || txt(raw) === '') return null;
+    const n = num(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  function rowNumero(row){ const n=rowNumeroRaw(row); return n>0?n:1; }
   function personOfId(id){ return id?arr('personas').find(p=>String(p?.id||p?.ID||'')===String(id)):null; }
   function personName(p){ return txt(p?.nombre||p?.Nombre||p?.NOMBRE||''); }
   function rowPersona(row){ return row?.persona || personOfId(rowPersonaId(row)) || {}; }
@@ -110,8 +116,14 @@
     return col.filter(c=>rowRango(c)==='SOCIO').map(c=>({row:c,name:rowName(c),norm:norm(rowName(c)),pid:rowPersonaId(c),numero:rowNumero(c)})).filter(x=>!!x.name);
   }
   function directGroupAttend(group, colNames){
-    // Una pareja solo se muestra como pareja si el registro del evento representa la pareja completa.
-    return colNames.some(c=>(sameNorm(c.name,group.name) || (c.pid && String(c.pid)===String(group.id))) && rowNumero(c.row)>=group.size);
+    // Una pareja se muestra como asistente completa si el registro representa la pareja
+    // completa o si está exenta de pago con Numero=0.
+    return colNames.some(c=>{
+      const same = sameNorm(c.name,group.name) || (c.pid && String(c.pid)===String(group.id));
+      if(!same) return false;
+      const rawNumero = rowNumeroRaw(c.row);
+      return rawNumero === 0 || rowNumero(c.row) >= group.size;
+    });
   }
   function directSingleAttend(name, personId, colNames){
     return colNames.some(c=>sameNorm(c.name,name) || (personId && c.pid && String(c.pid)===String(personId)));
