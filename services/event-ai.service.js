@@ -2064,7 +2064,7 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: systemPrompt(prompt, context) }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2 }
+      generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_EVENT_MAX_OUTPUT_TOKENS || 8192) }
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
@@ -2081,6 +2081,9 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
       let parsed;
       try { parsed = JSON.parse(stripJsonText(outText)); }
       catch (e) {
+        // FIX11: en informes/comparativas/alcance cerrado no se sustituye una respuesta rota de Zuzu
+        // por una tabla local que pueda parecer válida. Mejor no sacar información que sacar datos erróneos.
+        if (requiresZuzuPlannerStrict(prompt)) throw e;
         // v11_3_3 hotfix: nunca mostrar al usuario una respuesta cruda/rota de Zuzu.
         // Si Zuzu no respeta el JSON, se entrega una salida estructurada de ControlEvent
         // con los datos canónicos y una advertencia.
@@ -2154,6 +2157,87 @@ function requiresGeminiNarrativeStrict(prompt) {
   // Cuando el usuario pide tono, opinión o que “lo haga Zuzu”, no queremos plantillas locales.
   // ControlEvent cocina los datos; Zuzu debe escribir la respuesta humana.
   return wantsNarrativeReport(prompt) && /\b(zuzu|dejate|déjate|curra|opinion|opinión|merece|como\s+lo\s+ves|cómo\s+lo\s+ves|tono|cachond|chascarrill|coloquial|informal|simpatic|simpa[tá]ic|palabras|texto\s+de|una\s+pagina|1\s+pagina|p[aá]gina|para\s+darselo|para\s+dárselo|para\s+socios|para\s+direccion|direcci[oó]n)\b/.test(p);
+}
+
+function promptRestrictsEventScope(prompt) {
+  return /\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(prompt || '');
+}
+function requiresZuzuPlannerStrict(prompt) {
+  const p = norm(prompt);
+  return promptRestrictsEventScope(prompt)
+    || wantsNarrativeReport(prompt)
+    || isTransformAnalysisPrompt(prompt)
+    || /\b(compara|comparar|comparativa|producto\s+disponible|parte\s+meteorolog|meteorolog|metereolog|previsi[oó]n|tabla\s+comparativa|proporcional|socios?\s+asistentes?)\b/.test(p);
+}
+function titleNormNoDateFix11(value) {
+  return norm(value).replace(/\b(dic|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov)\s*\d{2,4}\b/g, '').replace(/\s+/g, ' ').trim();
+}
+function requestedExactEventIdsFix11(state, prompt) {
+  const events = arr(state?.eventos);
+  const out = [];
+  function push(id) { if (id && !out.includes(id)) out.push(id); }
+  const raw = text(prompt || '');
+  const fragments = [];
+  raw.split(/\r?\n/).forEach(line => {
+    const m = line.match(/^\s*(?:\d+[.)]|[-*•])\s*(.{3,120}?)\s*$/);
+    if (m) fragments.push(trim(m[1]));
+  });
+  function aliasHit(alias, fragment) {
+    const nf = norm(fragment); const a = norm(alias);
+    return a && nf && (nf === a || nf.startsWith(a + ' ') || a.startsWith(nf + ' '));
+  }
+  events.forEach(ev => {
+    const id = trim(ev?.id);
+    const title = norm(ev?.titulo || '');
+    const shortTitle = titleNormNoDateFix11(ev?.titulo || '');
+    if (!id || !title) return;
+    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
+    const hitInList = fragments.some(f => aliases.some(a => aliasHit(a, f)));
+    if (hitInList) push(id);
+  });
+  if (out.length) return out;
+  const np = ` ${norm(raw)} `;
+  events.forEach(ev => {
+    const id = trim(ev?.id);
+    const title = norm(ev?.titulo || '');
+    const shortTitle = titleNormNoDateFix11(ev?.titulo || '');
+    if (!id || !title) return;
+    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
+    const hitInPrompt = aliases.some(a => np.includes(` ${a} `));
+    if (hitInPrompt) push(id);
+  });
+  return out;
+}
+function restrictedScopeViolationFix11(state, prompt, context) {
+  const exactIds = requestedExactEventIdsFix11(state, prompt);
+  if (!exactIds.length) return null;
+  const expected = new Set(exactIds.map(trim));
+  const got = arr(context?.eventosObjetivo).map(e => trim(e?.id || e?.Id || e?.ID || e?.eventId || '')).filter(Boolean);
+  const gotSet = new Set(got);
+  const ok = got.length === exactIds.length && exactIds.every(id => gotSet.has(id));
+  if (ok) return null;
+  const eventNames = arr(state?.eventos).filter(e => expected.has(trim(e?.id))).map(e => trim(e?.titulo)).filter(Boolean);
+  const gotNames = arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.titulo || e?.Evento)).filter(Boolean);
+  return { expectedIds: exactIds, expectedNames: eventNames, gotIds: got, gotNames };
+}
+function noDataBecauseZuzuFailedResultFix11(userPrompt, flowTrace, reason, title = 'Zuzu no puede responder con seguridad') {
+  zuzuTracePush(flowTrace, 'Corte de seguridad FIX11', 'KO', reason);
+  return {
+    ok: true,
+    rejected: true,
+    title,
+    answer: 'No genero informe ni tablas porque el flujo seguro no se ha completado. Para proteger el prestigio de la Peña y de ControlEvent, es mejor no sacar datos que sacar datos mezclados o inventados.',
+    warnings: [reason, 'No se han presentado datos locales de respaldo ni tablas parciales. Repite la consulta cuando Zuzu planificador/redactor esté disponible o revisa la clave/modelo de Zuzu.'],
+    charts: [],
+    tables: [],
+    files: [],
+    provider: 'control-event-fix11-no-false-info',
+    model: '',
+    meta: { version: 'v21_prod_FIX11', generatedAt: new Date().toISOString(), debugTrace: arr(flowTrace).slice(0, 80), filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, {})).slice(0, 70) },
+    debugTrace: arr(flowTrace).slice(0, 80),
+    showDebugTrace: true,
+    showWarnings: true
+  };
 }
 function shouldEnrichLocalResultWithNarrative(prompt, result) {
   if (!result || result.rejected === true || result.ok === false) return false;
@@ -2600,12 +2684,19 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
     const timeoutLike = /timeout|abort|tard[oó] demasiado|504/i.test(trim(error?.message || error));
     const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike;
     if (strict) {
-      out.answer = `Zuzu no ha podido redactar todavía la parte humana del informe. Los datos calculados por ControlEvent quedan debajo para no perder el trabajo, pero no voy a disfrazar una plantilla local como si fuera una respuesta de Zuzu. Motivo: ${friendlyZuzuErrorMessage(error)}`;
-      out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-redaccion-no-disponible`;
-      out.model = 'zuzu-redaccion-obligatoria-fallida';
-      out.showWarnings = true;
-      out.warnings = out.warnings.concat('La petición exigía tono/opinión/redacción humana. Se evita respuesta mecánica de ControlEvent para no dar una falsa impresión de inteligencia.');
-      return out;
+      return {
+        ok: true,
+        rejected: true,
+        title: 'Zuzu no ha podido redactar con seguridad',
+        answer: `Zuzu no ha podido redactar todavía la respuesta final. No presento las tablas locales de ControlEvent para evitar que un respaldo mecánico se tome como informe válido. Motivo: ${friendlyZuzuErrorMessage(error)}`,
+        warnings: arr(out.warnings).concat('La petición exigía una respuesta humana/analítica de Zuzu. Por seguridad, se ocultan tablas, gráficas y ficheros locales hasta que Zuzu complete la respuesta.'),
+        charts: [],
+        tables: [],
+        files: [],
+        provider: `${trim(out.provider || 'control-event-local')}+zuzu-redaccion-no-disponible-sin-datos`,
+        model: 'zuzu-redaccion-obligatoria-fallida',
+        showWarnings: true
+      };
     }
     zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error));
     const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
@@ -2668,7 +2759,9 @@ Reglas rápidas:
 - socios que no asistirán/no figuran/no están registrados en un evento => EVENTOS+INGRESOS+PERSONAS, filtro rangos=[SOCIO]; si el usuario dice numero=1, no lo trates como nombre sino como criterio de cálculo.
 - tiempo/clima/previsión/parte meteorológico/metereológico de evento => EVENTOS + salidaDeseada METEOROLOGIA y GRAFICA.
 - todos los eventos/eventos registrados/celebraciones => todosLosEventos=true.
-- eventos entre comillas => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
+- eventos entre comillas o listados por nombre exacto => ponlos en eventos. Año => filters.anios. Estado finalizado/en curso => filters.estado.
+- Si el usuario dice SOLO, EXACTOS, no analices otro evento, no consulta global, lista 2-5 títulos concretos, o nombra eventos concretos: todosLosEventos=false y eventos debe ser una lista cerrada.
+- Nunca devuelvas todosLosEventos=true si el prompt restringe el alcance a eventos concretos aunque también use palabras como comparativa, eventos o asistentes.
 - needsClarification=true solo si no hay ningún módulo útil.
 
 Catálogo mínimo:
@@ -2730,8 +2823,8 @@ function shouldUseGeminiPlanner(userPrompt, local) {
 }
 async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
-  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'OK', `Plan local preventivo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}. No es respuesta final, solo red de seguridad.`);
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
+    zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', `Consulta simple resuelta con plan local mínimo: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Zuzu planificador no se ha usado solo por ausencia/fallo; en v19 la ruta normal siempre es Zuzu para planificar.`,
@@ -2742,25 +2835,56 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   try {
     const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
     const ai = await callGeminiPlanner(userPrompt, catalog, flowTrace);
-    const modules = [...new Set([].concat(arr(ai?.modules || ai?.modulos), arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
-    const filters = mergePlannerFilters(local.filters, ai?.filters);
+    const aiModules = arr(ai?.modules || ai?.modulos).map(x => trim(x).toUpperCase()).filter(Boolean);
+    const modules = [...new Set((aiModules.length ? aiModules : arr(local.modules)).map(x => trim(x).toUpperCase()).filter(Boolean))];
+    const aiEventos = arr(ai?.eventos).map(trim).filter(Boolean);
+    const aiHasClosedEventList = aiEventos.some(x => !/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x));
+    const promptRestrictsScope = /\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(userPrompt);
+    const hardClosedScope = local.strictEventScope === true || (promptRestrictsScope && aiHasClosedEventList);
+    const filters = mergePlannerFilters(hardClosedScope ? local.filters : {}, ai?.filters);
+    const eventos = hardClosedScope && arr(local.eventos).length ? arr(local.eventos) : (aiEventos.length ? aiEventos : arr(local.eventos));
+    const todosLosEventos = hardClosedScope ? false : (ai?.todosLosEventos === true && !aiHasClosedEventList);
+    if ((hardClosedScope || aiHasClosedEventList) && ai?.todosLosEventos === true) {
+      zuzuTracePush(flowTrace, 'Paso 1b · Control de alcance CE', 'INFO', 'Zuzu planificador propuso todosLosEventos=true con eventos concretos/restricción de alcance. CE impone lista cerrada y bloquea consulta global.');
+    }
     return {
       ...ai,
       ok: ai?.ok !== false,
       needsClarification: ai?.needsClarification === true && !modules.length,
       modules: modules.length ? modules : local.modules,
-      eventos: arr(ai?.eventos).length ? arr(ai.eventos) : arr(local.eventos),
-      todosLosEventos: ai?.todosLosEventos === true || local.todosLosEventos === true,
+      eventos,
+      todosLosEventos,
+      strictEventScope: hardClosedScope,
       filters,
       dataRequests: arr(ai?.dataRequests),
       salidaDeseada: arr(ai?.salidaDeseada),
-      reasoning: trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.',
+      reasoning: local.strictEventScope
+        ? 'Zuzu ha planificado módulos/filtros, pero ControlEvent impone alcance cerrado por eventos explícitos del prompt.'
+        : (trim(ai?.reasoning || '') || 'Zuzu ha deducido módulos y filtros desde el prompt; ControlEvent extrae solo los datos necesarios y humanizados.'),
       __zuzuPlannerProvider: 'zuzu-planner',
       __zuzuPlannerModel: ai.__zuzuPlannerModel || '',
       __zuzuPlannerUsage: ai.__zuzuPlannerUsage || null,
       __zuzuGeminiAllRows: false
     };
   } catch (error) {
+    if (requiresZuzuPlannerStrict(userPrompt)) {
+      zuzuTracePush(flowTrace, 'Paso 1b · Sin planificador no hay informe', 'KO', `Zuzu planificador no disponible. CE NO usa plan local para informes/comparativas/alcance cerrado. Motivo: ${cleanGeminiError(error)}`);
+      return {
+        ok: false,
+        needsClarification: true,
+        clarification: 'Zuzu planificador no ha podido decidir módulos y filtros. ControlEvent no extrae datos para evitar un informe falso o global por error.',
+        modules: [],
+        eventos: [],
+        todosLosEventos: false,
+        strictEventScope: false,
+        filters: {},
+        reasoning: 'Corte de seguridad FIX11: sin planificador Zuzu no hay extracción para consultas complejas.',
+        __zuzuPlannerProvider: 'zuzu-planner-required-failed',
+        __zuzuGeminiAllRows: false,
+        plannerWarning: cleanGeminiError(error)
+      };
+    }
+    zuzuTracePush(flowTrace, 'Paso 1b · Plan local CE de respaldo', 'OK', `Zuzu planificador no disponible. CE usa SOLO plan de seguridad: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
     return {
       ...local,
       filters: local.filters || {},
@@ -2826,13 +2950,14 @@ function sortResultTables(result) {
 }
 function scopeMetaFromContext(context) {
   const evs = arr(context?.eventosObjetivo);
+  const closed = context?.planZuzu?.alcanceCerrado === true || context?.planExtraccionControlEvent?.alcanceCerrado === true;
   if (evs.length === 1) {
     const e = evs[0] || {};
     const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
+  if (evs.length > 1) return { eventHeader: `${closed ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: closed ? 'restricted-multi-event' : 'multi-event', eventCount: evs.length };
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {
@@ -3033,6 +3158,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
   zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
+  if (plan?.__zuzuPlannerProvider === 'zuzu-planner-required-failed') {
+    return noDataBecauseZuzuFailedResultFix11(userPrompt, flowTrace, trim(plan?.clarification || plan?.plannerWarning || 'Zuzu planificador no disponible.'));
+  }
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
   context.fechaActualControlEvent = todayIsoMadrid();
   context.contextoTemporal = narrativeTemporalContext(context);
@@ -3044,7 +3172,11 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     usoPlanificador: plan?.__zuzuPlannerUsage || null,
     politicaModelos: 'planificador=Flash-Lite primero; redacción/informes=Flash primero; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
   };
-  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
+  const scopeViolation = restrictedScopeViolationFix11(state, userPrompt, context);
+  if (scopeViolation && promptRestrictsEventScope(userPrompt)) {
+    return noDataBecauseZuzuFailedResultFix11(userPrompt, flowTrace, `ControlEvent detectó un alcance cerrado (${scopeViolation.expectedNames.join(' | ') || 'eventos exactos'}), pero la extracción preparó otros eventos (${scopeViolation.gotNames.join(' | ') || 'sin eventos'}). Se corta antes de generar informe.`);
+  }
+  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}; alcance=${context?.planZuzu?.alcanceCerrado ? 'CERRADO' : 'abierto'}; planificador=${trim(context?.planZuzu?.planificador || 'desconocido')}.`);
 
   const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
   if (weatherCtx) {
@@ -3067,7 +3199,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     });
   }
 
-  const highConfidence = directHighConfidenceResultIfApplicable(userPrompt, context);
+  const highConfidence = requiresZuzuPlannerStrict(userPrompt) ? null : directHighConfidenceResultIfApplicable(userPrompt, context);
   if (highConfidence) {
     zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE', 'OK', `CE ha cocinado datos con alta confianza (${highConfidence.provider || 'provider local'}). La salida NO se entrega directamente: pasa a Zuzu redacción humana.`);
     const highConfidenceWithIndirect = attachWeatherVisualsIfNeeded(highConfidence, context, userPrompt);
@@ -3081,13 +3213,28 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   } catch (error) {
     const friendly = friendlyZuzuErrorMessage(error);
     zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'KO', cleanGeminiError(error));
-    const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
+    const fallback = requiresZuzuPlannerStrict(userPrompt) ? null : (directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context));
     if (fallback) {
       fallback.warnings = arr(fallback.warnings).concat(`${friendly} CE ha cocinado datos de respaldo, pero intentará pasarlos a Zuzu como redacción final.`);
       fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
       fallback.model = 'sin-gemini-estructurado-por-error';
       zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE de respaldo', 'OK', `CE generó datos de respaldo (${fallback.provider}). Ahora se intenta Zuzu narrativa.`);
       return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback, flowTrace));
+    }
+    if (requiresZuzuPlannerStrict(userPrompt)) {
+      return done({
+        ok: true,
+        rejected: true,
+        title: 'Zuzu no pudo completar la respuesta final',
+        answer: 'No presento informe ni tablas porque Zuzu no ha completado la respuesta final estructurada. Es preferible repetir la consulta a mostrar datos locales incompletos o mezclados.',
+        warnings: [friendly, 'Corte de seguridad FIX11: sin respuesta final de Zuzu no se muestran respaldos locales en informes/comparativas.'],
+        charts: [],
+        tables: [],
+        files: [],
+        provider: 'control-event-zuzu-final-failed-no-local-data',
+        model: '',
+        showWarnings: true
+      });
     }
     return done({
       ok: true,
