@@ -490,81 +490,9 @@ function findReferencedEventIds(events, prompt, selectedId) {
   }
   return selectedId ? [selectedId] : [];
 }
-function promptListEventFragments(prompt) {
-  const fragments = [];
-  text(prompt || '').split(/\r?\n/).forEach(line => {
-    const m = line.match(/^\s*(?:\d+[.)]|[-*•])\s*(.{3,120}?)\s*$/);
-    if (m) fragments.push(trim(m[1]));
-  });
-  return fragments;
-}
-function aliasHitsFragment(alias, fragment) {
-  const nf = norm(fragment);
-  const a = norm(alias);
-  return a && nf && (nf === a || nf.startsWith(a + ' ') || a.startsWith(nf + ' '));
-}
-function promptExactEventTitleIds(events, prompt) {
-  const out = [];
-  const raw = text(prompt || '');
-  const fragments = promptListEventFragments(raw);
-  function push(id) { if (id && !out.includes(id)) out.push(id); }
-  arr(events).forEach(ev => {
-    const id = trim(ev?.id);
-    const title = norm(ev?.titulo || '');
-    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
-    if (!id || !title) return;
-    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
-    if (fragments.length && fragments.some(f => aliases.some(a => aliasHitsFragment(a, f)))) return push(id);
-  });
-  if (out.length) return out;
-  const p = ` ${norm(raw)} `;
-  arr(events).forEach(ev => {
-    const id = trim(ev?.id);
-    const title = norm(ev?.titulo || '');
-    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
-    if (!id || !title) return;
-    if (p.includes(` ${title} `)) return push(id);
-    // Títulos cortos tipo "SySA 2024" o "FUNCION 2025" deben contar como mención exacta,
-    // pero no usamos palabras sueltas/año para arrastrar otros eventos.
-    if (shortTitle && shortTitle.length >= 6 && shortTitle !== title && p.includes(` ${shortTitle} `)) return push(id);
-  });
-  return out;
-}
-
-function promptHardExactEventTitleIds(events, prompt) {
-  const out = [];
-  function push(id) { if (id && !out.includes(id)) out.push(id); }
-  const raw = text(prompt || '');
-  const fragments = promptListEventFragments(raw);
-  // Captura listas explícitas: "1. SySA 2024", "- SySA 2025", etc. Si existen filas de lista
-  // que casan con eventos, manda la lista y NO una frase negativa como "ningún otro evento".
-  arr(events).forEach(ev => {
-    const id = trim(ev?.id);
-    const title = norm(ev?.titulo || '');
-    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
-    if (!id || !title) return;
-    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
-    const hitInList = fragments.some(f => aliases.some(a => aliasHitsFragment(a, f)));
-    if (hitInList) push(id);
-  });
-  if (out.length) return out;
-  const nPrompt = ` ${norm(raw)} `;
-  arr(events).forEach(ev => {
-    const id = trim(ev?.id);
-    const title = norm(ev?.titulo || '');
-    const shortTitle = eventTitleWithoutDateSuffix(ev?.titulo || '');
-    if (!id || !title) return;
-    const aliases = [title, shortTitle].filter(v => v && v.length >= 6);
-    const hitInPrompt = aliases.some(a => nPrompt.includes(` ${a} `));
-    if (hitInPrompt) push(id);
-  });
-  return out;
-}
 function findExplicitReferencedEventIds(events, prompt) {
   const out = [];
   function push(id) { if (id && !out.includes(id)) out.push(id); }
-  const exact = promptExactEventTitleIds(events, prompt);
-  if (exact.length) return exact;
   const quoted = quotedFragments(prompt);
   if (quoted.length) {
     // Si el usuario ha entrecomillado eventos, el alcance queda cerrado a esos textos.
@@ -1030,13 +958,6 @@ function zuzuPersonIdentityCue(prompt) {
 function zuzuFindExplicitEventIds(events, selectedId, prompt, plan) {
   const out = [];
   function push(id){ if(id && !out.includes(id)) out.push(id); }
-
-  // FIX11: una lista literal de eventos o títulos exactos escritos en el prompt manda por encima
-  // de cualquier pista global. Nunca puede convertirse en "todos los eventos" por contener
-  // palabras como comparativa, eventos, asistentes o total general.
-  promptHardExactEventTitleIds(events, prompt).forEach(push);
-  if (out.length) return out;
-
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim).filter(Boolean);
   const allRequested = plan?.todosLosEventos === true || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x)) || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos)\b/i.test(prompt);
   if (allRequested) { arr(events).forEach(e => push(trim(e?.id))); return out; }
@@ -1072,16 +993,9 @@ function zuzuFindEventIds(events, selectedId, prompt, plan, options = {}) {
   if (options.noSelectedFallback) return [];
   return selectedId ? [selectedId] : [];
 }
-function zuzuPromptHasExplicitEventScope(events, prompt) {
-  // FIX9 v21: si el usuario nombra eventos concretos, ControlEvent no puede ampliar a todos.
-  // Esto es una regla dura de alcance: Zuzu piensa módulos/filtros; CE ejecuta solo esos eventos.
-  return zuzuFindExplicitEventIds(events, '', prompt, { todosLosEventos: false }).length > 0;
-}
 function zuzuAllEventsRequested(prompt, plan = {}) {
   const p = norm(prompt);
   const requested = arr(plan?.eventos).concat(arr(plan?.events)).map(trim);
-  if (requested.some(x => !/^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))) return false;
-  if (/\b(solo|exactos?|exclusiv|no\s+analices\s+ning[uú]n\s+otro|no\s+hagas\s+consulta\s+global|ning[uú]n\s+otro\s+evento|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/i.test(prompt)) return false;
   return plan?.todosLosEventos === true
     || requested.some(x => /^(ALL|TODOS|TODOS_LOS_EVENTOS|EVENTOS_REGISTRADOS)$/i.test(x))
     || /\b(eventos\s+registrados|todos\s+los\s+eventos|todos\s+los\s+registrados|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos|cualquier(?:a)?\s+de\s+los\s+eventos|en\s+cualquier(?:a)?\s+evento|entre\s+todos\s+los\s+eventos|busca\s+entre\s+todos\s+los\s+eventos|celebraciones|los\s+\d+\s+eventos|las\s+\d+\s+celebraciones|a[nñ]o\s+20\d{2}|durante\s+20\d{2})\b/i.test(prompt);
@@ -1291,7 +1205,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       PERSONAS: 'catálogo maestro de personas y rango'
     },
     eventoActivo: selected,
-    eventos: events,
+    eventos,
     candidatosPorPrompt: { personas, productos, tiendas },
     conteosSistema: {
       eventos: arr(state?.eventos).length,
@@ -1306,16 +1220,14 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
 }
 export function buildZuzuLocalPlan(state, selectedEventId = '', userPrompt = '') {
   const modules = zuzuInferModulesLocal(userPrompt);
-  const events = arr(state?.eventos);
-  const explicitOnly = zuzuFindExplicitEventIds(events, selectedEventId, userPrompt, {});
-  const strictEventScope = explicitOnly.length > 0;
-  const crossEventSearch = !strictEventScope && zuzuCrossEventSearchRequested(userPrompt, modules);
-  const allEvents = strictEventScope ? false : (zuzuAllEventsRequested(userPrompt, {}) || crossEventSearch);
+  const explicitOnly = zuzuFindExplicitEventIds(arr(state?.eventos), selectedEventId, userPrompt, {});
+  const crossEventSearch = !explicitOnly.length && zuzuCrossEventSearchRequested(userPrompt, modules);
+  const allEvents = zuzuAllEventsRequested(userPrompt, {}) || crossEventSearch;
   const masterOnly = zuzuOnlyGlobalMasterModules(modules);
   let eventos = explicitOnly;
-  if (!eventos.length && allEvents) eventos = events.map(e => trim(e?.id)).filter(Boolean);
-  if (!eventos.length && !masterOnly) eventos = zuzuFindEventIds(events, selectedEventId, userPrompt, {}, { noSelectedFallback: crossEventSearch });
-  if (!eventos.length && masterOnly && modules.includes('EVENTOS')) eventos = events.map(e => trim(e?.id)).filter(Boolean);
+  if (!eventos.length && allEvents) eventos = arr(state?.eventos).map(e => trim(e?.id)).filter(Boolean);
+  if (!eventos.length && !masterOnly) eventos = zuzuFindEventIds(arr(state?.eventos), selectedEventId, userPrompt, {}, { noSelectedFallback: crossEventSearch });
+  if (!eventos.length && masterOnly && modules.includes('EVENTOS')) eventos = arr(state?.eventos).map(e => trim(e?.id)).filter(Boolean);
   const filters = zuzuDetectNamedFilters(userPrompt, state, eventos);
   return {
     ok: true,
@@ -1323,11 +1235,8 @@ export function buildZuzuLocalPlan(state, selectedEventId = '', userPrompt = '')
     modules,
     eventos,
     todosLosEventos: allEvents,
-    strictEventScope,
     filters,
-    reasoning: strictEventScope
-      ? 'Alcance cerrado por eventos nombrados explícitamente en el prompt. ControlEvent no puede convertir esta petición en consulta global.'
-      : 'Plan local de respaldo generado por ControlEvent. Solo se usa si Zuzu planificador no está disponible.'
+    reasoning: 'Plan local de respaldo generado por ControlEvent. Prioriza evento y filtros detectados localmente para no recortar registros reales por una deducción incorrecta de Zuzu.'
   };
 }
 function humanOrFallback(value, fallback) {
@@ -1696,10 +1605,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const p = plan && typeof plan === 'object' ? plan : localPlan;
   const allRowsMode = p.__zuzuGeminiAllRows === true;
   if (p.needsClarification && !localPlan.modules?.length && !arr(p.modules || p.modulos).length) return { needsClarification: true, clarification: p.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.' };
-  const plannerOwnModules = arr(p.modules || p.modulos).map(zuzuUpperModule).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
-  const modules = (p.__zuzuPlannerProvider === 'zuzu-planner' && plannerOwnModules.length)
-    ? zuzuUnique(plannerOwnModules)
-    : zuzuUnique([].concat(plannerOwnModules, arr(localPlan.modules).map(zuzuUpperModule))).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  const modules = zuzuUnique([].concat(arr(p.modules || p.modulos), arr(localPlan.modules)).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
   if (!modules.length) return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: indica si quieres ingresos, compras, donaciones, tickets, documentos, productos, tiendas, personas o eventos.' };
   const helpers = makeHelpers(safeState);
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
@@ -1707,16 +1613,15 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const hasEventScopedModules = modules.some(m => eventScopedModules.includes(m));
   const masterCatalogOnly = !hasEventScopedModules && !modules.includes('EVENTOS');
   let eventIds = [];
-  const strictEventScope = p.strictEventScope === true || localPlan.strictEventScope === true || zuzuPromptHasExplicitEventScope(events, userPrompt);
   if (allRowsMode) {
-    eventIds = strictEventScope ? arr(localPlan.eventos).map(trim).filter(Boolean) : zuzuFindEventIds(events, selectedId, userPrompt, p, { noSelectedFallback: true });
-    if (!eventIds.length && !strictEventScope && (zuzuAllEventsRequested(userPrompt, p) || modules.includes('EVENTOS'))) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
-    if (!eventIds.length && !strictEventScope && modules.some(m => eventScopedModules.includes(m))) eventIds = selectedId ? [selectedId] : arr(events).map(e => trim(e?.id)).filter(Boolean);
+    eventIds = zuzuFindEventIds(events, selectedId, userPrompt, p, { noSelectedFallback: true });
+    if (!eventIds.length && (zuzuAllEventsRequested(userPrompt, p) || modules.includes('EVENTOS'))) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
+    if (!eventIds.length && modules.some(m => eventScopedModules.includes(m))) eventIds = selectedId ? [selectedId] : arr(events).map(e => trim(e?.id)).filter(Boolean);
   } else {
     const localEventIds = arr(localPlan.eventos).map(trim).filter(Boolean);
-    const planEventIds = zuzuFindEventIds(events, selectedId, userPrompt, p, { noSelectedFallback: p.__zuzuPlannerProvider === 'zuzu-planner' && !strictEventScope });
-    eventIds = strictEventScope ? localEventIds : (planEventIds.length ? planEventIds : localEventIds);
-    if (!eventIds.length && !strictEventScope && modules.includes('EVENTOS') && zuzuAllEventsRequested(userPrompt, p)) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
+    const planEventIds = zuzuFindEventIds(events, selectedId, userPrompt, p);
+    eventIds = localEventIds.length ? localEventIds : planEventIds;
+    if (!eventIds.length && modules.includes('EVENTOS')) eventIds = arr(events).map(e => trim(e?.id)).filter(Boolean);
   }
   if (masterCatalogOnly) eventIds = [];
   if (!eventIds.length && modules.some(m => eventScopedModules.includes(m))) {
@@ -1739,7 +1644,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (modules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (modules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (modules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
-  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ id: trim(e?.id), 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
+  const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);
@@ -1751,7 +1656,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     seguridad: { modo: 'solo lectura', nota: 'Zuzu decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
-    planZuzu: { modules, eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO', alcanceCerrado: strictEventScope, planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
+    planZuzu: { modules, eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO', planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
     metricasCanonicas,
