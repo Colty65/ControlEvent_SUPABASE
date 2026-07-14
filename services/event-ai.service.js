@@ -1220,66 +1220,140 @@ function rangosSolicitadosFromPrompt(prompt) {
   if (/\bdonantes?\b/.test(p)) out.push('DONANTE');
   return out;
 }
-
+function excludedFromAttendanceName(name) {
+  const n = norm(name);
+  return !n || /^personas\b/.test(n) || /^grupo\b/.test(n) || /^pe[ñn]a\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
+}
+function canonicalNameKey(name) {
+  return norm(name).replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function isCanonicalPairName(name) {
+  return /\s+y\s+/i.test(trim(name));
+}
+function splitCanonicalPairName(name) {
+  return trim(name).split(/\s+y\s+/i).map(x => trim(x)).filter(Boolean);
+}
+function canonicalPersonNumber(row, fallback = 1) {
+  const n = num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
+  return n > 0 ? n : fallback;
+}
+function buildCanonicalSocioCensus(personRows) {
+  const base = arr(personRows)
+    .filter(p => norm(p.Rango || p.rango || '') === 'socio')
+    .filter(p => !excludedFromAttendanceName(p['Nombre persona'] || p.Nombre || p.nombre));
+  const pairs = base.filter(p => isCanonicalPairName(p['Nombre persona'] || p.Nombre || p.nombre)).map(p => {
+    const name = trim(p['Nombre persona'] || p.Nombre || p.nombre);
+    const parts = splitCanonicalPairName(name);
+    return { kind: 'pair', name, key: canonicalNameKey(name), parts, size: Math.max(2, parts.length || 2), row: p };
+  });
+  const out = [];
+  const seen = new Set();
+  pairs.forEach(pair => { if (!seen.has(pair.key)) { seen.add(pair.key); out.push(pair); } });
+  base.forEach(p => {
+    const name = trim(p['Nombre persona'] || p.Nombre || p.nombre);
+    if (!name || isCanonicalPairName(name)) return;
+    const key = canonicalNameKey(name);
+    if (pairs.some(pair => pair.parts.some(part => canonicalNameKey(part) === key))) return;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ kind: 'single', name, key, parts: [name], size: 1, row: p });
+  });
+  return out.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+}
+function canonicalIncomeNumber(row) {
+  const n = num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
+  return n > 0 ? n : 0;
+}
+function buildCanonicalSocioAttendanceForEvent(census, incomesForEvent) {
+  const socioIncome = arr(incomesForEvent)
+    .filter(r => norm(r.Rango || r.rango || '') === 'socio')
+    .map(r => ({ row: r, name: trim(r.Nombre || r.nombre || r['Nombre persona'] || ''), key: canonicalNameKey(r.Nombre || r.nombre || r['Nombre persona'] || ''), numero: canonicalIncomeNumber(r) }))
+    .filter(r => r.name && !excludedFromAttendanceName(r.name) && r.numero > 0);
+  function directPair(pair) {
+    return socioIncome.some(r => (r.key === pair.key) && r.numero >= pair.size);
+  }
+  function directSingle(name) {
+    const key = canonicalNameKey(name);
+    return socioIncome.some(r => r.key === key);
+  }
+  const asistentes = [];
+  const noAsisten = [];
+  census.forEach(item => {
+    if (item.kind === 'pair') {
+      if (directPair(item)) {
+        asistentes.push({ name: item.name, size: item.size, kind: 'pair' });
+        return;
+      }
+      const present = [];
+      const missing = [];
+      item.parts.forEach(part => { directSingle(part) ? present.push(part) : missing.push(part); });
+      if (!present.length) {
+        noAsisten.push({ name: item.name, size: item.size, kind: 'pair' });
+      } else {
+        present.forEach(part => asistentes.push({ name: part, size: 1, kind: 'single' }));
+        missing.forEach(part => noAsisten.push({ name: part, size: 1, kind: 'single' }));
+      }
+      return;
+    }
+    if (directSingle(item.name)) asistentes.push({ name: item.name, size: 1, kind: 'single' });
+    else noAsisten.push({ name: item.name, size: 1, kind: 'single' });
+  });
+  asistentes.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  noAsisten.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  return {
+    asistentes,
+    noAsisten,
+    totalSocios: census.reduce((a,x)=>a+num(x.size),0),
+    totalAsistentes: asistentes.reduce((a,x)=>a+num(x.size),0),
+    totalNoAsisten: noAsisten.reduce((a,x)=>a+num(x.size),0)
+  };
+}
+function canonicalAttendanceSummaryFromContext(context) {
+  const mods = context?.modulosExtraidos || {};
+  const census = buildCanonicalSocioCensus(arr(mods.PERSONAS));
+  const incomes = arr(mods.INGRESOS);
+  const events = eventNamesFromContext(context);
+  return events.map(ev => {
+    const pack = buildCanonicalSocioAttendanceForEvent(census, rowsForEvent(incomes, ev));
+    return { Evento: ev, ...pack };
+  });
+}
 function asksMissingAttendees(prompt) {
   const p = norm(prompt);
   return /\b(no\s+asistir|no\s+asistiran|no\s+asistir[aá]n|no\s+asisten|no\s+asistentes|no\s+estar[aá]n|no\s+estaran|no\s+estan|no\s+est[aá]n|no\s+esten\s+registrad|no\s+est[eé]n\s+registrad|no\s+figuran|no\s+aparecen|faltan\s+socios|socios?\s+que\s+faltan)\b/.test(p)
     || (/\bsocios?\b/.test(p) && /\b(no\s+est[eé]n|no\s+esten|exceptuando|excluyendo)\b/.test(p) && /\b(evento|ingresos|asist)\b/.test(p));
 }
-function excludedFromAttendanceName(name) {
-  const n = norm(name);
-  return !n || /^personas\b/.test(n) || /^grupo\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
-}
-function promptRequiresNumeroUno(prompt) {
-  return /\b(?:numero|n[uú]mero|num)\s*[=:]?\s*['\"]?1['\"]?\b/i.test(text(prompt));
-}
-function personaNumero(row) {
-  return num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
-}
-function nameAppearsInRegisteredPerson(personName, registeredNames) {
-  const n = norm(personName);
-  if (!n) return false;
-  return arr(registeredNames).some(x => {
-    const r = norm(x);
-    return r && (r === n || r.includes(n) || n.includes(r));
-  });
-}
 function missingAttendeesTablesAndCharts(context, prompt = '') {
   const mods = context?.modulosExtraidos || {};
-  const requireNumeroUno = promptRequiresNumeroUno(prompt);
-  let persons = arr(mods.PERSONAS).filter(p => norm(p.Rango) === 'socio' && !excludedFromAttendanceName(p['Nombre persona']));
-  const personsBeforeNumero = persons.length;
-  const hasNumeroData = persons.some(p => personaNumero(p) > 0);
-  if (requireNumeroUno) {
-    persons = hasNumeroData
-      ? persons.filter(p => personaNumero(p) === 1)
-      : persons.filter(p => !/\s+y\s+|\s+e\s+/i.test(trim(p['Nombre persona'])));
-  }
+  const census = buildCanonicalSocioCensus(arr(mods.PERSONAS));
   const incomes = arr(mods.INGRESOS);
   const events = eventNamesFromContext(context);
-  if (!persons.length || !events.length) {
-    const reason = requireNumeroUno
-      ? `No hay PERSONAS con rango SOCIO y Numero=1 disponibles para calcular socios no asistentes. Candidatos SOCIO antes de aplicar Numero=1: ${personsBeforeNumero}. Si PERSONAS no tiene campo Numero, ControlEvent intenta interpretar Numero=1 como socio individual, excluyendo nombres compuestos con y/e.`
-      : 'No hay PERSONAS con rango SOCIO disponibles para calcular socios no asistentes.';
-    return { tables: [], charts: [], resumenTexto: '', warnings: persons.length ? [] : [reason] };
+  if (!census.length || !events.length) {
+    return { tables: [], charts: [], resumenTexto: '', warnings: census.length ? [] : ['No hay PERSONAS con rango SOCIO disponibles para calcular asistencia canónica.'] };
   }
-  const detail = [];
   const summary = [];
+  const detail = [];
   events.forEach(ev => {
-    const regNames = rowsForEvent(incomes, ev).map(r => trim(r.Nombre));
-    const missing = persons.filter(p => !nameAppearsInRegisteredPerson(p['Nombre persona'], regNames));
-    missing.forEach(p => detail.push({ Evento: ev, 'Socio no registrado en INGRESOS': trim(p['Nombre persona']), Rango: trim(p.Rango), Numero: personaNumero(p) || '', Motivo: `Está en PERSONAS como SOCIO${requireNumeroUno ? ' con Numero=1' : ''} y no figura en INGRESOS del evento` }));
-    summary.push({ Evento: ev, 'Socios válidos en PERSONAS': persons.length, 'Socios con ingreso/asistencia registrada': persons.length - missing.length, 'Socios no registrados en este evento': missing.length, Criterio: requireNumeroUno ? (hasNumeroData ? 'Rango=SOCIO, Numero=1, excluyendo Grupo..., Personas..., z_de... y z_DEV...' : 'Rango=SOCIO e interpretación Numero=1 como socio individual; excluye nombres con y/e, Grupo..., Personas..., z_de... y z_DEV...') : 'Rango=SOCIO, excluyendo Grupo..., Personas..., z_de... y z_DEV...' });
+    const pack = buildCanonicalSocioAttendanceForEvent(census, rowsForEvent(incomes, ev));
+    summary.push({
+      Evento: ev,
+      'Socios canónicos': pack.totalSocios,
+      'Socios asistentes': pack.totalAsistentes,
+      'Socios no asistentes': pack.totalNoAsisten,
+      Criterio: 'Rango=SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero > 0, aunque estén Pendiente.'
+    });
+    pack.asistentes.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO asistente', Socio: x.name, Personas: x.size, Motivo: x.size > 1 ? 'Pareja/grupo canónico registrado como colaborador del evento' : 'Socio canónico registrado como colaborador del evento' }));
+    pack.noAsisten.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO no asistente', Socio: x.name, Personas: x.size, Motivo: 'Socio canónico que no figura como colaborador SOCIO con Numero > 0 en el evento' }));
   });
-  const summaryCols = ['Evento','Socios válidos en PERSONAS','Socios con ingreso/asistencia registrada','Socios no registrados en este evento','Criterio'];
-  const detailCols = ['Evento','Socio no registrado en INGRESOS','Rango','Numero','Motivo'];
+  const summaryCols = ['Evento','Socios canónicos','Socios asistentes','Socios no asistentes','Criterio'];
+  const detailCols = ['Evento','Tipo','Socio','Personas','Motivo'];
   const tables = [
-    { title: 'Resumen de socios no registrados/asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
-    { title: `Socios de PERSONAS que NO figuran en INGRESOS del evento (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
+    { title: 'Resumen canónico de socios asistentes/no asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
+    { title: `Detalle canónico de socios asistentes/no asistentes (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
   ];
-  const charts = summary.length === 1 ? [{ title: 'Socios con y sin asistencia registrada', type: 'donut', labels: ['Con ingreso/asistencia registrada','No registrados en el evento'], values: [num(summary[0]['Socios con ingreso/asistencia registrada']), num(summary[0]['Socios no registrados en este evento'])], unit: 'personas' }]
-    : [{ title: 'Socios no registrados por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no registrados en este evento'])), unit: 'personas' }];
-  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios no registrados en este evento']} socio(s) no figuran en INGRESOS de ${r['Socios válidos en PERSONAS']} socio(s) válidos (${r.Criterio})`).join(' | ');
+  const charts = summary.length === 1 ? [{ title: 'Socios canónicos con y sin asistencia', type: 'donut', labels: ['Socios asistentes','Socios no asistentes'], values: [num(summary[0]['Socios asistentes']), num(summary[0]['Socios no asistentes'])], unit: 'personas' }]
+    : [{ title: 'Socios no asistentes por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no asistentes'])), unit: 'personas' }];
+  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios asistentes']} asistentes y ${r['Socios no asistentes']} no asistentes sobre ${r['Socios canónicos']} socios canónicos`).join(' | ');
   return { tables, charts, resumenTexto, warnings: [] };
 }
 
@@ -1591,9 +1665,12 @@ function directEventReportIfApplicable(prompt, context) {
   const canonical = arr(context?.metricasCanonicas?.porEvento);
   const byEvent = new Map(canonical.map(r => [norm(r.Evento), r]));
   const mods = context.modulosExtraidos || {};
+  const canonicalAttendance = canonicalAttendanceSummaryFromContext(context);
+  const canonicalAttendanceByEvent = new Map(canonicalAttendance.map(r => [norm(r.Evento), r]));
   const rows = events.map(ev => {
     const can = byEvent.get(norm(ev)) || {};
     const ing = rowsForEvent(arr(mods.INGRESOS), ev);
+    const att = canonicalAttendanceByEvent.get(norm(ev));
     const com = rowsForEvent(arr(mods.COMPRAS), ev);
     const don = rowsForEvent(arr(mods.DONACIONES), ev);
     const tk = rowsForEvent(arr(mods.TICKETS), ev);
@@ -1613,14 +1690,17 @@ function directEventReportIfApplicable(prompt, context) {
       'Saldo ingresos - compras (€)': saldo,
       'Valor compras + donaciones (€)': valoracion,
       'Colaboradores': can['Colaboradores registros'] ?? ing.length,
-      'Asistentes / número': round(can['Asistentes / Numero'] ?? ing.reduce((a,r)=>a+num(r?.Numero),0),3),
+      'Socios canónicos': att ? att.totalSocios : '',
+      'Socios asistentes canónicos': att ? att.totalAsistentes : '',
+      'Socios no asistentes canónicos': att ? att.totalNoAsisten : '',
+      'Asistentes / número': att ? att.totalAsistentes : round(can['Asistentes / Numero'] ?? ing.reduce((a,r)=>a+num(r?.Numero),0),3),
       'Líneas compras': can['Compras registros'] ?? com.length,
       'Líneas donaciones': can['Donaciones registros'] ?? don.length,
       'Tickets': can['Tickets numero'] ?? tk.length,
       'Documentos': can['Documentos numero'] ?? doc.length
     };
   });
-  const columns = ['Evento','Ingresos total (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo ingresos - compras (€)','Valor compras + donaciones (€)','Colaboradores','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
+  const columns = ['Evento','Ingresos total (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo ingresos - compras (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
   const rowsTable = rows.map(r => columns.map(c => text(r[c])));
   const charts = [
     { title: 'Ingresos, compras y donaciones por evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Ingresos total (€)'],2)), unit: '€', series: [
@@ -1643,8 +1723,8 @@ function directEventReportIfApplicable(prompt, context) {
   addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
   addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
   addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
-  addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
-  addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
+  if (/(ticket|tickets|fototicket|fototickets|tk\s*\d*)/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
+  if (/(documento|documentos|doc\s*\d+|adjunto|adjuntos)/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
   const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context, prompt) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
@@ -2207,7 +2287,8 @@ function narrativeFactsFromResult(result) {
     if (t) add(tiendas, t, imp || 1);
     if (d) add(donantes, d, imp || 1);
   });
-  const examples = detalle.slice(0, 22).map(r => ({
+  const suppressDetailExamples = /control-event-local-informe-eventos/i.test(trim(result?.provider || ''));
+  const examples = suppressDetailExamples ? [] : detalle.slice(0, 22).map(r => ({
     evento: trim(r.Evento), papel: trim(r.Papel), producto: trim(r.Producto), unidades: trim(r.Unidades), importe: trim(r['Importe/valor (€)'] || r.Importe || r.Valor), detalle: trim(r.Detalle), relacionado: trim(r.Relacionado)
   }));
   return {
@@ -2408,9 +2489,10 @@ Reglas obligatorias:
 - Si el usuario pide opinión, da una opinión explícita de Zuzu, prudente y apoyada en datos. No digas que no puedes opinar si los datos permiten valorar participación, esfuerzo o relevancia.
 - Si el usuario dice "déjate de ControlEvent", debe notarse que habla Zuzu: usa primera persona con naturalidad, pero sin inventar datos.
 - Usa nombres, productos y cifras reales que aparecen en los datos resumidos. No inventes personas, importes, fechas ni incidencias.
+- No metas listas de ejemplos sueltos de compras/productos salvo que el usuario pida expresamente ranking, top o ejemplos. Para producto disponible, resume totales y remite la comparativa a las tablas; evita frases tipo "Producto: X, Uds: Y" en el texto narrativo.
 - Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
 - Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer y usa subtítulos cortos dentro del texto: Datos del evento, Socios que no asistirán/no registrados, Parte meteorológico. No dejes una parte fuera porque aparezca en tablas.
-- Si resultadoControlEvent incluye tablas de socios no registrados/no asistentes, menciona cuántos son y explica el criterio completo: PERSONAS con rango SOCIO; si el usuario pidió Numero=1, aplica y menciona Numero=1; no figuran en INGRESOS del evento; se excluyen patrones internos Grupo..., Personas..., z_de... y z_DEV....
+- Si resultadoControlEvent incluye tablas de socios asistentes/no asistentes, menciona cuántos son y explica el criterio canónico: PERSONAS con rango SOCIO; se excluyen Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero > 0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes canónicos.
 - ${limit}.
 - No uses markdown, no devuelvas tablas, no pegues JSON.
 - Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo", "se celebró", "se celebra hoy" ni "hoy 10 de julio" para eventos futuros.
@@ -2714,10 +2796,17 @@ function plannerGlobalFlag(raw, prompt) {
 }
 function inferPlannerModulesFromPrompt(prompt, localModules = []) {
   const p = norm(prompt);
-  const mods = new Set(arr(localModules).map(plannerModule).filter(Boolean));
+  // FIX25: en planes cerrados no heredamos módulos del detector local amplio.
+  // El detector local tiende a añadir TICKETS/DOCUMENTOS por palabras genéricas del informe,
+  // aunque el usuario haya pedido solo producto disponible, socios y meteo. Aquí inferimos
+  // únicamente desde la intención literal del prompt.
+  const mods = new Set();
   if (/producto\s+disponible|compras?\s+realiz|compras?\s+pend|donaciones?\s+de\s+producto|comparativa/.test(p)) ['EVENTOS','COMPRAS','DONACIONES','PRODUCTOS'].forEach(m => mods.add(m));
   if (/socio|socios|asistent|no\s+asistent|colaborador/.test(p)) ['INGRESOS','PERSONAS'].forEach(m => mods.add(m));
   if (/meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) ['EVENTOS','METEO'].forEach(m => mods.add(m));
+  // Si no se ha podido deducir nada desde el prompt, entonces sí usamos el plan local
+  // como respaldo mínimo, pero nunca como ampliación silenciosa.
+  if (!mods.size) arr(localModules).map(plannerModule).filter(Boolean).forEach(m => mods.add(m));
   if (!mods.size) mods.add('EVENTOS');
   return plannerUnique([...mods]);
 }
@@ -2875,6 +2964,10 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   const chosenIds = arr(ai?.eventIds).map(trim).filter(Boolean).length ? arr(ai.eventIds).map(trim).filter(Boolean) : exactEvents.map(e => e.id);
   const chosenTitles = arr(ai?.eventos).length ? arr(ai.eventos).map(trim).filter(Boolean) : exactEvents.map(e => e.titulo);
   let modules = ensurePlannerDependencies(arr(ai?.modules).length ? arr(ai.modules) : inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
+  // FIX25: aunque Zuzu o el detector local sugieran módulos accesorios, no se extraen TICKETS/DOCUMENTOS
+  // salvo petición explícita. Evita anexos gigantes y datos que no venían a cuento en comparativas.
+  if (!/(ticket|tickets|fototicket|fototickets|tk\s*\d*)/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
+  if (!/(documento|documentos|doc\s*\d+|adjunto|adjuntos)/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
   const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
 
   if (!ai && !chosenIds.length && strictRequested) {
@@ -2981,13 +3074,16 @@ function sortResultTables(result) {
 }
 function scopeMetaFromContext(context) {
   const evs = arr(context?.eventosObjetivo);
+  const strictMode = /ALCANCE_ESTRICTO|PLANTILLAS_CERRADAS/i.test(trim(context?.planZuzu?.modoExtraccion || ''));
   if (evs.length === 1) {
     const e = evs[0] || {};
     const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
     const estado = trim(e.Estado || e.situacion || '');
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
-  if (evs.length > 1) return { eventHeader: `Consulta global · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
+  if (evs.length > 1) {
+    return { eventHeader: `${strictMode ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: strictMode ? 'multi-event-restricted' : 'multi-event', eventCount: evs.length };
+  }
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }
 function dominantSubjectFromPrompt(prompt, result) {
