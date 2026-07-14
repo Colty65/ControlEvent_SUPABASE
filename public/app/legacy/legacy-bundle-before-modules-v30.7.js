@@ -378,10 +378,7 @@ function defaultState(){
       {id:uid(), nombre:'Ana', rango:'SOCIO'},
       {id:uid(), nombre:'Fundación amiga', rango:'DONANTE'}
     ],
-    eventos: [
-      {id:uid(), titulo:'Comida Primavera', precio:15, fechaIni:'01/05/25', fechaFin:'02/05/25', situacion:'En curso', descripcion:'Evento de ejemplo para organizar compras y colaboración económica.'},
-      {id:uid(), titulo:'Cena Verano', precio:20, fechaIni:'15/08/25', fechaFin:'16/08/25', situacion:'En curso', descripcion:'Segundo evento de ejemplo.'}
-    ],
+    eventos: [],
     tiendas: [
       {id:uid(), nombre:'Leroy Merlin'},
       {id:uid(), nombre:'Mercadona'}
