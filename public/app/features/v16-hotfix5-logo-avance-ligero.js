@@ -17,7 +17,12 @@
   const safe=(fn,fb)=>{try{const v=fn(); return v===undefined?fb:v;}catch(_){return fb;}};
   const st=()=>safe(()=> (typeof state!=='undefined'&&state)||window.state||window.ControlEventApp?.state||{}, window.state||window.ControlEventApp?.state||{});
   const arr=name=>Array.isArray(st()[name])?st()[name]:[];
-  const evId=()=>txt($('selectedEvent')?.value || st().selectedEventId || '');
+  function evId(){
+    const sel=$('selectedEvent');
+    // Si el selector existe y está en "Selecciona evento...", NO se permite caer al selectedEventId arrastrado del estado.
+    if(sel) return txt(sel.value || '');
+    return txt(st().selectedEventId || '');
+  }
   function selectedEvent(){
     const id=evId();
     return arr('eventos').find(e=>String(e?.id||'')===id) || safe(()=> typeof window.selectedEvent==='function'?window.selectedEvent():null,null) || {};

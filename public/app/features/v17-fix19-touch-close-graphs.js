@@ -21,7 +21,9 @@
   }
   function validSelectedEvent(){
     const sel = $('selectedEvent');
-    const id = norm(st().selectedEventId || (sel && sel.value) || '');
+    // Si hay selector y está vacío, estamos realmente en "Selecciona evento...".
+    // No usar selectedEventId viejo del estado porque abre el AVANCE vacío y el botón fantasma Cerrar.
+    const id = sel ? norm(sel.value || '') : norm(st().selectedEventId || '');
     if(!id) return false;
     const evs = arr('eventos');
     return !evs.length || evs.some(e => norm(e && e.id) === id);
@@ -247,6 +249,9 @@
     const loginActive = !!(overlay && !overlay.classList.contains('hidden'));
     const hasEvent = validSelectedEvent();
     const waiting = loginActive || !hasEvent;
+    if(waiting){
+      try{ $('ceHf48AvanceLayer')?.classList?.remove('visible'); $('ceV16Hf5AvanceLayer')?.classList?.remove('visible'); }catch(_){}
+    }
     document.body.classList.toggle('ce-v17-fix21-awaiting-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-no-event', !!waiting);
     document.body.classList.toggle('ce-v17-fix22-event-ready', !waiting);

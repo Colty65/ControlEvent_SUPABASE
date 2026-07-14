@@ -88,7 +88,10 @@ function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
   // Si solo hay GEMINI_MODEL global, se respeta antes de los fallback.
   splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
   let fallback;
-  if (t === 'zuzu-planner' || t === 'initial-planning-partial') {
+  if (t === 'zuzu-planner') {
+    // Para planificar módulos prima la latencia real: Flash primero. Lite estaba tardando/agotando Vercel en producción.
+    fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  } else if (t === 'initial-planning-partial') {
     fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   } else if (t === 'zuzu-narrative') {
     const tier = trim(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIER || process.env.CONTROLEVENT_ZUZU_COST_MODE || 'auto').toLowerCase();
@@ -2679,38 +2682,36 @@ function plannerSchema() {
   };
 }
 function plannerPrompt(userPrompt, catalog) {
-  const eventos = arr(catalog?.eventos).map(e => `${trim(e.titulo)} | id=${trim(e.id)} | inicio=${trim(e.fechaInicio)} | fin=${trim(e.fechaFin)} | estado=${trim(e.situacion)}`).filter(Boolean).join('\n');
+  const eventos = arr(catalog?.eventos).map(e => trim(e.titulo)).filter(Boolean).join(' | ');
   const modulos = arr(catalog?.modulosDisponibles).join(', ');
   const today = trim(catalog?.fechaActualControlEvent) || todayIsoMadrid();
-  return `Eres Zuzu, PLANIFICADOR DE MÓDULOS de ControlEvent. NO redactes el informe final y NO inventes datos.
+  return `Eres Zuzu, planificador de módulos de ControlEvent. No respondas al informe final.
 
-FECHA ACTUAL CONTROLEVENT: ${today}
-ZONA HORARIA: Europe/Madrid
+Fecha actual ControlEvent: ${today}
+Zona horaria: Europe/Madrid
 
-Tu único trabajo es leer el prompt del usuario y decir qué módulos necesita ControlEvent para extraer datos. ControlEvent ejecutará después.
+Prompt del usuario:
+${trim(userPrompt).slice(0, 2400)}
 
-MÓDULOS DISPONIBLES:
+Módulos disponibles:
 ${modulos}
 
-EVENTOS DISPONIBLES (elige por título exacto si el usuario nombra eventos):
+Eventos disponibles para validar título exacto:
 ${eventos}
 
-PROMPT DEL USUARIO:
-${trim(userPrompt).slice(0, 2600)}
+Responde SOLO con estas 5 líneas, sin Markdown y sin explicación extra:
+EVENTOS_SOLICITADOS: ...
+MODULOS_NECESARIOS: ...
+MODULOS_NO_NECESARIOS: ...
+CONSULTA_GLOBAL: SI/NO
+MOTIVO: ...
 
-Responde SOLO en este formato de texto, sin JSON, sin Markdown y sin explicación adicional:
-EVENTOS_SOLICITADOS: título exacto 1 | título exacto 2 | título exacto 3
-MODULOS_NECESARIOS: EVENTOS, COMPRAS, DONACIONES, PRODUCTOS, PERSONAS, INGRESOS, METEO
-MODULOS_NO_NECESARIOS: DOCUMENTOS, TICKETS
-CONSULTA_GLOBAL: NO
-MOTIVO: una frase breve
-
-Reglas obligatorias:
-- Si el usuario dice SOLO, exactos, no consulta global o enumera eventos concretos, CONSULTA_GLOBAL debe ser NO.
-- Si pide asistentes/socios/no asistentes, incluye INGRESOS y PERSONAS.
-- Si pide producto disponible, incluye COMPRAS, DONACIONES y PRODUCTOS.
-- Si pide meteorología/tiempo/fechas, incluye EVENTOS y METEO.
-- No incluyas DOCUMENTOS ni TICKETS salvo que el usuario los pida expresamente.`;
+Reglas:
+- Si el usuario dice SOLO, exactos o no consulta global, CONSULTA_GLOBAL: NO.
+- Para producto disponible: EVENTOS, COMPRAS, DONACIONES, PRODUCTOS.
+- Para socios/asistentes/no asistentes: INGRESOS, PERSONAS.
+- Para meteorología: METEO.
+- No uses DOCUMENTOS ni TICKETS salvo petición expresa.`;
 }
 function splitPlannerList(value) {
   return text(value)
@@ -2729,45 +2730,54 @@ function normalizePlannerModule(value) {
   return allowed.includes(v) ? v : '';
 }
 function parsePlannerPlainText(raw, userPrompt, catalog) {
-  const txt = stripJsonText(raw);
-  try {
-    const obj = JSON.parse(txt);
-    return {
-      ok: obj.ok !== false,
-      needsClarification: obj.needsClarification === true,
-      clarification: trim(obj.clarification || ''),
-      modules: arr(obj.modules || obj.modulos || obj.modulosNecesarios).map(normalizePlannerModule).filter(Boolean),
-      modulosNoNecesarios: arr(obj.modulosNoNecesarios || obj.modulesNotNeeded || obj.modulos_no_necesarios).map(normalizePlannerModule).filter(Boolean),
-      eventos: arr(obj.eventos || obj.eventosSolicitados || obj.eventos_solicitados).map(trim).filter(Boolean),
-      todosLosEventos: obj.todosLosEventos === true || obj.consultaGlobal === true,
-      filters: obj.filters || {},
-      dataRequests: arr(obj.dataRequests),
-      salidaDeseada: arr(obj.salidaDeseada),
-      reasoning: trim(obj.reasoning || obj.motivo || '') || 'Zuzu planificador devolvió JSON interpretable.'
-    };
-  } catch (_) {}
-  const eventosTxt = extractPlannerField(raw, 'EVENTOS_SOLICITADOS');
-  const modsTxt = extractPlannerField(raw, 'MODULOS_NECESARIOS');
-  const noModsTxt = extractPlannerField(raw, 'MODULOS_NO_NECESARIOS');
-  const globalTxt = extractPlannerField(raw, 'CONSULTA_GLOBAL');
-  const motivo = extractPlannerField(raw, 'MOTIVO');
+  const rawText = text(raw);
+  const trimmed = trim(rawText);
+  // Solo intentamos JSON si la respuesta empieza claramente por JSON. En texto normal con [SySA 2024]
+  // no recortamos por corchetes porque se pierden las líneas de módulos.
+  if (/^[\s`]*(?:```(?:json)?\s*)?[\[{]/i.test(trimmed)) {
+    try {
+      const obj = JSON.parse(stripJsonText(trimmed));
+      return {
+        ok: obj.ok !== false,
+        needsClarification: obj.needsClarification === true,
+        clarification: trim(obj.clarification || ''),
+        modules: arr(obj.modules || obj.modulos || obj.modulosNecesarios).map(normalizePlannerModule).filter(Boolean),
+        modulosNoNecesarios: arr(obj.modulosNoNecesarios || obj.modulesNotNeeded || obj.modulos_no_necesarios).map(normalizePlannerModule).filter(Boolean),
+        eventos: arr(obj.eventos || obj.eventosSolicitados || obj.eventos_solicitados).map(trim).filter(Boolean),
+        todosLosEventos: obj.todosLosEventos === true || obj.consultaGlobal === true,
+        filters: obj.filters || {},
+        dataRequests: arr(obj.dataRequests),
+        salidaDeseada: arr(obj.salidaDeseada),
+        reasoning: trim(obj.reasoning || obj.motivo || '') || 'Zuzu planificador devolvió JSON interpretable.'
+      };
+    } catch (_) { /* caemos al parser de texto */ }
+  }
+  const eventosTxt = extractPlannerField(rawText, 'EVENTOS_SOLICITADOS');
+  const modsTxt = extractPlannerField(rawText, 'MODULOS_NECESARIOS');
+  const noModsTxt = extractPlannerField(rawText, 'MODULOS_NO_NECESARIOS');
+  const globalTxt = extractPlannerField(rawText, 'CONSULTA_GLOBAL');
+  const motivo = extractPlannerField(rawText, 'MOTIVO');
   let modules = splitPlannerList(modsTxt).map(normalizePlannerModule).filter(Boolean);
   if (!modules.length) {
-    // Lectura tolerante de respuestas tipo viñetas: * EVENTOS: ...
-    const found = text(raw).match(/\b(EVENTOS|INGRESOS|COMPRAS|DONACIONES|PERSONAS|PRODUCTOS|METEO|DOCUMENTOS|TICKETS)\b/gi) || [];
+    // Lectura tolerante de respuestas explicativas tipo la prueba externa de Gemini:
+    // "* EVENTOS: Esencial... * COMPRAS: Requerido..."
+    const found = rawText.match(/\b(EVENTOS|INGRESOS|COMPRAS|DONACIONES|PERSONAS|PRODUCTOS|METEO|DOCUMENTOS|TICKETS)\b/gi) || [];
     modules = [...new Set(found.map(normalizePlannerModule).filter(Boolean))];
   }
+  // En respuestas explicativas puede mencionar módulos no necesarios. Si hay bloque explícito, lo restamos.
   const modulosNoNecesarios = splitPlannerList(noModsTxt).map(normalizePlannerModule).filter(Boolean);
+  if (modulosNoNecesarios.length) modules = modules.filter(m => !modulosNoNecesarios.includes(m));
   let eventos = splitPlannerList(eventosTxt).filter(x => !/^(ninguno|sin evento|no aplica|n\/a)$/i.test(x));
-  if (!eventos.length) {
-    const eventTitles = arr(catalog?.eventos).map(e => trim(e?.titulo)).filter(Boolean);
-    const p = norm(userPrompt);
-    eventos = eventTitles.filter(t => p.includes(norm(t)));
-  }
+  const eventTitles = arr(catalog?.eventos).map(e => trim(e?.titulo)).filter(Boolean);
+  const pnorm = norm(userPrompt);
+  const explicitlyMentioned = eventTitles.filter(t => pnorm.includes(norm(t)));
+  if (!eventos.length) eventos = explicitlyMentioned;
+  // Si el prompt contiene títulos exactos, esos mandan sobre lo que haya escrito Zuzu.
+  if (explicitlyMentioned.length) eventos = explicitlyMentioned;
   const globalNorm = norm(globalTxt);
   const promptClosed = /\b(solo|exactos?|no\s+hagas\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos)\b/i.test(userPrompt);
   const todosLosEventos = !promptClosed && /\b(si|s[ií]|true|todos|global)\b/.test(globalNorm);
-  if (!modules.length) throw new Error('Zuzu planificador no indicó módulos utilizables.');
+  if (!modules.length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${trim(rawText).slice(0, 600)}`);
   return {
     ok: true,
     needsClarification: false,
@@ -2806,7 +2816,8 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = []) {
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Petición ultraligera: solo módulos, eventos y alcance; sin datos operativos.`);
       sizeTrace(flowTrace, 'Paso 1 · Zuzu planificador', 'Contexto ultraligero enviado al planificador', plannerText);
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, 12000);
+      const plannerTimeout = Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 8000);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, plannerTimeout);
       logGeminiUsage('PASO 1 planificación ultraligera de módulos', model, payload);
       if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
       const outText = trim(geminiOutText(payload));
