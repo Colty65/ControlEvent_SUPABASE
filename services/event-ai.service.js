@@ -2810,7 +2810,6 @@ function shouldUseGeminiPlanner(userPrompt, local) {
 async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
   const closedScope = /\b(solo|exactos?|no\s+hagas\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos)\b/i.test(userPrompt);
-  zuzuTracePush(flowTrace, 'Paso 0 · Plan local CE', 'INFO', `Plan local disponible como detector técnico, no como respuesta: módulos=${arr(local.modules).join(', ') || 'sin módulos'}; eventos=${arr(local.eventos).join(' | ') || 'sin evento'}; todos=${local.todosLosEventos === true}.`);
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
     return {
       ...local,

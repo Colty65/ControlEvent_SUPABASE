@@ -236,16 +236,26 @@
     const layer=$('ceV16Hf5AvanceLayer'); if(layer) layer.classList.remove('visible');
     clearTimeout(timer);
   }
+  function showWelcomeInfoInstead(){
+    closeAvance();
+    const info=window.ControlEventV17Fix27WelcomeInfoGeneral;
+    if(info && typeof info.showInfo==='function'){
+      try{ info.showInfo(); return true; }catch(_){ }
+    }
+    return false;
+  }
   function toggleAvance(ev){
     if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
     const now=Date.now();
     if(now-lastToggle<260) return false;
     lastToggle=now;
+    if(!evId()) { showWelcomeInfoInstead(); return false; }
     const layer=$('ceV16Hf5AvanceLayer');
     if(layer?.classList?.contains('visible')) closeAvance(); else showAvance();
     return false;
   }
   function showAvance(){
+    if(!evId()) { showWelcomeInfoInstead(); return; }
     // Por si algún handler antiguo se ha disparado, limpiamos sus capas sin tocar el resto.
     try{ $('ceHf47AvanceBubbleLayer')?.remove(); $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
     let layer=$('ceV16Hf5AvanceLayer');
