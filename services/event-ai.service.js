@@ -1714,10 +1714,14 @@ function directEventReportIfApplicable(prompt, context) {
     const tk = rowsForEvent(arr(mods.TICKETS), ev);
     const doc = rowsForEvent(arr(mods.DOCUMENTOS), ev);
     const ingresos = round(can['Ingresos total'] ?? ing.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const ingresosRealizados = round(ing.filter(r=>!/pendiente/i.test(trim(r?.Ingreso || r?.ingreso || ''))).reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const ingresosPendientes = round(Math.max(0, ingresos - ingresosRealizados), 2);
     const compras = round(can['Compras realizadas'] ?? sumField(com.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
     const pendientes = round(can['Compras pendientes'] ?? sumField(com.filter(r=>/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
+    const comprasPrevistas = round(compras + pendientes, 2);
     const donaciones = round(can['Donaciones valor'] ?? sumField(don,'Valor'),2);
-    const saldo = round(can['Saldo actual'] ?? (ingresos-compras),2);
+    const saldoActual = round(ingresosRealizados - compras,2);
+    const saldoOperativo = round(ingresos - comprasPrevistas,2);
     const valoracion = round(can['Valoracion con donaciones'] ?? (compras+donaciones),2);
     const estadoEvento = firstNonEmpty(can.Estado, metaByEvent.get(norm(ev))?.Estado);
     return {
@@ -1725,10 +1729,14 @@ function directEventReportIfApplicable(prompt, context) {
       Estado: estadoEvento,
       'Nota estado': eventStateNoteForRow(ev, metaByEvent),
       'Ingresos total (€)': ingresos,
+      'Ingresos realizados (€)': ingresosRealizados,
+      'Ingresos pendientes (€)': ingresosPendientes,
       'Compras realizadas (€)': compras,
       'Compras pendientes (€)': pendientes,
+      'Compras previstas (€)': comprasPrevistas,
       'Donaciones valoradas (€)': donaciones,
-      'Saldo ingresos - compras (€)': saldo,
+      'Saldo actual (€)': saldoActual,
+      'Saldo operativo (€)': saldoOperativo,
       'Valor compras + donaciones (€)': valoracion,
       'Colaboradores': can['Colaboradores registros'] ?? ing.length,
       'Socios canónicos': att ? att.totalSocios : '',
@@ -1741,17 +1749,19 @@ function directEventReportIfApplicable(prompt, context) {
       'Documentos': can['Documentos numero'] ?? doc.length
     };
   });
-  const columns = ['Evento','Estado','Nota estado','Ingresos total (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo ingresos - compras (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
+  const columns = ['Evento','Estado','Nota estado','Ingresos total (€)','Ingresos realizados (€)','Ingresos pendientes (€)','Compras realizadas (€)','Compras pendientes (€)','Compras previstas (€)','Donaciones valoradas (€)','Saldo actual (€)','Saldo operativo (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
   const rowsTable = rows.map(r => columns.map(c => text(r[c])));
   const chartLabels = rows.map(r => eventLabelWithState(r.Evento, metaByEvent));
   const hasInProgressEvents = rows.some(r => isEventInProgressValue(r.Estado));
   const charts = [
     { title: `Ingresos, compras y donaciones por evento${hasInProgressEvents ? ' · En curso marcado' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Ingresos total (€)'],2)), unit: '€', series: [
-      { name: 'Ingresos', values: rows.map(r=>round(r['Ingresos total (€)'],2)) },
+      { name: 'Ingresos previstos', values: rows.map(r=>round(r['Ingresos total (€)'],2)) },
       { name: 'Compras realizadas', values: rows.map(r=>round(r['Compras realizadas (€)'],2)) },
+      { name: 'Compras pendientes', values: rows.map(r=>round(r['Compras pendientes (€)'],2)) },
       { name: 'Donaciones valoradas', values: rows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
     ] },
-    { title: `Saldo por evento${hasInProgressEvents ? ' · provisional si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo ingresos - compras (€)'],2)), unit: '€' },
+    { title: `Saldo actual por evento${hasInProgressEvents ? ' · caja disponible/provisional si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo actual (€)'],2)), unit: '€' },
+    { title: `Saldo operativo por evento${hasInProgressEvents ? ' · previsión al cierre si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo operativo (€)'],2)), unit: '€' },
     { title: `Volumen de registros por evento${hasInProgressEvents ? ' · En curso abierto' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>num(r['Líneas compras'])+num(r['Líneas donaciones'])+num(r.Colaboradores)), unit: 'registros' }
   ];
   const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|parte\s+meteorolog|parte\s+metereolog|meteorolog|metereolog|meteo|previsi[oó]n|lluvia|temperatura|calor|fr[ií]o|viento)\b/.test(p);
@@ -1772,7 +1782,7 @@ function directEventReportIfApplicable(prompt, context) {
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
   const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones, tickets/fototickets, documentos y saldo${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más la meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo = ingresos - compras realizadas; las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
@@ -2492,7 +2502,7 @@ function fallbackEventReportNarrativeForLocalReport(prompt, result, context = {}
     const ev = trim(r.Evento);
     const estado = trim(r.Estado);
     const provisional = /en\s*curso/i.test(estado) ? ' (En curso: cifras provisionales)' : '';
-    return `${ev}${provisional}: ingresos ${trim(r['Ingresos total (€)']) || '0'} €, compras realizadas ${trim(r['Compras realizadas (€)']) || '0'} €, compras pendientes ${trim(r['Compras pendientes (€)']) || '0'} €, donaciones valoradas ${trim(r['Donaciones valoradas (€)']) || '0'} €, saldo ${trim(r['Saldo ingresos - compras (€)']) || '0'} € y valor compras+donaciones ${trim(r['Valor compras + donaciones (€)']) || '0'} €`;
+    return `${ev}${provisional}: ingresos previstos ${trim(r['Ingresos total (€)']) || '0'} €, ingresos realizados ${trim(r['Ingresos realizados (€)']) || '0'} €, compras realizadas ${trim(r['Compras realizadas (€)']) || '0'} €, compras pendientes ${trim(r['Compras pendientes (€)']) || '0'} €, donaciones valoradas ${trim(r['Donaciones valoradas (€)']) || '0'} €, saldo actual ${trim(r['Saldo actual (€)']) || '0'} €, saldo operativo ${trim(r['Saldo operativo (€)']) || '0'} € y valor compras+donaciones ${trim(r['Valor compras + donaciones (€)']) || '0'} €`;
   };
   const inProgress = rows.filter(r => /en\s*curso/i.test(trim(r.Estado || r['Nota estado']))).map(r => trim(r.Evento)).filter(Boolean);
   const sociosText = socios.length ? socios.map(r => `${trim(r.Evento)}: ${trim(r['Socios asistentes'])} asistentes y ${trim(r['Socios no asistentes'])} no asistentes sobre ${trim(r['Socios canónicos'])} socios canónicos`).join('; ') : '';
@@ -2500,7 +2510,7 @@ function fallbackEventReportNarrativeForLocalReport(prompt, result, context = {}
   const totals = rows.map(line).join('. ');
   return `Resumen técnico ControlEvent: la consulta está restringida a ${rows.length} evento(s) y los cálculos se han hecho con plantillas cerradas, sin mezclar otros eventos. ${totals}.
 
-Lectura de producto disponible: los eventos finalizados son comparables como cierre; ${inProgress.length ? `${inProgress.join(', ')} está En curso y por tanto sus compras pendientes, donaciones, ingresos y saldo todavía pueden cambiar antes del cierre.` : 'no hay eventos En curso en esta comparativa.'} La comparación debe leer compras realizadas y pendientes por separado, y no confundir saldo financiero con valoración total del producto disponible.
+Lectura de producto disponible y saldos: los eventos finalizados son comparables como cierre; ${inProgress.length ? `${inProgress.join(', ')} está En curso y por tanto sus compras pendientes, donaciones, ingresos y saldos todavía pueden cambiar antes del cierre.` : 'no hay eventos En curso en esta comparativa.'} La comparación debe leer compras realizadas y pendientes por separado. Saldo actual = dinero efectivamente ingresado menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas. No conviene confundir saldos financieros con valoración total del producto disponible.
 
 Socios: ${sociosText || 'la asistencia canónica queda en las tablas.'}. Criterio aplicado: rango SOCIO, exclusión de registros técnicos/grupo/Peña, parejas con " y " como 2 personas, y colaboradores SOCIO con Numero >= 0 como asistentes, incluyendo exentos de pago con Numero=0.
 
@@ -2532,12 +2542,12 @@ function fallbackNarrativeForLocalReport(prompt, result, context = {}) {
   if (saldo) parts.push(`saldo ${saldo}`);
   const cifras = parts.length ? parts.join(', ') : 'actividad registrada en los módulos disponibles';
   if (tone.id === 'tecnico-financiero') {
-    return `Lectura ejecutiva de Zuzu: el informe de ${evento} presenta ${cifras}. El análisis separa la caja financiera de las donaciones valoradas: el saldo se interpreta como ingresos menos compras realizadas, mientras que las donaciones se muestran como aportación operativa adicional.\n\nConclusión: el detalle de tablas y ficheros permite justificar ingresos/colaboradores, gasto por compras, aportaciones donadas, tickets/fototickets y documentación soporte. Conviene revisar cualquier línea negativa o de ajuste antes de entregar el informe como cierre definitivo.`;
+    return `Lectura ejecutiva de Zuzu: el informe de ${evento} presenta ${cifras}. El análisis separa la caja financiera de las donaciones valoradas: el saldo actual se interpreta como ingresos realizados menos compras realizadas, y el saldo operativo como ingresos previstos menos compras previstas; las donaciones se muestran como aportación operativa adicional.\n\nConclusión: el detalle de tablas y ficheros permite justificar ingresos/colaboradores, gasto por compras, aportaciones donadas, tickets/fototickets y documentación soporte. Conviene revisar cualquier línea negativa o de ajuste antes de entregar el informe como cierre definitivo.`;
   }
   if (tone.id === 'coloquial-socios') {
     return `Lectura de Zuzu para contar a los socios: en ${evento} ${hasFutureEvent ? 'hay movimiento previsto y preparado' : 'hubo movimiento del bueno'}: ${cifras}. Traducido a cristiano, aquí no solo hay números; hay gente que colaboró, compras que sostuvieron la celebración y donaciones que ayudaron a que la cosa saliera adelante sin que la caja tuviera que cargar con todo.\n\nEl resumen detallado viene debajo con pelos y señales: colaboradores${colaboradores ? ` (${colaboradores})` : ''}, asistentes${asistentes ? ` (${asistentes})` : ''}, tickets${tickets ? ` (${tickets})` : ''} y documentos${documentos ? ` (${documentos})` : ''}. Vamos, que si alguien pregunta “¿y esto de dónde sale?”, hay papeles y números para aburrir a una oveja, pero contado bonito.`;
   }
-  return `Lectura general de Zuzu: el informe de ${evento} resume ${cifras}. Las tablas siguientes dejan trazabilidad por ingresos/colaboradores, compras, donaciones, tickets/fototickets y documentos.\n\nLa idea principal es separar la visión financiera de caja de la actividad real del evento: la caja se mide por ingresos menos compras realizadas, y las donaciones explican valor recibido aunque no entren como ingreso monetario.`;
+  return `Lectura general de Zuzu: el informe de ${evento} resume ${cifras}. Las tablas siguientes dejan trazabilidad por ingresos/colaboradores, compras, donaciones, tickets/fototickets y documentos.\n\nLa idea principal es separar la visión financiera de caja de la actividad real del evento: la caja real se mide por saldo actual (ingresos realizados menos compras realizadas), el cierre previsible por saldo operativo, y las donaciones explican valor recibido aunque no entren como ingreso monetario.`;
 }
 function narrativeMiniSchema() {
   return {
@@ -2565,7 +2575,8 @@ Reglas:
 - Usa cifras reales del resumen CE y habla claro: totales, comparación, criterio y conclusión.
 - Si hay evento En curso, avisa que sus cifras son provisionales y no lo compares como cierre definitivo.
 - Si hay socios, explica el criterio canónico: rango SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2; asistentes = colaboradores SOCIO con Numero >= 0, incluyendo exentos con Numero=0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes.
-- Si se pide meteorología y datosIndirectos.meteorologia trae filas, incluye temperatura máxima/mínima, lluvia, viento y cielo. No digas que no hay datos.
+- Si se pide meteorología y datosIndirectos.meteorologia.ok=true trae filas sin Aviso, incluye temperatura máxima/mínima, lluvia, viento, cielo, localidad y fuente. Si no hay datos meteorológicos externos fiables, dilo y NO inventes previsión.
+- Distingue siempre saldo actual y saldo operativo cuando aparezcan: saldo actual = ingresos realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas.
 - Si el evento es futuro, habla en futuro/condicional; si pasó, en pasado; si está En curso, en presente.
 - Si el usuario pide opinión, da una opinión prudente apoyada en datos.
 - Tono: ${tone.instruction}
@@ -3235,8 +3246,8 @@ function weatherCodeText(code) {
   if ([95,96,99].includes(c)) return 'Tormenta';
   return `Código ${trim(code)}`;
 }
-async function maybeFetchWeatherContext(userPrompt, context, flowTrace = []) {
-  if (!wantsWeatherInfo(userPrompt)) return null;
+async function maybeFetchWeatherContext(userPrompt, context, flowTrace = [], force = false) {
+  if (!force && !wantsWeatherInfo(userPrompt)) return null;
   const evs = arr(context?.eventosObjetivo);
   if (!evs.length) {
     zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'El usuario pide tiempo/clima, pero no hay evento objetivo con fechas.');
@@ -3398,9 +3409,16 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   };
   zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
 
-  const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace);
+  const weatherRequested = wantsWeatherInfo(userPrompt) || /\bMETEO\b/i.test(JSON.stringify(plan || {}));
+  const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace, weatherRequested);
   if (weatherCtx) {
     context.infoIndirecta = { ...(context.infoIndirecta || {}), meteorologia: weatherCtx };
+    if (!weatherCtx.ok) {
+      context.advertencias = arr(context.advertencias).concat('Se pidió meteorología, pero ControlEvent no obtuvo datos externos fiables; Zuzu no debe inventar previsión.');
+    }
+  } else if (weatherRequested) {
+    zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'Meteorología solicitada, pero no se pudo iniciar consulta externa.');
+    context.advertencias = arr(context.advertencias).concat('Se pidió meteorología, pero ControlEvent no pudo iniciar la consulta externa.');
   }
 
   const done = (result) => finalizeZuzuResult(result, context, userPrompt, flowTrace);
