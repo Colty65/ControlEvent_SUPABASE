@@ -2301,20 +2301,28 @@ function tableObjects(table, maxRows = 30) {
 }
 function pickNarrativeTables(result) {
   const tables = arr(result?.tables);
+  const provider = trim(result?.provider || '');
+  // FIX27: para informes comparativos grandes, Zuzu solo necesita resúmenes, no cientos de líneas de compras/donaciones.
+  if (/control-event-local-informe-eventos/i.test(provider)) {
+    const keep = tables.filter(tb => /resumen\s+operativo|resumen\s+canonico|resumen\s+canónico|meteorolog|metereolog|tiempo|clima|previsi[oó]n/i.test(norm(tb?.title || '')));
+    if (keep.length) return keep.slice(0, 4);
+  }
   const scored = tables.map((tb, idx) => {
     const t = norm(tb?.title || '');
     let score = 0;
     if (/resumen|cronica|crónica|comparativa|participaci|saldo|ranking|operativo/.test(t)) score += 10;
-    if (/detalle.*registros|detalle.*donaciones|detalle.*compras|detalle.*ingresos/.test(t)) score += 7;
-    else if (/detalle/.test(t)) score -= 1;
+    if (/detalle.*registros|detalle.*donaciones|detalle.*compras|detalle.*ingresos/.test(t)) score += 3;
+    else if (/detalle/.test(t)) score -= 4;
     return { tb, idx, score };
   }).sort((a,b)=>b.score-a.score || a.idx-b.idx);
   return scored.slice(0, 4).map(x => x.tb);
 }
+
 function narrativeFactsFromResult(result) {
   const roles = objectsFromResultTable(result, /resumen.*papel/, 50);
   const eventos = objectsFromResultTable(result, /resumen.*evento.*papel|resumen.*evento/, 50);
-  const detalle = objectsFromResultTable(result, /detalle.*registros|registros.*localizados|detalle/, 240);
+  const suppressDetailExamples = /control-event-local-informe-eventos/i.test(trim(result?.provider || ''));
+  const detalle = suppressDetailExamples ? [] : objectsFromResultTable(result, /detalle.*registros|registros.*localizados|detalle/, 160);
   const topProducto = new Map();
   const topImporte = new Map();
   const tiendas = new Map();
@@ -2331,8 +2339,7 @@ function narrativeFactsFromResult(result) {
     if (t) add(tiendas, t, imp || 1);
     if (d) add(donantes, d, imp || 1);
   });
-  const suppressDetailExamples = /control-event-local-informe-eventos/i.test(trim(result?.provider || ''));
-  const examples = suppressDetailExamples ? [] : detalle.slice(0, 22).map(r => ({
+  const examples = suppressDetailExamples ? [] : detalle.slice(0, 16).map(r => ({
     evento: trim(r.Evento), papel: trim(r.Papel), producto: trim(r.Producto), unidades: trim(r.Unidades), importe: trim(r['Importe/valor (€)'] || r.Importe || r.Valor), detalle: trim(r.Detalle), relacionado: trim(r.Relacionado)
   }));
   return {
@@ -2474,7 +2481,35 @@ Conclusión: los datos permiten considerar a ${who} como participante significat
 Mi valoración es positiva: no parece una presencia testimonial, sino una colaboración efectiva y con peso dentro de la organización del evento. Debajo queda el detalle para revisar cada línea sin perder trazabilidad.`;
 }
 
+
+function fallbackEventReportNarrativeForLocalReport(prompt, result, context = {}) {
+  if (!/control-event-local-informe-eventos/i.test(trim(result?.provider || ''))) return '';
+  const rows = objectsFromResultTable(result, /resumen\s+operativo\s+por\s+evento/, 20);
+  if (!rows.length) return '';
+  const socios = objectsFromResultTable(result, /resumen\s+canonico|resumen\s+canónico/, 20);
+  const weather = goodWeatherRowsFromContext(context);
+  const line = r => {
+    const ev = trim(r.Evento);
+    const estado = trim(r.Estado);
+    const provisional = /en\s*curso/i.test(estado) ? ' (En curso: cifras provisionales)' : '';
+    return `${ev}${provisional}: ingresos ${trim(r['Ingresos total (€)']) || '0'} €, compras realizadas ${trim(r['Compras realizadas (€)']) || '0'} €, compras pendientes ${trim(r['Compras pendientes (€)']) || '0'} €, donaciones valoradas ${trim(r['Donaciones valoradas (€)']) || '0'} €, saldo ${trim(r['Saldo ingresos - compras (€)']) || '0'} € y valor compras+donaciones ${trim(r['Valor compras + donaciones (€)']) || '0'} €`;
+  };
+  const inProgress = rows.filter(r => /en\s*curso/i.test(trim(r.Estado || r['Nota estado']))).map(r => trim(r.Evento)).filter(Boolean);
+  const sociosText = socios.length ? socios.map(r => `${trim(r.Evento)}: ${trim(r['Socios asistentes'])} asistentes y ${trim(r['Socios no asistentes'])} no asistentes sobre ${trim(r['Socios canónicos'])} socios canónicos`).join('; ') : '';
+  const weatherText = weather.length ? weather.map(r => `${trim(r.Evento)} ${trim(r.Fecha)}: ${trim(r.Cielo)}, máxima ${r['Temp. máx']} ºC, mínima ${r['Temp. mín']} ºC, lluvia ${r['Prob. lluvia %']} %, viento ${r['Viento km/h']} km/h`).join('; ') : '';
+  const totals = rows.map(line).join('. ');
+  return `Resumen técnico ControlEvent: la consulta está restringida a ${rows.length} evento(s) y los cálculos se han hecho con plantillas cerradas, sin mezclar otros eventos. ${totals}.
+
+Lectura de producto disponible: los eventos finalizados son comparables como cierre; ${inProgress.length ? `${inProgress.join(', ')} está En curso y por tanto sus compras pendientes, donaciones, ingresos y saldo todavía pueden cambiar antes del cierre.` : 'no hay eventos En curso en esta comparativa.'} La comparación debe leer compras realizadas y pendientes por separado, y no confundir saldo financiero con valoración total del producto disponible.
+
+Socios: ${sociosText || 'la asistencia canónica queda en las tablas.'}. Criterio aplicado: rango SOCIO, exclusión de registros técnicos/grupo/Peña, parejas con " y " como 2 personas, y colaboradores SOCIO con Numero >= 0 como asistentes, incluyendo exentos de pago con Numero=0.
+
+${weatherText ? `Meteorología: ${weatherText}.\n\n` : ''}Conclusión técnica: con los datos actuales, el evento En curso debe interpretarse como una foto provisional. La decisión correcta no es exigirle saldo parecido a un evento cerrado, sino comprobar si el producto disponible previsto —compras realizadas + pendientes + donaciones— está proporcionalmente alineado con los años cerrados.`;
+}
+
 function fallbackNarrativeForLocalReport(prompt, result, context = {}) {
+  const eventFallback = fallbackEventReportNarrativeForLocalReport(prompt, result, context);
+  if (eventFallback) return eventFallback;
   const temporal = narrativeTemporalContext(context);
   const hasFutureEvent = arr(temporal.eventos).some(e => e.relacionTemporal === 'futuro');
   const personFallback = fallbackPersonNarrativeForLocalReport(prompt, result, context);
@@ -2520,38 +2555,26 @@ function narrativePrompt(userPrompt, localResult, context) {
   const onePage = wantsOnePageNarrative(userPrompt);
   const enriched = { ...localResult, __userPrompt: userPrompt };
   const compact = compactResultForNarrative(enriched, context);
-  const ctx = compactJson({ tono: tone.label, instruccionesTono: tone.instruction, modoTextoLargo: onePage, resultadoControlEvent: compact }, onePage ? 20000 : 13000);
-  const limit = onePage ? 'entre 5 y 8 párrafos, con aspecto de una página de texto, hasta 6500 caracteres' : 'entre 4 y 7 párrafos, hasta 4200 caracteres si la pregunta tiene varias partes';
-  return `Eres Zuzu, la voz final de ControlEvent. ControlEvent ya ha hecho la parte fría: cálculos, tablas, gráficas y CSV. Tu trabajo NO es rellenar una plantilla: debes leer el prompt completo, captar intención, destinatario, tono y contexto, y escribir una respuesta humana, bonita y útil como si realmente te hubieran encargado a ti el informe.
+  const ctx = compactJson({ tono: tone.label, instruccionesTono: tone.instruction, resultadoControlEvent: compact }, onePage ? 12000 : 7500);
+  const limit = onePage ? '5 a 8 párrafos y máximo 5500 caracteres' : '4 a 6 párrafos y máximo 3200 caracteres';
+  return `Eres Zuzu, voz final de ControlEvent. ControlEvent ya calculó datos, tablas y gráficas: tú solo redactas una lectura humana y útil, sin inventar nada.
 
-Reglas obligatorias:
-- NO respondas como ControlEvent. No empieces con frases mecánicas tipo "He localizado X registros", "Informe operativo" o "Separado por papeles". Puedes usar los números, pero integrados en una explicación humana.
-- Esta redacción debe ser ORIGINAL para esta petición concreta. Prohibido reutilizar plantillas o coletillas de otros informes.
-- No menciones nombres que no vengan en la petición original o en los datos oficiales de abajo. Si el usuario pregunta por Colty, no acabes hablando de Pocholo; si pregunta por Pocholo, no cambies a Colty.
-- Respeta exactamente el tono pedido: si el usuario pide cachondeo, socios, chascarrillos o palabras cercanas, escribe con gracia y complicidad; si pide Dirección/financiero/técnico, escribe sobrio, ejecutivo y justificable.
-- Si el resumen/contexto incluye usuarioLogado, haz que Zuzu parezca cercana al usuario conectado: en tono informal trátalo por Identificacion/apodo; en informe serio usa Nombre. No fuerces el saludo si queda raro, pero sí úsalo cuando aporte cercanía.
-- Si el usuario pide opinión, da una opinión explícita de Zuzu, prudente y apoyada en datos. No digas que no puedes opinar si los datos permiten valorar participación, esfuerzo o relevancia.
-- Si el usuario dice "déjate de ControlEvent", debe notarse que habla Zuzu: usa primera persona con naturalidad, pero sin inventar datos.
-- Usa nombres, productos y cifras reales que aparecen en los datos resumidos. No inventes personas, importes, fechas ni incidencias.
-- No metas listas de ejemplos sueltos de compras/productos salvo que el usuario pida expresamente ranking, top o ejemplos. Para producto disponible, resume totales y remite la comparativa a las tablas; evita frases tipo "Producto: X, Uds: Y" en el texto narrativo.
-- Las tablas son soporte y ya se mostrarán debajo. Tu answer debe ser un texto redactado que sirva por sí solo para leerlo o entregarlo.
-- Si el usuario pide varias cosas en la misma frase, respóndelas todas en el answer y usa subtítulos cortos dentro del texto: Datos del evento, Socios que no asistirán/no registrados, Parte meteorológico. No dejes una parte fuera porque aparezca en tablas.
-- Si resultadoControlEvent incluye tablas de socios asistentes/no asistentes, menciona cuántos son y explica el criterio canónico: PERSONAS con rango SOCIO; se excluyen Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero >= 0, incluyendo exentos de pago con Numero=0, aunque estén Pendiente; no asistentes = censo canónico menos asistentes canónicos.
-- ${limit}.
-- No uses markdown, no devuelvas tablas, no pegues JSON.
-- Si contextoTemporal indica que el evento es futuro, habla en futuro o en condicional: "hará", "está previsto", "habrá", "se espera". No escribas "cómo fue", "tuvimos", "hubo", "se celebró", "se celebra hoy" ni "hoy 10 de julio" para eventos futuros.
-- contextoTemporal.hoy es la fecha real de ControlEvent en Madrid. Tiene prioridad sobre la fecha del evento y sobre cualquier frase ambigua del modelo.
-- Si contextoTemporal indica que el evento ya pasó, habla en pasado. Si es hoy o está en curso, usa presente: "está previsto", "hay registrado", "se está organizando".
-- Si el usuario pide temperatura/tiempo/clima/lluvia/viento y datosIndirectos.meteorologia contiene filas, debes incluir en answer los datos concretos de meteorología: temperatura máxima y mínima, probabilidad de lluvia, viento y cielo. Prohibido decir que no dispones de esa información.
-- Si se han obtenido datos indirectos relacionados con el evento, intégralos en la respuesta principal con naturalidad. No los relegues solo a tablas.
-- Si aparecen saldo/caja/donaciones, aclara con naturalidad que el saldo financiero no suma donaciones si procede.
-- Si algún evento está marcado como En curso/abierto/preparación, deja claro que sus cifras son provisionales y evolucionan hasta el cierre; no lo compares como si fuera un evento finalizado.
-- Devuelve SOLO JSON válido con title, answer, warnings.
+Reglas:
+- Devuelve SOLO JSON válido con title, answer y warnings.
+- No pegues tablas, listas de productos ni JSON dentro de answer; las tablas se mostrarán debajo.
+- Usa cifras reales del resumen CE y habla claro: totales, comparación, criterio y conclusión.
+- Si hay evento En curso, avisa que sus cifras son provisionales y no lo compares como cierre definitivo.
+- Si hay socios, explica el criterio canónico: rango SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2; asistentes = colaboradores SOCIO con Numero >= 0, incluyendo exentos con Numero=0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes.
+- Si se pide meteorología y datosIndirectos.meteorologia trae filas, incluye temperatura máxima/mínima, lluvia, viento y cielo. No digas que no hay datos.
+- Si el evento es futuro, habla en futuro/condicional; si pasó, en pasado; si está En curso, en presente.
+- Si el usuario pide opinión, da una opinión prudente apoyada en datos.
+- Tono: ${tone.instruction}
+- Extensión: ${limit}. Cierra con una conclusión terminada, sin dejar frases abiertas.
 
-PETICIÓN ORIGINAL DEL USUARIO:
-${trim(userPrompt).slice(0, 3500)}
+PETICIÓN ORIGINAL:
+${trim(userPrompt).slice(0, 2200)}
 
-DATOS OFICIALES CALCULADOS POR CONTROLEVENT:
+RESUMEN OFICIAL CE:
 ${ctx}`;
 }
 
@@ -2643,10 +2666,10 @@ function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
 
 function narrativeCorrectionInstruction(userPrompt, context) {
   const rows = goodWeatherRowsFromContext(context);
-  const weather = rows.length ? `Meteorología disponible: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)}: ${trim(r.Cielo)}, máxima ${r['Temp. máx']} ºC, mínima ${r['Temp. mín']} ºC, lluvia ${r['Prob. lluvia %']} %, viento ${r['Viento km/h']} km/h`).join(' | ')}.` : '';
-  const temporal = narrativeTemporalContext(context);
-  return `\n\nCORRECCIÓN OBLIGATORIA DE CONTROLEVENT ANTES DE RESPONDER: ${weather} Contexto temporal: ${JSON.stringify(temporal)}. Si el evento es futuro, redacta en futuro. Si hay meteorología disponible, inclúyela en el texto principal y no digas que no dispones de ella. Si hay socios no registrados/no asistentes, menciona el número y el criterio exacto. Si el usuario pidió varias cosas, contesta todas con apartados breves. Si la respuesta anterior quedó cortada, reházla completa, cerrada y terminada con puntuación final.`;
+  const weather = rows.length ? ` Meteo: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)} ${trim(r.Cielo)} max ${r['Temp. máx']} min ${r['Temp. mín']} lluvia ${r['Prob. lluvia %']}% viento ${r['Viento km/h']}km/h`).join(' | ')}.` : '';
+  return `\n\nREINTENTO: responde completo en 4 apartados breves: Producto disponible, Socios, Meteorología, Conclusión. No omitas meteo ni socios. Cierra la respuesta.${weather}`;
 }
+
 async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace = []) {
   const apiKey = geminiKey();
   if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', 'Sin GEMINI_API_KEY para redactar informe con Zuzu.'); throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.'); }
@@ -2726,6 +2749,15 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       return out;
     }
   } catch (error) {
+    const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
+    if (fallback) {
+      out.answer = sanitizeTemporalAnswerForContext(fallback, context);
+      out.provider = `${trim(out.provider || 'control-event-local')}+redaccion-local`;
+      out.model = 'redaccion-local-por-fallo-zuzu';
+      out.showWarnings = true;
+      out.warnings = out.warnings.concat(`Zuzu no pudo completar la redacción humana (${friendlyZuzuErrorMessage(error)}). ControlEvent muestra una redacción técnica local claramente etiquetada para no dejar el informe vacío.`);
+      return out;
+    }
     const timeoutLike = /timeout|abort|tard[oó] demasiado|504/i.test(trim(error?.message || error));
     const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike;
     if (strict) {
@@ -2737,15 +2769,6 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
       return out;
     }
     zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error));
-    const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
-    if (fallback) {
-      out.answer = sanitizeTemporalAnswerForContext(fallback, context);
-      out.provider = `${trim(out.provider || 'control-event-local')}+redaccion-local`;
-      out.model = 'redaccion-local-por-fallo-zuzu';
-      out.showWarnings = true;
-      out.warnings = out.warnings.concat(`Zuzu no pudo redactar el texto narrativo (${friendlyZuzuErrorMessage(error)}). ControlEvent ha aplicado una redacción local de respaldo.`);
-      return out;
-    }
   }
   return out;
 }
@@ -2992,6 +3015,39 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
       reasoning: `${local.reasoning || 'Plan local de respaldo.'} Consulta simple de persona/identidad; no se invoca planificador externo.`,
       __zuzuPlannerProvider: 'local-consulta-simple',
       __zuzuGeminiAllRows: false
+    };
+  }
+
+  // FIX27: si ControlEvent ya resuelve eventos exactos del prompt, no se llama a Zuzu planificador.
+  // Evita el KO repetido por respuesta truncada del planificador y ahorra tiempo/tokens.
+  if (exactEvents.length && strictRequested) {
+    let modules = ensurePlannerDependencies(inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
+    if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
+    if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
+    const chosenTitles = exactEvents.map(e => e.titulo);
+    const chosenIds = exactEvents.map(e => e.id);
+    const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
+    zuzuTracePush(flowTrace, 'Paso 1 · Planificador CE', 'OK', `Eventos exactos detectados en el prompt; no se invoca Zuzu planificador. Plantillas cerradas sobre: ${chosenTitles.join(' | ')}. Módulos=${modules.join(', ')}.`);
+    return {
+      ok: true,
+      needsClarification: false,
+      clarification: '',
+      modules,
+      eventos: chosenTitles,
+      eventIds: chosenIds,
+      todosLosEventos: false,
+      filters: {},
+      dataRequests: [],
+      salidaDeseada: [],
+      queryTemplates,
+      reasoning: 'ControlEvent resolvió eventos exactos del prompt y ejecuta plantillas cerradas; Zuzu planificador no es necesario.',
+      __strictEventScope: true,
+      __queryTemplatePlan: true,
+      __zuzuPlannerProvider: 'control-event-plantillas-cerradas-eventos-exactos-sin-planificador',
+      __zuzuPlannerModel: '',
+      __zuzuPlannerUsage: null,
+      __zuzuGeminiAllRows: false,
+      plannerWarning: ''
     };
   }
 
@@ -3338,7 +3394,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     planificador: trim(plan?.__zuzuPlannerProvider || 'desconocido'),
     modeloPlanificador: trim(plan?.__zuzuPlannerModel || ''),
     usoPlanificador: plan?.__zuzuPlannerUsage || null,
-    politicaModelos: 'planificador=Flash-Lite primero; redacción/informes=Flash primero; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
+    politicaModelos: 'planificador=se omite si CE detecta eventos exactos; redacción/informes=Flash primero con contexto compacto; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
   };
   zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
 
