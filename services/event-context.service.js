@@ -1310,6 +1310,11 @@ function zuzuQueryFilterRows(rows, filters, matcher, moduleName) {
       const tk = row['Ticket u otros gastos'] || row.TKxx || row['TKxx, GASTOS CORRIENTES o Pte. Compra'] || '';
       if (!matcher.ticketMatches(tk)) return false;
     }
+    if (filters.estado?.length) {
+      const estadoText = [row.Ingreso, row.Estado, row['Ticket u otros gastos'], row['Tipo de donación'], row['Ticket SI/NO'], row['Just.ing']].filter(Boolean).join(' ');
+      const estados = arr(filters.estado).map(norm).filter(Boolean);
+      if (estados.length && !estados.some(st => norm(estadoText).includes(st))) return false;
+    }
     if (filters.personas?.length || filters.responsables?.length || filters.donantes?.length) {
       const peopleText = [row.Nombre, row['Nombre persona'], row.Colaborador, row.Responsable, row.Donante].filter(Boolean).join(' ');
       if (!matcher.peopleMatches(peopleText)) return false;
@@ -1555,6 +1560,73 @@ function zuzuMergePlanFilters(...items) {
   }
   return out;
 }
+
+function zuzuSqlTableToModule(name) {
+  const t = trim(name).toUpperCase().replace(/[^A-Z0-9_]/g, '').split('.').pop();
+  const map = {
+    EVENTO: 'EVENTOS', EVENTOS: 'EVENTOS', CE_EVENTOS: 'EVENTOS',
+    INGRESO: 'INGRESOS', INGRESOS: 'INGRESOS', COLABORADOR: 'INGRESOS', COLABORADORES: 'INGRESOS', CE_COLABORADORES: 'INGRESOS', CE_INGRESOS: 'INGRESOS',
+    COMPRA: 'COMPRAS', COMPRAS: 'COMPRAS', GASTO: 'COMPRAS', GASTOS: 'COMPRAS', CE_COMPRAS: 'COMPRAS',
+    DONACION: 'DONACIONES', DONACIONES: 'DONACIONES', CE_DONACIONES: 'DONACIONES',
+    PERSONA: 'PERSONAS', PERSONAS: 'PERSONAS', CE_PERSONAS: 'PERSONAS',
+    PRODUCTO: 'PRODUCTOS', PRODUCTOS: 'PRODUCTOS', CE_PRODUCTOS: 'PRODUCTOS',
+    TIENDA: 'TIENDAS', TIENDAS: 'TIENDAS', CE_TIENDAS: 'TIENDAS',
+    DOCUMENTO: 'DOCUMENTOS', DOCUMENTOS: 'DOCUMENTOS', CE_DOCUMENTOS: 'DOCUMENTOS',
+    TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS'
+  };
+  return map[t] || '';
+}
+function zuzuSqlTables(sql) {
+  const out = [];
+  const s = text(sql);
+  const from = s.match(/\bFROM\s+([\s\S]*?)(?:\bWHERE\b|\bGROUP\s+BY\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i)?.[1] || '';
+  from.split(/\bJOIN\b|,/i).forEach(part => {
+    const table = trim(part).split(/\s+/)[0].replace(/["'`\[\]]/g, '');
+    const mod = zuzuSqlTableToModule(table);
+    if (mod && !out.includes(mod)) out.push(mod);
+  });
+  return out;
+}
+function zuzuModulesFromSqlSelects(selects) {
+  const out = [];
+  arr(selects).forEach(sql => zuzuSqlTables(sql).forEach(m => { if (!out.includes(m)) out.push(m); }));
+  return out;
+}
+function zuzuQuotedSqlValues(value) {
+  const vals = [];
+  const re = /'([^']{1,120})'|"([^"]{1,120})"/g;
+  let m;
+  while ((m = re.exec(text(value)))) vals.push(trim(m[1] || m[2] || ''));
+  return vals.filter(Boolean);
+}
+function zuzuFiltersFromSqlSelects(selects) {
+  const filters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
+  const notes = [];
+  arr(selects).forEach(sql => {
+    const s = text(sql);
+    const upper = s.toUpperCase();
+    const values = zuzuQuotedSqlValues(s);
+    if (/\b(BANCO|EFECTIVO|BIZUM|PENDIENTE)\b/i.test(s) && /\b(INGRESO|ESTADO|FORMA|SITUACION|SITUACIÓN|PAGO)\b/i.test(s)) {
+      ['BANCO','EFECTIVO','BIZUM','PENDIENTE'].forEach(v => { if (upper.includes(v) && !filters.estado.includes(v)) filters.estado.push(v); });
+    }
+    if (/\b(RANGO|TIPO_PERSONA)\b/i.test(s)) {
+      values.forEach(v => { if (/SOCIO|NO\s*SOCIO/i.test(v) && !filters.rangos.includes(v.toUpperCase())) filters.rangos.push(v.toUpperCase()); });
+    }
+    if (/\b(NOMBRE|PERSONA|RESPONSABLE|DONANTE|COLABORADOR)\b/i.test(s)) {
+      values.forEach(v => {
+        if (/^id[-_a-z0-9]+$/i.test(v)) return;
+        if (/^(BANCO|EFECTIVO|BIZUM|PENDIENTE|SOCIO|NO SOCIO)$/i.test(v)) return;
+        if (!filters.personas.includes(v)) filters.personas.push(v);
+        if (!filters.responsables.includes(v)) filters.responsables.push(v);
+        if (!filters.donantes.includes(v)) filters.donantes.push(v);
+      });
+    }
+    if (/\b(PRODUCTO|ARTICULO|ARTÍCULO)\b/i.test(s)) values.forEach(v => { if (!filters.productos.includes(v)) filters.productos.push(v); });
+    if (/\b(TIENDA)\b/i.test(s)) values.forEach(v => { if (!filters.tiendas.includes(v)) filters.tiendas.push(v); });
+    notes.push({ select: trim(s).slice(0, 500), tablas: zuzuSqlTables(s), filtrosDetectados: JSON.parse(JSON.stringify(filters)) });
+  });
+  return { filters, notes };
+}
 function zuzuEventYear(ev) {
   const candidates = [ev?.fechaIni, ev?.fechaFin, ev?.fecha_ini, ev?.fecha_fin].map(trim).filter(Boolean);
   for (const raw of candidates) {
@@ -1606,7 +1678,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const allRowsMode = p.__zuzuGeminiAllRows === true;
   if (p.needsClarification && !localPlan.modules?.length && !arr(p.modules || p.modulos).length) return { needsClarification: true, clarification: p.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.' };
   const strictPlan = p.__strictEventScope === true || p.__queryTemplatePlan === true;
-  const rawPlanModules = arr(p.modules || p.modulos).map(zuzuUpperModule).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  const sqlSelects = arr(p.selectsPropuestos || p.selectsPropuestas || p.sqlSelects || p.selects).map(trim).filter(Boolean);
+  const sqlModules = zuzuModulesFromSqlSelects(sqlSelects).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  const rawPlanModules = zuzuUnique([].concat(arr(p.modules || p.modulos).map(zuzuUpperModule), sqlModules)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
   const modules = strictPlan
     ? zuzuUnique(rawPlanModules)
     : zuzuUnique([].concat(rawPlanModules, arr(localPlan.modules)).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
@@ -1637,7 +1711,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     return { needsClarification: true, clarification: strictPlan ? 'Zuzu/ControlEvent han detectado alcance cerrado, pero no se han podido resolver los eventos exactos. No extraigo datos para evitar mezclar eventos.' : 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: no he podido identificar el evento o eventos objetivo.' };
   }
   // Flujo Zuzu v21: Zuzu/plan de consulta decide módulos; ControlEvent ejecuta plantillas cerradas y parametrizadas.
-  const mergedFilters = strictPlan ? (p.filters || {}) : zuzuMergePlanFilters(localPlan.filters || {}, p.filters || {});
+  const sqlFilterPlan = zuzuFiltersFromSqlSelects(sqlSelects);
+  const mergedFilters = strictPlan ? zuzuMergePlanFilters(sqlFilterPlan.filters, p.filters || {}) : zuzuMergePlanFilters(localPlan.filters || {}, sqlFilterPlan.filters, p.filters || {});
   const filters = allRowsMode ? { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], anios: [], estado: [] } : zuzuSanitizeFiltersForPrompt(userPrompt, modules, mergedFilters);
   if (!strictPlan) eventIds = zuzuApplyEventFilters(eventIds, safeState, filters);
   if (!eventIds.length && modules.some(m => eventScopedModules.includes(m) || m === 'EVENTOS')) {
@@ -1662,10 +1737,10 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const context = {
     versionContexto: 'ControlEvent Zuzu Modules v21_prod',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'Zuzu decide módulos y redacta la respuesta final. ControlEvent no ejecuta SQL externo ni modifica datos; solo extrae módulos oficiales, completos y humanizados.' },
+    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL FIX30: Zuzu puede proponer SELECTS_PROPUESTOS; ControlEvent solo acepta SELECT de lectura, no ejecuta mutaciones y los aplica como plan/filtro sobre módulos oficiales ya cargados.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
-    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO'), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || '') },
+    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_VALIDOS_SOLO_LECTURA' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
     metricasCanonicas,
@@ -1677,7 +1752,8 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-3-FLUJO-ZUZU', regla: 'Primero Zuzu planifica módulos y filtros; después ControlEvent extrae datos completos y humanizados; finalmente Zuzu cocina/formatea la respuesta usando el prompt original y esos datos.' },
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
-      { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' }
+      { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' },
+      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En esta versión experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent los usa como guía de módulos/filtros. No ejecutes SQL ni inventes resultados: usa modulosExtraidos y planZuzu.selectsAplicados.' }
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',

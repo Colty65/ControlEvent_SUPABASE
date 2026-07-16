@@ -2933,14 +2933,78 @@ function queryTemplatesForPlan(modules, prompt) {
   if (mods.has('EVENTOS')) out.push('eventos_objetivo');
   return [...new Set(out)];
 }
+
+function cleanPlannerSqlText(value) {
+  return trim(value)
+    .replace(/^```(?:sql)?/i, '')
+    .replace(/```$/i, '')
+    .replace(/[\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function isSafePlannerSelect(sql) {
+  const s0 = cleanPlannerSqlText(sql).replace(/;\s*$/, '').trim();
+  if (!s0 || /^(NINGUNO|NINGUNA|NO|NONE)$/i.test(s0)) return { ok: false, reason: 'vacío/NINGUNO' };
+  if (!/^SELECT\b/i.test(s0)) return { ok: false, reason: 'no empieza por SELECT' };
+  if (/;\s*\S/.test(cleanPlannerSqlText(sql))) return { ok: false, reason: 'contiene varias sentencias' };
+  if (/--|\/\*|\*\/|#/i.test(s0)) return { ok: false, reason: 'contiene comentarios' };
+  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|UPSERT|CALL|EXEC|EXECUTE|DO|COPY|GRANT|REVOKE|VACUUM|ANALYZE|REFRESH)\b/i.test(s0)) return { ok: false, reason: 'contiene verbo no permitido' };
+  if (/\b(AUTH|STORAGE|VAULT|SECRET|SECRETS|PG_|INFORMATION_SCHEMA|HTTP|NET|EXTENSION)\b/i.test(s0)) return { ok: false, reason: 'referencia a esquema/función no permitido' };
+  if (s0.length > 1800) return { ok: false, reason: 'SELECT demasiado largo' };
+  return { ok: true, sql: s0 };
+}
+function splitPlannerSelects(section) {
+  const raw = trim(section);
+  if (!raw || /^(NINGUNO|NINGUNA|NO|NONE)$/i.test(raw)) return [];
+  const lines = raw.replace(/```(?:sql)?/gi, '').replace(/```/g, '').split(/\n+/).map(trim).filter(Boolean);
+  const candidates = [];
+  if (lines.filter(x => /^SELECT\b/i.test(x)).length > 1) candidates.push(...lines.filter(x => /^SELECT\b/i.test(x)));
+  else candidates.push(...raw.split(/;(?=\s*SELECT\b|\s*$)/i).map(trim).filter(Boolean));
+  return candidates;
+}
+function plannerSelectsFromText(raw) {
+  const section = plannerSection(raw, ['SELECTS_PROPUESTOS', 'CONSULTAS_SELECT', 'SQL_SELECTS', 'SELECTS']);
+  const out = [];
+  const rejected = [];
+  splitPlannerSelects(section).forEach(candidate => {
+    const safe = isSafePlannerSelect(candidate);
+    if (safe.ok) out.push(safe.sql);
+    else if (trim(candidate) && !/^(NINGUNO|NINGUNA|NO|NONE)$/i.test(trim(candidate))) rejected.push({ sql: trim(candidate).slice(0, 300), motivo: safe.reason });
+  });
+  return { selects: out.slice(0, 5), rejected };
+}
+function plannerModulesFromSelects(selects) {
+  const map = {
+    EVENTO: 'EVENTOS', EVENTOS: 'EVENTOS', CE_EVENTOS: 'EVENTOS',
+    INGRESO: 'INGRESOS', INGRESOS: 'INGRESOS', COLABORADOR: 'INGRESOS', COLABORADORES: 'INGRESOS', CE_COLABORADORES: 'INGRESOS', CE_INGRESOS: 'INGRESOS',
+    COMPRA: 'COMPRAS', COMPRAS: 'COMPRAS', GASTO: 'COMPRAS', GASTOS: 'COMPRAS', CE_COMPRAS: 'COMPRAS',
+    DONACION: 'DONACIONES', DONACIONES: 'DONACIONES', CE_DONACIONES: 'DONACIONES',
+    PERSONA: 'PERSONAS', PERSONAS: 'PERSONAS', CE_PERSONAS: 'PERSONAS',
+    PRODUCTO: 'PRODUCTOS', PRODUCTOS: 'PRODUCTOS', CE_PRODUCTOS: 'PRODUCTOS',
+    TIENDA: 'TIENDAS', TIENDAS: 'TIENDAS', CE_TIENDAS: 'TIENDAS',
+    DOCUMENTO: 'DOCUMENTOS', DOCUMENTOS: 'DOCUMENTOS', CE_DOCUMENTOS: 'DOCUMENTOS',
+    TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS'
+  };
+  const mods = [];
+  arr(selects).forEach(sql => {
+    const s = text(sql).toUpperCase();
+    const m = s.match(/\bFROM\s+([\s\S]*?)(?:\bWHERE\b|\bGROUP\s+BY\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i);
+    const from = m ? m[1] : '';
+    const parts = from.split(/\bJOIN\b|,/i).map(x => trim(x).split(/\s+/)[0].replace(/[^A-Z0-9_\.]/gi, '').split('.').pop().toUpperCase()).filter(Boolean);
+    parts.forEach(t => { const mod = map[t]; if (mod && !mods.includes(mod)) mods.push(mod); });
+  });
+  return plannerUnique(mods);
+}
 function parsePlannerText(raw, catalog, userPrompt, localModules = []) {
   const catalogEvents = arr(catalog?.eventos || catalog?.events);
   const activeEvent = catalog?.eventoActivo || catalog?.activeEvent || null;
   const exactEvents = exactEventTitlesFromPrompt(userPrompt, catalogEvents);
   const aiEvents = eventsFromPlannerText(raw, catalogEvents, activeEvent);
   const chosenEvents = aiEvents.length ? aiEvents : exactEvents;
+  const sp = plannerSelectsFromText(raw);
+  const selectModules = plannerModulesFromSelects(sp.selects);
   const rawModules = modulesFromPlannerText(raw);
-  const modules = ensurePlannerDependencies(rawModules.length ? rawModules : inferPlannerModulesFromPrompt(userPrompt, localModules), userPrompt);
+  const modules = ensurePlannerDependencies(rawModules.length ? plannerUnique([].concat(rawModules, selectModules)) : (selectModules.length ? selectModules : inferPlannerModulesFromPrompt(userPrompt, localModules)), userPrompt);
   const consultaGlobal = strictScopeRequested(userPrompt) || chosenEvents.length ? false : plannerGlobalFlag(raw, userPrompt);
   const motivo = plannerSection(raw, ['MOTIVO', 'RAZONAMIENTO']) || 'Plan generado por Zuzu planificador en texto simple y validado por ControlEvent.';
   const pf = plannerFiltersFromText(raw);
@@ -2956,7 +3020,10 @@ function parsePlannerText(raw, catalog, userPrompt, localModules = []) {
     dataRequests: pf.conditions ? [{ tipo: 'condiciones_acceso', texto: pf.conditions }] : [],
     queryTemplates: queryTemplatesForPlan(modules, userPrompt),
     salidaDeseada: [],
-    reasoning: `${motivo}${pf.conditions ? ` Condiciones propuestas por Zuzu: ${pf.conditions}` : ''}`,
+    reasoning: `${motivo}${pf.conditions ? ` Condiciones propuestas por Zuzu: ${pf.conditions}` : ''}${sp.selects.length ? ` SELECTs propuestos por Zuzu validados por CE: ${sp.selects.length}.` : ''}`,
+    selectsPropuestos: sp.selects,
+    selectsRechazados: sp.rejected,
+    __sqlSelectExperiment: sp.selects.length > 0,
     __strictEventScope: strictScopeRequested(userPrompt) || chosenEvents.length > 0,
     __queryTemplatePlan: true,
     __rawPlannerText: trim(raw).slice(0, 2000)
@@ -2978,7 +3045,7 @@ EVENTO_EN_PANTALLA: ${activeLine}
 
 MODULOS_A_ELEGIR:
 - EVENTOS: título, fechas, estado, precio, descripción.
-- INGRESOS: colaboradores, importes obligatorios/voluntarios, estado de ingreso BANCO/EFECTIVO/PENDIENTE, socios/no socios, justificantes.
+- INGRESOS: colaboradores, importes obligatorios/voluntarios, estado de ingreso BANCO/EFECTIVO/BIZUM/PENDIENTE, socios/no socios, justificantes.
 - COMPRAS: compras realizadas, pendientes, gastos, tiendas, responsables, tickets.
 - DONACIONES: donaciones de producto, donante literal registrado, responsable, valoración.
 - PERSONAS: maestro de personas/rango; útil para socios/no socios y cruces.
@@ -2998,7 +3065,7 @@ MODULOS_NO_NECESARIOS: módulos separados por coma
 PERSONAS_IMPLICADAS: nombres si la pregunta nombra personas; si no, NINGUNA
 CONDICIONES_DATOS: filtros concretos de acceso a datos; por ejemplo estado ingreso, rango, donante, responsable, compras pendientes/realizadas; si no, NINGUNA
 CONSULTA_GLOBAL: SI o NO
-SELECTS_PROPUESTOS: opcional, solo SELECT simbólico o NINGUNO; no uses INSERT/UPDATE/DELETE
+SELECTS_PROPUESTOS: opcional, solo SELECT de lectura o NINGUNO; no uses INSERT/UPDATE/DELETE ni varias sentencias
 MOTIVO: una frase breve
 
 Reglas:
@@ -3051,7 +3118,7 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
       parsed.__zuzuPlannerUsage = usageSmall(payload, model);
       parsed.__rawPlannerText = outText.slice(0, 2000);
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Respuesta: ${outText.slice(0, 900)}`, { model, usage: usageSmall(payload, model) });
-      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador validado', 'OK', `Módulos=${arr(parsed.modules).join(', ')}; eventos=${arr(parsed.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed.todosLosEventos ? 'SI' : 'NO'}; filtros=${JSON.stringify(parsed.filters || {})}; plantillas=${arr(parsed.queryTemplates).join(', ') || 'sin plantillas'}`);
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador validado', 'OK', `Módulos=${arr(parsed.modules).join(', ')}; eventos=${arr(parsed.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed.todosLosEventos ? 'SI' : 'NO'}; filtros=${JSON.stringify(parsed.filters || {})}; plantillas=${arr(parsed.queryTemplates).join(', ') || 'sin plantillas'}; SELECTs válidos=${arr(parsed.selectsPropuestos).length}; SELECTs rechazados=${arr(parsed.selectsRechazados).length}`);
       if (parsed.plannerWarning) zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', parsed.plannerWarning);
       return parsed;
     } catch (error) {
@@ -3178,7 +3245,10 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
     dataRequests: arr(ai?.dataRequests),
     salidaDeseada: arr(ai?.salidaDeseada),
     queryTemplates,
-    reasoning: trim(ai?.reasoning || '') || (ai ? 'Zuzu ha deducido módulos y filtros en texto simple; ControlEvent ejecuta plantillas cerradas.' : 'Plan de plantillas cerradas construido con eventos exactos del prompt y reglas genéricas de dependencias.'),
+    selectsPropuestos: arr(ai?.selectsPropuestos),
+    selectsRechazados: arr(ai?.selectsRechazados),
+    __sqlSelectExperiment: arr(ai?.selectsPropuestos).length > 0,
+    reasoning: trim(ai?.reasoning || '') || (ai ? 'Zuzu ha deducido módulos, filtros y SELECTs orientativos en texto simple; ControlEvent valida SELECTs y los usa como plan de extracción de solo lectura.' : 'Plan de plantillas cerradas construido con eventos exactos del prompt y reglas genéricas de dependencias.'),
     __strictEventScope: strictRequested || chosenIds.length > 0,
     __queryTemplatePlan: true,
     __zuzuPlannerProvider: ai ? 'zuzu-planner-texto-simple' : 'control-event-plantillas-cerradas-por-eventos-exactos',
