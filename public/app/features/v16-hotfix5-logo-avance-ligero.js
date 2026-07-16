@@ -316,7 +316,7 @@
       try{ clone.style.cssText=(old.getAttribute('style')||'')+';cursor:pointer;'; }catch(_){ }
       old.replaceWith(clone);
     }
-    document.querySelectorAll('.ce-brand-logo-safe').forEach(logo=>{
+    document.querySelectorAll('.ce-brand-logo-safe,.brand,.brand-user,#brandCurrentUserName,#brandCurrentUserMeta').forEach(logo=>{
       if(logo.__ceV16Hf5Bound) return;
       logo.__ceV16Hf5Bound=true;
       logo.addEventListener('click',toggleAvance, true);
