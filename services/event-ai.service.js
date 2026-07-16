@@ -2790,9 +2790,9 @@ function plannerModule(value) {
   const map = {
     RECAUDACION: 'INGRESOS', ASISTENTES: 'INGRESOS', ASISTENCIA: 'INGRESOS', ENTRADAS: 'INGRESOS', COLABORADORES: 'INGRESOS',
     DONACION: 'DONACIONES', DONACIONES_PRODUCTO: 'DONACIONES', PRODUCTO_DONADO: 'DONACIONES',
-    GASTOS: 'COMPRAS', GASTOS_CORRIENTES: 'COMPRAS', PTE_COMPRA: 'COMPRAS', PRODUCTO_DISPONIBLE: 'COMPRAS',
+    GASTOS: 'COMPRAS', GASTOS_CORRIENTES: 'COMPRAS', PTE_COMPRA: 'COMPRAS', PENDIENTE_COMPRA: 'COMPRAS', PAGO: 'INGRESOS', PAGOS: 'INGRESOS', COBRO: 'INGRESOS', COBROS: 'INGRESOS', PAGADO: 'INGRESOS', PENDIENTE_PAGO: 'INGRESOS', PRODUCTO_DISPONIBLE: 'COMPRAS',
     PRODUCTO: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS',
-    SOCIOS: 'PERSONAS', PERSONA: 'PERSONAS',
+    SOCIOS: 'PERSONAS', SOCIO: 'PERSONAS', PERSONAS: 'PERSONAS', PERSON: 'PERSONAS', PERSONA: 'PERSONAS',
     METEOROLOGIA: 'METEO', METEREOLOGIA: 'METEO', CLIMA: 'METEO', TIEMPO: 'METEO', PREVISION: 'METEO', PRONOSTICO: 'METEO',
     TICKET: 'TICKETS', TKS: 'TICKETS', DOCUMENTO: 'DOCUMENTOS'
   };
@@ -2809,10 +2809,12 @@ function splitPlannerItems(value) {
 function plannerSection(textValue, labels) {
   const raw = text(textValue);
   const names = arr(labels).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const re = new RegExp('(?:^|\\n)\\s*(?:' + names + ')\\s*[:=]\\s*([\\s\\S]*?)(?=\\n\\s*(?:EVENTOS_SOLICITADOS|EVENTOS|MODULOS_NECESARIOS|MÓDULOS_NECESARIOS|MODULOS_NO_NECESARIOS|MÓDULOS_NO_NECESARIOS|CONSULTA_GLOBAL|ALCANCE|MOTIVO|PLANTILLAS|QUERY|SQL)\\s*[:=]|$)', 'i');
+  const stops = 'EVENTOS_SOLICITADOS|EVENTOS_NECESARIOS|EVENTOS|ALCANCE_EVENTOS|MODULOS_NECESARIOS|MÓDULOS_NECESARIOS|MODULOS_NO_NECESARIOS|MÓDULOS_NO_NECESARIOS|CONSULTA_GLOBAL|ALCANCE|PERSONAS_IMPLICADAS|CONDICIONES_DATOS|CONDICIONES_ACCESO|FILTROS_DATOS|FILTROS|SELECTS_PROPUESTOS|CONSULTAS_SELECT|MOTIVO|PLANTILLAS|QUERY|SQL';
+  const re = new RegExp('(?:^|\\n)\\s*(?:' + names + ')\\s*[:=]\\s*([\\s\\S]*?)(?=\\n\\s*(?:' + stops + ')\\s*[:=]|$)', 'i');
   const m = raw.match(re);
   return m ? trim(m[1]) : '';
 }
+
 function strictScopeRequested(prompt) {
   const p = norm(prompt);
   return /\b(solo|exactos?|estricto|restringid|no\s+hagas\s+consulta\s+global|no\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/.test(p);
@@ -2841,17 +2843,24 @@ function exactEventTitlesFromPrompt(prompt, catalogEvents) {
   });
   return out;
 }
-function eventsFromPlannerText(raw, catalogEvents) {
-  const section = plannerSection(raw, ['EVENTOS_SOLICITADOS', 'EVENTOS']);
+function eventsFromPlannerText(raw, catalogEvents, activeEvent = null) {
+  const section = plannerSection(raw, ['EVENTOS_SOLICITADOS', 'EVENTOS_NECESARIOS', 'EVENTOS']);
+  const scope = plannerSection(raw, ['ALCANCE_EVENTOS', 'ALCANCE']);
+  const combined = `${section}\n${scope}`;
   const out = [];
+  if (/\b(EVENTO_ACTIVO|EVENTO_EN_PANTALLA|EN_PANTALLA|ACTIVO|PANTALLA)\b/i.test(combined) && activeEvent?.id) {
+    out.push({ id: trim(activeEvent.id), titulo: trim(activeEvent.titulo) });
+  }
   if (!section) return out;
   splitPlannerItems(section).forEach(item => {
     const clean = cleanPotentialEventTitle(item);
+    if (/\b(EVENTO_ACTIVO|EVENTO_EN_PANTALLA|EN_PANTALLA|ACTIVO|PANTALLA|NINGUNO|NONE)\b/i.test(clean)) return;
     const ev = arr(catalogEvents).find(e => norm(e?.titulo) === norm(clean));
     if (ev && !out.some(x => trim(x.id) === trim(ev.id))) out.push({ id: trim(ev.id), titulo: trim(ev.titulo) });
   });
   return out;
 }
+
 function modulesFromPlannerText(raw) {
   let section = plannerSection(raw, ['MODULOS_NECESARIOS', 'MÓDULOS_NECESARIOS', 'MODULOS', 'MÓDULOS']);
   const mods = plannerUnique(splitPlannerItems(section));
@@ -2864,6 +2873,21 @@ function modulesFromPlannerText(raw) {
     if (ZUZU_PLAN_MODULES.includes(mod) && !out.includes(mod)) out.push(mod);
   });
   return out;
+}
+function plannerFiltersFromText(raw) {
+  const people = splitPlannerItems(plannerSection(raw, ['PERSONAS_IMPLICADAS', 'PERSONAS_AFECTADAS'])).filter(x => !/^(NINGUNA|NINGUNO|NO|TODOS|TODAS|PERSONAS)$/i.test(x));
+  const conditions = trim(plannerSection(raw, ['CONDICIONES_DATOS', 'CONDICIONES_ACCESO', 'FILTROS_DATOS', 'FILTROS']));
+  const filters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
+  if (people.length) {
+    filters.personas = people.slice();
+    filters.responsables = people.slice();
+    filters.donantes = people.slice();
+  }
+  const yrs = conditions.match(/20\d{2}/g) || [];
+  if (yrs.length) filters.anios = [...new Set(yrs)];
+  if (/\bNO\s+SOCIO\b/i.test(conditions)) filters.rangos.push('NO SOCIO');
+  else if (/\bSOCIO\b/i.test(conditions)) filters.rangos.push('SOCIO');
+  return { filters, conditions };
 }
 function plannerGlobalFlag(raw, prompt) {
   const sec = plannerSection(raw, ['CONSULTA_GLOBAL', 'ALCANCE']);
@@ -2880,6 +2904,8 @@ function inferPlannerModulesFromPrompt(prompt, localModules = []) {
   // aunque el usuario haya pedido solo producto disponible, socios y meteo. Aquí inferimos
   // únicamente desde la intención literal del prompt.
   const mods = new Set();
+  if (/\b(pagad[oa]s?|pagos?|pagar|pendient(?:e|es)\s+de\s+pago|quien\s+ha\s+pagado|quién\s+ha\s+pagado|falta\s+por\s+pagar)\b/.test(p)) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m => mods.add(m));
+  if (/\b(todos\s+los\s+datos|datos\s+del\s+evento|datos\s+de\s+los\s+que\s+dispongas|toda\s+la\s+info|informaci[oó]n\s+del\s+evento)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m => mods.add(m));
   if (/producto\s+disponible|compras?\s+realiz|compras?\s+pend|donaciones?\s+de\s+producto|comparativa/.test(p)) ['EVENTOS','COMPRAS','DONACIONES','PRODUCTOS'].forEach(m => mods.add(m));
   if (/socio|socios|asistent|no\s+asistent|colaborador/.test(p)) ['INGRESOS','PERSONAS'].forEach(m => mods.add(m));
   if (/meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) ['EVENTOS','METEO'].forEach(m => mods.add(m));
@@ -2909,60 +2935,84 @@ function queryTemplatesForPlan(modules, prompt) {
 }
 function parsePlannerText(raw, catalog, userPrompt, localModules = []) {
   const catalogEvents = arr(catalog?.eventos || catalog?.events);
+  const activeEvent = catalog?.eventoActivo || catalog?.activeEvent || null;
   const exactEvents = exactEventTitlesFromPrompt(userPrompt, catalogEvents);
-  const aiEvents = eventsFromPlannerText(raw, catalogEvents);
-  const chosenEvents = exactEvents.length ? exactEvents : aiEvents;
+  const aiEvents = eventsFromPlannerText(raw, catalogEvents, activeEvent);
+  const chosenEvents = aiEvents.length ? aiEvents : exactEvents;
   const rawModules = modulesFromPlannerText(raw);
   const modules = ensurePlannerDependencies(rawModules.length ? rawModules : inferPlannerModulesFromPrompt(userPrompt, localModules), userPrompt);
   const consultaGlobal = strictScopeRequested(userPrompt) || chosenEvents.length ? false : plannerGlobalFlag(raw, userPrompt);
   const motivo = plannerSection(raw, ['MOTIVO', 'RAZONAMIENTO']) || 'Plan generado por Zuzu planificador en texto simple y validado por ControlEvent.';
+  const pf = plannerFiltersFromText(raw);
   return {
     ok: true,
-    needsClarification: !modules.length || (!consultaGlobal && !chosenEvents.length && /\b(evento|eventos|sysa|comparativa|meteo|tiempo|clima)\b/i.test(userPrompt)),
+    needsClarification: !modules.length || (!consultaGlobal && !chosenEvents.length && /\b(evento|eventos|sysa|comparativa|meteo|tiempo|clima)\b/i.test(userPrompt) && !/evento\s+en\s+pantalla|evento\s+activo|este\s+evento/i.test(userPrompt)),
     clarification: '',
     modules,
     eventos: chosenEvents.map(e => e.titulo),
     eventIds: chosenEvents.map(e => e.id),
     todosLosEventos: consultaGlobal === true,
-    filters: {},
+    filters: pf.filters,
+    dataRequests: pf.conditions ? [{ tipo: 'condiciones_acceso', texto: pf.conditions }] : [],
     queryTemplates: queryTemplatesForPlan(modules, userPrompt),
     salidaDeseada: [],
-    reasoning: motivo,
+    reasoning: `${motivo}${pf.conditions ? ` Condiciones propuestas por Zuzu: ${pf.conditions}` : ''}`,
     __strictEventScope: strictScopeRequested(userPrompt) || chosenEvents.length > 0,
     __queryTemplatePlan: true,
     __rawPlannerText: trim(raw).slice(0, 2000)
   };
 }
+
 function plannerPrompt(userPrompt, catalog) {
-  const eventList = arr(catalog?.eventos).map(e => `- ${trim(e.titulo)} | id=${trim(e.id)} | ${trim(e.fechaInicio)} a ${trim(e.fechaFin)} | ${trim(e.situacion)}`).join('\n');
-  return `Eres Zuzu planificador de ControlEvent. NO respondas al usuario todavía.
-Tu tarea es decir qué datos necesita ControlEvent extraer para contestar el prompt.
+  const selected = catalog?.eventoActivo || null;
+  const activeLine = selected?.id ? `${trim(selected.titulo)} | id=${trim(selected.id)} | ${trim(selected.fechaInicio)} a ${trim(selected.fechaFin)} | ${trim(selected.situacion)}` : 'SIN EVENTO ACTIVO';
+  const eventList = arr(catalog?.eventos)
+    .map(e => `${trim(e.titulo)} | ${trim(e.fechaInicio)}-${trim(e.fechaFin)} | ${trim(e.situacion)}`)
+    .join('\n');
+  return `Eres Zuzu planificador de ControlEvent. NO respondas al usuario final.
+Decide SOLO qué módulos y condiciones de acceso necesita ControlEvent para extraer datos.
+ControlEvent hará la extracción y luego tú redactarás con esos datos.
 
-Fecha actual ControlEvent: ${todayIsoMadrid()}.
-Zona horaria: Europe/Madrid.
+FECHA_ACTUAL: ${todayIsoMadrid()}
+EVENTO_EN_PANTALLA: ${activeLine}
 
-Módulos disponibles: EVENTOS, INGRESOS, COMPRAS, DONACIONES, PRODUCTOS, PERSONAS, METEO, DOCUMENTOS, TICKETS.
+MODULOS_A_ELEGIR:
+- EVENTOS: título, fechas, estado, precio, descripción.
+- INGRESOS: colaboradores, importes obligatorios/voluntarios, estado de ingreso BANCO/EFECTIVO/PENDIENTE, socios/no socios, justificantes.
+- COMPRAS: compras realizadas, pendientes, gastos, tiendas, responsables, tickets.
+- DONACIONES: donaciones de producto, donante literal registrado, responsable, valoración.
+- PERSONAS: maestro de personas/rango; útil para socios/no socios y cruces.
+- PRODUCTOS: catálogo maestro de productos; útil para nombres, segmento/destino y equivalencias.
+- METEO: previsión/tiempo por fechas del evento.
+- DOCUMENTOS: documentos DOC del evento.
+- TICKETS: justificantes/tickets de compra.
 
-Eventos disponibles:
+EVENTOS_DISPONIBLES:
 ${eventList}
 
-Responde en texto simple, sin JSON y sin markdown largo, usando exactamente estas líneas:
-EVENTOS_SOLICITADOS: <títulos exactos separados por coma, o TODOS, o NINGUNO>
-MODULOS_NECESARIOS: <módulos de la lista separados por coma>
-MODULOS_NO_NECESARIOS: <módulos no necesarios separados por coma>
+Devuelve SOLO estas líneas, sin explicación adicional:
+EVENTOS_SOLICITADOS: EVENTO_ACTIVO, TODOS, NINGUNO o títulos exactos separados por coma
+ALCANCE_EVENTOS: EVENTO_ACTIVO | EVENTOS_EXACTOS | GLOBAL | SIN_EVENTO
+MODULOS_NECESARIOS: módulos separados por coma
+MODULOS_NO_NECESARIOS: módulos separados por coma
+PERSONAS_IMPLICADAS: nombres si la pregunta nombra personas; si no, NINGUNA
+CONDICIONES_DATOS: filtros concretos de acceso a datos; por ejemplo estado ingreso, rango, donante, responsable, compras pendientes/realizadas; si no, NINGUNA
 CONSULTA_GLOBAL: SI o NO
-MOTIVO: <una frase corta>
+SELECTS_PROPUESTOS: opcional, solo SELECT simbólico o NINGUNO; no uses INSERT/UPDATE/DELETE
+MOTIVO: una frase breve
 
 Reglas:
-- Si el usuario dice SOLO, exactos, no consulta global o enumera eventos, CONSULTA_GLOBAL debe ser NO.
-- Si pide producto disponible, normalmente hacen falta EVENTOS, COMPRAS, DONACIONES y PRODUCTOS.
-- Si pide socios/asistentes/no asistentes, hacen falta INGRESOS y PERSONAS.
-- Si pide tiempo/clima/meteorología, hace falta METEO y EVENTOS.
-- No inventes eventos. Usa solo títulos exactos de la lista.
+- Si el usuario dice evento en pantalla, este evento o evento activo, usa EVENTO_ACTIVO.
+- Para “quién ha pagado / falta por pagar” usa normalmente INGRESOS y PERSONAS. No uses DONACIONES ni COMPRAS salvo que pregunte por donaciones o gastos.
+- Para “todos los datos del evento” usa módulos del evento que aportan datos reales: EVENTOS, INGRESOS, COMPRAS, DONACIONES y PERSONAS; añade DOCUMENTOS/TICKETS solo si son relevantes.
+- Para donaciones usa DONACIONES y, si hay que identificar socios/personas, PERSONAS. El donante debe salir literal del registro, no deducido.
+- Para producto disponible usa COMPRAS, DONACIONES, PRODUCTOS y EVENTOS.
+- No inventes datos, eventos ni repartos. Solo decide módulos/filtros.
 
-Prompt del usuario:
-${trim(userPrompt).slice(0, 2500)}`;
+PREGUNTA_USUARIO:
+${trim(userPrompt).slice(0, 1800)}`;
 }
+
 function mergePlannerFilters(...items) {
   const out = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
   for (const src of items) {
@@ -2982,7 +3032,7 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { temperature: 0.05, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_TOKENS || 768) }
+      generationConfig: { temperature: 0.0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_TOKENS || 1024), thinkingConfig: { thinkingBudget: 0 } }
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Petición texto simple: eventos, módulos, alcance y motivo; sin datos operativos.`);
@@ -2993,14 +3043,16 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
       const outText = trim(geminiOutText(payload));
       if (!outText) throw new Error('Planificador no devolvió texto.');
       const finish = trim(payload?.candidates?.[0]?.finishReason || '');
-      if (/MAX_TOKENS/i.test(finish)) throw new Error(`Respuesta de Zuzu planificador truncada por límite de tokens. Recibido: ${outText.slice(0, 240)}`);
       const parsed = parsePlannerText(outText, catalog, userPrompt, localModules);
+      if (/MAX_TOKENS/i.test(finish) && !arr(parsed.modules).length) throw new Error(`Respuesta de Zuzu planificador truncada por límite de tokens. Recibido: ${outText.slice(0, 240)}`);
       if (!arr(parsed.modules).length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${outText.slice(0, 500)}`);
+      if (/MAX_TOKENS/i.test(finish)) parsed.plannerWarning = `Zuzu planificador acabó por MAX_TOKENS, pero ControlEvent pudo leer módulos/filtros. Respuesta parcial: ${outText.slice(0, 240)}`;
       parsed.__zuzuPlannerModel = model;
       parsed.__zuzuPlannerUsage = usageSmall(payload, model);
       parsed.__rawPlannerText = outText.slice(0, 2000);
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Respuesta: ${outText.slice(0, 900)}`, { model, usage: usageSmall(payload, model) });
-      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador validado', 'OK', `Módulos=${arr(parsed.modules).join(', ')}; eventos=${arr(parsed.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed.todosLosEventos ? 'SI' : 'NO'}; plantillas=${arr(parsed.queryTemplates).join(', ') || 'sin plantillas'}`);
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador validado', 'OK', `Módulos=${arr(parsed.modules).join(', ')}; eventos=${arr(parsed.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed.todosLosEventos ? 'SI' : 'NO'}; filtros=${JSON.stringify(parsed.filters || {})}; plantillas=${arr(parsed.queryTemplates).join(', ') || 'sin plantillas'}`);
+      if (parsed.plannerWarning) zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', parsed.plannerWarning);
       return parsed;
     } catch (error) {
       lastError = error;
@@ -3011,9 +3063,11 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
   throw lastError || new Error('Planificador Zuzu no disponible.');
 }
 function shouldUseGeminiPlanner(userPrompt, local) {
-  if (/\b(quien\s+es|quién\s+es|sabes\s+quien\s+es|sabes\s+quién\s+es|conoces\s+a|datos\s+de|datos\s+del|datos\s+sobre|ficha\s+de|informacion\s+de|información\s+de|info\s+de|dime\s+sus\s+datos)\b/i.test(userPrompt)) return false;
+  // FIX29: la inteligencia de selección de módulos/condiciones la pone Zuzu.
+  // ControlEvent solo actúa como barandilla si Zuzu no responde o si hay que evitar mezclar eventos.
   return true;
 }
+
 async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
   const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
@@ -3031,7 +3085,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
 
   // FIX27: si ControlEvent ya resuelve eventos exactos del prompt, no se llama a Zuzu planificador.
   // Evita el KO repetido por respuesta truncada del planificador y ahorra tiempo/tokens.
-  if (exactEvents.length && strictRequested) {
+  if (false && exactEvents.length && strictRequested) {
     let modules = ensurePlannerDependencies(inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
     if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
     if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
@@ -3073,8 +3127,11 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   // ControlEvent no decide el informe: solo aplica una barandilla genérica de seguridad.
   // Si el usuario ha dado eventos exactos y Zuzu falla, CE puede construir un plan de plantillas cerradas
   // con esos eventos para no caer en 20 eventos ni inventar datos.
-  const chosenIds = arr(ai?.eventIds).map(trim).filter(Boolean).length ? arr(ai.eventIds).map(trim).filter(Boolean) : exactEvents.map(e => e.id);
-  const chosenTitles = arr(ai?.eventos).length ? arr(ai.eventos).map(trim).filter(Boolean) : exactEvents.map(e => e.titulo);
+  const aiEventIds = arr(ai?.eventIds).map(trim).filter(Boolean);
+  const aiEventTitles = arr(ai?.eventos).map(trim).filter(Boolean);
+  const localEventIds = arr(local.eventos).map(trim).filter(Boolean);
+  const chosenIds = aiEventIds.length ? aiEventIds : (exactEvents.length ? exactEvents.map(e => e.id) : localEventIds);
+  const chosenTitles = aiEventTitles.length ? aiEventTitles : (exactEvents.length ? exactEvents.map(e => e.titulo) : []);
   let modules = ensurePlannerDependencies(arr(ai?.modules).length ? arr(ai.modules) : inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
   // FIX25: aunque Zuzu o el detector local sugieran módulos accesorios, no se extraen TICKETS/DOCUMENTOS
   // salvo petición explícita. Evita anexos gigantes y datos que no venían a cuento en comparativas.
@@ -3117,7 +3174,7 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
     eventos: chosenTitles.length ? chosenTitles : arr(ai?.eventos || local.eventos),
     eventIds: chosenIds,
     todosLosEventos: strictRequested || chosenIds.length ? false : (ai?.todosLosEventos === true || local.todosLosEventos === true),
-    filters: ai?.filters || {},
+    filters: mergePlannerFilters(local.filters || {}, ai?.filters || {}),
     dataRequests: arr(ai?.dataRequests),
     salidaDeseada: arr(ai?.salidaDeseada),
     queryTemplates,
