@@ -38,7 +38,14 @@
   }
   function hasSelectedEvent(){
     const sel = $('selectedEvent');
-    return !!String((sel && sel.value) || '').trim();
+    if(!sel) return false;
+    const value = String(sel.value || '').trim();
+    const label = String(sel.selectedOptions?.[0]?.textContent || sel.options?.[sel.selectedIndex]?.textContent || '').trim();
+    // Si el selector muestra el placeholder, no hay evento real aunque quede un id arrastrado en memoria.
+    if(!value) return false;
+    if(/selecciona\s+evento/i.test(label)) return false;
+    if(/^-{1,}|—|–/.test(label)) return false;
+    return true;
   }
   function welcomeActive(){
     // FIX23 PARTE 1: si NO hay evento elegido en el selector, ColtyLAB siempre abre
@@ -60,13 +67,20 @@
     st.textContent = `
       #${LAYER_ID}{position:fixed!important;inset:0!important;z-index:2147483300!important;display:none!important;align-items:center!important;justify-content:center!important;background:rgba(15,23,42,.16)!important;padding:10px!important;}
       #${LAYER_ID}.visible{display:flex!important;}
-      #${LAYER_ID} .ce-v17fix26-card{position:relative!important;width:min(620px,94vw)!important;max-height:min(78vh,640px)!important;overflow:auto!important;background:#fff!important;border:2px solid #0f172a!important;border-radius:22px!important;box-shadow:0 24px 70px rgba(15,23,42,.30)!important;padding:18px 16px 14px!important;color:#0f172a!important;font-family:inherit!important;}
+      #${LAYER_ID} .ce-v17fix26-card{position:relative!important;width:min(720px,94vw)!important;max-height:min(82vh,680px)!important;overflow:auto!important;background:#fff!important;border:2px solid #0f172a!important;border-radius:22px!important;box-shadow:0 24px 70px rgba(15,23,42,.30)!important;padding:18px 16px 14px!important;color:#0f172a!important;font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;}
       #${LAYER_ID} .ce-v17fix26-close{position:absolute!important;right:10px!important;top:8px!important;width:34px!important;height:34px!important;border-radius:999px!important;border:1px solid #cbd5e1!important;background:#fff!important;font-size:22px!important;font-weight:950!important;line-height:28px!important;cursor:pointer!important;color:#0f172a!important;}
-      #${LAYER_ID} .ce-v17fix26-title{text-align:center!important;margin:12px 36px 26px!important;font-size:clamp(24px,7vw,34px)!important;line-height:1.05!important;font-weight:950!important;color:#f97316!important;-webkit-text-stroke:.45px #111827!important;text-shadow:0 0 0 #111827!important;letter-spacing:.01em!important;}
-      #${LAYER_ID} .ce-v17fix26-body{font-size:15px!important;line-height:1.42!important;font-weight:600!important;color:#111827!important;display:grid!important;gap:3px!important;}
-      #${LAYER_ID} .ce-v17fix26-indent{padding-left:22px!important;}
-      #${LAYER_ID} .ce-v17fix26-foot{text-align:right!important;margin-top:22px!important;font-weight:950!important;color:#111827!important;font-size:14px!important;}
-      @media(max-width:420px){#${LAYER_ID} .ce-v17fix26-card{border-radius:18px!important;padding:16px 13px 12px!important;}#${LAYER_ID} .ce-v17fix26-title{margin-top:14px!important;margin-bottom:22px!important;}#${LAYER_ID} .ce-v17fix26-body{font-size:14px!important;}}
+      #${LAYER_ID} .modal-container{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;padding:20px!important;color:#333333!important;max-width:650px!important;margin:0 auto!important;}
+      #${LAYER_ID} .modal-title{color:#e65c00!important;font-size:24px!important;font-weight:800!important;text-align:center!important;margin:0 0 5px 0!important;letter-spacing:.5px!important;}
+      #${LAYER_ID} .modal-subtitle{font-size:11px!important;color:#666666!important;text-align:center!important;line-height:1.4!important;margin:0 0 20px 0!important;}
+      #${LAYER_ID} .modal-grid{display:flex!important;gap:15px!important;justify-content:space-between!important;margin-bottom:20px!important;}
+      #${LAYER_ID} .modal-col{flex:1!important;background:#f8f9fa!important;padding:10px!important;border-radius:6px!important;min-width:0!important;}
+      #${LAYER_ID} .ia-col{background:#f0f4f8!important;border:1px dashed #d0d7de!important;}
+      #${LAYER_ID} .modal-col h2{font-size:12px!important;font-weight:700!important;color:#222222!important;margin:0 0 8px 0!important;border-bottom:1px solid #e1e4e6!important;padding-bottom:4px!important;}
+      #${LAYER_ID} .modal-col ul{list-style-type:none!important;padding:0!important;margin:0!important;}
+      #${LAYER_ID} .modal-col li{font-size:11px!important;line-height:1.35!important;color:#444444!important;margin-bottom:6px!important;position:relative!important;padding-left:10px!important;}
+      #${LAYER_ID} .modal-col li::before{content:"•"!important;color:#e65c00!important;font-weight:bold!important;position:absolute!important;left:0!important;}
+      #${LAYER_ID} .modal-footer{text-align:right!important;font-size:10px!important;font-weight:bold!important;color:#000000!important;margin-top:10px!important;}
+      @media(max-width:620px){#${LAYER_ID} .modal-grid{display:grid!important;grid-template-columns:1fr!important;}#${LAYER_ID} .modal-container{padding:18px 8px!important;}}
     `;
     document.head.appendChild(st);
   }
@@ -85,18 +99,40 @@
     }
     layer.innerHTML = `<div class="ce-v17fix26-card" role="dialog" aria-live="polite" aria-label="Control Event App">
       <button type="button" class="ce-v17fix26-close" aria-label="Cerrar">×</button>
-      <div class="ce-v17fix26-title">Control_Event_App</div>
-      <div class="ce-v17fix26-body">
-        <div>- Creada para la fabricacion y control de eventos,</div>
-        <div>sirviendo en cada momento la informacion que se le pueda ocurrir saber al usuario,</div>
-        <div>Plug &amp; Play, lo quiero, lo tengo.</div>
-        <div style="height:8px"></div>
-        <div>- Asistida por IA (Zuzu) en:</div>
-        <div class="ce-v17fix26-indent">- Automatizacion tickets de compra.</div>
-        <div class="ce-v17fix26-indent">- Informacion detallada y gráfica (a demanda) sobre los eventos.</div>
-        <div class="ce-v17fix26-indent">- y como ayudante para la planificacion inicial de un nuevo evento.</div>
+      <div class="modal-container">
+        <h1 class="modal-title">Control_Event_App</h1>
+        <p class="modal-subtitle">Fabricación, control y consulta inteligente de eventos · Plug &amp; Play: lo quiero, lo tengo.</p>
+        <div class="modal-grid">
+          <section class="modal-col">
+            <h2>Control del evento</h2>
+            <ul>
+              <li>Ingresos, colaboradores y justificantes.</li>
+              <li>Compras, tickets y gastos pendientes.</li>
+              <li>Donaciones de producto y valoración.</li>
+              <li>Documentos, tiendas, productos y personas.</li>
+            </ul>
+          </section>
+          <section class="modal-col ia-col">
+            <h2>IA · Zuzu</h2>
+            <ul>
+              <li>Automatización de tickets de compra.</li>
+              <li>Información detallada y gráfica a demanda.</li>
+              <li>Comparativas y consultas sobre eventos.</li>
+              <li>Ayuda para planificación inicial.</li>
+            </ul>
+          </section>
+          <section class="modal-col">
+            <h2>Operativa</h2>
+            <ul>
+              <li>Resumen presupuestario y saldos.</li>
+              <li>Mapa de recursos y vista aérea.</li>
+              <li>INFOEVENTO, BACKUP y archivos de control.</li>
+              <li>Roles GD, RW y RO con permisos.</li>
+            </ul>
+          </section>
+        </div>
+        <div class="modal-footer">** (c)oltyLAB '26 - ${VERSION_LABEL} **</div>
       </div>
-      <div class="ce-v17fix26-foot">** (c)oltyLAB '26 - ${VERSION_LABEL} **</div>
     </div>`;
     layer.classList.add('visible');
     layer.querySelector('.ce-v17fix26-close')?.addEventListener('click', ev => { stopEvent(ev); closeInfo(); }, {once:true});

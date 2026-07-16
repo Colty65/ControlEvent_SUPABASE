@@ -257,7 +257,14 @@
   }
   function noSelectedEvent(){
     const sel=$('selectedEvent');
-    return !!(sel && !txt(sel.value || ''));
+    if(!sel) return true;
+    const value=txt(sel.value || '');
+    const label=txt(sel.selectedOptions?.[0]?.textContent || sel.options?.[sel.selectedIndex]?.textContent || '');
+    if(!value) return true;
+    if(/selecciona\s+evento/i.test(label)) return true;
+    // Si hay valor arrastrado pero no hay evento real en el estado, tratamos como sin evento.
+    try{ if(!arr('eventos').some(e=>String(e?.id||'')===String(value))) return true; }catch(_){ }
+    return false;
   }
   function openWelcomeInfoInstead(){
     try{ closeAvance(); }catch(_){ }
