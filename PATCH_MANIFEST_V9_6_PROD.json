@@ -1,0 +1,21 @@
+{
+  "version": "v16_prod",
+  "files": [
+    "index.html",
+    "public/index.html",
+    "public/app/version.js",
+    "public/app/features/v9-6-ticketauto-compras.js",
+    "public/app/features/v9-6-session-guard.js",
+    "public/app/features/v9-6-app-fixes.js",
+    "services/receipt-ai.service.js",
+    "lib/supabase-normalized.js"
+  ],
+  "checks": [
+    "node --check public/app/features/v9-6-ticketauto-compras.js",
+    "node --check public/app/features/v9-6-session-guard.js",
+    "node --check public/app/features/v9-6-app-fixes.js",
+    "node --check services/receipt-ai.service.js",
+    "node --check routes/crud.routes.js",
+    "node --check lib/supabase-normalized.js"
+  ]
+}

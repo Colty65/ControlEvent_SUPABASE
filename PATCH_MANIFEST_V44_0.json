@@ -1,0 +1,35 @@
+{
+  "version": "ControlEvent v16_prod",
+  "base": "ControlEvent v16_prod",
+  "notes": [
+    "Corrige que en PC/iPad cualquier pestaña abriera Planificación inicial por un estado pegado.",
+    "Refuerza acceso a Planificación inicial desde menú móvil sin envolver render global.",
+    "Al entrar desde login fuerza selección explícita de evento y muestra pantalla limpia con icono.",
+    "Actualiza versión a v44.0 y el nombre de fichero ControlEvent_v16_prod.",
+    "No cambia lógica de COMPRAS, DONACIONES, INFOEVENTO, BACKUP ni GRAFICAS."
+  ],
+  "changed_files": [
+    "index.html",
+    "PATCH_MANIFEST_V43_8_8.json",
+    "public/index.html",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "public/app/version.js",
+    "public/modules/excel/backup.js",
+    "public/assets/icons/controlevent-welcome-v44.png",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-4-fixes.js",
+    "public/app/features/v43-7-fixes.js",
+    "public/app/features/v43-8-1-fixes.js",
+    "public/app/features/v43-8-2-fixes.js",
+    "public/app/features/v44-0-fixes.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js"
+  ]
+}

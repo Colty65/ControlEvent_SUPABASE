@@ -1,0 +1,16 @@
+ControlEvent v8.5_prod FIX38 - SOLO MODIFICADOS
+
+Contiene solo:
+- public/app/features/v8-5-compras-rpc-head-fix38.js
+- public/index.html
+- index.html
+
+Cambio principal:
+- Tras baja de COMPRAS confirmada por BBDD, deja de intentar repintados parciales legacy.
+- Sincroniza /api/state, elimina la compra de memoria/localStorage y recarga la app de forma controlada.
+- Restaura el mismo evento y vuelve a COMPRAS tras la recarga.
+- Esto fuerza que COMPRAS, RESUMEN, GRAFICAS y saldos se reconstruyan desde datos reales, no desde memoria vieja.
+- Se elimina la carga del módulo v8-5-crud-root-fix28.js para reducir interferencias.
+- Se anula saveEventRecord legacy y el cambio de situación de eventos pasa por RPC.
+
+Mantener global_write_lock = ON.

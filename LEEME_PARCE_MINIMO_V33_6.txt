@@ -1,0 +1,17 @@
+ControlEvent v16_prod - Parche mínimo
+
+Base esperada: V33.5 funcionando correctamente.
+
+Cambios:
+- Planificación inicial: el botón "Crear evento real desde réplica" ya inserta en tablas reales.
+- Crea un nuevo EVENTO en curso tomando como modelo un evento FINALIZADO.
+- Replica ingresos/colaboradores del evento modelo.
+- Replica compras y donaciones de producto incluidas en la propuesta.
+- No crea ni elimina PERSONAS, TIENDAS ni PRODUCTOS generales.
+- Baja de evento: aviso reforzado y eliminación controlada solo de EVENTO + INGRESOS + COMPRAS/DONACIONES + imágenes de tickets.
+- Versión visible y metadatos: ControlEvent v16_prod.
+- Caché: controlevent-shell-v50-24.
+
+Instalación:
+Copiar estos archivos sobre el repositorio actual respetando carpetas, hacer commit y desplegar.
+No incluye package.json ni package-lock.json.

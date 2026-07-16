@@ -1,0 +1,23 @@
+{
+  "version": "v50.22",
+  "base": "v50.20",
+  "created_at": "2026-05-28",
+  "changes": [
+    "Retirada de v50.21 de la carga efectiva",
+    "Logout limpio sin arrastrar selectedEventId del usuario/evento anterior",
+    "Login -> CE + Selecciona evento sin bloquear la carga posterior",
+    "Version e INFOEVENTO unificados a v50.22"
+  ],
+  "functional_files": [
+    "public/app/features/v50-22-final-fixes.js"
+  ],
+  "version_files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

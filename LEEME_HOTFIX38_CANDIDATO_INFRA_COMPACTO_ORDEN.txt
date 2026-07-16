@@ -1,0 +1,41 @@
+ControlEvent v16_prod - HOTFIX38 sin cambio de versión
+
+Cambios sobre HOTFIX37:
+
+1. Selección inteligente de candidato de PRODUCTOS
+- Se añade ceHf38BestCatalogCandidate().
+- Ya no se elige el candidato más corto cuando hay varios.
+- Se puntúa por tokens importantes, alias, coincidencia de AMBAR/BARRIL/30 y penalizaciones fuertes.
+- Caso corregido: "Cerveza AMBAR (Barril 30l)" / "Cerveza AMBAR Barril 30l" debe elegir Cerveza AMBAR (Barril 30 l), no Cerveza 0,0.
+- Además ceHf27ResolveProductDiagnostic llama al override estricto antes de cualquier búsqueda genérica.
+
+2. Regla infraestructura
+- Para donaciones/existencias con SEGMENTO=INFRAESTRUCTURA se exige stock mínimo de 2 unidades por familia.
+- Si solo consta 1 unidad disponible, se propone comprar 1 más.
+- Agrupa familias como:
+  butano CEPSA + butano REPSOL = familia butano, si suman 2 no propone compra.
+- Excluye vajilla/plásticos/menaje de conteo unitario masivo:
+  cucharas, tenedores, cuchillos, platos, vasos, copas, servilletas, pajitas, menaje.
+- Mantiene reglas específicas AOVE/Vinagre.
+
+3. z_Otras compras imprevistas
+- La reserva pasa a llamarse:
+  z_Otras compras imprevistas
+- Sigue calculándose como 10% de compras previstas, redondeado a decena superior.
+
+4. Fichas de Detalle avanzado más compactas
+- Se elimina el texto "Diagnóstico HF..." / reason de cada ficha.
+- Se oculta .plan-reason.
+- Se reducen padding, tamaño de letra y altura de campos para ver más líneas en pantalla.
+
+5. Ordenación sincronizada
+- El criterio elegido arriba en PROPUESTA DETALLADA DEL EVENTO afecta también al "Detalle avanzado de líneas que se crearán".
+- Se ordena con sortPlanProposalDetailCards() usando el mismo planResourceOrderMode.
+
+6. Cache bust
+- planificacion-inicial.js?v=v16_prod_planificacion_hf38_candidato_infra_compacto_orden
+- Marcador consola:
+  HOTFIX38_CANDIDATO_INFRA_COMPACTO_ORDEN_ACTIVO
+
+No hay SQL nuevo.
+No cambia versión visible.

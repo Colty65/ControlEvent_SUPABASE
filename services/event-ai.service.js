@@ -1,0 +1,6971 @@
+/* ControlEvent v22_prod - Zuzu / Analítica libre sobre datos del evento.
+   Solo lectura: no modifica BBDD ni estado. */
+import { getState } from './state.service.js';
+import { getSupabaseAdmin } from '../lib/supabase.js';
+import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } from './event-context.service.js';
+
+function text(value) { return value == null ? '' : String(value); }
+function trim(value) { return text(value).trim(); }
+function num(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const n = Number(text(value).replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+function round(value, digits = 2) {
+  const n = num(value);
+  return Number(n.toFixed(digits));
+}
+function norm(value) {
+  const s = text(value);
+  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().trim();
+}
+function arr(value) { return Array.isArray(value) ? value : []; }
+function byId(rows) {
+  const out = new Map();
+  arr(rows).forEach(row => { const id = trim(row?.id); if (id) out.set(id, row); });
+  return out;
+}
+function firstNonEmpty(...values) {
+  for (const value of values) { const s = trim(value); if (s) return s; }
+  return '';
+}
+function ticketText(row) { return firstNonEmpty(row?.ticketDonacion, row?.ticket_donacion, row?.ticket, row?.ticketOtrosGastos, row?.ticket_otros_gastos); }
+function isDonationTicket(value) { return /^DONADO\s+(TIENDA|SOCIO|OTROS)$/i.test(trim(value)); }
+function isPendingTicket(value) { return /PTE\.?\s*COMPRA|PENDIENTE/i.test(trim(value)); }
+function valueOfLine(row) { return round(num(row?.unidades) * num(row?.precio), 2); }
+function topN(map, n = 12) {
+  return [...map.entries()].sort((a, b) => num(b[1]) - num(a[1])).slice(0, n).map(([k, v]) => ({ nombre: k, valor: round(v, 2) }));
+}
+function add(map, key, value) {
+  const k = trim(key) || 'Sin clasificar';
+  map.set(k, num(map.get(k)) + num(value));
+}
+function addQtyCost(map, key, qty, cost) {
+  const k = trim(key) || 'Sin clasificar';
+  const old = map.get(k) || { unidades: 0, coste: 0 };
+  old.unidades += num(qty);
+  old.coste += num(cost);
+  map.set(k, old);
+}
+function fileSafe(value) {
+  return trim(value || 'resultado').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').slice(0, 90) || 'resultado';
+}
+function looksLikeOpenAiKey(value) { return /^sk-/i.test(trim(value)); }
+function geminiKey() {
+  const explicitZuzu = process.env.GEMINI_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || process.env.CONTROLEVENT_GEMINI_API_KEY
+    || process.env.OPENIA_API_KEY
+    || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    || '';
+  if (explicitZuzu) return explicitZuzu;
+  const maybeOpenAiVar = process.env.OPENAI_API_KEY || '';
+  return maybeOpenAiVar && !looksLikeOpenAiKey(maybeOpenAiVar) ? maybeOpenAiVar : '';
+}
+function splitModels(value) { return trim(value).split(/[;,\s]+/).map(x => trim(x).replace(/^models\//, '')).filter(Boolean); }
+function pushCleanModel(out, model) {
+  const m = trim(model).replace(/^models\//, '');
+  if (!m) return;
+  if (/^gemini-1\.5(?:-|$)/i.test(m) || /^gemini-pro$/i.test(m) || /^gemini-2\.0-flash-lite$/i.test(m)) return;
+  if (!out.includes(m)) out.push(m);
+}
+function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
+  const t = trim(task).toLowerCase();
+  const explicitByTask = {
+    'zuzu-planner': process.env.CONTROLEVENT_ZUZU_PLANNER_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL,
+    'zuzu-structured': process.env.CONTROLEVENT_ZUZU_STRUCTURED_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL,
+    'zuzu-narrative': process.env.CONTROLEVENT_ZUZU_NARRATIVE_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL,
+    'initial-planning-full': process.env.CONTROLEVENT_INITIAL_PLAN_AI_MODEL || process.env.CONTROLEVENT_PLANIFICACION_AI_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL,
+    'initial-planning-partial': process.env.CONTROLEVENT_INITIAL_PLAN_AI_MODEL || process.env.CONTROLEVENT_PLANIFICACION_AI_MODEL || process.env.CONTROLEVENT_PLAN_AI_MODEL
+  };
+  const globalConfigured = process.env.GEMINI_MODEL || process.env.GOOGLE_GEMINI_MODEL || '';
+  const out = [];
+  splitModels(explicitByTask[t] || '').forEach(m => pushCleanModel(out, m));
+  // Decisión por funcionalidad:
+  // - Planificador Zuzu: Flash-Lite primero (JSON corto y barato).
+  // - Redacción/informes: Flash primero (calidad humana).
+  // - Planificación inicial TOTAL: Flash primero (razonamiento + propuesta de compra compleja).
+  // - Planificación inicial PARCIAL: Flash-Lite primero, con Flash de respaldo.
+  // Si solo hay GEMINI_MODEL global, se respeta antes de los fallback.
+  splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
+  let fallback;
+  if (t === 'zuzu-planner') {
+    fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  } else if (t === 'initial-planning-partial') {
+    fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  } else if (t === 'zuzu-narrative') {
+    const tier = trim(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIER || process.env.CONTROLEVENT_ZUZU_COST_MODE || 'auto').toLowerCase();
+    const prompt = trim(opts?.prompt || opts?.userPrompt || '');
+    const premium = /(exhaustiv|opini[oó]n|cachond|chascarr|coloquial|simp[aá]tic|direcci[oó]n|financier|t[eé]cnic|auditor|alegato|dos\s+p[aá]gin|una\s+p[aá]gina|informe\s+completo|datos\s+del\s+evento|info(?:rmaci[oó]n)?\s+del\s+evento|temperatura|tiempo|meteorolog|clima|lluvia|viento|previsi[oó]n)/i.test(prompt);
+    if (/^(lite|ahorro|econ[oó]mico|barato|low)$/i.test(tier)) fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+    else if (/^(flash|calidad|premium|alta)$/i.test(tier)) fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    else fallback = premium ? ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+  } else {
+    fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  }
+  fallback.forEach(m => pushCleanModel(out, m));
+  return out;
+}
+function configuredGeminiModels() { return configuredGeminiModelsForTask('zuzu-structured'); }
+function configuredGeminiPlanningModels(formOrMode = '') {
+  const mode = typeof formOrMode === 'string' ? formOrMode : trim(formOrMode?.mode || '');
+  const task = trim(mode).toUpperCase() === 'ZUZU_TOTAL' ? 'initial-planning-full' : 'initial-planning-partial';
+  return configuredGeminiModelsForTask(task);
+}
+
+function compactState(state, selectedEventId = '') {
+  const events = arr(state?.eventos);
+  const people = byId(state?.personas);
+  const stores = byId(state?.tiendas);
+  const products = byId(state?.productos);
+  const compras = arr(state?.compras);
+  const colaboradores = arr(state?.colaboradores);
+  const selectedEvent = events.find(e => trim(e.id) === trim(selectedEventId)) || null;
+
+  function productName(id) { return trim(products.get(trim(id))?.nombre || id || 'Sin producto'); }
+  function storeName(id) { return trim(stores.get(trim(id))?.nombre || id || 'Sin tienda'); }
+  function personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); }
+  function productSegment(id) { return trim(products.get(trim(id))?.segmento || ''); }
+  function productDestino(id) { return trim(products.get(trim(id))?.destino || ''); }
+  function firstNumber(row, keys, fallback = 0) {
+    for (const key of keys) {
+      if (row && row[key] !== undefined && row[key] !== null && trim(row[key]) !== '') return num(row[key]);
+    }
+    return fallback;
+  }
+  function incomeRango(row) {
+    const persona = people.get(trim(row?.personaId || row?.persona_id));
+    return norm(persona?.rango || row?.rango || row?.personaRango || row?.tipoPersona || '');
+  }
+  function isSocioIncome(row) { return incomeRango(row) === 'socio'; }
+  function incomePayment(row) { return trim(row?.situacion || row?.formaPago || row?.ingreso || 'Pendiente') || 'Pendiente'; }
+  function incomePersonName(row) {
+    const id = trim(row?.personaId || row?.persona_id);
+    return trim(people.get(id)?.nombre || row?.nombre || id || 'Sin colaborador');
+  }
+  function incomeParts(row, ev) {
+    const numero = num(row?.numero);
+    const precioEntrada = num(ev?.precio);
+    const socio = isSocioIncome(row);
+    const importeObligatorio = socio ? round(numero * precioEntrada, 2) : 0;
+    const importeVoluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
+    const importeTotal = round(importeObligatorio + importeVoluntario, 2);
+    return {
+      socio,
+      rango: socio ? 'SOCIO' : (trim(people.get(trim(row?.personaId || row?.persona_id))?.rango || row?.rango || row?.personaRango || '') || 'NO SOCIO / OTRO'),
+      numero: round(numero, 3),
+      formaPago: incomePayment(row),
+      importeObligatorio,
+      importeVoluntario: round(importeVoluntario, 2),
+      importeTotal,
+      importeCampoBBDD: round(row?.importe, 2)
+    };
+  }
+  function summarizeIngresos(rows, ev) {
+    const byForma = new Map();
+    const byRango = new Map();
+    let total = 0, totalSocios = 0, totalNoSocios = 0, obligatorioSocios = 0, voluntario = 0, entradas = 0;
+    arr(rows).forEach(row => {
+      const p = incomeParts(row, ev);
+      total += p.importeTotal;
+      entradas += p.numero;
+      voluntario += p.importeVoluntario;
+      obligatorioSocios += p.importeObligatorio;
+      if (p.socio) totalSocios += p.importeTotal; else totalNoSocios += p.importeTotal;
+      add(byForma, p.formaPago, p.importeTotal);
+      add(byRango, p.rango, p.importeTotal);
+    });
+    return {
+      ingresosTotal: round(total, 2),
+      ingresosSocios: round(totalSocios, 2),
+      ingresosNoSociosYOtros: round(totalNoSocios, 2),
+      importeObligatorioSocios: round(obligatorioSocios, 2),
+      importeVoluntario: round(voluntario, 2),
+      entradasTotal: round(entradas, 3),
+      porFormaPago: topN(byForma, 20),
+      porTipoPersona: topN(byRango, 20),
+      regla: 'IngresosTotal = importe obligatorio de socios (numero * precioEntrada) + importe voluntario / ingresos no socios. No usar solo el campo bruto importe si hay socios.'
+    };
+  }
+
+  const eventSummaries = events.map(ev => {
+    const evId = trim(ev.id);
+    const evCompras = compras.filter(c => trim(c.eventId || c.event_id) === evId);
+    const evIngresos = colaboradores.filter(c => trim(c.eventId || c.event_id) === evId);
+    const byProductQty = new Map();
+    const byProductCost = new Map();
+    const byStore = new Map();
+    const bySegment = new Map();
+    const byDestino = new Map();
+    let comprasReales = 0, comprasPendientes = 0, donacionesValor = 0;
+    const ingresosResumen = summarizeIngresos(evIngresos, ev);
+    const ingresosTotal = ingresosResumen.ingresosTotal;
+    const entradasTotal = ingresosResumen.entradasTotal;
+    evCompras.forEach(row => {
+      const amount = valueOfLine(row);
+      const ticket = ticketText(row);
+      const pName = productName(row.productoId || row.producto_id);
+      addQtyCost(byProductQty, pName, row.unidades, amount);
+      add(byProductCost, pName, amount);
+      add(byStore, storeName(row.tiendaId || row.tienda_id), amount);
+      add(bySegment, productSegment(row.productoId || row.producto_id) || 'Sin segmento', amount);
+      add(byDestino, productDestino(row.productoId || row.producto_id) || 'Sin destino', amount);
+      if (isDonationTicket(ticket)) donacionesValor += amount;
+      else if (isPendingTicket(ticket)) comprasPendientes += amount;
+      else comprasReales += amount;
+    });
+    const topCantidad = [...byProductQty.entries()]
+      .sort((a, b) => num(b[1].unidades) - num(a[1].unidades))
+      .slice(0, 12)
+      .map(([nombre, v]) => ({ nombre, unidades: round(v.unidades, 3), coste: round(v.coste, 2) }));
+    const topCoste = [...byProductQty.entries()]
+      .sort((a, b) => num(b[1].coste) - num(a[1].coste))
+      .slice(0, 12)
+      .map(([nombre, v]) => ({ nombre, unidades: round(v.unidades, 3), coste: round(v.coste, 2) }));
+    return {
+      id: evId,
+      titulo: trim(ev.titulo),
+      situacion: trim(ev.situacion || 'En curso'),
+      fechas: `${trim(ev.fechaIni)} a ${trim(ev.fechaFin)}`,
+      precioEntrada: round(ev.precio, 2),
+      ingresosTotal: round(ingresosTotal, 2),
+      entradasTotal: round(entradasTotal, 2),
+      ingresosSocios: ingresosResumen.ingresosSocios,
+      ingresosNoSociosYOtros: ingresosResumen.ingresosNoSociosYOtros,
+      importeObligatorioSocios: ingresosResumen.importeObligatorioSocios,
+      importeVoluntario: ingresosResumen.importeVoluntario,
+      ingresosPorFormaPago: ingresosResumen.porFormaPago,
+      ingresosPorTipoPersona: ingresosResumen.porTipoPersona,
+      comprasReales: round(comprasReales, 2),
+      comprasPendientes: round(comprasPendientes, 2),
+      donacionesValor: round(donacionesValor, 2),
+      valoracionEvento: round(ingresosTotal + donacionesValor - comprasReales, 2),
+      topCantidad,
+      topCoste,
+      tiendasPorImporte: topN(byStore),
+      segmentosPorImporte: topN(bySegment),
+      destinosPorImporte: topN(byDestino)
+    };
+  });
+
+  function detailedRowsForEvent(evId, maxRows = 600) {
+    const rows = compras.filter(c => trim(c.eventId || c.event_id) === evId).slice(0, maxRows).map(row => ({
+      tipo: isDonationTicket(ticketText(row)) ? 'DONACION_PRODUCTO' : isPendingTicket(ticketText(row)) ? 'PTE_COMPRA' : 'COMPRA_REAL',
+      producto: productName(row.productoId || row.producto_id),
+      segmento: productSegment(row.productoId || row.producto_id),
+      destino: productDestino(row.productoId || row.producto_id),
+      unidades: round(row.unidades, 3),
+      precio: round(row.precio, 4),
+      importe: valueOfLine(row),
+      ticket: ticketText(row),
+      tienda: storeName(row.tiendaId || row.tienda_id),
+      responsable: personName(row.responsableId || row.responsable_id),
+      donante: trim(row.donorRef || '')
+    }));
+    return rows;
+  }
+  function ingresosForEvent(evId, maxRows = 400) {
+    const ev = events.find(e => trim(e.id) === trim(evId)) || selectedEvent || {};
+    return colaboradores.filter(c => trim(c.eventId || c.event_id) === evId).slice(0, maxRows).map(row => {
+      const p = incomeParts(row, ev);
+      return {
+        colaborador: incomePersonName(row),
+        tipoPersona: p.rango,
+        esSocio: p.socio,
+        numero: p.numero,
+        formaPago: p.formaPago,
+        importeObligatorioSocios: p.importeObligatorio,
+        importeVoluntarioONoSocio: p.importeVoluntario,
+        importeTotalCalculado: p.importeTotal,
+        importeCampoBBDD: p.importeCampoBBDD,
+        notaCalculo: p.socio ? 'Socio: obligatorio = numero * precioEntrada; total = obligatorio + voluntario.' : 'No socio/otro: total = importe voluntario o importe registrado.'
+      };
+    });
+  }
+  function ingresosResumenForEvent(evId) {
+    const ev = events.find(e => trim(e.id) === trim(evId)) || selectedEvent || {};
+    const rows = colaboradores.filter(c => trim(c.eventId || c.event_id) === evId);
+    return summarizeIngresos(rows, ev);
+  }
+  const selectedId = trim(selectedEvent?.id || selectedEventId);
+  return {
+    generatedAt: new Date().toISOString(),
+    selectedEventId: selectedId,
+    selectedEvent: selectedEvent ? {
+      id: selectedId,
+      titulo: trim(selectedEvent.titulo),
+      situacion: trim(selectedEvent.situacion || 'En curso'),
+      fechaIni: trim(selectedEvent.fechaIni),
+      fechaFin: trim(selectedEvent.fechaFin),
+      precio: round(selectedEvent.precio, 2)
+    } : null,
+    eventosResumen: eventSummaries,
+    detalleEventoSeleccionado: selectedId ? {
+      resumenIngresosDetallado: ingresosResumenForEvent(selectedId),
+      comprasDonacionesYPendientes: detailedRowsForEvent(selectedId),
+      ingresos: ingresosForEvent(selectedId)
+    } : null,
+    catalogos: {
+      tiendas: arr(state?.tiendas).map(t => trim(t.nombre)).filter(Boolean).slice(0, 300),
+      responsables: arr(state?.personas).map(p => trim(p.nombre)).filter(Boolean).slice(0, 500),
+      productos: arr(state?.productos).map(p => ({ nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino), precio: round(p.defaultPrecio ?? p.precio, 4) })).slice(0, 1200)
+    },
+    limitaciones: 'Los datos son de solo lectura. Las compras pendientes son previsiones; las compras reales son tickets TK/otros gastos; DONADO TIENDA/SOCIO/OTROS son donaciones de producto valoradas.'
+  };
+}
+
+function eventAiSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      ok: { type: 'BOOLEAN' },
+      rejected: { type: 'BOOLEAN' },
+      title: { type: 'STRING' },
+      answer: { type: 'STRING' },
+      warnings: { type: 'ARRAY', items: { type: 'STRING' } },
+      charts: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING' },
+            type: { type: 'STRING', description: 'bar, horizontalBar, pie, donut, line o stackedBar' },
+            labels: { type: 'ARRAY', items: { type: 'STRING' } },
+            values: { type: 'ARRAY', items: { type: 'NUMBER' } },
+            series: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, values: { type: 'ARRAY', items: { type: 'NUMBER' } } } } },
+            unit: { type: 'STRING' }
+          },
+          required: ['title', 'type', 'labels', 'values', 'unit']
+        }
+      },
+      tables: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING' },
+            columns: { type: 'ARRAY', items: { type: 'STRING' } },
+            rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } }
+          },
+          required: ['title', 'columns', 'rows']
+        }
+      },
+      files: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            filename: { type: 'STRING' },
+            mime: { type: 'STRING' },
+            content: { type: 'STRING', description: 'Contenido textual del archivo, no base64' }
+          },
+          required: ['filename', 'mime', 'content']
+        }
+      }
+    },
+    required: ['ok', 'rejected', 'title', 'answer', 'warnings', 'charts', 'tables', 'files']
+  };
+}
+
+function systemPrompt(userPrompt, context) {
+  const rawCtx = JSON.stringify(context);
+  const ctx = rawCtx;
+  return `Eres Zuzu, la Analítica libre integrada en ControlEvent, una aplicación de gestión de eventos solidarios.
+
+Arquitectura obligatoria ya ejecutada por ControlEvent:
+1) Zuzu ha leído el prompt y ha devuelto módulos, filtros y datos solicitados.
+2) ControlEvent ha extraído esos módulos desde la app, en registros legibles y sin códigos internos.
+3) Ahora recibes TODOS los registros entregados por esos módulos y el prompt original del usuario. Tu trabajo es cocinar/formatear la respuesta final exactamente según lo pedido.
+4) ControlEvent NO debe decidir la conclusión por ti: si el contexto entregado no alcanza, debes pedir el dato o módulo que falta en warnings/answer, no inventar una respuesta cómoda.
+
+Reglas obligatorias:
+- Usa exclusivamente modulosExtraidos y metricasCanonicas. No inventes datos ni completes huecos por intuición.
+- La respuesta principal debe ser legible para usuario final: máximo 10-12 líneas de explicación; no pegues JSON, arrays ni listados brutos dentro de answer.
+- Si hay muchos registros, resume y crea tablas de resumen. El detalle completo debe ir en tables o files, no en answer.
+- Devuelve SIEMPRE JSON válido. No uses markdown fuera de los campos de texto. No cortes strings. Si no puedes generar todo, prioriza resumen + tablas cortas + aviso.
+- Si el usuario cita eventos concretos entre comillas o por título, filtra la respuesta a esos eventos exactos. No mezcles otros eventos aunque aparezcan en el contexto.
+- Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
+- Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
+- Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
+- Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
+- Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
+- Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
+- Si el usuario pregunta por el tiempo/clima/meteorología de un evento, usa infoIndirecta.meteorologia si existe. Devuelve una lectura útil para la organización del evento y al menos una tabla/gráfica meteorológica si hay datos externos.
+- Usa fechaActualControlEvent junto con EVENTOS.fecha ini/fecha fin para elegir tiempo verbal: futuro si el evento no ha llegado, pasado si ya terminó, presente si es hoy/en curso. No hables en pasado para eventos futuros.
+- FECHA REAL HOY en ControlEvent: ${trim(context?.fechaActualControlEvent || '') || todayIsoMadrid()}. Si el usuario dice que 10/07/2026 es mañana y fechaActualControlEvent es 2026-07-09, respétalo: NO digas "hoy 10 de julio", di "mañana 10 de julio" o "el 10 de julio".
+- El estado "En curso" no significa que el evento ya haya ocurrido: puede ser preparación/organización abierta. Si la fecha del evento es futura, habla en futuro aunque Estado sea En curso.
+- Si infoIndirecta.meteorologia existe, integra esos datos en la respuesta principal; no digas que no dispones de temperatura o clima.
+- Si el usuario pide productos consumidos, productos más consumidos, coste por producto o unidades por producto, usa COMPRAS y DONACIONES cuando estén disponibles, agrupa por Producto y devuelve DOS salidas si procede: ranking por coste/valor y ranking por unidades. No respondas con auditoría de extracción ni con métricas técnicas del módulo EVENTOS.
+- Si ControlEvent te entrega COMPRAS/DONACIONES/PRODUCTOS, úsalo como datos operativos; EVENTOS solo sirve para identificar título/fechas, no para construir una gráfica de consumo.
+- Tipos de gráfica disponibles: bar, horizontalBar, pie, donut, line y stackedBar. Para comparativas entre eventos usa bar/stackedBar. Para repartos por tipo usa pie/donut. Para rankings largos usa horizontalBar.
+- Para stackedBar rellena labels con las categorías y series con [{name, values}].
+- Para DONACIONES, suma el campo Valor. Para COMPRAS, suma Importe. Para INGRESOS, el total por línea es Importe obligatorio + Importe voluntario.
+- Para “producto/artículo más utilizado comprado/donado”, mide por Unidades, separando Comprado y Donado si el usuario lo pide.
+- Para listados, usa todos los registros relevantes. Puedes resumir en la respuesta principal, pero aporta una tabla o fichero si procede.
+- No generes SQL. No expliques claves internas. No propongas cambios en base de datos.
+- Si detectas que el contexto no contiene un módulo necesario para responder, dilo claramente en warnings y formula una petición concreta de ampliación de contexto para ControlEvent, por ejemplo: "Necesito COMPRAS y DONACIONES de todos los eventos de 2025".
+- Si necesitas más datos de ControlEvent para responder con precisión, no completes por intuición: responde con una solicitud concreta de información adicional y qué módulo/eventos deberían extraerse.
+- Responde siempre en español.
+- Respeta el tono solicitado por el usuario. Si pide informe coloquial, informal, simpático, con chascarrillos o para socios, escribe una lectura cercana y humana antes de las tablas, con humor ligero y sin perder rigor. Si pide informe técnico, financiero, auditoría, Dirección o justificación formal, escribe en tono ejecutivo, preciso y sobrio, con conclusiones, salvedades y criterios de cálculo.
+- Personaliza la respuesta con usuarioLogado si está en el contexto: usa Identificacion/apodo en conversación informal y Nombre en informes serios o formales. Si el usuario pregunta por una persona, revisa también usuarioLogado además de PERSONAS, INGRESOS, COMPRAS y DONACIONES.
+- No entregues solo datos crudos cuando el usuario pida un informe: primero redacta un texto de interpretación que explique las líneas generales y responda con el estilo pedido; después deja tablas, gráficas y ficheros como soporte.
+
+- En v19 TODA respuesta final debe parecer escrita por Zuzu: interpreta el prompt completo del usuario, su intención, tono y destinatario. ControlEvent solo te ha preparado los datos; no copies su carcasa.
+- No devuelvas una plantilla mecánica repetida. Cambia estructura, vocabulario y enfoque según cada petición y cada persona/evento consultado.
+- Si el usuario pide opinión, informe, valoración, tono cachondo, formal, técnico o coloquial, la parte answer debe ser una redacción humana completa y no una introducción de dos líneas seguida de tablas.
+
+Campos oficiales por módulo y datos indirectos:
+- METEOROLOGIA indirecta: Evento; Localidad; Fecha; Cielo; Temp. máx; Temp. mín; Prob. lluvia %; Viento km/h; Fuente. Úsala solo si infoIndirecta.meteorologia está presente.
+- INGRESOS: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Rango; Just.ing.
+- DONACIONES: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable.
+- COMPRAS: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable; Ticket SI/NO.
+- EVENTOS: Titulo del evento; Precio; fecha ini; fecha fin; Estado; Descripción; DOCxxx. Usa Descripción para entender el objetivo del evento y enriquecer informes/valoraciones, no como dato decorativo.
+- TICKETS: Evento; TKxx; Tienda; Responsable; Total ticket; Nº líneas; Ticket SI/NO; Líneas contables.
+- DOCUMENTOS: DOCxxx; Evento; Fecha; Descripcion; Tiene imagen.
+- PRODUCTOS: Nombre producto; Segmento; Destino; Precio rfa.
+- TIENDAS: Nombre tienda.
+- PERSONAS: Nombre persona; Rango.
+
+Formato de salida: SOLO JSON válido con el esquema indicado. Evita respuestas excesivamente largas: usa tablas y ficheros para detalle cuando sea necesario.
+Límites de presentación: answer <= 2500 caracteres; máximo 8 tablas; máximo 80 filas por tabla; máximo 8 gráficas. Si necesitas devolver más detalle, usa files en CSV.
+
+CONTEXTO CONTROL EVENT:
+${ctx}
+
+PETICIÓN DEL USUARIO:
+${trim(userPrompt).slice(0, 3000)}
+`;
+}
+function stripJsonText(value) {
+  let s = trim(value);
+  if (s.startsWith('```')) s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  const firstObj = s.indexOf('{');
+  const firstArr = s.indexOf('[');
+  const starts = [firstObj, firstArr].filter(n => n >= 0);
+  if (starts.length) {
+    const first = Math.min(...starts);
+    const lastObj = s.lastIndexOf('}');
+    const lastArr = s.lastIndexOf(']');
+    const last = Math.max(lastObj, lastArr);
+    if (last > first) s = s.slice(first, last + 1);
+  }
+  return s;
+}
+function parsePlanJsonLenientHf37(value) {
+  const original = stripJsonText(value);
+  try { return { parsed: JSON.parse(original), repaired: false, text: original }; } catch (firstError) {
+    let s = original;
+    // Reparaciones prudentes para respuestas Zuzu casi JSON: comas faltantes entre objetos/arrays
+    // y comas colgantes. No intenta interpretar texto libre como propuesta.
+    const repairers = [
+      x => x.replace(/,\s*([}\]])/g, '$1'),
+      x => x.replace(/}\s*(?=\{)/g, '},'),
+      x => x.replace(/]\s*(?=\")/g, '],'),
+      x => x.replace(/}\s*(?=\")/g, '},'),
+      x => x.replace(/\"\s*(?=\"(?:menuResumen|rows|donaciones|compras|avisos|notes|preguntasPendientes|ok|title)\"\s*:)/g, '\",')
+    ];
+    for (const fn of repairers) s = fn(s);
+    // Segunda pasada por si el primer arreglo reveló otro separador entre objetos.
+    s = s.replace(/}\s*(?=\{)/g, '},').replace(/,\s*([}\]])/g, '$1');
+    try { return { parsed: JSON.parse(s), repaired: true, text: s, firstError }; } catch (secondError) {
+      secondError.firstError = firstError;
+      secondError.repairedText = s;
+      secondError.originalText = original;
+      throw secondError;
+    }
+  }
+}
+
+function csvEscape(value) {
+  const s = text(value);
+  return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvFromRows(columns, rows) {
+  const lines = [columns.map(csvEscape).join(';')];
+  arr(rows).forEach(row => lines.push(columns.map(c => csvEscape(row?.[c])).join(';')));
+  return lines.join('\n');
+}
+function orderedColumnsForModule(moduleName, rows) {
+  const preferred = {
+    COMPRAS: ['Evento','Producto','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable','Ticket SI/NO'],
+    DONACIONES: ['Evento','Producto','Unidades','Precio','Valor','Tipo de donación','Donante','Responsable'],
+    INGRESOS: ['Evento','Nombre','Numero','Importe obligatorio','Importe voluntario','Ingreso','Rango','Just.ing'],
+    TICKETS: ['Evento','TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO','Líneas contables'],
+    DOCUMENTOS: ['DOCxxx','Evento','Fecha','Descripcion','Tiene imagen'],
+    EVENTOS: ['Titulo del evento','Precio','fecha ini','fecha fin','Estado','Descripción','DOCxxx','Fecha documento','Descripcion documento','Documento con imagen'],
+    PRODUCTOS: ['Nombre producto','Segmento','Destino','Precio rfa.'],
+    TIENDAS: ['Nombre tienda'],
+    PERSONAS: ['Nombre persona','Rango']
+  };
+  const seen = new Set();
+  const cols = [];
+  (preferred[moduleName] || []).forEach(c => { if (!seen.has(c)) { seen.add(c); cols.push(c); } });
+  arr(rows).forEach(row => Object.keys(row || {}).forEach(k => { if (!seen.has(k)) { seen.add(k); cols.push(k); } }));
+  return cols.filter(c => arr(rows).some(r => r && Object.prototype.hasOwnProperty.call(r, c)) || (preferred[moduleName]||[]).includes(c));
+}
+
+function isTransformAnalysisPrompt(prompt) {
+  const p = norm(prompt);
+  // Cuando el usuario pide operar sobre los datos, ControlEvent debe extraer los módulos
+  // y pasar esos datos ya fiables a Zuzu junto con el prompt original.
+  // No se debe cortar con el listado directo, porque perdería agrupaciones, totalizaciones,
+  // cálculos, comparativas, gráficos o formatos pedidos por el usuario.
+  return /\b(agrupa|agrupar|agrupado|agrupados|agrupacion|agrupación|totaliza|totalizar|totalizado|subtotal|subtotales|suma|sumar|sumatorio|calcula|calcular|calculo|cálculo|media|promedio|porcentaje|porcentajes|ratio|ranking|ordena|ordenar|filtra|filtrar|resume|resumen|resumir|analiza|analisis|análisis|compara|comparar|comparativa|evolucion|evolución|tendencia|grafica|gráfica|grafico|gráfico|diagrama|tabla dinamica|tabla dinámica|desglose|desglosa|desglosar)\b/.test(p);
+}
+function isListExtractionPrompt(prompt) {
+  const p = norm(prompt);
+  if (isTransformAnalysisPrompt(prompt)) return false;
+  return /\b(lista|listado|relacion|relación|detalle|detallame|detalla|dame|muestra|muéstrame|ensena|enseña|ver|cuales|cuáles|que|qué|saber|todos|todas)\b/.test(p);
+}
+function directModuleResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isListExtractionPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const p = norm(prompt);
+  const priority = [];
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) priority.push('COMPRAS');
+  if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) priority.push('DONACIONES');
+  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) priority.push('INGRESOS');
+  if (/\bticket|tickets|tk\s*\d+|factura|facturas\b/.test(p) && Array.isArray(mods.TICKETS)) priority.push('TICKETS');
+  if (/\bdocumento|documentos|doc\s*\d+\b/.test(p) && Array.isArray(mods.DOCUMENTOS)) priority.push('DOCUMENTOS');
+  const onlyTechnicalEventAsk = /\b(fecha|precio|estado|situacion|situación|titulo|título)\b/.test(p) && !/\b(datos|info|informacion|información|dossier|comparativa|compara|graficas?|gráficas?|participa|participado|donado|compras?|ingresos?|tickets?|documentos?|celebracion|celebración)\b/.test(p);
+  if (/\bevento|eventos|fecha|estado|situacion|situación\b/.test(p) && Array.isArray(mods.EVENTOS) && (onlyTechnicalEventAsk || !priority.length)) priority.push('EVENTOS');
+  if (/\bproducto|productos|catalogo|catálogo\b/.test(p) && Array.isArray(mods.PRODUCTOS)) priority.push('PRODUCTOS');
+  if (/\btienda|tiendas\b/.test(p) && Array.isArray(mods.TIENDAS) && !priority.includes('COMPRAS')) priority.push('TIENDAS');
+  if (/\bpersona|personas|responsable|responsables\b/.test(p) && Array.isArray(mods.PERSONAS) && !priority.includes('INGRESOS')) priority.push('PERSONAS');
+  if (!priority.length) return null;
+  const moduleName = priority[0];
+  const rows = arr(mods[moduleName]);
+  const columns = orderedColumnsForModule(moduleName, rows);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const filename = fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_v22_prod.csv`);
+  const tableLimit = 1000;
+  const tableRows = rows.slice(0, tableLimit).map(row => columns.map(c => {
+    const v = row?.[c];
+    if (c === 'Líneas contables' && Array.isArray(v)) return v.map(x => `${x.Producto || ''} ${x.Unidades || ''} x ${x.Precio || ''} = ${x.Importe || ''}`).join(' | ');
+    return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v);
+  }));
+  const extra = rows.length > tableRows.length ? ` Se muestran ${tableRows.length} en pantalla; el CSV descargable incluye las ${rows.length}.` : '';
+  return {
+    ok: true,
+    rejected: false,
+    title: `${moduleName}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `${rows.length} registro(s) encontrados.${extra}`,
+    warnings: arr(context.advertencias).concat(rows.length ? [] : [`El módulo ${moduleName} no tiene registros con los filtros solicitados.`]),
+    charts: [],
+    tables: rows.length ? [{ title: `${moduleName} (${rows.length} registro(s))`, columns, rows: tableRows }] : [],
+    files: rows.length ? [{ filename, mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    provider: 'control-event-query-modules-direct',
+    model: 'sin-gemini-para-listados'
+  };
+}
+
+
+
+function valueColumnForModule(moduleName) {
+  if (moduleName === 'DONACIONES') return 'Valor';
+  if (moduleName === 'COMPRAS') return 'Importe';
+  if (moduleName === 'INGRESOS') return 'Total ingreso';
+  return 'Importe';
+}
+function valueForModuleRow(moduleName, row) {
+  if (moduleName === 'INGRESOS') return num(row?.['Importe obligatorio']) + num(row?.['Importe voluntario']);
+  if (moduleName === 'DONACIONES') return num(row?.Valor);
+  if (moduleName === 'COMPRAS') return num(row?.Importe);
+  return 0;
+}
+function detectGroupField(moduleName, prompt) {
+  const p = norm(prompt);
+  if (moduleName === 'DONACIONES') {
+    if (/\btipo(?:\s+de)?\s+donaci|donado\s+socio|donado\s+no\s+socio|donado\s+otros|donado\s+tienda\b/.test(p)) return 'Tipo de donación';
+    if (/\bdonante|donantes\b/.test(p)) return 'Donante';
+    if (/\bresponsable|responsables\b/.test(p)) return 'Responsable';
+    if (/\bproducto|productos|articulo|articulos\b/.test(p)) return 'Producto';
+    return 'Tipo de donación';
+  }
+  if (moduleName === 'COMPRAS') {
+    if (/\btienda|tiendas|proveedor|proveedores\b/.test(p)) return 'Tienda';
+    if (/\bresponsable|responsables\b/.test(p)) return 'Responsable';
+    if (/\btk|ticket|factura|gastos\s+corrientes|pte\.?\s*compra\b/.test(p)) return 'Ticket u otros gastos';
+    if (/\bproducto|productos|articulo|articulos\b/.test(p)) return 'Producto';
+    return 'Producto';
+  }
+  if (moduleName === 'INGRESOS') {
+    if (/\bforma|ingreso|banco|bizum|efectivo|pendiente|pago\b/.test(p)) return 'Ingreso';
+    if (/\brango|socio|socios|no\s+socio|donante\b/.test(p)) return 'Rango';
+    if (/\bpersona|personas|nombre|colaborador|colaboradores|asistente|asistentes\b/.test(p)) return 'Nombre';
+    return 'Ingreso';
+  }
+  return 'Evento';
+}
+function detectAggregateModule(prompt, mods) {
+  const p = norm(prompt);
+  if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) return 'DONACIONES';
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) return 'COMPRAS';
+  if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) return 'INGRESOS';
+  return '';
+}
+function groupRowsForChart(moduleName, rows, prompt) {
+  const groupField = detectGroupField(moduleName, prompt);
+  const map = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[groupField]) || 'Sin clasificar';
+    const value = valueForModuleRow(moduleName, row);
+    map.set(key, num(map.get(key)) + value);
+  });
+  const ordered = [...map.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 30);
+  return { groupField, labels: ordered.map(x=>x[0]), values: ordered.map(x=>round(x[1],2)) };
+}
+function aggregateRowsForModule(moduleName, rows, prompt) {
+  const groupField = detectGroupField(moduleName, prompt);
+  const valueColumn = valueColumnForModule(moduleName);
+  const groups = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[groupField]) || 'Sin clasificar';
+    const old = groups.get(key) || { key, registros: 0, unidades: 0, total: 0 };
+    old.registros += 1;
+    if (row?.Unidades !== undefined) old.unidades += num(row.Unidades);
+    old.total += valueForModuleRow(moduleName, row);
+    groups.set(key, old);
+  });
+  const ordered = [...groups.values()].sort((a,b)=>num(b.total)-num(a.total) || String(a.key).localeCompare(String(b.key), 'es'));
+  const totalGeneral = round(ordered.reduce((acc, g) => acc + num(g.total), 0), 2);
+  const totalRegistros = ordered.reduce((acc, g) => acc + num(g.registros), 0);
+  const totalUnidades = round(ordered.reduce((acc, g) => acc + num(g.unidades), 0), 3);
+  return { groupField, valueColumn, groups: ordered, totalGeneral, totalRegistros, totalUnidades };
+}
+
+function distinctValuesForField(rows, field) {
+  const seen = new Map();
+  arr(rows).forEach(row => {
+    const key = trim(row?.[field]) || 'Sin clasificar';
+    seen.set(key, (seen.get(key) || 0) + 1);
+  });
+  return [...seen.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]), 'es')).map(([valor, registros]) => ({ valor, registros }));
+}
+function auditRowsForAggregate(moduleName, rows, ag, audit, context) {
+  const eventos = arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const values = distinctValuesForField(rows, ag.groupField);
+  const filtros = audit?.filtrosAplicados ? JSON.stringify(audit.filtros || {}) : 'NO';
+  return [
+    ['Módulo usado', moduleName],
+    ['Evento(s) detectado(s)', eventos || 'No indicado'],
+    ['Registros extraídos del módulo', String(rows.length)],
+    ['Registros fuente sin filtros', String(audit?.registrosFuenteSinFiltros ?? rows.length)],
+    ['Filtros aplicados', filtros],
+    ['Campo agrupado', ag.groupField],
+    ['Valores distintos encontrados', values.map(v => `${v.valor} (${v.registros})`).join(' | ') || 'Sin valores'],
+    ['Total general calculado por ControlEvent', String(ag.totalGeneral)],
+    ['Motor de cálculo', 'ControlEvent local, sin Zuzu para sumas/agrupaciones']
+  ];
+}
+
+function directAggregateResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  // Diagnóstico fiable: detección amplia, sin depender de que Zuzu interprete el prompt.
+  // Captura formas con y sin acento: agrúpalas/agrupar/agrupado, totalízalas/totalizar,
+  // suma, subtotales, desglose, etc.
+  if (!/(agrup|totaliz|subtotal|subtot|sumator|sumar|suma|desglos|calcula|calculo|cálculo|conteo|contar|recuento)/.test(p)) return null;
+  const mods = context.modulosExtraidos || {};
+  const moduleName = detectAggregateModule(prompt, mods);
+  if (!moduleName) return null;
+  const rows = arr(mods[moduleName]);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
+  if (!rows.length) {
+    return {
+      ok: true, rejected: false, title: `${moduleName} agrupado por ControlEvent`,
+      answer: `ControlEvent no puede agrupar porque el módulo ${moduleName} ha entregado 0 registros${eventos ? ` para ${eventos}` : ''}.`,
+      warnings: [audit ? `Auditoría ${moduleName}: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}.` : `El módulo ${moduleName} no tiene registros.`],
+      charts: [], tables: [], files: [], provider: 'control-event-query-modules-aggregate', model: 'sin-gemini-para-totales'
+    };
+  }
+  const ag = aggregateRowsForModule(moduleName, rows, prompt);
+  const groupedColumns = [ag.groupField, 'Registros'];
+  if (rows.some(r => r?.Unidades !== undefined)) groupedColumns.push('Unidades');
+  groupedColumns.push(`Total ${ag.valueColumn} (€)`);
+  groupedColumns.push('% sobre total');
+  const groupedRows = ag.groups.map(g => {
+    const base = [g.key, String(g.registros)];
+    if (groupedColumns.includes('Unidades')) base.push(String(round(g.unidades, 3)));
+    base.push(String(round(g.total, 2)));
+    base.push(ag.totalGeneral ? `${round((num(g.total) * 100) / ag.totalGeneral, 2)} %` : '0 %');
+    return base;
+  });
+  groupedRows.push(['TOTAL', String(ag.totalRegistros)].concat(groupedColumns.includes('Unidades') ? [String(ag.totalUnidades)] : []).concat([String(ag.totalGeneral), '100 %']));
+  const detailColumns = orderedColumnsForModule(moduleName, rows);
+  const detailRows = rows.slice(0, 300).map(row => detailColumns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  const groupedCsvRows = ag.groups.map(g => {
+    const row = { [ag.groupField]: g.key, Registros: g.registros, [`Total ${ag.valueColumn} (€)`]: round(g.total, 2), '% sobre total': ag.totalGeneral ? `${round((num(g.total) * 100) / ag.totalGeneral, 2)} %` : '0 %' };
+    if (groupedColumns.includes('Unidades')) row.Unidades = round(g.unidades, 3);
+    return row;
+  });
+  const groupedCsvColumns = groupedColumns;
+  const warningSynonyms = /donado\s+no\s+socio/.test(p) && moduleName === 'DONACIONES' ? ['En los datos reales el tipo equivalente a “DONADO NO SOCIO” suele venir como “DONADO OTROS”; se agrupa por el valor real del campo Tipo de donación.'] : [];
+  const auditText = audit ? ` Auditoría: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}${audit.filtrosAplicados ? ' con filtros verificados' : ' sin filtros'}.` : '';
+  const auditTableRows = auditRowsForAggregate(moduleName, rows, ag, audit, context);
+  return {
+    ok: true, rejected: false,
+    title: `${moduleName} agrupado por ${ag.groupField}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `Agrupación por ${ag.groupField}. Total general: ${ag.totalGeneral} €.` ,
+    warnings: arr(context.advertencias).concat(warningSynonyms),
+    charts: [{ title: `${moduleName} por ${ag.groupField} (cálculo local ControlEvent)`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
+    tables: [
+      { title: `${moduleName} agrupado por ${ag.groupField}`, columns: groupedColumns, rows: groupedRows },
+      { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
+    ],
+    files: [
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_agrupado_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(groupedCsvColumns, groupedCsvRows) },
+      { filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_detalle_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rows) }
+    ],
+    provider: 'control-event-local-deterministico',
+    model: 'sin-gemini-para-calculos'
+  };
+}
+
+
+function isModuleDataPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(donacion|donaciones|donado|donante|compra|compras|gasto|gastos|ingreso|ingresos|recaudacion|recaudación|asistente|asistentes|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|evento|eventos|producto|productos|tienda|tiendas|persona|personas|responsable|responsables)\b/.test(p);
+}
+
+function isComparativeAllDataPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(compara|comparar|comparativa|comparativo|entre\s+los\s+eventos|entre\s+eventos)\b/.test(p)
+    && /\b(todo|todos|todas|global|general|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|tk|ticket|tickets|documento|documentos|donacion|donaciones)\b/.test(p);
+}
+function uniqueEventNamesFromContext(context) {
+  return arr(context?.eventosObjetivo)
+    .map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento))
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i);
+}
+function rowsForEvent(rows, eventName) {
+  const n = norm(eventName);
+  return arr(rows).filter(row => norm(row?.Evento || row?.['Titulo del evento']) === n);
+}
+function countYes(rows, field) {
+  return arr(rows).filter(r => /^(si|sí|s)$/i.test(trim(r?.[field]))).length;
+}
+function sumField(rows, field) {
+  return round(arr(rows).reduce((acc, r) => acc + num(r?.[field]), 0), 2);
+}
+function directComparativeAllDataResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isComparativeAllDataPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const events = uniqueEventNamesFromContext(context);
+  if (events.length < 2) return null;
+
+  const ingresos = arr(mods.INGRESOS);
+  const compras = arr(mods.COMPRAS);
+  const donaciones = arr(mods.DONACIONES);
+  const tickets = arr(mods.TICKETS);
+  const documentos = arr(mods.DOCUMENTOS);
+
+  const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
+  const rows = events.map(eventName => {
+    const ing = rowsForEvent(ingresos, eventName);
+    const com = rowsForEvent(compras, eventName);
+    const don = rowsForEvent(donaciones, eventName);
+    const tk = rowsForEvent(tickets, eventName);
+    const doc = rowsForEvent(documentos, eventName);
+    const can = canonicalByEvent.get(norm(eventName)) || {};
+    const importeIngresos = round(can['Ingresos total'] ?? ing.reduce((acc, r) => acc + num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario']), 0), 2);
+    const importeCompras = round(can['Compras realizadas'] ?? sumField(com.filter(r => !/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))), 'Importe'), 2);
+    const valorDonaciones = round(can['Donaciones valor'] ?? sumField(don, 'Valor'), 2);
+    const totalTk = round(can['Tickets total'] ?? tk.reduce((acc, r) => acc + num(r?.['Total ticket']), 0), 2);
+    return {
+      Evento: eventName,
+      Colaboradores: can['Colaboradores registros'] ?? ing.length,
+      'Asistentes / Numero': round(can['Asistentes / Numero'] ?? ing.reduce((acc, r) => acc + num(r?.Numero), 0), 3),
+      'Just.ing SI': can['Justificantes ingreso SI'] ?? countYes(ing, 'Just.ing'),
+      'Ingresos total (€)': importeIngresos,
+      'Compras líneas': can['Compras registros'] ?? com.length,
+      'Compras realizadas (€)': importeCompras,
+      'Compras pendientes (€)': round(can['Compras pendientes'] ?? 0, 2),
+      'Donaciones líneas': can['Donaciones registros'] ?? don.length,
+      'Donaciones valor (€)': valorDonaciones,
+      TKxx: can['Tickets numero'] ?? tk.length,
+      'TKxx total (€)': totalTk,
+      Documentos: can['Documentos numero'] ?? doc.length,
+      'Saldo actual ingresos - compras (€)': round(can['Saldo actual'] ?? (importeIngresos - importeCompras), 2),
+      'Valoración compras + donaciones (€)': round(can['Valoracion con donaciones'] ?? (importeCompras + valorDonaciones), 2)
+    };
+  });
+
+  const columns = ['Evento','Colaboradores','Asistentes / Numero','Just.ing SI','Ingresos total (€)','Compras líneas','Compras realizadas (€)','Compras pendientes (€)','Donaciones líneas','Donaciones valor (€)','TKxx','TKxx total (€)','Documentos','Saldo actual ingresos - compras (€)','Valoración compras + donaciones (€)'];
+  const tableRows = rows.map(r => columns.map(c => text(r[c])));
+  const auditRows = [
+    ['Modo', 'Comparativa estricta entre eventos citados'],
+    ['Eventos usados', events.join(' | ')],
+    ['Eventos no citados', 'Excluidos'],
+    ['Módulos usados', ['INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].filter(m => Array.isArray(mods[m])).join(', ')],
+    ['Motor de cálculo', 'ControlEvent local, sin Zuzu para selección de eventos ni sumas']
+  ];
+  const charts = [
+    { title: 'Ingresos total por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Ingresos total (€)'], 2)), unit: '€' },
+    { title: 'Compras total por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Compras realizadas (€)'], 2)), unit: '€' },
+    { title: 'Donaciones valor por evento', type: 'bar', labels: events, values: rows.map(r => round(r['Donaciones valor (€)'], 2)), unit: '€' },
+    { title: 'Colaboradores por evento', type: 'bar', labels: events, values: rows.map(r => round(r.Colaboradores, 2)), unit: '' }
+  ];
+  return {
+    ok: true,
+    rejected: false,
+    title: `Comparativa estricta entre ${events.length} eventos`,
+    answer: `Comparativa entre ${events.join(' y ')}.` ,
+    warnings: arr(context.advertencias),
+    charts,
+    tables: [
+      { title: 'Comparativa general por evento', columns, rows: tableRows }
+    ],
+    files: [{ filename: fileSafe(`Comparativa_eventos_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    provider: 'control-event-local-comparativa-estricta',
+    model: 'sin-gemini-para-alcance-ni-calculos'
+  };
+}
+
+
+function firstIntInPrompt(prompt, fallback = 25) {
+  const m = text(prompt).match(/\b(\d{1,4})\b/);
+  const n = m ? Number(m[1]) : fallback;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 1000) : fallback;
+}
+function firstRankingLimitInPrompt(prompt, fallback = 25) {
+  const raw = text(prompt);
+  const patterns = [
+    /\b(?:top|ranking)\s*(?:de)?\s*(\d{1,3})\b/i,
+    /\b(\d{1,3})\s+(?:producto|productos|articulo|articulos)\b/i,
+    /\bprimer(?:os|as)?\s+(\d{1,3})\b/i
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    const n = m ? Number(m[1]) : 0;
+    if (Number.isFinite(n) && n > 0) return Math.min(n, 100);
+  }
+  return fallback;
+}
+function parseEventDateForSort(value) {
+  const s = trim(value);
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
+  if (m) {
+    let y = Number(m[3]); if (y < 100) y += 2000;
+    return new Date(y, Number(m[2]) - 1, Number(m[1])).getTime() || 0;
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() || 0;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : 0;
+}
+function eventNamesFromContext(context) {
+  return arr(context?.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.Evento || e?.EVENTO)).filter(Boolean);
+}
+function eventMetaByNameFromContext(context) {
+  const out = new Map();
+  const merge = row => {
+    const title = trim(row?.['Titulo del evento'] || row?.Titulo || row?.Evento || row?.EVENTO || row?.titulo || row?.nombre || '');
+    if (!title) return;
+    const key = norm(title);
+    const old = out.get(key) || { Evento: title };
+    out.set(key, {
+      ...old,
+      Evento: old.Evento || title,
+      Estado: firstNonEmpty(old.Estado, row?.Estado, row?.estado, row?.situacion, row?.Situacion),
+      'Fecha inicio': firstNonEmpty(old['Fecha inicio'], row?.['fecha ini'], row?.fechaIni, row?.fecha_inicio, row?.FechaInicio, row?.Fecha),
+      'Fecha fin': firstNonEmpty(old['Fecha fin'], row?.['fecha fin'], row?.fechaFin, row?.fecha_fin, row?.FechaFin)
+    });
+  };
+  arr(context?.modulosExtraidos?.EVENTOS).forEach(merge);
+  arr(context?.eventosObjetivo).forEach(merge);
+  return out;
+}
+function isEventInProgressValue(value) {
+  return /en\s*curso|abiert|activo|preparaci[oó]n/i.test(trim(value));
+}
+function eventLabelWithState(name, metaMap) {
+  const meta = metaMap?.get?.(norm(name)) || {};
+  const state = trim(meta.Estado);
+  return state && isEventInProgressValue(state) ? `${name} · En curso` : name;
+}
+function eventStateNoteForRow(name, metaMap) {
+  const meta = metaMap?.get?.(norm(name)) || {};
+  const state = trim(meta.Estado);
+  if (!state) return '';
+  if (isEventInProgressValue(state)) return 'Evento En curso: cifras provisionales; ingresos, compras, donaciones y saldo pueden variar hasta el cierre.';
+  if (/finalizad|cerrad/i.test(state)) return 'Evento cerrado/finalizado: cifras comparables como cierre.';
+  return '';
+}
+function normEq(a, b) { return norm(a) === norm(b); }
+function nameMatches(value, needle) {
+  const v = norm(value), n = norm(needle);
+  if (!v || !n) return false;
+  if (v === n) return true;
+  // Coincidencia flexible, pero evitando que una palabra corta contamine muchos nombres.
+  if (n.length >= 4 && v.includes(n)) return true;
+  if (v.length >= 5 && n.includes(v)) return true;
+  const vw = v.split(' ').filter(x => x.length >= 3);
+  const nw = n.split(' ').filter(x => x.length >= 3);
+  if (!vw.length || !nw.length) return false;
+  let hits = 0;
+  nw.forEach(w => {
+    if (vw.includes(w)) hits += 1;
+    else if (w.length >= 5 && vw.some(x => x.length >= 5 && (x.startsWith(w) || w.startsWith(x)))) hits += 0.5;
+  });
+  return hits >= Math.max(1, Math.ceil(Math.min(nw.length, 3) * 0.6));
+}
+function quotedNames(prompt) {
+  const out = [];
+  const re = /["“”']([^"“”']{2,120})["“”']/g; let m;
+  while ((m = re.exec(text(prompt)))) out.push(trim(m[1]));
+  return out;
+}
+function uniqueRowsBy(rows, keyFn) {
+  const seen = new Set(); const out = [];
+  arr(rows).forEach(r => { const k = keyFn(r); if (!seen.has(k)) { seen.add(k); out.push(r); } });
+  return out;
+}
+function directEventPriceExtremesIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(evento|eventos)\b/.test(p) || !/\b(precio|barato|costoso|caro|maximo|maxima|mínimo|minimo)\b/.test(p)) return null;
+  const rows = uniqueRowsBy(arr(context?.modulosExtraidos?.EVENTOS), r => trim(r?.['Titulo del evento'])).filter(r => trim(r?.['Titulo del evento']));
+  if (!rows.length) return null;
+  const positive = rows.filter(r => num(r?.Precio) > 0);
+  const base = positive.length ? positive : rows;
+  const sorted = base.slice().sort((a,b)=>num(a.Precio)-num(b.Precio));
+  const barato = sorted[0]; const caro = sorted[sorted.length-1];
+  const columns = ['Concepto','Titulo del evento','Precio','fecha ini','fecha fin','Estado'];
+  const tableRows = [
+    ['Más barato', barato?.['Titulo del evento'] || '', String(round(barato?.Precio,2)), text(barato?.['fecha ini']), text(barato?.['fecha fin']), text(barato?.Estado)],
+    ['Más costoso', caro?.['Titulo del evento'] || '', String(round(caro?.Precio,2)), text(caro?.['fecha ini']), text(caro?.['fecha fin']), text(caro?.Estado)]
+  ];
+  const warnings = positive.length && positive.length < rows.length ? ['Se han ignorado eventos con precio 0 para no confundir “sin precio definido” con el evento más barato.'] : [];
+  return { ok:true, rejected:false, title:'Precio de eventos', answer:`ControlEvent ha revisado ${rows.length} evento(s) y ha calculado localmente el más barato y el más costoso.`, warnings, charts:[{title:'Precio de eventos extremos', type:'bar', labels:['Más barato','Más costoso'], values:[round(barato?.Precio,2), round(caro?.Precio,2)], unit:'€'}], tables:[{title:'Evento más barato y más costoso', columns, rows: tableRows}], files:[{filename:fileSafe('EVENTOS_precios_extremos_v22_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, tableRows.map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]]))))}], provider:'control-event-local-eventos-precios', model:'sin-gemini-para-calculos' };
+}
+function directPersonAppearanceIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(busca|buscar|aparece|aparecen|cuantos|cuántos|revisa|participa|participan|participo|participado|participacion|participación|papel|desempenado|desempeñado|informe)\b/.test(p) || !/\b(persona|colaborador|colaboradores|responsable|responsables|donante|donantes)\b/.test(p)) return null;
+  const needles = personNeedlesFromPrompt(prompt, context);
+  const needle = needles[0] || '';
+  if (!needle) return null;
+  const ingresos = arr(context?.modulosExtraidos?.INGRESOS).filter(r => nameMatches(r?.Nombre, needle));
+  const comprasResp = arr(context?.modulosExtraidos?.COMPRAS).filter(r => nameMatches(r?.Responsable, needle));
+  const donResp = arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Responsable, needle));
+  const donDonante = /\bdonante|donantes|donad/.test(p) ? arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Donante, needle)) : [];
+  const events = new Map();
+  function touch(evento){ const e=trim(evento)||'Sin evento'; if(!events.has(e)) events.set(e,{Evento:e, Colaborador:0,'Responsable compras':0,'Responsable donaciones':0,'Donante donaciones':0}); return events.get(e); }
+  ingresos.forEach(r=>touch(r.Evento).Colaborador += 1);
+  comprasResp.forEach(r=>touch(r.Evento)['Responsable compras'] += 1);
+  donResp.forEach(r=>touch(r.Evento)['Responsable donaciones'] += 1);
+  donDonante.forEach(r=>touch(r.Evento)['Donante donaciones'] += 1);
+  const rows = [...events.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
+  const columns = ['Evento','Colaborador','Responsable compras','Responsable donaciones','Donante donaciones'];
+  return { ok:true, rejected:false, title:`Apariciones de ${needle}`, answer:`ControlEvent ha buscado a “${needle}” en los módulos disponibles: INGRESOS, COMPRAS y DONACIONES. Aparece en ${rows.length} evento(s).`, warnings: rows.length?[]:[`No hay coincidencias para “${needle}” en los módulos extraídos. Prueba con el nombre tal como aparece en PERSONAS/TIENDAS.`], charts:rows.length?[{title:`Eventos donde aparece ${needle}`, type:'bar', labels:rows.map(r=>r.Evento), values:rows.map(r=>r.Colaborador+r['Responsable compras']+r['Responsable donaciones']+r['Donante donaciones']), unit:'apariciones'}]:[], tables:rows.length?[{title:`Apariciones de ${needle} por evento`, columns, rows: rows.map(r=>columns.map(c=>text(r[c])))}]:[], files:rows.length?[{filename:fileSafe(`Apariciones_${needle}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}]:[], provider:'control-event-local-busqueda-persona', model:'sin-gemini-para-busquedas' };
+}
+
+function personNeedlesFromPrompt(prompt, context) {
+  const eventNames = eventNamesFromContext(context).map(norm);
+  const quoted = quotedNames(prompt).filter(q => {
+    const nq = norm(q);
+    return !eventNames.some(ev => ev === nq || ev.includes(nq) || nq.includes(ev));
+  });
+  if (quoted.length) return uniqueTextList(quoted);
+  const raw = text(prompt);
+  const patterns = [
+    /\b(?:de|del|para|sobre)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ0-9 ._-]{2,60}?)(?=\s+(?:con|como|en|que|y|o|,|\.|$))/,
+    /\b(?:persona|colaborador|responsable|donante)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ0-9 ._-]{2,60}?)(?=\s+(?:con|como|en|que|y|o|,|\.|$))/i
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    if (m && trim(m[1])) return uniqueTextList([trim(m[1]).replace(/^['"“”]+|['"“”]+$/g, '')]);
+  }
+  const people = arr(context?.modulosExtraidos?.PERSONAS);
+  if (people.length === 1) return uniqueTextList([people[0]?.['Nombre persona']]);
+  return [];
+}
+
+function zuzuPersonIdentityPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(quien\s+es|quién\s+es|sabes\s+quien\s+es|sabes\s+quién\s+es|conoces\s+a|datos\s+de|datos\s+del|datos\s+sobre|ficha\s+de|informacion\s+de|información\s+de|info\s+de|dime\s+sus\s+datos)\b/.test(p);
+}
+function cleanPersonNeedle(value) {
+  return trim(value)
+    .replace(/^['"“”]+|['"“”]+$/g, '')
+    .replace(/\b(dime|sus|datos|por\s+favor|porfa|sabes|conoces|quien|quién|es|de|del|sobre|info|informacion|información|ficha)\b/ig, ' ')
+    .replace(/[?¿!¡.,;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function identityNeedlesFromPrompt(prompt, context) {
+  const out = personNeedlesFromPrompt(prompt, context).slice();
+  const raw = text(prompt);
+  const patterns = [
+    /\b(?:quien|quién)\s+es\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i,
+    /\b(?:sabes\s+(?:quien|quién)\s+es|conoces\s+a)\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i,
+    /\b(?:datos|ficha|info|informacion|información)\s+(?:de|del|sobre)\s+["“”']?([^?¿!¡,"“”';:\n]{2,70})["“”']?/i
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    if (m && trim(m[1])) out.push(cleanPersonNeedle(m[1]));
+  }
+  const q = quotedNames(prompt).map(cleanPersonNeedle).filter(Boolean);
+  q.forEach(x => out.push(x));
+  return uniqueTextList(out.filter(x => trim(x).length >= 2));
+}
+function loggedUserFromContext(context) {
+  const u = context?.usuarioLogado || context?.user || context?.ce_acceso || context?.ceAcceso || null;
+  if (!u || typeof u !== 'object') return null;
+  const identificacion = firstNonEmpty(u.Identificacion, u.identificacion, u.usuario, u.user, u.apodo);
+  const nombre = firstNonEmpty(u.Nombre, u.nombre, u.name);
+  const nivel = firstNonEmpty(u.Nivel, u.nivel, u.rol, u.Rol);
+  if (!identificacion && !nombre) return null;
+  return { Identificacion: identificacion, Nombre: nombre, Nivel: nivel };
+}
+function loggedUserMatchesNeedle(user, needle) {
+  if (!user || !needle) return false;
+  return nameMatches(user.Identificacion, needle) || nameMatches(user.Nombre, needle);
+}
+function directPersonIdentityIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!zuzuPersonIdentityPrompt(prompt)) return null;
+  const needles = identityNeedlesFromPrompt(prompt, context);
+  const needle = needles[0] || '';
+  if (!needle) return null;
+  const mods = context.modulosExtraidos || {};
+  const user = loggedUserFromContext(context);
+  const loginMatch = loggedUserMatchesNeedle(user, needle);
+  const people = arr(mods.PERSONAS).filter(r => nameMatches(r?.['Nombre persona'] || r?.Nombre || r?.nombre, needle));
+  const ingresos = arr(mods.INGRESOS).filter(r => nameMatches(r?.Nombre, needle));
+  const comprasResp = arr(mods.COMPRAS).filter(r => nameMatches(r?.Responsable, needle));
+  const donResp = arr(mods.DONACIONES).filter(r => nameMatches(r?.Responsable, needle));
+  const donDonante = arr(mods.DONACIONES).filter(r => nameMatches(r?.Donante, needle));
+  const ficha = [];
+  people.slice(0, 20).forEach(r => ficha.push({ Origen: 'PERSONAS', Nombre: trim(r?.['Nombre persona'] || r?.Nombre || ''), Identificacion: trim(r?.Identificacion || r?.identificacion || r?.Apodo || ''), Rango: trim(r?.Rango || r?.rango || ''), Telefono: trim(r?.Telefono || r?.telefono || ''), Email: trim(r?.Email || r?.email || '') }));
+  if (loginMatch) ficha.unshift({ Origen: 'USUARIO LOGADO', Nombre: trim(user.Nombre), Identificacion: trim(user.Identificacion), Rango: trim(user.Nivel), Telefono: '', Email: '' });
+  const actividad = [];
+  ingresos.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Colaborador / ingreso', Producto: '', Unidades: '', 'Importe/valor (€)': round(num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario']), 2), Detalle: `Ingreso: ${trim(r.Ingreso || '')}; rango: ${trim(r.Rango || '')}; número: ${trim(r.Numero || '')}` }));
+  comprasResp.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Responsable de compra/gasto', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Importe, 2), Detalle: `${trim(r['Ticket u otros gastos'] || '')}; tienda: ${trim(r.Tienda || '')}` }));
+  donResp.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Responsable de donación', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; donante: ${trim(r.Donante || '')}` }));
+  donDonante.forEach(r => actividad.push({ Evento: trim(r.Evento), Papel: 'Donante', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; responsable: ${trim(r.Responsable || '')}` }));
+  actividad.sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es') || String(a.Papel).localeCompare(String(b.Papel),'es'));
+  const colsFicha = ['Origen','Nombre','Identificacion','Rango','Telefono','Email'];
+  const colsAct = ['Evento','Papel','Producto','Unidades','Importe/valor (€)','Detalle'];
+  const displayName = loginMatch && trim(user.Identificacion) ? trim(user.Identificacion) : needle;
+  const total = actividad.length + ficha.length;
+  const answer = total
+    ? `He buscado a “${needle}” en PERSONAS, en el usuario logado actual y en su actividad de INGRESOS, COMPRAS y DONACIONES. ${loginMatch ? `Además coincide con el usuario conectado: ${trim(user.Identificacion) || trim(user.Nombre)}.` : ''} Actividad encontrada: ${actividad.length} línea(s).`
+    : `No he encontrado a “${needle}” en PERSONAS, usuario logado ni en la actividad de INGRESOS, COMPRAS o DONACIONES de los datos extraídos.`;
+  const tables = [];
+  if (ficha.length) tables.push({ title: `Ficha / identidad de ${displayName}`, columns: colsFicha, rows: ficha.map(r => colsFicha.map(c => text(r[c]))) });
+  if (actividad.length) tables.push({ title: `Participación de ${displayName}`, columns: colsAct, rows: actividad.map(r => colsAct.map(c => text(r[c]))) });
+  const files = [];
+  if (ficha.length) files.push({ filename: fileSafe(`PERSONA_${displayName}_ficha_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(colsFicha, ficha) });
+  if (actividad.length) files.push({ filename: fileSafe(`PERSONA_${displayName}_actividad_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(colsAct, actividad) });
+  return { ok:true, rejected:false, title:`Datos de ${displayName}`, answer, warnings: total ? [] : [`Se han revisado PERSONAS, usuarioLogado, INGRESOS, COMPRAS y DONACIONES dentro del contexto entregado.`], charts:[], tables, files, provider:'control-event-local-persona-identidad', model:'sin-gemini-para-identidad-persona' };
+}
+
+function directPersonRoleReportIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  const hasParticipationCue = /\b(informe|papel|participacion|participación|desempenad[oa]|responsable|donante|colaborador|colaboradora|aparece|aparecen|participa|participan|participado|interviene|intervino)\b/.test(p);
+  const hasRoleCue = /\b(responsable|donante|colaborador|colaboradora|colaboradores|persona|papel|participacion|participación)\b/.test(p);
+  if (!hasParticipationCue) return null;
+  if (!hasRoleCue && !quotedNames(prompt).length) return null;
+  const needles = personNeedlesFromPrompt(prompt, context);
+  const needle = needles[0] || '';
+  if (!needle) return null;
+  const ingresos = arr(context?.modulosExtraidos?.INGRESOS).filter(r => nameMatches(r?.Nombre, needle));
+  const comprasResp = arr(context?.modulosExtraidos?.COMPRAS).filter(r => nameMatches(r?.Responsable, needle));
+  const donResp = arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Responsable, needle));
+  const donDonante = arr(context?.modulosExtraidos?.DONACIONES).filter(r => nameMatches(r?.Donante, needle));
+  const detail = [];
+  ingresos.forEach(r => detail.push({ Evento: trim(r.Evento), Papel: 'Colaborador / ingreso', Producto: '', Unidades: '', 'Importe/valor (€)': round(num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario']), 2), Detalle: `Ingreso: ${trim(r.Ingreso || '')}; rango: ${trim(r.Rango || '')}; número: ${trim(r.Numero || '')}`, Relacionado: trim(r.Nombre || '') }));
+  comprasResp.forEach(r => detail.push({ Evento: trim(r.Evento), Papel: 'Responsable de compra/gasto', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Importe, 2), Detalle: `${trim(r['Ticket u otros gastos'] || '')}; tienda: ${trim(r.Tienda || '')}`, Relacionado: trim(r.Responsable || '') }));
+  donResp.forEach(r => detail.push({ Evento: trim(r.Evento), Papel: 'Responsable de donación', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; donante: ${trim(r.Donante || '')}`, Relacionado: trim(r.Responsable || '') }));
+  donDonante.forEach(r => detail.push({ Evento: trim(r.Evento), Papel: 'Donante', Producto: trim(r.Producto), Unidades: round(r.Unidades, 3), 'Importe/valor (€)': round(r.Valor, 2), Detalle: `${trim(r['Tipo de donación'] || '')}; responsable: ${trim(r.Responsable || '')}`, Relacionado: trim(r.Donante || '') }));
+  if (!detail.length) {
+    const eventos = eventNamesFromContext(context);
+    return {
+      ok: true,
+      rejected: false,
+      title: `Participación de ${needle}`,
+      answer: `No he encontrado registros operativos de “${needle}” en INGRESOS, COMPRAS ni DONACIONES${eventos.length ? ` dentro de: ${eventos.join(' | ')}` : ''}. No devuelvo la tabla técnica de EVENTOS porque eso no respondería a “con qué participó”.`,
+      warnings: [`Se han revisado los módulos de actividad del evento, no solo la ficha técnica de EVENTOS.`],
+      charts: [],
+      tables: [],
+      files: [],
+      provider: 'control-event-local-informe-persona-cero',
+      model: 'sin-gemini-para-informes-de-persona'
+    };
+  }
+  detail.sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es') || String(a.Papel).localeCompare(String(b.Papel),'es') || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const byEvent = new Map();
+  const byRole = new Map();
+  detail.forEach(r => {
+    const ev = trim(r.Evento) || 'Sin evento';
+    const e = byEvent.get(ev) || { Evento: ev, Colaborador: 0, 'Resp. compras': 0, 'Resp. donaciones': 0, Donante: 0, 'Importe/valor total (€)': 0 };
+    if (r.Papel === 'Colaborador / ingreso') e.Colaborador += 1;
+    else if (r.Papel === 'Responsable de compra/gasto') e['Resp. compras'] += 1;
+    else if (r.Papel === 'Responsable de donación') e['Resp. donaciones'] += 1;
+    else if (r.Papel === 'Donante') e.Donante += 1;
+    e['Importe/valor total (€)'] = round(e['Importe/valor total (€)'] + num(r['Importe/valor (€)']), 2);
+    byEvent.set(ev, e);
+    const role = trim(r.Papel) || 'Sin papel';
+    const old = byRole.get(role) || { Papel: role, Registros: 0, 'Importe/valor (€)': 0 };
+    old.Registros += 1; old['Importe/valor (€)'] = round(old['Importe/valor (€)'] + num(r['Importe/valor (€)']), 2); byRole.set(role, old);
+  });
+  const summary = [...byEvent.values()].sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
+  const roleRows = [...byRole.values()].sort((a,b)=>num(b.Registros)-num(a.Registros));
+  const colsSummary = ['Evento','Colaborador','Resp. compras','Resp. donaciones','Donante','Importe/valor total (€)'];
+  const colsRoles = ['Papel','Registros','Importe/valor (€)'];
+  const colsDetail = ['Evento','Papel','Producto','Unidades','Importe/valor (€)','Detalle','Relacionado'];
+  const totalValor = round(detail.reduce((a,r)=>a+num(r['Importe/valor (€)']),0),2);
+  return {
+    ok: true,
+    rejected: false,
+    title: `Informe de participación de ${needle}`,
+    answer: `He localizado ${detail.length} registro(s) de “${needle}” en ${summary.length} evento(s). Separado por papeles: colaborador/ingresos, responsable de compras, responsable de donaciones y donante. Valor económico registrado en esas líneas: ${totalValor} €.`,
+    warnings: [],
+    charts: [
+      { title: `Participación de ${needle} por evento`, type: 'stackedBar', labels: summary.map(r=>r.Evento), values: [], unit: 'reg.', series: [
+        { name: 'Colaborador', values: summary.map(r=>num(r.Colaborador)) },
+        { name: 'Resp. compras', values: summary.map(r=>num(r['Resp. compras'])) },
+        { name: 'Resp. donaciones', values: summary.map(r=>num(r['Resp. donaciones'])) },
+        { name: 'Donante', values: summary.map(r=>num(r.Donante)) }
+      ] },
+      { title: `Valor asociado a ${needle} por evento`, type: 'bar', labels: summary.map(r=>r.Evento), values: summary.map(r=>round(r['Importe/valor total (€)'],2)), unit: '€' }
+    ],
+    tables: [
+      { title: 'Resumen por evento y papel', columns: colsSummary, rows: summary.map(r=>colsSummary.map(c=>text(r[c]))) },
+      { title: 'Resumen por papel desempeñado', columns: colsRoles, rows: roleRows.map(r=>colsRoles.map(c=>text(r[c]))) },
+      { title: 'Detalle de registros localizados', columns: colsDetail, rows: detail.slice(0, 500).map(r=>colsDetail.map(c=>text(r[c]))) }
+    ],
+    files: [{ filename: fileSafe(`Informe_participacion_${needle}_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(colsDetail, detail) }],
+    provider: 'control-event-local-informe-persona',
+    model: 'sin-gemini-para-informes-de-persona'
+  };
+}
+function parseInitialCashFromPrompt(prompt) {
+  const matches = [...text(prompt).matchAll(/(?:saldo(?:\s+de\s+caja)?\s+(?:inicial|de)?|comenzando\s+con\s+un\s+saldo\s+de|partiendo\s+de)\s*([+-]?\d{1,3}(?:\.\d{3})*(?:,\d{1,2})|[+-]?\d+(?:[,.]\d{1,2})?)\s*€?/gi)];
+  const raw = matches.length ? matches[matches.length - 1][1] : '';
+  if (!raw) return 0;
+  const n = Number(raw.replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(n) ? round(n, 2) : 0;
+}
+function directCashEvolutionIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(saldo\s+de\s+caja|saldo\s+caja|caja|evolucion\s+del\s+saldo|evolución\s+del\s+saldo|balance\s+de\s+caja)\b/.test(p)) return null;
+  if (!/\b(grafica|gráfica|grafico|gráfico|evolucion|evolución|temporal|ordenad[oa]s?)\b/.test(p)) return null;
+  const events = arr(context?.eventosObjetivo).map(e => ({
+    Evento: trim(e?.['Titulo del evento'] || e?.Titulo || e?.Evento || e?.EVENTO),
+    fechaIni: trim(e?.['fecha ini'] || e?.fechaIni || e?.Fecha || ''),
+    fechaFin: trim(e?.['fecha fin'] || e?.fechaFin || ''),
+    Estado: trim(e?.Estado || e?.situacion || '')
+  })).filter(e => e.Evento);
+  if (!events.length) return null;
+  const byEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
+  const mods = context?.modulosExtraidos || {};
+  const sorted = events.slice().sort((a,b)=>parseEventDateForSort(a.fechaIni || a.fechaFin)-parseEventDateForSort(b.fechaIni || b.fechaFin) || String(a.Evento).localeCompare(String(b.Evento),'es'));
+  let acumulado = parseInitialCashFromPrompt(prompt);
+  const inicial = acumulado;
+  const rows = sorted.map(ev => {
+    const can = byEvent.get(norm(ev.Evento)) || {};
+    const ing = rowsForEvent(arr(mods.INGRESOS), ev.Evento);
+    const com = rowsForEvent(arr(mods.COMPRAS), ev.Evento);
+    const ingresos = round(can['Ingresos total'] ?? ing.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0), 2);
+    const compras = round(can['Compras realizadas'] ?? sumField(com.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'), 2);
+    const movimiento = round(ingresos - compras, 2);
+    acumulado = round(acumulado + movimiento, 2);
+    return { Evento: ev.Evento, Fecha: ev.fechaIni || ev.fechaFin, Estado: ev.Estado, 'Saldo inicial antes del evento (€)': round(acumulado - movimiento, 2), 'Ingresos (€)': ingresos, 'Compras realizadas (€)': compras, 'Movimiento evento (€)': movimiento, 'Saldo de caja acumulado (€)': acumulado };
+  });
+  const cols = ['Fecha','Evento','Estado','Saldo inicial antes del evento (€)','Ingresos (€)','Compras realizadas (€)','Movimiento evento (€)','Saldo de caja acumulado (€)'];
+  const anio = (text(prompt).match(/\b(20\d{2}|19\d{2})\b/) || [,''])[1];
+  return {
+    ok: true,
+    rejected: false,
+    title: `Evolución del saldo de caja${anio ? ` ${anio}` : ''}`,
+    answer: `Saldo inicial aplicado: ${inicial} €. He ordenado ${rows.length} evento(s) temporalmente y he calculado cada movimiento como ingresos - compras realizadas. Saldo final acumulado: ${rows.length ? rows[rows.length-1]['Saldo de caja acumulado (€)'] : inicial} €.`,
+    warnings: [],
+    charts: [
+      { title: 'Saldo de caja acumulado por evento', type: 'line', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Saldo de caja acumulado (€)'],2)), unit: '€' },
+      { title: 'Movimiento de caja de cada evento', type: 'bar', labels: rows.map(r=>r.Evento), values: rows.map(r=>round(r['Movimiento evento (€)'],2)), unit: '€' },
+      { title: 'Ingresos y compras realizadas por evento', type: 'stackedBar', labels: rows.map(r=>r.Evento), values: [], unit: '€', series: [
+        { name: 'Ingresos', values: rows.map(r=>round(r['Ingresos (€)'],2)) },
+        { name: 'Compras realizadas', values: rows.map(r=>round(r['Compras realizadas (€)'],2)) }
+      ] }
+    ],
+    tables: [{ title: 'Evolución temporal del saldo de caja', columns: cols, rows: rows.map(r=>cols.map(c=>text(r[c]))) }],
+    files: [{ filename: fileSafe(`Evolucion_saldo_caja_${anio || 'ControlEvent'}_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(cols, rows) }],
+    provider: 'control-event-local-saldo-caja',
+    model: 'sin-gemini-para-saldo-caja'
+  };
+}
+function friendlyZuzuErrorMessage(error) {
+  const msg = trim(error?.message || error);
+  if (/quota|RESOURCE_EXHAUSTED|rate|429|rate-limit|rate limit|free_tier/i.test(msg)) return 'Zuzu ha alcanzado temporalmente la cuota de la API. ControlEvent intentará resolver localmente las preguntas que pueda; si no hay cálculo local disponible, espera un minuto y repite la consulta.';
+  if (/timeout|abort|tard[oó] demasiado|504/i.test(msg)) return 'Zuzu ha tardado demasiado. Prueba con una petición más concreta o repite la consulta.';
+  if (/GEMINI_API_KEY|api key|key/i.test(msg)) return 'Zuzu no está bien configurada en el servidor. Revisa la clave GEMINI_API_KEY en Vercel.';
+  return 'Zuzu no pudo completar la respuesta final. ControlEvent conserva la consulta y, cuando pueda, mostrará un respaldo local basado en los módulos oficiales.';
+}
+function directBoughtDonatedUsageIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (!/\b(comprado\s*\/\s*donado|comprado\s+y\s+donado|compras?\s+y\s+donaciones?|donaciones?\s+y\s+compras?|separa\s+comprado|mas\s+utilizado|más\s+utilizado)\b/.test(p)) return null;
+  if (!/\b(producto|productos|articulo|articulos|utilizado|usado|consumido)\b/.test(p)) return null;
+  const compras = arr(context?.modulosExtraidos?.COMPRAS);
+  const donaciones = arr(context?.modulosExtraidos?.DONACIONES);
+  if (!compras.length && !donaciones.length) return null;
+  const map = new Map();
+  function rec(prod){ const k=trim(prod)||'Sin producto'; if(!map.has(k)) map.set(k,{Producto:k,'Unidades compradas':0,'Unidades donadas':0,'Total unidades':0,'Importe comprado (€)':0,'Valor donado (€)':0}); return map.get(k); }
+  compras.forEach(r=>{ const o=rec(r.Producto); o['Unidades compradas']+=num(r.Unidades); o['Total unidades']+=num(r.Unidades); o['Importe comprado (€)']+=num(r.Importe); });
+  donaciones.forEach(r=>{ const o=rec(r.Producto); o['Unidades donadas']+=num(r.Unidades); o['Total unidades']+=num(r.Unidades); o['Valor donado (€)']+=num(r.Valor); });
+  const limit = firstIntInPrompt(prompt, 25);
+  const rows = [...map.values()].map(r=>({ ...r, 'Unidades compradas':round(r['Unidades compradas'],3), 'Unidades donadas':round(r['Unidades donadas'],3), 'Total unidades':round(r['Total unidades'],3), 'Importe comprado (€)':round(r['Importe comprado (€)'],2), 'Valor donado (€)':round(r['Valor donado (€)'],2)})).sort((a,b)=>num(b['Total unidades'])-num(a['Total unidades']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const eventos = eventNamesFromContext(context).join(', ');
+  const columns = ['Producto','Unidades compradas','Unidades donadas','Total unidades','Importe comprado (€)','Valor donado (€)'];
+  const shown = rows.slice(0, limit);
+  return { ok:true, rejected:false, title:`Productos más utilizados${eventos?` - ${eventos}`:''}`, answer:`ControlEvent ha unido COMPRAS y DONACIONES y ha calculado localmente el producto más utilizado por unidades, separando Comprado y Donado.`, warnings:[], charts:[{title:'Top productos por unidades compradas + donadas', type:'bar', labels:shown.slice(0,30).map(r=>r.Producto), values:shown.slice(0,30).map(r=>r['Total unidades']), unit:'uds'}], tables:[{title:`Top ${shown.length} productos por unidades`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))}], files:[{filename:fileSafe(`Productos_comprado_donado_${eventos||'ControlEvent'}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-comprado-donado', model:'sin-gemini-para-calculos' };
+}
+function directProductCatalogIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  const rows0 = arr(context?.modulosExtraidos?.PRODUCTOS);
+  if (!rows0.length || !/\b(producto|productos|ce_productos|catalogo|catálogo|segmento|destino|precio\s+rfa|precio\s+referencia)\b/.test(p)) return null;
+  let rows = rows0.slice();
+  const top = /\b(mas\s+caros|más\s+caros|mayor\s+precio|top)\b/.test(p);
+  if (top) rows.sort((a,b)=>num(b['Precio rfa.'])-num(a['Precio rfa.']) || String(a['Nombre producto']).localeCompare(String(b['Nombre producto']),'es'));
+  else rows.sort((a,b)=>String(a.Segmento).localeCompare(String(b.Segmento),'es') || String(a.Destino).localeCompare(String(b.Destino),'es') || String(a['Nombre producto']).localeCompare(String(b['Nombre producto']),'es'));
+  const limit = top ? firstIntInPrompt(prompt,25) : rows.length;
+  const shown = rows.slice(0, limit);
+  const columns = ['Nombre producto','Segmento','Destino','Precio rfa.'];
+  const tables = [];
+  if (/\b(agrupa|agrupad|agrupados|agrupadas|por\s+segmento|por\s+destino)\b/.test(p)) {
+    const groups = new Map();
+    rows.forEach(r=>{ const key=`${trim(r.Segmento)||'Sin segmento'} / ${trim(r.Destino)||'Sin destino'}`; const g=groups.get(key)||{Grupo:key, Productos:0,'Precio mínimo':Infinity,'Precio máximo':0,'Precio medio':0, _sum:0}; g.Productos++; const price=num(r['Precio rfa.']); g['Precio mínimo']=Math.min(g['Precio mínimo'],price); g['Precio máximo']=Math.max(g['Precio máximo'],price); g._sum+=price; groups.set(key,g); });
+    const groupRows=[...groups.values()].map(g=>({Grupo:g.Grupo, Productos:g.Productos, 'Precio mínimo':g['Precio mínimo']===Infinity?0:round(g['Precio mínimo'],2), 'Precio máximo':round(g['Precio máximo'],2), 'Precio medio':round(g._sum/g.Productos,2)})).sort((a,b)=>String(a.Grupo).localeCompare(String(b.Grupo),'es'));
+    const gcols=['Grupo','Productos','Precio mínimo','Precio máximo','Precio medio'];
+    tables.push({title:'Resumen por Segmento / Destino', columns:gcols, rows:groupRows.map(r=>gcols.map(c=>text(r[c])))});
+  }
+  tables.push({title:`PRODUCTOS ${top?`top ${shown.length} por precio`:`(${shown.length} registro(s))`}`, columns, rows:shown.map(r=>columns.map(c=>text(r[c])))});
+  return { ok:true, rejected:false, title:'PRODUCTOS extraído por ControlEvent', answer:`ControlEvent ha consultado el catálogo de productos con filtros exactos y cálculo local. Registros entregados: ${rows.length}.`, warnings:[], charts: top ? [{title:`Top ${shown.length} productos por precio rfa.`, type:'bar', labels:shown.slice(0,30).map(r=>r['Nombre producto']), values:shown.slice(0,30).map(r=>round(r['Precio rfa.'],2)), unit:'€'}] : [], tables, files:[{filename:fileSafe('PRODUCTOS_catalogo_v22_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, rows)}], provider:'control-event-local-productos', model:'sin-gemini-para-catalogos' };
+}
+function rangosSolicitadosFromPrompt(prompt) {
+  const p = norm(prompt);
+  const out = [];
+  if (/\bno\s+socios?\b/.test(p)) out.push('NO SOCIO');
+  else if (/\bsocios?\b/.test(p)) out.push('SOCIO');
+  if (/\bdonantes?\b/.test(p)) out.push('DONANTE');
+  return out;
+}
+function excludedFromAttendanceName(name) {
+  const n = norm(name);
+  return !n || /^personas\b/.test(n) || /^grupo\b/.test(n) || /^pe[ñn]a\b/.test(n) || /^z\s*_?\s*de/.test(n) || /^z\s*dev/.test(n);
+}
+function canonicalNameKey(name) {
+  return norm(name).replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function isCanonicalPairName(name) {
+  return /\s+y\s+/i.test(trim(name));
+}
+function splitCanonicalPairName(name) {
+  return trim(name).split(/\s+y\s+/i).map(x => trim(x)).filter(Boolean);
+}
+function canonicalPersonNumber(row, fallback = 1) {
+  const n = num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
+  return n > 0 ? n : fallback;
+}
+function buildCanonicalSocioCensus(personRows) {
+  const base = arr(personRows)
+    .filter(p => norm(p.Rango || p.rango || '') === 'socio')
+    .filter(p => !excludedFromAttendanceName(p['Nombre persona'] || p.Nombre || p.nombre));
+  const pairs = base.filter(p => isCanonicalPairName(p['Nombre persona'] || p.Nombre || p.nombre)).map(p => {
+    const name = trim(p['Nombre persona'] || p.Nombre || p.nombre);
+    const parts = splitCanonicalPairName(name);
+    return { kind: 'pair', name, key: canonicalNameKey(name), parts, size: Math.max(2, parts.length || 2), row: p };
+  });
+  const out = [];
+  const seen = new Set();
+  pairs.forEach(pair => { if (!seen.has(pair.key)) { seen.add(pair.key); out.push(pair); } });
+  base.forEach(p => {
+    const name = trim(p['Nombre persona'] || p.Nombre || p.nombre);
+    if (!name || isCanonicalPairName(name)) return;
+    const key = canonicalNameKey(name);
+    if (pairs.some(pair => pair.parts.some(part => canonicalNameKey(part) === key))) return;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ kind: 'single', name, key, parts: [name], size: 1, row: p });
+  });
+  return out.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+}
+function canonicalIncomeNumber(row) {
+  const raw = row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad;
+  if (raw === undefined || raw === null || trim(raw) === '') return null;
+  const n = num(raw);
+  return Number.isFinite(n) ? n : null;
+}
+function buildCanonicalSocioAttendanceForEvent(census, incomesForEvent) {
+  const socioIncome = arr(incomesForEvent)
+    .filter(r => norm(r.Rango || r.rango || '') === 'socio')
+    .map(r => ({ row: r, name: trim(r.Nombre || r.nombre || r['Nombre persona'] || ''), key: canonicalNameKey(r.Nombre || r.nombre || r['Nombre persona'] || ''), numero: canonicalIncomeNumber(r) }))
+    .filter(r => r.name && !excludedFromAttendanceName(r.name) && r.numero !== null && r.numero >= 0);
+  function directPair(pair) {
+    return socioIncome.some(r => (r.key === pair.key) && (r.numero === 0 || r.numero >= pair.size));
+  }
+  function directSingle(name) {
+    const key = canonicalNameKey(name);
+    return socioIncome.some(r => r.key === key);
+  }
+  const asistentes = [];
+  const noAsisten = [];
+  census.forEach(item => {
+    if (item.kind === 'pair') {
+      if (directPair(item)) {
+        asistentes.push({ name: item.name, size: item.size, kind: 'pair' });
+        return;
+      }
+      const present = [];
+      const missing = [];
+      item.parts.forEach(part => { directSingle(part) ? present.push(part) : missing.push(part); });
+      if (!present.length) {
+        noAsisten.push({ name: item.name, size: item.size, kind: 'pair' });
+      } else {
+        present.forEach(part => asistentes.push({ name: part, size: 1, kind: 'single' }));
+        missing.forEach(part => noAsisten.push({ name: part, size: 1, kind: 'single' }));
+      }
+      return;
+    }
+    if (directSingle(item.name)) asistentes.push({ name: item.name, size: 1, kind: 'single' });
+    else noAsisten.push({ name: item.name, size: 1, kind: 'single' });
+  });
+  asistentes.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  noAsisten.sort((a,b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  return {
+    asistentes,
+    noAsisten,
+    totalSocios: census.reduce((a,x)=>a+num(x.size),0),
+    totalAsistentes: asistentes.reduce((a,x)=>a+num(x.size),0),
+    totalNoAsisten: noAsisten.reduce((a,x)=>a+num(x.size),0)
+  };
+}
+function canonicalAttendanceSummaryFromContext(context) {
+  const mods = context?.modulosExtraidos || {};
+  const census = buildCanonicalSocioCensus(arr(mods.PERSONAS));
+  const incomes = arr(mods.INGRESOS);
+  const events = eventNamesFromContext(context);
+  return events.map(ev => {
+    const pack = buildCanonicalSocioAttendanceForEvent(census, rowsForEvent(incomes, ev));
+    return { Evento: ev, ...pack };
+  });
+}
+function asksMissingAttendees(prompt) {
+  const p = norm(prompt);
+  return /\b(no\s+asistir|no\s+asistiran|no\s+asistir[aá]n|no\s+asisten|no\s+asistentes|no\s+estar[aá]n|no\s+estaran|no\s+estan|no\s+est[aá]n|no\s+esten\s+registrad|no\s+est[eé]n\s+registrad|no\s+figuran|no\s+aparecen|faltan\s+socios|socios?\s+que\s+faltan)\b/.test(p)
+    || (/\bsocios?\b/.test(p) && /\b(no\s+est[eé]n|no\s+esten|exceptuando|excluyendo)\b/.test(p) && /\b(evento|ingresos|asist)\b/.test(p));
+}
+function missingAttendeesTablesAndCharts(context, prompt = '') {
+  const mods = context?.modulosExtraidos || {};
+  const census = buildCanonicalSocioCensus(arr(mods.PERSONAS));
+  const incomes = arr(mods.INGRESOS);
+  const events = eventNamesFromContext(context);
+  if (!census.length || !events.length) {
+    return { tables: [], charts: [], resumenTexto: '', warnings: census.length ? [] : ['No hay PERSONAS con rango SOCIO disponibles para calcular asistencia canónica.'] };
+  }
+  const summary = [];
+  const detail = [];
+  events.forEach(ev => {
+    const pack = buildCanonicalSocioAttendanceForEvent(census, rowsForEvent(incomes, ev));
+    summary.push({
+      Evento: ev,
+      'Socios canónicos': pack.totalSocios,
+      'Socios asistentes': pack.totalAsistentes,
+      'Socios no asistentes': pack.totalNoAsisten,
+      Criterio: 'Rango=SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2 y sustituyen a individuales duplicados; asistentes = colaboradores SOCIO del evento con Numero >= 0 (incluye exentos de pago con Numero=0), aunque estén Pendiente.'
+    });
+    pack.asistentes.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO asistente', Socio: x.name, Personas: x.size, Motivo: x.size > 1 ? 'Pareja/grupo canónico registrado como colaborador del evento' : 'Socio canónico registrado como colaborador del evento' }));
+    pack.noAsisten.forEach(x => detail.push({ Evento: ev, Tipo: 'SOCIO no asistente', Socio: x.name, Personas: x.size, Motivo: 'Socio canónico que no figura como colaborador SOCIO con Numero >= 0 en el evento' }));
+  });
+  const summaryCols = ['Evento','Socios canónicos','Socios asistentes','Socios no asistentes','Criterio'];
+  const detailCols = ['Evento','Tipo','Socio','Personas','Motivo'];
+  const tables = [
+    { title: 'Resumen canónico de socios asistentes/no asistentes', columns: summaryCols, rows: summary.map(r => summaryCols.map(c => text(r[c]))) },
+    { title: `Detalle canónico de socios asistentes/no asistentes (${detail.length})`, columns: detailCols, rows: detail.map(r => detailCols.map(c => text(r[c]))) }
+  ];
+  const charts = summary.length === 1 ? [{ title: 'Socios canónicos con y sin asistencia', type: 'donut', labels: ['Socios asistentes','Socios no asistentes'], values: [num(summary[0]['Socios asistentes']), num(summary[0]['Socios no asistentes'])], unit: 'personas' }]
+    : [{ title: 'Socios no asistentes por evento', type: 'horizontalBar', labels: summary.map(r=>r.Evento), values: summary.map(r=>num(r['Socios no asistentes'])), unit: 'personas' }];
+  const resumenTexto = summary.map(r => `${r.Evento}: ${r['Socios asistentes']} asistentes y ${r['Socios no asistentes']} no asistentes sobre ${r['Socios canónicos']} socios canónicos`).join(' | ');
+  return { tables, charts, resumenTexto, warnings: [] };
+}
+
+function directPersonsCatalogIfApplicable(prompt, context) {
+  const p = norm(prompt);
+  if (asksMissingAttendees(prompt)) return null;
+  const rows0 = arr(context?.modulosExtraidos?.PERSONAS);
+  if (!rows0.length && !Array.isArray(context?.modulosExtraidos?.PERSONAS)) return null;
+  if (!/\b(persona|personas|socios?|donantes?)\b/.test(p)) return null;
+  const catalogAsk = /\b(sistema|registrad[ao]s?|maestro|tabla|catalogo|catálogo|rango|lista|listado|dame|muestra|ver)\b/.test(p)
+    && !/\b(participa|participan|participado|papel|responsable|colaborador|evento|eventos|donado|donaciones?|compras?|ingresos?)\b/.test(p);
+  const groupingAsk = /\b(agrupa|agrupad|rango)\b/.test(p);
+  if (!catalogAsk && !groupingAsk) return null;
+  const rangos = rangosSolicitadosFromPrompt(prompt);
+  let rows = rows0.slice();
+  if (rangos.length) rows = rows.filter(r => rangos.some(rg => norm(r.Rango) === norm(rg) || norm(r.Rango).includes(norm(rg))));
+  rows.sort((a,b)=>String(a.Rango).localeCompare(String(b.Rango),'es') || String(a['Nombre persona']).localeCompare(String(b['Nombre persona']),'es'));
+  const allRows = rows0.slice().sort((a,b)=>String(a.Rango).localeCompare(String(b.Rango),'es') || String(a['Nombre persona']).localeCompare(String(b['Nombre persona']),'es'));
+  const baseForGroups = rangos.length ? rows : allRows;
+  const groups = new Map();
+  baseForGroups.forEach(r=>{ const k=trim(r.Rango)||'Sin rango'; groups.set(k,(groups.get(k)||0)+1); });
+  const gcols=['Rango','Personas'];
+  const grows=[...groups.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'es')).map(([k,v])=>[k,String(v)]);
+  const cols=['Nombre persona','Rango'];
+  const title = rangos.length ? `PERSONAS ${rangos.join(' / ')} registradas en el sistema` : 'PERSONAS registradas en el sistema';
+  const answer = rangos.length
+    ? `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Filtro de rango aplicado: ${rangos.join(', ')}. Registros encontrados: ${rows.length}.`
+    : `ControlEvent ha consultado PERSONAS como catálogo global del sistema, no el evento activo. Registros encontrados: ${rows.length}.`;
+  return {
+    ok:true,
+    rejected:false,
+    title,
+    answer,
+    warnings: rows.length ? [] : [`No hay personas con rango ${rangos.join(', ') || 'solicitado'} en la tabla PERSONAS.`],
+    charts:grows.length?[{title:'Personas por rango',type:'bar',labels:grows.map(r=>r[0]),values:grows.map(r=>num(r[1])),unit:'personas'}]:[],
+    tables:[{title:'Resumen por Rango',columns:gcols,rows:grows},{title:`PERSONAS (${rows.length})`,columns:cols,rows:rows.map(r=>cols.map(c=>text(r[c])))}],
+    files:[{filename:fileSafe(`${rangos.length ? 'PERSONAS_'+rangos.join('_') : 'PERSONAS_catalogo'}_v22_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,rows)}],
+    provider:'control-event-local-personas-catalogo',
+    model:'zuzu-planifica-control-event-filtra'
+  };
+}
+function directComparativeModuleTotalsIfApplicable(prompt, context) {
+  const p = norm(prompt); const events=eventNamesFromContext(context); if (events.length < 2 || !/\b(compara|comparar|comparativa)\b/.test(p)) return null;
+  const mods=context?.modulosExtraidos||{}; let moduleName='', valueField='', title='';
+  if (/\bcompra|compras\b/.test(p) && Array.isArray(mods.COMPRAS)) { moduleName='COMPRAS'; valueField='Importe'; title='Compras total por evento'; }
+  else if (/\bdonacion|donaciones\b/.test(p) && Array.isArray(mods.DONACIONES)) { moduleName='DONACIONES'; valueField='Valor'; title='Donaciones total por evento'; }
+  else if (/\bingreso|ingresos|recaudacion\b/.test(p) && Array.isArray(mods.INGRESOS)) { moduleName='INGRESOS'; valueField='Total ingreso'; title='Ingresos total por evento'; }
+  if (!moduleName) return null;
+  const rows=arr(mods[moduleName]);
+  const canonicalByEvent = new Map(arr(context?.metricasCanonicas?.porEvento).map(r => [norm(r.Evento), r]));
+  const out=events.map(ev=>{ const rs=rowsForEvent(rows,ev); const can=canonicalByEvent.get(norm(ev))||{}; let total; if(moduleName==='INGRESOS') total=round(can['Ingresos total'] ?? rs.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2); else if(moduleName==='COMPRAS') total=round(can['Compras realizadas'] ?? sumField(rs.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),valueField),2); else if(moduleName==='DONACIONES') total=round(can['Donaciones valor'] ?? sumField(rs,valueField),2); else total=sumField(rs,valueField); return {Evento:ev, Registros:rs.length, Total:total}; });
+  const cols=['Evento','Registros','Total'];
+  return {ok:true,rejected:false,title,answer:`ControlEvent ha comparado estrictamente ${moduleName} entre los eventos citados. No se han mezclado otros eventos.`,warnings:[],charts:[{title,type:'bar',labels:out.map(r=>r.Evento),values:out.map(r=>r.Total),unit:'€'}],tables:[{title,columns:cols,rows:out.map(r=>cols.map(c=>text(r[c])))}],files:[{filename:fileSafe(`${moduleName}_comparativa_eventos_v22_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(cols,out)}],provider:'control-event-local-comparativa-modulo',model:'sin-gemini-para-calculos'};
+}
+
+function uniqueTextList(list) {
+  const out = [];
+  arr(list).forEach(x => { const v = trim(x); if (v && !out.some(y => norm(y) === norm(v))) out.push(v); });
+  return out;
+}
+function donorNeedlesFromContext(prompt, context) {
+  const eventNames = eventNamesFromContext(context).map(norm);
+  const rawPrompt = text(prompt);
+  const names = [];
+  const quoted = quotedNames(rawPrompt);
+  quoted.forEach(q => {
+    const nq = norm(q);
+    const before = rawPrompt.slice(0, rawPrompt.indexOf(q)).slice(-40);
+    const isEventQuote = /\b(evento|eventos|llamado|llamados|t[ií]tulo|titulado)\s*$/i.test(before)
+      || /\b(jornada|solidaria|ela|cuotas|ingresos|gastos|extraordinarios|corrientes|dic\d{2}|20\d{2})\b/.test(nq)
+      || eventNames.some(ev => ev === nq || ev.includes(nq) || nq.includes(ev));
+    if (isEventQuote) return;
+    // Si el usuario escribe donaciones de "Carmelo" o donado por "Pocholo y Celes", esa cita es el filtro humano.
+    // No se amplía con la tabla PERSONAS porque nombres como "Luisa (Carmelo y Lucia)" ensucian el título y desvían el filtro.
+    names.push(q);
+  });
+  const explicitDe = rawPrompt.match(/\b(?:de|del|por|donante|donantes?)\s+([A-ZÁÉÍÓÚÑ][^,;.()]{2,80}?)(?=\s+\(|\s+en\s+el\s+evento|\s+en\s+evento|\s+que\b|\s+y\s+qu[eé]\b|$)/);
+  if (!names.length && explicitDe) names.push(trim(explicitDe[1]).replace(/^['"“”]+|['"“”]+$/g, ''));
+  const filters = context?.planZuzu?.filtrosHumanos || {};
+  if (!names.length) names.push(...arr(filters.donantes), ...arr(filters.personas));
+  return uniqueTextList(names).filter(n => n && !eventNames.some(ev => { const nn = norm(n); return ev === nn || ev.includes(nn) || nn.includes(ev); }));
+}
+function directDonorDonationProductsIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(donado|donados|donacion|donaciones|ha\s+donado|han\s+donado)\b/.test(p)) return null;
+  if (!/\b(producto|productos|articulo|articulos|evento|eventos|que|qué|cuales|cuáles)\b/.test(p)) return null;
+  const rowsAll = arr(context?.modulosExtraidos?.DONACIONES);
+  if (!rowsAll.length) return null;
+  const names = donorNeedlesFromContext(prompt, context);
+  if (!names.length && /\b(ranking|top|mas|menos|mayor|menor|consumo|consumido|consumidos|consumidas|grafica|gráfica|temporal|evolucion|evolución)\b/.test(p)) return null;
+  const useResponsible = /\bresponsable|responsables\b/.test(p);
+  let rows = rowsAll;
+  if (names.length) {
+    rows = rowsAll.filter(r => names.some(n => nameMatches(r?.Donante, n) || (useResponsible && nameMatches(r?.Responsable, n))));
+  }
+  const titleNames = names.length ? names.join(' y ') : 'los donantes solicitados';
+  const detailColumns = ['Evento','Donante','Producto','Unidades','Valor','Tipo de donación','Responsable'];
+  const grouped = new Map();
+  rows.forEach(r => {
+    const key = [trim(r.Evento), trim(r.Donante), trim(r.Producto), trim(r['Tipo de donación']), trim(r.Responsable)].join('|');
+    const old = grouped.get(key) || { Evento: trim(r.Evento), Donante: trim(r.Donante), Producto: trim(r.Producto), Unidades: 0, Valor: 0, 'Tipo de donación': trim(r['Tipo de donación']), Responsable: trim(r.Responsable) };
+    old.Unidades += num(r.Unidades);
+    old.Valor += num(r.Valor);
+    grouped.set(key, old);
+  });
+  const detail = [...grouped.values()].map(r => ({ ...r, Unidades: round(r.Unidades,3), Valor: round(r.Valor,2) }))
+    .sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es') || String(a.Donante).localeCompare(String(b.Donante),'es') || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const evMap = new Map();
+  detail.forEach(r => {
+    const ev = trim(r.Evento) || 'Sin evento';
+    const old = evMap.get(ev) || { Evento: ev, Donantes: new Set(), Productos: new Set(), 'Unidades donadas': 0, 'Valor donado (€)': 0, 'Nº líneas': 0 };
+    old.Donantes.add(trim(r.Donante) || 'Sin donante');
+    old.Productos.add(trim(r.Producto) || 'Sin producto');
+    old['Unidades donadas'] += num(r.Unidades);
+    old['Valor donado (€)'] += num(r.Valor);
+    old['Nº líneas'] += 1;
+    evMap.set(ev, old);
+  });
+  const eventSummary = [...evMap.values()].map(r => ({ Evento: r.Evento, Donantes: [...r.Donantes].join(' | '), Productos: [...r.Productos].join(' | '), 'Unidades donadas': round(r['Unidades donadas'],3), 'Valor donado (€)': round(r['Valor donado (€)'],2), 'Nº líneas': r['Nº líneas'] }))
+    .sort((a,b)=>String(a.Evento).localeCompare(String(b.Evento),'es'));
+  const prodMap = new Map();
+  detail.forEach(r => {
+    const prod = trim(r.Producto) || 'Sin producto';
+    const old = prodMap.get(prod) || { Producto: prod, Unidades: 0, Valor: 0 };
+    old.Unidades += num(r.Unidades); old.Valor += num(r.Valor); prodMap.set(prod, old);
+  });
+  const prodRows = [...prodMap.values()].map(r => ({ Producto: r.Producto, Unidades: round(r.Unidades,3), Valor: round(r.Valor,2) })).sort((a,b)=>num(b.Unidades)-num(a.Unidades) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const detailRows = detail.map(r => detailColumns.map(c => text(r[c])));
+  const eventColumns = ['Evento','Donantes','Productos','Unidades donadas','Valor donado (€)','Nº líneas'];
+  const prodColumns = ['Producto','Unidades','Valor'];
+  const answer = rows.length
+    ? `He encontrado ${detail.length} línea(s) agrupada(s) de donaciones para ${titleNames}. Aparecen en ${eventSummary.length} evento(s) y suman ${round(detail.reduce((a,r)=>a+num(r.Unidades),0),3)} unidades donadas.`
+    : `No he encontrado productos donados para ${titleNames} con los filtros actuales.`;
+  return {
+    ok: true,
+    rejected: false,
+    title: `Productos donados por ${titleNames}`,
+    answer,
+    warnings: rows.length ? [] : [`Se revisó el módulo DONACIONES, pero no hay líneas para ${titleNames}.`],
+    charts: prodRows.length ? [{ title: `Productos donados por ${titleNames}`, type: 'horizontalBar', labels: prodRows.slice(0,30).map(r=>r.Producto), values: prodRows.slice(0,30).map(r=>r.Unidades), unit: 'uds' }] : [],
+    tables: [
+      ...(eventSummary.length ? [{ title: 'Eventos donde aparecen esas donaciones', columns: eventColumns, rows: eventSummary.map(r=>eventColumns.map(c=>text(r[c])))}] : []),
+      ...(prodRows.length ? [{ title: 'Productos donados agrupados', columns: prodColumns, rows: prodRows.map(r=>prodColumns.map(c=>text(r[c])))}] : []),
+      ...(detailRows.length ? [{ title: 'Detalle de donaciones', columns: detailColumns, rows: detailRows.slice(0,500)}] : [])
+    ],
+    files: detail.length ? [{ filename: fileSafe(`Donaciones_${titleNames}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }] : [],
+    provider: 'control-event-analitica-donaciones',
+    model: 'calculo-local-oficial'
+  };
+}
+
+function eventTitleFromRow(row) {
+  return trim(row?.['Titulo del evento'] || row?.Titulo || row?.Evento || row?.EVENTO || row?.titulo || row?.nombre || '');
+}
+function eventMetaRowsChronological(context) {
+  const out = new Map();
+  function merge(row) {
+    const title = eventTitleFromRow(row);
+    if (!title) return;
+    const key = norm(title);
+    const old = out.get(key) || { Evento: title };
+    out.set(key, {
+      ...old,
+      Evento: old.Evento || title,
+      'Fecha inicio': firstNonEmpty(old['Fecha inicio'], row?.['fecha ini'], row?.fechaIni, row?.FechaInicio, row?.fecha_inicio, row?.Fecha),
+      'Fecha fin': firstNonEmpty(old['Fecha fin'], row?.['fecha fin'], row?.fechaFin, row?.FechaFin, row?.fecha_fin),
+      Estado: firstNonEmpty(old.Estado, row?.Estado, row?.situacion, row?.Situacion),
+      Precio: firstNonEmpty(old.Precio, row?.Precio, row?.precio)
+    });
+  }
+  arr(context?.modulosExtraidos?.EVENTOS).forEach(merge);
+  arr(context?.eventosObjetivo).forEach(merge);
+  eventNamesFromContext(context).forEach(name => merge({ Evento: name }));
+  return [...out.values()].sort((a,b) => parseEventDateForSort(a['Fecha inicio']) - parseEventDateForSort(b['Fecha inicio']) || String(a.Evento).localeCompare(String(b.Evento),'es'));
+}
+function topJoined(rows, labelField, valueField, limit = 4, unit = '') {
+  const map = new Map();
+  arr(rows).forEach(r => {
+    const key = trim(r?.[labelField]) || 'Sin clasificar';
+    map.set(key, num(map.get(key)) + (valueField ? num(r?.[valueField]) : 1));
+  });
+  return [...map.entries()]
+    .sort((a,b) => num(b[1]) - num(a[1]) || String(a[0]).localeCompare(String(b[0]), 'es'))
+    .slice(0, limit)
+    .map(([k,v]) => `${k} (${round(v, unit === 'uds' ? 3 : 2)}${unit ? ' ' + unit : ''})`)
+    .join(' | ');
+}
+function formatMoneyText(value) { return `${round(value, 2)} €`; }
+function calcIngresosTotal(rows) { return round(arr(rows).reduce((a,r)=>a + (r?.['Total ingreso'] !== undefined ? num(r?.['Total ingreso']) : num(r?.['Importe obligatorio']) + num(r?.['Importe voluntario'])),0),2); }
+function directChronologicalEventNarrativeIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  const wantsAllRegistered = /\b(eventos\s+registrados|todos\s+los\s+eventos|cada\s+evento|cada\s+uno\s+de\s+los\s+eventos|celebracion\s+de\s+cada\s+evento|celebración\s+de\s+cada\s+evento)\b/.test(p);
+  const wantsNarrative = /\b(informe|cuentes|contar|cuenta|relato|cronica|crónica|cosas\s+que\s+ocurrieron|ocurrio|ocurrió|actividad|historial|evolucion|evolución)\b/.test(p);
+  const wantsTimeOrder = /\b(ordenad[oa]s?|ordenalo|ordénalo|tiempo|temporal|cronologic[oa]|cronológic[oa]|fecha\s+inicio|fecha\s+de\s+celebracion|fecha\s+de\s+celebración|celebracion|celebración)\b/.test(p);
+  const eventMeta = eventMetaRowsChronological(context);
+  if (eventMeta.length < 2 || !(wantsNarrative && (wantsAllRegistered || wantsTimeOrder))) return null;
+
+  const mods = context.modulosExtraidos || {};
+  const canonical = arr(context?.metricasCanonicas?.porEvento);
+  const byEvent = new Map(canonical.map(r => [norm(r.Evento), r]));
+  const summaryRows = [];
+  const moduleRows = [];
+  eventMeta.forEach((ev, idx) => {
+    const eventName = ev.Evento;
+    const can = byEvent.get(norm(eventName)) || {};
+    const ing = rowsForEvent(arr(mods.INGRESOS), eventName);
+    const comAll = rowsForEvent(arr(mods.COMPRAS), eventName);
+    const comReal = comAll.filter(r => !/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])) && !/^DONADO\s+/i.test(trim(r?.['Ticket u otros gastos'])));
+    const comPend = comAll.filter(r => /pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos'])));
+    const don = rowsForEvent(arr(mods.DONACIONES), eventName);
+    const tk = rowsForEvent(arr(mods.TICKETS), eventName);
+    const doc = rowsForEvent(arr(mods.DOCUMENTOS), eventName);
+    const ingresos = round(can['Ingresos total'] ?? calcIngresosTotal(ing), 2);
+    const compras = round(can['Compras realizadas'] ?? sumField(comReal, 'Importe'), 2);
+    const pendientes = round(can['Compras pendientes'] ?? sumField(comPend, 'Importe'), 2);
+    const donaciones = round(can['Donaciones valor'] ?? sumField(don, 'Valor'), 2);
+    const saldo = round(can['Saldo actual'] ?? (ingresos - compras), 2);
+    const asistentes = round(can['Asistentes / Numero'] ?? ing.reduce((a,r)=>a+num(r?.Numero),0), 3);
+    const colaboradores = can['Colaboradores registros'] ?? ing.length;
+    const comprasTop = topJoined(comReal, 'Producto', 'Importe', 4, '€');
+    const tiendasTop = topJoined(comReal, 'Tienda', 'Importe', 3, '€');
+    const donTopProd = topJoined(don, 'Producto', 'Unidades', 4, 'uds');
+    const donTopDonantes = topJoined(don, 'Donante', 'Valor', 4, '€');
+    const docsList = doc.slice(0, 5).map(r => `${trim(r?.DOCxxx) || 'DOC'}${trim(r?.Descripcion) ? ': ' + trim(r?.Descripcion) : ''}`).join(' | ');
+    const tkList = tk.slice(0, 5).map(r => `${trim(r?.TKxx) || 'TK'}${trim(r?.Tienda) ? ' ' + trim(r?.Tienda) : ''}${num(r?.['Total ticket']) ? ' ' + formatMoneyText(r?.['Total ticket']) : ''}`).join(' | ');
+    const facts = [];
+    if (colaboradores || asistentes) facts.push(`${colaboradores} registro(s) de ingresos/colaboradores y ${asistentes} asistente(s)/unidad(es)`);
+    if (ingresos) facts.push(`${formatMoneyText(ingresos)} de ingresos`);
+    if (compras) facts.push(`${formatMoneyText(compras)} en compras realizadas`);
+    if (pendientes) facts.push(`${formatMoneyText(pendientes)} pendiente(s) de compra`);
+    if (don.length || donaciones) facts.push(`${don.length} línea(s) de donación valoradas en ${formatMoneyText(donaciones)}`);
+    if (tk.length) facts.push(`${tk.length} ticket(s)/fototicket(s)`);
+    if (doc.length) facts.push(`${doc.length} documento(s)`);
+    const occurred = facts.length ? facts.join('; ') + '.' : 'No hay actividad operativa registrada en los módulos extraídos.';
+    const highlights = [
+      comprasTop ? `Compras destacadas: ${comprasTop}.` : '',
+      tiendasTop ? `Tiendas principales: ${tiendasTop}.` : '',
+      donTopProd ? `Donaciones destacadas: ${donTopProd}.` : '',
+      donTopDonantes ? `Donantes principales: ${donTopDonantes}.` : '',
+      docsList ? `Documentos: ${docsList}.` : '',
+      tkList ? `Tickets: ${tkList}.` : ''
+    ].filter(Boolean).join(' ');
+    summaryRows.push({
+      Orden: idx + 1,
+      'Fecha inicio': trim(ev['Fecha inicio']),
+      'Fecha fin': trim(ev['Fecha fin']),
+      Evento: eventName,
+      Estado: trim(ev.Estado),
+      'Ingresos (€)': ingresos,
+      'Compras realizadas (€)': compras,
+      'Compras pendientes (€)': pendientes,
+      'Donaciones valoradas (€)': donaciones,
+      'Saldo (€)': saldo,
+      Colaboradores: colaboradores,
+      'Asistentes / número': asistentes,
+      Tickets: tk.length,
+      Documentos: doc.length,
+      'Qué ocurrió': `${occurred} ${highlights}`.trim()
+    });
+    moduleRows.push(
+      { Orden: idx + 1, Evento: eventName, Módulo: 'INGRESOS', Registros: ing.length, Total: ingresos, Detalle: colaboradores || asistentes || ingresos ? `${colaboradores} colaborador(es), ${asistentes} asistente(s)/unidad(es), ${formatMoneyText(ingresos)}. Formas de ingreso: ${topJoined(ing, 'Ingreso', null, 4) || 'sin desglose'}.` : 'Sin ingresos registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'COMPRAS', Registros: comAll.length, Total: compras, Detalle: comAll.length ? `Realizadas ${formatMoneyText(compras)}; pendientes ${formatMoneyText(pendientes)}. ${comprasTop ? 'Productos: ' + comprasTop + '.' : ''} ${tiendasTop ? 'Tiendas: ' + tiendasTop + '.' : ''}`.trim() : 'Sin compras registradas.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'DONACIONES', Registros: don.length, Total: donaciones, Detalle: don.length ? `${don.length} línea(s), ${formatMoneyText(donaciones)} valorado. ${donTopProd ? 'Productos: ' + donTopProd + '.' : ''} ${donTopDonantes ? 'Donantes: ' + donTopDonantes + '.' : ''}`.trim() : 'Sin donaciones registradas.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'TICKETS', Registros: tk.length, Total: round(sumField(tk, 'Total ticket'),2), Detalle: tk.length ? (tkList || `${tk.length} ticket(s) registrados.`) : 'Sin fototickets/tickets registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'DOCUMENTOS', Registros: doc.length, Total: doc.length, Detalle: doc.length ? (docsList || `${doc.length} documento(s) registrados.`) : 'Sin documentos registrados.' }
+    );
+  });
+  const columns = ['Orden','Fecha inicio','Fecha fin','Evento','Estado','Ingresos (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo (€)','Colaboradores','Asistentes / número','Tickets','Documentos','Qué ocurrió'];
+  const moduleColumns = ['Orden','Evento','Módulo','Registros','Total','Detalle'];
+  const labels = summaryRows.map(r => `${r['Fecha inicio'] || '?'} · ${r.Evento}`);
+  return {
+    ok: true,
+    rejected: false,
+    title: 'Informe cronológico de eventos',
+    answer: `He ordenado ${summaryRows.length} evento(s) por fecha de inicio/celebración y he preparado una crónica operativa de lo que ocurrió en cada uno. No uso EVENTOS como respuesta final: EVENTOS solo ordena e identifica; el contenido sale de INGRESOS, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS.`,
+    warnings: arr(context.advertencias),
+    charts: [
+      { title: 'Cronología económica por evento', type: 'stackedBar', labels, values: summaryRows.map(r=>round(r['Ingresos (€)'],2)), unit: '€', series: [
+        { name: 'Ingresos', values: summaryRows.map(r=>round(r['Ingresos (€)'],2)) },
+        { name: 'Compras realizadas', values: summaryRows.map(r=>round(r['Compras realizadas (€)'],2)) },
+        { name: 'Donaciones valoradas', values: summaryRows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
+      ]},
+      { title: 'Actividad registrada por evento', type: 'bar', labels, values: summaryRows.map(r=>num(r.Colaboradores)+num(r.Tickets)+num(r.Documentos)+num(r['Asistentes / número'])), unit: 'registros/unidades' }
+    ],
+    tables: [
+      { title: 'Crónica ordenada por fecha de celebración', columns, rows: summaryRows.map(r=>columns.map(c=>text(r[c]))) },
+      { title: 'Detalle por evento y módulo', columns: moduleColumns, rows: moduleRows.map(r=>moduleColumns.map(c=>text(r[c]))) }
+    ],
+    files: [
+      { filename: fileSafe('Informe_cronologico_eventos_v22_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, summaryRows) },
+      { filename: fileSafe('Informe_cronologico_eventos_detalle_modulos_v22_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(moduleColumns, moduleRows) }
+    ],
+    provider: 'control-event-local-cronica-eventos',
+    model: 'zuzu-planifica-control-event-ordena-y-resume'
+  };
+}
+
+function directEventReportIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  const events = eventNamesFromContext(context);
+  const wantsReport = /\b(informe|exhaustivo|exhaustiva|resumen\s+general|dashboard|balance|situaci[oó]n|estado\s+general)\b/.test(p);
+  const wantsGraph = /\b(grafica|gráfica|grafico|gráfico|graficamente|gráficamente|representado|representar|diagrama|barras)\b/.test(p);
+  const wantsEventDossier = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog|metereolog|meteo)\b/.test(p);
+  const wantsComparison = events.length >= 2 && /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p);
+  if (!events.length || !(wantsReport || wantsEventDossier || wantsComparison || (events.length >= 2 && wantsGraph))) return null;
+  const canonical = arr(context?.metricasCanonicas?.porEvento);
+  const byEvent = new Map(canonical.map(r => [norm(r.Evento), r]));
+  const mods = context.modulosExtraidos || {};
+  const metaByEvent = eventMetaByNameFromContext(context);
+  const canonicalAttendance = canonicalAttendanceSummaryFromContext(context);
+  const canonicalAttendanceByEvent = new Map(canonicalAttendance.map(r => [norm(r.Evento), r]));
+  const rows = events.map(ev => {
+    const can = byEvent.get(norm(ev)) || {};
+    const ing = rowsForEvent(arr(mods.INGRESOS), ev);
+    const att = canonicalAttendanceByEvent.get(norm(ev));
+    const com = rowsForEvent(arr(mods.COMPRAS), ev);
+    const don = rowsForEvent(arr(mods.DONACIONES), ev);
+    const tk = rowsForEvent(arr(mods.TICKETS), ev);
+    const doc = rowsForEvent(arr(mods.DOCUMENTOS), ev);
+    const ingresos = round(can['Ingresos total'] ?? ing.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const ingresosRealizados = round(ing.filter(r=>!/pendiente/i.test(trim(r?.Ingreso || r?.ingreso || ''))).reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const ingresosPendientes = round(Math.max(0, ingresos - ingresosRealizados), 2);
+    const compras = round(can['Compras realizadas'] ?? sumField(com.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
+    const pendientes = round(can['Compras pendientes'] ?? sumField(com.filter(r=>/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
+    const comprasPrevistas = round(compras + pendientes, 2);
+    const donaciones = round(can['Donaciones valor'] ?? sumField(don,'Valor'),2);
+    const saldoActual = round(ingresosRealizados - compras,2);
+    const saldoOperativo = round(ingresos - comprasPrevistas,2);
+    const valoracion = round(can['Valoracion con donaciones'] ?? (compras+donaciones),2);
+    const estadoEvento = firstNonEmpty(can.Estado, metaByEvent.get(norm(ev))?.Estado);
+    return {
+      Evento: ev,
+      Estado: estadoEvento,
+      'Nota estado': eventStateNoteForRow(ev, metaByEvent),
+      'Ingresos total (€)': ingresos,
+      'Ingresos realizados (€)': ingresosRealizados,
+      'Ingresos pendientes (€)': ingresosPendientes,
+      'Compras realizadas (€)': compras,
+      'Compras pendientes (€)': pendientes,
+      'Compras previstas (€)': comprasPrevistas,
+      'Donaciones valoradas (€)': donaciones,
+      'Saldo actual (€)': saldoActual,
+      'Saldo operativo (€)': saldoOperativo,
+      'Valor compras + donaciones (€)': valoracion,
+      'Colaboradores': can['Colaboradores registros'] ?? ing.length,
+      'Socios canónicos': att ? att.totalSocios : '',
+      'Socios asistentes canónicos': att ? att.totalAsistentes : '',
+      'Socios no asistentes canónicos': att ? att.totalNoAsisten : '',
+      'Asistentes / número': att ? att.totalAsistentes : round(can['Asistentes / Numero'] ?? ing.reduce((a,r)=>a+num(r?.Numero),0),3),
+      'Líneas compras': can['Compras registros'] ?? com.length,
+      'Líneas donaciones': can['Donaciones registros'] ?? don.length,
+      'Tickets': can['Tickets numero'] ?? tk.length,
+      'Documentos': can['Documentos numero'] ?? doc.length
+    };
+  });
+  const columns = ['Evento','Estado','Nota estado','Ingresos total (€)','Ingresos realizados (€)','Ingresos pendientes (€)','Compras realizadas (€)','Compras pendientes (€)','Compras previstas (€)','Donaciones valoradas (€)','Saldo actual (€)','Saldo operativo (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
+  const rowsTable = rows.map(r => columns.map(c => text(r[c])));
+  const chartLabels = rows.map(r => eventLabelWithState(r.Evento, metaByEvent));
+  const hasInProgressEvents = rows.some(r => isEventInProgressValue(r.Estado));
+  const charts = [
+    { title: `Ingresos, compras y donaciones por evento${hasInProgressEvents ? ' · En curso marcado' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Ingresos total (€)'],2)), unit: '€', series: [
+      { name: 'Ingresos previstos', values: rows.map(r=>round(r['Ingresos total (€)'],2)) },
+      { name: 'Compras realizadas', values: rows.map(r=>round(r['Compras realizadas (€)'],2)) },
+      { name: 'Compras pendientes', values: rows.map(r=>round(r['Compras pendientes (€)'],2)) },
+      { name: 'Donaciones valoradas', values: rows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
+    ] },
+    { title: `Saldo actual por evento${hasInProgressEvents ? ' · caja disponible/provisional si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo actual (€)'],2)), unit: '€' },
+    { title: `Saldo operativo por evento${hasInProgressEvents ? ' · previsión al cierre si En curso' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>round(r['Saldo operativo (€)'],2)), unit: '€' },
+    { title: `Volumen de registros por evento${hasInProgressEvents ? ' · En curso abierto' : ''}`, type: 'bar', labels: chartLabels, values: rows.map(r=>num(r['Líneas compras'])+num(r['Líneas donaciones'])+num(r.Colaboradores)), unit: 'registros' }
+  ];
+  const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|parte\s+meteorolog|parte\s+metereolog|meteorolog|metereolog|meteo|previsi[oó]n|lluvia|temperatura|calor|fr[ií]o|viento)\b/.test(p);
+  const missingAttendeesAsked = asksMissingAttendees(prompt);
+  const detailTables = [];
+  function addModuleDetail(moduleName, title, limit = 120) {
+    const data = arr(mods[moduleName]);
+    if (!data.length) return;
+    const cols = orderedColumnsForModule(moduleName, data);
+    detailTables.push({ title, columns: cols, rows: data.slice(0, limit).map(r => cols.map(c => { const v = r?.[c]; if (Array.isArray(v)) return v.map(x => typeof x === 'object' ? JSON.stringify(x) : text(x)).join(' | '); return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v); })) });
+  }
+  addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
+  addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
+  addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
+  if (/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
+  if (/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
+  const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context, prompt) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
+  if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
+  if (missingPack.charts.length) charts.push(...missingPack.charts);
+  const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
+  return {
+    ok: true, rejected: false,
+    title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
+    answer,
+    warnings: arr(context.advertencias).concat(arr(missingPack.warnings)),
+    charts,
+    tables: [{ title: 'Resumen operativo por evento', columns, rows: rowsTable }, ...detailTables],
+    files: [{ filename: fileSafe(`Informe_eventos_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    provider: 'control-event-local-informe-eventos',
+    model: 'calculo-local-oficial'
+  };
+}
+
+function directHighConfidenceResultIfApplicable(prompt, context) {
+  return directCashEvolutionIfApplicable(prompt, context)
+    || directEventReportIfApplicable(prompt, context)
+    || directPersonIdentityIfApplicable(prompt, context)
+    || directPersonsCatalogIfApplicable(prompt, context)
+    || directPersonRoleReportIfApplicable(prompt, context)
+    || directPersonAppearanceIfApplicable(prompt, context)
+    || directProductConsumptionResultIfApplicable(prompt, context)
+    || directDonorDonationProductsIfApplicable(prompt, context)
+    || directBoughtDonatedUsageIfApplicable(prompt, context)
+    || directChronologicalEventNarrativeIfApplicable(prompt, context);
+}
+function isProductConsumptionAnalysisPrompt(prompt) {
+  const p = norm(prompt);
+  return /\b(producto|productos|articulo|articulos|consumo|consumidos|consumidas|utilizado|utilizados|comprado|comprados|donado|donados)\b/.test(p)
+    && /\b(grafica|gráfica|grafico|gráfico|barras|ranking|ordena|ordenar|coste|costes|importe|unidades|cantidad|cantidades|mas|menos|mayor|menor)\b/.test(p);
+}
+function directProductConsumptionResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  if (!isProductConsumptionAnalysisPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const compras = arr(mods.COMPRAS);
+  const donaciones = arr(mods.DONACIONES);
+  const p = norm(prompt);
+  const includeCompras = compras.length && (!/\bdonado|donados|donaciones\b/.test(p) || /\bcomprado|comprados|compras?|consumid/.test(p));
+  const includeDonaciones = donaciones.length && (!/\bcomprado|comprados|compras\b/.test(p) || /\bdonado|donados|donaciones|consumid/.test(p));
+  const rowsSrc = [];
+  if (includeCompras) compras.forEach(r => rowsSrc.push({ origen:'Comprado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Importe), precio: num(r.Precio), detalle: trim(r['Ticket u otros gastos'] || ''), tercero: trim(r.Tienda || ''), responsable: trim(r.Responsable || '') }));
+  if (includeDonaciones) donaciones.forEach(r => rowsSrc.push({ origen:'Donado', evento: trim(r.Evento), producto: trim(r.Producto), unidades: num(r.Unidades), importe: num(r.Valor), precio: num(r.Precio), detalle: trim(r['Tipo de donación'] || ''), tercero: trim(r.Donante || ''), responsable: trim(r.Responsable || '') }));
+  if (!rowsSrc.length) return null;
+  const eventMeta = arr(context.eventosObjetivo).map(e => ({ name: trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento), date: parseEventDateForSort(e?.['fecha ini'] || e?.fechaIni || e?.Fecha || '') })).filter(e => e.name);
+  const events = eventMeta.map(e => e.name);
+  const byProduct = new Map();
+  rowsSrc.forEach(r => {
+    const key = r.producto || 'Sin producto';
+    const old = byProduct.get(key) || { Producto:key, 'Unidades total':0, 'Coste/valor total (€)':0, 'Comprado unidades':0, 'Comprado importe (€)':0, 'Donado unidades':0, 'Donado valor (€)':0, 'Nº líneas':0, Eventos:new Set() };
+    old['Unidades total'] += num(r.unidades);
+    old['Coste/valor total (€)'] += num(r.importe);
+    if (r.origen === 'Comprado') { old['Comprado unidades'] += num(r.unidades); old['Comprado importe (€)'] += num(r.importe); }
+    else { old['Donado unidades'] += num(r.unidades); old['Donado valor (€)'] += num(r.importe); }
+    old['Nº líneas'] += 1;
+    if (r.evento) old.Eventos.add(r.evento);
+    byProduct.set(key, old);
+  });
+  const summary = [...byProduct.values()].map(r => ({ ...r, Eventos: [...r.Eventos].join(' | '), 'Unidades total': round(r['Unidades total'],3), 'Coste/valor total (€)': round(r['Coste/valor total (€)'],2), 'Comprado unidades': round(r['Comprado unidades'],3), 'Comprado importe (€)': round(r['Comprado importe (€)'],2), 'Donado unidades': round(r['Donado unidades'],3), 'Donado valor (€)': round(r['Donado valor (€)'],2) }));
+  const byCost = summary.slice().sort((a,b)=>num(b['Coste/valor total (€)'])-num(a['Coste/valor total (€)']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const byUnits = summary.slice().sort((a,b)=>num(b['Unidades total'])-num(a['Unidades total']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const limit = firstRankingLimitInPrompt(prompt, 25);
+  const detailColumns = ['Evento','Origen','Producto','Unidades','Precio','Importe/Valor','Ticket/Tipo','Tienda/Donante','Responsable'];
+  const detailRows = rowsSrc.slice().sort((a,b)=>String(a.producto).localeCompare(String(b.producto),'es')).map(r => [r.evento, r.origen, r.producto, String(round(r.unidades,3)), String(round(r.precio,4)), String(round(r.importe,2)), r.detalle, r.tercero, r.responsable]);
+  const columns = ['Producto','Unidades total','Coste/valor total (€)','Comprado unidades','Comprado importe (€)','Donado unidades','Donado valor (€)','Nº líneas','Eventos'];
+  const tableCostRows = byCost.map(r => columns.map(c => text(r[c])));
+  const tableUnitsRows = byUnits.map(r => columns.map(c => text(r[c])));
+  const titleEvents = events.length ? ` - ${events.join(' | ')}` : '';
+  const totalCost = round(summary.reduce((acc,r)=>acc+num(r['Coste/valor total (€)']),0),2);
+  const totalUnits = round(summary.reduce((acc,r)=>acc+num(r['Unidades total']),0),3);
+  const wantsTemporal = /\b(temporal|tiempo|fecha|fechas|cronologico|cronológico|evolucion|evolución|por\s+evento|cada\s+evento)\b/.test(p);
+  const topProductsForTemporal = byUnits.slice(0, limit).map(r => r.Producto);
+  const sortedEventNames = (eventMeta.length ? eventMeta.slice().sort((a,b)=>a.date-b.date || a.name.localeCompare(b.name,'es')).map(e=>e.name) : events).filter(Boolean);
+  const eventProduct = new Map();
+  rowsSrc.forEach(r => {
+    const key = `${r.evento}|${r.producto}`;
+    const old = eventProduct.get(key) || { Evento: r.evento, Producto: r.producto, 'Unidades total': 0, 'Comprado unidades': 0, 'Donado unidades': 0, 'Coste/valor (€)': 0 };
+    old['Unidades total'] += num(r.unidades);
+    old['Coste/valor (€)'] += num(r.importe);
+    if (r.origen === 'Comprado') old['Comprado unidades'] += num(r.unidades); else old['Donado unidades'] += num(r.unidades);
+    eventProduct.set(key, old);
+  });
+  const eventProductRows = [...eventProduct.values()]
+    .filter(r => !topProductsForTemporal.length || topProductsForTemporal.includes(r.Producto))
+    .map(r => ({ ...r, 'Unidades total': round(r['Unidades total'],3), 'Comprado unidades': round(r['Comprado unidades'],3), 'Donado unidades': round(r['Donado unidades'],3), 'Coste/valor (€)': round(r['Coste/valor (€)'],2) }))
+    .sort((a,b)=>sortedEventNames.indexOf(a.Evento)-sortedEventNames.indexOf(b.Evento) || num(b['Unidades total'])-num(a['Unidades total']) || String(a.Producto).localeCompare(String(b.Producto),'es'));
+  const temporalSeries = topProductsForTemporal.map(prod => ({ name: prod, values: sortedEventNames.map(ev => round(eventProduct.get(`${ev}|${prod}`)?.['Unidades total'] || 0, 3)) }));
+  const temporalChart = wantsTemporal && sortedEventNames.length ? [{ title: `Consumo temporal por evento · Top ${topProductsForTemporal.length} productos`, type: 'stackedBar', labels: sortedEventNames, series: temporalSeries, unit: 'uds' }] : [];
+  return {
+    ok: true,
+    rejected: false,
+    title: `Productos consumidos${titleEvents}`,
+    answer: `He agrupado ${rowsSrc.length} línea(s) de ${includeCompras?'COMPRAS':''}${includeCompras&&includeDonaciones?' + ':''}${includeDonaciones?'DONACIONES':''} por producto. Total agrupado: ${totalUnits} unidades y ${totalCost} €. ${wantsTemporal ? `Además separo el Top ${topProductsForTemporal.length} por evento en orden temporal.` : 'Incluyo ranking por coste/valor y por unidades.'}`,
+    warnings: arr(context.advertencias),
+    charts: [
+      ...temporalChart,
+      { title: `Top ${Math.min(limit, byUnits.length)} productos por unidades`, type: 'horizontalBar', labels: byUnits.slice(0,limit).map(r=>r.Producto), values: byUnits.slice(0,limit).map(r=>round(r['Unidades total'],3)), unit: 'ud' },
+      { title: `Top ${Math.min(limit, byCost.length)} productos por coste/valor`, type: 'horizontalBar', labels: byCost.slice(0,limit).map(r=>r.Producto), values: byCost.slice(0,limit).map(r=>round(r['Coste/valor total (€)'],2)), unit: '€' }
+    ],
+    tables: [
+      { title: `Ranking por unidades · Top ${Math.min(limit, byUnits.length)}`, columns, rows: tableUnitsRows.slice(0,limit) },
+      { title: `Ranking por coste/valor · Top ${Math.min(limit, byCost.length)}`, columns, rows: tableCostRows.slice(0,limit) },
+      ...(wantsTemporal ? [{ title: `Detalle temporal por evento y producto · Top ${topProductsForTemporal.length}`, columns: ['Evento','Producto','Unidades total','Comprado unidades','Donado unidades','Coste/valor (€)'], rows: eventProductRows.map(r=>['Evento','Producto','Unidades total','Comprado unidades','Donado unidades','Coste/valor (€)'].map(c=>text(r[c]))).slice(0,500) }] : []),
+      { title: `Detalle base (${rowsSrc.length} línea(s))`, columns: detailColumns, rows: detailRows.slice(0,300) }
+    ],
+    files: [
+      { filename: fileSafe(`Productos_consumidos_coste${titleEvents}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byCost) },
+      { filename: fileSafe(`Productos_consumidos_unidades${titleEvents}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, byUnits) },
+      { filename: fileSafe(`Productos_consumidos_detalle${titleEvents}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, rowsSrc.map(r=>({ 'Evento':r.evento, 'Origen':r.origen, 'Producto':r.producto, 'Unidades':round(r.unidades,3), 'Precio':round(r.precio,4), 'Importe/Valor':round(r.importe,2), 'Ticket/Tipo':r.detalle, 'Tienda/Donante':r.tercero, 'Responsable':r.responsable }))) }
+    ],
+    provider: 'control-event-analitica-productos',
+    model: 'calculo-local-oficial'
+  };
+}
+
+function directDeterministicResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const productConsumption = directProductConsumptionResultIfApplicable(prompt, context);
+  if (productConsumption) return productConsumption;
+  const donorDonations = directDonorDonationProductsIfApplicable(prompt, context);
+  if (donorDonations) return donorDonations;
+  // Fase de diagnóstico: todo lo que sea petición de datos de módulos se resuelve primero y, salvo análisis libre puro,
+  // se devuelve desde ControlEvent para poder auditar si los módulos sirven todos los registros.
+  const personSearch = directPersonAppearanceIfApplicable(prompt, context);
+  if (personSearch) return personSearch;
+  const productCatalog = directProductCatalogIfApplicable(prompt, context);
+  if (productCatalog) return productCatalog;
+  const personsCatalog = directPersonsCatalogIfApplicable(prompt, context);
+  if (personsCatalog) return personsCatalog;
+  const eventPrices = directEventPriceExtremesIfApplicable(prompt, context);
+  if (eventPrices) return eventPrices;
+  const boughtDonated = directBoughtDonatedUsageIfApplicable(prompt, context);
+  if (boughtDonated) return boughtDonated;
+  const cmpMod = directComparativeModuleTotalsIfApplicable(prompt, context);
+  if (cmpMod) return cmpMod;
+  const cmp = directComparativeAllDataResultIfApplicable(prompt, context);
+  if (cmp) return cmp;
+  const ag = directAggregateResultIfApplicable(prompt, context);
+  if (ag) return ag;
+  const gr = directGraphResultIfApplicable(prompt, context);
+  if (gr) return gr;
+  const list = directModuleResultIfApplicable(prompt, context);
+  if (list) return list;
+  // No convertir una petición de análisis/gráficas en una auditoría técnica.
+  // Si Zuzu no estructura y tampoco hay una salida local específica, se debe decir que falta respuesta,
+  // no enseñar una gráfica de campos técnicos del módulo EVENTOS.
+  if (isTransformAnalysisPrompt(prompt)) return null;
+  if (!isModuleDataPrompt(prompt)) return null;
+  const mods = context.modulosExtraidos || {};
+  const prefer = ['DONACIONES','COMPRAS','INGRESOS','TICKETS','DOCUMENTOS','PRODUCTOS','EVENTOS','TIENDAS','PERSONAS'];
+  const first = prefer.find(k => Array.isArray(mods[k])) || Object.keys(mods).find(k => Array.isArray(mods[k]));
+  if (!first) return null;
+  const rows = arr(mods[first]);
+  const columns = orderedColumnsForModule(first, rows);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === first);
+  const tableRows = rows.slice(0, 1000).map(row => columns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  const auditRows = [
+    ['Módulo usado', first],
+    ['Evento(s) detectado(s)', eventos || 'No indicado'],
+    ['Registros extraídos', String(rows.length)],
+    ['Registros fuente sin filtros', String(audit?.registrosFuenteSinFiltros ?? rows.length)],
+    ['Filtros aplicados', audit?.filtrosAplicados ? JSON.stringify(audit.filtros || {}) : 'NO'],
+    ['Motor', 'ControlEvent local, consulta directa de módulos']
+  ];
+  return {
+    ok: true,
+    rejected: false,
+    title: `${first}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `He encontrado ${rows.length} registro(s) en ${first}${eventos ? ` para ${eventos}` : ''}. Te lo dejo en tabla y CSV para que puedas revisarlo o cruzarlo con otro dato.`,
+    warnings: arr(context.advertencias),
+    charts: [],
+    tables: [
+      { title: 'Resumen de extracción', columns: ['Dato','Valor'], rows: auditRows },
+      ...(rows.length ? [{ title: `${first} (${rows.length} registro(s))`, columns, rows: tableRows }] : [])
+    ],
+    files: rows.length ? [{ filename: fileSafe(`${first}_${eventos || 'ControlEvent'}_diagnostico_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }] : [],
+    provider: 'control-event-local-consulta-directa',
+    model: 'consulta-modulos-sin-gemini'
+  };
+}
+
+function directGraphResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(grafica|gráfica|grafico|gráfico|diagrama|barras|tarta)\b/.test(p)) return null;
+  const mods = context.modulosExtraidos || {};
+  if (/\b(producto|productos|consumo|consumidos|consumidas|utilizado|utilizados)\b/.test(p) && (Array.isArray(mods.COMPRAS) || Array.isArray(mods.DONACIONES))) {
+    const pc = directProductConsumptionResultIfApplicable(prompt, context);
+    if (pc) return pc;
+  }
+  let moduleName = '';
+  if (/\bcompra|compras|gasto|gastos|comprado\b/.test(p) && Array.isArray(mods.COMPRAS)) moduleName = 'COMPRAS';
+  else if (/\bdonacion|donaciones|donado|donante\b/.test(p) && Array.isArray(mods.DONACIONES)) moduleName = 'DONACIONES';
+  else if (/\bingreso|ingresos|recaudacion|recaudación|asistente|asistentes|entrada|entradas|colaborador|colaboradores|socio|socios\b/.test(p) && Array.isArray(mods.INGRESOS)) moduleName = 'INGRESOS';
+  if (!moduleName) return null;
+  const rows = arr(mods[moduleName]);
+  const eventos = arr(context.eventosObjetivo).map(e => trim(e?.['Titulo del evento'] || e?.Titulo || e?.EVENTO || e?.Evento)).filter(Boolean).join(', ');
+  const audit = arr(context.auditoriaModulos).find(a => a.modulo === moduleName);
+  if (!rows.length) {
+    return {
+      ok: true,
+      rejected: false,
+      title: `Gráfica de ${moduleName}`,
+      answer: `ControlEvent no ha podido generar la gráfica porque el módulo ${moduleName} ha entregado 0 registros${eventos ? ` para ${eventos}` : ''}.`,
+      warnings: [audit ? `Auditoría ${moduleName}: fuente sin filtros ${audit.registrosFuenteSinFiltros}, entregados ${audit.registrosEntregados}, filtros ${audit.filtrosAplicados ? JSON.stringify(audit.filtros) : 'NO'}.` : `El módulo ${moduleName} no tiene registros.`],
+      charts: [], tables: [], files: [], provider: 'control-event-modules-direct', model: 'sin-gemini-para-graficas'
+    };
+  }
+  const g = groupRowsForChart(moduleName, rows, prompt);
+  const columns = orderedColumnsForModule(moduleName, rows);
+  const tableRows = rows.slice(0, 300).map(row => columns.map(c => typeof row?.[c] === 'object' && row?.[c] !== null ? JSON.stringify(row[c]) : text(row?.[c])));
+  return {
+    ok: true,
+    rejected: false,
+    title: `Gráfica de ${moduleName}${eventos ? ` - ${eventos}` : ''}`,
+    answer: `Gráfica por ${g.groupField} con ${rows.length} registro(s).`,
+    warnings: arr(context.advertencias),
+    charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
+    tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
+    files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    provider: 'control-event-modules-direct',
+    model: 'sin-gemini-para-graficas'
+  };
+}
+
+function normalizeResult(raw, model) {
+  const out = raw && typeof raw === 'object' ? raw : {};
+  const charts = arr(out.charts).map(ch => {
+    const rawType = trim(ch.type || 'bar');
+    const type = ['bar','horizontalBar','pie','donut','line','stackedBar'].includes(rawType) ? rawType : 'bar';
+    const labels = arr(ch.labels).map(x => trim(x)).slice(0, 40);
+    const values = arr(ch.values).map(x => round(x, 4)).slice(0, 40);
+    const series = arr(ch.series).map(s => ({ name: trim(s?.name || 'Serie'), values: arr(s?.values).map(x => round(x, 4)).slice(0, 40) })).filter(s => s.values.length);
+    return { title: trim(ch.title || 'Gráfica'), type, labels, values, series, unit: trim(ch.unit || '') };
+  }).filter(ch => ch.labels.length && (ch.values.length || ch.series.length));
+  const tables = arr(out.tables).map(tb => ({
+    title: trim(tb.title || 'Tabla'),
+    columns: arr(tb.columns).map(x => trim(x)).slice(0, 12),
+    rows: arr(tb.rows).slice(0, 80).map(row => arr(row).map(x => trim(x)).slice(0, 12))
+  })).filter(tb => tb.columns.length && tb.rows.length);
+  const files = arr(out.files).map(f => ({
+    filename: fileSafe(f.filename || 'resultado_control_event.txt'),
+    mime: trim(f.mime || 'text/plain'),
+    content: text(f.content || '').slice(0, 250000)
+  })).filter(f => f.content);
+  return {
+    ok: out.ok !== false,
+    rejected: out.rejected === true,
+    title: trim(out.title || 'Respuesta de Zuzu del evento'),
+    answer: trim(out.answer || ''),
+    warnings: arr(out.warnings).map(x => trim(x)).filter(Boolean).slice(0, 8),
+    charts,
+    tables,
+    files,
+    model,
+    provider: 'gemini-rest'
+  };
+}
+function geminiOutText(payload) { return payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || ''; }
+function estimateGeminiCost(model, usage = {}) {
+  const m = trim(model).toLowerCase();
+  const promptTokens = num(usage.promptTokenCount ?? usage.promptTokens ?? usage.prompt_tokens ?? 0);
+  const candidateTokens = num(usage.candidatesTokenCount ?? usage.candidateTokens ?? usage.outputTokens ?? usage.output_tokens ?? 0);
+  const totalTokens = num(usage.totalTokenCount ?? usage.totalTokens ?? 0);
+  // Gemini factura la salida incluyendo posibles thinking tokens. En usageMetadata a veces
+  // candidatesTokenCount solo representa texto visible, mientras totalTokenCount incluye tokens internos.
+  // Por eso el coste debe usar el mayor entre candidates y (total - prompt).
+  const billableOutputTokens = Math.max(0, candidateTokens, totalTokens ? totalTokens - promptTokens : 0);
+  const hiddenOutputTokens = Math.max(0, billableOutputTokens - candidateTokens);
+  let inputUsdPerM = 0.30, outputUsdPerM = 2.50, family = 'gemini-2.5-flash';
+  if (/flash-lite/i.test(m)) { inputUsdPerM = 0.10; outputUsdPerM = 0.40; family = 'gemini-2.5-flash-lite'; }
+  else if (/2\.0-flash|flash-latest/i.test(m)) { inputUsdPerM = 0.30; outputUsdPerM = 2.50; family = 'gemini-flash'; }
+  const usd = (promptTokens * inputUsdPerM + billableOutputTokens * outputUsdPerM) / 1000000;
+  const eurRate = num(process.env.CONTROLEVENT_USD_EUR || '0.92') || 0.92;
+  return {
+    family,
+    promptTokens,
+    candidateTokens,
+    visibleOutputTokens: candidateTokens,
+    hiddenOutputTokens,
+    outputTokens: billableOutputTokens,
+    billableOutputTokens,
+    totalTokens: totalTokens || (promptTokens + billableOutputTokens),
+    inputUsdPerM,
+    outputUsdPerM,
+    costUsd: Number(usd.toFixed(8)),
+    costEurApprox: Number((usd * eurRate).toFixed(8))
+  };
+}
+function logGeminiUsage(stage, model, payload) {
+  try {
+    const u = payload?.usageMetadata || {};
+    const c = estimateGeminiCost(model, u);
+    console.log(`[ControlEvent v22_prod Zuzu] ${stage} · ${model} · prompt=${u.promptTokenCount ?? ''} candidates=${u.candidatesTokenCount ?? ''} total=${u.totalTokenCount ?? ''} billableOut=${c.billableOutputTokens ?? c.outputTokens} · coste≈$${Number(c.costUsd||0).toFixed(6)}/€${Number(c.costEurApprox||0).toFixed(6)}`);
+  } catch (_) {}
+}
+function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|504|aborted|abort|tard[oó] demasiado|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
+function isQuotaError(err) { return /429|quota|RESOURCE_EXHAUSTED|rate limit|rate-limit|free_tier|free tier|retry in/i.test(text(err?.message || '') + ' ' + text(err?.details?.error?.status || '')); }
+const __zuzuMemo = new Map();
+function memoKey(prefix, value) {
+  const raw = prefix + ':' + text(value);
+  let h = 2166136261;
+  for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return prefix + ':' + (h >>> 0).toString(36);
+}
+function memoGet(key) { const x = __zuzuMemo.get(key); return x && (Date.now() - x.t < 10 * 60 * 1000) ? x.v : null; }
+function memoSet(key, value) {
+  __zuzuMemo.set(key, { t: Date.now(), v: value });
+  if (__zuzuMemo.size > 80) { const first = __zuzuMemo.keys().next().value; if (first) __zuzuMemo.delete(first); }
+}
+
+function zuzuTraceItem(step, status = 'INFO', detail = '', extra = {}) {
+  return {
+    time: new Date().toISOString(),
+    step: trim(step),
+    status: trim(status || 'INFO').toUpperCase(),
+    detail: trim(detail).slice(0, 900),
+    ...extra
+  };
+}
+function zuzuTracePush(trace, step, status = 'INFO', detail = '', extra = {}) {
+  if (!Array.isArray(trace)) return;
+  trace.push(zuzuTraceItem(step, status, detail, extra));
+}
+function usageSmall(payload, model = '') {
+  const u = payload?.usageMetadata || payload || {};
+  const base = {
+    promptTokens: u.promptTokenCount ?? u.promptTokens ?? '',
+    candidateTokens: u.candidatesTokenCount ?? u.candidateTokens ?? '',
+    totalTokens: u.totalTokenCount ?? u.totalTokens ?? ''
+  };
+  if (model) {
+    const cost = estimateGeminiCost(model, u);
+    base.outputTokens = cost.outputTokens;
+    base.costUsd = cost.costUsd;
+    base.costEurApprox = cost.costEurApprox;
+    base.pricingFamily = cost.family;
+  }
+  return base;
+}
+function summarizeGeminiUsageFromTrace(trace = []) {
+  const items = arr(trace).filter(x => x?.usage && (x.usage.promptTokens || x.usage.totalTokens));
+  const total = items.reduce((acc, x) => {
+    acc.promptTokens += num(x.usage.promptTokens);
+    acc.candidateTokens += num(x.usage.candidateTokens);
+    acc.outputTokens += num(x.usage.outputTokens || x.usage.billableOutputTokens);
+    acc.hiddenOutputTokens += num(x.usage.hiddenOutputTokens);
+    acc.totalTokens += num(x.usage.totalTokens);
+    acc.costUsd += num(x.usage.costUsd);
+    acc.costEurApprox += num(x.usage.costEurApprox);
+    return acc;
+  }, { promptTokens:0, candidateTokens:0, outputTokens:0, hiddenOutputTokens:0, totalTokens:0, costUsd:0, costEurApprox:0 });
+  total.costUsd = Number(total.costUsd.toFixed(6));
+  total.costEurApprox = Number(total.costEurApprox.toFixed(6));
+  return { calls: items.length, ...total, note: 'Coste estimado por ControlEvent usando output facturable = max(candidatesTokenCount, totalTokenCount - promptTokenCount). La factura real puede variar por caché, región, impuestos o cambios de tarifa.' };
+}
+
+function estimateTokensFromText(value) {
+  // Estimación local barata: Gemini usa tokenización propia; para traza y decisiones de compactado basta aproximar.
+  const chars = text(value).length;
+  return Math.max(1, Math.ceil(chars / 4));
+}
+function sizeTrace(trace, step, label, payloadText) {
+  if (!Array.isArray(trace)) return;
+  const chars = text(payloadText).length;
+  zuzuTracePush(trace, step, 'INFO', `${label}: ${chars} caracteres aprox.; ~${estimateTokensFromText(payloadText)} tokens de entrada estimados antes de Zuzu.`);
+}
+function compactJson(value, maxChars = 12000) {
+  return JSON.stringify(value ?? null).replace(/\s+/g, ' ').slice(0, maxChars);
+}
+function todayIsoMadrid() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function cleanGeminiError(error) {
+  const status = error?.status ? `HTTP ${error.status}: ` : '';
+  const raw = text(error?.message || error);
+  const detailMsg = text(error?.details?.error?.message || error?.details?.message || '');
+  return (status + (raw || detailMsg || 'Error desconocido de Zuzu')).slice(0, 1200);
+}
+
+async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body), signal: controller.signal });
+    const payload = await res.json().catch(async () => ({ error: { message: await res.text().catch(() => res.statusText) } }));
+    return { res, payload };
+  } catch (error) {
+    if (error && (error.name === 'AbortError' || /abort/i.test(text(error.message)))) {
+      const e = new Error(`Zuzu tardó demasiado y se abortó a los ${Math.round(timeoutMs/1000)} s`);
+      e.status = 504;
+      throw e;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callGeminiEvent(prompt, context, flowTrace = []) {
+  const apiKey = geminiKey();
+  if (!apiKey) {
+    const err = new Error('Falta GEMINI_API_KEY en Vercel para usar Zuzu / Analítica libre.');
+    err.status = 503;
+    zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final', 'KO', err.message);
+    throw err;
+  }
+  let lastError = null;
+  for (const model of configuredGeminiModelsForTask('zuzu-structured')) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: systemPrompt(prompt, context) }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: eventAiSchema(), temperature: 0.2 }
+    };
+    try {
+      zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'RUN', `Modelo ${model}. Enviando prompt original + contexto extraído por CE.`);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_EVENT_TIMEOUT_MS || 24000));
+      logGeminiUsage('PASO 2 respuesta final estructurada', model, payload);
+      if (!res.ok) {
+        const e = new Error(payload?.error?.message || `Zuzu HTTP ${res.status}`);
+        e.status = Number(res.status || 502);
+        e.details = payload;
+        throw e;
+      }
+      const outText = trim(geminiOutText(payload));
+      if (!outText) throw new Error('Zuzu no devolvió texto analizable.');
+      let parsed;
+      try { parsed = JSON.parse(stripJsonText(outText)); }
+      catch (e) {
+        // v11_3_3 hotfix: nunca mostrar al usuario una respuesta cruda/rota de Zuzu.
+        // Si Zuzu no respeta el JSON, se entrega una salida estructurada de ControlEvent
+        // con los datos canónicos y una advertencia.
+        const fallback = directPersonsCatalogIfApplicable(prompt, context) || directProductConsumptionResultIfApplicable(prompt, context) || directDeterministicResultIfApplicable(prompt, context) || directGraphResultIfApplicable(prompt, context) || (!isTransformAnalysisPrompt(prompt) ? directModuleResultIfApplicable(prompt, context) : null);
+        if (fallback) {
+          fallback.warnings = arr(fallback.warnings).concat('Zuzu fue llamado pero no devolvió JSON estructurado válido; ControlEvent muestra una salida analítica estructurada para no dejar una pantalla inútil.');
+          fallback.provider = `${fallback.provider || 'control-event'}-json-fallback`;
+          fallback.model = 'formato-local-por-json-invalido';
+          return fallback;
+        }
+        zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'KO', 'Zuzu respondió, pero no en JSON válido. Se adjunta texto crudo como fichero.', { model });
+        return {
+          ok: true,
+          rejected: false,
+          title: 'Respuesta de Zuzu no estructurada',
+          answer: 'Zuzu no devolvió un JSON válido. ControlEvent ha evitado mostrar la respuesta cruda para no entregar una pantalla ilegible. Repite la consulta de forma algo más concreta o revisa la cuota/modelo de Zuzu.',
+          warnings: ['Zuzu no devolvió JSON estructurado válido y no hubo una salida local aplicable.'],
+          charts: [],
+          tables: [],
+          files: [{ filename: fileSafe('Zuzu_respuesta_zuzu_no_estructurada_v22_prod.txt'), mime: 'text/plain;charset=utf-8', content: outText.slice(0, 250000) }],
+          provider: 'gemini-rest-json-fallback',
+          model
+        };
+      }
+      const normalized = normalizeResult(parsed, model);
+      normalized.answer = sanitizeTemporalAnswerForContext(normalized.answer, context);
+      normalized.__zuzuGeminiFinal = { ok: true, model, usage: usageSmall(payload, model), mode: 'structured-json' };
+      zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'OK', `Zuzu devolvió JSON válido. Tablas=${arr(normalized.tables).length}; gráficas=${arr(normalized.charts).length}; ficheros=${arr(normalized.files).length}.`, { model, usage: usageSmall(payload, model) });
+      return normalized;
+    } catch (error) {
+      lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'KO', cleanGeminiError(error), { model });
+      if (isQuotaError(error) || !isRetryable(error)) break;
+    }
+  }
+  lastError.status = lastError.status || 502;
+  throw lastError;
+}
+
+
+function narrativeToneFromPrompt(prompt) {
+  const p = norm(prompt);
+  const informal = /\b(coloquial|informal|simpatic|simpático|chascarrill|cachond|cachondo|cachonda|cachondeo|coña|broma|risas|guasa|gracios|socios?|soci[ao]s?|peña|ameno|cercano|divertid|natural|humano|campechano|para\s+contar|para\s+leer|para\s+dar|para\s+darselo|para\s+dárselo|buena\s+persona|señor[ao]\s+espos[ao])\b/.test(p);
+  const technical = /\b(tecnic|técnic|financier|contable|auditor|direccion|dirección|junta\s+directiva|formal|ejecutiv|presupuest|balance|referencias?\s+tecnic|complicad|justificad|fiscal|tesoreria|tesorería|direcci[oó]n|informe\s+de\s+cierre|informe\s+oficial)\b/.test(p);
+  if (technical) return {
+    id: 'tecnico-financiero',
+    label: 'técnico/financiero',
+    instruction: 'Redacta en tono formal, ejecutivo y verificable: conclusiones, criterios de cálculo, salvedades, trazabilidad y lectura financiera. Evita bromas y frases coloquiales.'
+  };
+  if (informal) return {
+    id: 'coloquial-socios',
+    label: 'coloquial para socios',
+    instruction: 'Redacta como Zuzu en tono cercano para socios: humano, simpático, con gracia ligera y complicidad. Puedes usar chascarrillos suaves si el usuario los pide, sin ridiculizar a nadie y apoyando cada opinión en los datos.'
+  };
+  return {
+    id: 'general',
+    label: 'general',
+    instruction: 'Redacta en tono claro, natural y útil, con interpretación de líneas generales, opinión prudente si la piden y conclusiones prácticas.'
+  };
+}
+function wantsOnePageNarrative(prompt) {
+  const p = norm(prompt);
+  return /\b(una\s+pagina|1\s+pagina|p[aá]gina|texto\s+de\s+1|texto\s+de\s+una|informe\s+en\s+texto|redaccion|redacción|desarrollado|todo\s+lujo\s+de\s+detalles)\b/.test(p);
+}
+function wantsNarrativeReport(prompt) {
+  const p = norm(prompt);
+  return /\b(informe|infore|memoria|cronica|crónica|resumen|dossier|explica|explicame|explícame|cuenta|cuentame|cuéntame|cositas|lectura|conclusiones|valoracion|valoración|opinion|opinión|parece|merece|ves\s+tu|ves\s+tú|como\s+lo\s+ves|cómo\s+lo\s+ves|texto|pagina|página|redaccion|redacción|palabras|entonacion|entonación|tono|sentimiento|para\s+entregar|para\s+pasar|para\s+darlo|para\s+darselo|para\s+dárselo|socios|direccion|dirección|coloquial|informal|cachond|chascarrill|tecnic|técnic|financier|contable)\b/.test(p);
+}
+function requiresGeminiNarrativeStrict(prompt) {
+  const p = norm(prompt);
+  // Cuando el usuario pide tono, opinión o que “lo haga Zuzu”, no queremos plantillas locales.
+  // ControlEvent cocina los datos; Zuzu debe escribir la respuesta humana.
+  return wantsNarrativeReport(prompt) && /\b(zuzu|dejate|déjate|curra|opinion|opinión|merece|como\s+lo\s+ves|cómo\s+lo\s+ves|tono|cachond|chascarrill|coloquial|informal|simpatic|simpa[tá]ic|palabras|texto\s+de|una\s+pagina|1\s+pagina|p[aá]gina|para\s+darselo|para\s+dárselo|para\s+socios|para\s+direccion|direcci[oó]n)\b/.test(p);
+}
+function shouldEnrichLocalResultWithNarrative(prompt, result) {
+  if (!result || result.rejected === true || result.ok === false) return false;
+  const hasData = arr(result.tables).length || arr(result.charts).length || trim(result.answer);
+  if (!hasData) return false;
+  const provider = trim(result.provider || '');
+  // v19: toda salida cocinada localmente por CE debe pasar por Zuzu como capa final de contexto y redacción.
+  // Si ya viene de Zuzu REST estructurado o de la capa de redacción, no se fuerza una segunda llamada.
+  if (/^gemini-rest/i.test(provider) || /zuzu-redaccion|zuzu-sentimiento|zuzu-gemini-final|redaccion-local/i.test(provider)) return false;
+  return !!geminiKey();
+}
+function tableObjects(table, maxRows = 30) {
+  const columns = arr(table?.columns).map(c => trim(c));
+  return arr(table?.rows).slice(0, maxRows).map(row => {
+    const obj = {};
+    columns.forEach((c, i) => { obj[c] = trim(arr(row)[i]); });
+    return obj;
+  });
+}
+function pickNarrativeTables(result) {
+  const tables = arr(result?.tables);
+  const provider = trim(result?.provider || '');
+  // FIX27: para informes comparativos grandes, Zuzu solo necesita resúmenes, no cientos de líneas de compras/donaciones.
+  if (/control-event-local-informe-eventos/i.test(provider)) {
+    const keep = tables.filter(tb => /resumen\s+operativo|resumen\s+canonico|resumen\s+canónico|meteorolog|metereolog|tiempo|clima|previsi[oó]n/i.test(norm(tb?.title || '')));
+    if (keep.length) return keep.slice(0, 4);
+  }
+  const scored = tables.map((tb, idx) => {
+    const t = norm(tb?.title || '');
+    let score = 0;
+    if (/resumen|cronica|crónica|comparativa|participaci|saldo|ranking|operativo/.test(t)) score += 10;
+    if (/detalle.*registros|detalle.*donaciones|detalle.*compras|detalle.*ingresos/.test(t)) score += 3;
+    else if (/detalle/.test(t)) score -= 4;
+    return { tb, idx, score };
+  }).sort((a,b)=>b.score-a.score || a.idx-b.idx);
+  return scored.slice(0, 4).map(x => x.tb);
+}
+
+function narrativeFactsFromResult(result) {
+  const roles = objectsFromResultTable(result, /resumen.*papel/, 50);
+  const eventos = objectsFromResultTable(result, /resumen.*evento.*papel|resumen.*evento/, 50);
+  const suppressDetailExamples = /control-event-local-informe-eventos/i.test(trim(result?.provider || ''));
+  const detalle = suppressDetailExamples ? [] : objectsFromResultTable(result, /detalle.*registros|registros.*localizados|detalle/, 160);
+  const topProducto = new Map();
+  const topImporte = new Map();
+  const tiendas = new Map();
+  const donantes = new Map();
+  detalle.forEach(r => {
+    const prod = trim(r.Producto || r.producto || r['Nombre producto']);
+    const imp = num(r['Importe/valor (€)'] || r.Importe || r.Valor || r.valor || r['Importe (€)']);
+    const uds = num(r.Unidades || r.unidades);
+    if (prod) addQtyCost(topProducto, prod, uds, imp);
+    if (prod) add(topImporte, prod, imp);
+    const det = trim(r.Detalle || r.detalle || '');
+    const t = (det.match(/tienda:\s*([^;]+)/i) || [,''])[1];
+    const d = (det.match(/donante:\s*([^;]+)/i) || [,''])[1] || (det.match(/responsable:\s*([^;]+)/i) || [,''])[1];
+    if (t) add(tiendas, t, imp || 1);
+    if (d) add(donantes, d, imp || 1);
+  });
+  const examples = suppressDetailExamples ? [] : detalle.slice(0, 16).map(r => ({
+    evento: trim(r.Evento), papel: trim(r.Papel), producto: trim(r.Producto), unidades: trim(r.Unidades), importe: trim(r['Importe/valor (€)'] || r.Importe || r.Valor), detalle: trim(r.Detalle), relacionado: trim(r.Relacionado)
+  }));
+  return {
+    titulo: trim(result?.title),
+    resumenEventos: eventos.slice(0, 20),
+    resumenPapeles: roles.slice(0, 25),
+    registrosDetalleTotal: detalle.length,
+    productosDestacadosPorImporte: [...topImporte.entries()].sort((a,b)=>num(b[1])-num(a[1])).slice(0, 16).map(([nombre, valor]) => ({ nombre, valor: round(valor,2) })),
+    productosDestacadosPorUnidades: [...topProducto.entries()].sort((a,b)=>num(b[1]?.unidades)-num(a[1]?.unidades)).slice(0, 16).map(([nombre, v]) => ({ nombre, unidades: round(v.unidades,3), valor: round(v.coste,2) })),
+    tiendasDetectadas: topN(tiendas, 12),
+    donantesOResponsablesDetectados: topN(donantes, 12),
+    ejemplosRepresentativos: examples,
+    notaAnexo: 'El detalle completo queda en tablas/anexos generados por CE; Zuzu recibe resumen y ejemplos para ahorrar tokens.'
+  };
+}
+function narrativeTemporalContext(context) {
+  const todayIso = trim(context?.fechaActualControlEvent || '') || todayIsoMadrid();
+  const events = arr(context?.eventosObjetivo).map(ev => {
+    const title = trim(ev?.['Titulo del evento'] || ev?.Titulo || ev?.Evento || ev?.EVENTO || '');
+    const startIso = parseCeDateToIso(ev?.['fecha ini'] || ev?.fechaIni || ev?.Fecha || ev?.fecha || '');
+    const endIso = parseCeDateToIso(ev?.['fecha fin'] || ev?.fechaFin || ev?.FechaFin || ev?.fecha_fin || '') || startIso;
+    const estado = trim(ev?.Estado || ev?.estado || '');
+    let relacionTemporal = 'sin_fecha';
+    if (startIso) {
+      if (startIso > todayIso) relacionTemporal = 'futuro';
+      else if (endIso && endIso < todayIso) relacionTemporal = 'pasado';
+      else relacionTemporal = 'en_curso_o_hoy';
+    }
+    return { titulo:title, fechaInicio:startIso, fechaFin:endIso, estado, relacionTemporal };
+  }).filter(e => e.titulo || e.fechaInicio);
+  return { hoy: todayIso, eventos: events };
+}
+function compactIndirectContextForNarrative(context) {
+  const weather = context?.infoIndirecta?.meteorologia;
+  const out = {};
+  if (weather) {
+    out.meteorologia = {
+      ok: !!weather.ok,
+      proveedor: trim(weather.proveedor || 'Open-Meteo'),
+      localidad: trim(weather.localidad || ''),
+      filas: arr(weather.filas).slice(0, 14).map(r => ({
+        Evento: trim(r.Evento),
+        Localidad: trim(r.Localidad),
+        Fecha: trim(r.Fecha),
+        Cielo: trim(r.Cielo),
+        'Temp. max': r['Temp. máx'],
+        'Temp. min': r['Temp. mín'],
+        'Prob. lluvia %': r['Prob. lluvia %'],
+        'Viento km/h': r['Viento km/h'],
+        Aviso: trim(r.Aviso || '')
+      }))
+    };
+  }
+  return out;
+}
+function compactResultForNarrative(result, narrativeContext = {}) {
+  const onePage = wantsOnePageNarrative(result?.__userPrompt || '');
+  const tables = pickNarrativeTables(result).map(tb => {
+    const t = norm(tb?.title || '');
+    const isDetail = /detalle/.test(t);
+    const isWeather = /meteorolog|tiempo|clima|lluvia|temperatura/.test(t);
+    const maxRows = isWeather ? 14 : (isDetail ? (onePage ? 28 : 18) : (onePage ? 40 : 24));
+    return {
+      title: trim(tb?.title),
+      columns: arr(tb?.columns).map(c => trim(c)).slice(0, 12),
+      rows: tableObjects(tb, maxRows)
+    };
+  });
+  const charts = arr(result?.charts).slice(0, 6).map(ch => ({
+    title: trim(ch?.title),
+    type: trim(ch?.type),
+    labels: arr(ch?.labels).map(x => trim(x)).slice(0, 12),
+    values: arr(ch?.values).map(x => round(x, 3)).slice(0, 12),
+    series: arr(ch?.series).slice(0, 4).map(s => ({ name: trim(s?.name), values: arr(s?.values).map(x => round(x, 3)).slice(0, 12) })),
+    unit: trim(ch?.unit)
+  }));
+  return {
+    title: trim(result?.title),
+    contextoTemporal: narrativeTemporalContext(narrativeContext),
+    usuarioLogado: narrativeContext?.usuarioLogado || null,
+    datosIndirectos: compactIndirectContextForNarrative(narrativeContext),
+    resumenCocinado: narrativeFactsFromResult(result),
+    answerBase: trim(result?.answer).slice(0, 600),
+    charts,
+    tables,
+    warnings: arr(result?.warnings).map(w => trim(w)).filter(Boolean).slice(0, 5)
+  };
+}
+function firstSummaryObject(result) {
+  const tb = pickNarrativeTables(result)[0];
+  return tableObjects(tb, 1)[0] || {};
+}
+function columnValueLoose(obj, re) {
+  const entry = Object.entries(obj || {}).find(([k]) => re.test(norm(k)));
+  return entry ? trim(entry[1]) : '';
+}
+
+function objectsFromResultTable(result, titleRe, maxRows = 200) {
+  const tb = arr(result?.tables).find(t => titleRe.test(norm(t?.title || '')));
+  return tb ? tableObjects(tb, maxRows) : [];
+}
+function fallbackPersonNarrativeForLocalReport(prompt, result, context = {}) {
+  const p = norm(prompt);
+  const title = trim(result?.title || '');
+  if (!/participaci|papel/.test(norm(title))) return '';
+  const tone = narrativeToneFromPrompt(prompt);
+  const detail = objectsFromResultTable(result, /detalle.*registros|registros.*localizados/, 80);
+  const roles = objectsFromResultTable(result, /resumen.*papel/, 20);
+  const eventSummary = objectsFromResultTable(result, /resumen.*evento.*papel/, 20);
+  if (!detail.length && !roles.length) return '';
+  const who = (title.match(/participación de\s+(.+)$/i) || [,'la persona consultada'])[1];
+  const eventos = uniqueTextList(detail.map(r => r.Evento).filter(Boolean));
+  const productos = uniqueTextList(detail.map(r => r.Producto).filter(Boolean)).slice(0, 12);
+  const total = eventSummary.reduce((a,r)=>a+num(r['Importe/valor total (€)']),0) || roles.reduce((a,r)=>a+num(r['Importe/valor (€)']),0);
+  const donante = roles.find(r => /donante/.test(norm(r.Papel)) && !/responsable/.test(norm(r.Papel)));
+  const respDon = roles.find(r => /responsable.*donacion/.test(norm(r.Papel)));
+  const colab = roles.find(r => /colaborador|ingreso/.test(norm(r.Papel)));
+  const roleBits = [];
+  if (colab) roleBits.push(`${colab.Registros} registro(s) como colaborador/ingreso`);
+  if (donante) roleBits.push(`${donante.Registros} línea(s) como donante`);
+  if (respDon) roleBits.push(`${respDon.Registros} línea(s) como responsable de donación`);
+  const rolesText = roleBits.length ? roleBits.join(', ') : `${detail.length} registro(s) localizados`;
+  if (tone.id === 'coloquial-socios') {
+    return `Zuzu lo ve bastante claro: ${who} no pasó por ${eventos.join(' | ') || 'el evento'} a mirar desde la barrera. Su participación aparece con ${rolesText}${total ? ` y un valor asociado de ${round(total,2)} €` : ''}. Y eso, dicho en versión de peña, es entrar por la puerta con la gorra puesta y salir habiendo dejado huella.
+
+En lo concreto, la aportación viene cargada de producto y de intendencia: ${productos.join(', ')}${productos.length ? '...' : 'varias líneas registradas'}. No es la típica colaboración de “yo si eso me paso luego”; aquí hay comida, bebida, organización y presencia real. Si además aparece solo y acompañado, la lectura es todavía más bonita: no es una aportación aislada, es una participación de las que hacen grupo.
+
+Mi opinión, apoyándome en los datos, es que ${who} queda retratado como alguien que arrima el hombro de verdad. Con números delante y sin vender humo, su papel fue relevante, generoso y de esos que conviene agradecer en público. Vamos, que para darle este informe a esa persona, yo lo resumiría así: ${who} no fue de figurante; ${who} dejó una participación con huella y con datos que la sostienen.`;
+  }
+  if (tone.id === 'tecnico-financiero') {
+    return `La participación de ${who} en ${eventos.join(' | ') || 'el evento consultado'} queda acreditada mediante ${rolesText}${total ? `, con un importe/valor agregado de ${round(total,2)} €` : ''}. La información se apoya en los módulos operativos de ingresos y donaciones, separando el papel de donante del papel de responsable de la aportación cuando ambos aparecen diferenciados.
+
+Desde el punto de vista de trazabilidad, la participación es relevante porque no se limita a una presencia nominal: hay líneas de producto identificadas, unidades, valoración económica y relación con el evento. Los productos principales registrados incluyen ${productos.join(', ') || 'las líneas detalladas en la tabla inferior'}.
+
+Conclusión: los datos permiten considerar a ${who} como participante significativo, con aportación material y responsabilidad operativa documentada. La tabla posterior conserva el detalle verificable línea a línea para contraste o archivo.`;
+  }
+  return `La participación de ${who} en ${eventos.join(' | ') || 'el evento consultado'} aparece documentada con ${rolesText}${total ? ` y un valor asociado de ${round(total,2)} €` : ''}. Las líneas localizadas muestran una aportación real, especialmente en productos como ${productos.join(', ') || 'los detallados en la tabla'}.
+
+Mi valoración es positiva: no parece una presencia testimonial, sino una colaboración efectiva y con peso dentro de la organización del evento. Debajo queda el detalle para revisar cada línea sin perder trazabilidad.`;
+}
+
+
+function fallbackEventReportNarrativeForLocalReport(prompt, result, context = {}) {
+  if (!/control-event-local-informe-eventos/i.test(trim(result?.provider || ''))) return '';
+  const rows = objectsFromResultTable(result, /resumen\s+operativo\s+por\s+evento/, 20);
+  if (!rows.length) return '';
+  const socios = objectsFromResultTable(result, /resumen\s+canonico|resumen\s+canónico/, 20);
+  const weather = goodWeatherRowsFromContext(context);
+  const line = r => {
+    const ev = trim(r.Evento);
+    const estado = trim(r.Estado);
+    const provisional = /en\s*curso/i.test(estado) ? ' (En curso: cifras provisionales)' : '';
+    return `${ev}${provisional}: ingresos previstos ${trim(r['Ingresos total (€)']) || '0'} €, ingresos realizados ${trim(r['Ingresos realizados (€)']) || '0'} €, compras realizadas ${trim(r['Compras realizadas (€)']) || '0'} €, compras pendientes ${trim(r['Compras pendientes (€)']) || '0'} €, donaciones valoradas ${trim(r['Donaciones valoradas (€)']) || '0'} €, saldo actual ${trim(r['Saldo actual (€)']) || '0'} €, saldo operativo ${trim(r['Saldo operativo (€)']) || '0'} € y valor compras+donaciones ${trim(r['Valor compras + donaciones (€)']) || '0'} €`;
+  };
+  const inProgress = rows.filter(r => /en\s*curso/i.test(trim(r.Estado || r['Nota estado']))).map(r => trim(r.Evento)).filter(Boolean);
+  const sociosText = socios.length ? socios.map(r => `${trim(r.Evento)}: ${trim(r['Socios asistentes'])} asistentes y ${trim(r['Socios no asistentes'])} no asistentes sobre ${trim(r['Socios canónicos'])} socios canónicos`).join('; ') : '';
+  const weatherText = weather.length ? weather.map(r => `${trim(r.Evento)} ${trim(r.Fecha)}: ${trim(r.Cielo)}, máxima ${r['Temp. máx']} ºC, mínima ${r['Temp. mín']} ºC, lluvia ${r['Prob. lluvia %']} %, viento ${r['Viento km/h']} km/h`).join('; ') : '';
+  const totals = rows.map(line).join('. ');
+  return `Resumen técnico ControlEvent: la consulta está restringida a ${rows.length} evento(s) y los cálculos se han hecho con plantillas cerradas, sin mezclar otros eventos. ${totals}.
+
+Lectura de producto disponible y saldos: los eventos finalizados son comparables como cierre; ${inProgress.length ? `${inProgress.join(', ')} está En curso y por tanto sus compras pendientes, donaciones, ingresos y saldos todavía pueden cambiar antes del cierre.` : 'no hay eventos En curso en esta comparativa.'} La comparación debe leer compras realizadas y pendientes por separado. Saldo actual = dinero efectivamente ingresado menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas. No conviene confundir saldos financieros con valoración total del producto disponible.
+
+Socios: ${sociosText || 'la asistencia canónica queda en las tablas.'}. Criterio aplicado: rango SOCIO, exclusión de registros técnicos/grupo/Peña, parejas con " y " como 2 personas, y colaboradores SOCIO con Numero >= 0 como asistentes, incluyendo exentos de pago con Numero=0.
+
+${weatherText ? `Meteorología: ${weatherText}.\n\n` : ''}Conclusión técnica: con los datos actuales, el evento En curso debe interpretarse como una foto provisional. La decisión correcta no es exigirle saldo parecido a un evento cerrado, sino comprobar si el producto disponible previsto —compras realizadas + pendientes + donaciones— está proporcionalmente alineado con los años cerrados.`;
+}
+
+function fallbackNarrativeForLocalReport(prompt, result, context = {}) {
+  const eventFallback = fallbackEventReportNarrativeForLocalReport(prompt, result, context);
+  if (eventFallback) return eventFallback;
+  const temporal = narrativeTemporalContext(context);
+  const hasFutureEvent = arr(temporal.eventos).some(e => e.relacionTemporal === 'futuro');
+  const personFallback = fallbackPersonNarrativeForLocalReport(prompt, result, context);
+  if (personFallback) return personFallback;
+  const tone = narrativeToneFromPrompt(prompt);
+  const one = firstSummaryObject(result);
+  const evento = columnValueLoose(one, /(^|\b)evento(\b|$)/) || trim(result?.title || 'el informe');
+  const ingresos = columnValueLoose(one, /ingresos/);
+  const compras = columnValueLoose(one, /compras.*realizadas|compras/);
+  const donaciones = columnValueLoose(one, /donaciones/);
+  const saldo = columnValueLoose(one, /saldo/);
+  const colaboradores = columnValueLoose(one, /colaboradores|ingresos.*registros/);
+  const asistentes = columnValueLoose(one, /asistentes|numero|número/);
+  const tickets = columnValueLoose(one, /tickets/);
+  const documentos = columnValueLoose(one, /documentos/);
+  const parts = [];
+  if (ingresos) parts.push(`ingresos ${ingresos}`);
+  if (compras) parts.push(`compras ${compras}`);
+  if (donaciones) parts.push(`donaciones valoradas ${donaciones}`);
+  if (saldo) parts.push(`saldo ${saldo}`);
+  const cifras = parts.length ? parts.join(', ') : 'actividad registrada en los módulos disponibles';
+  if (tone.id === 'tecnico-financiero') {
+    return `Lectura ejecutiva de Zuzu: el informe de ${evento} presenta ${cifras}. El análisis separa la caja financiera de las donaciones valoradas: el saldo actual se interpreta como ingresos realizados menos compras realizadas, y el saldo operativo como ingresos previstos menos compras previstas; las donaciones se muestran como aportación operativa adicional.\n\nConclusión: el detalle de tablas y ficheros permite justificar ingresos/colaboradores, gasto por compras, aportaciones donadas, tickets/fototickets y documentación soporte. Conviene revisar cualquier línea negativa o de ajuste antes de entregar el informe como cierre definitivo.`;
+  }
+  if (tone.id === 'coloquial-socios') {
+    return `Lectura de Zuzu para contar a los socios: en ${evento} ${hasFutureEvent ? 'hay movimiento previsto y preparado' : 'hubo movimiento del bueno'}: ${cifras}. Traducido a cristiano, aquí no solo hay números; hay gente que colaboró, compras que sostuvieron la celebración y donaciones que ayudaron a que la cosa saliera adelante sin que la caja tuviera que cargar con todo.\n\nEl resumen detallado viene debajo con pelos y señales: colaboradores${colaboradores ? ` (${colaboradores})` : ''}, asistentes${asistentes ? ` (${asistentes})` : ''}, tickets${tickets ? ` (${tickets})` : ''} y documentos${documentos ? ` (${documentos})` : ''}. Vamos, que si alguien pregunta “¿y esto de dónde sale?”, hay papeles y números para aburrir a una oveja, pero contado bonito.`;
+  }
+  return `Lectura general de Zuzu: el informe de ${evento} resume ${cifras}. Las tablas siguientes dejan trazabilidad por ingresos/colaboradores, compras, donaciones, tickets/fototickets y documentos.\n\nLa idea principal es separar la visión financiera de caja de la actividad real del evento: la caja real se mide por saldo actual (ingresos realizados menos compras realizadas), el cierre previsible por saldo operativo, y las donaciones explican valor recibido aunque no entren como ingreso monetario.`;
+}
+function narrativeMiniSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      title: { type: 'STRING' },
+      answer: { type: 'STRING' },
+      warnings: { type: 'ARRAY', items: { type: 'STRING' } }
+    },
+    required: ['title','answer','warnings']
+  };
+}
+function narrativePrompt(userPrompt, localResult, context) {
+  const tone = narrativeToneFromPrompt(userPrompt);
+  const onePage = wantsOnePageNarrative(userPrompt);
+  const enriched = { ...localResult, __userPrompt: userPrompt };
+  const compact = compactResultForNarrative(enriched, context);
+  const ctx = compactJson({ tono: tone.label, instruccionesTono: tone.instruction, resultadoControlEvent: compact }, onePage ? 12000 : 7500);
+  const limit = onePage ? '5 a 8 párrafos y máximo 5500 caracteres' : '4 a 6 párrafos y máximo 3200 caracteres';
+  return `Eres Zuzu, voz final de ControlEvent. ControlEvent ya calculó datos, tablas y gráficas: tú solo redactas una lectura humana y útil, sin inventar nada.
+
+Reglas:
+- Devuelve SOLO JSON válido con title, answer y warnings.
+- No pegues tablas, listas de productos ni JSON dentro de answer; las tablas se mostrarán debajo.
+- No menciones códigos internos técnicos como id, persona_id, event_id, producto_id, tienda_id, donor_ref o valores tipo P:id.../T:id...; habla siempre con nombres humanos de personas, eventos, productos, tiendas y donantes.
+- Usa cifras reales del resumen CE y habla claro: totales, comparación, criterio y conclusión.
+- Si hay evento En curso, avisa que sus cifras son provisionales y no lo compares como cierre definitivo.
+- Si hay socios, explica el criterio canónico: rango SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2; asistentes = colaboradores SOCIO con Numero >= 0, incluyendo exentos con Numero=0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes.
+- Si se pide meteorología y datosIndirectos.meteorologia.ok=true trae filas sin Aviso, incluye temperatura máxima/mínima, lluvia, viento, cielo, localidad y fuente. Si no hay datos meteorológicos externos fiables, dilo y NO inventes previsión.
+- Distingue siempre saldo actual y saldo operativo cuando aparezcan: saldo actual = ingresos realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas.
+- Si el evento es futuro, habla en futuro/condicional; si pasó, en pasado; si está En curso, en presente.
+- Si el usuario pide opinión, da una opinión prudente apoyada en datos.
+- Tono: ${tone.instruction}
+- Extensión: ${limit}. Cierra con una conclusión terminada, sin dejar frases abiertas.
+
+PETICIÓN ORIGINAL:
+${trim(userPrompt).slice(0, 2200)}
+
+RESUMEN OFICIAL CE:
+${ctx}`;
+}
+
+function narrativeMaxOutputTokens(userPrompt) {
+  const p = norm(userPrompt);
+  const mode = trim(process.env.CONTROLEVENT_ZUZU_COST_MODE || '').toLowerCase();
+  const multi = /\b(tambien|también|ademas|además|\d+\s*\.-|1\.-|2\.-|3\.-|socios?.*meteorolog|metereolog|tiempo|temperatura)\b/.test(p);
+  if (/ultra|ahorro|max/i.test(mode)) return /dos\s+p[aá]gin|exhaustiv|completo/.test(p) ? 3400 : (multi ? 2600 : 1900);
+  if (wantsOnePageNarrative(userPrompt)) return 5600;
+  if (/exhaustiv|informe\s+completo|direcci[oó]n|financier|t[eé]cnic/.test(p)) return 4200;
+  return multi ? 3600 : 2600;
+}
+function cleanGeminiLooseText(outText) {
+  const raw = trim(outText).replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+  if (!raw) return raw;
+  if (/^\{\s*"(?:title|answer)"\s*:/i.test(raw)) {
+    try { const obj = JSON.parse(stripJsonText(raw)); return trim(obj.answer || obj.text || raw); } catch (_) {}
+    const m = raw.match(/"answer"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"warnings"|"\s*\}|$)/i);
+    if (m) return m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+  }
+  return raw;
+}
+function goodWeatherRowsFromContext(context) {
+  return arr(context?.infoIndirecta?.meteorologia?.filas).filter(r => !trim(r?.Aviso));
+}
+function narrativeViolatesWeatherRequest(userPrompt, context, answer) {
+  if (!wantsWeatherInfo(userPrompt)) return false;
+  const rows = goodWeatherRowsFromContext(context);
+  if (!rows.length) return false;
+  const a = norm(answer);
+  const denies = /(no dispongo|no tengo|no cuento|no hay informacion|no hay información|mis datos se centran|no puedo consultar|no aparece.*temperatura|no se ha podido obtener)/i.test(answer || '');
+  const mentions = /(temperatura|grados|º|°|lluvia|viento|cubierto|despejado|nuboso|llovizna|tormenta|probabilidad)/i.test(answer || '');
+  return denies || !mentions;
+}
+function narrativeViolatesTemporalContext(userPrompt, context, answer) {
+  const events = arr(narrativeTemporalContext(context).eventos);
+  if (!events.some(e => e.relacionTemporal === 'futuro')) return false;
+  if (!/(temperatura|tiempo|clima|datos del evento|informe|evento)/i.test(userPrompt || '')) return false;
+  const a = answer || '';
+  return /(c[oó]mo fue|tuvimos|contamos con|se celebr[oó]|se celebra hoy|celebra hoy|el evento fue|hizo el d[ií]a|durante el evento tuvimos|para hoy\s+10|hoy\s+(?:mismo,?\s*)?10\s+de\s+julio|hoy\s+10\/07\/2026)/i.test(a);
+}
+function prettyIsoEs(iso) {
+  const s = trim(iso);
+  if (!s) return '';
+  try {
+    return new Intl.DateTimeFormat('es-ES', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${s}T00:00:00Z`));
+  } catch (_) {
+    return s;
+  }
+}
+function sanitizeTemporalAnswerForContext(answer, context) {
+  let out = trim(answer);
+  const temporal = narrativeTemporalContext(context);
+  const future = arr(temporal.eventos).find(e => e.relacionTemporal === 'futuro' && e.fechaInicio);
+  if (!future || !out) return out;
+  const today = trim(temporal.hoy);
+  const start = trim(future.fechaInicio);
+  const label = daysBetweenIso(today, start) === 1 ? 'mañana' : `el ${prettyIsoEs(start)}`;
+  const pretty = prettyIsoEs(start);
+  out = out
+    .replace(/que\s+se\s+celebra\s+hoy\s+mismo,?\s*10\s+de\s+julio\s+de\s+2026/ig, `que está previsto para ${label}${pretty ? `, ${pretty}` : ''}`)
+    .replace(/que\s+se\s+celebra\s+hoy/ig, `que está previsto para ${label}`)
+    .replace(/para\s+hoy\s+10\s+de\s+julio/ig, `para ${label} 10 de julio`)
+    .replace(/para\s+hoy\s+10\/07\/2026/ig, `para ${label} 10/07/2026`)
+    .replace(/hoy\s+mismo,?\s*10\s+de\s+julio\s+de\s+2026/ig, `${label}, ${pretty || start}`)
+    .replace(/hoy\s+10\/07\/2026/ig, `${label} 10/07/2026`);
+  return out;
+}
+
+function narrativeLooksTruncated(answer, userPrompt) {
+  const a = trim(answer);
+  if (!a) return true;
+  const p = norm(userPrompt);
+  const asksMany = /\b(tambien|también|ademas|además|\d+\s*\.-|1\.-|2\.-|3\.-| y )\b/.test(p) || (wantsWeatherInfo(userPrompt) && /\b(datos\s+del\s+evento|socios?|asist)/.test(p));
+  if (asksMany && a.length < 900) return true;
+  if (/[,:;\-–—(]$/.test(a)) return true;
+  if (!/[.!?…]$/.test(a) && asksMany) return true;
+  if (/\b(el|la|los|las|de|del|con|para|por|que|como|cómo|va|van|mirando|seg[uú]n|tambien|también|adem[aá]s|asciende|ascienden|importa|suma|queda|habr[aá]|tendr[aá])\s*$/i.test(a)) return true;
+  return false;
+}
+function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
+  const a = norm(answer);
+  const p = norm(userPrompt);
+  if (wantsWeatherInfo(userPrompt) && goodWeatherRowsFromContext(context).length && !/\b(temperatura|maxima|maxima|mínima|minima|lluvia|viento|cielo|meteorolog|tiempo)\b/.test(a)) return true;
+  if (asksMissingAttendees(userPrompt) && !/\b(no\s+registrad|no\s+figuran|no\s+asist|socios?\s+no|faltan)\b/.test(a)) return true;
+  if (/\b(datos\s+del\s+evento|info\s+del\s+evento)\b/.test(p) && !/\b(ingresos|compras|donaciones|saldo|colaboradores|asistentes)\b/.test(a)) return true;
+  return false;
+}
+
+function narrativeCorrectionInstruction(userPrompt, context) {
+  const rows = goodWeatherRowsFromContext(context);
+  const weather = rows.length ? ` Meteo: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)} ${trim(r.Cielo)} max ${r['Temp. máx']} min ${r['Temp. mín']} lluvia ${r['Prob. lluvia %']}% viento ${r['Viento km/h']}km/h`).join(' | ')}.` : '';
+  return `\n\nREINTENTO: responde completo en 4 apartados breves: Producto disponible, Socios, Meteorología, Conclusión. No omitas meteo ni socios. Cierra la respuesta.${weather}`;
+}
+
+async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace = []) {
+  const apiKey = geminiKey();
+  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', 'Sin GEMINI_API_KEY para redactar informe con Zuzu.'); throw new Error('Sin GEMINI_API_KEY para redactar informe con Zuzu.'); }
+  // v19: no se usa caché narrativa; el usuario ha contratado prepago y quiere que Zuzu recontextualice cada petición.
+  const tone = narrativeToneFromPrompt(userPrompt);
+  let lastError = null;
+  for (const model of configuredGeminiModelsForTask('zuzu-narrative', { prompt: userPrompt, localResult })) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    let correction = '';
+    try {
+      let payload, res, outText, parsed;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const narrativeText = narrativePrompt(userPrompt, localResult, context) + correction;
+        const body = {
+          contents: [{ role: 'user', parts: [{ text: narrativeText }] }],
+          generationConfig: { responseMimeType: 'application/json', responseSchema: narrativeMiniSchema(), temperature: tone.id === 'coloquial-socios' ? 0.68 : 0.22, maxOutputTokens: narrativeMaxOutputTokens(userPrompt) }
+        };
+        zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'RUN', `Modelo ${model}${attempt ? ' · reintento guiado' : ''}. Zuzu recibe prompt original + resumen cocinado por CE para redactar con tono.`);
+        sizeTrace(flowTrace, 'Paso 4 · Zuzu redacción humana', attempt ? 'Contexto corregido enviado a redacción' : 'Contexto compacto enviado a redacción', narrativeText);
+        ({ res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || (wantsOnePageNarrative(userPrompt) ? 30000 : 22000))));
+        logGeminiUsage('PASO 2 redacción humana', model, payload);
+        if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu narrativa HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+        outText = trim(geminiOutText(payload));
+        if (!outText) throw new Error('Zuzu narrativa no devolvió texto.');
+        try { parsed = JSON.parse(stripJsonText(outText)); }
+        catch (_) {
+          const cleaned = cleanGeminiLooseText(outText);
+          const badLoose = narrativeViolatesWeatherRequest(userPrompt, context, cleaned) || narrativeViolatesTemporalContext(userPrompt, context, cleaned) || narrativeLooksTruncated(cleaned, userPrompt) || narrativeMissingRequestedBlocks(cleaned, userPrompt, context);
+          if (badLoose && attempt === 0) {
+            correction = narrativeCorrectionInstruction(userPrompt, context);
+            zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'INFO', 'Zuzu omitió una parte pedida, meteorología o dejó el texto cortado; ControlEvent reenvía a Zuzu con corrección, sin redactar localmente.');
+            continue;
+          }
+          if (badLoose) throw new Error('Zuzu devolvió texto libre incompleto o sin cubrir todas las partes pedidas.');
+          zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'OK', 'Zuzu redactó texto libre no JSON; CE lo presenta sin plantilla local.', { model, usage: usageSmall(payload, model) });
+          return { title: trim(localResult?.title || 'Respuesta de Zuzu'), answer: sanitizeTemporalAnswerForContext(cleaned, context), warnings: ['Zuzu redactó texto libre y ControlEvent lo ha presentado sin plantilla local.'], model, usage: usageSmall(payload, model) };
+        }
+        const answerCandidate = trim(parsed?.answer);
+        const badNarrative = narrativeViolatesWeatherRequest(userPrompt, context, answerCandidate) || narrativeViolatesTemporalContext(userPrompt, context, answerCandidate) || narrativeLooksTruncated(answerCandidate, userPrompt) || narrativeMissingRequestedBlocks(answerCandidate, userPrompt, context);
+        if (badNarrative && attempt === 0) {
+          correction = narrativeCorrectionInstruction(userPrompt, context);
+          zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'INFO', 'Zuzu omitió una parte pedida, meteorología o dejó el texto cortado; ControlEvent reenvía a Zuzu con corrección, sin redactar localmente.');
+          continue;
+        }
+        if (badNarrative) {
+          throw new Error('Zuzu devolvió una respuesta narrativa incompleta o sin cubrir todas las partes pedidas.');
+        }
+        break;
+      }
+      const finalNarrative = { title: trim(parsed?.title), answer: sanitizeTemporalAnswerForContext(parsed?.answer, context), warnings: arr(parsed?.warnings).map(w => trim(w)).filter(Boolean), model, usage: usageSmall(payload, model) };
+      zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'OK', `Zuzu redactó answer de ${trim(parsed?.answer).length} caracteres.`, { model, usage: usageSmall(payload, model) });
+      return finalNarrative;
+    } catch (error) {
+      lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error), { model });
+      if (isQuotaError(error) || !isRetryable(error)) break;
+    }
+  }
+  throw lastError || new Error('Zuzu narrativa no disponible.');
+}
+async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, flowTrace = []) {
+  if (!shouldEnrichLocalResultWithNarrative(userPrompt, localResult)) return localResult;
+  const out = { ...localResult, warnings: arr(localResult.warnings).slice() };
+  try {
+    const narrative = await callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace);
+    if (trim(narrative.answer)) {
+      const ans = trim(narrative.answer);
+      const tone = narrativeToneFromPrompt(userPrompt);
+      const mechanical = tone.id === 'coloquial-socios' && /^he localizado\s+\d+\s+registro/i.test(ans);
+      if (mechanical) throw new Error('Zuzu devolvió una redacción demasiado mecánica para el tono pedido.');
+      out.title = trim(narrative.title) || out.title;
+      out.answer = sanitizeTemporalAnswerForContext(ans, context);
+      out.warnings = arr(out.warnings).concat(arr(narrative.warnings));
+      out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-sentimiento-redaccion`;
+      out.model = narrative.model || 'zuzu-redaccion';
+      out.__zuzuGeminiNarrative = { ok: true, model: narrative.model || 'zuzu-redaccion', usage: narrative.usage || null };
+      return out;
+    }
+  } catch (error) {
+    const fallback = fallbackNarrativeForLocalReport(userPrompt, localResult, context);
+    if (fallback) {
+      out.answer = sanitizeTemporalAnswerForContext(fallback, context);
+      out.provider = `${trim(out.provider || 'control-event-local')}+redaccion-local`;
+      out.model = 'redaccion-local-por-fallo-zuzu';
+      out.showWarnings = true;
+      out.warnings = out.warnings.concat(`Zuzu no pudo completar la redacción humana (${friendlyZuzuErrorMessage(error)}). ControlEvent muestra una redacción técnica local claramente etiquetada para no dejar el informe vacío.`);
+      return out;
+    }
+    const timeoutLike = /timeout|abort|tard[oó] demasiado|504/i.test(trim(error?.message || error));
+    const strict = requiresGeminiNarrativeStrict(userPrompt) && !timeoutLike;
+    if (strict) {
+      out.answer = `Zuzu no ha podido redactar todavía la parte humana del informe. Los datos calculados por ControlEvent quedan debajo para no perder el trabajo, pero no voy a disfrazar una plantilla local como si fuera una respuesta de Zuzu. Motivo: ${friendlyZuzuErrorMessage(error)}`;
+      out.provider = `${trim(out.provider || 'control-event-local')}+zuzu-redaccion-no-disponible`;
+      out.model = 'zuzu-redaccion-obligatoria-fallida';
+      out.showWarnings = true;
+      out.warnings = out.warnings.concat('La petición exigía tono/opinión/redacción humana. Se evita respuesta mecánica de ControlEvent para no dar una falsa impresión de inteligencia.');
+      return out;
+    }
+    zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error));
+  }
+  return out;
+}
+
+const ZUZU_PLAN_MODULES = ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PRODUCTOS','PERSONAS','METEO','DOCUMENTOS','TICKETS','TIENDAS'];
+function plannerModule(value) {
+  const raw = trim(value).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const map = {
+    RECAUDACION: 'INGRESOS', ASISTENTES: 'INGRESOS', ASISTENCIA: 'INGRESOS', ENTRADAS: 'INGRESOS', COLABORADORES: 'INGRESOS',
+    DONACION: 'DONACIONES', DONACIONES_PRODUCTO: 'DONACIONES', PRODUCTO_DONADO: 'DONACIONES',
+    GASTOS: 'COMPRAS', GASTOS_CORRIENTES: 'COMPRAS', PTE_COMPRA: 'COMPRAS', PENDIENTE_COMPRA: 'COMPRAS', PAGO: 'INGRESOS', PAGOS: 'INGRESOS', COBRO: 'INGRESOS', COBROS: 'INGRESOS', PAGADO: 'INGRESOS', PENDIENTE_PAGO: 'INGRESOS', PRODUCTO_DISPONIBLE: 'COMPRAS',
+    PRODUCTO: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS',
+    SOCIOS: 'PERSONAS', SOCIO: 'PERSONAS', PERSONAS: 'PERSONAS', PERSON: 'PERSONAS', PERSONA: 'PERSONAS',
+    METEOROLOGIA: 'METEO', METEREOLOGIA: 'METEO', CLIMA: 'METEO', TIEMPO: 'METEO', PREVISION: 'METEO', PRONOSTICO: 'METEO',
+    TICKET: 'TICKETS', TKS: 'TICKETS', DOCUMENTO: 'DOCUMENTOS'
+  };
+  return map[raw] || raw;
+}
+function plannerUnique(list) {
+  const out = [];
+  arr(list).forEach(x => { const v = plannerModule(x); if (v && ZUZU_PLAN_MODULES.includes(v) && !out.includes(v)) out.push(v); });
+  return out;
+}
+function splitPlannerItems(value) {
+  return trim(value).replace(/[\[\]{}]/g, ' ').split(/[;,|\n]+/).flatMap(x => x.split(/\s+\/\s+/)).map(x => trim(x).replace(/^[-*•]+\s*/, '').replace(/^['"“”]+|['"“”.,;:]+$/g, '')).filter(Boolean);
+}
+function plannerSection(textValue, labels) {
+  const raw = text(textValue);
+  const names = arr(labels).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const stops = 'EVENTOS_SOLICITADOS|EVENTOS_NECESARIOS|EVENTOS|ALCANCE_EVENTOS|MODULOS_NECESARIOS|MÓDULOS_NECESARIOS|MODULOS_NO_NECESARIOS|MÓDULOS_NO_NECESARIOS|CONSULTA_GLOBAL|ALCANCE|PERSONAS_IMPLICADAS|CONDICIONES_DATOS|CONDICIONES_ACCESO|FILTROS_DATOS|FILTROS|SELECTS_PROPUESTOS|CONSULTAS_SELECT|MOTIVO|PLANTILLAS|QUERY|SQL';
+  const re = new RegExp('(?:^|\\n)\\s*(?:' + names + ')\\s*[:=]\\s*([\\s\\S]*?)(?=\\n\\s*(?:' + stops + ')\\s*[:=]|$)', 'i');
+  const m = raw.match(re);
+  return m ? trim(m[1]) : '';
+}
+
+function strictScopeRequested(prompt) {
+  const p = norm(prompt);
+  return /\b(solo|exactos?|estricto|restringid|no\s+hagas\s+consulta\s+global|no\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/.test(p);
+}
+function cleanPotentialEventTitle(value) {
+  return trim(value).replace(/^[-*•]+\s*/, '').replace(/^['"“”]+|['"“”.,;:]+$/g, '').replace(/\s+/g, ' ');
+}
+function exactEventTitlesFromPrompt(prompt, catalogEvents) {
+  const events = arr(catalogEvents || []);
+  const promptNorm = ` ${norm(prompt)} `;
+  const out = [];
+  function addByTitle(title) {
+    const n = norm(title);
+    const ev = events.find(e => norm(e?.titulo) === n);
+    if (ev && !out.some(x => trim(x.id) === trim(ev.id))) out.push({ id: trim(ev.id), titulo: trim(ev.titulo) });
+  }
+  const lineRe = /^\s*\d+\s*[.)\-:]\s*([^\n\r]{2,120})/gm;
+  let m;
+  while ((m = lineRe.exec(text(prompt)))) addByTitle(cleanPotentialEventTitle(m[1]));
+  const quoteRe = /["“”'‘’]([^"“”'‘’]{2,120})["“”'‘’]/g;
+  while ((m = quoteRe.exec(text(prompt)))) addByTitle(cleanPotentialEventTitle(m[1]));
+  events.forEach(ev => {
+    const n = norm(ev?.titulo);
+    if (!n || n.length < 3) return;
+    if (promptNorm.includes(` ${n} `) && !out.some(x => trim(x.id) === trim(ev.id))) out.push({ id: trim(ev.id), titulo: trim(ev.titulo) });
+  });
+  return out;
+}
+function eventsFromPlannerText(raw, catalogEvents, activeEvent = null) {
+  const section = plannerSection(raw, ['EVENTOS_SOLICITADOS', 'EVENTOS_NECESARIOS', 'EVENTOS']);
+  const scope = plannerSection(raw, ['ALCANCE_EVENTOS', 'ALCANCE']);
+  const combined = `${section}\n${scope}`;
+  const out = [];
+  if (/\b(EVENTO_ACTIVO|EVENTO_EN_PANTALLA|EN_PANTALLA|ACTIVO|PANTALLA)\b/i.test(combined) && activeEvent?.id) {
+    out.push({ id: trim(activeEvent.id), titulo: trim(activeEvent.titulo) });
+  }
+  if (!section) return out;
+  splitPlannerItems(section).forEach(item => {
+    const clean = cleanPotentialEventTitle(item);
+    if (/\b(EVENTO_ACTIVO|EVENTO_EN_PANTALLA|EN_PANTALLA|ACTIVO|PANTALLA|NINGUNO|NONE)\b/i.test(clean)) return;
+    const ev = arr(catalogEvents).find(e => norm(e?.titulo) === norm(clean));
+    if (ev && !out.some(x => trim(x.id) === trim(ev.id))) out.push({ id: trim(ev.id), titulo: trim(ev.titulo) });
+  });
+  return out;
+}
+
+function modulesFromPlannerText(raw) {
+  let section = plannerSection(raw, ['MODULOS_NECESARIOS', 'MÓDULOS_NECESARIOS', 'MODULOS', 'MÓDULOS']);
+  const mods = plannerUnique(splitPlannerItems(section));
+  if (mods.length) return mods;
+  const out = [];
+  text(raw).split(/\n+/).forEach(line => {
+    const m = trim(line).match(/^[-*•]?\s*([A-ZÁÉÍÓÚÑ_ ]{4,30})\s*:/i);
+    if (!m) return;
+    const mod = plannerModule(m[1]);
+    if (ZUZU_PLAN_MODULES.includes(mod) && !out.includes(mod)) out.push(mod);
+  });
+  return out;
+}
+function plannerFiltersFromText(raw) {
+  const people = splitPlannerItems(plannerSection(raw, ['PERSONAS_IMPLICADAS', 'PERSONAS_AFECTADAS'])).filter(x => !/^(NINGUNA|NINGUNO|NO|TODOS|TODAS|PERSONAS)$/i.test(x));
+  const conditions = trim(plannerSection(raw, ['CONDICIONES_DATOS', 'CONDICIONES_ACCESO', 'FILTROS_DATOS', 'FILTROS']));
+  const filters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
+  if (people.length) {
+    filters.personas = people.slice();
+    filters.responsables = people.slice();
+    filters.donantes = people.slice();
+  }
+  const yrs = conditions.match(/20\d{2}/g) || [];
+  if (yrs.length) filters.anios = [...new Set(yrs)];
+  if (/\bNO\s+SOCIO\b/i.test(conditions)) filters.rangos.push('NO SOCIO');
+  else if (/\bSOCIO\b/i.test(conditions)) filters.rangos.push('SOCIO');
+  return { filters, conditions };
+}
+function plannerGlobalFlag(raw, prompt) {
+  const sec = plannerSection(raw, ['CONSULTA_GLOBAL', 'ALCANCE']);
+  const v = norm(sec);
+  if (strictScopeRequested(prompt)) return false;
+  if (/\b(si|sí|true|global|todos)\b/.test(v)) return true;
+  if (/\b(no|false|restring|cerrad|solo)\b/.test(v)) return false;
+  return false;
+}
+function inferPlannerModulesFromPrompt(prompt, localModules = []) {
+  const p = norm(prompt);
+  // FIX25: en planes cerrados no heredamos módulos del detector local amplio.
+  // El detector local tiende a añadir TICKETS/DOCUMENTOS por palabras genéricas del informe,
+  // aunque el usuario haya pedido solo producto disponible, socios y meteo. Aquí inferimos
+  // únicamente desde la intención literal del prompt.
+  const mods = new Set();
+  if (/\b(pagad[oa]s?|pagos?|pagar|pendient(?:e|es)\s+de\s+pago|quien\s+ha\s+pagado|quién\s+ha\s+pagado|falta\s+por\s+pagar)\b/.test(p)) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m => mods.add(m));
+  if (/\b(todos\s+los\s+datos|datos\s+del\s+evento|datos\s+de\s+los\s+que\s+dispongas|toda\s+la\s+info|informaci[oó]n\s+del\s+evento)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m => mods.add(m));
+  if (/producto\s+disponible|compras?\s+realiz|compras?\s+pend|donaciones?\s+de\s+producto|comparativa/.test(p)) ['EVENTOS','COMPRAS','DONACIONES','PRODUCTOS'].forEach(m => mods.add(m));
+  if (/socio|socios|asistent|no\s+asistent|colaborador/.test(p)) ['INGRESOS','PERSONAS'].forEach(m => mods.add(m));
+  if (/meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) ['EVENTOS','METEO'].forEach(m => mods.add(m));
+  // Si no se ha podido deducir nada desde el prompt, entonces sí usamos el plan local
+  // como respaldo mínimo, pero nunca como ampliación silenciosa.
+  if (!mods.size) arr(localModules).map(plannerModule).filter(Boolean).forEach(m => mods.add(m));
+  if (!mods.size) mods.add('EVENTOS');
+  return plannerUnique([...mods]);
+}
+function ensurePlannerDependencies(modules, prompt) {
+  const mods = new Set(plannerUnique(modules));
+  const p = norm(prompt);
+  if (mods.has('COMPRAS') || mods.has('DONACIONES') || /producto\s+disponible/.test(p)) { mods.add('EVENTOS'); mods.add('PRODUCTOS'); }
+  if (mods.has('PERSONAS') || /socio|asistent/.test(p)) { mods.add('INGRESOS'); mods.add('PERSONAS'); mods.add('EVENTOS'); }
+  if (mods.has('METEO') || /meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) { mods.add('EVENTOS'); mods.add('METEO'); }
+  return plannerUnique([...mods]);
+}
+function queryTemplatesForPlan(modules, prompt) {
+  const mods = new Set(plannerUnique(modules));
+  const p = norm(prompt);
+  const out = [];
+  if (mods.has('COMPRAS') || mods.has('DONACIONES') || /producto\s+disponible/.test(p)) out.push('producto_disponible_por_evento', 'compras_realizadas_pendientes_por_evento', 'donaciones_producto_por_evento');
+  if (mods.has('INGRESOS') || mods.has('PERSONAS') || /socio|asistent/.test(p)) out.push('asistencia_socios_canonica');
+  if (mods.has('METEO') || /meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) out.push('meteorologia_por_fechas_evento');
+  if (mods.has('EVENTOS')) out.push('eventos_objetivo');
+  return [...new Set(out)];
+}
+
+function plannerDatabaseSchemaText() {
+  return `TABLAS_REALES_SUPABASE_Y_CAMPOS:
+- ce_eventos(id, titulo, precio, fecha_ini, fecha_fin, situacion, descripcion, created_at, updated_at)
+- ce_colaboradores(id, event_id, persona_id, numero, situacion, importe, created_at, updated_at)
+- ce_personas(id, nombre, rango, created_at, updated_at)
+- ce_compras(id, event_id, producto_id, unidades, precio, ticket_donacion, donor_ref, responsable_id, tienda_id, created_at, updated_at)
+- ce_productos(id, nombre, segmento, destino, default_precio, default_tienda_id, created_at, updated_at)
+- ce_tiendas(id, nombre, created_at, updated_at)
+- ce_ticket_images(image_key, event_id, label, storage_path, public_url, pathname, content_type, size_bytes, created_at, updated_at)
+- ce_users(identificacion, nombre, clave, nivel, created_at, updated_at) [NO consultar clave]
+
+MAPEO_DE_DOMINIO:
+- EVENTOS = ce_eventos
+- INGRESOS = ce_colaboradores JOIN ce_personas ON ce_colaboradores.persona_id = ce_personas.id JOIN ce_eventos ON ce_colaboradores.event_id = ce_eventos.id
+- COMPRAS realizadas = ce_compras donde ticket_donacion NO sea DONADO ... ni Pte. Compra/PENDIENTE.
+- COMPRAS pendientes = ce_compras donde ticket_donacion contenga Pte. Compra o PENDIENTE.
+- DONACIONES = ce_compras donde ticket_donacion sea DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
+- PERSONAS = ce_personas
+- PRODUCTOS = ce_productos
+- TIENDAS = ce_tiendas
+- TICKETS = ce_ticket_images y ce_compras.ticket_donacion
+
+REGLAS_PARA_SELECTS_PROPUESTOS:
+- Cuando la pregunta requiera datos, intenta devolver SELECTS_PROPUESTOS usando SOLO las tablas/campos reales anteriores.
+- Usa SELECT puro. Prohibido INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, DO, EXEC, COPY, GRANT, REVOKE.
+- Para evento en pantalla usa el id literal del EVENTO_EN_PANTALLA si está disponible.
+- Para pagos: situacion IN ('BANCO','EFECTIVO','BIZUM') son ingresos pagados; 'PENDIENTE' es pendiente. Si numero=0 o importe=0 en socio, puede ser exento, no pago normal.
+- Para donaciones: el donante literal sale de donor_ref. Si donor_ref empieza por P: cruza con ce_personas.id; si empieza por T: cruza con ce_tiendas.id. No inventes repartos.
+- Incluye LIMIT razonable si pides detalle amplio.
+- Cuando selecciones IDs o referencias internas, haz JOIN para devolver nombres humanos y usa alias claros en castellano: colaborador_nombre, producto_nombre, tienda_nombre, donante_nombre, responsable_nombre. Evita devolver id/persona_id/event_id/producto_id/tienda_id si no son imprescindibles.
+- Para donor_ref, resuelve P: con ce_personas y T: con ce_tiendas, devolviendo el nombre del donante, no el código.`;
+}
+
+function cleanPlannerSqlText(value) {
+  return trim(value)
+    .replace(/^```(?:sql)?/i, '')
+    .replace(/```$/i, '')
+    .replace(/[\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function isSafePlannerSelect(sql) {
+  const s0 = cleanPlannerSqlText(sql).replace(/;\s*$/, '').trim();
+  if (!s0 || /^(NINGUNO|NINGUNA|NO|NONE)$/i.test(s0)) return { ok: false, reason: 'vacío/NINGUNO' };
+  if (!/^SELECT\b/i.test(s0)) return { ok: false, reason: 'no empieza por SELECT' };
+  if (/;\s*\S/.test(cleanPlannerSqlText(sql))) return { ok: false, reason: 'contiene varias sentencias' };
+  if (/--|\/\*|\*\/|#/i.test(s0)) return { ok: false, reason: 'contiene comentarios' };
+  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|UPSERT|CALL|EXEC|EXECUTE|DO|COPY|GRANT|REVOKE|VACUUM|ANALYZE|REFRESH)\b/i.test(s0)) return { ok: false, reason: 'contiene verbo no permitido' };
+  if (/\b(AUTH|STORAGE|VAULT|SECRET|SECRETS|PG_|INFORMATION_SCHEMA|HTTP|NET|EXTENSION)\b/i.test(s0)) return { ok: false, reason: 'referencia a esquema/función no permitido' };
+  if (s0.length > 1800) return { ok: false, reason: 'SELECT demasiado largo' };
+  return { ok: true, sql: s0 };
+}
+function splitPlannerSelects(section) {
+  const raw = trim(section);
+  if (!raw || /^(NINGUNO|NINGUNA|NO|NONE)$/i.test(raw)) return [];
+  const lines = raw.replace(/```(?:sql)?/gi, '').replace(/```/g, '').split(/\n+/).map(trim).filter(Boolean);
+  const candidates = [];
+  if (lines.filter(x => /^SELECT\b/i.test(x)).length > 1) candidates.push(...lines.filter(x => /^SELECT\b/i.test(x)));
+  else candidates.push(...raw.split(/;(?=\s*SELECT\b|\s*$)/i).map(trim).filter(Boolean));
+  return candidates;
+}
+function plannerSelectsFromText(raw) {
+  const section = plannerSection(raw, ['SELECTS_PROPUESTOS', 'CONSULTAS_SELECT', 'SQL_SELECTS', 'SELECTS']);
+  const out = [];
+  const rejected = [];
+  splitPlannerSelects(section).forEach(candidate => {
+    const safe = isSafePlannerSelect(candidate);
+    if (safe.ok) out.push(safe.sql);
+    else if (trim(candidate) && !/^(NINGUNO|NINGUNA|NO|NONE)$/i.test(trim(candidate))) rejected.push({ sql: trim(candidate).slice(0, 300), motivo: safe.reason });
+  });
+  return { selects: out.slice(0, 5), rejected };
+}
+
+function normalizeSqlIdCode(value) {
+  return text(value)
+    .replace(/id[￾￿ -]+([A-Za-z0-9])/g, 'id-$1')
+    .replace(/[￾￿ -]+/g, '')
+    .trim();
+}
+function normalizeLookupKey(value) {
+  return normalizeSqlIdCode(value).replace(/^['"]|['"]$/g, '').trim();
+}
+function collectSqlHumanLookups(executed = []) {
+  const lookups = { personas: {}, tiendas: {}, productos: {}, eventos: {} };
+  arr(executed).forEach(item => arr(item.rows).forEach(row => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return;
+    const id = normalizeLookupKey(row.id || row.ID || row.persona_id || row.personaId || row.tienda_id || row.producto_id || row.event_id || '');
+    if (!id) return;
+    const nombre = trim(row.nombre || row.Nombre || row.persona_nombre || row.colaborador_nombre || row.donante_nombre || row.responsable_nombre || '');
+    const titulo = trim(row.titulo || row.Titulo || row.evento || row.Evento || '');
+    const tienda = trim(row.tienda_nombre || row.tienda || '');
+    const producto = trim(row.producto_nombre || row.producto || '');
+    const rango = trim(row.rango || row.Rango || '');
+    if (nombre && (rango || /persona|colaborador|donante|responsable/i.test(Object.keys(row).join(' ')))) lookups.personas[id] = nombre;
+    if (nombre && !lookups.personas[id] && Object.keys(row).some(k => /persona|colaborador|donante|responsable/i.test(k))) lookups.personas[id] = nombre;
+    if (titulo) lookups.eventos[id] = titulo;
+    if (tienda) lookups.tiendas[id] = tienda;
+    if (producto) lookups.productos[id] = producto;
+  }));
+  return lookups;
+}
+function humanNameFromSqlRef(value, lookups = {}) {
+  const s = normalizeSqlIdCode(value);
+  if (!s) return '';
+  const m = s.match(/^(P|PERSONA|PERSONAS|T|TIENDA|TIENDAS|PRODUCTO|EVENTO)\s*:\s*(.+)$/i);
+  const kind = m ? m[1].toUpperCase() : '';
+  const id = normalizeLookupKey(m ? m[2] : s);
+  if (!id) return '';
+  if (/^P/.test(kind) && lookups.personas?.[id]) return lookups.personas[id];
+  if (/^T/.test(kind) && lookups.tiendas?.[id]) return lookups.tiendas[id];
+  if (/PRODUCTO/.test(kind) && lookups.productos?.[id]) return lookups.productos[id];
+  if (/EVENTO/.test(kind) && lookups.eventos?.[id]) return lookups.eventos[id];
+  return lookups.personas?.[id] || lookups.tiendas?.[id] || lookups.productos?.[id] || lookups.eventos?.[id] || '';
+}
+function humanSqlColumnName(key) {
+  const k = trim(key);
+  const n = norm(k);
+  const map = {
+    COLABORADOR_NOMBRE: 'Colaborador', RESPONSABLE_NOMBRE: 'Responsable', DONANTE_NOMBRE: 'Donante', PERSONA_NOMBRE: 'Persona',
+    PRODUCTO_NOMBRE: 'Producto', TIENDA_NOMBRE: 'Tienda', EVENTO_NOMBRE: 'Evento', TITULO: 'Evento', NOMBRE: 'Nombre',
+    FECHA_INI: 'Fecha inicio', FECHA_INICIO: 'Fecha inicio', FECHA_FIN: 'Fecha fin', SITUACION: 'Situación', ESTADO: 'Estado',
+    DESCRIPCION: 'Descripción', NUMERO: 'Número', IMPORTE: 'Importe', PRECIO: 'Precio', UNIDADES: 'Unidades',
+    TICKET_DONACION: 'Tipo / ticket / estado', JUSTIFICANTE: 'Justificante', RANGO: 'Rango', DONOR_REF: 'Donante'
+  };
+  if (map[n]) return map[n];
+  return k.replace(/_/g, ' ').replace(/\w/g, ch => ch.toUpperCase());
+}
+function isInternalSqlCodeColumn(key) {
+  const n = norm(key);
+  return n === 'ID' || /^__/.test(trim(key)) || /(^|_)ID$/.test(n) || /ID$/.test(n) || /REF$/.test(n);
+}
+function humanizeSqlRowForDisplay(row, lookups = {}, selectIndex = '') {
+  const out = {};
+  if (selectIndex) out.Consulta = `SELECT #${selectIndex}`;
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return out;
+  Object.entries(row).forEach(([key, value]) => {
+    const n = norm(key);
+    if (/^__/.test(key)) return;
+    if (n === 'DONOR_REF') {
+      const name = humanNameFromSqlRef(value, lookups);
+      if (name) out.Donante = name;
+      return;
+    }
+    if (isInternalSqlCodeColumn(key)) return;
+    let val = value;
+    if (typeof val === 'string') {
+      const resolved = humanNameFromSqlRef(val, lookups);
+      val = resolved || normalizeSqlIdCode(val);
+      // No sacar códigos internos largos si no se han podido resolver.
+      if (/^(?:P|T)\s*:\s*id[-A-Za-z0-9]+$/i.test(val) || /^id[-A-Za-z0-9]{8,}$/i.test(val)) return;
+    }
+    const label = humanSqlColumnName(key);
+    if (out[label] === undefined) out[label] = val;
+    else out[`${label} (${key})`] = val;
+  });
+  return out;
+}
+function humanizeExecutedSqlRows(executed = []) {
+  const lookups = collectSqlHumanLookups(executed);
+  arr(executed).forEach(item => {
+    const displayRows = arr(item.rows).map(row => humanizeSqlRowForDisplay(row, lookups, item.indice)).filter(row => Object.keys(row).length);
+    item.rows = displayRows;
+    item.humanized = true;
+  });
+  return executed;
+}
+function rowsToTableRows(rows, max = 100) {
+  const list = arr(rows).slice(0, max);
+  const cols = [];
+  list.forEach(row => {
+    if (row && typeof row === 'object' && !Array.isArray(row)) Object.keys(row).forEach(k => { if (!cols.includes(k)) cols.push(k); });
+  });
+  return { columns: cols.slice(0, 24), rows: list.map(row => cols.slice(0, 24).map(c => text(row?.[c]))) };
+}
+async function executeZuzuSqlSelects(context, flowTrace = []) {
+  const selects = arr(context?.planZuzu?.selectsPropuestos).map(trim).filter(Boolean);
+  if (!selects.length) return context;
+  const executed = [];
+  let client = null;
+  try { client = getSupabaseAdmin(); }
+  catch (error) {
+    zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'KO', `No se puede ejecutar SELECT porque falta conexión Supabase admin: ${trim(error?.message || error)}`);
+    context.sqlSelectsEjecutados = { ok: false, error: trim(error?.message || error), selects };
+    return context;
+  }
+  zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'RUN', `Ejecutando ${selects.length} SELECT(s) propuesto(s) por Zuzu mediante RPC ce_zuzu_select. Solo lectura.`);
+  for (let i = 0; i < selects.length; i += 1) {
+    const sql = selects[i];
+    try {
+      const { data, error } = await client.rpc('ce_zuzu_select', { p_sql: sql, p_max_rows: 300 });
+      if (error) throw error;
+      const payload = data && typeof data === 'object' ? data : { ok: true, rows: data };
+      const rows = arr(payload.rows || payload.data || payload.resultados);
+      executed.push({ indice: i + 1, ok: payload.ok !== false, sql, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, error: trim(payload.error || '') });
+      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', payload.ok === false ? 'KO' : 'OK', `SELECT #${i + 1}: ${payload.ok === false ? trim(payload.error || 'KO') : `${rows.length} fila(s) devuelta(s)`}.`);
+    } catch (error) {
+      executed.push({ indice: i + 1, ok: false, sql, rows: [], rowCount: 0, error: trim(error?.message || error) });
+      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'KO', `SELECT #${i + 1} no ejecutado: ${trim(error?.message || error)}`);
+    }
+  }
+  humanizeExecutedSqlRows(executed);
+  context.sqlSelectsEjecutados = { ok: executed.some(x => x.ok), executed };
+  const flat = [];
+  executed.forEach(item => arr(item.rows).slice(0, 300).forEach((row, idx) => flat.push({ Consulta: `SELECT #${item.indice}`, Fila: idx + 1, ...row })));
+  if (flat.length) {
+    context.modulosExtraidos = { ...(context.modulosExtraidos || {}), SELECTS_SQL_ZUZU: flat };
+    context.totalesRegistrosPorModulo = { ...(context.totalesRegistrosPorModulo || {}), SELECTS_SQL_ZUZU: flat.length };
+  }
+  context.planZuzu = { ...(context.planZuzu || {}), modoExtraccion: 'EJECUCION_REAL_SELECTS_PROPUESTOS_ZUZU', selectsEjecutados: executed.map(x => ({ indice: x.indice, ok: x.ok, filas: x.rowCount, error: x.error || '', sql: x.sql })) };
+  context.instruccionesFuncionalesZuzu = arr(context.instruccionesFuncionalesZuzu).concat({ id: 'V22-SQL-REAL', regla: 'En v22_prod experimental, si hay SELECTS_PROPUESTOS válidos se han ejecutado literalmente como SELECT de solo lectura mediante ce_zuzu_select. Prioriza modulosExtraidos.SELECTS_SQL_ZUZU y planZuzu.selectsEjecutados para responder.' });
+  return context;
+}
+function directSqlSelectResultIfApplicable(prompt, context) {
+  const executed = arr(context?.sqlSelectsEjecutados?.executed).filter(x => x && x.ok);
+  if (!executed.length) return null;
+  const tables = [];
+  const files = [];
+  executed.forEach(item => {
+    const { columns, rows } = rowsToTableRows(item.rows, 300);
+    if (columns.length) {
+      tables.push({ title: `Resultado SELECT Zuzu #${item.indice} (${item.rowCount} fila(s))`, columns, rows });
+      files.push({ filename: fileSafe(`ZUZU_SELECT_${item.indice}_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, arr(item.rows).map(r => Object.fromEntries(columns.map(c => [c, r?.[c]])))) });
+    } else {
+      tables.push({ title: `Resultado SELECT Zuzu #${item.indice}`, columns: ['SQL','Filas','Estado'], rows: [[item.sql, String(item.rowCount || 0), 'Sin filas']] });
+    }
+  });
+  return {
+    ok: true,
+    rejected: false,
+    title: 'Resultado SQL SELECT de Zuzu',
+    answer: `ControlEvent ha ejecutado literalmente ${executed.length} SELECT(s) propuesto(s) por Zuzu, tras validar que eran de solo lectura. Los datos mostrados abajo son el resultado directo de esas consultas, presentado con nombres humanos y sin códigos internos de personas/eventos/productos siempre que hay una equivalencia disponible.`,
+    warnings: arr(context?.advertencias).concat('Versión experimental v22_prod: SELECTs ejecutados literalmente mediante RPC ce_zuzu_select. Si la RPC no está instalada, no habrá resultados SQL reales.'),
+    charts: [],
+    tables,
+    files,
+    provider: 'control-event-zuzu-select-sql-real',
+    model: 'supabase-rpc-ce_zuzu_select'
+  };
+}
+function plannerModulesFromSelects(selects) {
+  const map = {
+    EVENTO: 'EVENTOS', EVENTOS: 'EVENTOS', CE_EVENTOS: 'EVENTOS',
+    INGRESO: 'INGRESOS', INGRESOS: 'INGRESOS', COLABORADOR: 'INGRESOS', COLABORADORES: 'INGRESOS', CE_COLABORADORES: 'INGRESOS', CE_INGRESOS: 'INGRESOS',
+    COMPRA: 'COMPRAS', COMPRAS: 'COMPRAS', GASTO: 'COMPRAS', GASTOS: 'COMPRAS', CE_COMPRAS: 'COMPRAS',
+    DONACION: 'DONACIONES', DONACIONES: 'DONACIONES', CE_DONACIONES: 'DONACIONES',
+    PERSONA: 'PERSONAS', PERSONAS: 'PERSONAS', CE_PERSONAS: 'PERSONAS',
+    PRODUCTO: 'PRODUCTOS', PRODUCTOS: 'PRODUCTOS', CE_PRODUCTOS: 'PRODUCTOS',
+    TIENDA: 'TIENDAS', TIENDAS: 'TIENDAS', CE_TIENDAS: 'TIENDAS',
+    DOCUMENTO: 'DOCUMENTOS', DOCUMENTOS: 'DOCUMENTOS', CE_DOCUMENTOS: 'DOCUMENTOS',
+    TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS'
+  };
+  const mods = [];
+  arr(selects).forEach(sql => {
+    const s = text(sql).toUpperCase();
+    const m = s.match(/\bFROM\s+([\s\S]*?)(?:\bWHERE\b|\bGROUP\s+BY\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i);
+    const from = m ? m[1] : '';
+    const parts = from.split(/\bJOIN\b|,/i).map(x => trim(x).split(/\s+/)[0].replace(/[^A-Z0-9_\.]/gi, '').split('.').pop().toUpperCase()).filter(Boolean);
+    parts.forEach(t => { const mod = map[t]; if (mod && !mods.includes(mod)) mods.push(mod); });
+  });
+  return plannerUnique(mods);
+}
+function parsePlannerText(raw, catalog, userPrompt, localModules = []) {
+  const catalogEvents = arr(catalog?.eventos || catalog?.events);
+  const activeEvent = catalog?.eventoActivo || catalog?.activeEvent || null;
+  const exactEvents = exactEventTitlesFromPrompt(userPrompt, catalogEvents);
+  const aiEvents = eventsFromPlannerText(raw, catalogEvents, activeEvent);
+  const chosenEvents = aiEvents.length ? aiEvents : exactEvents;
+  const sp = plannerSelectsFromText(raw);
+  const selectModules = plannerModulesFromSelects(sp.selects);
+  const rawModules = modulesFromPlannerText(raw);
+  const modules = ensurePlannerDependencies(rawModules.length ? plannerUnique([].concat(rawModules, selectModules)) : (selectModules.length ? selectModules : inferPlannerModulesFromPrompt(userPrompt, localModules)), userPrompt);
+  const consultaGlobal = strictScopeRequested(userPrompt) || chosenEvents.length ? false : plannerGlobalFlag(raw, userPrompt);
+  const motivo = plannerSection(raw, ['MOTIVO', 'RAZONAMIENTO']) || 'Plan generado por Zuzu planificador en texto simple y validado por ControlEvent.';
+  const pf = plannerFiltersFromText(raw);
+  return {
+    ok: true,
+    needsClarification: !modules.length || (!consultaGlobal && !chosenEvents.length && /\b(evento|eventos|sysa|comparativa|meteo|tiempo|clima)\b/i.test(userPrompt) && !/evento\s+en\s+pantalla|evento\s+activo|este\s+evento/i.test(userPrompt)),
+    clarification: '',
+    modules,
+    eventos: chosenEvents.map(e => e.titulo),
+    eventIds: chosenEvents.map(e => e.id),
+    todosLosEventos: consultaGlobal === true,
+    filters: pf.filters,
+    dataRequests: pf.conditions ? [{ tipo: 'condiciones_acceso', texto: pf.conditions }] : [],
+    queryTemplates: queryTemplatesForPlan(modules, userPrompt),
+    salidaDeseada: [],
+    reasoning: `${motivo}${pf.conditions ? ` Condiciones propuestas por Zuzu: ${pf.conditions}` : ''}${sp.selects.length ? ` SELECTs propuestos por Zuzu validados por CE: ${sp.selects.length}.` : ''}`,
+    selectsPropuestos: sp.selects,
+    selectsRechazados: sp.rejected,
+    __sqlSelectExperiment: sp.selects.length > 0,
+    __strictEventScope: strictScopeRequested(userPrompt) || chosenEvents.length > 0,
+    __queryTemplatePlan: true,
+    __rawPlannerText: trim(raw).slice(0, 2000)
+  };
+}
+
+function plannerPrompt(userPrompt, catalog) {
+  const selected = catalog?.eventoActivo || null;
+  const activeLine = selected?.id ? `${trim(selected.titulo)} | id=${trim(selected.id)} | ${trim(selected.fechaInicio)} a ${trim(selected.fechaFin)} | ${trim(selected.situacion)}` : 'SIN EVENTO ACTIVO';
+  const eventList = arr(catalog?.eventos)
+    .map(e => `${trim(e.titulo)} | ${trim(e.fechaInicio)}-${trim(e.fechaFin)} | ${trim(e.situacion)}`)
+    .join('\n');
+  return `Eres Zuzu planificador de ControlEvent. NO respondas al usuario final.
+Decide SOLO qué módulos y condiciones de acceso necesita ControlEvent para extraer datos.
+ControlEvent hará la extracción y luego tú redactarás con esos datos.
+
+FECHA_ACTUAL: ${todayIsoMadrid()}
+EVENTO_EN_PANTALLA: ${activeLine}
+
+MODULOS_A_ELEGIR:
+- EVENTOS: título, fechas, estado, precio, descripción.
+- INGRESOS: colaboradores, importes obligatorios/voluntarios, estado de ingreso BANCO/EFECTIVO/BIZUM/PENDIENTE, socios/no socios, justificantes.
+- COMPRAS: compras realizadas, pendientes, gastos, tiendas, responsables, tickets.
+- DONACIONES: donaciones de producto, donante literal registrado, responsable, valoración.
+- PERSONAS: maestro de personas/rango; útil para socios/no socios y cruces.
+- PRODUCTOS: catálogo maestro de productos; útil para nombres, segmento/destino y equivalencias.
+- METEO: previsión/tiempo por fechas del evento.
+- DOCUMENTOS: documentos DOC del evento.
+- TICKETS: justificantes/tickets de compra.
+
+EVENTOS_DISPONIBLES:
+${eventList}
+
+${plannerDatabaseSchemaText()}
+
+Devuelve SOLO estas líneas, sin explicación adicional:
+EVENTOS_SOLICITADOS: EVENTO_ACTIVO, TODOS, NINGUNO o títulos exactos separados por coma
+ALCANCE_EVENTOS: EVENTO_ACTIVO | EVENTOS_EXACTOS | GLOBAL | SIN_EVENTO
+MODULOS_NECESARIOS: módulos separados por coma
+MODULOS_NO_NECESARIOS: módulos separados por coma
+PERSONAS_IMPLICADAS: nombres si la pregunta nombra personas; si no, NINGUNA
+CONDICIONES_DATOS: filtros concretos de acceso a datos; por ejemplo estado ingreso, rango, donante, responsable, compras pendientes/realizadas; si no, NINGUNA
+CONSULTA_GLOBAL: SI o NO
+SELECTS_PROPUESTOS: si la pregunta requiere datos, devuelve uno o varios SELECT reales usando las tablas/campos indicados; si no hace falta, NINGUNO
+MOTIVO: una frase breve
+
+Reglas:
+- Si el usuario dice evento en pantalla, este evento o evento activo, usa EVENTO_ACTIVO.
+- Para “quién ha pagado / falta por pagar” usa normalmente INGRESOS y PERSONAS. No uses DONACIONES ni COMPRAS salvo que pregunte por donaciones o gastos.
+- Para “todos los datos del evento” usa módulos del evento que aportan datos reales: EVENTOS, INGRESOS, COMPRAS, DONACIONES y PERSONAS; añade DOCUMENTOS/TICKETS solo si son relevantes.
+- Para donaciones usa DONACIONES y, si hay que identificar socios/personas, PERSONAS. El donante debe salir literal del registro, no deducido.
+- Para producto disponible usa COMPRAS, DONACIONES, PRODUCTOS y EVENTOS.
+- No inventes datos, eventos ni repartos. Solo decide módulos/filtros.
+- La parte inteligente de deducir SELECT la haces tú: usa el esquema real y las condiciones del prompt para proponer SELECT exactos cuando sea posible.
+
+PREGUNTA_USUARIO:
+${trim(userPrompt).slice(0, 1800)}`;
+}
+
+function mergePlannerFilters(...items) {
+  const out = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
+  for (const src of items) {
+    const f = src && typeof src === 'object' ? src : {};
+    Object.keys(out).forEach(k => { arr(f[k]).forEach(v => { const s = trim(v); if (s && !out[k].includes(s)) out[k].push(s); }); });
+    if (trim(f.fechaDesde)) out.fechaDesde = trim(f.fechaDesde);
+    if (trim(f.fechaHasta)) out.fechaHasta = trim(f.fechaHasta);
+  }
+  return out;
+}
+async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModules = []) {
+  const apiKey = geminiKey();
+  if (!apiKey) { zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'KO', 'Sin GEMINI_API_KEY para Zuzu planificador.'); throw new Error('Sin GEMINI_API_KEY para Zuzu planificador.'); }
+  let lastError = null;
+  const plannerText = plannerPrompt(userPrompt, catalog);
+  for (const model of configuredGeminiModelsForTask('zuzu-planner')) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: plannerText }] }],
+      generationConfig: { temperature: 0.0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_TOKENS || 1024), thinkingConfig: { thinkingBudget: 0 } }
+    };
+    try {
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Petición texto simple: eventos, módulos, alcance y motivo; sin datos operativos.`);
+      sizeTrace(flowTrace, 'Paso 1 · Zuzu planificador', 'Contexto ultraligero enviado al planificador', plannerText);
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 22000));
+      logGeminiUsage('PASO 1 planificación de datos', model, payload);
+      if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+      const outText = trim(geminiOutText(payload));
+      if (!outText) throw new Error('Planificador no devolvió texto.');
+      const finish = trim(payload?.candidates?.[0]?.finishReason || '');
+      const parsed = parsePlannerText(outText, catalog, userPrompt, localModules);
+      if (/MAX_TOKENS/i.test(finish) && !arr(parsed.modules).length) throw new Error(`Respuesta de Zuzu planificador truncada por límite de tokens. Recibido: ${outText.slice(0, 240)}`);
+      if (!arr(parsed.modules).length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${outText.slice(0, 500)}`);
+      if (/MAX_TOKENS/i.test(finish)) parsed.plannerWarning = `Zuzu planificador acabó por MAX_TOKENS, pero ControlEvent pudo leer módulos/filtros. Respuesta parcial: ${outText.slice(0, 240)}`;
+      parsed.__zuzuPlannerModel = model;
+      parsed.__zuzuPlannerUsage = usageSmall(payload, model);
+      parsed.__rawPlannerText = outText.slice(0, 2000);
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'OK', `Respuesta: ${outText.slice(0, 900)}`, { model, usage: usageSmall(payload, model) });
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador validado', 'OK', `Módulos=${arr(parsed.modules).join(', ')}; eventos=${arr(parsed.eventos).join(' | ') || 'sin evento explícito'}; consulta_global=${parsed.todosLosEventos ? 'SI' : 'NO'}; filtros=${JSON.stringify(parsed.filters || {})}; plantillas=${arr(parsed.queryTemplates).join(', ') || 'sin plantillas'}; SELECTs válidos=${arr(parsed.selectsPropuestos).length}; SELECTs rechazados=${arr(parsed.selectsRechazados).length}`);
+      if (parsed.plannerWarning) zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'INFO', parsed.plannerWarning);
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'KO', cleanGeminiError(error), { model });
+      if (isQuotaError(error) || !isRetryable(error)) break;
+    }
+  }
+  throw lastError || new Error('Planificador Zuzu no disponible.');
+}
+function shouldUseGeminiPlanner(userPrompt, local) {
+  // FIX29: la inteligencia de selección de módulos/condiciones la pone Zuzu.
+  // ControlEvent solo actúa como barandilla si Zuzu no responde o si hay que evitar mezclar eventos.
+  return true;
+}
+
+async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = []) {
+  const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
+  const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
+  const exactEvents = exactEventTitlesFromPrompt(userPrompt, arr(catalog?.eventos));
+  const strictRequested = strictScopeRequested(userPrompt) || exactEvents.length > 0;
+
+  if (!shouldUseGeminiPlanner(userPrompt, local)) {
+    return {
+      ...local,
+      reasoning: `${local.reasoning || 'Plan local de respaldo.'} Consulta simple de persona/identidad; no se invoca planificador externo.`,
+      __zuzuPlannerProvider: 'local-consulta-simple',
+      __zuzuGeminiAllRows: false
+    };
+  }
+
+  // FIX27: si ControlEvent ya resuelve eventos exactos del prompt, no se llama a Zuzu planificador.
+  // Evita el KO repetido por respuesta truncada del planificador y ahorra tiempo/tokens.
+  if (false && exactEvents.length && strictRequested) {
+    let modules = ensurePlannerDependencies(inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
+    if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
+    if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
+    const chosenTitles = exactEvents.map(e => e.titulo);
+    const chosenIds = exactEvents.map(e => e.id);
+    const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
+    zuzuTracePush(flowTrace, 'Paso 1 · Planificador CE', 'OK', `Eventos exactos detectados en el prompt; no se invoca Zuzu planificador. Plantillas cerradas sobre: ${chosenTitles.join(' | ')}. Módulos=${modules.join(', ')}.`);
+    return {
+      ok: true,
+      needsClarification: false,
+      clarification: '',
+      modules,
+      eventos: chosenTitles,
+      eventIds: chosenIds,
+      todosLosEventos: false,
+      filters: {},
+      dataRequests: [],
+      salidaDeseada: [],
+      queryTemplates,
+      reasoning: 'ControlEvent resolvió eventos exactos del prompt y ejecuta plantillas cerradas; Zuzu planificador no es necesario.',
+      __strictEventScope: true,
+      __queryTemplatePlan: true,
+      __zuzuPlannerProvider: 'control-event-plantillas-cerradas-eventos-exactos-sin-planificador',
+      __zuzuPlannerModel: '',
+      __zuzuPlannerUsage: null,
+      __zuzuGeminiAllRows: false,
+      plannerWarning: ''
+    };
+  }
+
+  let ai = null;
+  let plannerError = null;
+  try {
+    ai = await callGeminiPlanner(userPrompt, catalog, flowTrace, local.modules);
+  } catch (error) {
+    plannerError = error;
+  }
+
+  // ControlEvent no decide el informe: solo aplica una barandilla genérica de seguridad.
+  // Si el usuario ha dado eventos exactos y Zuzu falla, CE puede construir un plan de plantillas cerradas
+  // con esos eventos para no caer en 20 eventos ni inventar datos.
+  const aiEventIds = arr(ai?.eventIds).map(trim).filter(Boolean);
+  const aiEventTitles = arr(ai?.eventos).map(trim).filter(Boolean);
+  const localEventIds = arr(local.eventos).map(trim).filter(Boolean);
+  const chosenIds = aiEventIds.length ? aiEventIds : (exactEvents.length ? exactEvents.map(e => e.id) : localEventIds);
+  const chosenTitles = aiEventTitles.length ? aiEventTitles : (exactEvents.length ? exactEvents.map(e => e.titulo) : []);
+  let modules = ensurePlannerDependencies(arr(ai?.modules).length ? arr(ai.modules) : inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
+  // FIX25: aunque Zuzu o el detector local sugieran módulos accesorios, no se extraen TICKETS/DOCUMENTOS
+  // salvo petición explícita. Evita anexos gigantes y datos que no venían a cuento en comparativas.
+  if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
+  if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
+  const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
+
+  if (!ai && !chosenIds.length && strictRequested) {
+    return {
+      ok: false,
+      needsClarification: true,
+      clarification: `Zuzu planificador no ha completado el plan y ControlEvent no ha podido resolver los eventos exactos. No extraigo datos para evitar un informe falso. Motivo: ${cleanGeminiError(plannerError)}`,
+      modules: [], eventos: [], eventIds: [], todosLosEventos: false, filters: {},
+      reasoning: 'Corte seguro por falta de plan y de eventos exactos.',
+      __zuzuPlannerProvider: 'corte-seguro-sin-plan', __zuzuGeminiAllRows: false
+    };
+  }
+
+  if (!ai && chosenIds.length) {
+    zuzuTracePush(flowTrace, 'Paso 1b · Barandilla CE', 'OK', `Zuzu planificador no completó el plan (${cleanGeminiError(plannerError)}). Como el prompt contiene eventos exactos, CE usa plantillas cerradas sobre esos eventos: ${chosenTitles.join(' | ')}.`);
+  }
+
+  if (!chosenIds.length && !strictRequested && ai?.todosLosEventos === true) {
+    // Consulta verdaderamente global permitida por Zuzu.
+  } else if (!chosenIds.length && !arr(local.eventos).length && arr(modules).some(m => ['INGRESOS','COMPRAS','DONACIONES'].includes(m))) {
+    return {
+      ok: false, needsClarification: true,
+      clarification: 'Zuzu ha pedido módulos de evento, pero no se ha podido resolver ningún evento objetivo. No extraigo datos para evitar mezclar eventos.',
+      modules: [], eventos: [], eventIds: [], todosLosEventos: false, filters: {},
+      reasoning: 'Corte seguro por falta de evento objetivo.',
+      __zuzuPlannerProvider: 'corte-seguro-sin-evento', __zuzuGeminiAllRows: false
+    };
+  }
+
+  return {
+    ok: true,
+    needsClarification: false,
+    clarification: '',
+    modules,
+    eventos: chosenTitles.length ? chosenTitles : arr(ai?.eventos || local.eventos),
+    eventIds: chosenIds,
+    todosLosEventos: strictRequested || chosenIds.length ? false : (ai?.todosLosEventos === true || local.todosLosEventos === true),
+    filters: mergePlannerFilters(local.filters || {}, ai?.filters || {}),
+    dataRequests: arr(ai?.dataRequests),
+    salidaDeseada: arr(ai?.salidaDeseada),
+    queryTemplates,
+    selectsPropuestos: arr(ai?.selectsPropuestos),
+    selectsRechazados: arr(ai?.selectsRechazados),
+    __sqlSelectExperiment: arr(ai?.selectsPropuestos).length > 0,
+    reasoning: trim(ai?.reasoning || '') || (ai ? 'Zuzu ha deducido módulos, filtros y SELECTs orientativos en texto simple; ControlEvent valida SELECTs y los usa como plan de extracción de solo lectura.' : 'Plan de plantillas cerradas construido con eventos exactos del prompt y reglas genéricas de dependencias.'),
+    __strictEventScope: strictRequested || chosenIds.length > 0,
+    __queryTemplatePlan: true,
+    __zuzuPlannerProvider: ai ? 'zuzu-planner-texto-simple' : 'control-event-plantillas-cerradas-por-eventos-exactos',
+    __zuzuPlannerModel: ai?.__zuzuPlannerModel || '',
+    __zuzuPlannerUsage: ai?.__zuzuPlannerUsage || null,
+    __zuzuGeminiAllRows: false,
+    plannerWarning: plannerError ? cleanGeminiError(plannerError) : ''
+  };
+}
+
+
+function tableColIndex(cols, re) {
+  return arr(cols).findIndex(c => re.test(norm(c)));
+}
+function sortKeyValue(v) {
+  const raw = trim(v);
+  const n = Number(raw.replace(',', '.').replace(/[^0-9.-]/g, ''));
+  if (raw && Number.isFinite(n) && /^-?\d+(?:[,.]\d+)?\s*(?:€|uds?|reg\.?|)?$/i.test(raw)) return { n, s: '' };
+  return { n: null, s: norm(raw) };
+}
+function compareCell(a, b) {
+  const va = sortKeyValue(a), vb = sortKeyValue(b);
+  if (va.n !== null || vb.n !== null) return (va.n ?? 0) - (vb.n ?? 0);
+  return va.s.localeCompare(vb.s, 'es', { numeric: true, sensitivity: 'base' });
+}
+function sortRowsByColumns(rows, cols, order) {
+  const idxs = order.map(re => tableColIndex(cols, re)).filter(i => i >= 0);
+  if (!idxs.length) return rows;
+  return arr(rows).slice().sort((a,b) => {
+    for (const i of idxs) {
+      const c = compareCell(arr(a)[i], arr(b)[i]);
+      if (c) return c;
+    }
+    return 0;
+  });
+}
+function sortOneTable(tb) {
+  const cols = arr(tb?.columns).map(c => trim(c));
+  const title = norm(tb?.title || '');
+  if (!cols.length || !arr(tb?.rows).length) return tb;
+  let order = [];
+  if (/donaciones|donados|donantes/.test(title) || cols.some(c => /donante/i.test(c))) {
+    order = [/^evento$/i, /donante/i, /tipo.*donaci/i, /producto/i, /responsable/i, /tienda/i, /ticket|tk/i];
+  } else if (/compras|gastos|tickets|fototickets/.test(title) || cols.some(c => /tienda/i.test(c))) {
+    order = [/^evento$/i, /tienda/i, /ticket|tk/i, /producto/i, /responsable/i, /importe|valor|total/i];
+  } else if (/participaci|papel|registros localizados|apariciones/.test(title) || cols.some(c => /papel/i.test(c))) {
+    order = [/^evento$/i, /papel/i, /relacionado|nombre|persona|donante/i, /producto/i, /tienda/i];
+  } else if (/ingresos|colaboradores|personas/.test(title) || cols.some(c => /nombre/i.test(c))) {
+    order = [/^evento$/i, /rango/i, /nombre|persona/i, /ingreso|forma/i];
+  } else if (/producto|ranking|catalogo|catálogo/.test(title)) {
+    order = [/^evento$/i, /producto|nombre producto/i, /segmento/i, /destino/i];
+  } else if (/cronica|crónica|resumen|comparativa|saldo/.test(title)) {
+    order = [/fecha ini|fecha inicio|fecha|fecha celebración|evento/i, /^evento$/i];
+  } else {
+    order = [/^evento$/i, /tienda/i, /donante/i, /producto/i, /nombre/i];
+  }
+  return { ...tb, rows: sortRowsByColumns(tb.rows, cols, order) };
+}
+function sortResultTables(result) {
+  if (!result || !Array.isArray(result.tables)) return result;
+  return { ...result, tables: result.tables.map(sortOneTable) };
+}
+function scopeMetaFromContext(context) {
+  const evs = arr(context?.eventosObjetivo);
+  const strictMode = /ALCANCE_ESTRICTO|PLANTILLAS_CERRADAS/i.test(trim(context?.planZuzu?.modoExtraccion || ''));
+  if (evs.length === 1) {
+    const e = evs[0] || {};
+    const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
+    const estado = trim(e.Estado || e.situacion || '');
+    return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
+  }
+  if (evs.length > 1) {
+    return { eventHeader: `${strictMode ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: strictMode ? 'multi-event-restricted' : 'multi-event', eventCount: evs.length };
+  }
+  return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
+}
+function dominantSubjectFromPrompt(prompt, result) {
+  const q = [...text(prompt).matchAll(/["“”'‘’]([^"“”'‘’]{2,80})["“”'‘’]/g)].map(m => trim(m[1])).filter(Boolean);
+  const p = norm(prompt);
+  if (/participaci|opini|papel|aparece|colabor/.test(p) && q[0]) return `Informe_opinion_${q[0]}`;
+  if (/donaci/.test(p) && q[0]) return `Donaciones_${q[0]}`;
+  if (/compar/.test(p)) return 'Comparativa_eventos';
+  if (/cronica|crónica|todos los eventos|cada evento/.test(p)) return 'Cronica_eventos';
+  return trim(result?.title || q[0] || prompt).slice(0, 80);
+}
+
+function wantsWeatherInfo(prompt) {
+  return /\b(tiempo|meteorolog|meteorología|metereolog|metereología|meteo|parte\s+meteorolog|parte\s+metereolog|clima|lluvia|llover|temperatura|calor|fr[ií]o|viento|previsi[oó]n|pron[oó]stico|forecast)\b/i.test(text(prompt));
+}
+function parseCeDateToIso(value) {
+  const s = trim(value);
+  if (!s) return '';
+  const m1 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m1) return `${m1[1]}-${String(m1[2]).padStart(2,'0')}-${String(m1[3]).padStart(2,'0')}`;
+  const m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m2) {
+    const y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
+    return `${y}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
+  }
+  return '';
+}
+function addDaysIso(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (!Number.isFinite(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function daysBetweenIso(a, b) {
+  const da = new Date(`${a}T00:00:00Z`), db = new Date(`${b}T00:00:00Z`);
+  if (!Number.isFinite(da.getTime()) || !Number.isFinite(db.getTime())) return 0;
+  return Math.round((db - da) / 86400000);
+}
+function weatherCodeText(code) {
+  const c = Number(code);
+  if ([0].includes(c)) return 'Despejado';
+  if ([1,2].includes(c)) return 'Poco nuboso';
+  if ([3].includes(c)) return 'Cubierto';
+  if ([45,48].includes(c)) return 'Niebla';
+  if ([51,53,55,56,57].includes(c)) return 'Llovizna';
+  if ([61,63,65,66,67,80,81,82].includes(c)) return 'Lluvia';
+  if ([71,73,75,77,85,86].includes(c)) return 'Nieve';
+  if ([95,96,99].includes(c)) return 'Tormenta';
+  return `Código ${trim(code)}`;
+}
+async function maybeFetchWeatherContext(userPrompt, context, flowTrace = [], force = false) {
+  if (!force && !wantsWeatherInfo(userPrompt)) return null;
+  const evs = arr(context?.eventosObjetivo);
+  if (!evs.length) {
+    zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'El usuario pide tiempo/clima, pero no hay evento objetivo con fechas.');
+    return { ok:false, reason:'No hay evento objetivo con fechas para consultar meteorología.' };
+  }
+  const lat = Number(process.env.CONTROLEVENT_WEATHER_LAT || process.env.WEATHER_LAT || '39.743');
+  const lon = Number(process.env.CONTROLEVENT_WEATHER_LON || process.env.WEATHER_LON || '-3.657');
+  const place = trim(process.env.CONTROLEVENT_WEATHER_PLACE || process.env.WEATHER_PLACE || 'Villanueva de Bogas, Toledo');
+  const rows = [];
+  for (const ev of evs.slice(0, 4)) {
+    const title = trim(ev['Titulo del evento'] || ev.titulo || ev.Evento || 'Evento');
+    const start = parseCeDateToIso(ev['fecha ini'] || ev.fechaIni || ev.fecha || '');
+    const end0 = parseCeDateToIso(ev['fecha fin'] || ev.fechaFin || '') || start;
+    if (!start) { rows.push({ Evento:title, Aviso:'Evento sin fecha de inicio legible para meteorología.' }); continue; }
+    const end = daysBetweenIso(start, end0) > 9 ? addDaysIso(start, 9) : end0;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&timezone=Europe%2FMadrid&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+    try {
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'RUN', `Consultando Open-Meteo para ${title} (${start} a ${end}) en ${place}.`);
+      const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+      const payload = await res.json().catch(async () => ({ error: await res.text().catch(() => res.statusText) }));
+      if (!res.ok) throw new Error(payload?.reason || payload?.error || `Open-Meteo HTTP ${res.status}`);
+      const d = payload?.daily || {};
+      arr(d.time).forEach((dia, i) => rows.push({
+        Evento: title,
+        Localidad: place,
+        Fecha: dia,
+        Cielo: weatherCodeText(arr(d.weather_code)[i]),
+        'Temp. máx': round(arr(d.temperature_2m_max)[i], 1),
+        'Temp. mín': round(arr(d.temperature_2m_min)[i], 1),
+        'Prob. lluvia %': round(arr(d.precipitation_probability_max)[i], 0),
+        'Viento km/h': round(arr(d.wind_speed_10m_max)[i], 1),
+        Fuente: 'Open-Meteo'
+      }));
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'OK', `Open-Meteo devolvió ${arr(d.time).length} día(s) para ${title}.`);
+    } catch (error) {
+      rows.push({ Evento:title, Localidad:place, Fecha:start, Aviso:`No se pudo obtener previsión externa: ${cleanGeminiError(error)}` });
+      zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', cleanGeminiError(error));
+    }
+  }
+  return { ok: rows.some(r => !r.Aviso), proveedor: 'Open-Meteo', localidad: place, filas: rows };
+}
+function weatherTableAndCharts(weatherCtx) {
+  const rows = arr(weatherCtx?.filas);
+  if (!rows.length) return { tables: [], charts: [] };
+  const columns = ['Evento','Localidad','Fecha','Cielo','Temp. máx','Temp. mín','Prob. lluvia %','Viento km/h','Aviso'];
+  const tableRows = rows.map(r => columns.map(c => text(r[c])));
+  const okRows = rows.filter(r => !r.Aviso);
+  const titleKind = arr(rows).some(r => trim(r.Fecha) && trim(r.Fecha) < new Date().toISOString().slice(0,10)) ? 'Meteorología registrada' : 'Meteorología prevista';
+  const charts = [];
+  if (okRows.length) {
+    charts.push({
+      title: `${titleKind} · resumen meteorológico`,
+      type: 'weather',
+      unit: '',
+      weatherRows: okRows.map(r => ({
+        evento: trim(r.Evento), fecha: trim(r.Fecha), cielo: trim(r.Cielo),
+        tmax: num(r['Temp. máx']), tmin: num(r['Temp. mín']), lluvia: num(r['Prob. lluvia %']), viento: num(r['Viento km/h']), localidad: trim(r.Localidad)
+      }))
+    });
+    if (okRows.length > 1) {
+      charts.push({ title: 'Temperatura máxima y mínima por día', type: 'line', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Temp. máx'])), unit: 'ºC', series: [
+        { name: 'Máxima', values: okRows.map(r => num(r['Temp. máx'])) },
+        { name: 'Mínima', values: okRows.map(r => num(r['Temp. mín'])) }
+      ] });
+      charts.push({ title: 'Probabilidad de lluvia por día', type: 'bar', labels: okRows.map(r => `${r.Fecha}`), values: okRows.map(r => num(r['Prob. lluvia %'])), unit: '%' });
+    }
+  }
+  return { tables: [{ title: `${titleKind} · ${trim(weatherCtx?.localidad || '')}`, columns, rows: tableRows }], charts };
+}
+
+function attachWeatherVisualsIfNeeded(result, context, userPrompt) {
+  if (!wantsWeatherInfo(userPrompt)) return result;
+  const weatherCtx = context?.infoIndirecta?.meteorologia;
+  if (!weatherCtx || !arr(weatherCtx.filas).length) return result;
+  const wc = weatherTableAndCharts(weatherCtx);
+  const existingWeather = arr(result?.tables).some(t => /meteorolog|tiempo|clima|lluvia|temperatura/i.test(trim(t?.title || '')));
+  const existingChartTitles = new Set(arr(result?.charts).map(c => norm(c?.title || '')));
+  const extraCharts = arr(wc.charts).filter(c => !existingChartTitles.has(norm(c?.title || '')));
+  return {
+    ...result,
+    tables: existingWeather ? arr(result?.tables) : arr(result?.tables).concat(wc.tables),
+    charts: arr(result?.charts).concat(extraCharts)
+  };
+}
+
+function normalizeLoggedUserFix10(payload = {}) {
+  const raw = payload?.usuarioLogado || payload?.user || payload?.authUser || payload?.ce_acceso || payload?.ceAcceso || payload?.loggedUser || null;
+  if (!raw || typeof raw !== 'object') return null;
+  const identificacion = trim(raw.Identificacion ?? raw.identificacion ?? raw.IDENTIFICACION ?? raw.usuario ?? raw.user ?? '');
+  const nombre = trim(raw.Nombre ?? raw.nombre ?? raw.NOMBRE ?? raw.name ?? '');
+  const nivel = trim(raw.Nivel ?? raw.nivel ?? raw.NIVEL ?? '');
+  if (!identificacion && !nombre) return null;
+  return { identificacion, nombre, nivel, Identificacion: identificacion, Nombre: nombre, Nivel: nivel };
+}
+function attachLoggedUserFix10(state, payload = {}) {
+  const user = normalizeLoggedUserFix10(payload);
+  if (!user) return state;
+  return { ...(state || {}), usuarioLogado: user, ce_acceso_usuario_logado: { Identificacion: user.Identificacion, Nombre: user.Nombre, Nivel: user.Nivel } };
+}
+
+function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
+  const withWeather = attachWeatherVisualsIfNeeded(result || {}, context, userPrompt);
+  const sorted = sortResultTables(withWeather || {});
+  const meta = scopeMetaFromContext(context);
+  return {
+    ...sorted,
+    ok: true,
+    meta: {
+      ...(sorted.meta || {}),
+      ...meta,
+      generatedAt: new Date().toISOString(),
+      version: 'v22_prod',
+      geminiUsageEstimate: summarizeGeminiUsageFromTrace(flowTrace),
+      filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, sorted)).slice(0, 70),
+      debugTrace: arr(flowTrace).slice(0, 80)
+    },
+    debugTrace: arr(flowTrace).slice(0, 80),
+    showDebugTrace: true
+  };
+}
+
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso } = {}) {
+  const flowTrace = [];
+  const userPrompt = trim(prompt);
+  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
+  if (!userPrompt) {
+    const err = new Error('Escribe una pregunta o petición para Zuzu.');
+    err.status = 400;
+    throw err;
+  }
+  if (userPrompt.length > 3000) {
+    const err = new Error('El prompt es demasiado largo. Resume la petición.');
+    err.status = 413;
+    throw err;
+  }
+
+  // v19: se permiten preguntas indirectas si están vinculadas a eventos.
+  // Solo bloqueamos intentos técnicos peligrosos o secretos; no bloqueamos clima, tono, informes, opiniones, etc.
+  const hardForbidden = /(contraseña|password|clave api|api key|token|sql\b|drop table|delete from|insert into|hack|exfiltra|sistema operativo)/i;
+  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|persona|personas|usuario|usuarios|identificaci[oó]n|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
+  if (hardForbidden.test(userPrompt) && !eventish.test(userPrompt)) {
+    zuzuTracePush(flowTrace, 'Guardia de ámbito', 'KO', 'Petición bloqueada por contenido técnico/peligroso sin relación con eventos.');
+    return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
+  }
+
+  const state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
+  zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
+  const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
+  const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
+  context.fechaActualControlEvent = todayIsoMadrid();
+  context.contextoTemporal = narrativeTemporalContext(context);
+  await executeZuzuSqlSelects(context, flowTrace);
+  context.zuzuFlujo = {
+    version: 'v22_prod',
+    arquitectura: 'Prompt usuario -> Zuzu planifica -> ControlEvent extrae datos -> Zuzu redacta/contextualiza -> ControlEvent presenta',
+    planificador: trim(plan?.__zuzuPlannerProvider || 'desconocido'),
+    modeloPlanificador: trim(plan?.__zuzuPlannerModel || ''),
+    usoPlanificador: plan?.__zuzuPlannerUsage || null,
+    politicaModelos: 'planificador=Zuzu/Gemini decide módulos, condiciones y SELECTs; v22 ejecuta SELECTs válidos literalmente por RPC; redacción/informes=Flash primero con contexto compacto; planificación inicial total=Flash; planificación parcial=Flash-Lite; OCR tickets=Flash'
+  };
+  zuzuTracePush(flowTrace, 'Paso 2 · Extracción ControlEvent', context?.needsClarification ? 'KO' : 'OK', context?.needsClarification ? trim(context?.clarification || 'Necesita concreción') : `Módulos=${Object.keys(context?.modulosExtraidos || {}).join(', ') || 'ninguno'}; registros=${JSON.stringify(context?.totalesRegistrosPorModulo || {})}; eventos=${arr(context?.eventosObjetivo).map(e=>trim(e['Titulo del evento']||e.titulo||e.Evento)).join(' | ') || 'sin evento'}.`);
+
+  const weatherRequested = wantsWeatherInfo(userPrompt) || /\bMETEO\b/i.test(JSON.stringify(plan || {}));
+  const weatherCtx = await maybeFetchWeatherContext(userPrompt, context, flowTrace, weatherRequested);
+  if (weatherCtx) {
+    context.infoIndirecta = { ...(context.infoIndirecta || {}), meteorologia: weatherCtx };
+    if (!weatherCtx.ok) {
+      context.advertencias = arr(context.advertencias).concat('Se pidió meteorología, pero ControlEvent no obtuvo datos externos fiables; Zuzu no debe inventar previsión.');
+    }
+  } else if (weatherRequested) {
+    zuzuTracePush(flowTrace, 'Paso 2b · Datos indirectos meteorología', 'KO', 'Meteorología solicitada, pero no se pudo iniciar consulta externa.');
+    context.advertencias = arr(context.advertencias).concat('Se pidió meteorología, pero ControlEvent no pudo iniciar la consulta externa.');
+  }
+
+  const done = (result) => finalizeZuzuResult(result, context, userPrompt, flowTrace);
+  if (context?.needsClarification) {
+    return done({
+      ok: true,
+      rejected: true,
+      title: 'Zuzu necesita una petición más concreta',
+      answer: context.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.',
+      warnings: Array.isArray(context.warnings) ? context.warnings : [],
+      charts: [],
+      tables: [],
+      files: [],
+      provider: 'control-event-context-planner',
+      model: ''
+    });
+  }
+
+  const highConfidence = directSqlSelectResultIfApplicable(userPrompt, context) || directHighConfidenceResultIfApplicable(userPrompt, context);
+  if (highConfidence) {
+    zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE', 'OK', `CE ha cocinado datos con alta confianza (${highConfidence.provider || 'provider local'}). La salida NO se entrega directamente: pasa a Zuzu redacción humana.`);
+    const highConfidenceWithIndirect = attachWeatherVisualsIfNeeded(highConfidence, context, userPrompt);
+    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, highConfidenceWithIndirect, flowTrace));
+  }
+
+  try {
+    const geminiResult = await callGeminiEvent(userPrompt, context, flowTrace);
+    zuzuTracePush(flowTrace, 'Paso 5 · Presentación CE', 'OK', `Respuesta principal viene de ${geminiResult.provider || 'Zuzu'} / ${geminiResult.model || 'modelo no informado'}.`);
+    return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, geminiResult, flowTrace));
+  } catch (error) {
+    const friendly = friendlyZuzuErrorMessage(error);
+    zuzuTracePush(flowTrace, 'Paso 3 · Zuzu respuesta final estructurada', 'KO', cleanGeminiError(error));
+    const fallback = directCashEvolutionIfApplicable(userPrompt, context) || directPersonsCatalogIfApplicable(userPrompt, context) || directPersonRoleReportIfApplicable(userPrompt, context) || directChronologicalEventNarrativeIfApplicable(userPrompt, context) || directProductConsumptionResultIfApplicable(userPrompt, context) || directDeterministicResultIfApplicable(userPrompt, context) || directGraphResultIfApplicable(userPrompt, context);
+    if (fallback) {
+      fallback.warnings = arr(fallback.warnings).concat(`${friendly} CE ha cocinado datos de respaldo, pero intentará pasarlos a Zuzu como redacción final.`);
+      fallback.provider = `${fallback.provider || 'control-event'}-fallback`;
+      fallback.model = 'sin-gemini-estructurado-por-error';
+      zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE de respaldo', 'OK', `CE generó datos de respaldo (${fallback.provider}). Ahora se intenta Zuzu narrativa.`);
+      return done(await maybeEnrichLocalResultWithZuzu(userPrompt, context, fallback, flowTrace));
+    }
+    return done({
+      ok: true,
+      rejected: true,
+      title: 'Zuzu no disponible temporalmente',
+      answer: friendly,
+      warnings: [],
+      charts: [],
+      tables: [],
+      files: [],
+      provider: 'control-event-zuzu-error-sanitizado',
+      model: ''
+    });
+  }
+}
+
+// v22_prod - Planificación inicial asistida por Zuzu.
+function planAiSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      ok: { type: 'BOOLEAN' },
+      title: { type: 'STRING' },
+      notes: { type: 'ARRAY', items: { type: 'STRING' } },
+      menuResumen: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            dia: { type: 'STRING', description: 'dia_1, dia_2, dia_3...' },
+            momento: { type: 'STRING', description: 'aperitivo, comida, tardeo/cubatas, cena u otro momento del día' },
+            resumen: { type: 'STRING', description: 'Resumen claro de qué se va a servir o de qué va a componerse ese momento' }
+          },
+          required: ['dia','momento','resumen']
+        }
+      },
+      rows: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            productId: { type: 'STRING' },
+            producto: { type: 'STRING' },
+            tipo: { type: 'STRING', description: 'COMPRA o DONACION' },
+            unidades: { type: 'NUMBER' },
+            precio: { type: 'NUMBER' },
+            ticketDonacion: { type: 'STRING' },
+            tienda: { type: 'STRING' },
+            responsable: { type: 'STRING' },
+            donante: { type: 'STRING' },
+            include: { type: 'BOOLEAN' },
+            reason: { type: 'STRING' },
+            necesidadTotal: { type: 'NUMBER', description: 'Necesidad total calculada para el evento antes de restar donaciones/existencias' }
+          },
+          required: ['tipo','producto','unidades','precio','reason']
+        }
+      }
+    },
+    required: ['ok','title','notes','menuResumen','rows']
+  };
+}
+function planModeLabel(mode) {
+  const m = trim(mode).toUpperCase();
+  if (m === 'ZUZU_TOTAL') return 'Encargo total a Zuzu';
+  if (m === 'ZUZU_PARCIAL') return 'Encargo parcial a Zuzu';
+  return 'Replicar un evento Finalizado';
+}
+function planContentModules(content) {
+  const c = trim(content || 'TODO').toUpperCase();
+  if (c === 'INGRESOS') return ['INGRESOS'];
+  if (c === 'COMPRAS') return ['COMPRAS'];
+  if (c === 'DONACIONES') return ['DONACIONES'];
+  if (c === 'INGRESOS_COMPRAS') return ['INGRESOS','COMPRAS'];
+  if (c === 'INGRESOS_DONACIONES') return ['INGRESOS','DONACIONES'];
+  if (c === 'COMPRAS_DONACIONES') return ['COMPRAS','DONACIONES'];
+  if (c === 'INGRESOS_SOCIOS_OBLIGATORIOS') return ['INGRESOS_SOCIOS_OBLIGATORIOS'];
+  if (c === 'NINGUN_DATO') return [];
+  return ['INGRESOS','COMPRAS','DONACIONES'];
+}
+function normPlanKey(value) { return norm(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function planProductAliasKey(value) {
+  const n = normPlanKey(value || '');
+  if (!n) return '';
+  const has = (...parts) => parts.every(part => n.includes(normPlanKey(part)));
+  const hasTok = (tok) => new RegExp('(^|\\s)' + normPlanKey(tok) + '(\\s|$)').test(n);
+
+  if (has('COCA','COLA','ZERO') && (has('ZERO','ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias coca cola zero zero';
+  if (has('COCA','COLA','ZERO')) return 'alias coca cola zero';
+  if (has('COCA','COLA')) return 'alias coca cola normal';
+  if (has('FANTA','NARANJA')) return 'alias fanta naranja';
+  if (has('FANTA','LIMON')) return 'alias fanta limon';
+  if (hasTok('SPRITE')) return 'alias sprite';
+  if (has('CERVEZA','SKOL')) return 'alias cerveza skol';
+  if (has('TONICA','SCHWEPPES')) return 'alias tonica schweppes';
+  if ((hasTok('BITTER') || hasTok('BEETER')) && hasTok('KAS')) return 'alias bitter kas';
+
+  if (has('ron','barcelo')) return 'alias ron barcelo';
+  if (has('ron','brugal')) return 'alias ron brugal';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (hasTok('jb') || /j\s*b/.test(n) || has('5','anos') || has('5','años'))) return 'alias whisky jb';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && hasTok('dyc')) return 'alias whisky dyc';
+  if ((hasTok('wiski') || hasTok('whisky') || hasTok('whiski')) && (has('johnnie') || has('jonie') || has('jhony') || has('johny') || has('walker'))) return 'alias whisky walker';
+  if ((hasTok('ginebra') || hasTok('gin')) && has('puerto','indias')) return 'alias ginebra puerto indias';
+  if ((hasTok('ginebra') || hasTok('gin')) && hasTok('larios')) return 'alias ginebra larios';
+  if ((hasTok('ginebra') || hasTok('gin')) && (hasTok('beefeater') || hasTok('beefetaer'))) return 'alias ginebra beefeater';
+
+  if (has('aceite','aove') || hasTok('aove')) return 'alias aceite aove';
+  if (hasTok('vinagre')) return 'alias vinagre';
+  if (hasTok('agua') && (has('1l') || has('1','l') || hasTok('cristal'))) return 'alias agua 1l cristal';
+  if (hasTok('baicon') || hasTok('bacon')) return 'alias baicon';
+  if (has('chuleta','cerdo')) return 'alias chuleta cerdo';
+  if (hasTok('fairy')) return 'alias fairy';
+  if (has('papel','higienico')) return 'alias papel higienico';
+  if (has('rollo','secamanos') || has('papel','secamanos')) return 'alias rollo secamanos';
+  if (has('bolsas','basura') || has('bolsa','basura')) return 'alias bolsas basura grandes';
+  if (has('jabon','manos') || has('jabon','lavamanos')) return 'alias jabon manos';
+  if (hasTok('ambientador')) return 'alias ambientador';
+
+  if (has('cafe','descafeinado')) return 'alias cafe descafeinado gorritas';
+  if (has('cafe','normal')) return 'alias cafe normal gorritas';
+  if (has('vino','blanco')) return 'alias vino blanco';
+  if (has('vino','frizzante')) return 'alias vino frizzante';
+  if (has('vino','tinto','rioja')) return 'alias vino tinto rioja';
+  if (has('vino','tinto')) return 'alias vino tinto';
+  if (has('oreja','salsa')) return 'alias oreja en salsa';
+
+  return n;
+}
+function planBuildMaps(state) {
+  const events = arr(state?.eventos);
+  const people = byId(state?.personas);
+  const stores = byId(state?.tiendas);
+  const products = byId(state?.productos);
+  const productByName = new Map();
+  arr(state?.productos).forEach(p => {
+    const k = normPlanKey(p?.nombre); if(k && !productByName.has(k)) productByName.set(k, p);
+    const ak = planProductAliasKey(p?.nombre); if(ak && !productByName.has(ak)) productByName.set(ak, p);
+  });
+  const storeByName = new Map();
+  arr(state?.tiendas).forEach(t => { const k = normPlanKey(t?.nombre); if(k && !storeByName.has(k)) storeByName.set(k, t); });
+  const personByName = new Map();
+  arr(state?.personas).forEach(pe => { const k = normPlanKey(pe?.nombre); if(k && !personByName.has(k)) personByName.set(k, pe); });
+  return { events, people, stores, products, productByName, storeByName, personByName };
+}
+function planEventById(state, eventId) {
+  const id = trim(eventId);
+  return arr(state?.eventos).find(e => trim(e?.id) === id) || null;
+}
+function planEventTitle(ev) { return trim(ev?.titulo) || 'Evento sin título'; }
+function planIsDonation(row) { return /^DONADO\s+(TIENDA|SOCIO|OTROS)$/i.test(trim(row?.ticketDonacion || row?.ticket || '')); }
+function planTicket(row) { return trim(row?.ticketDonacion || row?.ticket || '') || 'Pte.Compra u otros gastos'; }
+function planLineValue(row) {
+  const explicit = num(row?.importe ?? row?.valor ?? row?.total ?? row?.importeTotal);
+  if (explicit > 0) return round(explicit, 2);
+  return round(num(row?.unidades) * num(row?.precio), 2);
+}
+function planProductName(row, maps) { return trim(maps.products.get(trim(row?.productoId || row?.producto_id))?.nombre || row?.producto || 'Producto sin nombre'); }
+function planProduct(row, maps) { return maps.products.get(trim(row?.productoId || row?.producto_id)) || null; }
+function planStoreName(id, maps) { return trim(maps.stores.get(trim(id))?.nombre || 'Sin tienda'); }
+function planPersonName(id, maps) { return trim(maps.people.get(trim(id))?.nombre || 'Sin responsable'); }
+function planDonorLabel(ref, maps) {
+  const raw = trim(ref);
+  if (!raw) return '';
+  const [kind, ...rest] = raw.split(':');
+  const id = rest.join(':');
+  if (/^P$/i.test(kind)) return trim(maps.people.get(id)?.nombre || raw);
+  if (/^T$/i.test(kind)) return trim(maps.stores.get(id)?.nombre || raw);
+  return raw;
+}
+function planDonorRefFromLabel(label, maps) {
+  const k = normPlanKey(label);
+  if (!k) return '';
+  const pe = maps.personByName.get(k);
+  if (pe?.id) return 'P:' + pe.id;
+  const st = maps.storeByName.get(k);
+  if (st?.id) return 'T:' + st.id;
+  return '';
+}
+
+function planImportantProductTokens(key) {
+  return String(key || '').split(' ').filter(t => /\d/.test(t) || /^(cl|ml|l|kg|gr|ud|uds|unidad|unidades|lata|latas|botellin|botellines|botella|botellas|pack|packs)$/.test(t));
+}
+function planFindProductLoose(label, maps) {
+  const rawLabel = trim(label || '');
+  const key = normPlanKey(rawLabel);
+  if (!key) return null;
+
+  function aliasText(value) {
+    return normPlanKey(value || '')
+      .replace(/\bWISKI\b/g, 'WHISKY')
+      .replace(/\bWHISKI\b/g, 'WHISKY')
+      .replace(/\bJOHNY\b/g, 'JHONY')
+      .replace(/\bJOHNNY\b/g, 'JHONY')
+      .replace(/\bJOHNNIE\b/g, 'JHONY')
+      .replace(/\bJONIE\b/g, 'JHONY')
+      .replace(/\bJ\s*B\b/g, 'JB')
+      .replace(/\bBEETER\b/g, 'BITTER')
+      .replace(/\bLAVAMANOS\b/g, 'MANOS')
+      .replace(/\bBTLLA\b/g, 'BOTELLA')
+      .replace(/\bBTELLA\b/g, 'BOTELLA')
+      .replace(/\bAÑEJO\b/g,'ANEJO')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function simplify(value) {
+    return aliasText(value || '')
+      .replace(/\b(?:BOLSA|PACK|PACKS|PAQUETE|PAQUETES|CAJA|PIEZA|UD|UDS|UNIDAD|UNIDADES|BOTELLA|BOTELLAS|LATA|LATAS|BOTE|BOTES|BARRIL|BARRILES|KG|GR|L|CL|ML|LITRO|LITROS|NORMAL|GRANDE|MEDIANA|PEQUENA|PEQUEÑA|ENTERO|MEZCLA)\b/g, ' ')
+      .replace(/\b\d+(?:[,.]\d+)?\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function aliasKey(value) {
+    const n = aliasText(value || '');
+    const s = simplify(value || '');
+    const has = (...parts) => parts.every(part => n.includes(aliasText(part)));
+    const hasS = (...parts) => parts.every(part => s.includes(aliasText(part)));
+    const tok = t => new RegExp('(^|\\s)' + aliasText(t) + '(\\s|$)').test(n);
+
+    if(has('COCA','COLA','ZERO') && (has('ZERO ZERO') || /ZERO\s+ZERO/.test(n))) return 'alias:coca-cola-zero-zero';
+    if(has('COCA','COLA','ZERO')) return 'alias:coca-cola-zero';
+    if(has('COCA','COLA')) return 'alias:coca-cola';
+    if(has('FANTA','NARANJA')) return 'alias:fanta-naranja';
+    if(has('FANTA','LIMON')) return 'alias:fanta-limon';
+    if(has('SPRITE')) return 'alias:sprite';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL') && (has('50') || /\b50\s*L?\b/.test(n))) return 'alias:cerveza-ambar-barril-50';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL') && (has('30') || /\b30\s*L?\b/.test(n))) return 'alias:cerveza-ambar-barril-30';
+    if(has('CERVEZA','AMBAR') && hasS('BARRIL')) return 'alias:cerveza-ambar-barril';
+    if(has('CERVEZA','SKOL')) return 'alias:cerveza-skol';
+    if(has('TONICA','SCHWEPPES')) return 'alias:tonica-schweppes';
+    if((has('BITTER') || has('BEETER')) && has('KAS')) return 'alias:bitter-kas';
+    if(has('RON','BARCELO')) return 'alias:ron-barcelo';
+    if(has('RON','BRUGAL')) return 'alias:ron-brugal';
+    if((hasS('WHISKY') || hasS('WISKI')) && (tok('JB') || has('J B') || has('5 ANOS') || has('5 AÑOS'))) return 'alias:whisky-jb';
+    if((hasS('WHISKY') || hasS('WISKI')) && hasS('DYC')) return 'alias:whisky-dyc';
+    if((hasS('WHISKY') || hasS('WISKI')) && (hasS('JHONY') || hasS('JOHNY') || hasS('JONIE') || hasS('WALKER'))) return 'alias:whisky-walker';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('PUERTO','INDIAS')) return 'alias:ginebra-puerto-indias';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('LARIOS')) return 'alias:ginebra-larios';
+    if((hasS('GINEBRA') || hasS('GIN')) && hasS('BEEFEATER')) return 'alias:ginebra-beefeater';
+    if(hasS('ACEITE','AOVE') || hasS('AOVE')) return 'alias:aceite-aove';
+    if(hasS('VINAGRE')) return 'alias:vinagre';
+    if(hasS('AGUA') && (has('1L') || has('1 L') || hasS('CRISTAL'))) return 'alias:agua-1l-cristal';
+    if(hasS('BAICON') || hasS('BACON')) return 'alias:baicon';
+    if(hasS('CHULETA','CERDO')) return 'alias:chuleta-cerdo';
+    if(hasS('FAIRY')) return 'alias:fairy';
+    if(hasS('PAPEL','HIGIENICO')) return 'alias:papel-higienico';
+    if(hasS('ROLLO','SECAMANOS') || hasS('PAPEL','SECAMANOS')) return 'alias:rollo-secamanos';
+    if(hasS('BOLSAS','BASURA') || hasS('BOLSA','BASURA')) return 'alias:bolsas-basura';
+    if(hasS('JABON','MANOS') || hasS('JABON','LAVAMANOS')) return 'alias:jabon-manos';
+    if(hasS('AMBIENTADOR')) return 'alias:ambientador';
+    if(hasS('CAFE','DESCAFEINADO')) return 'alias:cafe-descafeinado-gorritas';
+    if(hasS('CAFE','NORMAL') || (hasS('CAFE') && hasS('GORRITAS') && !hasS('DESCAFEINADO'))) return 'alias:cafe-normal-gorritas';
+    if(hasS('VINO','BLANCO')) return 'alias:vino-blanco';
+    if(hasS('VINO','FRIZZANTE')) return 'alias:vino-frizzante';
+    if(hasS('VINO','TINTO','RIOJA')) return 'alias:vino-tinto-rioja';
+    if(hasS('VINO','TINTO')) return 'alias:vino-tinto';
+    if(hasS('OREJA','SALSA')) return 'alias:oreja-salsa';
+    if(hasS('MEJILLONES')) return 'alias:mejillones';
+    return 'norm:' + simplify(value || '');
+  }
+
+  const norm = aliasText(rawLabel);
+  if (maps.productByName.has(norm)) return maps.productByName.get(norm);
+
+  const wantedAlias = aliasKey(rawLabel);
+  const rawHas50Barril = /\bCERVEZA\b/i.test(aliasText(rawLabel)) && /\bAMBAR\b/i.test(aliasText(rawLabel)) && /\bBARRIL\b/i.test(aliasText(rawLabel)) && /\b50\b/.test(aliasText(rawLabel));
+  const rawHas30Barril = /\bCERVEZA\b/i.test(aliasText(rawLabel)) && /\bAMBAR\b/i.test(aliasText(rawLabel)) && /\bBARRIL\b/i.test(aliasText(rawLabel)) && /\b30\b/.test(aliasText(rawLabel));
+  const aliasMatches = Array.from(maps.products.values()).filter(p => aliasKey(p?.nombre || '') === wantedAlias);
+  if (aliasMatches.length === 1) return aliasMatches[0];
+  if (aliasMatches.length > 1) {
+    const exactNorm = aliasMatches.find(p => aliasText(p?.nombre || '') === norm);
+    if (exactNorm) return exactNorm;
+    const sizeExact = aliasMatches.find(p => {
+      const pn = aliasText(p?.nombre || '');
+      return (rawHas50Barril && /\b50\b/.test(pn)) || (rawHas30Barril && /\b30\b/.test(pn));
+    });
+    if (sizeExact) return sizeExact;
+    return aliasMatches.sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length)[0];
+  }
+
+  const target = simplify(rawLabel);
+  const exactSimple = Array.from(maps.products.values()).find(p => simplify(p?.nombre || '') === target);
+  if (exactSimple) return exactSimple;
+
+  const queries = [];
+  if(target) queries.push(target);
+  const words = target.split(' ').filter(w => w.length >= 3);
+  for(let i=0;i<words.length;i++){
+    const q = words.slice(i).join(' ');
+    if(q.length >= 4) queries.push(q);
+  }
+  for(const q0 of [...queries]){
+    let q = trim(q0);
+    while(q.length >= 5){
+      queries.push(q);
+      q = trim(q.slice(0, -1));
+    }
+  }
+  for(const q of [...new Set(queries.filter(Boolean))]){
+    const contains = Array.from(maps.products.values()).filter(p => simplify(p?.nombre || '').includes(q));
+    if(contains.length === 1) return contains[0];
+    if(contains.length > 1) return contains.sort((a,b)=>String(a?.nombre||'').length-String(b?.nombre||'').length)[0];
+  }
+
+  const generic = new Set('DE DEL LA EL LOS LAS EN CON SIN TIPO PARA Y O A UN UNA UNO UD UDS UNIDAD UNIDADES BOTELLA BOTELLAS LATA LATAS BOTE BOTES BOLSA BOLSAS PACK PAQUETE PAQUETES CAJA PIEZA KG GR L CL ML LITRO LITROS NORMAL GRANDE MEDIANA PEQUENA PEQUEÑA ENTERO MEZCLA'.split(' '));
+  const toks = value => simplify(value).split(' ').filter(t => t.length >= 2 && !generic.has(t));
+  const wanted = toks(rawLabel);
+  let best = null, bestScore = -9999;
+  for (const p of maps.products.values()) {
+    const ps = simplify(p?.nombre || '');
+    const pt = toks(p?.nombre || '');
+    let score = 0, matched = 0;
+    wanted.forEach(t => {
+      if (pt.includes(t)) { score += 80 + t.length; matched++; }
+      else if (ps.includes(t)) { score += 40 + t.length; matched++; }
+      else score -= 18;
+    });
+    if(aliasKey(p?.nombre || '') === wantedAlias) score += 400;
+    if(!matched) score -= 300;
+    score -= Math.abs(ps.length - target.length) * 0.05;
+    if(score > bestScore){ bestScore = score; best = p; }
+  }
+  return bestScore >= 80 ? best : null;
+}
+function planReasonablePlanPrice(productName, catalogPrice = 0) {
+  const n = normPlanKey(productName || '');
+  const c = num(catalogPrice);
+  const reasonable = (fallback, max = Infinity) => (c > 0 && c <= max ? round(c,4) : fallback);
+  if (/hielo|cubito/.test(n)) return reasonable(0.9, 3);
+  if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n) && /lata|bote|33|25/.test(n)) return reasonable(0.75, 2);
+  if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n) && /botella.*2|2\s*l/.test(n)) return reasonable(1.6, 4);
+  if (/agua/.test(n) && /bot/.test(n)) return reasonable(0.35, 2);
+  if (/cerveza/.test(n) && /lata|skol|bote/.test(n)) return reasonable(0.55, 2);
+  if (/cerveza/.test(n) && /botell/.test(n)) return reasonable(0.45, 2);
+  if (/barril/.test(n) && /50/.test(n)) return reasonable(110, 180);
+  if (/barril/.test(n) && /30/.test(n)) return reasonable(70, 140);
+  if (/ron/.test(n)) return reasonable(14, 35);
+  if (/whisky|wiski|jb|dyc|walker/.test(n)) return reasonable(12, 35);
+  if (/gin|ginebra|beefeater|larios|puerto de indias/.test(n)) return reasonable(13, 35);
+  if (/jamon/.test(n)) return reasonable(70, 180);
+  if (/queso/.test(n)) return reasonable(20, 80);
+  if (/pan/.test(n)) return reasonable(1.2, 5);
+  if (/servilleta|vasos|copa|cuchara|tenedor|plato/.test(n)) return reasonable(0.04, 2);
+  if (/bolsa.*basura|sacos.*basura/.test(n)) return reasonable(0.4, 3);
+  if (/fairy|jabon|ambientador|papel|rollo/.test(n)) return reasonable(c || 2.5, 12);
+  if (c > 0) return round(c,4);
+  return 1;
+}
+function planPackRoundedProduct(productName) {
+  const n = normPlanKey(productName || '');
+  if (/(lata|latas|botellin|botellines|bote|botes)/.test(n) && /(cerveza|coca|fanta|sprite|tonica|aquarius|acuarius|refresco|bitter)/.test(n)) return true;
+  if (/(coca cola|fanta|sprite|tonica|aquarius|acuarius|cerveza skol)/.test(n) && !/botella\s*2/.test(n)) return true;
+  return false;
+}
+function planProductAllowsDecimalUnits(productName) {
+  const n = normPlanKey(productName || '');
+  if (!/(kg|kilo|kilos|gr|gramo|gramos|litro|litros)/.test(n)) return false;
+  // Si el propio nombre habla de botella, lata, bote, garrafa, pack, saco, etc., se compra por unidad/envase.
+  if (/(lata|latas|botellin|botellines|bote|botes|botella|botellas|garrafa|garrafas|saco|sacos|pack|packs|paquete|paquetes|barril|barriles)/.test(n)) return false;
+  return true;
+}
+function planRoundBuyUnits(productName, units) {
+  const u = Math.max(0, num(units));
+  if (!u) return 0;
+  if (planPackRoundedProduct(productName)) return Math.max(24, Math.ceil(u / 24) * 24);
+  if (planProductAllowsDecimalUnits(productName)) return round(Math.ceil(u * 100) / 100, 2);
+  return Math.max(1, Math.ceil(u));
+}
+function planBuyAfterDonation(productName, totalNeed, donatedUnits) {
+  const need = Math.max(0, num(totalNeed));
+  const donated = Math.max(0, num(donatedUnits));
+  // HOTFIX18: A COMPRAR es exactamente necesidad calculada - suma de donaciones del producto.
+  // No se vuelve a redondear aquí, porque la necesidad calculada ya es la cifra que revisa el usuario.
+  return Math.max(0, round(need - donated, 2));
+}
+function planCanonicalProductForRow(row, maps) {
+  const byIdProd = trim(row?.productId || row?.productoId || row?.producto_id) ? maps.products.get(trim(row?.productId || row?.productoId || row?.producto_id)) : null;
+  return byIdProd || planFindProductLoose(row?.productName || row?.producto || '', maps) || null;
+}
+function planCanonicalizeRowProduct(row, maps) {
+  const prod = planCanonicalProductForRow(row, maps);
+  if (!prod?.id) return row;
+  const original = trim(row?.__productoEscritoOriginal || row?.producto || row?.productName || '');
+  if (original && row?.__geminiDirect38 === true && !planProductFormatCompatible38(original, prod.nombre || '')) {
+    return {
+      ...row,
+      productId: '',
+      productName: original,
+      segmento: trim(row.segmento || prod.segmento || 'Sin segmento'),
+      destino: trim(row.destino || prod.destino || 'Sin destino'),
+      reason: trim(row.reason || '') + ' Producto conservado como revisable: el catálogo parecido cambiaba formato/capacidad.'
+    };
+  }
+  return {
+    ...row,
+    productId: trim(prod.id),
+    productName: trim(prod.nombre || row.productName || row.producto || 'Producto'),
+    segmento: trim(prod.segmento || row.segmento || 'Sin segmento'),
+    destino: trim(prod.destino || row.destino || 'Sin destino')
+  };
+}
+function planDisplayNeedAfterRounding(productName, totalNeed) {
+  const need = Math.max(0, num(totalNeed));
+  if (!need) return 0;
+  return planPackRoundedProduct(productName) ? planRoundBuyUnits(productName, need) : round(need, 2);
+}
+function planConsumptionProfile(form) {
+  const rawInfo = trim((form?.info || '') + ' ' + (form?.descripcion || ''));
+  const info = normPlanKey(rawInfo);
+  const people = Math.max(1, num(form?.personas) || 25);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const calor = /40|calor|temperatura|verano|mucho sol/.test(info);
+  const cubatas = /cubata|copa|copas|tardeo|barra libre/.test(info);
+  const cerveza = /cerveza|botellin|botellines|lata|barril/.test(info) || cubatas;
+  const noAlcoholCue = /niños|ninos|infantil|sin alcohol|no bebedores|abstemios/.test(info);
+  function explicit(re) {
+    const m = rawInfo.match(re);
+    return m ? Math.max(0, Math.round(num(m[1]))) : 0;
+  }
+  const explicitBeer = explicit(/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+)/i);
+  const explicitCuba = explicit(/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+)/i);
+  const explicitNoAlcohol = explicit(/personas\s+sin\s+alcohol(?:\s*\/\s*ni[ñn]os|\s+o\s+ni[ñn]os|[^\n:]*)?\s*[:=]\s*(\d+)/i);
+  const beerPeople = explicitBeer || Math.max(0, Math.round(people * (cerveza ? (noAlcoholCue ? 0.55 : 0.70) : 0.35)));
+  const cubaPeople = explicitCuba || Math.max(0, Math.round(people * (cubatas ? (noAlcoholCue ? 0.35 : 0.45) : 0.15)));
+  const directSoftPeople = Math.max(1, explicitNoAlcohol || Math.round(people * (noAlcoholCue ? 0.45 : 0.25)));
+  return { people, days, calor, cubatas, beerPeople, cubaPeople, directSoftPeople, cubatasTotal: cubaPeople * (cubatas ? 3.5 : 1.5) * days };
+}
+function planProductLooksTwoLiter(n) { return /botella.*2|2\s*l|2l|litro/.test(n) && !/lata|bote|33|25/.test(n); }
+function planMinimumNeed(productName, form, currentNeed) {
+  const n = normPlanKey(productName || '');
+  const p = planConsumptionProfile(form);
+  let min = 0;
+
+  if (/cerveza/.test(n) && /lata|botellin|botellines|skol|bote/.test(n)) {
+    // No se fuerza el máximo completo por cada marca/formato: el cupo de cerveza se reparte entre barril, latas y botellines.
+    // Si hay existencias/donaciones explícitas, se respetan y no se infla esa misma línea automáticamente.
+    min = num(currentNeed);
+  } else if (/barril/.test(n) && /cerveza/.test(n)) {
+    // Un barril ya cubre muchas cañas; no duplicar además el máximo de latas/botellines por persona.
+    min = num(currentNeed);
+  } else if (/ron|whisky|wiski|gin|ginebra/.test(n)) {
+    // Los cubatas se reparten entre varios alcoholes; no calcular 4 botellas de ron + 4 de whisky + 4 de ginebra.
+    min = Math.max(num(currentNeed), 1);
+  } else if (/coca|fanta|sprite|tonica|aquarius|acuarius|bitter|refresco/.test(n)) {
+    if (planProductLooksTwoLiter(n)) {
+      // Botellas de 2 l: mezcla de cubatas + algo de consumo directo, con margen extra si hay calor y tardeo.
+      const mixerBottles = p.cubatas ? Math.ceil(p.cubatasTotal / 7) : 0;
+      const directBottles = Math.ceil((p.directSoftPeople * (p.calor ? 0.85 : 0.50) * p.days) / 6);
+      min = mixerBottles + directBottles + (p.calor && p.cubatas ? 1 : 0);
+    } else {
+      // Latas/botes directos: en día caluroso + aperitivo + cubatas, Coca-Colas y refrescos se quedan cortos con 2-3 packs.
+      const cubataMixUnits = p.cubatas ? Math.ceil(p.cubatasTotal * (/coca/.test(n) ? 0.55 : (/tonica|sprite|fanta/.test(n) ? 0.22 : 0.12))) : 0;
+      min = p.directSoftPeople * (p.calor ? 1.75 : 1.10) * p.days + cubataMixUnits;
+      if (p.calor && p.cubatas && /coca|fanta|sprite|tonica/.test(n)) min += 24; // un pack extra de margen por tipo principal.
+    }
+  } else if (/agua/.test(n) && /bot/.test(n)) {
+    min = p.people * (p.calor ? 2.0 : 1.25) * p.days;
+  } else if (/hielo|cubito/.test(n)) {
+    // Bolsas de 2 kg aprox.: con calor/cubatas 11 se queda corto; damos margen operativo sin dispararlo.
+    min = Math.ceil(p.people * (p.calor ? 0.65 : 0.40) * p.days) + (p.cubatas ? 2 : 0);
+  } else if (/gambon|gambones|langostino|langostinos/.test(n)) {
+    // Referencia del usuario: para una paella normal, 1 kg de gambones puede ser base suficiente; no saltar a 5 kg sin justificación.
+    min = Math.max(num(currentNeed), Math.min(2, Math.max(1, Math.ceil(p.people / 70))));
+  } else if (/arroz/.test(n)) {
+    min = Math.max(num(currentNeed), Math.ceil((p.people * 0.10) * 10) / 10);
+  } else if (/chorizo|morcilla|montado|panceta/.test(n)) {
+    // Aperitivo/cena informal: evitar barbaridades tipo 17 kg de chorizo por copiar una proporción de personas.
+    // Si el prompt no fija otra cosa, se propone 1 kg/unidad de referencia por producto y se revisa a mano.
+    const current = num(currentNeed);
+    if (current > 0 && current <= 3) return current;
+    return Math.max(1, Math.ceil(p.people / 90));
+  }
+  if (!min) return Math.max(0, num(currentNeed));
+  return Math.max(num(currentNeed), Math.ceil(min));
+}
+function planCompraTotal(rows) {
+  return arr(rows).filter(r => r?.include !== false && r?.tipo === 'COMPRA').reduce((sum, r) => sum + num(r.unidades) * num(r.precio), 0);
+}
+
+function planMenuIntentHf29(form) {
+  const raw = trim((form?.descripcion || '') + '\n' + (form?.info || ''));
+  const n = normPlanKey(raw);
+  const negPaella = /\b(NO|SIN|NADA\s+DE|EVITAR|EVITA|NO\s+QUEREMOS|NO\s+HACER|NO\s+PREPARAR)\b.{0,50}\b(PAELLA|ARROZ|MARISCO|GAMBON|GAMBONES|ALMEJA|ALMEJAS)\b/.test(n);
+  const negBbq = /\b(NO|SIN|NADA\s+DE|EVITAR|EVITA|NO\s+QUEREMOS|NO\s+HACER|NO\s+PREPARAR)\b.{0,50}\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|LOMO|MORCILLA|PANCETA|CHORIZO)\b/.test(n);
+  const paella = !negPaella && /\b(PAELLA|ARROZ|FIDEUA|FIDEU[AÁ]|MARISCO|GAMBON|GAMBONES|GAMBA|GAMBAS|ALMEJA|ALMEJAS|CALDO\s+PAELLA)\b/.test(n);
+  const bbq = !negBbq && /\b(BARBACOA|BBQ|PARRILLA|BRASA|ASADO|ASADA|PLANCHA|LOMO|MORCILLA|PANCETA|CHORIZO|MONTADO|MONTADOS)\b/.test(n);
+  const bocadillos = /\b(BOCADILLO|BOCADILLOS|SANDWICH|SANDWICHES|PERRITO|PERRITOS|HAMBURGUESA|HAMBURGUESAS)\b/.test(n);
+  const tapas = /\b(TAPA|TAPAS|APERITIVO|PICOTEO|RACIONES|TORTILLA|EMPANADA|CANAPE|CANAPES|EMBUTIDO|QUESO)\b/.test(n);
+  const frio = /\b(FRIO|FRIA|FRÍA|COMIDA\s+FRIA|COMIDA\s+FRÍA|ENSALADA|GAZPACHO)\b/.test(n);
+  return { paella, bbq, bocadillos, tapas, frio, texto: n.slice(0, 1200) };
+}
+function planLegacyMenuFamilyHf29(productName) {
+  const n = normPlanKey(productName || '');
+  if (/\bARROZ\b|GAMBON|GAMBONES|GAMBA|GAMBAS|LANGOSTINO|LANGOSTINOS|ALMEJA|ALMEJAS|CALDO\s+PAELLA|PREPARADO\s+PAELLA/.test(n)) return 'paella';
+  if (/\bLOMO\b|LOMO\s+FRESCO|MORCILLA|PANCETA|CHORIZO|CHORIZOS/.test(n)) return 'bbq';
+  return '';
+}
+function planFilterUnrequestedLegacyMenuRowsHf29(rows, form) {
+  // FIX30_PLANIFICACION: se deja como no-op defensivo.
+  // ControlEvent ya no elimina paella/barbacoa propuestas por Zuzu: solo se evita el menú local fijo saltándose este filtro.
+  return { rows: arr(rows).slice(), notes: [] };
+}
+
+
+function planBudgetGuard(rows, form) {
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 25);
+  const budget = planBudgetFromPrompt(form);
+  const maxPer = budget.maximoPorPersona || 35;
+  const targetPer = budget.objetivoPorPersona || Math.min(32.5, maxPer);
+  const notes = [];
+  let out = arr(rows).map(r => ({...r}));
+  let total = planCompraTotal(out);
+  let per = total / people;
+  const initialPer = per;
+  if (maxPer > 0 && initialPer > maxPer) {
+    const target = Math.max(1, Math.min(targetPer || maxPer * 0.95, maxPer * 0.96));
+    const factor = Math.max(0.25, (target * people) / Math.max(1, total));
+    out = out.map(r => {
+      if (r?.tipo !== 'COMPRA' || r.include === false) return r;
+      const before = num(r.unidades);
+      const productName = trim(r.productName || r.producto || '');
+      if (num(r.donadoTotal) > 0 || r.explicitPromptDonation === true) {
+        return { ...r, unidades: before, aComprarCalculado: before, reason: trim(r.reason || '') + ' Línea con donación/existencia confirmada: no se reduce automáticamente para no descuadrar el déficit.' };
+      }
+      const rawScaled = before * factor;
+      const scaled = planRoundBuyUnits(productName, rawScaled);
+      return { ...r, unidades: scaled, aComprarCalculado: scaled, reason: trim(r.reason || '') + ` Ajuste automático de Zuzu: la propuesta inicial superaba el límite de ${round(maxPer,2)} €/persona indicado en el prompt.` };
+    });
+    total = planCompraTotal(out);
+    per = total / people;
+    notes.push(`Control de coste: la primera propuesta salía a ${round(initialPer,2)} €/persona. Zuzu la ha reducido a ${round(per,2)} €/persona para respetar el límite del prompt (${round(maxPer,2)} €/persona).`);
+  } else if (budget.objetivoPorPersona || budget.maximoPorPersona) {
+    notes.push(`Control de coste: compra prevista ${round(initialPer,2)} €/persona frente a objetivo ${budget.objetivoPorPersona || 'sin dato'} €/persona y límite ${budget.maximoPorPersona || maxPer} €/persona indicados en el prompt.`);
+  } else if (initialPer > 25) {
+    notes.push(`Control de coste: la propuesta queda en ${round(initialPer,2)} €/persona de compra prevista. Está por encima del objetivo normal de 25 €/persona, pero dentro del rango revisable.`);
+  } else {
+    notes.push(`Control de coste: la propuesta queda en ${round(initialPer,2)} €/persona de compra prevista, dentro del objetivo normal de coste.`);
+  }
+  return { rows: out, notes };
+}
+
+
+function planApplyPositiveSaldoFix39(rows, form, state) {
+  const out = arr(rows).map(r => ({...r}));
+  const budget = planBudgetFromPrompt(form);
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 0);
+  const income = people * num(budget.objetivoPorPersona);
+  const notes = [];
+  if (!income || income <= 0) return { rows: out, notes };
+  let total = planCompraTotal(out);
+  if (total <= 0) return { rows: out, notes };
+  const initialSaldo = income - total;
+  const initialRatio = initialSaldo / total;
+  if (!(initialSaldo > 0 && initialRatio > 0.25)) return { rows: out, notes };
+  const maps = planBuildMaps(state || {});
+  const defaults = { tiendaId: trim(form.defaultStoreId), responsableId: trim(form.defaultResponsibleId) };
+  const maxAdds = new Map();
+  function currentRatio() { const t = planCompraTotal(out); return t > 0 ? (income - t) / t : 0; }
+  function keyFor(item){ return normPlanKey(item.label || item.q); }
+  function addItem(item, reasonTag) {
+    const countKey = keyFor(item);
+    const currentCount = maxAdds.get(countKey) || 0;
+    if (item.maxAdds && currentCount >= item.maxAdds) return false;
+    const prod = planFindProductLoose(item.q, maps) || planFindProductLoose(item.label, maps) || {};
+    const productName = trim(prod.nombre || item.label);
+    const price = planReasonablePlanPrice(productName, prod.defaultPrecio ?? prod.precio ?? item.fallback);
+    const units = item.units;
+    const cost = units * price;
+    const nextTotal = planCompraTotal(out) + cost;
+    if (income - nextTotal < -0.005) return false;
+    const existing = out.find(r => r.tipo === 'COMPRA' && ((trim(r.productId) && trim(r.productId) === trim(prod.id)) || normPlanKey(r.productName) === normPlanKey(productName)));
+    if (existing) {
+      existing.unidades = round(num(existing.unidades) + units, 2);
+      existing.aComprarCalculado = existing.unidades;
+      existing.reason = trim(existing.reason || '') + ` Ajuste automático de saldo positivo FIX43 (${reasonTag}).`;
+      existing.__ceHf46SaldoBalancer = true;
+      existing.__ceHf52SaldoBalancer = true;
+      maxAdds.set(countKey, currentCount + 1);
+      return true;
+    }
+    out.push({
+      key:`saldo-fix43:${out.length}:${trim(prod.id || productName)}`,
+      include:true,
+      tipo:'COMPRA',
+      productId:trim(prod.id || ''),
+      productName,
+      segmento:trim(prod.segmento || item.segmento || 'BEBIDA'),
+      destino:trim(prod.destino || item.destino || 'CUBATAS'),
+      unidades:units,
+      precio:price,
+      tiendaId:trim(prod.defaultTiendaId || defaults.tiendaId),
+      responsableId:trim(defaults.responsableId),
+      ticketDonacion:'',
+      donorRef:'',
+      confidence:'Ajuste saldo FIX43',
+      reason:`Ajuste automático de saldo positivo FIX43: se añade por prioridad y proporción de bebidas (${reasonTag}) hasta acercar el saldo al 10%.`,
+      __ceHf46SaldoBalancer:true,
+      __ceHf52SaldoBalancer:true
+    });
+    maxAdds.set(countKey, currentCount + 1);
+    return true;
+  }
+  const BEER = {q:'Cerveza lata 33cl', label:'Cerveza lata 33cl', units:24, fallback:0.55, maxAdds:6};
+  const COKE = {q:'COCA COLA Bote 32 Cl', label:'COCA COLA Bote 32 Cl', units:24, fallback:0.75, maxAdds:4};
+  const COKE_ZERO = {q:'COCA COLA ZERO Bote 32 Cl', label:'COCA COLA ZERO Bote 32 Cl', units:24, fallback:0.75, maxAdds:4};
+  const COKE_ZZ = {q:'COCA COLA ZERO -ZERO 33 cl', label:'COCA COLA ZERO -ZERO 33 cl', units:24, fallback:0.75, maxAdds:3};
+  const ICE = {q:'Hielo', label:'Hielo en cubitos', units:5, fallback:1.25, maxAdds:8};
+  const RON = {q:'Ron BARCELO Añejo 0.7 L', label:'Ron BARCELO Añejo 0.7 L', units:1, fallback:14.35, maxAdds:4};
+  const WJB = {q:'Whisky 5 Años J.B Botella 0.7 L', label:'Whisky 5 Años J.B Botella 0.7 L', units:1, fallback:14.65, maxAdds:4};
+  const GIN = {q:'GINEBRA Beefeater', label:'GINEBRA Beefeater', units:1, fallback:16.8, maxAdds:4};
+  const FANTA_N = {q:'FANTA Naranja Bote 32 C.L', label:'FANTA Naranja Bote 32 C.L', units:24, fallback:0.6, maxAdds:2};
+  const FANTA_L = {q:'FANTA Limon Bote 32 CL', label:'FANTA Limon Bote 32 CL', units:24, fallback:0.6, maxAdds:2};
+  const TONIC = {q:'Tónica lata', label:'Tónica lata', units:24, fallback:0.75, maxAdds:2};
+  const SPRITE = {q:'Sprite lata (33cl)', label:'Sprite lata (33cl)', units:24, fallback:0.52, maxAdds:2};
+  const BRUGAL = {q:'Ron BRUGAL Añejo 0.7L', label:'Ron BRUGAL Añejo 0.7L', units:1, fallback:13.59, maxAdds:2};
+  const PAPEL_SEC = {q:'Rollo papel secamanos', label:'Rollo papel secamanos', units:1, fallback:3.5, maxAdds:2, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const FAIRY = {q:'Fairy', label:'Fairy', units:1, fallback:3.5, maxAdds:2, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const BOLSAS = {q:'Bolsas Basura Grandes 240L', label:'Bolsas Basura Grandes 240L', units:1, fallback:4.5, maxAdds:2, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const LAVAVAJILLAS = {q:'Lavavajillas', label:'Lavavajillas', units:1, fallback:7, maxAdds:1, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const ABRILLANTADOR = {q:'Abrillantador lavavajillas', label:'Abrillantador lavavajillas', units:1, fallback:5, maxAdds:1, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const JABON_MANOS = {q:'Jabon de manos', label:'Jabón lavamanos', units:1, fallback:2.5, maxAdds:2, segmento:'INFRAESTRUCTURA', destino:'INFRAESTRUCTURA'};
+  const infraCycles = initialRatio >= 0.50 ? [[PAPEL_SEC], [FAIRY], [BOLSAS], [LAVAVAJILLAS], [ABRILLANTADOR], [JABON_MANOS]] : [];
+  const cycles = [
+    [BEER],
+    [COKE, RON, WJB, ICE],
+    [COKE_ZERO, RON, WJB, ICE],
+    [COKE_ZZ, RON, WJB, ICE],
+    [TONIC, GIN, GIN, ICE],
+    [FANTA_N, ICE],
+    [FANTA_L, ICE],
+    [SPRITE, BRUGAL, ICE],
+    ...infraCycles
+  ];
+  let added = 0, guard = 0;
+  while (currentRatio() > 0.10 + 0.005 && guard < 80) {
+    guard += 1;
+    let didCycle = false;
+    for (const cycle of cycles) {
+      if (currentRatio() <= 0.10 + 0.005) break;
+      let cycleAdded = false;
+      for (const item of cycle) {
+        if (currentRatio() <= 0.10 + 0.005) break;
+        if (addItem(item, cycle.map(x=>x.label).join(' + '))) { added += 1; cycleAdded = true; didCycle = true; }
+      }
+      if (cycleAdded) break;
+    }
+    if (!didCycle) break;
+  }
+  if (added) {
+    const finalTotal = planCompraTotal(out);
+    const capped = currentRatio() > 0.10 + 0.005;
+    notes.push(`Ajuste automático de saldo proporcional: saldo inicial ${round(initialSaldo,2)} € (${round(initialRatio*100,1)}% sobre compras). Se han añadido/reforzado ${added} línea(s) manteniendo proporción: pack de Coca-Cola acompaña ron y whisky; pack de tónica acompaña 2 ginebras; cada ciclo añade saco de hielo de 5 bolsas de 2 kg; si el saldo inicial supera el 50% sobre compras se incorporan elementos INFRAESTRUCTURA - INFRAESTRUCTURA imprescindibles. Compra final ${round(finalTotal,2)} € y saldo ${round(income-finalTotal,2)} €${capped ? '; se para por topes operativos para evitar inflados' : ''}.`);
+  }
+  return { rows: out, notes };
+}
+
+
+
+function planClampOperationalUnitsFix40(rows, form, state = {}) {
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const people = Math.max(1, num(openCtx.asistentesBase) || num(form?.personas) || 30);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const out = arr(rows).map(r => ({...r}));
+  const maxByPrompt = {
+    beer: 504,
+    coca: 504,
+    fantaNaranja: 168,
+    fantaLimon: 192,
+    tonica: 120,
+    spriteLata: 24,
+    spriteBotella2l: 10,
+    otras: 24,
+    panBarra: Math.ceil(people * 0.55) * days,
+    bbqKg: round(people * 0.3 * days, 2)
+  };
+  function nameOf(r){ return normPlanKey(r?.productName || r?.producto || ''); }
+  function isCompra(r){ return r && r.tipo === 'COMPRA' && r.include !== false && num(r.unidades) > 0; }
+  function addReason(r, text){ r.reason = trim(r.reason || '') + ' ' + text; }
+  function stepFor(predicateName){ return /beer|coca|fanta|tonica|spriteLata|otras/.test(predicateName) ? 24 : (/pan/.test(predicateName) ? 1 : 0.1); }
+  function roundDownStep(v, step){ if(step >= 1) return Math.max(0, Math.floor(v / step) * step); return Math.max(0, Math.floor(v * 10) / 10); }
+  function capGroup(label, predicate, cap, step, reason){
+    const items = out.map((r,i)=>({r,i})).filter(x => isCompra(x.r) && predicate(nameOf(x.r), x.r));
+    const total = items.reduce((sum,x)=>sum + num(x.r.unidades), 0);
+    if(!(cap > 0) || total <= cap + 0.001) return;
+    let remaining = cap;
+    items.forEach((x,pos) => {
+      const old = num(x.r.unidades);
+      let next;
+      if(pos === items.length - 1) next = remaining;
+      else next = Math.min(remaining, roundDownStep(old * cap / total, step || 1));
+      if(step >= 1 && next > 0 && next < step && remaining >= step) next = step;
+      next = Math.max(0, round(next, 2));
+      remaining = Math.max(0, round(remaining - next, 2));
+      if(next < old - 0.001){
+        x.r.unidades = next;
+        x.r.aComprarCalculado = next;
+        x.r.necesidadTotal = Math.min(num(x.r.necesidadTotal || old), cap);
+        if(next <= 0) x.r.include = false;
+        addReason(x.r, `Ajustado por tope operativo FIX45 ${label}: máximo ${cap} (${reason}).`);
+      }
+    });
+  }
+  capGroup('cerveza lata/botellín', n => /cerveza/.test(n) && !/barril/.test(n), maxByPrompt.beer, 24, 'sumando todas las marcas/formato lata o botellín');
+  capGroup('Coca-Cola lata', n => /coca\s*cola|cocacola/.test(n) && !/botella.*2\s*l/.test(n), maxByPrompt.coca, 24, 'normal, Zero y Zero-Zero sumadas');
+  capGroup('Fanta naranja', n => /fanta/.test(n) && /naranja/.test(n), maxByPrompt.fantaNaranja, 24, '7 packs');
+  capGroup('Fanta limón', n => /fanta/.test(n) && /limon|limón/.test(n), maxByPrompt.fantaLimon, 24, '8 packs');
+  capGroup('tónica', n => /tonica|tónica|schweppes|sweep/.test(n), maxByPrompt.tonica, 24, '5 packs');
+  capGroup('Sprite lata 33cl', n => /sprite/.test(n) && !/botella|2\s*l/.test(n), maxByPrompt.spriteLata, 24, '1 pack');
+  capGroup('Sprite botella 2l', n => /sprite/.test(n) && (/BOTELLA/.test(n) || /2\s*L/.test(n)), maxByPrompt.spriteBotella2l, 1, '10 botellas');
+  capGroup('otras bebidas', n => /bitter|beeter|kas|tinto\s+de\s+verano|aquarius|nestea/.test(n), maxByPrompt.otras, 24, 'otras bebidas limitadas');
+  capGroup('pan barra', n => /pan/.test(n) && /barra|baguette/.test(n), maxByPrompt.panBarra, 1, '0,55 barras/persona/día');
+  capGroup('carnes barbacoa', n => /(panceta|chorizo|lomo|morcilla|chuleta|venao|venado)/.test(n), maxByPrompt.bbqKg, 0.1, '300 g/persona/día sumando carnes de barbacoa');
+
+  function findOrCreate(label, units, familyReason){
+    if(!(units > 0)) return;
+    const maps = planBuildMaps(state || {});
+    const prod = planFindProductLoose(label, maps) || {};
+    const normLabel = normPlanKey(label);
+    const row = out.find(r => isCompra(r) && (normPlanKey(r.productName || r.producto || '') === normLabel || planProductAliasKey(r.productName || r.producto || '') === planProductAliasKey(label)));
+    if(row){
+      row.unidades = units; row.aComprarCalculado = units; row.include = true;
+      addReason(row, `Reparto proporcional FIX45 de bebidas alcohólicas (${familyReason}).`);
+      return;
+    }
+    out.push({ key:`fix45-spirit:${out.length}:${normLabel}`, include:true, tipo:'COMPRA', productId:trim(prod.id || ''), productName:trim(prod.nombre || label), producto:trim(prod.nombre || label), segmento:trim(prod.segmento || 'BEBIDA'), destino:trim(prod.destino || 'CUBATAS'), unidades:units, precio:planReasonablePlanPrice(prod.nombre || label, prod.defaultPrecio ?? prod.precio ?? 0), tiendaId:trim(prod.defaultTiendaId || form?.defaultStoreId || ''), responsableId:trim(form?.defaultResponsibleId || ''), ticketDonacion:'', donorRef:'', confidence:'Reparto proporcional FIX45', reason:`Reparto proporcional FIX45 de bebidas alcohólicas (${familyReason}).` });
+  }
+  function rebalanceFamily(familyName, predicate, desired){
+    const items = out.filter(r => isCompra(r) && predicate(nameOf(r), r));
+    const total = Math.round(items.reduce((sum,r)=>sum + num(r.unidades), 0));
+    if(total <= 1) return;
+    items.forEach(r => { r.unidades = 0; r.aComprarCalculado = 0; r.include = false; addReason(r, `Sustituido por reparto proporcional FIX45 ${familyName}.`); });
+    const weights = desired.map(x=>x.weight);
+    const split = planSplitWholeFix45(total, weights);
+    desired.forEach((d,i) => { if(split[i] > 0) findOrCreate(d.label, split[i], `${familyName}: ${d.note}`); });
+  }
+  rebalanceFamily('ron', n => /ron/.test(n), [
+    {label:'Ron BARCELO Añejo 0.7 L', weight:60, note:'60% Barceló'},
+    {label:'Ron BRUGAL Añejo 0.7L', weight:30, note:'30% Brugal'},
+    {label:'Ron Puerto de Indias', weight:10, note:'10% otros/residual'}
+  ]);
+  rebalanceFamily('whisky', n => /whisky|wiski|j\.?b\b|jb\b|dyc|walker|jhony|johnnie|jonie/.test(n), [
+    {label:'Whisky 5 Años J.B Botella 0.7 L', weight:60, note:'60% JB'},
+    {label:'Whisky DYC 1L. 40°', weight:30, note:'30% DYC 1L'},
+    {label:'Whisky JHONY WALKER 0.7 L. 40°', weight:10, note:'10% Jhonnie Walker'}
+  ]);
+  rebalanceFamily('ginebra', n => /ginebra|gin|beefeater|larios|tanquer|tanker|puerto\s+de\s+indias/.test(n), [
+    {label:'Gin BEEFEATER 0.7 L. 43°', weight:55, note:'55% Beefeater'},
+    {label:'Gin LARIOS 1 L. 40°', weight:30, note:'30% Larios 1L'},
+    {label:'GINEBRA Tanqueray', weight:15, note:'15% Tanqueray/residual'}
+  ]);
+  return out.filter(r => !(r?.tipo === 'COMPRA' && num(r.unidades) <= 0 && r.include === false));
+}
+
+function planReadableNotes(rawNotes, rows, form, budgetNotes) {
+  const people = Math.max(1, num(form?.personas) || 25);
+  const days = Math.max(1, num(form?.dias) || 1);
+  const total = planCompraTotal(rows);
+  const per = total / people;
+  const title = trim(form?.title) || 'evento nuevo';
+  const useful = arr(rawNotes)
+    .map(n => trim(n))
+    .filter(Boolean)
+    // Evita mezclar mensajes de Zuzu sobre costes anteriores con el coste final postprocesado.
+    .filter(n => !/(coste|persona|25|35|sobredimensionad|reajust|control de realidad|precio orientativo|dentro del rango)/i.test(n))
+    .slice(0, 2);
+  const donCount = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).length;
+  const donUnits = arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).reduce((sum, r) => sum + num(r.unidades), 0);
+  const compraCount = arr(rows).filter(r => r?.tipo === 'COMPRA' && r.include !== false).length;
+  const geminiFailed = arr(rawNotes).some(n => /Zuzu no pudo|no devolvi[oó]|tard[oó] demasiado|timeout|aborted|cuota|quota/i.test(trim(n)));
+  const base = (geminiFailed && compraCount === 0)
+    ? `Atención: Zuzu no ha devuelto compras estructuradas para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). ControlEvent conserva ${donCount} donaciones/existencias detectadas, pero NO da por calculada la compra: vuelve a generar o revisa la traza.`
+    : `Resumen claro: Zuzu ha preparado una propuesta revisable para “${title}” (${people} personas, ${days} día${days === 1 ? '' : 's'}). Compra prevista final: ${round(total,2)} € (${round(per,2)} €/persona). Donaciones/existencias detectadas: ${donCount} líneas / ${round(donUnits,2)} ud.; solo se descuentan si están confirmadas por el prompt o por histórico real.`;
+  const guide = `Para afinar de verdad, usa el campo de información como una conversación guiada: asistentes que beben cerveza, asistentes que toman cubatas, niños/no bebedores, comidas incluidas, presupuesto objetivo y existencias/donaciones confirmadas.`;
+  return [base, ...arr(budgetNotes).map(n => trim(n)).filter(Boolean), ...useful, guide].filter(Boolean);
+}
+function planPostProcessPlanningRows(rows, form, state) {
+  const maps = planBuildMaps(state);
+  const promptHintsHf21 = planConfirmedPromptDonationHintsHf21(form, state);
+  const hintMapHf21 = new Map(promptHintsHf21.map(h => [h.key, h]));
+  const grouped = new Map();
+  const out = arr(rows).map((r, idx) => planCanonicalizeRowProduct({...r, key:r.key || `plan:${idx}`}, maps));
+  // HOTFIX21: si una línea del prompt confirmado quedó como compra, se reconvierte a DONACION.
+  out.forEach(row => {
+    const prod = row.productId ? maps.products.get(trim(row.productId)) : planFindProductLoose(row.productName || row.producto || '', maps);
+    const k = trim(prod?.id || row.productId) ? `id:${trim(prod?.id || row.productId)}` : (planProductAliasKey(row.productName || row.producto || '') || normPlanKey(row.productName || row.producto || ''));
+    const h = hintMapHf21.get(k);
+    if (h && row.tipo !== 'DONACION') {
+      row.tipo = 'DONACION';
+      row.productId = h.productId || row.productId || '';
+      row.productName = h.productName || row.productName;
+      row.segmento = h.segmento || row.segmento;
+      row.destino = h.destino || row.destino;
+      row.unidades = h.unidades;
+      row.precio = h.precio || row.precio;
+      row.ticketDonacion = h.ticketDonacion;
+      row.donorRef = h.donorRef;
+      row.tiendaId = h.tiendaId;
+      row.responsableId = h.responsableId;
+      row.explicitPromptDonation = true;
+      row.explicitConfirmedDonation = true;
+      row.explicitPromptStrictHf12 = true;
+      row.reason = `Donación/existencia confirmada por prompt (${h.donorLabel}).`;
+    }
+  });
+  // Añade cualquier donación del prompt que todavía no exista en rows.
+  promptHintsHf21.forEach((h, pos) => {
+    const already = out.some(row => {
+      const prod = row.productId ? maps.products.get(trim(row.productId)) : planFindProductLoose(row.productName || row.producto || '', maps);
+      const k = trim(prod?.id || row.productId) ? `id:${trim(prod?.id || row.productId)}` : (planProductAliasKey(row.productName || row.producto || '') || normPlanKey(row.productName || row.producto || ''));
+      return k === h.key && row.tipo === 'DONACION';
+    });
+    if (!already) out.push({
+      key:`prompt-hf21-missing:${pos}:${h.key}`,
+      include:true,
+      tipo:'DONACION',
+      productId:h.productId,
+      productName:h.productName,
+      segmento:h.segmento,
+      destino:h.destino,
+      unidades:h.unidades,
+      precio:h.precio,
+      tiendaId:h.tiendaId,
+      responsableId:h.responsableId,
+      ticketDonacion:h.ticketDonacion,
+      donorRef:h.donorRef,
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      reason:`Donación/existencia confirmada por prompt (${h.donorLabel}).`
+    });
+  });
+  out.forEach((r, idx) => {
+    const k = trim(r.productId) ? `id:${trim(r.productId)}` : (planProductAliasKey(r.productName || r.producto || '') || normPlanKey(r.productName || r.producto || r.productId || `p${idx}`));
+    const g = grouped.get(k) || {key:k, rows:[], donation:0, purchase:0, needHint:0, productName:r.productName || r.producto || '', productId:r.productId || '', segment:r.segmento, destino:r.destino};
+    g.rows.push(idx);
+    const units = num(r.unidades);
+    if (r.tipo === 'DONACION') g.donation += units; else g.purchase += units;
+    if (num(r.necesidadTotal) > g.needHint) g.needHint = num(r.necesidadTotal);
+    if ((r.productName || '').length > (g.productName || '').length) { g.productName = r.productName || g.productName; g.segment = r.segmento || g.segment; g.destino = r.destino || g.destino; }
+    if (!g.productId && r.productId) g.productId = r.productId;
+    if (r.tipo === 'COMPRA' && r.productId) g.productId = r.productId;
+    grouped.set(k, g);
+  });
+  for (const g of grouped.values()) {
+    const prod = g.productId ? maps.products.get(trim(g.productId)) : planFindProductLoose(g.productName, maps);
+    const pname = trim(prod?.nombre || g.productName);
+    const hasExplicitDonation = g.rows.some(i => out[i]?.explicitPromptDonation === true);
+    // Si hay una donación explícita del prompt y no viene necesidadTotal fiable, la compra existente
+    // se interpreta como necesidad total calculada, NO como compra adicional sobre lo donado.
+    // Ej.: Anchoas donadas 1 y Zuzu calcula 2 => necesidad 2, compra 1; no compra 2.
+    const currentNeed = hasExplicitDonation
+      ? (g.needHint > 0 ? Math.max(g.needHint, g.donation) : Math.max(g.donation, g.purchase || g.donation))
+      : (g.needHint > 0 ? g.needHint : (g.donation + g.purchase));
+    const rawNeed = (hasExplicitDonation && g.purchase <= 0 && g.needHint <= 0)
+      ? currentNeed
+      : planMinimumNeed(pname, form, currentNeed);
+    const need = planDisplayNeedAfterRounding(pname, rawNeed);
+    // HOTFIX20: si solo hay donación/existencia explícita y no hay cálculo externo de necesidad,
+    // no se inventa compra por déficit para esa misma línea.
+    let buy = (hasExplicitDonation && g.purchase <= 0 && g.needHint <= 0) ? 0 : planBuyAfterDonation(pname, need, g.donation);
+    const price = planReasonablePlanPrice(pname, prod?.defaultPrecio ?? prod?.precio ?? 0);
+    let firstPurchase = g.rows.find(i => out[i]?.tipo === 'COMPRA');
+    if (buy > 0 && firstPurchase === undefined) {
+      firstPurchase = out.length;
+      out.push({
+        key:`auto-deficit:${g.key}`,
+        include:true,
+        tipo:'COMPRA', productId:trim(prod?.id || g.productId), productName:pname, segmento:trim(prod?.segmento || g.segment || 'Sin segmento'), destino:trim(prod?.destino || g.destino || 'Sin destino'),
+        unidades:buy, precio:price, tiendaId:trim(form.defaultStoreId), responsableId:trim(form.defaultResponsibleId), ticketDonacion:'', donorRef:'', confidence:'Déficit calculado',
+        reason:'Compra creada automáticamente como déficit tras restar existencias/donaciones.'
+      });
+      g.rows.push(firstPurchase);
+    }
+    g.rows.forEach(i => {
+      if (!out[i]) return;
+      out[i].necesidadTotal = round(need,2);
+      out[i].donadoTotal = round(g.donation,2);
+      out[i].aComprarCalculado = round(buy,2);
+      if (out[i].tipo === 'DONACION') out[i].precio = planReasonablePlanPrice(pname, out[i].precio || price);
+    });
+    if (firstPurchase !== undefined && out[firstPurchase]) {
+      out[firstPurchase].include = buy > 0;
+      out[firstPurchase].unidades = buy;
+      out[firstPurchase].precio = price;
+      out[firstPurchase].tiendaId = trim(out[firstPurchase].tiendaId || form.defaultStoreId);
+      out[firstPurchase].responsableId = trim(out[firstPurchase].responsableId || form.defaultResponsibleId);
+      out[firstPurchase].necesidadTotal = round(need,2);
+      out[firstPurchase].donadoTotal = round(g.donation,2);
+      out[firstPurchase].aComprarCalculado = round(buy,2);
+    }
+  }
+  return out.filter(r => r.productId || r.productName);
+}
+
+function planRefFromLooseLabel(label, maps, preferred = 'P') {
+  const direct = planDonorRefFromLabel(label, maps);
+  if (direct) return direct;
+  const key = normPlanKey(label);
+  if (!key) return '';
+  const scan = preferred === 'T' ? maps.stores : maps.people;
+  let best = null, bestScore = 0;
+  for (const row of scan.values()) {
+    const rk = normPlanKey(row?.nombre);
+    if (!rk) continue;
+    let score = 0;
+    if (rk === key) score += 100;
+    if (rk.includes(key) || key.includes(rk)) score += 30;
+    key.split(' ').filter(t=>t.length>=3).forEach(t => { if (rk.includes(t)) score += Math.min(8,t.length); });
+    if (score > bestScore) { best = row; bestScore = score; }
+  }
+  if (best && bestScore >= 12) return (preferred === 'T' ? 'T:' : 'P:') + best.id;
+  return '';
+}
+function planFindPersonLoose(label, maps) {
+  const key = normPlanKey(label);
+  if (!key) return null;
+  if (maps.personByName.has(key)) return maps.personByName.get(key);
+  let best = null, scoreBest = 0;
+  for (const p of maps.people.values()) {
+    const pk = normPlanKey(p?.nombre);
+    if (!pk) continue;
+    let score = 0;
+    if (pk === key) score += 100;
+    if (pk.includes(key) || key.includes(pk)) score += 30;
+    key.split(' ').filter(t=>t.length>=3).forEach(t => { if (pk.includes(t)) score += Math.min(7,t.length); });
+    if (score > scoreBest) { best = p; scoreBest = score; }
+  }
+  return scoreBest >= 12 ? best : null;
+}
+function planFindStoreLoose(label, maps) {
+  const key = normPlanKey(label);
+  if (!key) return null;
+  if (maps.storeByName.has(key)) return maps.storeByName.get(key);
+  let best = null, scoreBest = 0;
+  for (const t of maps.stores.values()) {
+    const tk = normPlanKey(t?.nombre);
+    if (!tk) continue;
+    let score = 0;
+    if (tk === key) score += 100;
+    if (tk.includes(key) || key.includes(tk)) score += 30;
+    key.split(' ').filter(x=>x.length>=3).forEach(x => { if (tk.includes(x)) score += Math.min(7,x.length); });
+    if (score > scoreBest) { best = t; scoreBest = score; }
+  }
+  return scoreBest >= 12 ? best : null;
+}
+function planExtractBracket(text, names) {
+  const raw = trim(text || '');
+  for (const name of names) {
+    const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let m = raw.match(new RegExp('\\[\\s*' + safe + '\\s*[:=]\\s*([^\\]\\n]+)\\]', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
+    m = raw.match(new RegExp(safe + '\\s*[:=]\\s*["“]([^"”]+)["”]', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
+    m = raw.match(new RegExp(safe + '\\s*[:=]\\s*([^\\]\\);,\\n]+)', 'i'));
+    if (m) return trim(m[1] || '').replace(/[\]\)\.。]+$/,'').trim();
+  }
+  return '';
+}
+function planMentionedStore(textBlock, maps) {
+  const hay = normPlanKey(textBlock || '');
+  if (!hay) return null;
+  return [...maps.stores.values()]
+    .filter(t => normPlanKey(t?.nombre).length >= 3)
+    .sort((a,b)=>normPlanKey(b?.nombre).length - normPlanKey(a?.nombre).length)
+    .find(t => hay.includes(normPlanKey(t?.nombre))) || null;
+}
+function planMentionedPerson(textBlock, maps) {
+  const hay = normPlanKey(textBlock || '');
+  if (!hay) return null;
+  return [...maps.people.values()]
+    .filter(pe => normPlanKey(pe?.nombre).length >= 3)
+    .sort((a,b)=>normPlanKey(b?.nombre).length - normPlanKey(a?.nombre).length)
+    .find(pe => hay.includes(normPlanKey(pe?.nombre))) || null;
+}
+function planCleanExplicitProductText(text) {
+  let s = trim(text || '').replace(/^\s*[•\-\*]\s*/, '');
+  const donorPrefix = s.match(/^([^:\n]{2,90})\s*:\s*([^:\n]{2,240}:\s*.+)$/i);
+  if (donorPrefix) s = trim(donorPrefix[2]);
+  if (s.includes(':')) s = s.slice(0, s.lastIndexOf(':'));
+  s = s.replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+(?:de\s+)?/i, '');
+  s = s.replace(/\(([^)]*)\)/g, (m, inner) => {
+    const t = trim(inner || '');
+    if (!t) return ' ';
+    if (/^(?:bolsa|pack|paquete|caja)\s+\d/i.test(t)) return ' ';
+    return ' ' + t + ' ';
+  });
+  s = s.replace(/\b(?:bolsa|pack|packs|paquete|paquetes)\s*(?:de|x)?\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?\b/ig, ' ');
+  s = s.replace(/\bpieza\s+\d+(?:[,.]\d+)?\s*kg\b/ig, ' ');
+  s = s.replace(/\bBEETER\b/ig, 'Bitter');
+  s = s.replace(/\bWISKI\b/ig, 'Whisky');
+  s = s.replace(/\bJHONY\b/ig, 'Jhony');
+  s = s.replace(/\bLAVAMANOS\b/ig, 'manos');
+  s = s.replace(/\s+/g, ' ');
+  return trim(s.replace(/[.;]+$/,''));
+}
+function planExplicitUnits(text) {
+  const raw = trim(text || '');
+  const tail = raw.includes(':') ? raw.slice(raw.lastIndexOf(':') + 1) : raw;
+  let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?/i);
+  if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
+  m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+  if (m) return Math.max(0, round(num(m[1]), 2));
+  m = tail.match(/(\d+(?:[,.]\d+)?)/);
+  if (m) return Math.max(0, num(m[1]));
+  m = raw.match(/^\s*[•\-]?\s*(\d+(?:[,.]\d+)?)/);
+  if (m) return Math.max(0, num(m[1]));
+  return 1;
+}
+function planBlockBetween(raw, startRe, endReList) {
+  const m = raw.match(startRe);
+  if (!m) return '';
+  const start = m.index + m[0].length;
+  let end = raw.length;
+  for (const re of endReList) {
+    const sub = raw.slice(start).search(re);
+    if (sub >= 0) end = Math.min(end, start + sub);
+  }
+  return raw.slice(start, end);
+}
+function planExplicitItemLines(block) {
+  const out = [];
+  trim(block).split(/\n+/).forEach(line => {
+    const s = trim(line);
+    if (!s || /^\s*[•\-\*]?\s*COMPRA\s*:/i.test(s)) return;
+    if (/\b(responsable|donante|tienda|tipo\s+donaci[oó]n)\b\s*:/i.test(s) && !/\d/.test(s)) return;
+    const m = s.match(/^\s*[•\-\*]\s*(.+)$/);
+    if (m) { out.push(m[1]); return; }
+    // Soporta líneas sin guion: "Anchoas: 1", "Rollo papel secamanos: 1", "1 kg de chorizo"
+    // y líneas con donante delante: "Pocholo y Celes: Anchoas: 1".
+    if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,140}:\s*(?:\d|un|una|uno)/i.test(s)
+      || /^[^:\n]{2,90}:\s*[^:\n]{2,160}:\s*(?:\d|un|una|uno)/i.test(s)
+      || /^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(s)) out.push(s);
+  });
+  return out.map(x => trim(x).replace(/^\s*[•\-\*]\s*/, '')).filter(Boolean);
+}
+function planExplicitDonationSections(info) {
+  const raw = trim(info || '').replace(/\r/g, '');
+  if (!raw) return [];
+  const headerRe = /(?:^|\n)[^\n]*(?:(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A)|PRODUCTOS?\s+DONADOS?|DONACIONES?|DONACION|EXISTENCIAS?|YA\s+TENEMOS|MATERIAL\s+DONADO)[^\n]*/gi;
+  const matches = [];
+  let m;
+  while ((m = headerRe.exec(raw))) matches.push({ index:m.index, end:headerRe.lastIndex, header:trim(m[0]) });
+  return matches.map((h, idx) => {
+    let end = idx + 1 < matches.length ? matches[idx + 1].index : raw.length;
+    const tail = raw.slice(h.end);
+    const stopRe = /\n\s*(?:[•\-]\s*)?(?:COMPRA|COMPRAS|A\s+COMPRAR|DETALLES\s+PARA|COMIDAS\s+INCLUIDAS|CRITERIO\s+DE\s+C[ÁA]LCULO|RESULTADO\s+QUE\s+QUIERO|OBJETIVO)\s*:/i;
+    const stop = tail.search(stopRe);
+    if (stop >= 0) end = Math.min(end, h.end + stop);
+    const block = raw.slice(h.end, end);
+    const typeMatch = (h.header + '\n' + block.slice(0, 250)).match(/DONADO\s+(SOCIO|TIENDA|OTROS)/i);
+    const ticket = typeMatch ? `DONADO ${typeMatch[1].toUpperCase()}` : (/\btienda\b|\bdespensa\b/i.test(h.header) ? 'DONADO TIENDA' : 'DONADO SOCIO');
+    return { header:h.header, block, ticketDonacion:ticket };
+  }).filter(x => planExplicitItemLines(x.block).length);
+}
+function planExplicitDonationRowsFromPrompt(form, state) {
+  const info = planPromptRawText(form).replace(/\r/g, '');
+  if (!trim(info)) return [];
+  const maps = planBuildMaps(state);
+  const rowsOut = [];
+  const seen = new Set();
+
+  function donationTypeFromText(txt) {
+    const n = normPlanKey(txt || '');
+    if (/donado\s+tienda|donacion\s+de\s+tienda|donaci[oó]n\s+de\s+tienda|donaciones\s+de\s+tienda/.test(n)) return 'DONADO TIENDA';
+    if (/donado\s+otros|donacion\s+de\s+otros|donaci[oó]n\s+de\s+otros|donaciones\s+de\s+otros/.test(n)) return 'DONADO OTROS';
+    if (/producto\s+en\s+la\s+pe[nñ]a|donado\s+socio|donaciones\s+de\s+socios|donacion\s+de\s+socios/.test(n)) return 'DONADO SOCIO';
+    if (/tienda/.test(n)) return 'DONADO TIENDA';
+    if (/otros|externo/.test(n)) return 'DONADO OTROS';
+    return 'DONADO SOCIO';
+  }
+  function headerMeta(line, prev = {}) {
+    const h = trim(line || '');
+    const out = { ...(prev || {}) };
+    const type = donationTypeFromText(h);
+    if (/donado|donaci[oó]n|producto\s+en\s+la\s+pe[nñ]a|existenc|ya\s+tenemos/i.test(h)) out.ticket = type;
+    const bracketDonor = planExtractBracket(h, ['Donante']);
+    const bracketResp = planExtractBracket(h, ['Responsable']);
+    const bracketStore = planExtractBracket(h, ['Tienda']);
+    if (bracketDonor) out.donor = bracketDonor;
+    if (bracketResp) out.responsable = bracketResp;
+    if (bracketStore) out.tienda = bracketStore;
+
+    // Soporta: "Donado socio - Peña El Arrastre / Responsable Colty"
+    let m = h.match(/donado\s+(socio|tienda|otros)\s*[-–:]\s*([^\n\[]+)/i)
+      || h.match(/donaci[oó]n\s+de\s+(socio|socios|tienda|otros)\s*[-–:]\s*([^\n\[]+)/i)
+      || h.match(/donaciones\s+de\s+(socios|tienda|otros)\s*[-–:]\s*([^\n\[]+)/i);
+    if (m) {
+      const kind = normPlanKey(m[1] || '');
+      out.ticket = /tienda/.test(kind) ? 'DONADO TIENDA' : (/otro/.test(kind) ? 'DONADO OTROS' : 'DONADO SOCIO');
+      const rest = trim(m[2] || '');
+      const parts = rest.split('/').map(x => trim(x)).filter(Boolean);
+      // FIX35: si aparece un encabezado explícito de donación, ese encabezado manda.
+      // En FIX34 se heredaba "Existencias" desde el encabezado general y no se sustituía.
+      if (parts[0]) out.donor = parts[0].replace(/responsable\s*[:=]?.*$/i, '').trim();
+      const respPart = parts.find(x => /responsable/i.test(x));
+      if (respPart) out.responsable = trim(respPart.replace(/responsable\s*[:=]?/i, ''));
+      if (!out.responsable && out.donor && /producto\s+en\s+la\s+pe[nñ]a/i.test(h)) out.responsable = trim(form.defaultResponsibleName || 'Colty');
+    }
+    if (!out.donor && /producto\s+en\s+la\s+pe[nñ]a/i.test(h)) out.donor = 'Peña El Arrastre';
+    if (!out.responsable && /producto\s+en\s+la\s+pe[nñ]a/i.test(h)) out.responsable = trim(form.defaultResponsibleName || 'Colty');
+    if (!out.ticket) out.ticket = 'DONADO SOCIO';
+    if (!out.donor && /^\s*(?:[-*•]\s*)?(?:existencias?|ya\s+tenemos)\b/i.test(h)) out.donor = 'Existencias';
+    if (!out.donor) out.donor = out.ticket === 'DONADO TIENDA' ? 'Tienda donante' : (out.ticket === 'DONADO OTROS' ? 'Donante externo' : 'Donante indicado');
+    if (!out.responsable) out.responsable = trim(form.defaultResponsibleName || out.donor);
+    if (!out.tienda && out.ticket === 'DONADO TIENDA') out.tienda = out.donor;
+    return out;
+  }
+  function isDonationHeader(line) {
+    const l = line || '';
+    // FIX38: "Donaciones y existencias confirmadas" es un título de sección, no un donante.
+    // En FIX36/FIX37 activaba el donante genérico "Existencias" y se perdían Peña/Pocholo/etc.
+    if (/^\s*(?:[-*•]\s*)?DONACIONES?\s+Y\s+EXISTENCIAS\s+CONFIRMADAS\b/i.test(l)) return false;
+    return /^\s*(?:[-*•]\s*)?(?:PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\s+(?:DE\s+SOCIOS?|DE\s+TIENDA|DE\s+OTROS)|DONACI[OÓ]N\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONACION\s+DE\s+(?:SOCIOS?|TIENDA|OTROS)|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:]|EXISTENCIAS?\b|YA\s+TENEMOS\b|PRODUCTOS?\s+DONADOS?|MATERIAL\s+DONADO)\b/i.test(l);
+  }
+  function isHardStop(line) {
+    return /^\s*(?:PISTAS?\s+DE\s+COMPRA|REGLAS?\s+FINALES|CRITERIOS?\s+DE\s+C[ÁA]LCULO|DATOS\s+PARA\s+EL\s+C[ÁA]LCULO|DESCRIPCI[OÓ]N\s+CONCEPTUAL|OBJETIVO\s+DEL\s+EVENTO)\b/i.test(line || '');
+  }
+  function isProductLine(line) {
+    const s = trim(line || '');
+    if (!s || /^PRODUCTOS?\s*:?$/i.test(s)) return false;
+    if (/^(?:tratar\s+todo|donante|responsable|tienda)\b/i.test(s)) return false;
+    if (/^\s*[•\-*]\s*[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(line || '')) return true;
+    if (/^[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(s)) return true;
+    return /^\s*[•\-*]\s*\d+(?:[,.]\d+)?\s*(?:ud\.?|uds\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(line || '');
+  }
+  function pushItem(itemRaw, meta) {
+    const productoTexto = planCleanExplicitProductText(itemRaw);
+    if (!productoTexto || /^(productos?|donante|responsable|tratar\s+todo|bloque)$/i.test(productoTexto)) return;
+    const unidades = Math.max(0.01, planExplicitUnits(itemRaw));
+    const k = [meta.ticket, normPlanKey(meta.donor), normPlanKey(productoTexto), unidades].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    const prod = planFindProductLoose(productoTexto, maps) || {};
+    const donorKind = meta.ticket === 'DONADO TIENDA' ? 'T' : 'P';
+    const donorRef = planRefFromLooseLabel(meta.donor, maps, donorKind) || (meta.ticket === 'DONADO TIENDA' ? planRefFromLooseLabel(meta.tienda || meta.donor, maps, 'T') : '') || trim(meta.donor);
+    const rowResp = planFindPersonLoose(meta.responsable, maps);
+    const rowStore = planFindStoreLoose(meta.tienda || meta.donor, maps);
+    rowsOut.push({
+      key:`prompt-don-fix35:${rowsOut.length}:${trim(prod?.id || productoTexto)}`,
+      include:true,
+      tipo:'DONACION',
+      productId:trim(prod?.id || ''),
+      productName:trim(prod?.nombre || productoTexto),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      unidades:round(unidades, 2),
+      precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      tiendaId:trim(rowStore?.id || form.defaultStoreId || ''),
+      responsableId:trim(rowResp?.id || form.defaultResponsibleId || ''),
+      ticketDonacion:meta.ticket,
+      donorRef,
+      confidence:'Prompt explícito',
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      reason:`Existencia/donación indicada literalmente por el usuario (${meta.donor}).`
+    });
+  }
+
+  let active = null;
+  info.split(/\n/).forEach(rawLine => {
+    const line = trim(rawLine);
+    if (!line) return;
+    if (isHardStop(line)) { active = null; return; }
+    if (isDonationHeader(line)) { active = headerMeta(line, active || {}); return; }
+    if (active && (/Tratar\s+todo\s+este\s+bloque\s+como\s+DONADO/i.test(line) || /Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line) || /^responsable\s*[:=]/i.test(line) || /^donante\s*[:=]/i.test(line))) { active = headerMeta(line, active); return; }
+    if (!active) return;
+    if (/^PRODUCTOS?\s*:?$/i.test(line)) return;
+    if (isProductLine(rawLine)) pushItem(rawLine, active);
+  });
+
+  // Frases sueltas fuera de bloques: "Pocholo dona Anchoas: 1" o "Ya tenemos ...".
+  info.split(/\n+/).forEach(lineRaw => {
+    const s = trim(lineRaw);
+    if (!s || !/(dona|donar|donad|aport|regala|cede|existenc|ya\s+tenemos)/i.test(s)) return;
+    let m = s.match(/^\s*(?:[•\-]\s*)?(.{2,80}?)\s+(?:dona|donar[áa]?|aporta|regala|cede)\s+(.+)$/i);
+    if (m) { pushItem(trim(m[2]), { ticket:'DONADO SOCIO', donor:trim(m[1]), responsable:trim(m[1]), tienda:'' }); return; }
+    m = s.match(/^\s*(?:[•\-]\s*)?(?:ya\s+tenemos|existencias?)\s*:?\s*(.+)$/i);
+    if (m) pushItem(trim(m[1]), { ticket:'DONADO SOCIO', donor:'Existencias', responsable:trim(form.defaultResponsibleName || 'Responsable'), tienda:'' });
+  });
+  return rowsOut;
+}
+
+function planExplicitDonationRowsFromPromptRobustFix39(form, state) {
+  const info = planPromptRawText(form).replace(/\r/g, '');
+  if (!trim(info)) return [];
+  const maps = planBuildMaps(state || {});
+  const rows = [];
+  const seen = new Set();
+
+  function typeFromKind(kind, whole='') {
+    const n = normPlanKey((kind || '') + ' ' + (whole || ''));
+    if (/TIENDA/.test(n)) return 'DONADO TIENDA';
+    if (/OTRO|OTROS|EXTERNO/.test(n)) return 'DONADO OTROS';
+    return 'DONADO SOCIO';
+  }
+  function cleanDonorText(value) {
+    return trim(String(value || '')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/responsable\s*[:=]?.*$/i, '')
+      .replace(/tratar\s+todo.*$/i, '')
+      .replace(/productos?\s*:.*$/i, '')
+      .replace(/[.;]+$/g, '')
+    );
+  }
+  function headerFromLine(line, prev={}) {
+    const h = trim(line || '');
+    const meta = {...(prev || {})};
+    let m = h.match(/^\s*(?:[-*•]\s*)?Donado\s+(socio|tienda|otros)\s*[-–:]\s*(.+)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaci[oó]n\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaciones\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i);
+    if (m) {
+      meta.ticket = typeFromKind(m[1], h);
+      const rest = trim(m[2] || '');
+      if (rest) {
+        const parts = rest.split('/').map(x => trim(x)).filter(Boolean);
+        if (parts[0]) meta.donor = cleanDonorText(parts[0]);
+        const respPart = parts.find(x => /responsable/i.test(x));
+        if (respPart) meta.responsable = trim(respPart.replace(/responsable\s*[:=]?/i, ''));
+      }
+      if (!meta.donor && /tienda/i.test(m[1])) meta.donor = 'Tienda donante';
+      if (!meta.donor && /otros/i.test(m[1])) meta.donor = 'Donante externo';
+      return meta;
+    }
+    if (/PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) {
+      meta.ticket = 'DONADO SOCIO';
+      meta.donor = meta.donor && !/existenc|donante indicado/i.test(meta.donor) ? meta.donor : 'Peña El Arrastre';
+      meta.responsable = meta.responsable || trim(form.defaultResponsibleName || 'Colty');
+      return meta;
+    }
+    if (/DONACI[OÓ]N\s+DE\s+TIENDA|DONACION\s+DE\s+TIENDA|DONADO\s+TIENDA/i.test(h)) { meta.ticket = 'DONADO TIENDA'; return meta; }
+    if (/DONACI[OÓ]N\s+DE\s+OTROS|DONACION\s+DE\s+OTROS|DONADO\s+OTROS/i.test(h)) { meta.ticket = 'DONADO OTROS'; return meta; }
+    if (/DONACIONES?\s+DE\s+SOCIOS?|DONADO\s+SOCIO/i.test(h)) { meta.ticket = 'DONADO SOCIO'; return meta; }
+    if (/EXISTENCIAS?|YA\s+TENEMOS/i.test(h)) { meta.ticket = meta.ticket || 'DONADO SOCIO'; meta.donor = meta.donor || 'Existencias'; return meta; }
+    return meta;
+  }
+  function applyMetaLine(line, meta={}) {
+    const h = trim(line || '');
+    const out = {...(meta || {})};
+    const donor = planExtractBracket(h, ['Donante']) || (h.match(/^\s*Donante\s*[:=]\s*(.+)$/i)||[])[1] || '';
+    const resp = planExtractBracket(h, ['Responsable']) || (h.match(/^\s*Responsable\s*[:=]\s*(.+)$/i)||[])[1] || '';
+    if (donor) out.donor = trim(donor);
+    if (resp) out.responsable = trim(resp);
+    if (/DONADO\s+TIENDA/i.test(h)) out.ticket = 'DONADO TIENDA';
+    else if (/DONADO\s+OTROS/i.test(h)) out.ticket = 'DONADO OTROS';
+    else if (/DONADO\s+SOCIO/i.test(h)) out.ticket = 'DONADO SOCIO';
+    return out;
+  }
+  function isHeader(line) {
+    const l = trim(line || '');
+    if (/^DONACIONES?\s+Y\s+EXISTENCIAS\s+CONFIRMADAS\b/i.test(l)) return false;
+    return /^(?:[-*•]\s*)?(?:Donado\s+(?:socio|tienda|otros)\s*[-–:]|Donaci[oó]n\s+de\s+(?:socio|socios|tienda|otros)|Donaciones\s+de\s+(?:socio|socios|tienda|otros)|Producto\s+en\s+la\s+pe[nñ]a|Existencias?|Ya\s+tenemos)\b/i.test(l);
+  }
+  function isStop(line) {
+    return /^\s*(?:Pistas?\s+de\s+compra|Reglas?\s+finales|Criterios?\s+de\s+c[aá]lculo|Datos\s+para\s+el\s+c[aá]lculo|Descripci[oó]n\s+conceptual|Resumen\s+de\s+men[uú]|Personas\s+y\s+consumo|Datos\s+generales)\b/i.test(line || '');
+  }
+  function productLine(line) {
+    const s = trim(line || '').replace(/^\s*[•\-*]\s*/, '');
+    if (!s || /^PRODUCTOS?\s*:?$/i.test(s)) return '';
+    if (/^(?:Tratar\s+todo|Donante|Responsable|Tienda)\b/i.test(s)) return '';
+    if (/^[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(s)) return s;
+    return '';
+  }
+  function push(raw, meta) {
+    const m = {...(meta || {})};
+    if (!m.ticket) m.ticket = 'DONADO SOCIO';
+    if (!m.donor) m.donor = m.ticket === 'DONADO TIENDA' ? 'Tienda donante' : (m.ticket === 'DONADO OTROS' ? 'Donante externo' : 'Donante indicado');
+    if (!m.responsable) m.responsable = trim(form.defaultResponsibleName || m.donor);
+    const productoTexto = planCleanExplicitProductText(raw);
+    if (!productoTexto) return;
+    const unidades = Math.max(0.01, planExplicitUnits(raw));
+    const k = [normPlanKey(m.ticket), normPlanKey(m.donor), normPlanKey(productoTexto), unidades].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    const prod = planFindProductLoose(productoTexto, maps) || {};
+    const donorKind = m.ticket === 'DONADO TIENDA' ? 'T' : 'P';
+    const donorRef = planRefFromLooseLabel(m.donor, maps, donorKind) || trim(m.donor);
+    const rowResp = planFindPersonLoose(m.responsable, maps);
+    const rowStore = m.ticket === 'DONADO TIENDA' ? planFindStoreLoose(m.donor, maps) : null;
+    rows.push({
+      key:`prompt-don-fix39:${rows.length}:${trim(prod?.id || productoTexto)}`,
+      include:true,
+      tipo:'DONACION',
+      productId:trim(prod?.id || ''),
+      productName:trim(prod?.nombre || productoTexto),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      unidades:round(unidades, 2),
+      precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      tiendaId:trim(rowStore?.id || form.defaultStoreId || ''),
+      responsableId:trim(rowResp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
+      ticketDonacion:m.ticket,
+      donorRef,
+      confidence:'Prompt explícito FIX39',
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      reason:`Existencia/donación indicada literalmente por el usuario (${m.donor}).`
+    });
+  }
+
+  let active = null;
+  info.split(/\n/).forEach(raw => {
+    const line = trim(raw);
+    if (!line) return;
+    if (isStop(line)) { active = null; return; }
+    if (isHeader(line)) { active = headerFromLine(line, active || {}); return; }
+    if (active && (/Tratar\s+todo\s+este\s+bloque\s+como\s+DONADO/i.test(line) || /^\[?(?:Donante|Responsable)\s*:/i.test(line) || /^\s*(?:Donante|Responsable)\s*=/i.test(line))) { active = applyMetaLine(line, active); return; }
+    if (!active) return;
+    const pl = productLine(raw);
+    if (pl) push(pl, active);
+  });
+  return rows;
+}
+
+
+function planExplicitDonationRowsUltraFix40(form, state) {
+  const info = planPromptRawText(form).replace(/\r/g, '');
+  if (!trim(info)) return [];
+  const maps = planBuildMaps(state || {});
+  const rows = [];
+  const seen = new Set();
+  function parseHeader(line) {
+    const h = trim(line || '');
+    let m = h.match(/^\s*(?:[-*•]\s*)?Donado\s+(socio|tienda|otros)\s*[-–:]\s*(.+)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaci[oó]n\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i)
+      || h.match(/^\s*(?:[-*•]\s*)?Donaciones\s+de\s+(socio|socios|tienda|otros)\s*[-–:]?\s*(.*)$/i);
+    if (m) {
+      const kind = normPlanKey(m[1] || '');
+      const ticket = /tienda/.test(kind) ? 'DONADO TIENDA' : (/otro/.test(kind) ? 'DONADO OTROS' : 'DONADO SOCIO');
+      const rest = trim(m[2] || '');
+      const parts = rest.split('/').map(x => trim(x)).filter(Boolean);
+      const donor = trim((parts[0] || (ticket === 'DONADO TIENDA' ? 'Tienda donante' : ticket === 'DONADO OTROS' ? 'Donante externo' : 'Donante indicado')).replace(/responsable\s*[:=]?.*$/i, ''));
+      const respPart = parts.find(x => /responsable/i.test(x));
+      const responsable = respPart ? trim(respPart.replace(/responsable\s*[:=]?/i, '')) : trim(form.defaultResponsibleName || donor);
+      return { ticket, donor, responsable, tienda: ticket === 'DONADO TIENDA' ? donor : '' };
+    }
+    if (/^\s*(?:[-*•]\s*)?Producto\s+en\s+la\s+pe[nñ]a\b/i.test(h)) return { ticket:'DONADO SOCIO', donor:'Peña El Arrastre', responsable:trim(form.defaultResponsibleName || 'Colty'), tienda:'' };
+    return null;
+  }
+  function isStop(line) {
+    return /^\s*(?:Pistas?\s+de\s+compra|Reglas?\s+finales|Criterios?\s+de\s+c[aá]lculo|Datos\s+para\s+el\s+c[aá]lculo|Descripci[oó]n\s+conceptual|Resumen\s+de\s+men[uú]|Personas\s+y\s+consumo|Datos\s+generales|Objetivo\s+del\s+evento)\b/i.test(line || '');
+  }
+  function isProduct(line) {
+    const s = trim(line || '').replace(/^\s*[•\-*]\s*/, '');
+    if (!s || /^PRODUCTOS?\s*:?$/i.test(s)) return false;
+    if (/^(?:Tratar\s+todo|Donante|Responsable|Tienda)\b/i.test(s)) return false;
+    return /^[^:\n]{2,260}:\s*(?:\d|un|una|uno|pack|paquete|caja|barril)/i.test(s);
+  }
+  function push(raw, meta) {
+    const clean = trim(String(raw || '').replace(/^\s*[•\-*]\s*/, ''));
+    const productoTexto = planCleanExplicitProductText(clean);
+    if (!productoTexto) return;
+    const unidades = Math.max(0.01, planExplicitUnits(clean));
+    const k = [normPlanKey(meta.ticket), normPlanKey(meta.donor), normPlanKey(productoTexto), round(unidades, 2)].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    let prod = planFindProductLoose(productoTexto, maps) || {};
+    const incompatible = prod?.id && !planProductFormatCompatible38(productoTexto, prod.nombre || '');
+    const donorKind = meta.ticket === 'DONADO TIENDA' ? 'T' : 'P';
+    const donorRef = planRefFromLooseLabel(meta.donor, maps, donorKind) || trim(meta.donor);
+    const rowResp = planFindPersonLoose(meta.responsable, maps);
+    const rowStore = meta.ticket === 'DONADO TIENDA' ? planFindStoreLoose(meta.tienda || meta.donor, maps) : null;
+    rows.push({
+      key:`prompt-don-fix40:${rows.length}:${trim((!incompatible && prod?.id) || productoTexto)}`,
+      include:true,
+      tipo:'DONACION',
+      productId: incompatible ? '' : trim(prod?.id || ''),
+      productName: incompatible ? productoTexto : trim(prod?.nombre || productoTexto),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      unidades:round(unidades, 2),
+      precio:planReasonablePlanPrice(prod?.nombre || productoTexto, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      tiendaId:trim(rowStore?.id || form.defaultStoreId || ''),
+      responsableId:trim(rowResp?.id || (String(donorRef).startsWith('P:') ? String(donorRef).slice(2) : '') || form.defaultResponsibleId || ''),
+      ticketDonacion:meta.ticket,
+      donorRef,
+      confidence:'Prompt explícito FIX40',
+      explicitPromptDonation:true,
+      explicitConfirmedDonation:true,
+      explicitPromptStrictHf12:true,
+      __productoEscritoOriginal: productoTexto,
+      reason:`Donación/existencia indicada literalmente por el usuario (${meta.donor}).`
+    });
+  }
+  let active = null;
+  info.split(/\n/).forEach(raw => {
+    const line = trim(raw);
+    if (!line) return;
+    const header = parseHeader(line);
+    if (header) { active = header; return; }
+    if (active && isStop(line)) { active = null; return; }
+    if (active && isProduct(line)) push(raw, active);
+  });
+  return rows;
+}
+
+function planExplicitDonationRowsLocalFix39(form, state) {
+  const oldRows = arr(planExplicitDonationRowsFromPrompt(form, state));
+  const robustRows = arr(planExplicitDonationRowsFromPromptRobustFix39(form, state));
+  const ultraRows = arr(planExplicitDonationRowsUltraFix40(form, state));
+  const byKey = new Map();
+  function key(row) { return [normPlanKey(row?.ticketDonacion), normPlanKey(row?.donorRef), normPlanKey(row?.productName), round(row?.unidades,2)].join('|'); }
+  function donorIsGeneric(row){ return /EXISTENCIAS|DONANTE INDICADO|DONANTE EXTERNO|TIENDA DONANTE/.test(normPlanKey(row?.donorRef || row?.donorLabel || '')); }
+  function put(row){
+    if (row?.tipo !== 'DONACION') return;
+    const k = key(row);
+    const old = byKey.get(k);
+    if (!old || donorIsGeneric(old) || !donorIsGeneric(row)) byKey.set(k, row);
+  }
+  oldRows.forEach(put);
+  robustRows.forEach(put);
+  ultraRows.forEach(put);
+  return [...byKey.values()];
+}
+
+function planDonationProductKey(row) {
+  return trim(row?.productId) || planProductAliasKey(row?.productName || row?.producto || '') || normPlanKey(row?.productName || row?.producto || '');
+}
+function planExplicitDonationMatch(row, ex, exactUnits = false) {
+  if (!row || row.tipo !== 'DONACION' || !ex) return false;
+  const rowKey = planDonationProductKey(row);
+  const exKey = planDonationProductKey(ex);
+  if (!rowKey || !exKey || rowKey !== exKey) return false;
+  const rowDonor = trim(row.donorRef);
+  const exDonor = trim(ex.donorRef);
+  if (rowDonor && exDonor && rowDonor !== exDonor) return false;
+  const rowTicket = trim(row.ticketDonacion).toUpperCase();
+  const exTicket = trim(ex.ticketDonacion).toUpperCase();
+  if (rowTicket && exTicket && rowTicket !== exTicket) return false;
+  if (exactUnits && Math.abs(num(row.unidades) - num(ex.unidades)) >= 0.01) return false;
+  return true;
+}
+function planMergeExplicitDonations(rows, explicitRows) {
+  let explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION' && num(r.unidades) > 0);
+  if (!explicit.length) return arr(rows).slice();
+  // FIX38: si Zuzu devuelve donaciones en JSON directo, se respetan sus donantes/responsables.
+  // El parser local queda como red de seguridad para añadir faltantes, no para pisar a Zuzu con "Existencias".
+  const rowsListForDirect38 = arr(rows);
+  const hasGeminiDirectDonation38 = rowsListForDirect38.some(r => r?.tipo === 'DONACION' && r.__geminiDirect38 === true);
+  if (hasGeminiDirectDonation38) {
+    const directKeys = new Set(rowsListForDirect38.filter(r => r?.tipo === 'DONACION').map(planDonationProductKey).filter(Boolean));
+    explicit = explicit.filter(ex => !directKeys.has(planDonationProductKey(ex)));
+    if (!explicit.length) return rowsListForDirect38.slice();
+  }
+  // Deduplicación defensiva: el mismo producto/donante/tipo puede detectarse dos veces si el usuario
+  // lo escribe dentro de un bloque de donaciones y además como línea suelta. En ese caso manda la
+  // cantidad menor/primera escrita, para evitar barbaridades como 20 + 48 de la misma cerveza.
+  const byExplicitKey = new Map();
+  explicit.forEach(ex => {
+    const k = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase()].join('|');
+    const prev = byExplicitKey.get(k);
+    if (!prev) { byExplicitKey.set(k, ex); return; }
+    const a = num(prev.unidades), b = num(ex.unidades);
+    // Si una detección trae más unidades por haber leído una frase larga o contexto, se conserva la cantidad más prudente.
+    byExplicitKey.set(k, b > 0 && (a <= 0 || b < a) ? ex : prev);
+  });
+  explicit = [...byExplicitKey.values()];
+  // Si el prompt trae una donación explícita, esa cantidad manda. Eliminamos cualquier DONACION de Zuzu
+  // o histórica del mismo producto, aunque traiga otro donante o más unidades, para que no se duplique ni se infle.
+  const explicitKeys = new Set(explicit.map(planDonationProductKey).filter(Boolean));
+  const out = arr(rows).filter(row => !(row?.tipo === 'DONACION' && explicitKeys.has(planDonationProductKey(row))));
+  const seen = new Set();
+  explicit.forEach(ex => {
+    const key = [planDonationProductKey(ex), trim(ex.donorRef), trim(ex.ticketDonacion).toUpperCase()].join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.unshift({
+      ...ex,
+      explicitPromptDonation: true,
+      explicitConfirmedDonation: true,
+      unidades: Math.max(0, round(ex.unidades, 2)),
+      include: ex.include !== false,
+      confidence: trim(ex.confidence || 'Prompt explícito'),
+      reason: trim(ex.reason || 'Donación indicada por el usuario.') + ' Cantidad de donación bloqueada por prompt: cualquier necesidad adicional debe ir a compra por déficit.'
+    });
+  });
+  return out;
+}
+function planSanitizeInventedDonations(rows, baseRows, explicitRows, mode = '') {
+  const allowedHistoric = new Set();
+  // En REPLICA se conservan donaciones históricas. En ZUZU_TOTAL/PARCIAL no se arrastran
+  // donaciones futuras no confirmadas por el prompt: se convierten en compra pendiente.
+  if (trim(mode).toUpperCase() === 'REPLICA') arr(baseRows).filter(r => r?.tipo === 'DONACION').forEach(r => allowedHistoric.add(planDonationProductKey(r)));
+  const explicit = arr(explicitRows).filter(r => r?.tipo === 'DONACION');
+  const allowedExplicit = new Set(explicit.map(planDonationProductKey).filter(Boolean));
+  return arr(rows).map(row => {
+    if (row?.tipo !== 'DONACION') return row;
+    const key = planDonationProductKey(row);
+    if (row?.explicitPromptDonation === true || row?.explicitPromptStrictHf12 === true || row?.explicitConfirmedDonation === true) return row;
+    if (allowedExplicit.has(key) && /Prompt|expl[ií]cito|confirmad/i.test(trim(row?.confidence || '') + ' ' + trim(row?.reason || ''))) return {...row, explicitPromptDonation:true, explicitConfirmedDonation:true};
+    const exactExplicit = explicit.some(ex => planExplicitDonationMatch(row, ex, true));
+    if (exactExplicit) return row;
+    if (allowedExplicit.has(key)) {
+      return {
+        ...row,
+        tipo: 'COMPRA',
+        ticketDonacion: '',
+        donorRef: '',
+        include: row.include !== false,
+        confidence: 'Compra por déficit',
+        reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' El prompt ya fija una donación exacta para este producto; esta cantidad adicional no se acepta como donación y queda como compra pendiente.'
+      };
+    }
+    if (trim(mode).toUpperCase() === 'REPLICA' && (allowedHistoric.has(key) || /^histor/i.test(trim(row.confidence)) || /^histor/i.test(trim(row.key)))) return row;
+    return {
+      ...row,
+      tipo: 'COMPRA',
+      ticketDonacion: '',
+      donorRef: '',
+      include: row.include !== false,
+      confidence: 'Posible donación pendiente',
+      reason: trim(row.reason || 'Zuzu propuso esta línea.') + ' No se acepta como donación porque no está indicada de forma explícita en el prompt; se mantiene como compra pendiente para no descontarla.'
+    };
+  });
+}
+
+
+
+function planCoalesceDonationsAfterSanitize(rows, explicitRows, mode = '') {
+  const explicitKeys = new Set(arr(explicitRows).map(planDonationProductKey).filter(Boolean));
+  const seenDonation = new Map();
+  const out = [];
+  arr(rows).forEach(row => {
+    if (row?.tipo !== 'DONACION') { out.push(row); return; }
+    const key = [planDonationProductKey(row), trim(row.donorRef), trim(row.ticketDonacion).toUpperCase()].join('|');
+    const isExplicit = row.explicitPromptDonation === true || explicitKeys.has(planDonationProductKey(row));
+    const prevIndex = seenDonation.get(key);
+    if (prevIndex == null) {
+      seenDonation.set(key, out.length);
+      out.push({...row, explicitPromptDonation:isExplicit || row.explicitPromptDonation === true});
+      return;
+    }
+    const prev = out[prevIndex];
+    if (isExplicit || prev?.explicitPromptDonation) {
+      // Para donaciones del prompt no se suman duplicados: se conserva la cantidad menor/confirmada.
+      const prevUnits = num(prev.unidades), rowUnits = num(row.unidades);
+      if (rowUnits > 0 && (prevUnits <= 0 || rowUnits < prevUnits)) {
+        out[prevIndex] = {...prev, ...row, unidades:round(rowUnits,2), explicitPromptDonation:true, include:row.include !== false};
+      }
+      return;
+    }
+    // Histórico puro: si de verdad hay varias líneas iguales, se agrupan para no enseñar duplicados.
+    prev.unidades = round(num(prev.unidades) + num(row.unidades), 2);
+    prev.precio = num(prev.precio) || num(row.precio);
+    prev.reason = trim(prev.reason || '') + ' Línea de donación equivalente agrupada para evitar duplicados visuales.';
+  });
+  return out;
+}
+
+function planInfoDonationRules(info, maps) {
+  const raw = trim(info || '');
+  if (!raw) return [];
+  const rules = [];
+  function addRule(productText, donorLabel, respLabel, type = 'DONADO SOCIO') {
+    const cleanProduct = trim(productText).replace(/^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg|l|litros|botellas|latas|rollos|sacos|pack|packs)?\s*/i, '').replace(/[.:;]+$/,'').trim();
+    if (!cleanProduct || cleanProduct.length < 2) return;
+    const donorRef = planDonorRefFromLabel(donorLabel, maps);
+    const resp = maps.personByName.get(normPlanKey(respLabel || donorLabel));
+    rules.push({ productKey:normPlanKey(cleanProduct), productText:cleanProduct, donorRef, responsableId:trim(resp?.id), ticketDonacion:type, donorLabel:trim(donorLabel), responsableLabel:trim(respLabel || donorLabel) });
+  }
+  const existHeader = raw.match(/INFORMACION\s+SOBRE\s+EXISTENCIA[\s\S]{0,220}?DONADO\s+SOCIO\s+["“]([^"”]+)["”][\s\S]{0,160}?RESPONSABLE\s+["“]([^"”]+)["”]/i);
+  if (existHeader) {
+    const start = existHeader.index + existHeader[0].length;
+    const next = raw.slice(start).search(/\n\s*-?\s*POSIBLES\s+DONACIONES/i);
+    const block = next >= 0 ? raw.slice(start, start + next) : raw.slice(start);
+    block.split(/\n+/).forEach(line => {
+      const m = line.match(/^\s*[-•]\s*(.+)$/);
+      if (!m) return;
+      const item = m[1].split(':')[0].trim();
+      addRule(item, existHeader[1], existHeader[2], 'DONADO SOCIO');
+    });
+  }
+  const poss = raw.match(/POSIBLES\s+DONACIONES\s+DE\s+["“]([^"”]+)["”]\s*:\s*([\s\S]+)/i);
+  if (poss) {
+    poss[2].split(/[\n,;]+/).forEach(part => addRule(part, poss[1], poss[1], 'DONADO SOCIO'));
+  }
+  for (const section of planExplicitDonationSections(raw)) {
+    const donor = planExtractBracket(section.header, ['Donante']) || (/PE[NÑ]A/i.test(section.header) ? 'Peña El Arrastre' : 'Donante indicado');
+    const resp = planExtractBracket(section.header, ['Responsable']) || donor;
+    planExplicitItemLines(section.block).forEach(item => addRule(item, donor, resp, section.ticketDonacion));
+  }
+  return rules.filter(r => r.donorRef || r.responsableId);
+}
+function planApplyDonationRules(rows, rules) {
+  const list = arr(rules);
+  if (!list.length) return rows;
+  return arr(rows).map(row => {
+    if (row.tipo !== 'DONACION') return row;
+    const key = normPlanKey(row.productName);
+    const rule = list.find(r => key.includes(r.productKey) || r.productKey.includes(key) || r.productKey.split(' ').filter(Boolean).some(tok => tok.length >= 5 && key.includes(tok)));
+    if (!rule) return row;
+    return {
+      ...row,
+      ticketDonacion: row.ticketDonacion || rule.ticketDonacion || 'DONADO SOCIO',
+      donorRef: row.donorRef || rule.donorRef,
+      responsableId: row.responsableId || rule.responsableId,
+      reason: trim(row.reason || 'Propuesta ajustada por Zuzu.') + ` Donante/responsable aplicado desde instrucciones del prompt: ${rule.donorLabel || rule.productText}.`
+    };
+  });
+}
+function planRowsForEvent(state, eventId, modules) {
+  const maps = planBuildMaps(state);
+  const ev = planEventById(state, eventId);
+  const rowsOut = [];
+  const includeCompras = modules.includes('COMPRAS');
+  const includeDon = modules.includes('DONACIONES');
+  arr(state?.compras).filter(row => trim(row?.eventId || row?.event_id) === trim(eventId)).forEach((row, index) => {
+    const don = planIsDonation(row);
+    if (don && !includeDon) return;
+    if (!don && !includeCompras) return;
+    const prod = planProduct(row, maps) || {};
+    const unidades = round(row?.unidades, 3);
+    const amount = planLineValue(row);
+    const precio = unidades ? round(amount / unidades, 4) : round(row?.precio, 4);
+    rowsOut.push({
+      key: `plan:${trim(row?.id) || index}`,
+      include: true,
+      tipo: don ? 'DONACION' : 'COMPRA',
+      sourceId: trim(row?.id),
+      productId: trim(row?.productoId || row?.producto_id),
+      productName: trim(prod.nombre || row?.producto || planProductName(row, maps)),
+      segmento: trim(prod.segmento || row?.segmento || 'Sin segmento'),
+      destino: trim(prod.destino || row?.destino || 'Sin destino'),
+      unidades,
+      precio: precio || round(row?.precio, 4),
+      tiendaId: trim(row?.tiendaId || row?.tienda_id || prod.defaultTiendaId || prod.tiendaId),
+      responsableId: trim(row?.responsableId || row?.responsable_id),
+      ticketDonacion: don ? planTicket(row) : '',
+      donorRef: don ? trim(row?.donorRef || row?.donor_ref || '') : '',
+      confidence: 'Histórico',
+      reason: don ? 'Donación tomada del histórico del evento modelo.' : 'Compra tomada del histórico del evento modelo.',
+      sourceEventTitle: ev ? planEventTitle(ev) : ''
+    });
+  });
+  return rowsOut;
+}
+function planIncomeRowsForEvent(state, eventId) {
+  const maps = planBuildMaps(state);
+  const ev = planEventById(state, eventId) || {};
+  const precio = num(ev.precio);
+  return arr(state?.colaboradores).filter(c => trim(c?.eventId || c?.event_id) === trim(eventId)).map((c, index) => {
+    const p = maps.people.get(trim(c?.personaId || c?.persona_id)) || {};
+    const rango = trim(p.rango || c?.rango || '').toUpperCase() || 'SIN RANGO';
+    const numero = num(c.numero);
+    const voluntario = num(c.importeVoluntario ?? c.importe ?? 0);
+    return {
+      key: `ingreso:${trim(c.id) || index}`,
+      sourceId: trim(c.id),
+      personaId: trim(c?.personaId || c?.persona_id),
+      personaName: trim(p.nombre || c?.nombre || 'Persona sin nombre'),
+      rango,
+      numero,
+      situacion: trim(c.situacion || c.ingreso || 'Pendiente'),
+      importeVoluntario: round(voluntario, 2),
+      importeObligatorio: rango === 'SOCIO' ? round(numero * precio, 2) : 0
+    };
+  });
+}
+function planScaleRows(rows, factor, defaultStoreId, defaultRespId) {
+  const f = Number.isFinite(factor) && factor > 0 ? factor : 1;
+  return arr(rows).map(row => {
+    const isDonation = trim(row?.tipo).toUpperCase() === 'DONACION';
+    const unidades = isDonation ? Math.max(0, round(row.unidades, 2)) : Math.max(0, round(num(row.unidades) * f, 2));
+    return {
+      ...row,
+      unidades,
+      tiendaId: trim(row.tiendaId || defaultStoreId),
+      responsableId: trim(row.responsableId || defaultRespId),
+      reason: isDonation
+        ? `${row.reason || 'Línea histórica.'} Donación conservada sin escalado: las unidades donadas son exactas.`
+        : `${row.reason || 'Línea histórica.'} Ajuste inicial aplicado por planificación (${round(f, 3)}x).`
+    };
+  });
+}
+
+function planAttendeesForEvent(state, eventId) {
+  return arr(state?.colaboradores).filter(c => trim(c?.eventId || c?.event_id) === trim(eventId)).reduce((sum, c) => sum + num(c.numero), 0);
+}
+function planPlanningProductScore(product, rawPrompt) {
+  const raw = normPlanKey(rawPrompt || '');
+  const name = trim(product?.nombre || '');
+  const n = normPlanKey([name, product?.segmento, product?.destino].filter(Boolean).join(' '));
+  if (!n) return -999;
+  let score = 0;
+  const important = [
+    'cerveza','vino','ron','whisky','ginebra','gin','beefeater','larios','brugal','barcelo','dyc','johnny','jhonny','walker','cubata','licor',
+    'coca','cola','fanta','sprite','kas','tonica','refresco','lata','botella','tinto de verano','agua','hielo',
+    'jamon','chorizo','salchichon','queso','anchoa','mejillon','salmon','patata','berenjena','tortilla','huevo','pan','picos',
+    'lomo','panceta','morcilla','venao','venado','chuleta','carne','baicon','bacon','barbacoa','carbon','butano',
+    'vaso','plato','servilleta','cuchillo','tenedor','bolsa','basura','fairy','jabon','papel','secamanos','higienico','ambientador','limpieza','cafe','aceite','vinagre'
+  ];
+  important.forEach(tok => { const t = normPlanKey(tok); if (n.includes(t)) score += 8; if (raw.includes(t) && n.includes(t)) score += 16; });
+  const words = n.split(' ').filter(w => w.length >= 4);
+  words.forEach(w => { if (raw.includes(w)) score += Math.min(18, 4 + w.length); });
+  if (/bebida|alimentaci|comida|carnicer|aperitivo|infraestructura|limpieza|menaje/i.test(n)) score += 5;
+  return score;
+}
+function planCatalogForGemini(state, form = {}) {
+  const maps = planBuildMaps(state);
+  const raw = planPromptRawText(form);
+  const totalMode = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL';
+  const finalizados = totalMode ? [] : arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion)));
+  const productosBase = arr(state?.productos).map(p => ({
+    id: trim(p.id), nombre: trim(p.nombre), segmento: trim(p.segmento), destino: trim(p.destino),
+    precio: round(p.defaultPrecio ?? p.precio, 4), tienda: planStoreName(p.defaultTiendaId || p.tiendaId, maps),
+    __score: planPlanningProductScore(p, raw)
+  })).filter(p => p.nombre);
+  const mustHave = /cerveza|vino|ron|whisky|ginebra|gin|coca|fanta|sprite|kas|tonica|refresco|agua|hielo|jamon|chorizo|salchichon|queso|anchoa|mejillon|patata|berenjena|tortilla|huevo|pan|lomo|panceta|morcilla|venao|venado|chuleta|bacon|baicon|barbacoa|carbon|butano|vaso|plato|servilleta|bolsa|basura|fairy|jabon|papel|secamanos|higienico|ambientador|cafe|aceite|vinagre/i;
+  const productosOrdenados = productosBase
+    .filter(p => !totalMode || p.__score > 0 || mustHave.test([p.nombre,p.segmento,p.destino].join(' ')))
+    .sort((a,b) => b.__score - a.__score || a.nombre.localeCompare(b.nombre, 'es'));
+  const productos = (productosOrdenados.length ? productosOrdenados : productosBase)
+    .slice(0, totalMode ? 120 : 650)
+    .map(({__score, tienda, ...p}) => totalMode ? ({...p, tienda}) : ({...p, tienda}));
+  return { modoCatalogo: totalMode ? 'json-directo-productos-fix39' : 'historico-ampliado', totalProductosCatalogo: arr(state?.productos).length, productosEntregadosGemini: productos.length, eventosFinalizados: finalizados.map(e => ({ id: trim(e.id), titulo: planEventTitle(e), fechaIni: trim(e.fechaIni), fechaFin: trim(e.fechaFin), precio: round(e.precio, 2), asistentes: planAttendeesForEvent(state, e.id) })).slice(0, 60), productos, tiendas: totalMode ? [] : arr(state?.tiendas).map(t => trim(t.nombre)).filter(Boolean).slice(0, 180), personas: totalMode ? [] : arr(state?.personas).map(p => ({ nombre: trim(p.nombre), rango: trim(p.rango) })).filter(p => p.nombre).slice(0, 250) };
+}
+function planDetectedDaysFromPrompt(form = {}) {
+  const raw = trim([form.title, form.descripcion, form.info].filter(Boolean).join('\n'));
+  const lower = normPlanKey(raw);
+  const candidates = [];
+  const add = v => { const n = Math.round(num(v)); if (n >= 1 && n <= 14) candidates.push(n); };
+  let m;
+  const patterns = [
+    /(?:durara|durará|dura|duracion|duración|duracion\s+del\s+evento|seran|serán|son|de)\s*[:=]?\s*(\d{1,2})\s*(?:dia|dias|día|días|jornada|jornadas)/gi,
+    /(\d{1,2})\s*(?:dia|dias|día|días|jornada|jornadas)\s*(?:de\s+evento|de\s+fiesta|completos|completas)?/gi,
+    /(?:dia|día)\s*[_\- ]*([1-9]\d?)/gi
+  ];
+  patterns.forEach(rx => { while ((m = rx.exec(raw + '\n' + lower))) add(m[1]); });
+  const dayLabels = new Set();
+  const dayRe = /(?:^|\n)\s*(?:[-*]\s*)?(?:dia|día)\s*[_\- ]*([1-9]\d?)/gi;
+  while ((m = dayRe.exec(raw))) add(m[1]);
+  const weekdays = ['lunes','martes','miercoles','miércoles','jueves','viernes','sabado','sábado','domingo'];
+  weekdays.forEach(d => { if (lower.includes(normPlanKey(d))) dayLabels.add(normPlanKey(d)); });
+  if (dayLabels.size >= 2) candidates.push(Math.min(7, dayLabels.size));
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+function planEffectiveDays(form = {}) {
+  return Math.max(1, planDetectedDaysFromPrompt(form) || num(form?.dias) || 1);
+}
+function planExpectedMenuSlots(days) {
+  const total = Math.max(1, Math.min(14, Math.round(num(days) || 1)));
+  const slots = [];
+  for (let i = 1; i <= total; i += 1) {
+    ['aperitivo','comida','tardeo/cubatas','cena'].forEach(momento => slots.push({ dia:`dia_${i}`, momento }));
+  }
+  return slots;
+}
+function planNormalizeMenuResumen(raw, form = {}) {
+  const expectedDays = planEffectiveDays(form);
+  const list = arr(raw).map((item, idx) => {
+    if (typeof item === 'string') return { dia:`dia_${Math.floor(idx / 4) + 1}`, momento:'resumen', resumen:trim(item) };
+    return { dia:trim(item?.dia || item?.day || `dia_${Math.floor(idx / 4) + 1}`), momento:trim(item?.momento || item?.slot || item?.franja || 'resumen'), resumen:trim(item?.resumen || item?.summary || item?.descripcion || item?.texto || '') };
+  }).filter(item => item.resumen);
+  if (!list.length) return [];
+  return list.map(item => ({
+    dia: /^dia[_\- ]?\d+/i.test(item.dia) ? item.dia.replace(/\s+/g,'_').toLowerCase() : item.dia,
+    momento: item.momento,
+    resumen: item.resumen
+  })).slice(0, Math.max(4, expectedDays * 6));
+}
+
+function planPromptRawText(form = {}) {
+  return trim([form.title, form.descripcion, form.info].filter(Boolean).join('\n'));
+}
+function planPromptNumber(form, patterns, fallback = 0) {
+  const raw = planPromptRawText(form);
+  for (const rx of patterns) {
+    const m = raw.match(rx);
+    if (m) return num(m[1]);
+  }
+  return fallback;
+}
+
+function planPromptRangeFix47(form, patterns, fallbackMin = 0, fallbackMax = 0) {
+  const raw = planPromptRawText(form);
+  for (const rx of patterns) {
+    const m = raw.match(rx);
+    if (!m) continue;
+    const a = num(m[1]);
+    const b = num(m[2]);
+    if (a > 0 || b > 0) {
+      const min = a > 0 ? a : b;
+      const max = b > 0 ? Math.max(a, b) : min;
+      return { min, max };
+    }
+  }
+  return { min: fallbackMin, max: fallbackMax || fallbackMin };
+}
+function planOpenConsumptionContextFix47(form = {}) {
+  const raw = planPromptRawText(form);
+  const base = planPromptNumber(form, [
+    /asistentes\s+base\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+base\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /asistentes\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /(\d+(?:[,.]\d+)?)\s+personas/i
+  ], num(form.personas));
+  const explicitOpen = planPromptNumber(form, [
+    /consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /asistentes\s+(?:de\s+)?consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /personas\s+(?:de\s+)?consumo\s+abierto\s*[:=]\s*(\d+(?:[,.]\d+)?)/i,
+    /equivalentes?\s+(?:de\s+)?consumo\s*[:=]\s*(\d+(?:[,.]\d+)?)/i
+  ], 0);
+  const hasOpenHint = /consumo\s+abierto|pe[nñ]a[^\n]{0,80}plaza|plaza[^\n]{0,80}pe[nñ]a|pasa\s+mucha\s+gente|gente\s+de\s+paso|se\s+(?:les\s+)?invita|se\s+invita\s+a\s+todos|evento\s+abierto/i.test(raw);
+  const derivedOpen = base > 0 ? Math.ceil(base * 1.66) : 0;
+  const consumoAbiertoPersonas = explicitOpen > 0 ? explicitOpen : (hasOpenHint ? derivedOpen : base);
+  const aplicaConsumoAbierto = explicitOpen > 0 || hasOpenHint;
+  const cenaRange = planPromptRangeFix47(form, [
+    /(?:asistentes\s+)?cena\s+real\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i,
+    /personas\s+que\s+cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i,
+    /cenar[aá]n\s+realmente\s*[:=]\s*(\d+(?:[,.]\d+)?)(?:\s*(?:-|–|a|\/)\s*(\d+(?:[,.]\d+)?))?/i
+  ], 0, 0);
+  const derivedCena = base > 0 ? Math.ceil(base / 2) : 0;
+  const cenaRealMin = cenaRange.min > 0 ? cenaRange.min : derivedCena;
+  const cenaRealMax = cenaRange.max > 0 ? cenaRange.max : cenaRealMin;
+  return {
+    asistentesBase: base || 0,
+    consumoAbiertoPersonas: consumoAbiertoPersonas || 0,
+    consumoAbiertoCalculado: derivedOpen || 0,
+    aplicaConsumoAbierto,
+    consumoAbiertoOrigen: explicitOpen > 0 ? 'prompt' : (hasOpenHint ? 'formula_66_por_ciento' : 'base'),
+    cenaRealMin: cenaRealMin || 0,
+    cenaRealMax: cenaRealMax || 0,
+    cenaRealOrigen: (cenaRange.min > 0 || cenaRange.max > 0) ? 'prompt' : (derivedCena ? 'base_dividido_entre_2' : 'sin_dato')
+  };
+}
+function planBudgetFromPrompt(form = {}) {
+  const objetivo = planPromptNumber(form, [
+    /presupuesto\s+objetivo\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i,
+    /objetivo\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i
+  ], 0);
+  const maximo = planPromptNumber(form, [
+    /l[ií]mite\s+m[aá]ximo\s+de\s+coste\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i,
+    /coste\s+m[aá]ximo\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i,
+    /m[aá]ximo\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*€?\s*\/\s*persona/i
+  ], 0);
+  return { objetivoPorPersona: objetivo, maximoPorPersona: maximo || (objetivo ? round(objetivo * 1.10, 2) : 0) };
+}
+function planExtractParagraph(raw, startWord, nextWords) {
+  const txt = text(raw || '').replace(/\r/g, '');
+  const startRe = new RegExp('(?:^|\\n)\\s*(?:el\\s+)?' + startWord + '\\b[\\s\\S]*?', 'i');
+  const m = txt.match(startRe);
+  if (!m || m.index == null) return '';
+  const from = m.index;
+  let to = txt.length;
+  const rest = txt.slice(from + 1);
+  for (const w of nextWords) {
+    const re = new RegExp('\\n\\s*(?:el\\s+)?' + w + '\\b', 'i');
+    const k = rest.search(re);
+    if (k >= 0) to = Math.min(to, from + 1 + k);
+  }
+  return trim(txt.slice(from, to)).replace(/\s+/g, ' ').slice(0, 900);
+}
+function planMomentsFromPrompt(form = {}) {
+  const raw = planPromptRawText(form).replace(/\r/g, '');
+  const days = planEffectiveDays(form);
+  const lines = raw.split(/\n/);
+  const out = [];
+  const seen = new Set();
+  const dayLineRe = /^\s*(?:[-*•]\s*)?(?:d[ií]a|dia|jornada)\s*[_\- ]*(\d{1,2})\b\s*(?:\(([^)]*)\))?\s*:??\s*([^\n]*)/i;
+  const stopRe = /^\s*(?:DATOS\s+PARA|DESCRIPCI[OÓ]N\s+CONCEPTUAL|CRITERIOS?|REGLAS?|PRODUCTO\s+EN|DONACIONES?|DONACI[OÓ]N|DONADO\s+(?:SOCIO|TIENDA|OTROS)|PISTAS?|RESULTADO|OBJETIVO)\b/i;
+  function add(dia, momento, detalle, index) {
+    if (!momento || dia > days) return;
+    const key = `${dia}|${normPlanKey(momento)}`;
+    const clean = trim(detalle || '').replace(/^\([^)]*\)\s*:??\s*/,'').replace(/\s+/g,' ');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ dia:`dia_${dia}`, momento, detalle:clean || 'Franja detectada por ControlEvent; Zuzu debe concretarla.', index:index || 0 });
+  }
+  function momentFromText(text) {
+    const n = normPlanKey(text || '');
+    const found = [];
+    const push = (momento, rx) => { const m = n.match(rx); if (m) found.push({ momento, index:m.index }); };
+    push('desayuno', /\bdesayuno\b/);
+    push('aperitivo', /\b(aperitivo|vermut|vermu|picoteo|entrantes?)\b/);
+    push('comida', /\b(comida|almuerzo|buffet|paella|asado)\b/);
+    push('tardeo/cubatas', /\b(tardeo|sobremesa|cubatas?\s+de\s+tarde|copas?\s+de\s+tarde|tarde[^.;,\n]{0,40}cubatas?|cubatas?[^.;,\n]{0,40}tarde)\b/);
+    push('merienda', /\bmerienda\b/);
+    push('cena', /\b(cena|cenar)\b/);
+    if (/\b(cubatas?|copas?)\b/.test(n) && /\b(noche|nocturn[oa]s?)\b/.test(n)) push('cubatas noche', /\b(cubatas?\s*(?:de\s*)?noche|copas?\s*(?:de\s*)?noche|noche[^.;,\n]{0,40}cubatas?|noche[^.;,\n]{0,40}copas?)\b/);
+    if (/todo\s+el\s+d[ií]a|dia\s+completo|día\s+completo/.test(n) && !found.length) return ['aperitivo','comida','tardeo/cubatas','cena'].map((momento,index)=>({momento,index}));
+    const localSeen = new Set();
+    return found.sort((a,b)=>a.index-b.index).filter(x => { const k=normPlanKey(x.momento); if(localSeen.has(k)) return false; localSeen.add(k); return true; });
+  }
+  function isExplicitMoment(paren) {
+    const n = normPlanKey(paren || '');
+    if (!n) return [];
+    const out = [];
+    if (/\bdesayuno\b/.test(n)) out.push('desayuno');
+    if (/\baperitivo\b|\bvermut\b|\bpicoteo\b/.test(n)) out.push('aperitivo');
+    if (/\bcomida\b|\balmuerzo\b/.test(n)) out.push('comida');
+    if (/\btardeo\b|cubatas.*tarde|tarde.*cubatas/.test(n)) out.push('tardeo/cubatas');
+    if (/\bmerienda\b/.test(n)) out.push('merienda');
+    if (/\bcubatas?\s*(?:de\s*)?noche\b|\bnoche\s+de\s+copas\b/.test(n)) out.push('cubatas noche');
+    if (/\bcena\b/.test(n)) out.push('cena');
+    return out;
+  }
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].match(dayLineRe);
+    if (!m) continue;
+    const dia = Math.max(1, Math.min(14, Math.round(num(m[1]))));
+    const paren = trim(m[2] || '');
+    const bodyParts = [trim(m[3] || '')];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (dayLineRe.test(lines[j]) || stopRe.test(lines[j])) break;
+      const l = trim(lines[j]);
+      if (l) bodyParts.push(l);
+      if (bodyParts.join(' ').length > 600) break;
+    }
+    const body = bodyParts.join(' ').replace(/^:\s*/,'').trim();
+    const explicit = isExplicitMoment(paren);
+    if (explicit.length && explicit.length <= 2 && !/todo\s+el\s+d[ií]a|sabado|s[áa]bado|domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|\d{1,2}\/\d{1,2}/i.test(paren)) {
+      explicit.forEach((momento, k) => add(dia, momento, body || paren, i * 10 + k));
+    } else {
+      const slots = momentFromText(body || paren);
+      slots.forEach((slot, k) => add(dia, slot.momento, body || paren, i * 10 + slot.index + k));
+    }
+  }
+  if (!out.length) {
+    const n = normPlanKey(raw); const slots = [];
+    if (/aperitivo|vermut|picoteo/.test(n)) slots.push('aperitivo');
+    if (/comida|almuerzo|buffet|paella|asado/.test(n)) slots.push('comida');
+    if (/tardeo|sobremesa|cubata|copa/.test(n)) slots.push('tardeo/cubatas');
+    if (/cena|cenar/.test(n)) slots.push('cena');
+    const use = slots.length ? slots : ['aperitivo','comida','tardeo/cubatas','cena'];
+    for (let d=1; d<=Math.max(1,days); d+=1) use.forEach((momento,k) => add(d, momento, 'Franja inferida genéricamente del prompt; Zuzu debe concretarla.', d*10+k));
+  }
+  return out.sort((a,b)=>a.index-b.index).map(({index, ...x}) => x).slice(0, 120);
+}
+function planPromptBriefObject(form = {}, state = {}) {
+  const raw = planPromptRawText(form);
+  const budget = planBudgetFromPrompt(form);
+  const openCtx = planOpenConsumptionContextFix47(form);
+  const basePeople = openCtx.asistentesBase || num(form.personas) || 0;
+  const beerDeclared = planPromptNumber(form, [/personas\s+que\s+beber[aá]n\s+cerveza\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cerveza[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0);
+  const cubataDeclared = planPromptNumber(form, [/personas\s+que\s+tomar[aá]n\s+cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /cubatas[^\n]{0,50}?(\d+(?:[,.]\d+)?)\s+personas/i], 0);
+  const consumptionOpen = openCtx.consumoAbiertoPersonas || basePeople;
+  const beerCalc = openCtx.aplicaConsumoAbierto ? Math.max(beerDeclared, consumptionOpen) : beerDeclared;
+  const cubataCalc = openCtx.aplicaConsumoAbierto ? Math.max(cubataDeclared, consumptionOpen) : cubataDeclared;
+  return {
+    versionBrief: 'FIX47_CONSUMO_ABIERTO_VARIABLE_V1',
+    objetivoEvento: firstNonEmpty((raw.match(/OBJETIVO\s+DEL\s+EVENTO\s*:\s*([^\n]+)/i) || [])[1], form.title),
+    duracionDias: planEffectiveDays(form),
+    personasAsistentes: basePeople,
+    asistentesBase: basePeople,
+    personasConsumoAbierto: consumptionOpen,
+    consumoAbiertoAplicado: openCtx.aplicaConsumoAbierto,
+    consumoAbiertoOrigen: openCtx.consumoAbiertoOrigen,
+    consumoAbiertoCalculado: openCtx.consumoAbiertoCalculado,
+    presupuestoObjetivoPorPersona: budget.objetivoPorPersona,
+    limiteMaximoPorPersona: budget.maximoPorPersona,
+    temperatura: firstNonEmpty((raw.match(/temperatura\s+prevista\s*:\s*([^\n]+)/i) || [])[1], /calor|verano|mucho\s+sol/i.test(raw) ? 'mucho calor' : ''),
+    personasCervezaDeclaradas: beerDeclared,
+    personasCerveza: beerCalc,
+    personasCubatasDeclaradas: cubataDeclared,
+    personasCubatas: cubataCalc,
+    cubatasPorPersonaConsumidora: planPromptNumber(form, [/cubatas\s*[:=]\s*(\d+(?:[,.]\d+)?)\s*por\s+persona/i, /(\d+(?:[,.]\d+)?)\s*cubatas\s+por\s+persona/i], 0),
+    cervezasMaxPorPersonaDia: planPromptNumber(form, [/cerveza\s*[:=]\s*(?:m[aá]ximo\s*)?(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)/i, /(\d+(?:[,.]\d+)?)\s*(?:latas|botellines)\s+por\s+persona\s+consumidora/i], 0),
+    personasSinAlcoholNinos: planPromptNumber(form, [/personas\s+sin\s+alcohol\s*\/\s*ni[ñn]os\s*[:=]\s*(\d+(?:[,.]\d+)?)/i, /personas\s+sin\s+alcohol[^\n:]*[:=]\s*(\d+(?:[,.]\d+)?)/i], 0),
+    personasCenaReal: openCtx.cenaRealMax,
+    personasCenaRealMin: openCtx.cenaRealMin,
+    personasCenaRealMax: openCtx.cenaRealMax,
+    cenaRealOrigen: openCtx.cenaRealOrigen,
+    horas: {
+      aperitivo: firstNonEmpty((raw.match(/hora\s+aproximada\s+del\s+aperitivo\s*:\s*([^\n]+)/i) || [])[1], ''),
+      comida: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+comida\s*:\s*([^\n]+)/i) || [])[1], ''),
+      tardeoCubatas: firstNonEmpty((raw.match(/duraci[oó]n\s+del\s+tardeo\s*\/?\s*cubatas\s*:\s*([^\n]+)/i) || [])[1], ''),
+      cena: firstNonEmpty((raw.match(/hora\s+aproximada\s+de\s+la\s+cena\s*:\s*([^\n]+)/i) || [])[1], '')
+    },
+    momentosPorDia: planMomentsFromPrompt(form),
+    concepto: {
+      aperitivo: planExtractParagraph(raw, 'aperitivo', ['comida', 'tardeo', 'cena', 'criterios?']),
+      comida: planExtractParagraph(raw, 'comida', ['tardeo', 'cena', 'criterios?']),
+      tardeoCubatas: planExtractParagraph(raw, 'tardeo', ['cena', 'criterios?']),
+      cena: planExtractParagraph(raw, 'cena', ['criterios?', 'producto\\s+en\\s+la\\s+pe[nñ]a', 'donaciones?', 'pistas'])
+    },
+    reglasBebida: [
+      'Cerveza/cubatas solo a consumidores reales cuando el usuario lo indique.',
+      'Si existe consumo abierto, usar personasConsumoAbierto para cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje.',
+      'Separar refrescos de mezcla y refrescos de consumo directo si aparece en el prompt.',
+      'Ajustar agua, hielo, cerveza y refrescos por calor sin exagerar.',
+      'Redondear packs/latas a múltiplos operativos cuando el prompt lo pida.'
+    ],
+    reglasComida: [
+      'No multiplicar todos los productos por todos los asistentes.',
+      'Calcular aperitivos como picoteo compartido si procede.',
+      'Calcular cenas solo para quienes cenan realmente si el prompt lo indica; si no, usar asistentesBase/2.',
+      'Compra = necesidad total - donaciones/existencias confirmadas.'
+    ],
+    donacionesDetectadas: planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto:r.productName, unidades:r.unidades, tipo:r.ticketDonacion, donante:r.donorRef, responsable:r.responsableId })).slice(0, 140)
+  };
+}
+function planPromptBriefText(form = {}, state = {}) {
+  const b = planPromptBriefObject(form, state);
+  const lines = [];
+  lines.push('BRIEF ESTRUCTURADO DEL EVENTO - ControlEvent FIX47');
+  lines.push(`Duración: ${b.duracionDias} día(s). Asistentes base: ${b.asistentesBase || b.personasAsistentes || 'sin dato'}.`);
+  lines.push(`Consumo abierto: ${b.consumoAbiertoAplicado ? `${b.personasConsumoAbierto} personas (${b.consumoAbiertoOrigen})` : 'no aplicado'}${b.consumoAbiertoCalculado ? ` · fórmula base+66%=${b.consumoAbiertoCalculado}` : ''}.`);
+  lines.push(`Bebida: cerveza ${b.personasCerveza || 'sin dato'} personas (${b.cervezasMaxPorPersonaDia || '?'} ud/persona/día si aplica); cubatas ${b.personasCubatas || 'sin dato'} personas (${b.cubatasPorPersonaConsumidora || '?'} por persona si aplica); sin alcohol/niños ${b.personasSinAlcoholNinos || 'sin dato'}.`);
+  if (b.personasCenaReal) lines.push(`Cena real: ${b.personasCenaRealMin && b.personasCenaRealMin !== b.personasCenaRealMax ? `${b.personasCenaRealMin}-${b.personasCenaRealMax}` : b.personasCenaReal} personas (${b.cenaRealOrigen}).`);
+  if (b.presupuestoObjetivoPorPersona || b.limiteMaximoPorPersona) lines.push(`Presupuesto: objetivo ${b.presupuestoObjetivoPorPersona || '?'} €/persona; máximo ${b.limiteMaximoPorPersona || '?'} €/persona.`);
+  if (b.temperatura) lines.push(`Temperatura/clima: ${b.temperatura}`);
+  lines.push('Momentos detectados:');
+  b.momentosPorDia.forEach(m => lines.push(`- ${m.dia} (${m.momento}): ${m.detalle}`));
+  const conceptLines = Object.entries(b.concepto).filter(([,v]) => v).map(([k,v]) => `- ${k}: ${v}`);
+  if (conceptLines.length) lines.push('Concepto resumido:\n' + conceptLines.join('\n'));
+  lines.push(`Donaciones/existencias confirmadas detectadas: ${b.donacionesDetectadas.length} línea(s).`);
+  lines.push('Regla central: Zuzu calcula compras por déficit; ControlEvent conserva donaciones literales y no copia históricos en encargo total.');
+  return lines.join('\n');
+}
+function planMenuResumenFromBrief(form = {}) {
+  const b = planPromptBriefObject(form, {});
+  function resumenPara(item) {
+    const det = trim(item?.detalle || '');
+    if (det && !/franja\s+(?:a\s+definir|inferida)/i.test(det)) { const limpio = det.replace(/^todo\s+el\s+d[ií]a\s*:?\s*/i, '').replace(/\s+/g, ' ').trim(); return /^ser[aá]\s+a\s+base\s+de/i.test(limpio) ? limpio : `Será a base de ${limpio.charAt(0).toLowerCase()}${limpio.slice(1)}`; }
+    const mom = normPlanKey(item?.momento);
+    if (/aperitivo/.test(mom)) return 'Será a base de aperitivo/picoteo compartido, ajustado al concepto del usuario y a las donaciones disponibles.';
+    if (/comida/.test(mom)) return 'Será a base de una comida principal definida por Zuzu según el brief, con compras solo por déficit.';
+    if (/tardeo|cubata/.test(mom) && !/noche/.test(mom)) return 'Será a base de tardeo/copas/cubatas si procede, separando mezcla, consumo directo, hielo y vasos.';
+    if (/cena/.test(mom)) return 'Será a base de una cena ajustada a las personas que realmente cenan y al tipo de evento indicado.';
+    if (/noche/.test(mom)) return 'Será a base de copas/cubatas de noche si procede, calculadas para consumidores reales.';
+    return 'Será a base de una propuesta libre de Zuzu ajustada al brief, sin plantilla fija.';
+  }
+  return b.momentosPorDia.map(item => ({ dia:item.dia, momento:item.momento, resumen:resumenPara(item) }));
+}
+function planCompleteMenuResumen(raw, form = {}) {
+  const base = planNormalizeMenuResumen(raw, form);
+  const fallback = planMenuResumenFromBrief(form);
+  const seen = new Set(base.map(x => `${normPlanKey(x.dia)}|${normPlanKey(x.momento)}`));
+  fallback.forEach(x => {
+    const k = `${normPlanKey(x.dia)}|${normPlanKey(x.momento)}`;
+    if (!seen.has(k)) base.push(x);
+  });
+  return base.slice(0, Math.max(4, planEffectiveDays(form) * 6));
+}
+
+
+
+function planPromptCompactForGemini33(form = {}) {
+  const raw = planPromptRawText(form).replace(/\r/g, '');
+  if (!raw) return '';
+  const lines = raw.split(/\n/).map(x => trim(x)).filter(Boolean);
+  const useful = [];
+  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|asistentes\s+base|consumo\s+abierto|cena\s+real|presupuesto|l[ií]mite|temperatura|tipo\s+de\s+evento|personas\s+que|sin\s+alcohol|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?)/i;
+  for (const line of lines) { if (useful.join('\n').length > 3500) break; if (keepRx.test(line) || /^(?:d[ií]a|dia)\s*[_\- ]*\d+/i.test(line)) useful.push(line); }
+  const txt = useful.join('\n') || raw.slice(0, 3500);
+  return txt.slice(0, 4200);
+}
+function planDonationRowsForGemini33(form = {}, state = {}) {
+  const maps = planBuildMaps(state);
+  return planExplicitDonationRowsLocalFix39(form, state).map(r => ({ producto: trim(r.productName), unidades: round(r.unidades, 2), precio: round(r.precio, 4), tipoDonacion: trim(r.ticketDonacion), donante: planDonorLabel(r.donorRef, maps) || trim(r.donorRef), responsable: planPersonName(r.responsableId, maps) || trim(r.responsableId), segmento: trim(r.segmento), destino: trim(r.destino) })).slice(0, 140);
+}
+
+function planDonationCompactLine(r) {
+  return [trim(r.tipoDonacion || r.ticketDonacion || 'DONADO'), trim(r.donante || r.donorRef || 'Donante'), trim(r.responsable || r.responsableId || 'Responsable'), `${trim(r.producto || r.productName || '')}: ${round(r.unidades, 2)}`]
+    .filter(Boolean).join(' | ');
+}
+function planFormattedUserPromptForGemini38(form = {}) {
+  const raw = planPromptRawText(form).replace(/\r/g, '');
+  if (!raw) return '';
+  const lines = raw.split(/\n/).map(x => trim(x)).filter(Boolean);
+  const useful = [];
+  let skipProducts = false;
+  const keepRx = /(objetivo|fecha|duraci[oó]n|asistentes|asistentes\s+base|consumo\s+abierto|cena\s+real|presupuesto|l[ií]mite|temperatura|coste|personas que|sin alcohol|ni[ñn]os|cenar[aá]n|hora|tardeo|aperitivo|comida|cena|cubatas|cerveza|reglas?|criterios?|pistas?|d[ií]a\s*[_\- ]*\d|donado\s+(?:socio|tienda|otros)|responsable|comprar solo|d[eé]ficit|no inventar|no copiar|cat[aá]logo)/i;
+  for (const line of lines) {
+    if (/^PRODUCTOS\s*:?$/i.test(line)) { skipProducts = true; continue; }
+    if (/^(?:Donado|Donaci[oó]n|Pistas|Reglas|Criterios|Datos|Resumen|Objetivo|Fechas|Duraci[oó]n|Asistentes|Presupuesto|L[ií]mite|Temperatura)/i.test(line)) skipProducts = false;
+    if (skipProducts && /^[*\-•]?\s*.+\s*:\s*\d+(?:[,.]\d+)?\s*$/i.test(line)) continue;
+    if (keepRx.test(line)) useful.push(line);
+    if (useful.join('\n').length > 5200) break;
+  }
+  return (useful.join('\n') || raw.slice(0, 5200)).slice(0, 6200);
+}
+
+function planContextDirectJsonForGemini38(ctx, form = {}) {
+  const brief = ctx?.briefEvento || {};
+  const moments = arr(ctx?.momentosEsperados || brief?.momentosPorDia)
+    .map(m => ({ dia: trim(m.dia), momento: trim(m.momento), detalle: trim(m.detalle || '') }))
+    .slice(0, 80);
+  const products = arr(ctx?.catalogos?.productos).slice(0, 160).map(p => ({
+    producto: trim(p.nombre),
+    precio: round(p.precio, 4),
+    segmento: trim(p.segmento),
+    destino: trim(p.destino),
+    tienda: trim(p.tienda)
+  })).filter(p => p.producto);
+  return {
+    versionContexto: 'FIX47_CONSUMO_ABIERTO_VARIABLE',
+    modo: ctx?.modo,
+    instruccionPrincipal: 'Lee el prompt formateado como fuente principal. Las donaciones ya las crea ControlEvent; usa el resumen solo para descontar déficit. Devuelve compras concretas y avisos, no repitas donaciones.',
+    evento: {
+      titulo: ctx?.eventoNuevo?.titulo,
+      dias: ctx?.eventoNuevo?.diasOperativos,
+      asistentes: brief.personasAsistentes,
+      presupuestoObjetivoPersona: brief.presupuestoObjetivoPorPersona,
+      limitePersona: brief.limiteMaximoPorPersona,
+      clima: brief.temperatura
+    },
+    consumo: {
+      cervezaPersonas: brief.personasCerveza,
+      cervezaMaxPorPersonaDia: brief.cervezasMaxPorPersonaDia,
+      cubatasPersonas: brief.personasCubatas,
+      cubatasPorPersona: brief.cubatasPorPersonaConsumidora,
+      sinAlcoholNinos: brief.personasSinAlcoholNinos,
+      cenaRealPersonas: brief.personasCenaReal
+    },
+    momentosDetectadosPorControlEvent: moments,
+    promptFormateadoUsuario: planFormattedUserPromptForGemini38(form),
+    donacionesExistenciasResumen: arr(ctx?.existenciasYDonacionesExplicitas).map(planDonationCompactLine).slice(0, 60),
+    productosCatalogo: products.slice(0, 55),
+    reglasControlEvent: [
+      'NO devuelvas donaciones completas; ControlEvent ya las extrae y crea desde el prompt. Úsalas solo para calcular déficit.',
+      'Las compras deben salir en compras con producto, tienda y responsable; añade cantidad/unidades/precio si puedes.',
+      'Compra solo déficit real tras restar donaciones/existencias descritas en el prompt.',
+      'No inventes donaciones; si algo es dudoso, compra revisable o aviso.',
+      'No uses plantillas fijas ni históricos.',
+      'Mantén nombres de producto parecidos al catálogo cuando encajen, pero si el tamaño/formato cambia conserva el nombre original.'
+    ],
+    salidaJsonEsperada: {
+      menuResumen: [{ dia:'dia_1', momento:'cena', resumen:'Será a base de ...' }],
+      compras: [{ producto:'Cerveza clásica (8 packs de 24 latas 33cl)', tienda:'Supermercado Mayorista', responsable:'Zuzu', unidades:192, precio:0.45 }],
+      avisos: []
+    }
+  };
+}
+function planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules) {
+  const totalMode = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL';
+  const compactRows = totalMode ? [] : arr(baseRows).slice(0, 450).map(r => ({ productId:r.productId, producto:r.productName, segmento:r.segmento, destino:r.destino, tipo:r.tipo, unidades:r.unidades, precio:r.precio, ticketDonacion:r.ticketDonacion, tienda: r.tiendaId, responsable: r.responsableId, donante:r.donorRef, origen:r.sourceEventTitle }));
+  const diasDetectadosPrompt = planDetectedDaysFromPrompt(form);
+  const diasOperativos = planEffectiveDays(form);
+  const brief = planPromptBriefObject(form, state);
+  const donaciones = planDonationRowsForGemini33(form, state);
+  return { __formForGemini38: form, versionContexto: totalMode ? 'FIX47_CONSUMO_ABIERTO_VARIABLE' : 'HISTORICO_AMPLIADO', modo: planModeLabel(form.mode), aislamientoEncargoTotal: totalMode ? 'ACTIVO: no se entregan eventos finalizados ni filas históricas como fuente; solo brief variable, donaciones literales y catálogo compacto.' : 'NO ACTIVO', modulosSolicitados: modules, eventoNuevo: { titulo: trim(form.title), fechaIni: trim(form.fechaIni), fechaFin: trim(form.fechaFin), diasFormulario: num(form.diasFormulario ?? form.dias), diasDetectadosPrompt, diasOperativos, personasEstimadas: num(form.personas) }, promptUsuarioCompacto: totalMode ? planPromptCompactForGemini33(form) : planPromptRawText(form).slice(0, 12000), briefEvento: brief, briefEventoTexto: planPromptBriefText(form, state), momentosEsperados: brief.momentosPorDia, eventoModelo: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), precio: round(sourceEvent.precio, 2), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin) } : null, responsablePorDefecto: trim(form.defaultResponsibleName), tiendaPorDefecto: trim(form.defaultStoreName), filasHistoricasBase: compactRows, ingresosHistoricosBase: totalMode ? [] : arr(incomeRows).slice(0, 120).map(i => ({ colaborador:i.personaName, rango:i.rango, numero:i.numero, obligatorio:i.importeObligatorio, voluntario:i.importeVoluntario })), existenciasYDonacionesExplicitas: donaciones, reglasCalculo: ['Crear compras solo por déficit: necesidad total menos donaciones/existencias confirmadas.', 'No inventar donaciones ni aumentar cantidades donadas.', 'Conservar como compra revisable cualquier producto razonable que no encaje exacto en catálogo.', 'No usar menús fijos: el menú sale del brief del usuario y de la propuesta de Zuzu.', 'Si no hay datos suficientes, proponer supuestos explícitos y preguntas pendientes, no copiar históricos.'], catalogos: planCatalogForGemini(state, form) };
+}
+function planPromptContextForGemini(ctx, totalMode) {
+  if (!totalMode) return ctx;
+  // FIX35: el prompt a Zuzu debe parecerse a una consulta humana corta.
+  // La traza completa conserva el brief detallado, pero a Zuzu solo se le manda lo operativo.
+  return planContextDirectJsonForGemini38(ctx, ctx?.__formForGemini38 || {});
+}
+
+
+function planPromptWithoutDonationBlocksFix43(form = {}) {
+  const raw = planPromptRawText(form).replace(/\r/g, '');
+  const lines = raw.split(/\n/);
+  const out = [];
+  let skipping = false;
+  const startDon = /^(\s*)(DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|DONADO\s+(?:SOCIO|TIENDA|OTROS)\b|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A\b|EXISTENCIAS?\b|YA\s+TENEMOS\b|PRODUCTOS\s*:)/i;
+  const stop = /^(\s*)(PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|CRITERIOS?|OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|RESUMEN\s+DE\s+MEN[ÚU]|REGLAS\s+DE\s+BEBIDA|REGLAS\s+DE\s+COMIDA)\b/i;
+  for (const line of lines) {
+    const t = trim(line || '');
+    if (startDon.test(t)) { skipping = true; continue; }
+    if (skipping && stop.test(t)) { skipping = false; out.push(line); continue; }
+    if (!skipping) out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 2400);
+}
+function planCompactCatalogForNeedsFix43(state = {}, form = {}) {
+  const wanted = /cerveza|coca|zero|fanta|sprite|tonica|t[oó]nica|schweppes|hielo|agua|ron|barcelo|brugal|whisky|wiski|jb|ginebra|beefeater|larios|pan|chorizo|lomo|morcilla|panceta|venao|jam[oó]n|queso|anchoa|mejillon|patata|encurtido|vaso|plato|servilleta|bolsa|basura|fairy|lavavajillas|abrillantador|secamanos|papel|jabon|jab[oó]n|ambientador/i;
+  const seen = new Set();
+  const products = arr(state?.productos)
+    .filter(p => p && p.nombre && (wanted.test(p.nombre) || wanted.test(String(p.segmento || '') + ' ' + String(p.destino || ''))))
+    .map(p => ({ producto:trim(p.nombre), precio:round(num(p.defaultPrecio ?? p.precio ?? p.precioReferencia), 4), segmento:trim(p.segmento || ''), destino:trim(p.destino || '') }))
+    .filter(p => {
+      const k = normPlanKey(p.producto);
+      if(!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  // FIX44: catálogo mínimo y útil. No se manda media base de datos a Zuzu.
+  const priority = /cerveza|coca|hielo|ron|whisky|wiski|jb|ginebra|beefeater|tonica|fanta|sprite|agua|chorizo|lomo|morcilla|panceta|venao|pan|vaso|plato|servilleta|fairy|lavavajillas|abrillantador|secamanos|bolsa.*basura/i;
+  return products.sort((a,b)=> (priority.test(b.producto)?1:0) - (priority.test(a.producto)?1:0)).slice(0, 32);
+}
+function planTheoreticalPromptContextFix43(form = {}, state = {}) {
+  const brief = planPromptBriefObject(form, state);
+  return {
+    versionContexto:'FIX47_CONSUMO_ABIERTO_VARIABLE',
+    tarea:'Devuelve SOLO un array JSON de necesidades teóricas totales; ControlEvent descontará donaciones y calculará el déficit.',
+    evento:{
+      dias:brief.duracionDias,
+      asistentesBase:brief.asistentesBase || brief.personasAsistentes,
+      asistentes:brief.personasAsistentes,
+      consumoAbiertoPersonas:brief.personasConsumoAbierto,
+      consumoAbiertoAplicado:brief.consumoAbiertoAplicado,
+      consumoAbiertoOrigen:brief.consumoAbiertoOrigen,
+      cenaRealPersonas:brief.personasCenaReal,
+      cenaRealMin:brief.personasCenaRealMin,
+      cenaRealMax:brief.personasCenaRealMax,
+      clima:brief.temperatura,
+      presupuestoPersona:brief.presupuestoObjetivoPorPersona,
+      limitePersona:brief.limiteMaximoPorPersona
+    },
+    consumo:{
+      cervezaPersonasDeclaradas:brief.personasCervezaDeclaradas,
+      cervezaPersonasCalculo:brief.personasCerveza,
+      cervezaMaxPorPersonaDia:brief.cervezasMaxPorPersonaDia,
+      cubatasPersonasDeclaradas:brief.personasCubatasDeclaradas,
+      cubatasPersonasCalculo:brief.personasCubatas,
+      cubatasPorPersona:brief.cubatasPorPersonaConsumidora,
+      sinAlcoholNinos:brief.personasSinAlcoholNinos,
+      cenaRealPersonas:brief.personasCenaReal
+    },
+    reglasConsumoAbierto:[
+      'Si consumoAbiertoAplicado es true, calcula cerveza, refrescos, cubatas, hielo, vasos, aperitivo y menaje usando consumoAbiertoPersonas, no asistentesBase.',
+      'La cena/barbacoa se calcula aparte con cenaRealPersonas o rango cenaRealMin-cenaRealMax.',
+      'Si no se indica consumo abierto pero el texto habla de peña en plaza, gente de paso o invitados, ControlEvent usa asistentesBase + 66%.'
+    ],
+    momentos:arr(brief.momentosPorDia).slice(0, 14).map(m => `${m.dia} ${m.momento}: ${trim(m.detalle).slice(0,120)}`),
+    concepto:planPromptWithoutDonationBlocksFix43(form),
+    catalogo:planCompactCatalogForNeedsFix43(state, form),
+    salida:'array JSON: [{"producto":"...","cantidadTotal":0,"unidad":"ud|kg|botellas|bolsas","motivo":"formula o criterio"}]'
+  };
+}
+
+function planSplitWholeFix45(total, weights) {
+  const t = Math.max(0, Math.round(num(total)));
+  const ws = arr(weights).map(w => Math.max(0, num(w)));
+  const sum = ws.reduce((a,b)=>a+b,0) || 1;
+  const raw = ws.map(w => (t * w) / sum);
+  const base = raw.map(x => Math.floor(x));
+  let left = t - base.reduce((a,b)=>a+b,0);
+  raw.map((x,i)=>({i, frac:x-base[i]})).sort((a,b)=>b.frac-a.frac).forEach(x => { if(left>0){ base[x.i] += 1; left -= 1; } });
+  return base;
+}
+function planLocalTheoreticalNeedsFix44(form = {}) {
+  const b = planPromptBriefObject(form, {});
+  const days = Math.max(1, num(b.duracionDias) || 1);
+  const people = Math.max(1, num(b.asistentesBase || b.personasAsistentes) || num(form.personas) || 1);
+  const openPeople = Math.max(people, num(b.personasConsumoAbierto) || people);
+  const activePeople = b.consumoAbiertoAplicado ? openPeople : people;
+  const beerPeople = Math.max(0, num(b.personasCerveza) || (b.consumoAbiertoAplicado ? activePeople : 0));
+  const beerPerDay = Math.max(0, num(b.cervezasMaxPorPersonaDia));
+  const cubataPeople = Math.max(0, num(b.personasCubatas) || (b.consumoAbiertoAplicado ? activePeople : 0));
+  const cubatasPer = Math.max(0, num(b.cubatasPorPersonaConsumidora));
+  const cenaPeople = Math.max(0, num(b.personasCenaRealMax || b.personasCenaReal) || Math.ceil(people / 2));
+  const hot = /calor|verano|sol/i.test(String(b.temperatura || '') + ' ' + planPromptRawText(form));
+  const out = [];
+  function add(producto, cantidadTotal, unidad, motivo){
+    const qty = round(num(cantidadTotal), 2);
+    if(!producto || !(qty > 0)) return;
+    out.push({producto, cantidadTotal:qty, unidad, motivo});
+  }
+  if(beerPeople && beerPerDay) add('Cerveza lata 33cl', Math.ceil((beerPeople * beerPerDay * days) / 24) * 24, 'ud', `${beerPeople} consumidores x ${beerPerDay} ud x ${days} días, redondeado a packs de 24`);
+  const totalCubatas = cubataPeople && cubatasPer ? cubataPeople * cubatasPer : 0;
+  if(totalCubatas){
+    const ronTotal = Math.max(1, Math.ceil(totalCubatas * 0.35 / 14));
+    const whiskyTotal = Math.max(1, Math.ceil(totalCubatas * 0.30 / 14));
+    const ginTotal = Math.max(1, Math.ceil(totalCubatas * 0.25 / 14));
+    const ron = planSplitWholeFix45(ronTotal, [60,30,10]);
+    const whisky = planSplitWholeFix45(whiskyTotal, [60,30,10]);
+    const gin = planSplitWholeFix45(ginTotal, [55,30,15]);
+    if(ron[0]) add('Ron BARCELO Añejo 0.7 L', ron[0], 'botellas', `${totalCubatas} cubatas teóricos: ron 60% Barceló, 30% Brugal, 10% otros.`);
+    if(ron[1]) add('Ron BRUGAL Añejo 0.7L', ron[1], 'botellas', `${totalCubatas} cubatas teóricos: ron 60% Barceló, 30% Brugal, 10% otros.`);
+    if(ron[2]) add('Ron Puerto de Indias', ron[2], 'botellas', `${totalCubatas} cubatas teóricos: ron residual/otros.`);
+    if(whisky[0]) add('Whisky 5 Años J.B Botella 0.7 L', whisky[0], 'botellas', `${totalCubatas} cubatas teóricos: whisky 60% JB, 30% DYC 1L, 10% Jhonnie Walker.`);
+    if(whisky[1]) add('Whisky DYC 1L. 40°', whisky[1], 'botellas', `${totalCubatas} cubatas teóricos: whisky 60% JB, 30% DYC 1L, 10% Jhonnie Walker.`);
+    if(whisky[2]) add('Whisky JHONY WALKER 0.7 L. 40°', whisky[2], 'botellas', `${totalCubatas} cubatas teóricos: whisky residual/otros.`);
+    if(gin[0]) add('Gin BEEFEATER 0.7 L. 43°', gin[0], 'botellas', `${totalCubatas} cubatas teóricos: ginebra 55% Beefeater, 30% Larios, 15% Tanqueray.`);
+    if(gin[1]) add('Gin LARIOS 1 L. 40°', gin[1], 'botellas', `${totalCubatas} cubatas teóricos: ginebra 55% Beefeater, 30% Larios, 15% Tanqueray.`);
+    if(gin[2]) add('GINEBRA Tanqueray', gin[2], 'botellas', `${totalCubatas} cubatas teóricos: ginebra residual Tanqueray.`);
+    add('COCA COLA Bote 32 Cl', Math.ceil((totalCubatas * 0.45) / 24) * 24, 'ud', 'Refresco de mezcla principal para cubatas');
+    add('COCA COLA ZERO Bote 32 Cl', Math.ceil((totalCubatas * 0.20) / 24) * 24, 'ud', 'Refresco de mezcla y consumo directo sin azúcar');
+    add('Tónica lata', Math.ceil((totalCubatas * 0.18) / 24) * 24, 'ud', 'Tónica para ginebra y combinados');
+    add('FANTA Naranja Bote 32 C.L', 24, 'ud', 'Refresco de apoyo para mezcla/consumo directo');
+    add('FANTA Limon Bote 32 CL', 24, 'ud', 'Refresco de apoyo para mezcla/consumo directo');
+    add('HIELO', hot ? 35 : 25, 'bolsas', 'Cubatas, refrescos y conservación con ajuste por calor');
+  }
+  add('Garrafa AGUA (5L)', hot ? Math.ceil((activePeople * days * 1.2) / 5) : Math.ceil((activePeople * days * 0.8) / 5), 'garrafas', 'Agua de apoyo por consumo abierto/base, días y temperatura');
+  const raw = planPromptRawText(form);
+  if(/chorizo/i.test(raw)) add('Chorizo fresco de asar', Math.max(1, round(cenaPeople * 0.10 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
+  if(/lomo/i.test(raw)) add('Lomo fresco', Math.max(1, round(cenaPeople * 0.12 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
+  if(/morcilla/i.test(raw)) add('Morcilla', Math.max(1, round(cenaPeople * 0.08 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
+  if(/panceta|baicon|bacon/i.test(raw)) add('Panceta', Math.max(1, round(cenaPeople * 0.10 * Math.min(days,3), 1)), 'kg', 'Cena informal calculada solo para quienes cenan realmente');
+  if(/venao|venado/i.test(raw)) add('Venao en salsa', Math.max(2, round(cenaPeople * 0.18, 1)), 'kg', 'Plato indicado en cena, cantidad revisable');
+  if(/aperitivo|picoteo|patatas/i.test(raw)) add('patatas fritas (bolsa grande)', Math.max(4, Math.ceil(activePeople / 12) * days), 'bolsas', 'Picoteo compartido calculado con consumo abierto/base');
+  if(/pan|barra|buffet|barbacoa/i.test(raw)) add('PAN (Barra)', Math.max(10, Math.ceil(people * days * 0.55)), 'ud', 'Pan de apoyo calculado con asistentes base: 0,55 barras/persona/día');
+  add('Vasos de plástico', Math.max(100, Math.ceil((activePeople * days * 4) / 50) * 50), 'ud', 'Vasos para bebida/cubatas calculados con consumo abierto/base');
+  add('Platos desechables', Math.max(50, Math.ceil((Math.max(activePeople, cenaPeople) * Math.min(days,3) * 1.5) / 50) * 50), 'ud', 'Platos para comidas/cenas con consumo abierto y cena real');
+  add('Servilletas', Math.max(2, days), 'paquetes', 'Servicio de comidas y aperitivos');
+  add('Bolsas Basura Grandes 240L', Math.max(1, days), 'rollos', 'Infraestructura básica del local');
+  return out.slice(0, 28);
+}
+function planMergeTheoreticalNeedsFix44(parsed, form = {}) {
+  const out = Array.isArray(parsed) ? { necesidadesTeoricas: parsed, __jsonArrayFix44:true } : { ...(parsed || {}) };
+  const list = arr(out.necesidadesTeoricas || out.necesidades_teoricas || out.NECESIDADES_TEORICAS || out.theoreticalNeeds || out.requirements).slice();
+  const seen = new Set(list.map(x => planFamilyFix43(x?.producto || x?.PRODUCTO || x?.product || x?.nombre || '')).filter(Boolean));
+  for(const n of planLocalTheoreticalNeedsFix44(form)){
+    const fam = planFamilyFix43(n.producto);
+    if(fam && !seen.has(fam)){ list.push({...n, motivo: trim(n.motivo || '') + ' · añadido por ControlEvent FIX47 porque Zuzu no entregó esta familia.'}); seen.add(fam); }
+  }
+  out.necesidadesTeoricas = list.slice(0, 28);
+  out.__ceFix44MergedLocalNeeds = true;
+  return out;
+}
+
+function planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules) {
+  const ctx = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
+  const totalMode = trim(form.mode).toUpperCase() === 'ZUZU_TOTAL';
+  if (!totalMode) {
+    const ctxJson = JSON.stringify(planPromptContextForGemini(ctx, false));
+    return `Eres Zuzu, planificador de eventos dentro de ControlEvent. Devuelve SOLO JSON válido.
+SALIDA: {"menuResumen":[{"dia":"dia_1","momento":"aperitivo","resumen":"Será a base de ..."}],"rows":[{"tipo":"COMPRA","producto":"...","unidades":1,"precio":0,"necesidadTotal":1,"reason":"..."}],"notes":[],"preguntasPendientes":[]}
+CONTEXTO:
+${ctxJson}`;
+  }
+  const needCtx = planTheoreticalPromptContextFix43(form, state);
+  const needJson = JSON.stringify(needCtx);
+  return `Devuelve SOLO un ARRAY JSON válido, sin markdown y sin texto fuera.
+Cada elemento debe ser una necesidad teórica total del evento, NO una compra final.
+No descuentes donaciones. ControlEvent descontará después con equivalencias locales.
+Máximo 18 elementos. Prioriza bebida, hielo, agua, comida indicada, menaje e infraestructura básica.
+Formato exacto: [{"producto":"Cerveza lata 33cl","cantidadTotal":375,"unidad":"ud","motivo":"25 consumidores x 5 ud x 3 días"}]
+Usa nombres parecidos al catálogo si encajan, sin cambiar formato/capacidad.
+CONTEXTO=${needJson}`;
+}
+
+function planRowsFromLocalTheoreticalNeedsFix44(form = {}, state = {}, explicitDonationRows = [], baseRows = []) {
+  const pseudo = planNormalizeDirectGeminiJson38(planMergeTheoreticalNeedsFix44({ necesidadesTeoricas: [] }, form));
+  let matched = matchPlanRows(pseudo.rows, arr(baseRows), state, form);
+  matched = planSubtractDonationsFromTheoreticalRowsFix43(matched, explicitDonationRows);
+  return {
+    rows: matched,
+    menuResumen: planCompleteMenuResumen([], form),
+    notes: ['ControlEvent FIX47 ha completado necesidades teóricas por cálculo local porque Zuzu no devolvió un JSON completo. Se usan datos del prompt: días, asistentes, cerveza, cubatas, calor, cenas reales, comida indicada e infraestructura básica.']
+  };
+}
+function planDirectDonationType38(value) {
+  const n = normPlanKey(value || '');
+  if (/TIENDA/.test(n)) return 'DONADO TIENDA';
+  if (/OTROS|OTRO|EXTERNO/.test(n)) return 'DONADO OTROS';
+  return 'DONADO SOCIO';
+}
+function planUnitsFromGeminiProduct38(productText, fallback = 1) {
+  const raw = trim(productText || '');
+  let m = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes|caja|cajas)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)\s*(?:ud\.?|uds\.?|unidades|latas|botellines|botellas|botes)?/i);
+  if (m) return Math.max(0.01, round(num(m[1]) * num(m[2]), 2));
+  m = raw.match(/[\(\[]\s*(\d+(?:[,.]\d+)?)\s*(?:botellas?|bolsas?|sacos?|packs?|paquetes?|cajas?|latas?|botes?|ud\.?|uds\.?|unidades|kg|kilos?)\b/i);
+  if (m) return Math.max(0.01, round(num(m[1]), 2));
+  m = raw.match(/\b(\d+(?:[,.]\d+)?)\s*(?:botellas?|bolsas?|sacos?|packs?|paquetes?|cajas?|latas?|botes?|ud\.?|uds\.?|unidades|kg|kilos?)\b/i);
+  if (m) return Math.max(0.01, round(num(m[1]), 2));
+  if (num(fallback) > 0) return Math.max(0.01, round(fallback, 2));
+  return Math.max(0.01, planExplicitUnits(raw));
+}
+function planCleanGeminiProductLabel38(productText) {
+  let s = trim(productText || '');
+  // En donaciones con "Producto: 1", planCleanExplicitProductText ya conserva el nombre.
+  s = s.replace(/\s*[\(\[]\s*\d+(?:[,.]\d+)?\s*(?:botellas?|bolsas?|sacos?|packs?|paquetes?|cajas?|latas?|botes?|ud\.?|uds\.?|unidades)\b[^\)\]]*[\)\]]\s*/ig, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return planCleanExplicitProductText(s) || trim(productText || '');
+}
+function planNormalizeDirectGeminiJson38(parsed) {
+  const out = Array.isArray(parsed) ? { necesidadesTeoricas: parsed, __jsonArrayFix44:true } : { ...(parsed || {}) };
+  const rows = arr(out.rows).slice();
+  const necesidades = arr(out.necesidadesTeoricas || out.necesidades_teoricas || out.NECESIDADES_TEORICAS || out.theoreticalNeeds || out.requirements);
+  const donaciones = arr(out.donaciones || out.DONACIONES || out.donations || out.DONATIONS);
+  const compras = arr(out.compras || out.COMPRAS || out.purchases || out.PURCHASES);
+  necesidades.forEach((n, idx) => {
+    const productoRaw = trim(n?.producto || n?.PRODUCTO || n?.product || n?.nombre || '');
+    if (!productoRaw) return;
+    const totalNeed = num(n?.cantidadTotal ?? n?.cantidad ?? n?.unidades ?? n?.uds ?? n?.total ?? 0) || planUnitsFromGeminiProduct38(productoRaw, 1);
+    rows.push({
+      tipo:'COMPRA',
+      producto: planCleanGeminiProductLabel38(productoRaw),
+      unidades: Math.max(0, round(totalNeed, 2)),
+      necesidadTotal: Math.max(0, round(totalNeed, 2)),
+      unidadTeorica: trim(n?.unidad || n?.UNIDAD || ''),
+      precio: num(n?.precio ?? n?.price ?? 0),
+      tienda: trim(n?.tienda || n?.TIENDA || n?.store || ''),
+      responsable: trim(n?.responsable || n?.RESPONSABLE || n?.manager || 'Zuzu'),
+      reason: trim(n?.motivo || n?.reason || '') || 'Necesidad teórica total devuelta por Zuzu; ControlEvent resta donaciones después.',
+      __ceFix43NecesidadTeorica:true,
+      __productoEscritoOriginal: productoRaw,
+      __geminiDirect38:true,
+      __geminiDirectIndex: idx
+    });
+  });
+  donaciones.forEach((d, idx) => {
+    const productoRaw = trim(d?.producto || d?.PRODUCTO || d?.product || d?.Product || '');
+    if (!productoRaw) return;
+    rows.push({
+      tipo: 'DONACION',
+      producto: planCleanGeminiProductLabel38(productoRaw),
+      unidades: num(d?.unidades ?? d?.uds ?? d?.cantidad) > 0 ? num(d?.unidades ?? d?.uds ?? d?.cantidad) : planExplicitUnits(productoRaw),
+      ticketDonacion: planDirectDonationType38(d?.tipoDonacion || d?.['TIPO DE DONACION'] || d?.tipo || d?.type),
+      donante: trim(d?.donante || d?.DONANTE || d?.donor || ''),
+      responsable: trim(d?.responsable || d?.RESPONSABLE || d?.manager || ''),
+      reason: 'Donación devuelta por Zuzu en JSON directo.',
+      __geminiDirect38: true,
+      __geminiDirectIndex: idx
+    });
+  });
+  compras.forEach((c, idx) => {
+    const productoRaw = trim(c?.producto || c?.PRODUCTO || c?.product || c?.Product || '');
+    if (!productoRaw) return;
+    rows.push({
+      tipo: 'COMPRA',
+      producto: planCleanGeminiProductLabel38(productoRaw),
+      unidades: num(c?.unidades ?? c?.uds ?? c?.cantidad) > 0 ? num(c?.unidades ?? c?.uds ?? c?.cantidad) : planUnitsFromGeminiProduct38(productoRaw, 1),
+      precio: num(c?.precio ?? c?.price ?? 0),
+      tienda: trim(c?.tienda || c?.TIENDA || c?.store || ''),
+      responsable: trim(c?.responsable || c?.RESPONSABLE || c?.manager || 'Zuzu'),
+      reason: trim(c?.reason || c?.motivo || c?.MOTIVO || '') || 'Compra por déficit devuelta por Zuzu en JSON directo.',
+      __productoEscritoOriginal: productoRaw,
+      __geminiDirect38: true,
+      __geminiDirectIndex: idx
+    });
+  });
+  out.rows = rows;
+  out.notes = arr(out.notes).concat(arr(out.avisos || out.AVISOS || out.warnings)).map(x => trim(typeof x === 'string' ? x : JSON.stringify(x))).filter(Boolean);
+  out.__directCounts38 = { necesidadesTeoricas: necesidades.length, donaciones: donaciones.length, compras: compras.length, rows: rows.length };
+  return out;
+}
+
+function planExtractJsonArrayByKeyFix39(textValue, key) {
+  const txt = String(textValue || '');
+  const rx = new RegExp('"' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"\\s*:\\s*\\[', 'i');
+  const m = rx.exec(txt);
+  if (!m) return [];
+  let i = m.index + m[0].lastIndexOf('[');
+  let depth = 0, inStr = false, esc = false;
+  for (let j=i; j<txt.length; j++) {
+    const ch = txt[j];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '[') depth += 1;
+    else if (ch === ']') {
+      depth -= 1;
+      if (depth === 0) {
+        const piece = txt.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1');
+        try { return JSON.parse(piece); } catch (_) { return []; }
+      }
+    }
+  }
+  return [];
+}
+function planSalvageJsonArrayPrefixFix44(outText) {
+  const txt = String(outText || '').trim();
+  const start = txt.indexOf('[');
+  if (start < 0) return [];
+  const out = [];
+  let depth = 0, objStart = -1, inStr = false, esc = false;
+  for (let i = start + 1; i < txt.length; i++) {
+    const ch = txt[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{') { if (depth === 0) objStart = i; depth += 1; }
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0 && objStart >= 0) {
+        const piece = txt.slice(objStart, i + 1).replace(/,\s*([}\]])/g, '$1');
+        try { out.push(JSON.parse(piece)); } catch (_) {}
+        objStart = -1;
+      }
+    }
+  }
+  return out;
+}
+function planSalvageDirectGeminiJsonFix39(outText) {
+  let necesidadesTeoricas = planExtractJsonArrayByKeyFix39(outText, 'necesidadesTeoricas');
+  const topArray = planSalvageJsonArrayPrefixFix44(outText);
+  if (!necesidadesTeoricas.length && topArray.length) necesidadesTeoricas = topArray;
+  const menuResumen = planExtractJsonArrayByKeyFix39(outText, 'menuResumen');
+  const compras = planExtractJsonArrayByKeyFix39(outText, 'compras');
+  const avisos = planExtractJsonArrayByKeyFix39(outText, 'avisos');
+  const notes = planExtractJsonArrayByKeyFix39(outText, 'notes');
+  if (necesidadesTeoricas.length || menuResumen.length || compras.length || avisos.length || notes.length) return { necesidadesTeoricas, menuResumen, compras, avisos, notes, __jsonSalvagedFix39:true, __jsonArrayPrefixSalvagedFix44: topArray.length > 0 };
+  return null;
+}
+
+async function callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules) {
+  const apiKey = geminiKey();
+  if (!apiKey) throw new Error('Sin GEMINI_API_KEY para planificacion con Zuzu.');
+  const started = Date.now();
+  const promptText = planPrompt(form, baseRows, incomeRows, state, sourceEvent, modules);
+  const context = planGeminiContext(form, baseRows, incomeRows, state, sourceEvent, modules);
+  const contextPrompt = planPromptContextForGemini(context, trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL');
+  const trace = {
+    version: 'FIX47_CONSUMO_ABIERTO_VARIABLE',
+    startedAt: new Date(started).toISOString(),
+    mode: trim(form?.mode),
+    promptChars: promptText.length,
+    contextResumen: {
+      diasOperativos: context?.eventoNuevo?.diasOperativos,
+      diasDetectadosPrompt: context?.eventoNuevo?.diasDetectadosPrompt,
+      asistentes: context?.briefEvento?.personasAsistentes,
+      consumoAbierto: context?.briefEvento?.personasConsumoAbierto,
+      consumoAbiertoAplicado: context?.briefEvento?.consumoAbiertoAplicado,
+      cenaReal: context?.briefEvento?.personasCenaReal,
+      momentos: arr(context?.briefEvento?.momentosPorDia).length,
+      donacionesDetectadas: arr(context?.existenciasYDonacionesExplicitas).length,
+      productosCatalogoEntregados: arr(contextPrompt?.productosCatalogo).length || arr(contextPrompt?.catalogoIndicativo).length || contextPrompt?.catalogos?.productosEntregadosZuzu || context?.catalogos?.productosEntregadosGemini,
+      totalProductosCatalogo: context?.catalogos?.totalProductosCatalogo
+    },
+    briefEvento: context.briefEvento,
+    briefEventoTexto: context.briefEventoTexto,
+    geminiRequestPreview: promptText.slice(0, 12000),
+    promptCharsFinal: promptText.length,
+    attempts: []
+  };
+  let lastError = null;
+  for (const model of configuredGeminiPlanningModels(form)) {
+    const attemptStart = Date.now();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const totalPlanMode = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL';
+    const generationConfig = {
+      responseMimeType: 'application/json',
+      temperature: totalPlanMode ? 0.45 : 0.25,
+      maxOutputTokens: totalPlanMode ? 3072 : 4096
+    };
+    // FIX44: en Encargo total sí forzamos esquema, pero esquema de ARRAY muy simple.
+    // Esto evita respuestas cortadas en objetos grandes con menuResumen/compras/donaciones.
+    if (totalPlanMode) {
+      generationConfig.responseSchema = {
+        type:'ARRAY',
+        items:{
+          type:'OBJECT',
+          properties:{
+            producto:{type:'STRING'},
+            cantidadTotal:{type:'NUMBER'},
+            unidad:{type:'STRING'},
+            motivo:{type:'STRING'}
+          },
+          required:['producto','cantidadTotal','unidad','motivo']
+        }
+      };
+    } else {
+      generationConfig.responseSchema = planAiSchema();
+    }
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      generationConfig
+    };
+    try {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutMs = trim(form?.mode).toUpperCase() === 'ZUZU_TOTAL' ? 26000 : 16000;
+      const abortTimer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+      let res;
+      try {
+        res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body), signal: controller?.signal });
+      } finally {
+        if (abortTimer) clearTimeout(abortTimer);
+      }
+      const payload = await res.json().catch(async () => ({ error:{ message: await res.text().catch(() => res.statusText) } }));
+      const elapsedMs = Date.now() - attemptStart;
+      if (!res.ok) {
+        trace.attempts.push({ model, ok:false, elapsedMs, httpStatus:res.status, error:payload?.error?.message || `HTTP ${res.status}` });
+        throw new Error(payload?.error?.message || `Zuzu planificacion HTTP ${res.status}`);
+      }
+      const outText = trim(geminiOutText(payload));
+      if (!outText) {
+        trace.attempts.push({ model, ok:false, elapsedMs, httpStatus:res.status, error:'Zuzu no devolvió texto analizable.' });
+        throw new Error('Zuzu no devolvió propuesta de planificación.');
+      }
+      let parsed, repairedJson = false;
+      try {
+        const parsedInfo = parsePlanJsonLenientHf37(outText);
+        parsed = parsedInfo.parsed;
+        repairedJson = !!parsedInfo.repaired;
+      } catch (jsonError) {
+        const salvaged = planSalvageDirectGeminiJsonFix39(outText);
+        if (salvaged) {
+          parsed = salvaged;
+          repairedJson = true;
+        } else {
+          trace.attempts.push({ model, ok:false, elapsedMs, httpStatus:res.status, error:trim(jsonError?.message || jsonError), rawChars:outText.length, rawTextPreview:outText.slice(0, 60000) });
+          jsonError.__trace = trace;
+          throw jsonError;
+        }
+      }
+      if (totalPlanMode) parsed = planMergeTheoreticalNeedsFix44(parsed, form);
+      parsed = planNormalizeDirectGeminiJson38(parsed);
+      parsed.__model = model;
+      trace.attempts.push({
+        model,
+        ok:true,
+        jsonRepaired: repairedJson,
+        elapsedMs,
+        httpStatus:res.status,
+        rawChars:outText.length,
+        usage: usageSmall(payload, model),
+        costEstimate: estimateGeminiCost(model, payload?.usageMetadata || {}),
+        necesidadesTeoricasGemini: parsed.__directCounts38?.necesidadesTeoricas || 0,
+        menuResumenGemini: arr(parsed.menuResumen).length,
+        rowsGemini: arr(parsed.rows).length,
+        comprasGemini: arr(parsed.rows).filter(r => /^COMPRA$/i.test(trim(r?.tipo))).length,
+        donacionesGemini: arr(parsed.rows).filter(r => /^DON/i.test(trim(r?.tipo))).length,
+        comprasDirectasGemini: parsed.__directCounts38?.compras || 0,
+        donacionesDirectasGemini: parsed.__directCounts38?.donaciones || 0,
+        rawTextPreview: outText.slice(0, 60000)
+      });
+      trace.elapsedMs = Date.now() - started;
+      trace.selectedModel = model;
+      trace.costEstimate = summarizeGeminiUsageFromTrace(trace.attempts.map(a => ({ usage:a.usage })).filter(Boolean));
+      trace.geminiRawTextPreview = outText.slice(0, 60000);
+      trace.geminiParsedCounts = {
+        necesidadesTeoricas: parsed.__directCounts38?.necesidadesTeoricas || 0,
+        menuResumen: arr(parsed.menuResumen).length,
+        rows: arr(parsed.rows).length,
+        compras: arr(parsed.rows).filter(r => /^COMPRA$/i.test(trim(r?.tipo))).length,
+        donaciones: arr(parsed.rows).filter(r => /^DON/i.test(trim(r?.tipo))).length,
+        comprasDirectas: parsed.__directCounts38?.compras || 0,
+        donacionesDirectas: parsed.__directCounts38?.donaciones || 0
+      };
+      parsed.__trace = trace;
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      if (!trace.attempts.some(a => a.model === model)) trace.attempts.push({ model, ok:false, elapsedMs:Date.now() - attemptStart, error:trim(error?.message || error) });
+      if (!isRetryable(error)) break;
+    }
+  }
+  if (lastError) lastError.__trace = { ...trace, elapsedMs:Date.now() - started, lastError:trim(lastError?.message || lastError) };
+  throw lastError || new Error('Zuzu planificación no disponible.');
+}
+
+function planProductFormatTokens38(value) {
+  const n = normPlanKey(value || '');
+  const capacities = [];
+  const containers = new Set();
+  let m;
+  const capRx = /(\d+(?:[,.]\d+)?)\s*(l|litro|litros|kg|kilo|kilos|cl|ml)\b/g;
+  while ((m = capRx.exec(n))) {
+    const unitRaw = m[2];
+    const unit = /^k/.test(unitRaw) ? 'KG' : (/^c/.test(unitRaw) ? 'CL' : (/^m/.test(unitRaw) ? 'ML' : 'L'));
+    capacities.push(`${String(m[1]).replace(',','.')}:${unit}`);
+  }
+  if (/\bbarril(?:es)?\b/.test(n)) containers.add('BARRIL');
+  if (/\blata(?:s)?\b|\bbote(?:s)?\b/.test(n)) containers.add('LATA');
+  if (/\bbotella(?:s)?\b/.test(n)) containers.add('BOTELLA');
+  if (/\bgarrafa(?:s)?\b/.test(n)) containers.add('GARRAFA');
+  if (/\bbolsa(?:s)?\b|\bsaco(?:s)?\b/.test(n)) containers.add('BOLSA');
+  return { capacities, containers:[...containers] };
+}
+function planProductFormatCompatible38(written, catalogName) {
+  const a = planProductFormatTokens38(written);
+  const b = planProductFormatTokens38(catalogName);
+  if (a.capacities.length && b.capacities.length) {
+    // Si el usuario escribió 50l y el catálogo dice 30l, no se acepta como exacto.
+    const commonUnits = new Set(a.capacities.map(x => x.split(':')[1]).filter(u => b.capacities.some(y => y.endsWith(':'+u))));
+    for (const u of commonUnits) {
+      const av = a.capacities.filter(x => x.endsWith(':'+u)).map(x => x.split(':')[0]);
+      const bv = b.capacities.filter(x => x.endsWith(':'+u)).map(x => x.split(':')[0]);
+      if (av.length && bv.length && !av.some(v => bv.includes(v))) return false;
+    }
+  }
+  if (a.containers.length && b.containers.length) {
+    const same = a.containers.some(x => b.containers.includes(x));
+    // Lata/bote no debe convertirse en botella 2L, ni botella en lata; barril sí debe seguir siendo barril.
+    if (!same) return false;
+  }
+  return true;
+}
+function matchPlanRows(aiRows, baseRows, state, form) {
+  const maps = planBuildMaps(state);
+  const defaults = { tiendaId: trim(form.defaultStoreId), responsableId: trim(form.defaultResponsibleId) };
+  const baseByProduct = new Map();
+  arr(baseRows).forEach(r => { const k = trim(r.productId) || normPlanKey(r.productName); if(k && !baseByProduct.has(k)) baseByProduct.set(k, r); });
+  const out = [];
+  arr(aiRows).forEach((row, idx) => {
+    const pid = trim(row?.productId);
+    let prod = pid ? maps.products.get(pid) : null;
+    if (!prod) prod = maps.productByName.get(normPlanKey(row?.producto));
+    if (!prod) prod = planFindProductLoose(row?.producto, maps);
+    const base = prod ? (baseByProduct.get(trim(prod.id)) || baseByProduct.get(normPlanKey(prod.nombre))) : null;
+    // FIX31: no descartar propuestas libres de Zuzu por no encajar al 100% con PRODUCTOS.
+    // Se conservan como líneas revisables con productId vacío, para que el usuario vea la idea y pueda ajustar catálogo.
+    const tipo = /^DON/i.test(trim(row?.tipo)) ? 'DONACION' : 'COMPRA';
+    const ticketDonacion = tipo === 'DONACION' ? (trim(row?.ticketDonacion) || 'DONADO OTROS') : '';
+    const tienda = maps.storeByName.get(normPlanKey(row?.tienda)) || planFindStoreLoose(row?.tienda, maps);
+    const responsable = maps.personByName.get(normPlanKey(row?.responsable)) || planFindPersonLoose(row?.responsable, maps);
+    const donorRef = tipo === 'DONACION' ? (planDonorRefFromLabel(row?.donante, maps) || planRefFromLooseLabel(row?.donante, maps, /^DONADO\s+TIENDA/i.test(ticketDonacion) ? 'T' : 'P') || base?.donorRef || '') : '';
+    out.push({
+      ...(base || {}),
+      key: `zuzu:${idx}:${trim(prod?.id || base?.productId || row?.producto || 'sin-producto')}`,
+      include: row?.include !== false,
+      tipo,
+      productId: trim((row?.__productoEscritoOriginal && prod && !planProductFormatCompatible38(row.__productoEscritoOriginal, prod.nombre)) ? '' : (prod?.id || base?.productId)),
+      productName: trim((row?.__productoEscritoOriginal && prod && !planProductFormatCompatible38(row.__productoEscritoOriginal, prod.nombre)) ? row.__productoEscritoOriginal : (prod?.nombre || base?.productName || row?.producto)),
+      segmento: trim(prod?.segmento || base?.segmento || 'Sin segmento'),
+      destino: trim(prod?.destino || base?.destino || 'Sin destino'),
+      unidades: tipo === 'COMPRA'
+        ? planRoundBuyUnits(prod?.nombre || base?.productName || row?.producto, row?.unidades)
+        : Math.max(0, round(row?.unidades, 2)),
+      precio: planReasonablePlanPrice(prod?.nombre || base?.productName || row?.producto, num(row?.precio) > 0 ? row.precio : (base?.precio || prod?.defaultPrecio || prod?.precio)),
+      tiendaId: trim(tienda?.id || base?.tiendaId || defaults.tiendaId),
+      responsableId: trim(responsable?.id || base?.responsableId || defaults.responsableId),
+      ticketDonacion,
+      donorRef,
+      confidence: row?.__geminiDirect38 === true ? 'Zuzu JSON directo' : 'Zuzu',
+      __geminiDirect38: row?.__geminiDirect38 === true,
+      explicitPromptDonation: tipo === 'DONACION' && row?.__geminiDirect38 === true,
+      explicitConfirmedDonation: tipo === 'DONACION' && row?.__geminiDirect38 === true,
+      explicitPromptStrictHf12: tipo === 'DONACION' && row?.__geminiDirect38 === true,
+      __productoEscritoOriginal: row?.__productoEscritoOriginal || '',
+      necesidadTotal: num(row?.necesidadTotal) > 0 ? round(row.necesidadTotal, 2) : undefined,
+      reason: trim(row?.reason) || 'Propuesta ajustada por Zuzu a partir del menú, asistentes, duración, temperatura y existencias.'
+    });
+  });
+  return planApplyDonationRules(out.filter(r => (r.productId || r.productName) && r.unidades >= 0), planInfoDonationRules(planPromptRawText(form), maps));
+}
+
+function planFamilyFix43(name) {
+  const n = normPlanKey(name || '');
+  if (/cerveza/.test(n)) return 'cerveza';
+  if (/coca.*zero.*zero|zero.*zero/.test(n)) return 'coca-zero-zero';
+  if (/coca.*zero|zero/.test(n)) return 'coca-zero';
+  if (/coca/.test(n)) return 'coca-normal';
+  if (/fanta.*naranja|naranja/.test(n)) return 'fanta-naranja';
+  if (/fanta.*lim[oó]n|limon/.test(n)) return 'fanta-limon';
+  if (/sprite/.test(n)) return 'sprite';
+  if (/t[oó]nica|tonica|schweppes/.test(n)) return 'tonica';
+  if (/hielo/.test(n)) return 'hielo';
+  if (/agua/.test(n)) return 'agua';
+  if (/ron.*barcelo|barcelo/.test(n)) return 'ron-barcelo';
+  if (/brugal/.test(n)) return 'ron-brugal';
+  if (/ron/.test(n)) return 'ron';
+  if (/whisky|wiski|j\.?b\b|jb\b/.test(n)) return 'whisky';
+  if (/ginebra|gin|beefeater|larios|puerto de indias/.test(n)) return 'ginebra';
+  if (/chorizo/.test(n)) return 'chorizo';
+  if (/lomo/.test(n)) return 'lomo';
+  if (/morcilla/.test(n)) return 'morcilla';
+  if (/panceta|baicon|bacon/.test(n)) return 'panceta';
+  if (/venao|venado/.test(n)) return 'venao';
+  if (/pan\b|barra|baguette/.test(n)) return 'pan';
+  if (/vaso/.test(n)) return 'vasos';
+  if (/plato/.test(n)) return 'platos';
+  if (/servilleta/.test(n)) return 'servilletas';
+  if (/bolsa.*basura|basura/.test(n)) return 'bolsas-basura';
+  if (/fairy/.test(n)) return 'fairy';
+  if (/lavavajillas/.test(n)) return 'lavavajillas';
+  if (/abrillantador/.test(n)) return 'abrillantador';
+  if (/secamanos/.test(n)) return 'papel-secamanos';
+  return normPlanKey(name || '').slice(0,80);
+}
+function planEquivalentUnitsForFamilyFix43(name, units) {
+  const n = normPlanKey(name || '');
+  const u = Math.max(0, num(units));
+  if (/cerveza/.test(n) && /barril/.test(n)) {
+    const liters = /50\s*l/.test(n) ? 50 : (/30\s*l/.test(n) ? 30 : 50);
+    return round((liters / 0.33) * u, 2);
+  }
+  if (/(coca|fanta|sprite|refresco)/.test(n) && /botella/.test(n) && /2\s*l/.test(n)) return round(u * 6, 2);
+  return u;
+}
+function planSubtractDonationsFromTheoreticalRowsFix43(rows, explicitDonationRows) {
+  const donationEquiv = new Map();
+  arr(explicitDonationRows).forEach(d => {
+    const fam = planFamilyFix43(d.productName || d.producto || '');
+    if (!fam) return;
+    donationEquiv.set(fam, (donationEquiv.get(fam) || 0) + planEquivalentUnitsForFamilyFix43(d.productName || d.producto || '', d.unidades));
+  });
+  return arr(rows).map(row => {
+    if (row?.tipo !== 'COMPRA' || row.__ceFix43NecesidadAjustada === true) return row;
+    const fam = planFamilyFix43(row.productName || row.producto || '');
+    const totalNeed = Math.max(0, num(row.necesidadTotal || row.unidades || row.aComprarCalculado));
+    if (!fam || totalNeed <= 0) return row;
+    const donated = Math.max(0, donationEquiv.get(fam) || 0);
+    const deficit = Math.max(0, round(totalNeed - donated, 2));
+    return {
+      ...row,
+      unidades:deficit,
+      aComprarCalculado:deficit,
+      necesidadTotal:totalNeed,
+      include:deficit > 0 && row.include !== false,
+      reason: trim(row.reason || '') + ` Déficit calculado por ControlEvent FIX43: necesidad teórica ${round(totalNeed,2)} - donado/existente equivalente ${round(donated,2)} = compra ${round(deficit,2)}.`,
+      __ceFix43NecesidadAjustada:true,
+      __ceFix43DonadoRestado:donated
+    };
+  }).filter(r => r && (r.tipo !== 'COMPRA' || num(r.unidades) > 0 || r.include !== false));
+}
+
+function buildTotalBaseRows(state, modules, form) {
+  if (!arr(modules).some(m => m === 'COMPRAS' || m === 'DONACIONES')) return [];
+  const maps = planBuildMaps(state);
+  const finalIds = new Set(arr(state?.eventos).filter(e => /^finalizado$/i.test(trim(e?.situacion))).map(e => trim(e.id)).filter(Boolean));
+  const grouped = new Map();
+  arr(state?.compras).forEach(row => {
+    const evId = trim(row?.eventId || row?.event_id);
+    if (!finalIds.has(evId)) return;
+    const don = planIsDonation(row);
+    if (don && !modules.includes('DONACIONES')) return;
+    if (!don && !modules.includes('COMPRAS')) return;
+    const prod = planProduct(row, maps);
+    const pid = trim(prod?.id || row?.productoId || row?.producto_id);
+    if (!pid) return;
+    const key = `${don?'D':'C'}|${pid}`;
+    const old = grouped.get(key) || { row, unidades:0, importe:0, count:0, don };
+    old.unidades += num(row.unidades);
+    old.importe += planLineValue(row);
+    old.count += 1;
+    grouped.set(key, old);
+  });
+  const estimated = Math.max(1, num(form.personas) || 30);
+  return [...grouped.values()].sort((a,b)=>b.count-a.count || b.importe-a.importe).slice(0, 80).map((g, idx) => {
+    const row = g.row;
+    const prod = planProduct(row, maps) || {};
+    const avgUnits = Math.max(0.5, round(g.unidades / Math.max(1, g.count), 2));
+    const precio = planReasonablePlanPrice(prod.nombre || row.producto, g.unidades ? round(g.importe / g.unidades, 4) : (row.precio || prod.defaultPrecio || prod.precio));
+    return {
+      key:`total:${idx}:${prod.id || row.productoId}`,
+      include:true,
+      tipo:g.don ? 'DONACION' : 'COMPRA',
+      productId:trim(prod.id || row.productoId || row.producto_id),
+      productName:trim(prod.nombre || row.producto || 'Producto'),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      unidades: avgUnits,
+      precio,
+      tiendaId:trim(row.tiendaId || row.tienda_id || prod.defaultTiendaId || form.defaultStoreId),
+      responsableId:trim(row.responsableId || row.responsable_id || form.defaultResponsibleId),
+      ticketDonacion:g.don ? planTicket(row) : '',
+      donorRef:g.don ? trim(row.donorRef || row.donor_ref || '') : '',
+      confidence:'Histórico general',
+      reason:`Producto frecuente en históricos finalizados (${g.count} apariciones). Ajustar manualmente según ${estimated} personas estimadas.`
+    };
+  });
+}
+function planApplyFinalDefaultsHf14(rows, form, state) {
+  const maps = planBuildMaps(state);
+  const defStoreByName = planFindStoreLoose(form?.defaultStoreName || '', maps);
+  const defRespByName = planFindPersonLoose(form?.defaultResponsibleName || '', maps);
+  const firstStore = arr(state?.tiendas)[0] || {};
+  const firstResp = arr(state?.personas)[0] || {};
+  const defStoreId = trim(form?.defaultStoreId || defStoreByName?.id || firstStore?.id || '');
+  const defRespId = trim(form?.defaultResponsibleId || defRespByName?.id || firstResp?.id || '');
+  return arr(rows).map(row => {
+    const out = {...row};
+    if (out.tipo === 'COMPRA') {
+      out.tiendaId = trim(out.tiendaId || defStoreId);
+      out.responsableId = trim(out.responsableId || defRespId);
+      out.ticketDonacion = '';
+      out.donorRef = '';
+      return out;
+    }
+    if (out.tipo === 'DONACION') {
+      out.explicitConfirmedDonation = out.explicitConfirmedDonation || out.explicitPromptDonation === true || out.explicitPromptStrictHf12 === true;
+      const donor = trim(out.donorRef || '');
+      if (!out.responsableId) {
+        if (donor.startsWith('P:')) out.responsableId = donor.slice(2);
+        else out.responsableId = defRespId;
+      }
+      if (/DONADO\s+TIENDA/i.test(out.ticketDonacion || '') && !out.tiendaId && donor.startsWith('T:')) {
+        out.tiendaId = donor.slice(2);
+      }
+    }
+    return out;
+  });
+}
+
+
+function planConfirmedPromptDonationHintsHf21(form, state) {
+  const info = planPromptRawText(form);
+  if (!info) return [];
+  const maps = planBuildMaps(state || {});
+  const hints = [];
+  const lines = info.replace(/\r/g, '').split(/\n/);
+  let active = null;
+  const stop = /^(OBJETIVO|DATOS\s+PARA|DESCRIPCI[ÓO]N|CRITERIOS?|DETALLES|COMIDAS|PISTAS\s+DE\s+COMPRA|REGLAS\s+FINALES|COMPRA|COMPRAS|A\s+COMPRAR)\s*:/i;
+  const start = /^(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?\b|DONACI[ÓO]N\b|DONACION\b|EXISTENCIAS?\b|YA\s+TENEMOS\b)/i;
+  function meta(line, prev) {
+    const h = trim(line || '');
+    const m = {...(prev || {})};
+    if (/DONADO\s+TIENDA|DONACI[ÓO]N\s+DE\s+TIENDA/i.test(h)) m.ticketDonacion = 'DONADO TIENDA';
+    else if (/DONADO\s+OTROS|DONACI[ÓO]N\s+DE\s+OTROS/i.test(h)) m.ticketDonacion = 'DONADO OTROS';
+    else if (/DONADO\s+SOCIO|DONACIONES?\s+DE\s+SOCIOS?|PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.ticketDonacion = 'DONADO SOCIO';
+    if (!m.ticketDonacion) m.ticketDonacion = 'DONADO SOCIO';
+    const donor = planExtractBracket(h, ['Donante']) || '';
+    const resp = planExtractBracket(h, ['Responsable']) || '';
+    if (donor) m.donor = donor;
+    if (resp) m.responsable = resp;
+    if (!m.donor && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.donor = 'Peña El Arrastre';
+    if (!m.responsable && /PRODUCTO\s+EN\s+LA\s+PE[NÑ]A/i.test(h)) m.responsable = trim(form.defaultResponsibleName || 'Colty');
+    return m;
+  }
+  function qty(raw) {
+    const s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+    const tail = s.includes(':') ? s.slice(s.lastIndexOf(':') + 1) : s;
+    let m = tail.match(/(\d+(?:[,.]\d+)?)\s*(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+    if (m) return Math.max(0, round(num(m[1]) * num(m[2]), 2));
+    m = tail.match(/(?:pack|packs|paquete|paquetes)\s*(?:de|x)\s*(\d+(?:[,.]\d+)?)/i);
+    if (m) return Math.max(0, round(num(m[1]), 2));
+    m = tail.match(/(\d+(?:[,.]\d+)?)/);
+    return m ? Math.max(0, num(m[1])) : 1;
+  }
+  function prodText(raw) {
+    let s = trim(raw || '').replace(/^\s*[•\-\*]\s*/, '');
+    if (!s.includes(':')) return '';
+    s = s.slice(0, s.lastIndexOf(':'));
+    return planCleanExplicitProductText(s);
+  }
+  function keyOf(name, prod) {
+    return trim(prod?.id) ? `id:${trim(prod.id)}` : (planProductAliasKey(name || '') || normPlanKey(name || ''));
+  }
+  lines.forEach(raw => {
+    const line = trim(raw);
+    if (!line) return;
+    if (stop.test(line)) { active = null; return; }
+    if (start.test(line)) { active = meta(line, {}); return; }
+    if (active && (/Tratar\s+como\s+DONADO/i.test(line) || /\[Donante:|\[Responsable:/i.test(line))) { active = meta(line, active); return; }
+    if (active && /^PRODUCTOS?\s*:?\s*$/i.test(line)) return;
+    if (!active || !/^\s*[•\-\*]\s*[^:\n]{2,220}:\s*(?:\d|un|una|uno|pack|paquete)/i.test(raw)) return;
+    const text = prodText(raw);
+    if (!text) return;
+    const prod = planFindProductLoose(text, maps);
+    const ticket = active.ticketDonacion || 'DONADO SOCIO';
+    const donorLabel = trim(active.donor || 'Donante indicado');
+    const respLabel = trim(active.responsable || (ticket === 'DONADO TIENDA' ? form.defaultResponsibleName : donorLabel) || form.defaultResponsibleName || '');
+    const donorRef = planRefFromLooseLabel(donorLabel, maps, ticket === 'DONADO TIENDA' ? 'T' : 'P') || donorLabel;
+    const resp = planFindPersonLoose(respLabel, maps);
+    const store = ticket === 'DONADO TIENDA' ? planFindStoreLoose(donorLabel, maps) : null;
+    hints.push({
+      productText:text,
+      productId:trim(prod?.id || ''),
+      productName:trim(prod?.nombre || text),
+      key:keyOf(text, prod),
+      unidades:qty(raw),
+      precio:planReasonablePlanPrice(prod?.nombre || text, prod?.defaultPrecio ?? prod?.precio ?? 0),
+      segmento:trim(prod?.segmento || 'Sin segmento'),
+      destino:trim(prod?.destino || 'Sin destino'),
+      ticketDonacion:ticket,
+      donorRef,
+      tiendaId:trim(store?.id || form.defaultStoreId || ''),
+      responsableId:trim(resp?.id || (donorRef.startsWith('P:') ? donorRef.slice(2) : '') || form.defaultResponsibleId || ''),
+      donorLabel
+    });
+  });
+  return hints;
+}
+
+function planHasConfirmedDonationBlocksHf17(form) {
+  const info = planPromptRawText(form);
+  return /(PRODUCTO\s+EN\s+LA\s+PE[NÑ]A|DONACIONES?(?:\s+(?:Y\s+EXISTENCIAS\s+CONFIRMADAS|DE\s+[^:\n]+))?\s*:|DONACION(?:\s+DE\s+[^:\n]+)?\s*:|DONACI[ÓO]N(?:\s+DE\s+[^:\n]+)?\s*:|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:]|EXISTENCIAS?(?:\s+[^:\n]+)?\s*:|YA\s+TENEMOS)/i.test(info)
+    && /(\[Donante:|Tratar\s+como\s+DONADO|PRODUCTOS?\s*:|DONADO\s+(?:SOCIO|TIENDA|OTROS)\s*[-–:])/i.test(info);
+}
+function planRowsFromExplicitPromptOnlyHf17(form, state) {
+  const explicit = planExplicitDonationRowsFromPrompt(form, state);
+  return arr(explicit).map((r, idx) => ({
+    ...r,
+    key: r.key || `prompt-direct:${idx}`,
+    include: r.include !== false,
+    explicitPromptDonation: true,
+    explicitConfirmedDonation: true,
+    confidence: trim(r.confidence || 'Prompt explícito confirmado'),
+    reason: trim(r.reason || 'Donación/existencia confirmada por el prompt.')
+  }));
+}
+function planWithTimeoutHf17(promise, ms, label = 'Zuzu') {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} tardó demasiado y se ha usado cálculo directo del prompt.`)), Math.max(1000, ms || 18000));
+    })
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+function planBoolOptionFix46(value, defaultValue = true) {
+  if (value === undefined || value === null || value === '') return !!defaultValue;
+  if (typeof value === 'boolean') return value;
+  const s = trim(value).toLowerCase();
+  return ['1','true','yes','si','sí','on','checked'].includes(s);
+}
+function planOptionSummaryFix46(form) {
+  return {
+    ajusteSaldo: planBoolOptionFix46(form?.applySaldoAjuste, true),
+    topesProducto: planBoolOptionFix46(form?.applyProductCaps, true)
+  };
+}
+
+export async function planificacionInicialZuzu({ mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info, applySaldoAjuste, applyProductCaps, usuarioLogado, user, authUser, ce_acceso } = {}) {
+  const state = attachLoggedUserFix10(await getState(), { usuarioLogado, user, authUser, ce_acceso });
+  const maps = planBuildMaps(state);
+  const modules = planContentModules(content);
+  const rawForm = { mode, modelEventId, content, title, fechaIni, fechaFin, dias, personas, defaultResponsibleId, defaultStoreId, descripcion, info, applySaldoAjuste, applyProductCaps };
+  const diasDetectadosPrompt = planDetectedDaysFromPrompt(rawForm);
+  const diasOperativos = Math.max(1, diasDetectadosPrompt || num(dias) || 1);
+  const form = { ...rawForm, diasFormulario: dias, diasDetectadosPrompt, dias: diasOperativos, defaultResponsibleName: planPersonName(defaultResponsibleId, maps), defaultStoreName: planStoreName(defaultStoreId, maps) };
+  const m = trim(mode || 'REPLICA').toUpperCase();
+  const planOptionsFix46 = planOptionSummaryFix46(form);
+  const allowLocalFallbackFix46 = planOptionsFix46.ajusteSaldo || planOptionsFix46.topesProducto || (applySaldoAjuste === undefined && applyProductCaps === undefined);
+  const phaseDetailsFix46 = [];
+  const phaseSnapshotFix46 = (fase, rows, extra = {}) => phaseDetailsFix46.push({
+    fase,
+    compras: arr(rows).filter(r => r?.tipo === 'COMPRA' && r.include !== false).length,
+    donaciones: arr(rows).filter(r => r?.tipo === 'DONACION' && r.include !== false).length,
+    totalCompras: round(planCompraTotal(rows), 2),
+    ...extra
+  });
+  phaseDetailsFix46.push({ fase:'Opciones', origen:'ControlEvent', compras:'', donaciones:'', totalCompras:null, detalle:`Ajuste saldo: ${planOptionsFix46.ajusteSaldo ? 'ACTIVO' : 'NO'} · Topes producto: ${planOptionsFix46.topesProducto ? 'ACTIVOS' : 'NO'} · Base ${planOpenConsumptionContextFix47(form).asistentesBase || '—'} · Consumo abierto ${planOpenConsumptionContextFix47(form).aplicaConsumoAbierto ? planOpenConsumptionContextFix47(form).consumoAbiertoPersonas : 'NO'} · Cena real ${planOpenConsumptionContextFix47(form).cenaRealMin && planOpenConsumptionContextFix47(form).cenaRealMax && planOpenConsumptionContextFix47(form).cenaRealMin !== planOpenConsumptionContextFix47(form).cenaRealMax ? planOpenConsumptionContextFix47(form).cenaRealMin + '-' + planOpenConsumptionContextFix47(form).cenaRealMax : (planOpenConsumptionContextFix47(form).cenaRealMax || '—')}` });
+  const sourceEvent = planEventById(state, modelEventId);
+  if ((m === 'REPLICA' || m === 'ZUZU_PARCIAL') && !sourceEvent) {
+    const err = new Error('Debes elegir un Evento modelo finalizado para este modo de planificación.');
+    err.status = 400; throw err;
+  }
+  let baseRows = (m === 'ZUZU_TOTAL') ? [] : planRowsForEvent(state, modelEventId, modules);
+  const sourceAtt = sourceEvent ? planAttendeesForEvent(state, sourceEvent.id) : 0;
+  const targetAtt = num(planOpenConsumptionContextFix47(form).asistentesBase) || num(personas) || sourceAtt || 30;
+  const sourceDays = sourceEvent ? Math.max(1, 1) : 1;
+  const targetDays = Math.max(1, num(form.dias) || 1);
+  if (m === 'ZUZU_PARCIAL' && sourceAtt > 0) baseRows = planScaleRows(baseRows, Math.max(0.1, (targetAtt / sourceAtt) * Math.sqrt(targetDays / sourceDays)), defaultStoreId, defaultResponsibleId);
+  let incomeRows = modules.includes('INGRESOS') && sourceEvent ? planIncomeRowsForEvent(state, sourceEvent.id) : [];
+  const explicitDonationRows = planExplicitDonationRowsLocalFix39(form, state);
+  let rowsOut = baseRows;
+  let aiNotes = [];
+  let aiProvider = 'control-event-historico';
+  let aiModel = '';
+  let aiMenuResumen = [];
+  let aiTrace = null;
+  const hasConfirmedPromptBlocks = planHasConfirmedDonationBlocksHf17(form);
+  const largePrompt = trim(form.info || '').length > 6000;
+
+  if (m === 'ZUZU_TOTAL' && hasConfirmedPromptBlocks) {
+    // FIX28 planificación: las donaciones/existencias explícitas se cargan siempre,
+    // pero Zuzu debe interpretar también el concepto, duración y comidas del prompt.
+    // Si Zuzu falla, NO se inventa menú fijo local; se devuelven solo esas donaciones y notas de aviso.
+    rowsOut = planRowsFromExplicitPromptOnlyHf17(form, state);
+    aiProvider = 'control-event-prompt-directo';
+    aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: ControlEvent extrae y crea localmente las donaciones/existencias; Zuzu devuelve solo necesidades teóricas totales y ControlEvent calcula el déficit real.');
+    try {
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, [], incomeRows, state, sourceEvent, modules), 34000, 'Zuzu planificación');
+      aiTrace = ai?.__trace || null;
+      let matched = matchPlanRows(ai?.rows, [], state, form);
+      matched = planSubtractDonationsFromTheoreticalRowsFix43(matched, explicitDonationRows);
+      if (aiTrace) aiTrace.matchCounts = { rowsGemini: arr(ai?.rows).length, matched: matched.length, comprasMatched: matched.filter(r=>r.tipo==='COMPRA').length, donacionesMatched: matched.filter(r=>r.tipo==='DONACION').length };
+      if (matched.length) {
+        rowsOut = planMergeExplicitDonations(matched, explicitDonationRows);
+        aiMenuResumen = planCompleteMenuResumen(ai?.menuResumen, form);
+        aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean).concat(aiNotes);
+        aiProvider = 'gemini-planificacion+prompt-confirmado'; aiModel = ai.__model || '';
+      } else {
+        if (allowLocalFallbackFix46) {
+          const local = planRowsFromLocalTheoreticalNeedsFix44(form, state, explicitDonationRows, []);
+          if(local.rows.length){
+            rowsOut = planMergeExplicitDonations(local.rows, explicitDonationRows);
+            aiMenuResumen = local.menuResumen;
+            aiNotes = local.notes.concat(aiNotes);
+            aiProvider = 'control-event-necesidades-locales-fix44';
+          } else {
+            aiNotes.push('Zuzu no devolvió necesidades teóricas utilizables y ControlEvent no pudo completar cálculo local revisable.');
+          }
+        } else {
+          aiNotes.push('Zuzu no devolvió necesidades teóricas utilizables. Como las opciones de saldo y topes están desactivadas, ControlEvent no aplica cálculo local de emergencia.');
+        }
+      }
+    } catch (error) {
+      aiTrace = error?.__trace || aiTrace;
+      if (allowLocalFallbackFix46) {
+        const local = planRowsFromLocalTheoreticalNeedsFix44(form, state, explicitDonationRows, []);
+        if(local.rows.length){
+          rowsOut = planMergeExplicitDonations(local.rows, explicitDonationRows);
+          aiMenuResumen = local.menuResumen;
+          aiNotes = local.notes.concat(aiNotes);
+          aiProvider = 'control-event-necesidades-locales-fix44';
+        }
+        aiNotes.push('Zuzu no pudo completar la planificación de necesidades: ' + trim(error?.message || error) + '. ControlEvent aplica cálculo local de necesidades y descuenta donaciones porque hay opciones de ajuste activas.');
+      } else {
+        aiNotes.push('Zuzu no pudo completar la planificación de necesidades: ' + trim(error?.message || error) + '. Opciones de saldo/topes desactivadas: se muestran solo donaciones y cualquier necesidad real recuperada de Zuzu.');
+      }
+    }
+  } else if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
+    if (m === 'ZUZU_TOTAL') aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: encargo total con brief estructurado y control real de Zuzu; sin históricos, sin compras locales de seguridad y con resumen por días/momentos.');
+    try {
+      const ai = await planWithTimeoutHf17(callGeminiPlanificacion(form, baseRows, incomeRows, state, sourceEvent, modules), 34000, 'Zuzu planificación');
+      aiTrace = ai?.__trace || null;
+      let matched = matchPlanRows(ai?.rows, baseRows, state, form);
+      matched = planSubtractDonationsFromTheoreticalRowsFix43(matched, explicitDonationRows);
+      if (aiTrace) aiTrace.matchCounts = { rowsGemini: arr(ai?.rows).length, matched: matched.length, comprasMatched: matched.filter(r=>r.tipo==='COMPRA').length, donacionesMatched: matched.filter(r=>r.tipo==='DONACION').length };
+      if (matched.length) {
+        rowsOut = matched;
+        aiMenuResumen = planCompleteMenuResumen(ai?.menuResumen, form);
+        aiNotes = arr(ai?.notes).map(x => trim(x)).filter(Boolean);
+        aiProvider = 'gemini-planificacion'; aiModel = ai.__model || '';
+      } else {
+        if (allowLocalFallbackFix46) {
+          const local = planRowsFromLocalTheoreticalNeedsFix44(form, state, explicitDonationRows, baseRows);
+          if(local.rows.length){ rowsOut = local.rows; aiMenuResumen = local.menuResumen; aiNotes = local.notes; aiProvider = 'control-event-necesidades-locales-fix44'; }
+          else aiNotes.push('Zuzu no devolvió filas utilizables; se mantiene la propuesta histórica base.');
+        } else {
+          aiNotes.push('Zuzu no devolvió filas utilizables. Sin saldo ni topes activos, ControlEvent no aplica cálculo local de emergencia.');
+        }
+      }
+    } catch (error) {
+      aiTrace = error?.__trace || aiTrace;
+      if (allowLocalFallbackFix46) {
+        const local = planRowsFromLocalTheoreticalNeedsFix44(form, state, explicitDonationRows, baseRows);
+        if(local.rows.length){ rowsOut = local.rows; aiMenuResumen = local.menuResumen; aiNotes = local.notes; aiProvider = 'control-event-necesidades-locales-fix44'; }
+        aiNotes.push('Zuzu no pudo ajustar la propuesta a tiempo; ControlEvent usa necesidades locales y donaciones del prompt porque hay opciones de ajuste activas: ' + trim(error?.message || error));
+        aiProvider = aiProvider || 'control-event-timeout-fallback';
+      } else {
+        aiNotes.push('Zuzu no pudo ajustar la propuesta a tiempo: ' + trim(error?.message || error) + '. Opciones de saldo/topes desactivadas: no se genera cálculo local alternativo.');
+      }
+    }
+  } else {
+    aiNotes.push('Modo réplica: se conserva el evento modelo sin ajuste de IA.');
+  }
+  rowsOut = planMergeExplicitDonations(rowsOut, explicitDonationRows);
+  phaseSnapshotFix46('0. Zuzu / fallback antes de cocinar', rowsOut, { origen: aiProvider || 'pendiente', detalle: aiModel ? `Modelo: ${aiModel}` : 'Sin modelo Zuzu final o con fallback local.' });
+  rowsOut = planSanitizeInventedDonations(rowsOut, baseRows, explicitDonationRows, m);
+  rowsOut = planCoalesceDonationsAfterSanitize(rowsOut, explicitDonationRows, m);
+  rowsOut = planApplyFinalDefaultsHf14(arr(rowsOut).map((row, idx) => ({ ...row, key: row.key || `plan:${idx}` })), form, state);
+  phaseSnapshotFix46('1. Donaciones confirmadas y saneo', rowsOut, { origen:'ControlEvent', detalle:`${explicitDonationRows.length} donaciones/existencias detectadas en prompt.` });
+  if (m === 'ZUZU_TOTAL' || m === 'ZUZU_PARCIAL') {
+    rowsOut = planPostProcessPlanningRows(rowsOut, form, state);
+    phaseSnapshotFix46('2. Déficit base', rowsOut, { origen:'ControlEvent', detalle:'Cruce con catálogo y resta de donaciones/existencias. Sin saldo ni topes todavía.' });
+    if (planOptionsFix46.topesProducto) {
+      rowsOut = planClampOperationalUnitsFix40(rowsOut, form, state);
+      phaseSnapshotFix46('3. Topes de producto', rowsOut, { origen:'ControlEvent', estado:'ACTIVO', detalle:'Aplicados límites por familia: cerveza, refrescos, tónica, carnes, pan, etc.' });
+    } else {
+      phaseSnapshotFix46('3. Topes de producto', rowsOut, { origen:'ControlEvent', estado:'NO APLICADO', detalle:'Se conserva el déficit base sin recortar por topes operativos.' });
+    }
+    if (m === 'ZUZU_TOTAL') {
+      aiNotes.push('FIX47_CONSUMO_ABIERTO_VARIABLE activo: Zuzu/ControlEvent generan necesidad base; el usuario decide si aplica ajuste por saldo y/o topes de producto.');
+    }
+    if (!aiMenuResumen.length) aiMenuResumen = planCompleteMenuResumen([], form);
+    const budgetNotes = [];
+    let saldoNotes = [];
+    if (planOptionsFix46.topesProducto) {
+      const budget = planBudgetGuard(rowsOut, form);
+      rowsOut = budget.rows;
+      budgetNotes.push(...arr(budget.notes));
+      phaseSnapshotFix46('4. Control de coste/tope presupuesto', rowsOut, { origen:'ControlEvent', estado:'ACTIVO', detalle:'Aplicado junto con topes de producto.' });
+    } else {
+      phaseSnapshotFix46('4. Control de coste/tope presupuesto', rowsOut, { origen:'ControlEvent', estado:'NO APLICADO', detalle:'No se reduce ni ajusta por coste/persona; se muestra necesidad base.' });
+    }
+    if (planOptionsFix46.ajusteSaldo) {
+      const saldoFix39 = planApplyPositiveSaldoFix39(rowsOut, form, state);
+      rowsOut = saldoFix39.rows;
+      saldoNotes = arr(saldoFix39.notes);
+      phaseSnapshotFix46('5. Ajuste de compras por saldo', rowsOut, { origen:'ControlEvent', estado:'ACTIVO', detalle: saldoNotes.join(' ') || 'No hizo falta añadir compra por saldo.' });
+    } else {
+      phaseSnapshotFix46('5. Ajuste de compras por saldo', rowsOut, { origen:'ControlEvent', estado:'NO APLICADO', detalle:'No se añaden compras extra para gastar saldo positivo.' });
+    }
+    if (planOptionsFix46.topesProducto) {
+      rowsOut = planClampOperationalUnitsFix40(rowsOut, form, state);
+      phaseSnapshotFix46('6. Topes finales post-saldo', rowsOut, { origen:'ControlEvent', estado:'ACTIVO', detalle:'Revisión final de topes después del saldo.' });
+    }
+      phaseSnapshotFix46('7. Compra final presentada', rowsOut, { origen:'ControlEvent', detalle:'Resultado que verá el usuario en propuesta y detalle avanzado.' });
+    const optionNote = `Opciones de cálculo: Ajuste de compras por saldo ${planOptionsFix46.ajusteSaldo ? 'ACTIVO' : 'DESACTIVADO'}; Topes de producto ${planOptionsFix46.topesProducto ? 'ACTIVOS' : 'DESACTIVADOS'}.`;
+    aiNotes = planReadableNotes([optionNote].concat(aiNotes), rowsOut, form, budgetNotes.concat(saldoNotes));
+  } else {
+    phaseSnapshotFix46('2. Réplica final', rowsOut, { origen:'ControlEvent', detalle:'Modo réplica sin IA.' });
+    aiNotes = planReadableNotes(aiNotes, rowsOut, form, []);
+  }
+  return {
+    ok: true,
+    version: 'v22_prod_FIX47_CONSUMO_ABIERTO_VARIABLE',
+    provider: aiProvider,
+    model: aiModel,
+    mode: m,
+    modules,
+    event: sourceEvent ? { id: trim(sourceEvent.id), titulo: planEventTitle(sourceEvent), fechaIni: trim(sourceEvent.fechaIni), fechaFin: trim(sourceEvent.fechaFin), situacion: trim(sourceEvent.situacion), precio: round(sourceEvent.precio,2) } : { id:'', titulo:'Sin evento modelo', situacion:'No procede' },
+    rows: rowsOut,
+    incomes: incomeRows,
+    notes: aiNotes,
+    menuResumen: aiMenuResumen,
+    briefEvento: planPromptBriefObject(form, state),
+    debugPlanificacion: {
+      ...(aiTrace || { version:'FIX47_CONSUMO_ABIERTO_VARIABLE', warning:'No hubo llamada Zuzu trazable; revisar provider/notas.', contextResumen:{ diasOperativos: form.dias, asistentes: targetAtt, donacionesDetectadas: explicitDonationRows.length } }),
+      phaseDetails: phaseDetailsFix46,
+      opcionesCalculo: planOptionsFix46,
+      finalCounts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length },
+      providerFinal: aiProvider,
+      modelFinal: aiModel,
+      notesFinal: aiNotes.slice(0, 20)
+    },
+    counts: { rows: rowsOut.length, incomes: incomeRows.length, compras: rowsOut.filter(r=>r.tipo==='COMPRA').length, donaciones: rowsOut.filter(r=>r.tipo==='DONACION').length }
+  };
+}

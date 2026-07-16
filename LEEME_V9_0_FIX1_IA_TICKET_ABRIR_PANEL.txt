@@ -1,0 +1,16 @@
+ControlEvent v9.0_prod - FIX1 IA Ticket abrir panel
+
+Problema observado:
+- El botón IA mostraba el tooltip/mensaje, pero no abría la ventana de captura/análisis del ticket.
+
+Corrección:
+- Se refuerza el botón inferior 🧾IA con data-ce-ai-ticket-open.
+- Se añade un segundo botón superior visible 🧾 IA junto a las acciones del usuario.
+- Se instala apertura robusta por captura de click.
+- Se expone función de prueba en consola: window.__ceOpenTicketIaComprasV90()
+
+No se toca:
+- SQL / Supabase
+- BACKUP / CARGA
+- OPENAI_API_KEY
+- lógica de grabación de compras salvo la apertura del panel

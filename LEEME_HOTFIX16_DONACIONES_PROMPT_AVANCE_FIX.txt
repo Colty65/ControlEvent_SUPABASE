@@ -1,0 +1,23 @@
+ControlEvent v16_prod - HOTFIX16 sin cambio de versión
+
+Cambios incluidos:
+
+1. Donaciones/existencias del prompt
+- Parser determinista nuevo para PRODUCTO EN LA PEÑA / DONACIONES / DONACION / EXISTENCIAS.
+- Todo producto listado dentro de esos bloques se acepta como DONACION confirmada.
+- Ya no se exige histórico real ni confirmación adicional.
+- Si no se encuentra producto exacto en catálogo, se conserva como donación revisable textual en vez de transformarlo en compra.
+- Se refuerza el emparejamiento de productos para no perder líneas por variantes de nombre/envase.
+- Se conserva la regla: donación confirmada + compra solo por déficit.
+
+2. Botón AVANCE DEL EVENTO en Mapa de recursos
+- Nuevo botón HF16 con onpointerdown/onclick inline para evitar que se quede solo en tooltip.
+- Limpia restos de botones/paneles anteriores HF13/HF14/HF15.
+- Inserta la ficha justo debajo de la cabecera de Mapa de recursos.
+- El botón pliega/despliega la ficha.
+
+3. Resumen presupuestario
+- La ficha de avance sigue fuera de Resumen, manteniendo la ventana limpia y fluida.
+
+No cambia versión visible.
+No hay SQL nuevo.

@@ -1,0 +1,44 @@
+ControlEvent v16_prod - HOTFIX39 sin cambio de versión
+
+Cambios sobre HOTFIX38:
+
+1. Infraestructura mínima forzada al final
+- Ahora se vuelve a aplicar justo antes de pintar la propuesta.
+- Si hay 1 unidad donada/disponible de un producto con SEGMENTO=INFRAESTRUCTURA, se propone comprar 1 más.
+- Ejemplos esperados:
+  Ambientador: 1 donado => compra 1 más.
+  Bolsas Basura: 1 donado => compra 1 más.
+  Butano CEPSA 1 + butano REPSOL 1 => familia butano suma 2, no compra más.
+- Se mantienen excluidos vajilla/plásticos/menaje masivo.
+
+2. Packs de 24
+- Se fuerza redondeo final de compras de cerveza/refrescos/tonica/coca/fanta a múltiplos de 24.
+- Cerveza SIN tostada 22 => 24.
+
+3. Tónica coherente
+- Si hay una tónica detectada/donada, la compra adicional se intenta hacer con la misma referencia.
+- Evita comprar "Tonica normal" cuando la donación localizada era "Tonica SCHWEPPES Zero Lata 25cl".
+
+4. Vasos cubata
+- Se eliminan de la previsión automática de compras.
+- Se asume que normalmente se consiguen de regalo. Si se necesitan, se añadirán manualmente.
+
+5. Whisky / ginebra
+- Se refuerza la previsión de whisky para tardeo/cubatas.
+- Reparto orientativo:
+  JB 60%, DYC 20%, JHONY WALKER/otras 10% cuando la cantidad lo justifique.
+- Ginebra algo más alegre para gin-tonic/tardeo.
+
+6. Más imaginación en aperitivo
+- Si el prompt habla de aperitivo/embutido/jamón/queso/chorizo/salchichón, añade chorizo ibérico y salchichón ibérico si no están ya donados/comprados.
+
+7. Reserva
+- z_Otras compras imprevistas se mantiene como una sola línea y no entra en stock mínimo de infraestructura.
+
+8. Cache bust
+- planificacion-inicial.js?v=v16_prod_planificacion_hf39_infra_pack_bebida_imaginacion
+- Marcador consola:
+  HOTFIX39_INFRA_PACK_BEBIDA_IMAGINACION_ACTIVO
+
+No hay SQL nuevo.
+No cambia versión visible.

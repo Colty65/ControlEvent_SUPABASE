@@ -1,0 +1,7 @@
+ControlEvent v16_prod
+
+Subir TODO el contenido de este ZIP al repositorio, sustituyendo archivos anteriores.
+Esta versión parte de V30.10_RESCATE estable, corrige la numeración visible y añade Mapa de recursos.
+
+Importante: no recuperar scripts v30.9.x. Si quedan en el repo, pueden borrarse si no están referenciados.
+Tras desplegar en Vercel, cerrar pestañas antiguas de la app y abrir de nuevo para renovar service worker/cache.

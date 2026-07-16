@@ -1,0 +1,14 @@
+ControlEvent v16_prod
+
+Base: v3.6_prod adjunta por el usuario.
+
+Cambios acotados:
+- Visor de fotos de TICKETS con informacion TKxx/detalle a la izquierda.
+- En evento FINALIZADO se permite ampliar miniaturas de justificantes de INGRESOS y TICKETS, sin permitir modificar.
+- Rehidratacion de fotos desde /api/ticket-images al entrar, cambiar evento, volver de foco o pulsar refrescar.
+- Version actualizada a v4.0_prod.
+
+No tocar:
+- Login.
+- INFOEVENTO/BACKUP salvo version interna/nombre.
+- Flujo Salir/Login.

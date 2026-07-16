@@ -1,0 +1,29 @@
+ControlEvent v16_prod - HOTFIX4 sin cambio visible de versión
+
+NO se ha cambiado la versión visible de la app.
+NO se han tocado ficheros INFOEVENTO ni BACKUP.
+
+Cambios incluidos:
+1) Zuzu Planificación inicial:
+   - Detecta bloques del prompt con estos formatos:
+     PRODUCTO EN LA PEÑA ... Tratar como DONADO SOCIO [Donante: ...] [Responsable: ...]
+     DONACIONES: Tratar como DONADO SOCIO/TIENDA/OTROS [Donante: ...] [Responsable: ...]
+     DONACION: Tratar como DONADO SOCIO/TIENDA/OTROS [Donante: ...] [Responsable: ...]
+   - Añade esas líneas como DONACION explícita antes de calcular déficit.
+   - Soporta cantidades tipo "1 pack de 24 ud" y lo transforma en 24 unidades.
+   - Las notas de Zuzu muestran cuántas líneas/unidades de donación/existencia han sido detectadas.
+
+2) Cálculo:
+   - Se leen los números explícitos del prompt: personas que beben cerveza, personas que toman cubatas y personas sin alcohol/niños.
+   - Se evita inflar cada marca/formato de cerveza por separado cuando ya hay barril/latas/botellines.
+   - Se evita calcular 4 botellas de ron + 4 de whisky + 4 de ginebra: los cubatas se reparten entre tipos de alcohol.
+
+3) Catálogo de PRODUCTOS:
+   - La app intenta actualizar precio/tienda/segmento/destino general del producto mediante RPC ce_update_producto_catalogo_libre.
+   - Esa actualización NO modifica compras/donaciones históricas de eventos ya finalizados.
+
+IMPORTANTE PARA SUPABASE:
+Si sigue apareciendo el aviso CE_BLOQUEO_FINALIZADO al modificar un producto usado en eventos finalizados, hay que ejecutar una vez en Supabase SQL Editor el fichero:
+ControlEvent_SQL_FIX_PRODUCTOS_CATALOGO_LIBRE.sql
+
+Ese SQL crea la RPC autorizada para modificar el catálogo sin tocar precios históricos de eventos.

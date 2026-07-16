@@ -1,0 +1,29 @@
+ControlEvent v16_prod - HOTFIX43 sin cambio de versión visible
+
+Correcciones aplicadas sobre HOTFIX42:
+
+1) Mapa de recursos / AVANCE DEL EVENTO
+- Se neutralizan los botones antiguos de avance generados por hotfix previos.
+- Se deja un único botón visible, centrado, con despliegue/pliegue por click real.
+- El panel ya no depende de mantener pulsado ni queda abierto/cerrado por eventos retrasados.
+
+2) Cambio de situación de eventos Finalizados
+- Se corrige el guardado desde Mantenimiento cuando se pasa un evento de Finalizado a En curso.
+- Se aceptan fechas en formato ISO o dd/mm/aaaa para comparar que no hay cambios reales de otros campos.
+- Si el único cambio efectivo es SITUACIÓN, el servidor usa la RPC específica de cambio de situación.
+
+3) Documentos del evento
+- Se añade persistencia de eventDocumentMeta en ce_meta.
+- La fecha y el texto de documentos DOCXX quedan protegidos aunque la foto se recupere desde ce_ticket_images.
+- La carga scoped por evento también filtra eventDocumentMeta del evento correspondiente.
+
+4) Planificación / Necesidad calculada
+- La caja NECESIDAD CALCULADA pasa a ser realmente manual cuando el usuario la edita.
+- Si existe 1 donado + 1 a comprar y el usuario baja la necesidad de 2 a 1, ya no vuelve a 2 por arrastre de la línea de compra.
+- La reconstrucción previa a crear evento conserva el valor manual.
+
+5) Fuente visual de la app
+- Se aplica Inter como fuente principal de interfaz, con fallback moderno del sistema.
+- Se ajusta el suavizado y pesos para legibilidad en pantallas.
+
+Versión visible mantenida: v16_prod.

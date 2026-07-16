@@ -1,0 +1,19 @@
+ControlEvent v16_prod
+
+Cambios principales:
+- Planificación inicial incorpora Zuzu con tres modos: replicar evento finalizado, encargo total y encargo parcial.
+- Nuevo endpoint /api/event-ai/planificacion-propuesta para generar propuestas con históricos y Zuzu cuando esté disponible.
+- Contenido seleccionable por módulos: todos, ingresos, compras, donaciones y combinaciones.
+- Botones renombrados: Generar propuesta y Generar nuevo evento.
+- Responsable inicial pasa a Responsable por defecto.
+- Evento finalizado ya no debe bloquear Planificación inicial ni sus controles generales.
+- Versión actualizada a v16_prod / ControlEvent_v16_prod / 15.0.0.
+
+Validaciones locales:
+- node --check services/event-ai.service.js
+- node --check routes/event-ai.routes.js
+- node --check public/app/features/planificacion-inicial.js
+- node --check public/app/features/v12-0-finalizado-herramientas-consulta.js
+- node --check public/app/features/v11-3-zuzu-analitica-libre.js
+- node --check public/app/features/v12-0-event-scoped-loader.js
+- package.json y package-lock.json parseados correctamente

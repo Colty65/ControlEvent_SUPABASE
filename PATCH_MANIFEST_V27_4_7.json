@@ -1,0 +1,40 @@
+{
+  "version": "v27.4.8",
+  "base": "v27.4.6",
+  "modified": [
+    "PATCH_MANIFEST_V27_4_6.json",
+    "README_V27_4_6.md",
+    "package-lock.json",
+    "package.json",
+    "public/app/diagnostics/build-metrics.json",
+    "public/app/diagnostics/import-price-diagnostics.js",
+    "public/app/diagnostics/runtime-diagnostics.js",
+    "public/app/main.js",
+    "public/app/version.js",
+    "public/index.html",
+    "public/modules/excel/_excel-runtime.js",
+    "public/modules/excel/backup.js",
+    "public/modules/excel/graficas-sheet.js",
+    "public/modules/excel/infoevento.js",
+    "public/modules/excel/resumen-sheet.js",
+    "public/sw.js",
+    "routes/export.routes.js",
+    "routes/health.routes.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V27_4_8.md",
+    "README_V27_4_8_DELETE_OLD_FILES.txt",
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.8.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.8.js"
+  ],
+  "removed": [
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.6.js",
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.6.js"
+  ],
+  "delete_old_files": [
+    "public/app/legacy/legacy-bundle-before-modules-v27.4.6.js",
+    "public/app/legacy/legacy-bundle-after-modules-v27.4.6.js"
+  ],
+  "notes": "Corrige standalone RESUMEN/GRAFICAS: conserva drawings/media y añade gráficos PNG protegidos. INFOEVENTO no cambia funcionalmente."
+}

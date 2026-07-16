@@ -1,0 +1,27 @@
+{
+  "version": "ControlEvent v16_prod",
+  "from": "ControlEvent v16_prod",
+  "changes": [
+    "GRAFICAS: se evita el parpadeo en PC, iPhone y Android estabilizando el render y evitando repintados innecesarios.",
+    "GRAFICAS: se desactiva el render de gráficas de v41.3 cuando ya está activo el render definitivo de v43.6.",
+    "GRAFICAS: las barras de Por destino son más anchas y más cómodas de pulsar.",
+    "Actualización de versión a ControlEvent v16_prod."
+  ],
+  "files": [
+    "public/index.html",
+    "public/sw.js",
+    "public/app/version.js",
+    "public/app/features/v41-3-fixes.js",
+    "public/app/features/v43-4-fixes.js",
+    "public/app/features/v40-fixes.js",
+    "public/app/features/v41-1-fixes.js",
+    "public/app/features/v41-2-fixes.js",
+    "public/app/features/mapa-productos.js",
+    "public/app/features/planificacion-inicial.js",
+    "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/diagnostics/build-metrics.json",
+    "package.json",
+    "package-lock.json"
+  ]
+}

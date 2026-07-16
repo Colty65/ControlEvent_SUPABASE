@@ -1,0 +1,10 @@
+HOTFIX10 SIN CAMBIO DE VERSION
+
+- Resumen Por tienda y Ticket: vuelve a mostrar en la fila DONANTE | tipo de donación o TIENDA | TKxx.
+- El detalle aparece en modal/globo con tabla en columnas y scroll.
+- AVANCE del evento compactado para ocupar menos alto.
+- Botones de ordenación de Propuesta editable quedan sombreados según el orden activo.
+- El detalle avanzado no se cierra al tabular o pinchar fuera; solo al pulsar su cabecera.
+- Al cambiar unidades de compra en Detalle avanzado se actualiza también la necesidad calculada del panel superior.
+- Refuerzo para descartar donantes fantasma tipo Donaciones:/ciones:.
+- Sin SQL nuevo.

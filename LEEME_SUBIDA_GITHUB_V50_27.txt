@@ -1,0 +1,13 @@
+ControlEvent v50.27
+
+Corrección centrada en el problema detectado:
+- Ctrl+F5 + nuevo login funciona bien.
+- Salir dejaba residuos de sesión/evento y después los globos quedaban inactivos.
+
+Solución:
+- Salir hace una salida dura controlada: limpia sesión/selector/usuario y recarga la app.
+- Se desactiva la reanudación automática de sesión ligera.
+- La app vuelve a pedir login limpio al arrancar.
+- No se toca la lógica de justificantes de INGRESOS ni la lógica interna de globos.
+
+Versión unificada: ControlEvent v50.27 / ControlEvent_v50_27.

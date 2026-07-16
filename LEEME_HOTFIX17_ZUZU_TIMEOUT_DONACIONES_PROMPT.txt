@@ -1,0 +1,21 @@
+ControlEvent v16_prod - HOTFIX17 sin cambio de versión
+
+Cambios incluidos:
+
+1. Evitar 504 en Planificación inicial
+- En Encargo total a Zuzu con prompt largo y bloques confirmados de donaciones/existencias, la app ya no espera indefinidamente a Zuzu.
+- Primero carga directamente las donaciones/existencias del prompt.
+- Para prompts largos, no bloquea la respuesta esperando a Zuzu.
+- Para prompts cortos, Zuzu tiene un límite de tiempo; si tarda, se sigue con cálculo directo del prompt.
+
+2. Donaciones/existencias del prompt
+- Se mantienen como DONACION confirmada.
+- No dependen de histórico ni de confirmación adicional.
+- No deben convertirse a compra por "no confirmada".
+- Se conserva regla: donación confirmada + compra solo por déficit.
+
+3. Replica y Zuzu parcial
+- Se mantiene la lógica anterior, pero con límite de tiempo en Zuzu para evitar bloqueos.
+
+No cambia versión visible.
+No hay SQL nuevo.

@@ -1,0 +1,10 @@
+ControlEvent v7.2_prod
+
+Base: v7.1_prod.
+Cambios funcionales limitados:
+- Android: retorno al globo de GRAFICAS tras cerrar foto de INGRESOS/SALDO ACTUAL/SALDO OPERATIVO.
+- PC/iPad: hidratación bajo demanda de miniaturas del globo de GRAFICAS para evitar depender de Refrescar.
+- Reducción de carga: el fix final de v7.2 no usa setInterval ni reintentos por cada click para forzar versión.
+- Versión normalizada a ControlEvent v7.2_prod / ControlEvent_v7_2_prod en scripts activos, version.js, service worker, Excel/BACKUP y servidor.
+
+No se han tocado cálculos, Supabase ni estructura de datos.

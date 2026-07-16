@@ -1,0 +1,42 @@
+ControlEvent v16_prod
+==========================
+
+Cambios incluidos:
+
+1) Ventana Ticket IA / COMPRAS
+- Al abrir la ventana queda limpia totalmente.
+- Ya no quedan compras previstas de usos anteriores.
+- Ya no se preselecciona automáticamente el primer TKxx libre.
+- El botón Limpiar hace la misma limpieza total.
+
+2) Aprovechamiento de pantalla
+- Eliminadas las líneas explicativas que ocupaban altura.
+- Eliminado el rótulo "Indicaciones adicionales para Zuzu".
+- Eliminada la línea de foto cargada como fila independiente.
+- Eliminada la explicación de compras previstas.
+- Eliminada la línea de conteo/resumen de compras Pte.Compra.
+- Los mensajes pasan a la cabecera, a la derecha del título "Alta asistida de COMPRAS".
+
+3) Botones compactos y activos
+- Analizar IA, Añadir manual y Limpiar son iconos más pequeños.
+- Quedan repartidos en la fila: izquierda, centro y derecha.
+- Procesar queda abajo a la izquierda.
+- Recargar evento queda abajo a la derecha.
+- Actualizar compras previstas pasa a icono pequeño y refresca la lista.
+- Se eliminan los textos tipo tooltip/title de estos iconos para no mostrar globos molestos.
+
+4) Compras previstas
+- El bloque pasa a llamarse: "Compras previstas del evento. Marca para eliminar las ya compradas en este ticket".
+- La lista ocupa el resto de ventana disponible debajo de las líneas IA/manuales.
+- La tabla IA/manual se compacta para mostrar hasta 6 líneas aproximadamente.
+
+5) Avisos negros inferiores
+- Reforzada la eliminación de avisos flotantes negros antiguos en COMPRAS.
+- Los avisos técnicos quedan como consola, no como cartel inferior molesto.
+
+Ficheros principales:
+- public/app/features/v9-5-2-ticketauto-compras.js
+- public/app/features/v9-5-1-login-event-clean.js
+- index.html
+- public/index.html
+- public/app/version.js
