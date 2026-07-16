@@ -1,6 +1,6 @@
 # FIX30 SQL SELECT experimental
 
-Base: `CE_v21_PROD_BASE_FIX29_PLANIFICADOR_ZUZU.zip`.
+Base: `CE_v22_PROD_BASE_FIX29_PLANIFICADOR_ZUZU.zip`.
 
 Objetivo: probar el flujo pedido por el usuario en el que Zuzu/Gemini no solo decide módulos, sino que puede devolver `SELECTS_PROPUESTOS` para orientar la extracción de ControlEvent.
 

@@ -1,4 +1,4 @@
-# ControlEvent v21_prod · Zuzu indirectos y contexto temporal Gemini
+# ControlEvent v22_prod · Zuzu indirectos y contexto temporal Gemini
 
 Versión centrada en corregir informes de evento donde se solicitaban datos indirectos, especialmente meteorología.
 

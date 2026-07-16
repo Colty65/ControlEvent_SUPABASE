@@ -1,4 +1,4 @@
-# ControlEvent v21_prod - FIX11 Carga real visor y miniaturas
+# ControlEvent v22_prod - FIX11 Carga real visor y miniaturas
 
 Base: FIX10.
 
@@ -14,4 +14,4 @@ Cambios acotados:
 4. Se refuerza la eliminación visual de miniaturas duplicadas en cada fila de `Cálculos por tienda y ticket`.
 5. Se refuerza el cierre del globo de detalle con aspa y Escape.
 
-No cambia versión visible: sigue `v21_prod`.
+No cambia versión visible: sigue `v22_prod`.

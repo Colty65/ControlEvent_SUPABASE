@@ -1,6 +1,6 @@
 # FIX25 PARTE 3 aplicado
 
-Base: CE_v21_PROD_BASE_FIX24_PARTE2.zip
+Base: CE_v22_PROD_BASE_FIX24_PARTE2.zip
 
 Cambios pequeños, centrados en informe Zuzu:
 

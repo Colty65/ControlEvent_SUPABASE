@@ -1,4 +1,4 @@
-# ControlEvent v21_prod - FIX19 cierre móvil + gráficas
+# ControlEvent v22_prod - FIX19 cierre móvil + gráficas
 
 Base: CE_v17_PROD_FIX18_ORDENACION_RENDIMIENTO.zip
 
@@ -25,4 +25,4 @@ No se han tocado:
 - Permisos.
 - Zuzu.
 - Ordenaciones de datos de FIX18.
-- Versión visible, que sigue siendo v21_prod.
+- Versión visible, que sigue siendo v22_prod.

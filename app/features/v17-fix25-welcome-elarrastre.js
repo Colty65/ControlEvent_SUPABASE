@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
+/* ControlEvent v22_prod FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
    No refresca datos ni toca cálculos: solo pinta el logo si no hay evento elegido y lo oculta antes de cargar GRAFICAS. */
 (function(){
   'use strict';
@@ -190,7 +190,7 @@
   setTimeout(syncWelcome, 900);
 
   window.ControlEventV17Fix25WelcomeElArrastre = {
-    version:'v21_prod_fix25_welcome_elarrastre',
+    version:'v22_prod_fix25_welcome_elarrastre',
     install,
     sync:syncWelcome,
     show:showWelcome,

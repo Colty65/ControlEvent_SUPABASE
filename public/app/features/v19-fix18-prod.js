@@ -1,4 +1,4 @@
-// ControlEvent v21_prod · FIX18 mínimo
+// ControlEvent v22_prod · FIX18 mínimo
 // Solo: Vista aérea (saldo descuentos, activo único y ancho), selector eventos por fecha/color, descripción para Zuzu ya va en backend.
 (function(){
   'use strict';
@@ -168,5 +168,5 @@
 
   function install(){ injectCss(); installVistaHandlers(); installRenderHook(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
-  window.ControlEventV19Fix18={version:'v21_prod_FIX18'};
+  window.ControlEventV19Fix18={version:'v22_prod_FIX18'};
 })();

@@ -1,4 +1,4 @@
-# ControlEvent v21_prod FIX9 - Vista aérea + modificación ingresos
+# ControlEvent v22_prod FIX9 - Vista aérea + modificación ingresos
 
 Partiendo de CE_v19_PROD_MAPA_GLOBAL_FIX8.zip.
 

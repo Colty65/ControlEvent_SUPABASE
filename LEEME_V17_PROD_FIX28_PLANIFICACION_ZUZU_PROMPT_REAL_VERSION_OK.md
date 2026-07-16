@@ -1,11 +1,11 @@
-# ControlEvent v21_prod FIX28_PLANIFICACION — versión corregida visible
+# ControlEvent v22_prod FIX28_PLANIFICACION — versión corregida visible
 
-Base: v21_prod_FIX27 recuperada + ajuste de Planificación inicial.
+Base: v22_prod_FIX27 recuperada + ajuste de Planificación inicial.
 
 Corrección sobre la entrega anterior:
-- El globo ColtyLAB de bienvenida ahora muestra `v21_prod_FIX28_PLANIFICACION`, no FIX27.
+- El globo ColtyLAB de bienvenida ahora muestra `v22_prod_FIX28_PLANIFICACION`, no FIX27.
 - Se han actualizado las marcas `?v=` de `planificacion-inicial.js` y del módulo ColtyLAB para evitar caché antigua.
-- El backend devuelve `version: v21_prod_FIX28_PLANIFICACION` en `/api/event-ai/planificacion-propuesta`.
+- El backend devuelve `version: v22_prod_FIX28_PLANIFICACION` en `/api/event-ai/planificacion-propuesta`.
 - En las notas de Zuzu aparece una línea `FIX28_PLANIFICACION activo...` para verificar que se está ejecutando esta versión.
 
 Cambio funcional mantenido:

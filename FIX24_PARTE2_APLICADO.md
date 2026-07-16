@@ -1,6 +1,6 @@
-# CE_v21_PROD_BASE_FIX24_PARTE2
+# CE_v22_PROD_BASE_FIX24_PARTE2
 
-Base: CE_v21_PROD_BASE_FIX23_PARTE1.
+Base: CE_v22_PROD_BASE_FIX23_PARTE1.
 
 Cambios aplicados solo en backend Zuzu:
 

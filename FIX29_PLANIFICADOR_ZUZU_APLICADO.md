@@ -1,6 +1,6 @@
 # FIX29 · Planificador Zuzu como inteligencia de módulos/condiciones
 
-Base: CE_v21_PROD_BASE_FIX28_PARTE6
+Base: CE_v22_PROD_BASE_FIX28_PARTE6
 
 Cambios:
 

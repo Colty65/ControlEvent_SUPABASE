@@ -1,11 +1,11 @@
-# ControlEvent v21_prod · base limpia desde V19_PROD-FIX18
+# ControlEvent v22_prod · base limpia desde V19_PROD-FIX18
 
 Base utilizada: `CE_v19_PROD_MAPA_GLOBAL_FIX18.zip`.
 
 Cambios aplicados en esta entrega:
 
-1. Cambio de versión a `v21_prod` en textos visibles, trazas, nombres de PDF/backup/infoevento y cache busting donde aparecía `v19_prod`.
-2. `package.json` y `package-lock.json` pasan a `controlevent-v21-prod` / `21.0.0`.
+1. Cambio de versión a `v22_prod` en textos visibles, trazas, nombres de PDF/backup/infoevento y cache busting donde aparecía `v19_prod`.
+2. `package.json` y `package-lock.json` pasan a `controlevent-v22-prod` / `21.0.0`.
 3. Desplegable principal de eventos reforzado:
    - orden estable por `fechaIni` / fecha de inicio,
    - desempate por título,

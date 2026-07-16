@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod FIX24 - modo reposo: reduce ventilador/longtasks en PC y móviles.
+/* ControlEvent v22_prod FIX24 - modo reposo: reduce ventilador/longtasks en PC y móviles.
    No toca datos, fotos, permisos ni cálculos. */
 (function(){
   'use strict';
@@ -24,7 +24,7 @@
   function status(){
     const p = window.ControlEventPerf?.report?.();
     return {
-      version:'v21_prod_fix24_idle_quiet',
+      version:'v22_prod_fix24_idle_quiet',
       nodes:p?.last?.dom?.nodes || document.getElementsByTagName('*').length,
       longTasks:p?.counters?.longTasks,
       domMutations:p?.counters?.domMutations,
@@ -32,7 +32,7 @@
       note:'PERF ya no repinta automáticamente; usar botón Actualizar para medir.'
     };
   }
-  window.ControlEventFix24IdleQuiet = {version:'v21_prod_fix24_idle_quiet', status, quiet:function(){ clearPerfLiveNoise(); closeStaleTransientUi(); return status(); }};
+  window.ControlEventFix24IdleQuiet = {version:'v22_prod_fix24_idle_quiet', status, quiet:function(){ clearPerfLiveNoise(); closeStaleTransientUi(); return status(); }};
 
   window.addEventListener('controlevent:event-loaded', () => setTimeout(clearPerfLiveNoise, 1200), true);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') setTimeout(clearPerfLiveNoise, 300); }, true);

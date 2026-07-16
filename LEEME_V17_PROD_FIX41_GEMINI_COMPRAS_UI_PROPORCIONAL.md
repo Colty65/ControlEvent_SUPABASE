@@ -1,4 +1,4 @@
-# ControlEvent v21_prod FIX41 - Zuzu compras + UI compras/donaciones
+# ControlEvent v22_prod FIX41 - Zuzu compras + UI compras/donaciones
 
 Cambios:
 

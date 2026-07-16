@@ -1,4 +1,4 @@
-# ControlEvent v21_prod FIX5 - Vista gráfica Mapa de recursos
+# ControlEvent v22_prod FIX5 - Vista gráfica Mapa de recursos
 
 Aplicado sobre `CE_v19_PROD_MAPA_GLOBAL_FIX4.zip`.
 

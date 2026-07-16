@@ -1,4 +1,4 @@
-# CE v21_prod FIX33 - Planificación: prompt compacto variable para Zuzu
+# CE v22_prod FIX33 - Planificación: prompt compacto variable para Zuzu
 
 Base: CE_v17_PROD_FIX32_PLANIFICACION_TRAZA_GEMINI.
 

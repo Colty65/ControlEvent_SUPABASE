@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v22_prod - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 
 function text(value) { return value == null ? '' : String(value); }
@@ -720,7 +720,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v21_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v22_prod - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -773,7 +773,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v21_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v22_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','METEO'];
@@ -1189,7 +1189,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v21_prod',
+    version: 'ControlEvent Zuzu Planner v22_prod',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null,
@@ -1735,12 +1735,12 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v21_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v22_prod',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL FIX30: Zuzu puede proponer SELECTS_PROPUESTOS; ControlEvent solo acepta SELECT de lectura, no ejecuta mutaciones y los aplica como plan/filtro sobre módulos oficiales ya cargados.' },
+    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v22_prod: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
-    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_VALIDOS_SOLO_LECTURA' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes },
+    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_EJECUCION_REAL' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
     metricasCanonicas,
@@ -1753,7 +1753,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
       { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' },
-      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En esta versión experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent los usa como guía de módulos/filtros. No ejecutes SQL ni inventes resultados: usa modulosExtraidos y planZuzu.selectsAplicados.' }
+      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v22_prod experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' }
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',

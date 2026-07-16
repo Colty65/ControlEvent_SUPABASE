@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod - HOTFIX48: avance solo en logo, modales/títulos, globos A-Z, mantenimiento desde documentos. */
+/* ControlEvent v22_prod - HOTFIX48: avance solo en logo, modales/títulos, globos A-Z, mantenimiento desde documentos. */
 (function(){
   'use strict';
   const INSTALLED='__ceV15Hotfix23AvanceLogoModalesGlobos';

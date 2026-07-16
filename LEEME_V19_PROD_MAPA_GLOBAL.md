@@ -1,8 +1,8 @@
-# ControlEvent v21_prod · Mapa de recursos global
+# ControlEvent v22_prod · Mapa de recursos global
 
 Cambios aplicados sobre el ZIP v18.11.10:
 
-1. Versión subida a `v21_prod` en front, API, `package.json`, `package-lock.json`, `INFOEVENTO` y `BACKUP`.
+1. Versión subida a `v22_prod` en front, API, `package.json`, `package-lock.json`, `INFOEVENTO` y `BACKUP`.
 2. Se elimina la etiqueta flotante de versión de la esquina superior derecha para no tapar la cabecera. Queda solo la versión oficial de la cabecera.
 3. Nuevo botón solo con icono `📊` en la cabecera de **Mapa de recursos**, alineado a la derecha.
 4. Nueva ventana gráfica global desde Mapa de recursos:

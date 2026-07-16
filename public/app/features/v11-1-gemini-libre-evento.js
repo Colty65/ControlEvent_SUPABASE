@@ -1,9 +1,9 @@
-/* ControlEvent v21_prod - Analítica libre de explotación del evento.
+/* ControlEvent v22_prod - Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV111GeminiLibre) return; window.__ceV111GeminiLibre=true;
-  var VERSION='v21_prod';
+  var VERSION='v22_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }

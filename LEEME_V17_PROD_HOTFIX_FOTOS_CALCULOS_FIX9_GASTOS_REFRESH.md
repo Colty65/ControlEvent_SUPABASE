@@ -1,6 +1,6 @@
-# ControlEvent v21_prod - HOTFIX Cálculos FIX9
+# ControlEvent v22_prod - HOTFIX Cálculos FIX9
 
-Sin cambio de versión visible: sigue `v21_prod`.
+Sin cambio de versión visible: sigue `v22_prod`.
 
 Cambios:
 

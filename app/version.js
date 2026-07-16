@@ -1,8 +1,8 @@
 // ControlEvent version source of truth - generated 20260708-200500
 export const PACKAGE_NAME = 'controlevent';
-export const VERSION_LABEL = 'v21_prod';
-export const VERSION_TEXT = 'ControlEvent v21_prod';
-export const VERSION_FILE = 'ControlEvent_v21_prod';
+export const VERSION_LABEL = 'v22_prod';
+export const VERSION_TEXT = 'ControlEvent v22_prod';
+export const VERSION_FILE = 'ControlEvent_v22_prod';
 export const BUILD_ID = '20260708-200500';
 export const ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';
 export const VERSION = VERSION_TEXT;

@@ -1,4 +1,4 @@
-# ControlEvent v21_prod - FIX18 ORDENACIÓN Y RENDIMIENTO
+# ControlEvent v22_prod - FIX18 ORDENACIÓN Y RENDIMIENTO
 
 Base exacta utilizada: `CE_v17_PROD_FIX13_TITULO_EVENTO_COLOR_ESTADO.zip`.
 
@@ -43,4 +43,4 @@ Base exacta utilizada: `CE_v17_PROD_FIX13_TITULO_EVENTO_COLOR_ESTADO.zip`.
 - `public/index.html`
 - `index.html`
 
-Se mantiene la versión visible como `v21_prod`.
+Se mantiene la versión visible como `v22_prod`.

@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod - GRAFICAS: miniaturas y retorno al globo sin bucles.
+/* ControlEvent v22_prod - GRAFICAS: miniaturas y retorno al globo sin bucles.
    Alcance: Android restaura el globo al cerrar foto; todos los dispositivos hidratan miniaturas del globo activo bajo demanda. */
 (function(){
   'use strict';
@@ -6,8 +6,8 @@
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const VERSION = 'ControlEvent v21_prod';
-  const VERSION_FILE = 'ControlEvent_v21_prod';
+  const VERSION = 'ControlEvent v22_prod';
+  const VERSION_FILE = 'ControlEvent_v22_prod';
   let lastGraphTipSnapshot = null;
   let hydrateTimer = 0;
   const observed = new WeakSet();

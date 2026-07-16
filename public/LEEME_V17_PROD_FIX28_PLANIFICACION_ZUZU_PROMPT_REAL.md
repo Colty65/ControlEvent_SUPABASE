@@ -1,6 +1,6 @@
-# ControlEvent v21_prod_FIX28 - Planificación Zuzu interpreta prompt real
+# ControlEvent v22_prod_FIX28 - Planificación Zuzu interpreta prompt real
 
-Base: v21_prod_FIX27_WELCOME_INFO_GENERAL recuperada.
+Base: v22_prod_FIX27_WELCOME_INFO_GENERAL recuperada.
 
 Cambio aplicado SOLO en Planificación inicial / Encargo total a Zuzu:
 

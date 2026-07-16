@@ -1,4 +1,4 @@
-# ControlEvent v21_prod FIX50 - Zuzu calidad analítica
+# ControlEvent v22_prod FIX50 - Zuzu calidad analítica
 
 Base: FIX49.
 

@@ -1,4 +1,4 @@
-/* ControlEvent v21_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v22_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    FIX7: asistencia ampliada + no socios, y no actuar durante logon.
    - Mantiene selector/orden de FIX4.
    - La lógica de avance se ejecuta solo con sesión activa. */

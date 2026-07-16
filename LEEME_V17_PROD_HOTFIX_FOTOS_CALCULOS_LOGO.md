@@ -1,4 +1,4 @@
-# Hotfix acotado v21_prod - fotos en Cálculos y logo inicial
+# Hotfix acotado v22_prod - fotos en Cálculos y logo inicial
 
 No cambia la versión de la aplicación.
 

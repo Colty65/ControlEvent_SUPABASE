@@ -1,4 +1,4 @@
-# ControlEvent v21_prod · FIX16 aplicado
+# ControlEvent v22_prod · FIX16 aplicado
 
 Corrección sobre FIX15 centrada en estabilidad y en retirar los parches que estaban haciendo pesada la app.
 
@@ -26,7 +26,7 @@ Corrección sobre FIX15 centrada en estabilidad y en retirar los parches que est
    - También se añade una normalización de último recurso en `v19-fix16-prod.js` para enlaces con `ticket_TKxx.jpg`.
 
 5. Cache busting
-   - HTML actualizado a `v21_prod_20260709194000_FIX16`.
+   - HTML actualizado a `v22_prod_20260709194000_FIX16`.
 
 ## Verificación
 

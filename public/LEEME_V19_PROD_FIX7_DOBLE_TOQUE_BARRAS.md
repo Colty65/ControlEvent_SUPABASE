@@ -1,4 +1,4 @@
-# ControlEvent v21_prod - FIX7 Vista aérea
+# ControlEvent v22_prod - FIX7 Vista aérea
 
 Cambios aplicados sobre `CE_v19_PROD_MAPA_GLOBAL_FIX6.zip`:
 

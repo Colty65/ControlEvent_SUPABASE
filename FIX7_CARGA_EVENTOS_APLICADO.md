@@ -1,6 +1,6 @@
 # FIX7 CARGA EVENTOS
 
-Base: CE_v21_PROD_BASE_FIX7.zip.
+Base: CE_v22_PROD_BASE_FIX7.zip.
 
 Cambio mínimo:
 - Se corrige defaultState para que no falle cuando la lista interna de eventos arranca vacía.

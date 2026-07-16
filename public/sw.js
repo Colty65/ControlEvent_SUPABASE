@@ -1,4 +1,4 @@
-// ControlEvent v21_prod
+// ControlEvent v22_prod
 // Service Worker neutralizado: no cachea y elimina caches anteriores para evitar servir JS viejo.
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {

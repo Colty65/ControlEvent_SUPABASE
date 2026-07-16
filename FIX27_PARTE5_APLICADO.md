@@ -1,6 +1,6 @@
 # FIX27_PARTE5 aplicado
 
-Base: CE_v21_PROD_BASE_FIX26_PARTE4.zip
+Base: CE_v22_PROD_BASE_FIX26_PARTE4.zip
 
 Objetivo: estabilizar informes Zuzu sin tocar frontend ni logon.
 

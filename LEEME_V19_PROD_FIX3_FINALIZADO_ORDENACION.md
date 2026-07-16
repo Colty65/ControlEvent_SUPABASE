@@ -1,4 +1,4 @@
-# ControlEvent v21_prod - FIX3 Mapa gráfico global
+# ControlEvent v22_prod - FIX3 Mapa gráfico global
 
 Cambios aplicados sobre `CE_v19_PROD_MAPA_GLOBAL_FIX2.zip`:
 
