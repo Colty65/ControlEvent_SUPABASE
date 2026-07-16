@@ -1,8 +1,0 @@
-ControlEvent v16_prod
-
-Cambios principales:
-- Estabilización de menús por rol RW/RO para evitar temblores/refrescos continuos.
-- Reducción del watchdog visual de justificantes para evitar duplicados en INGRESOS.
-- Botón Salir más accesible en iPhone/Android sin girar el dispositivo.
-- Justificantes de ingresos en INGRESOS: eventos táctiles reforzados para iPad, manteniendo criterio de tickets.
-- Las fotos de justificantes siguen con sincronización no destructiva contra /api/ticket-images.
