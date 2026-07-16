@@ -2573,7 +2573,6 @@ function narrativePrompt(userPrompt, localResult, context) {
 Reglas:
 - Devuelve SOLO JSON válido con title, answer y warnings.
 - No pegues tablas, listas de productos ni JSON dentro de answer; las tablas se mostrarán debajo.
-- No menciones códigos internos técnicos como id, persona_id, event_id, producto_id, tienda_id, donor_ref o valores tipo P:id.../T:id...; habla siempre con nombres humanos de personas, eventos, productos, tiendas y donantes.
 - Usa cifras reales del resumen CE y habla claro: totales, comparación, criterio y conclusión.
 - Si hay evento En curso, avisa que sus cifras son provisionales y no lo compares como cierre definitivo.
 - Si hay socios, explica el criterio canónico: rango SOCIO; excluye Grupo..., Peña..., Personas..., z_de... y z_DEV...; parejas con " y " cuentan como 2; asistentes = colaboradores SOCIO con Numero >= 0, incluyendo exentos con Numero=0 aunque estén Pendiente; no asistentes = censo canónico menos asistentes.
@@ -2964,9 +2963,7 @@ REGLAS_PARA_SELECTS_PROPUESTOS:
 - Para evento en pantalla usa el id literal del EVENTO_EN_PANTALLA si está disponible.
 - Para pagos: situacion IN ('BANCO','EFECTIVO','BIZUM') son ingresos pagados; 'PENDIENTE' es pendiente. Si numero=0 o importe=0 en socio, puede ser exento, no pago normal.
 - Para donaciones: el donante literal sale de donor_ref. Si donor_ref empieza por P: cruza con ce_personas.id; si empieza por T: cruza con ce_tiendas.id. No inventes repartos.
-- Incluye LIMIT razonable si pides detalle amplio.
-- Cuando selecciones IDs o referencias internas, haz JOIN para devolver nombres humanos y usa alias claros en castellano: colaborador_nombre, producto_nombre, tienda_nombre, donante_nombre, responsable_nombre. Evita devolver id/persona_id/event_id/producto_id/tienda_id si no son imprescindibles.
-- Para donor_ref, resuelve P: con ce_personas y T: con ce_tiendas, devolviendo el nombre del donante, no el código.`;
+- Incluye LIMIT razonable si pides detalle amplio.`;
 }
 
 function cleanPlannerSqlText(value) {
@@ -3009,99 +3006,6 @@ function plannerSelectsFromText(raw) {
   return { selects: out.slice(0, 5), rejected };
 }
 
-function normalizeSqlIdCode(value) {
-  return text(value)
-    .replace(/id[￾￿ -]+([A-Za-z0-9])/g, 'id-$1')
-    .replace(/[￾￿ -]+/g, '')
-    .trim();
-}
-function normalizeLookupKey(value) {
-  return normalizeSqlIdCode(value).replace(/^['"]|['"]$/g, '').trim();
-}
-function collectSqlHumanLookups(executed = []) {
-  const lookups = { personas: {}, tiendas: {}, productos: {}, eventos: {} };
-  arr(executed).forEach(item => arr(item.rows).forEach(row => {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) return;
-    const id = normalizeLookupKey(row.id || row.ID || row.persona_id || row.personaId || row.tienda_id || row.producto_id || row.event_id || '');
-    if (!id) return;
-    const nombre = trim(row.nombre || row.Nombre || row.persona_nombre || row.colaborador_nombre || row.donante_nombre || row.responsable_nombre || '');
-    const titulo = trim(row.titulo || row.Titulo || row.evento || row.Evento || '');
-    const tienda = trim(row.tienda_nombre || row.tienda || '');
-    const producto = trim(row.producto_nombre || row.producto || '');
-    const rango = trim(row.rango || row.Rango || '');
-    if (nombre && (rango || /persona|colaborador|donante|responsable/i.test(Object.keys(row).join(' ')))) lookups.personas[id] = nombre;
-    if (nombre && !lookups.personas[id] && Object.keys(row).some(k => /persona|colaborador|donante|responsable/i.test(k))) lookups.personas[id] = nombre;
-    if (titulo) lookups.eventos[id] = titulo;
-    if (tienda) lookups.tiendas[id] = tienda;
-    if (producto) lookups.productos[id] = producto;
-  }));
-  return lookups;
-}
-function humanNameFromSqlRef(value, lookups = {}) {
-  const s = normalizeSqlIdCode(value);
-  if (!s) return '';
-  const m = s.match(/^(P|PERSONA|PERSONAS|T|TIENDA|TIENDAS|PRODUCTO|EVENTO)\s*:\s*(.+)$/i);
-  const kind = m ? m[1].toUpperCase() : '';
-  const id = normalizeLookupKey(m ? m[2] : s);
-  if (!id) return '';
-  if (/^P/.test(kind) && lookups.personas?.[id]) return lookups.personas[id];
-  if (/^T/.test(kind) && lookups.tiendas?.[id]) return lookups.tiendas[id];
-  if (/PRODUCTO/.test(kind) && lookups.productos?.[id]) return lookups.productos[id];
-  if (/EVENTO/.test(kind) && lookups.eventos?.[id]) return lookups.eventos[id];
-  return lookups.personas?.[id] || lookups.tiendas?.[id] || lookups.productos?.[id] || lookups.eventos?.[id] || '';
-}
-function humanSqlColumnName(key) {
-  const k = trim(key);
-  const n = norm(k);
-  const map = {
-    COLABORADOR_NOMBRE: 'Colaborador', RESPONSABLE_NOMBRE: 'Responsable', DONANTE_NOMBRE: 'Donante', PERSONA_NOMBRE: 'Persona',
-    PRODUCTO_NOMBRE: 'Producto', TIENDA_NOMBRE: 'Tienda', EVENTO_NOMBRE: 'Evento', TITULO: 'Evento', NOMBRE: 'Nombre',
-    FECHA_INI: 'Fecha inicio', FECHA_INICIO: 'Fecha inicio', FECHA_FIN: 'Fecha fin', SITUACION: 'Situación', ESTADO: 'Estado',
-    DESCRIPCION: 'Descripción', NUMERO: 'Número', IMPORTE: 'Importe', PRECIO: 'Precio', UNIDADES: 'Unidades',
-    TICKET_DONACION: 'Tipo / ticket / estado', JUSTIFICANTE: 'Justificante', RANGO: 'Rango', DONOR_REF: 'Donante'
-  };
-  if (map[n]) return map[n];
-  return k.replace(/_/g, ' ').replace(/\w/g, ch => ch.toUpperCase());
-}
-function isInternalSqlCodeColumn(key) {
-  const n = norm(key);
-  return n === 'ID' || /^__/.test(trim(key)) || /(^|_)ID$/.test(n) || /ID$/.test(n) || /REF$/.test(n);
-}
-function humanizeSqlRowForDisplay(row, lookups = {}, selectIndex = '') {
-  const out = {};
-  if (selectIndex) out.Consulta = `SELECT #${selectIndex}`;
-  if (!row || typeof row !== 'object' || Array.isArray(row)) return out;
-  Object.entries(row).forEach(([key, value]) => {
-    const n = norm(key);
-    if (/^__/.test(key)) return;
-    if (n === 'DONOR_REF') {
-      const name = humanNameFromSqlRef(value, lookups);
-      if (name) out.Donante = name;
-      return;
-    }
-    if (isInternalSqlCodeColumn(key)) return;
-    let val = value;
-    if (typeof val === 'string') {
-      const resolved = humanNameFromSqlRef(val, lookups);
-      val = resolved || normalizeSqlIdCode(val);
-      // No sacar códigos internos largos si no se han podido resolver.
-      if (/^(?:P|T)\s*:\s*id[-A-Za-z0-9]+$/i.test(val) || /^id[-A-Za-z0-9]{8,}$/i.test(val)) return;
-    }
-    const label = humanSqlColumnName(key);
-    if (out[label] === undefined) out[label] = val;
-    else out[`${label} (${key})`] = val;
-  });
-  return out;
-}
-function humanizeExecutedSqlRows(executed = []) {
-  const lookups = collectSqlHumanLookups(executed);
-  arr(executed).forEach(item => {
-    const displayRows = arr(item.rows).map(row => humanizeSqlRowForDisplay(row, lookups, item.indice)).filter(row => Object.keys(row).length);
-    item.rows = displayRows;
-    item.humanized = true;
-  });
-  return executed;
-}
 function rowsToTableRows(rows, max = 100) {
   const list = arr(rows).slice(0, max);
   const cols = [];
@@ -3136,10 +3040,9 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
       zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'KO', `SELECT #${i + 1} no ejecutado: ${trim(error?.message || error)}`);
     }
   }
-  humanizeExecutedSqlRows(executed);
   context.sqlSelectsEjecutados = { ok: executed.some(x => x.ok), executed };
   const flat = [];
-  executed.forEach(item => arr(item.rows).slice(0, 300).forEach((row, idx) => flat.push({ Consulta: `SELECT #${item.indice}`, Fila: idx + 1, ...row })));
+  executed.forEach(item => arr(item.rows).slice(0, 300).forEach((row, idx) => flat.push({ __select: item.indice, __row: idx + 1, ...row })));
   if (flat.length) {
     context.modulosExtraidos = { ...(context.modulosExtraidos || {}), SELECTS_SQL_ZUZU: flat };
     context.totalesRegistrosPorModulo = { ...(context.totalesRegistrosPorModulo || {}), SELECTS_SQL_ZUZU: flat.length };
@@ -3166,7 +3069,7 @@ function directSqlSelectResultIfApplicable(prompt, context) {
     ok: true,
     rejected: false,
     title: 'Resultado SQL SELECT de Zuzu',
-    answer: `ControlEvent ha ejecutado literalmente ${executed.length} SELECT(s) propuesto(s) por Zuzu, tras validar que eran de solo lectura. Los datos mostrados abajo son el resultado directo de esas consultas, presentado con nombres humanos y sin códigos internos de personas/eventos/productos siempre que hay una equivalencia disponible.`,
+    answer: `ControlEvent ha ejecutado literalmente ${executed.length} SELECT(s) propuesto(s) por Zuzu, tras validar que eran de solo lectura. Los datos mostrados abajo son el resultado directo de esas consultas; no son una reinterpretación local por módulos.`,
     warnings: arr(context?.advertencias).concat('Versión experimental v22_prod: SELECTs ejecutados literalmente mediante RPC ce_zuzu_select. Si la RPC no está instalada, no habrá resultados SQL reales.'),
     charts: [],
     tables,

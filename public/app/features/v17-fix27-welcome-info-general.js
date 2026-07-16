@@ -8,7 +8,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v22_prod_fix2';
+  const VERSION_LABEL = 'v22_prod';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
@@ -55,8 +55,7 @@
     return !hasSelectedEvent();
   }
   function isColtyLogo(target){
-    // FIX2: el usuario puede pulsar no solo sobre el icono, sino sobre todo el bloque ColtyLAB/usuario.
-    return !!target?.closest?.('.brand, .brand-user, #brandCurrentUserName, #brandCurrentUserMeta, img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large');
+    return !!target?.closest?.('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large');
   }
   function syncLogoTitle(){
     try{
@@ -165,10 +164,18 @@
   function handleLogo(ev){
     if(!welcomeActive()) return false;
     if(!isColtyLogo(ev.target)) return false;
+    const hasPointerEvents = !!window.PointerEvent;
+    if(hasPointerEvents && ev.type !== 'pointerup'){
+      stopEvent(ev);
+      return true;
+    }
+    if(!hasPointerEvents && ev.type === 'click'){
+      stopEvent(ev);
+      return true;
+    }
     stopEvent(ev);
     const t = Date.now();
-    // Evita el doble disparo pointerup+click, pero permite abrir con cualquiera de ellos.
-    if(t - lastLogoAction < 420) return true;
+    if(t - lastLogoAction < 260) return true;
     lastLogoAction = t;
     const layer = $(LAYER_ID);
     if(layer?.classList?.contains('visible')) closeInfo(); else showInfo();
