@@ -710,7 +710,7 @@ function directAggregateResultIfApplicable(prompt, context) {
     title: `${moduleName} agrupado por ${ag.groupField}${eventos ? ` - ${eventos}` : ''}`,
     answer: `Agrupación por ${ag.groupField}. Total general: ${ag.totalGeneral} €.` ,
     warnings: arr(context.advertencias).concat(warningSynonyms),
-    charts: [{ title: `${moduleName} por ${ag.groupField} (cálculo local ControlEvent)`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
+    charts: [{ title: `${moduleName} por ${ag.groupField} (cálculo local ControlEvent)`, type: /\b(tarta|queso|pastel|pie|donut)\b/.test(p) ? 'pie' : 'bar', labels: ag.groups.map(g => g.key).slice(0, 30), values: ag.groups.map(g => round(g.total, 2)).slice(0, 30), unit: '€' }],
     tables: [
       { title: `${moduleName} agrupado por ${ag.groupField}`, columns: groupedColumns, rows: groupedRows },
       { title: `${moduleName} detalle base (${rows.length} registro(s))`, columns: detailColumns, rows: detailRows }
@@ -721,6 +721,120 @@ function directAggregateResultIfApplicable(prompt, context) {
     ],
     provider: 'control-event-local-deterministico',
     model: 'sin-gemini-para-calculos'
+  };
+}
+
+
+function directSegmentDestinationSituationPieIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  const asksPie = /\b(graf|gr[aá]fic|queso|tarta|pastel|pie|donut)\b/.test(p);
+  const asksFields = /\bsegmento\b/.test(p) && /\bdestino\b/.test(p);
+  const asksPurchaseSituation = /\b(compra|compras|pte\.?\s*compra|pendiente|tkxx|ticket|gastos?\s+corrientes?|situaci[oó]n)\b/.test(p);
+  if (!(asksPie && asksFields && asksPurchaseSituation)) return null;
+
+  const mods = context.modulosExtraidos || {};
+  const compras = arr(mods.COMPRAS);
+  const productos = arr(mods.PRODUCTOS);
+  const events = eventNamesFromContext(context);
+  if (!compras.length) {
+    return {
+      ok: true,
+      rejected: false,
+      title: `Compras por segmento, destino y situación${events.length ? ` - ${events.join(' | ')}` : ''}`,
+      answer: 'No hay líneas de compra disponibles para construir el reparto solicitado.',
+      warnings: arr(context.advertencias),
+      charts: [], tables: [], files: [],
+      provider: 'control-event-local-segmento-destino-situacion',
+      model: 'calculo-local-oficial'
+    };
+  }
+
+  const catalog = new Map();
+  productos.forEach(row => {
+    const name = trim(row?.['Nombre producto'] || row?.Producto || '');
+    if (!name) return;
+    catalog.set(norm(name), {
+      segmento: trim(row?.Segmento) || 'SIN SEGMENTO',
+      destino: trim(row?.Destino) || 'SIN DESTINO'
+    });
+  });
+
+  const categoryOrder = ['Pte. Compra', 'TKxx', 'GASTOS CORRIENTES'];
+  const categoryColors = {
+    'Pte. Compra': '#dc2626',
+    'TKxx': '#2563eb',
+    'GASTOS CORRIENTES': '#111827'
+  };
+  function situationOf(row) {
+    const raw = trim(row?.['Ticket u otros gastos'] || '');
+    if (/pte\.?\s*compra|pendiente/i.test(raw) || !raw) return 'Pte. Compra';
+    if (/gastos?\s+corrientes?/i.test(raw)) return 'GASTOS CORRIENTES';
+    if (/^tk\s*\d+/i.test(raw)) return 'TKxx';
+    return 'TKxx';
+  }
+
+  const groups = new Map();
+  const totalsBySituation = Object.fromEntries(categoryOrder.map(k => [k, 0]));
+  const detail = [];
+  compras.forEach(row => {
+    const product = trim(row?.Producto) || 'Sin producto';
+    const cat = catalog.get(norm(product)) || { segmento: 'SIN SEGMENTO', destino: 'SIN DESTINO' };
+    const segmento = trim(cat.segmento).toUpperCase() || 'SIN SEGMENTO';
+    const destino = trim(cat.destino).toUpperCase() || 'SIN DESTINO';
+    const situation = situationOf(row);
+    const amount = round(num(row?.Importe), 2);
+    const key = `${segmento} / ${destino}`;
+    const old = groups.get(key) || { Segmento: segmento, Destino: destino, totals: Object.fromEntries(categoryOrder.map(k => [k, 0])), total: 0, lines: 0 };
+    old.totals[situation] = round(num(old.totals[situation]) + amount, 2);
+    old.total = round(old.total + amount, 2);
+    old.lines += 1;
+    groups.set(key, old);
+    totalsBySituation[situation] = round(num(totalsBySituation[situation]) + amount, 2);
+    detail.push({
+      Evento: trim(row?.Evento), Producto: product, Segmento: segmento, Destino: destino,
+      Situacion: situation, Importe: amount, 'Ticket u otros gastos': trim(row?.['Ticket u otros gastos']),
+      Tienda: trim(row?.Tienda), Responsable: trim(row?.Responsable)
+    });
+  });
+
+  const ordered = [...groups.values()].sort((a,b) => num(b.total) - num(a.total) || a.Segmento.localeCompare(b.Segmento, 'es') || a.Destino.localeCompare(b.Destino, 'es'));
+  const totalGeneral = round(ordered.reduce((acc, g) => acc + num(g.total), 0), 2);
+  const columns = ['Segmento','Destino','Pte. Compra (€)','TKxx (€)','GASTOS CORRIENTES (€)','Total parcial (€)','% del total general','Líneas'];
+  const rows = ordered.map(g => [
+    g.Segmento, g.Destino,
+    round(g.totals['Pte. Compra'],2), round(g.totals.TKxx,2), round(g.totals['GASTOS CORRIENTES'],2),
+    round(g.total,2), totalGeneral ? `${round((g.total*100)/totalGeneral,2)} %` : '0 %', g.lines
+  ].map(text));
+  rows.push(['TOTAL GENERAL','',round(totalsBySituation['Pte. Compra'],2),round(totalsBySituation.TKxx,2),round(totalsBySituation['GASTOS CORRIENTES'],2),totalGeneral,'100 %',compras.length].map(text));
+
+  const colors = categoryOrder.map(k => categoryColors[k]);
+  const charts = [{
+    title: `Distribución general por situación · Total ${totalGeneral.toLocaleString('es-ES',{maximumFractionDigits:2})} €`,
+    type: 'pie', labels: categoryOrder, values: categoryOrder.map(k => round(totalsBySituation[k],2)), unit: '€', colors
+  }];
+  ordered.forEach(g => {
+    charts.push({
+      title: `${g.Segmento} / ${g.Destino} · Total parcial ${round(g.total,2).toLocaleString('es-ES',{maximumFractionDigits:2})} €`,
+      type: 'pie', labels: categoryOrder, values: categoryOrder.map(k => round(g.totals[k],2)), unit: '€', colors
+    });
+  });
+
+  const detailColumns = ['Evento','Producto','Segmento','Destino','Situacion','Importe','Ticket u otros gastos','Tienda','Responsable'];
+  return {
+    ok: true,
+    rejected: false,
+    title: `Compras por segmento, destino y situación${events.length ? ` - ${events.join(' | ')}` : ''}`,
+    answer: `He agrupado ${compras.length} línea(s) de compra por SEGMENTO/DESTINO y por situación. Total general: ${totalGeneral.toLocaleString('es-ES',{maximumFractionDigits:2})} €. Los quesos parciales mantienen el mismo código de color: Pte. Compra en rojo, TKxx en azul y GASTOS CORRIENTES en negro.`,
+    warnings: arr(context.advertencias),
+    charts,
+    tables: [{ title: 'Totales parciales y total general por SEGMENTO / DESTINO', columns, rows }],
+    files: [
+      { filename: fileSafe(`Compras_segmento_destino_situacion_${events.join('_') || 'evento'}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(columns, ordered.map(g => ({ Segmento:g.Segmento, Destino:g.Destino, 'Pte. Compra (€)':round(g.totals['Pte. Compra'],2), 'TKxx (€)':round(g.totals.TKxx,2), 'GASTOS CORRIENTES (€)':round(g.totals['GASTOS CORRIENTES'],2), 'Total parcial (€)':round(g.total,2), '% del total general':totalGeneral ? `${round((g.total*100)/totalGeneral,2)} %` : '0 %', Líneas:g.lines }))) },
+      { filename: fileSafe(`Compras_segmento_destino_situacion_detalle_${events.join('_') || 'evento'}_v22_prod.csv`), mime:'text/csv;charset=utf-8', content: csvFromRows(detailColumns, detail) }
+    ],
+    provider: 'control-event-local-segmento-destino-situacion',
+    model: 'calculo-local-oficial'
   };
 }
 
@@ -1695,8 +1809,11 @@ function directEventReportIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
   const events = eventNamesFromContext(context);
-  const wantsReport = /\b(informe|exhaustivo|exhaustiva|resumen\s+general|dashboard|balance|situaci[oó]n|estado\s+general)\b/.test(p);
-  const wantsGraph = /\b(grafica|gráfica|grafico|gráfico|graficamente|gráficamente|representado|representar|diagrama|barras)\b/.test(p);
+  // FIX7: "situación" no basta para convertir cualquier petición en un informe general.
+  // En frases como "colores según su situación (Pte. Compra, TKxx...)" describe una dimensión
+  // de la gráfica, no el estado global del evento.
+  const wantsReport = /\b(informe|exhaustivo|exhaustiva|resumen\s+general|dashboard|balance|situaci[oó]n\s+(?:general|del\s+evento)|estado\s+(?:general|del\s+evento))\b/.test(p);
+  const wantsGraph = /\b(grafica|gráfica|grafico|gráfico|graficamente|gráficamente|representado|representar|diagrama|barras|tarta|queso|pastel|pie|donut)\b/.test(p);
   const wantsEventDossier = /\b(toda\s+la\s+info|toda\s+la\s+informacion|toda\s+la\s+información|informacion\s+del\s+evento|información\s+del\s+evento|info\s+del\s+evento|datos\s+del\s+evento|dossier|celebracion|celebración|que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|meteorolog|metereolog|meteo)\b/.test(p);
   const wantsComparison = events.length >= 2 && /\b(compara|comparar|comparativa|comparativas|frente\s+a|versus|\bvs\b)\b/.test(p);
   if (!events.length || !(wantsReport || wantsEventDossier || wantsComparison || (events.length >= 2 && wantsGraph))) return null;
@@ -1907,6 +2024,7 @@ function directOperationalRankingResultIfApplicable(prompt, context) {
 function directHighConfidenceResultIfApplicable(prompt, context) {
   return directCashEvolutionIfApplicable(prompt, context)
     || directOperationalRankingResultIfApplicable(prompt, context)
+    || directSegmentDestinationSituationPieIfApplicable(prompt, context)
     || directEventReportIfApplicable(prompt, context)
     || directPersonIdentityIfApplicable(prompt, context)
     || directPersonsCatalogIfApplicable(prompt, context)
@@ -2028,6 +2146,8 @@ function directDeterministicResultIfApplicable(prompt, context) {
   if (cmpMod) return cmpMod;
   const cmp = directComparativeAllDataResultIfApplicable(prompt, context);
   if (cmp) return cmp;
+  const segDestSituation = directSegmentDestinationSituationPieIfApplicable(prompt, context);
+  if (segDestSituation) return segDestSituation;
   const ag = directAggregateResultIfApplicable(prompt, context);
   if (ag) return ag;
   const gr = directGraphResultIfApplicable(prompt, context);
@@ -2076,7 +2196,7 @@ function directDeterministicResultIfApplicable(prompt, context) {
 function directGraphResultIfApplicable(prompt, context) {
   if (!context || context.needsClarification) return null;
   const p = norm(prompt);
-  if (!/\b(grafica|gráfica|grafico|gráfico|diagrama|barras|tarta)\b/.test(p)) return null;
+  if (!/\b(grafica|gráfica|grafico|gráfico|diagrama|barras|tarta|queso|pastel|pie|donut)\b/.test(p)) return null;
   const mods = context.modulosExtraidos || {};
   if (/\b(producto|productos|consumo|consumidos|consumidas|utilizado|utilizados)\b/.test(p) && (Array.isArray(mods.COMPRAS) || Array.isArray(mods.DONACIONES))) {
     const pc = directProductConsumptionResultIfApplicable(prompt, context);
@@ -2109,7 +2229,7 @@ function directGraphResultIfApplicable(prompt, context) {
     title: `Gráfica de ${moduleName}${eventos ? ` - ${eventos}` : ''}`,
     answer: `Gráfica por ${g.groupField} con ${rows.length} registro(s).`,
     warnings: arr(context.advertencias),
-    charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\btarta|pie\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
+    charts: [{ title: `${moduleName} por ${g.groupField}`, type: /\b(tarta|queso|pastel|pie|donut)\b/.test(p) ? 'pie' : 'bar', labels: g.labels, values: g.values, unit: '€' }],
     tables: [{ title: `${moduleName} base usada (${rows.length} registro(s))`, columns, rows: tableRows }],
     files: [{ filename: fileSafe(`${moduleName}_${eventos || 'ControlEvent'}_grafica_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
     provider: 'control-event-modules-direct',
@@ -2189,6 +2309,7 @@ function logGeminiUsage(stage, model, payload) {
   } catch (_) {}
 }
 function isRetryable(err) { return /400|404|model|not supported|429|quota|RESOURCE_EXHAUSTED|rate|unavailable|503|504|aborted|abort|tard[oó] demasiado|INVALID_ARGUMENT/i.test(text(err?.message || '')); }
+function isNarrativeQualityError(err) { return /redacci[oó]n.*(?:incompleta|cortada)|respuesta narrativa incompleta|texto libre incompleto|sin cubrir todas las partes|omiti[oó].*parte|dej[oó].*cortad/i.test(text(err?.message || err)); }
 function isQuotaError(err) { return /429|quota|RESOURCE_EXHAUSTED|rate limit|rate-limit|free_tier|free tier|retry in/i.test(text(err?.message || '') + ' ' + text(err?.details?.error?.status || '')); }
 const __zuzuMemo = new Map();
 function memoKey(prefix, value) {
@@ -2368,7 +2489,7 @@ async function callGeminiEvent(prompt, context, flowTrace = []) {
 
 function narrativeToneFromPrompt(prompt) {
   const p = norm(prompt);
-  const informal = /\b(coloquial|informal|simpatic|simpático|chascarrill|cachond|cachondo|cachonda|cachondeo|coña|broma|risas|guasa|gracios|socios?|soci[ao]s?|peña|ameno|cercano|divertid|natural|humano|campechano|para\s+contar|para\s+leer|para\s+dar|para\s+darselo|para\s+dárselo|buena\s+persona|señor[ao]\s+espos[ao])\b/.test(p);
+  const informal = /\b(coloquial|informal|simpatic|simpático|chascarrill|cachond|cachondo|cachonda|cachondeo|coña|broma|risas|guasa|gracios|socios?|soci[ao]s?|peña|ameno|cercano|divertid|natural|humano|campechano|tronquet|colegueo|colega|curra|curres|ya\s+me\s+conoces|como\s+vas\s+por|cómo\s+vas\s+por|para\s+contar|para\s+leer|para\s+dar|para\s+darselo|para\s+dárselo|buena\s+persona|señor[ao]\s+espos[ao])\b/.test(p);
   const technical = /\b(tecnic|técnic|financier|contable|auditor|direccion|dirección|junta\s+directiva|formal|ejecutiv|presupuest|balance|referencias?\s+tecnic|complicad|justificad|fiscal|tesoreria|tesorería|direcci[oó]n|informe\s+de\s+cierre|informe\s+oficial)\b/.test(p);
   if (technical) return {
     id: 'tecnico-financiero',
@@ -2398,7 +2519,7 @@ function requiresGeminiNarrativeStrict(prompt) {
   const p = norm(prompt);
   // Cuando el usuario pide tono, opinión o que “lo haga Zuzu”, no queremos plantillas locales.
   // ControlEvent cocina los datos; Zuzu debe escribir la respuesta humana.
-  return wantsNarrativeReport(prompt) && /\b(zuzu|dejate|déjate|curra|opinion|opinión|merece|como\s+lo\s+ves|cómo\s+lo\s+ves|tono|cachond|chascarrill|coloquial|informal|simpatic|simpa[tá]ic|palabras|texto\s+de|una\s+pagina|1\s+pagina|p[aá]gina|para\s+darselo|para\s+dárselo|para\s+socios|para\s+direccion|direcci[oó]n)\b/.test(p);
+  return wantsNarrativeReport(prompt) && /\b(zuzu|dejate|déjate|curra|curres|tronquet|colegueo|colega|ya\s+me\s+conoces|opinion|opinión|merece|como\s+lo\s+ves|cómo\s+lo\s+ves|tono|cachond|chascarrill|coloquial|informal|simpatic|simpa[tá]ic|palabras|texto\s+de|una\s+pagina|1\s+pagina|p[aá]gina|para\s+darselo|para\s+dárselo|para\s+socios|para\s+direccion|direcci[oó]n)\b/.test(p);
 }
 function shouldEnrichLocalResultWithNarrative(prompt, result) {
   if (!result || result.rejected === true || result.ok === false) return false;
@@ -2603,18 +2724,25 @@ Mi valoración es positiva: no parece una presencia testimonial, sino una colabo
 
 function fallbackEventReportNarrativeForLocalReport(prompt, result, context = {}) {
   if (!/control-event-local-informe-eventos/i.test(trim(result?.provider || ''))) return '';
-  const rows = objectsFromResultTable(result, /resumen\s+operativo\s+por\s+evento/, 20);
+  const rows = objectsFromResultTable(result, /resumen\s+(?:operativo|econ[oó]mico)\s+por\s+evento/, 20);
   if (!rows.length) return '';
-  const socios = objectsFromResultTable(result, /resumen\s+canonico|resumen\s+canónico/, 20);
+  const socios = objectsFromResultTable(result, /resumen\s+canonico|resumen\s+canónico|participaci[oó]n\s+y\s+documentaci[oó]n\s+por\s+evento/, 20);
   const weather = goodWeatherRowsFromContext(context);
   const line = r => {
     const ev = trim(r.Evento);
     const estado = trim(r.Estado);
     const provisional = /en\s*curso/i.test(estado) ? ' (En curso: cifras provisionales)' : '';
-    return `${ev}${provisional}: ingresos previstos ${trim(r['Ingresos total (€)']) || '0'} €, ingresos realizados ${trim(r['Ingresos realizados (€)']) || '0'} €, compras realizadas ${trim(r['Compras realizadas (€)']) || '0'} €, compras pendientes ${trim(r['Compras pendientes (€)']) || '0'} €, donaciones valoradas ${trim(r['Donaciones valoradas (€)']) || '0'} €, saldo actual ${trim(r['Saldo actual (€)']) || '0'} €, saldo operativo ${trim(r['Saldo operativo (€)']) || '0'} € y valor compras+donaciones ${trim(r['Valor compras + donaciones (€)']) || '0'} €`;
+    const ingresosPrevistos = trim(r['Ingresos previstos (€)'] || r['Ingresos total (€)']) || '0';
+    const ingresosCobrados = trim(r['Ingresos cobrados (€)'] || r['Ingresos realizados (€)']) || '0';
+    const comprasRealizadas = trim(r['Compras realizadas (€)']) || '0';
+    const comprasPendientes = trim(r['Compras pendientes (€)']) || '0';
+    const donaciones = trim(r['Donaciones valoradas (€)']) || '0';
+    const saldoActual = trim(r['Saldo actual (€)']) || '0';
+    const saldoCierre = trim(r['Saldo previsto al cierre (€)'] || r['Saldo operativo (€)']) || '0';
+    return `${ev}${provisional}: ingresos previstos ${ingresosPrevistos} €, ingresos cobrados ${ingresosCobrados} €, compras realizadas ${comprasRealizadas} €, compras pendientes ${comprasPendientes} €, donaciones valoradas ${donaciones} €, saldo actual ${saldoActual} € y saldo previsto al cierre ${saldoCierre} €`;
   };
   const inProgress = rows.filter(r => /en\s*curso/i.test(trim(r.Estado || r['Nota estado']))).map(r => trim(r.Evento)).filter(Boolean);
-  const sociosText = socios.length ? socios.map(r => `${trim(r.Evento)}: ${trim(r['Socios asistentes'])} asistentes y ${trim(r['Socios no asistentes'])} no asistentes sobre ${trim(r['Socios canónicos'])} socios canónicos`).join('; ') : '';
+  const sociosText = socios.length ? socios.map(r => `${trim(r.Evento)}: ${trim(r['Socios asistentes'] || r['Socios asistentes canónicos']) || '0'} asistentes y ${trim(r['Socios no asistentes'] || r['Socios no asistentes canónicos']) || '0'} no asistentes sobre ${trim(r['Socios'] || r['Socios canónicos']) || '0'} socios`).join('; ') : '';
   const weatherText = weather.length ? weather.map(r => `${trim(r.Evento)} ${trim(r.Fecha)}: ${trim(r.Cielo)}, máxima ${r['Temp. máx']} ºC, mínima ${r['Temp. mín']} ºC, lluvia ${r['Prob. lluvia %']} %, viento ${r['Viento km/h']} km/h`).join('; ') : '';
   const totals = rows.map(line).join('. ');
   return `Resumen técnico ControlEvent: la consulta está restringida a ${rows.length} evento(s) y los cálculos se han hecho con plantillas cerradas, sin mezclar otros eventos. ${totals}.
@@ -2859,7 +2987,13 @@ async function callGeminiNarrativeForLocalResult(userPrompt, localResult, contex
     } catch (error) {
       lastError = error;
       zuzuTracePush(flowTrace, 'Paso 4 · Zuzu redacción humana', 'KO', cleanGeminiError(error), { model });
-      if (isQuotaError(error) || !isRetryable(error)) break;
+      if (isQuotaError(error)) break;
+      // FIX7: una respuesta cortada es un fallo de calidad, no un error definitivo.
+      // Tras el reintento guiado del mismo modelo, se prueba el siguiente modelo antes
+      // de caer a la redacción local. Así la misma pregunta no alterna entre un informe
+      // excelente y una introducción genérica por un corte ocasional.
+      if (isNarrativeQualityError(error)) continue;
+      if (!isRetryable(error)) break;
     }
   }
   throw lastError || new Error('Zuzu narrativa no disponible.');

@@ -899,6 +899,26 @@ function zuzuSanitizeFiltersForPrompt(prompt, modules, filters) {
     out.donantes = [];
     if (/\bsocios?\b|rango\s*[=:]\s*['"]?socio['"]?/i.test(text(prompt))) out.rangos = ['SOCIO'];
   }
+
+  // FIX7: en peticiones analíticas donde SEGMENTO/DESTINO son campos de agrupación,
+  // el saludo o el colegueo del usuario no pueden convertirse en filtros de persona,
+  // tienda, donante, producto, segmento o destino. Solo se conservan filtros si se
+  // expresan de forma inequívoca ("tienda X", "responsable X", producto entre comillas...).
+  const structuralGroupingAsk = /\b(segmento)\b/.test(p)
+    && /\b(destino)\b/.test(p)
+    && /\b(graf|gr[aá]fic|queso|tarta|pastel|pie|donut|agrup|subtotal|parcial|total)\b/.test(p);
+  if (structuralGroupingAsk) {
+    // La agrupación solicitada es por campos del producto/situación. Un nombre del saludo
+    // (por ejemplo, Tembleque) nunca debe reducir las filas de compras.
+    out.personas = [];
+    out.responsables = [];
+    out.donantes = [];
+    if (!zuzuPromptHasExplicitSpecificFilter(prompt, 'tiendas')) out.tiendas = [];
+    if (!zuzuPromptHasExplicitSpecificFilter(prompt, 'productos')) out.productos = [];
+    // "SEGMENTO/DESTINO" nombra columnas de agrupación, no valores concretos.
+    out.segmentos = [];
+    out.destinos = [];
+  }
   return out;
 }
 

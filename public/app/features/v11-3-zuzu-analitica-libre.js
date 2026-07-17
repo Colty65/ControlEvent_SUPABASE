@@ -221,7 +221,7 @@
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();
     return {
-      charts:/\b(graf|gr[aá]fic|chart|dispersion|dispersi[oó]n|tendencia|linea|l[ií]nea|evoluci[oó]n)\b/i.test(p),
+      charts:/\b(graf|gr[aá]fic|chart|queso|tarta|pastel|pie|donut|dispersion|dispersi[oó]n|tendencia|linea|l[ií]nea|evoluci[oó]n)\b/i.test(p),
       allEvents:/\b(todos\s+los\s+eventos|eventos\s+registrados|a[nñ]o\s+\d{4}|celebraciones|\b\d+\s+eventos\b)\b/i.test(p),
       products:/\b(producto|productos|art[ií]culo|art[ií]culos|consumo|consumidos|comprados|donados)\b/i.test(p),
       tickets:/\b(ticket|tickets|tk\s*\d+)\b/i.test(p),
@@ -377,7 +377,7 @@
     el.querySelectorAll('[data-file-index]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.fileIndex)]; downloadText(f.content||'', f.filename||'archivo.txt', f.mime||'text/plain;charset=utf-8'); }; });
     el.querySelectorAll('[data-file-preview]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.filePreview)]; var p=$('ceAiFilePreview'); if(!p) return; p.style.display='block'; p.textContent=f.content||''; }; });
   }
-  function wantsChart(p){ return /\b(graf|gr[aá]fic|chart|barras|tarta|pastel|donut|linea|línea|comparativ)/i.test(String(p||'')); }
+  function wantsChart(p){ return /\b(graf|gr[aá]fic|chart|barras|tarta|queso|pastel|pie|donut|linea|línea|comparativ)/i.test(String(p||'')); }
   function autoChartsFromTables(tables){
     var out=[]; (tables||[]).some(function(tb){
       var cols=tb.columns||[], rows=tb.rows||[]; if(!cols.length || !rows.length) return false;
@@ -418,6 +418,11 @@
   function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function formatCost(v){ return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:5, maximumFractionDigits:6}); }
   function chartColor(i){ return ['#38bdf8','#fb923c','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
+  function chartItemColor(ch,i){
+    var colors=Array.isArray(ch&&ch.colors)?ch.colors:[];
+    var c=String(colors[i]||'').trim();
+    return /^#[0-9a-f]{3,8}$/i.test(c)?c:chartColor(i);
+  }
 
   function weatherIcon(cielo){
     var c=String(cielo||'').toLowerCase();
@@ -454,8 +459,8 @@
 
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
-    var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartColor(i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
-    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartColor(i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
+    var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartItemColor(ch,i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
+    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
   function lineChartHtml(ch, labels, values){
