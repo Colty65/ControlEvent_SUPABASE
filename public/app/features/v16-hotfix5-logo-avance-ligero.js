@@ -279,6 +279,7 @@
   }
   function toggleAvance(ev){
     if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
+    if(window.__ceColtyLabAlwaysInfoCard){ openWelcomeInfoInstead(); return false; }
     if(noSelectedEvent()){ openWelcomeInfoInstead(); return false; }
     const now=Date.now();
     if(now-lastToggle<260) return false;
@@ -312,7 +313,7 @@
       const clone=old.cloneNode(true);
       clone.className='ce-brand-logo-safe';
       clone.alt='Logo';
-      clone.title=noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento';
+      clone.title=window.__ceColtyLabAlwaysInfoCard?'Ver información de ControlEvent':(noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento');
       try{ clone.style.cssText=(old.getAttribute('style')||'')+';cursor:pointer;'; }catch(_){ }
       old.replaceWith(clone);
     }

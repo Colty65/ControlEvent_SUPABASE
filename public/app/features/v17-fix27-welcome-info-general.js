@@ -5,10 +5,11 @@
   'use strict';
   if(window.__ceV17Fix27WelcomeInfoGeneral) return;
   window.__ceV17Fix27WelcomeInfoGeneral = true;
+  window.__ceColtyLabAlwaysInfoCard = true;
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v22_prod_fix2';
+  const VERSION_LABEL = 'v22_prod_fix5';
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
@@ -60,9 +61,9 @@
   }
   function syncLogoTitle(){
     try{
-      const title = welcomeActive() ? 'Ver información de ControlEvent' : 'Ver avance del evento';
-      document.querySelectorAll('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large').forEach(el => {
-        try{ el.title = title; el.setAttribute('title', title); }catch(_){ }
+      const title = 'Ver información de ControlEvent';
+      document.querySelectorAll('.brand,.brand-user,#brandCurrentUserName,#brandCurrentUserMeta,img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large').forEach(el => {
+        try{ el.title = title; el.setAttribute('title', title); el.style.cursor='pointer'; }catch(_){ }
       });
     }catch(_){ }
   }
@@ -163,7 +164,7 @@
 
   let lastLogoAction = 0;
   function handleLogo(ev){
-    if(!welcomeActive()) return false;
+    if(loginVisible()) return false;
     if(!isColtyLogo(ev.target)) return false;
     stopEvent(ev);
     const t = Date.now();
@@ -176,7 +177,9 @@
   }
 
   ['pointerup','touchend','click'].forEach(type => {
-    document.addEventListener(type, ev => { try{ handleLogo(ev); }catch(_){ } }, {capture:true, passive:false});
+    // En window/captura se ejecuta antes que los handlers antiguos de AVANCE DEL EVENTO.
+    // Así ColtyLAB abre siempre su ficha, también después de seleccionar un evento.
+    window.addEventListener(type, ev => { try{ handleLogo(ev); }catch(_){ } }, {capture:true, passive:false});
   });
   document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeInfo(); }, true);
 

@@ -1783,7 +1783,7 @@ function directEventReportIfApplicable(prompt, context) {
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
   const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. EVENTOS solo se usa para identificar título, fechas y estado. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
@@ -2752,10 +2752,17 @@ function narrativeLooksTruncated(answer, userPrompt) {
   const a = trim(answer);
   if (!a) return true;
   const p = norm(userPrompt);
-  const asksMany = /\b(tambien|también|ademas|además|\d+\s*\.-|1\.-|2\.-|3\.-| y )\b/.test(p) || (wantsWeatherInfo(userPrompt) && /\b(datos\s+del\s+evento|socios?|asist)/.test(p));
-  if (asksMany && a.length < 900) return true;
+  const asksComparison = /\b(compara|comparar|comparativa|comparativo|frente\s+a|versus|\bvs\b)\b/.test(p);
+  const asksWeather = wantsWeatherInfo(userPrompt);
+  const asksBroad = /\b(toda\s+la\s+info|toda\s+la\s+informacion|todo\s+lo\s+disponible|informe|dossier|detalles|detalle|conclusion|conclusiones)\b/.test(p);
+  const quotedEvents = [...text(userPrompt).matchAll(/["“”'‘’]([^"“”'‘’]{2,90})["“”'‘’]/g)].length;
+  const conjunctions = (p.match(/\b(y|ademas|tambien|no\s+obstante)\b/g) || []).length;
+  const asksMany = asksComparison || asksWeather || asksBroad || quotedEvents > 1 || conjunctions > 1;
+  const minLength = asksComparison && asksWeather ? 700 : (asksMany ? 450 : 120);
+  if (a.length < minLength) return true;
   if (/[,:;\-–—(]$/.test(a)) return true;
   if (!/[.!?…]$/.test(a) && asksMany) return true;
+  if (/\b(es\s+importante|conviene|hay\s+que|teniendo\s+en\s+cuenta|por\s+otro\s+lado|adem[aá]s|sin\s+embargo|no\s+obstante)\s*$/i.test(a)) return true;
   if (/\b(el|la|los|las|de|del|con|para|por|que|como|cómo|va|van|mirando|seg[uú]n|tambien|también|adem[aá]s|asciende|ascienden|importa|suma|queda|habr[aá]|tendr[aá])\s*$/i.test(a)) return true;
   return false;
 }
@@ -2770,8 +2777,14 @@ function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
 
 function narrativeCorrectionInstruction(userPrompt, context) {
   const rows = goodWeatherRowsFromContext(context);
-  const weather = rows.length ? ` Meteo: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)} ${trim(r.Cielo)} max ${r['Temp. máx']} min ${r['Temp. mín']} lluvia ${r['Prob. lluvia %']}% viento ${r['Viento km/h']}km/h`).join(' | ')}.` : '';
-  return `\n\nREINTENTO: responde completo en 4 apartados breves: Producto disponible, Socios, Meteorología, Conclusión. No omitas meteo ni socios. Cierra la respuesta.${weather}`;
+  const p = norm(userPrompt);
+  const comparison = /\b(compara|comparar|comparativa|comparativo|versus|\bvs\b)\b/.test(p);
+  const weatherRequested = wantsWeatherInfo(userPrompt);
+  const sections = comparison
+    ? ['Comparativa económica y operativa', 'Lectura del evento En curso', ...(weatherRequested ? ['Meteorología del evento pedido'] : []), 'Conclusión clara']
+    : ['Resumen', 'Datos clave', ...(weatherRequested ? ['Meteorología'] : []), 'Conclusión'];
+  const weather = rows.length ? ` Datos meteorológicos verificados: ${rows.map(r => `${trim(r.Evento)} ${trim(r.Fecha)} ${trim(r.Cielo)} max ${r['Temp. máx']} min ${r['Temp. mín']} lluvia ${r['Prob. lluvia %']}% viento ${r['Viento km/h']}km/h`).join(' | ')}.` : '';
+  return `\n\nREINTENTO OBLIGATORIO: la respuesta anterior quedó cortada o incompleta. Devuelve SOLO un JSON válido con title, answer y warnings. El answer debe cerrar todas estas partes: ${sections.join('; ')}. No empieces diciendo "se ha solicitado" ni menciones SELECT, SQL, tokens, módulos o trazabilidad. Termina con una conclusión completa.${weather}`;
 }
 
 async function callGeminiNarrativeForLocalResult(userPrompt, localResult, context, flowTrace = []) {
@@ -3272,6 +3285,17 @@ function sqlResultLooksAggregate(rows = []) {
   const keys = Object.keys(first).join(' ');
   return /(total|importe|valor|saldo|unidades|cantidad|count|sum|media|promedio)/i.test(keys) && /(nombre|producto|evento|colaborador|donante|responsable|tienda|tipo|movimiento|label)/i.test(keys);
 }
+function sqlSelectLooksUnsafeFactJoin(sql = '') {
+  const q = text(sql).toUpperCase();
+  const hasAggregate = /\b(SUM|COUNT|AVG|MIN|MAX)\s*\(/.test(q);
+  const factTables = ['CE_COLABORADORES','CE_COMPRAS','CE_DONACIONES'].filter(t => new RegExp(`\\b${t}\\b`).test(q));
+  if (!hasAggregate || factTables.length < 2) return false;
+  // Un JOIN directo entre dos tablas de hechos multiplica filas (N x M) y falsea importes.
+  // Solo se admite cuando cada tabla aparece previamente agregada en una CTE/subconsulta.
+  const hasPreAggregation = /\bWITH\b[\s\S]{0,5000}\bGROUP\s+BY\b/.test(q)
+    || /\(\s*SELECT[\s\S]{0,2500}\bGROUP\s+BY\b[\s\S]{0,800}\)\s*(AS\s+)?[A-Z_][A-Z0-9_]*/.test(q);
+  return !hasPreAggregation;
+}
 function allSqlRowsEmpty(executed = []) {
   const ok = arr(executed).filter(x => x && x.ok);
   return ok.length > 0 && ok.every(x => (Number(x.rowCount) || arr(x.rows).length || 0) === 0);
@@ -3296,9 +3320,14 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
       if (error) throw error;
       const payload = data && typeof data === 'object' ? data : { ok: true, rows: data };
       const rows = arr(payload.rows || payload.data || payload.resultados);
-      const suspect = payload.ok !== false && sqlResultHasNullMetric(rows);
-      executed.push({ indice: i + 1, ok: payload.ok !== false, sql, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, error: trim(payload.error || ''), suspect, suspectReason: suspect ? 'Métrica agregada nula/vacía en filas con etiqueta; posible filtro de estado mal normalizado o SELECT incompleta.' : '' });
-      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', payload.ok === false ? 'KO' : (suspect ? 'INFO' : 'OK'), `SELECT #${i + 1}: ${payload.ok === false ? trim(payload.error || 'KO') : `${rows.length} fila(s) devuelta(s)${suspect ? ' · advertencia: métrica nula/vacía detectada' : ''}`}.`);
+      const nullMetric = payload.ok !== false && sqlResultHasNullMetric(rows);
+      const unsafeFactJoin = payload.ok !== false && sqlSelectLooksUnsafeFactJoin(sql);
+      const suspect = nullMetric || unsafeFactJoin;
+      const suspectReason = unsafeFactJoin
+        ? 'Agregación sobre varias tablas de hechos unidas directamente; riesgo de multiplicación cartesiana de importes.'
+        : (nullMetric ? 'Métrica agregada nula/vacía en filas con etiqueta; posible filtro de estado mal normalizado o SELECT incompleta.' : '');
+      executed.push({ indice: i + 1, ok: payload.ok !== false, sql, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, error: trim(payload.error || ''), suspect, suspectReason });
+      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', payload.ok === false ? 'KO' : (suspect ? 'INFO' : 'OK'), `SELECT #${i + 1}: ${payload.ok === false ? trim(payload.error || 'KO') : `${rows.length} fila(s) devuelta(s)${suspect ? ` · descartada para totales: ${suspectReason}` : ''}`}.`);
     } catch (error) {
       executed.push({ indice: i + 1, ok: false, sql, rows: [], rowCount: 0, error: trim(error?.message || error) });
       zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'KO', `SELECT #${i + 1} no ejecutado: ${trim(error?.message || error)}`);
@@ -3307,16 +3336,25 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
   humanizeExecutedSqlRows(executed);
   context.sqlSelectsEjecutados = { ok: executed.some(x => x.ok), executed };
   const flat = [];
-  executed.forEach(item => arr(item.rows).slice(0, 300).forEach((row, idx) => flat.push({ Consulta: `SELECT #${item.indice}`, Fila: idx + 1, ...row })));
+  executed.filter(item => item.ok && !item.suspect).forEach(item => arr(item.rows).slice(0, 300).forEach((row, idx) => flat.push({ Consulta: `Comprobación interna ${item.indice}`, Fila: idx + 1, ...row })));
   if (flat.length) {
     context.modulosExtraidos = { ...(context.modulosExtraidos || {}), SELECTS_SQL_ZUZU: flat };
     context.totalesRegistrosPorModulo = { ...(context.totalesRegistrosPorModulo || {}), SELECTS_SQL_ZUZU: flat.length };
   }
   context.planZuzu = { ...(context.planZuzu || {}), modoExtraccion: 'EJECUCION_REAL_SELECTS_PROPUESTOS_ZUZU', selectsEjecutados: executed.map(x => ({ indice: x.indice, ok: x.ok, filas: x.rowCount, error: x.error || '', sospechoso: x.suspect === true, motivoSospecha: x.suspectReason || '', sql: x.sql })) };
-  context.instruccionesFuncionalesZuzu = arr(context.instruccionesFuncionalesZuzu).concat({ id: 'V22-SQL-REAL', regla: 'En v22_prod experimental, si hay SELECTS_PROPUESTOS válidos se han ejecutado literalmente como SELECT de solo lectura mediante ce_zuzu_select. Prioriza modulosExtraidos.SELECTS_SQL_ZUZU y planZuzu.selectsEjecutados para responder.' });
+  context.instruccionesFuncionalesZuzu = arr(context.instruccionesFuncionalesZuzu).concat({ id: 'V22-SQL-REAL', regla: 'Las consultas SQL son una comprobación interna de solo lectura. Para importes, saldos y comparativas prevalecen siempre metricasCanonicas y los módulos oficiales de ControlEvent. No menciones SELECT, SQL, RPC, tokens ni trazabilidad en una respuesta normal; solo muéstralos si el usuario pide expresamente una vista técnica.' });
   return context;
 }
+function explicitTechnicalSqlRequest(prompt) {
+  const p = norm(prompt);
+  return /\b(sql|select|consulta\s+sql|resultado\s+crudo|sentencia|query\s+tecnica|query\s+t[eé]cnica)\b/.test(p)
+    && /\b(muestra|ensena|enseña|ver|detalle|literal|crudo|tecnic|t[eé]cnic|audita|auditor[ií]a)\b/.test(p);
+}
 function directSqlSelectResultIfApplicable(prompt, context) {
+  // FIX5: las SELECT son una herramienta interna. Solo se enseñan cuando el usuario
+  // pide expresamente una salida técnica SQL; en cualquier informe normal se usan
+  // como comprobación y la presentación final sale de las métricas oficiales de CE.
+  if (!explicitTechnicalSqlRequest(prompt)) return null;
   const executed = arr(context?.sqlSelectsEjecutados?.executed).filter(x => x && x.ok);
   if (!executed.length) return null;
   const totalSqlRows = executed.reduce((a, x) => a + (Number(x?.rowCount) || arr(x?.rows).length || 0), 0);
@@ -3344,8 +3382,8 @@ function directSqlSelectResultIfApplicable(prompt, context) {
   return {
     ok: true,
     rejected: false,
-    title: 'Resultado SQL SELECT de Zuzu',
-    answer: `ControlEvent ha ejecutado literalmente ${executed.length} SELECT(s) propuesto(s) por Zuzu, tras validar que eran de solo lectura. Los datos mostrados abajo son el resultado directo de esas consultas, presentado con nombres humanos y sin códigos internos de personas/eventos/productos siempre que hay una equivalencia disponible.`,
+    title: 'Detalle técnico de consultas SQL',
+    answer: `Vista técnica solicitada: ControlEvent ha ejecutado ${executed.length} consulta(s) SQL de solo lectura y muestra su resultado humanizado. Esta salida no se usa como título ni como anexo de los informes normales para usuarios finales.`,
     warnings: arr(context?.advertencias).concat('Versión experimental v22_prod: SELECTs ejecutados literalmente mediante RPC ce_zuzu_select. Si la RPC no está instalada, no habrá resultados SQL reales.'),
     charts: [],
     tables,
@@ -3807,6 +3845,20 @@ function dominantSubjectFromPrompt(prompt, result) {
 function wantsWeatherInfo(prompt) {
   return /\b(tiempo|meteorolog|meteorología|metereolog|metereología|meteo|parte\s+meteorolog|parte\s+metereolog|clima|lluvia|llover|temperatura|calor|fr[ií]o|viento|previsi[oó]n|pron[oó]stico|forecast)\b/i.test(text(prompt));
 }
+function weatherTargetEventNamesFromPrompt(prompt, eventRows = []) {
+  const raw = text(prompt);
+  const marker = raw.search(/\b(tiempo|meteorol[oó]g\w*|metereol[oó]g\w*|meteo\w*|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)\b/i);
+  if (marker < 0) return [];
+  const weatherPart = raw.slice(marker);
+  const names = [];
+  arr(eventRows).forEach(ev => {
+    const title = trim(ev?.['Titulo del evento'] || ev?.titulo || ev?.Evento || '');
+    if (!title) return;
+    const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(escaped, 'i').test(weatherPart) && !names.includes(title)) names.push(title);
+  });
+  return names;
+}
 function parseCeDateToIso(value) {
   const s = trim(value);
   if (!s) return '';
@@ -3853,7 +3905,11 @@ async function maybeFetchWeatherContext(userPrompt, context, flowTrace = [], for
   const lon = Number(process.env.CONTROLEVENT_WEATHER_LON || process.env.WEATHER_LON || '-3.657');
   const place = trim(process.env.CONTROLEVENT_WEATHER_PLACE || process.env.WEATHER_PLACE || 'Villanueva de Bogas, Toledo');
   const rows = [];
-  for (const ev of evs.slice(0, 4)) {
+  const weatherTargets = weatherTargetEventNamesFromPrompt(userPrompt, evs);
+  const targetEvents = weatherTargets.length
+    ? evs.filter(ev => weatherTargets.includes(trim(ev['Titulo del evento'] || ev.titulo || ev.Evento || '')))
+    : evs;
+  for (const ev of targetEvents.slice(0, 4)) {
     const title = trim(ev['Titulo del evento'] || ev.titulo || ev.Evento || 'Evento');
     const start = parseCeDateToIso(ev['fecha ini'] || ev.fechaIni || ev.fecha || '');
     const end0 = parseCeDateToIso(ev['fecha fin'] || ev.fechaFin || '') || start;
@@ -3929,6 +3985,38 @@ function attachWeatherVisualsIfNeeded(result, context, userPrompt) {
   };
 }
 
+function mergeRowsByIdentity(baseRows, extraRows) {
+  const map = new Map();
+  arr(baseRows).concat(arr(extraRows)).forEach((row, index) => {
+    const key = trim(row?.id) || `${trim(row?.eventId || row?.event_id)}|${trim(row?.productoId || row?.producto_id || row?.personaId || row?.persona_id)}|${trim(row?.ticketDonacion || row?.ticket_donacion)}|${index}`;
+    map.set(key, row);
+  });
+  return [...map.values()];
+}
+async function hydrateStateForExactEvents(baseState, plan, flowTrace = []) {
+  const ids = arr(plan?.eventIds || plan?.event_ids).map(trim).filter(Boolean).slice(0, 8);
+  const eventModules = arr(plan?.modules).some(m => ['INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS'].includes(trim(m).toUpperCase()));
+  if (ids.length < 2 || !eventModules) return baseState;
+  let merged = { ...(baseState || {}) };
+  let loaded = 0;
+  zuzuTracePush(flowTrace, 'Paso 2a · Carga detallada por evento', 'RUN', `Comprobando datos completos de ${ids.length} eventos exactos para evitar comparativas parciales.`);
+  for (const eventId of ids) {
+    try {
+      const scoped = await getState({ eventId });
+      merged.colaboradores = mergeRowsByIdentity(merged.colaboradores, scoped?.colaboradores);
+      merged.compras = mergeRowsByIdentity(merged.compras, scoped?.compras);
+      merged.eventDocuments = mergeRowsByIdentity(merged.eventDocuments, scoped?.eventDocuments);
+      merged.ticketImages = { ...(merged.ticketImages || {}), ...(scoped?.ticketImages || {}) };
+      merged.ticketImageRefs = { ...(merged.ticketImageRefs || {}), ...(scoped?.ticketImageRefs || {}) };
+      loaded += 1;
+    } catch (error) {
+      zuzuTracePush(flowTrace, 'Paso 2a · Carga detallada por evento', 'INFO', `No se pudo reforzar el evento ${eventId}: ${cleanGeminiError(error)}`);
+    }
+  }
+  zuzuTracePush(flowTrace, 'Paso 2a · Carga detallada por evento', loaded ? 'OK' : 'KO', loaded ? `Datos detallados reforzados para ${loaded}/${ids.length} eventos.` : 'No se pudo reforzar ningún evento; se conserva el estado global.');
+  return merged;
+}
+
 function normalizeLoggedUserFix10(payload = {}) {
   const raw = payload?.usuarioLogado || payload?.user || payload?.authUser || payload?.ce_acceso || payload?.ceAcceso || payload?.loggedUser || null;
   if (!raw || typeof raw !== 'object') return null;
@@ -3989,9 +4077,10 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
   }
 
-  const state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
+  let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
   zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
+  state = await hydrateStateForExactEvents(state, plan, flowTrace);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);
   context.fechaActualControlEvent = todayIsoMadrid();
   context.contextoTemporal = narrativeTemporalContext(context);
@@ -4034,7 +4123,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     });
   }
 
-  const highConfidence = directSqlSelectResultIfApplicable(userPrompt, context) || directHighConfidenceResultIfApplicable(userPrompt, context);
+  const highConfidence = directHighConfidenceResultIfApplicable(userPrompt, context) || directSqlSelectResultIfApplicable(userPrompt, context);
   if (highConfidence) {
     zuzuTracePush(flowTrace, 'Paso 2c · Cálculo local CE', 'OK', `CE ha cocinado datos con alta confianza (${highConfidence.provider || 'provider local'}). La salida NO se entrega directamente: pasa a Zuzu redacción humana.`);
     const highConfidenceWithIndirect = attachWeatherVisualsIfNeeded(highConfidence, context, userPrompt);
