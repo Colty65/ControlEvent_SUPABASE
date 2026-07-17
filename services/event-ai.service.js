@@ -2811,7 +2811,7 @@ function splitPlannerItems(value) {
 function plannerSection(textValue, labels) {
   const raw = text(textValue);
   const names = arr(labels).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const stops = 'EVENTOS_SOLICITADOS|EVENTOS_NECESARIOS|EVENTOS|ALCANCE_EVENTOS|MODULOS_NECESARIOS|MÓDULOS_NECESARIOS|MODULOS_NO_NECESARIOS|MÓDULOS_NO_NECESARIOS|CONSULTA_GLOBAL|ALCANCE|PERSONAS_IMPLICADAS|CONDICIONES_DATOS|CONDICIONES_ACCESO|FILTROS_DATOS|FILTROS|SELECTS_PROPUESTOS|CONSULTAS_SELECT|MOTIVO|PLANTILLAS|QUERY|SQL';
+  const stops = 'EVENTOS_SOLICITADOS|EVENTOS_NECESARIOS|EVENTOS|ALCANCE_EVENTOS|MODULOS_NECESARIOS|MÓDULOS_NECESARIOS|MODULOS_NO_NECESARIOS|MÓDULOS_NO_NECESARIOS|CONSULTA_GLOBAL|ALCANCE|PERSONAS_IMPLICADAS|CONDICIONES_DATOS|CONDICIONES_ACCESO|FILTROS_DATOS|FILTROS|CRITERIO_INCLUSION|CRITERIO_INCLUSIÓN|CRITERIO_EXCLUSION|CRITERIO_EXCLUSIÓN|SELECT_PRINCIPAL|SELECT_VALIDACION|SELECT_VALIDACIÓN|SELECTS_PROPUESTOS|CONSULTAS_SELECT|MOTIVO|PLANTILLAS|QUERY|SQL';
   const re = new RegExp('(?:^|\\n)\\s*(?:' + names + ')\\s*[:=]\\s*([\\s\\S]*?)(?=\\n\\s*(?:' + stops + ')\\s*[:=]|$)', 'i');
   const m = raw.match(re);
   return m ? trim(m[1]) : '';
@@ -2878,7 +2878,7 @@ function modulesFromPlannerText(raw) {
 }
 function plannerFiltersFromText(raw) {
   const people = splitPlannerItems(plannerSection(raw, ['PERSONAS_IMPLICADAS', 'PERSONAS_AFECTADAS'])).filter(x => !/^(NINGUNA|NINGUNO|NO|TODOS|TODAS|PERSONAS)$/i.test(x));
-  const conditions = trim(plannerSection(raw, ['CONDICIONES_DATOS', 'CONDICIONES_ACCESO', 'FILTROS_DATOS', 'FILTROS']));
+  const conditions = [plannerSection(raw, ['CONDICIONES_DATOS', 'CONDICIONES_ACCESO', 'FILTROS_DATOS', 'FILTROS']), plannerSection(raw, ['CRITERIO_INCLUSION', 'CRITERIO_INCLUSIÓN']), plannerSection(raw, ['CRITERIO_EXCLUSION', 'CRITERIO_EXCLUSIÓN'])].map(trim).filter(Boolean).join(' | ');
   const filters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
   if (people.length) {
     filters.personas = people.slice();
@@ -2948,27 +2948,45 @@ function plannerDatabaseSchemaText() {
 - ce_users(identificacion, nombre, clave, nivel, created_at, updated_at) [NO consultar clave]
 
 MAPEO_DE_DOMINIO:
-- EVENTOS = ce_eventos
-- INGRESOS = ce_colaboradores JOIN ce_personas ON ce_colaboradores.persona_id = ce_personas.id JOIN ce_eventos ON ce_colaboradores.event_id = ce_eventos.id
-- COMPRAS realizadas = ce_compras donde ticket_donacion NO sea DONADO ... ni Pte. Compra/PENDIENTE.
-- COMPRAS pendientes = ce_compras donde ticket_donacion contenga Pte. Compra o PENDIENTE.
+- EVENTOS = ce_eventos.
+- INGRESOS = ce_colaboradores JOIN ce_personas ON ce_colaboradores.persona_id = ce_personas.id JOIN ce_eventos ON ce_colaboradores.event_id = ce_eventos.id.
+- COMPRAS = ce_compras con ticket_donacion que NO empieza por DONADO. Incluye compras realizadas y compras pendientes.
+- COMPRAS realizadas = ce_compras donde ticket_donacion NO sea DONADO ... y NO sea Pte. Compra/PENDIENTE.
+- COMPRAS pendientes / previstas = ce_compras donde ticket_donacion contenga Pte. Compra o PENDIENTE.
 - DONACIONES = ce_compras donde ticket_donacion sea DONADO SOCIO, DONADO TIENDA o DONADO OTROS.
-- PERSONAS = ce_personas
-- PRODUCTOS = ce_productos
-- TIENDAS = ce_tiendas
-- TICKETS = ce_ticket_images y ce_compras.ticket_donacion
+- PERSONAS = ce_personas.
+- PRODUCTOS = ce_productos.
+- TIENDAS = ce_tiendas.
+- TICKETS/DOCUMENTOS = ce_ticket_images y ce_compras.ticket_donacion.
+
+SEMANTICA_CONTROL_EVENT:
+- ce_colaboradores.numero = número de personas asociadas al colaborador. En parejas normalmente 2; en exentos puede ser 0.
+- ce_eventos.precio = cuota obligatoria por persona.
+- Importe obligatorio de una colaboración = ce_colaboradores.numero * ce_eventos.precio. NO uses ce_colaboradores.importe para esto.
+- ce_colaboradores.importe = importe voluntario/aportación adicional cuando exista.
+- Pago de cuota obligatoria confirmado = situacion en BANCO, EFECTIVO o BIZUM Y numero * precio > 0.
+- Pago voluntario confirmado = situacion en BANCO, EFECTIVO o BIZUM Y importe > 0.
+- Exento = socio/colaborador con numero = 0 o cuota obligatoria 0. No lo llames pagado normal si el importe obligatorio y voluntario son 0.
+- Pendiente = situacion PENDIENTE. No lo mezcles con pagado.
+- En ce_compras, el valor económico de línea es unidades * precio, salvo que preguntes solo precio unitario.
+- ticket_donacion = 'Pte. Compra' o similar significa compra prevista/provisional, no ausencia de compra.
+- Si el usuario dice que consideres eventos En curso como finalizados/provisionales, INCLUYE Pte. Compra y PENDIENTE en el análisis, indicando que son provisionales.
+- Si el usuario pide compras realizadas/cerradas, EXCLUYE Pte. Compra y PENDIENTE.
+- Si el usuario pide artículos/productos más consumidos/utilizados, normalmente agrupa por ce_productos.nombre y suma ce_compras.unidades. Si no limita a compras realizadas, incluye compras pendientes y donaciones cuando el contexto diga producto disponible/consumo previsto.
+- Si el usuario pide eventos del año 2026, incluye eventos cuya fecha_ini o fecha_fin caiga en 2026. No exijas que ambas fechas estén dentro del año salvo que el usuario lo diga.
+- Si una SELECT de ranking o consumo devuelve 0 filas, revisa si has excluido indebidamente Pte. Compra, PENDIENTE o DONADO frente a lo pedido.
 
 REGLAS_PARA_SELECTS_PROPUESTOS:
 - Cuando la pregunta requiera datos, intenta devolver SELECTS_PROPUESTOS usando SOLO las tablas/campos reales anteriores.
 - Usa SELECT puro. Prohibido INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, DO, EXEC, COPY, GRANT, REVOKE.
 - Para evento en pantalla usa el id literal del EVENTO_EN_PANTALLA si está disponible.
-- Para pagos: situacion IN ('BANCO','EFECTIVO','BIZUM') son ingresos pagados; 'PENDIENTE' es pendiente. Si numero=0 o importe=0 en socio, puede ser exento, no pago normal.
-- Para donaciones: el donante literal sale de donor_ref. Si donor_ref empieza por P: cruza con ce_personas.id; si empieza por T: cruza con ce_tiendas.id. No inventes repartos.
-- Incluye LIMIT razonable si pides detalle amplio.
-- Cuando selecciones IDs o referencias internas, haz JOIN para devolver nombres humanos y usa alias claros en castellano: colaborador_nombre, producto_nombre, tienda_nombre, donante_nombre, responsable_nombre. Evita devolver id/persona_id/event_id/producto_id/tienda_id si no son imprescindibles.
-- Para donor_ref, resuelve P: con ce_personas y T: con ce_tiendas, devolviendo el nombre del donante, no el código.`;
+- Devuelve SELECTs en formato humano: usa JOIN y alias claros en castellano: evento, colaborador_nombre, producto_nombre, tienda_nombre, donante_nombre, responsable_nombre, unidades_total, importe_total.
+- Evita devolver id/persona_id/event_id/producto_id/tienda_id/donor_ref si no son imprescindibles.
+- Para donor_ref, resuelve P: con ce_personas y T: con ce_tiendas, devolviendo el nombre del donante, no el código.
+- En consultas analíticas, usa SELECT_PRINCIPAL agregado y, si procede, SELECT_VALIDACION para comprobar que hay filas base.
+- Devuelve CRITERIO_INCLUSION y CRITERIO_EXCLUSION explicando qué entra y qué queda fuera según el prompt.
+- Incluye LIMIT razonable si pides detalle amplio.`;
 }
-
 function cleanPlannerSqlText(value) {
   return trim(value)
     .replace(/^```(?:sql)?/i, '')
@@ -2998,7 +3016,7 @@ function splitPlannerSelects(section) {
   return candidates;
 }
 function plannerSelectsFromText(raw) {
-  const section = plannerSection(raw, ['SELECTS_PROPUESTOS', 'CONSULTAS_SELECT', 'SQL_SELECTS', 'SELECTS']);
+  const section = [plannerSection(raw, ['SELECT_PRINCIPAL']), plannerSection(raw, ['SELECT_VALIDACION', 'SELECT_VALIDACIÓN']), plannerSection(raw, ['SELECTS_PROPUESTOS', 'CONSULTAS_SELECT', 'SQL_SELECTS', 'SELECTS'])].map(trim).filter(Boolean).join('; ');
   const out = [];
   const rejected = [];
   splitPlannerSelects(section).forEach(candidate => {
@@ -3151,6 +3169,15 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
 function directSqlSelectResultIfApplicable(prompt, context) {
   const executed = arr(context?.sqlSelectsEjecutados?.executed).filter(x => x && x.ok);
   if (!executed.length) return null;
+  const totalSqlRows = executed.reduce((a, x) => a + (Number(x?.rowCount) || arr(x?.rows).length || 0), 0);
+  if (totalSqlRows === 0) {
+    const totals = context?.totalesRegistrosPorModulo || {};
+    const officialRows = Object.entries(totals).filter(([k]) => k !== 'SELECTS_SQL_ZUZU').reduce((a, [,v]) => a + (Number(v) || 0), 0);
+    if (officialRows > 0) {
+      context.advertencias = arr(context.advertencias).concat('Las SELECTs propuestas por Zuzu devolvieron 0 filas, pero los módulos oficiales de ControlEvent contienen datos. Se descarta la salida SQL vacía y se usa el cálculo local/plantillas como contraste.');
+      return null;
+    }
+  }
   const tables = [];
   const files = [];
   executed.forEach(item => {
@@ -3268,8 +3295,12 @@ MODULOS_NECESARIOS: módulos separados por coma
 MODULOS_NO_NECESARIOS: módulos separados por coma
 PERSONAS_IMPLICADAS: nombres si la pregunta nombra personas; si no, NINGUNA
 CONDICIONES_DATOS: filtros concretos de acceso a datos; por ejemplo estado ingreso, rango, donante, responsable, compras pendientes/realizadas; si no, NINGUNA
+CRITERIO_INCLUSION: qué registros deben entrar según la pregunta; si no aplica, NINGUNO
+CRITERIO_EXCLUSION: qué registros deben quedar fuera según la pregunta; si no aplica, NINGUNO
 CONSULTA_GLOBAL: SI o NO
-SELECTS_PROPUESTOS: si la pregunta requiere datos, devuelve uno o varios SELECT reales usando las tablas/campos indicados; si no hace falta, NINGUNO
+SELECT_PRINCIPAL: SELECT principal recomendado; si no hace falta, NINGUNO
+SELECT_VALIDACION: SELECT breve de validación/recuento base; si no hace falta, NINGUNO
+SELECTS_PROPUESTOS: uno o varios SELECT reales usando tablas/campos indicados; incluye SELECT_PRINCIPAL y SELECT_VALIDACION si los has usado; si no hace falta, NINGUNO
 MOTIVO: una frase breve
 
 Reglas:
@@ -3279,7 +3310,9 @@ Reglas:
 - Para donaciones usa DONACIONES y, si hay que identificar socios/personas, PERSONAS. El donante debe salir literal del registro, no deducido.
 - Para producto disponible usa COMPRAS, DONACIONES, PRODUCTOS y EVENTOS.
 - No inventes datos, eventos ni repartos. Solo decide módulos/filtros.
-- La parte inteligente de deducir SELECT la haces tú: usa el esquema real y las condiciones del prompt para proponer SELECT exactos cuando sea posible.
+- La parte inteligente de deducir SELECT la haces tú: usa el esquema real, la semántica y las condiciones del prompt para proponer SELECT exactos cuando sea posible.
+- Si el usuario pide datos provisionales, eventos En curso como finalizados o consumo previsto, no excluyas Pte. Compra/PENDIENTE. Si el usuario pide solo compras realizadas/cerradas, entonces sí exclúyelos.
+- Para rankings o gráficas, la SELECT principal debe devolver al menos una columna de etiqueta humana y una métrica numérica agregada.
 
 PREGUNTA_USUARIO:
 ${trim(userPrompt).slice(0, 1800)}`;

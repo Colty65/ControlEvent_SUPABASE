@@ -1712,7 +1712,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   }
   // Flujo Zuzu v21: Zuzu/plan de consulta decide módulos; ControlEvent ejecuta plantillas cerradas y parametrizadas.
   const sqlFilterPlan = zuzuFiltersFromSqlSelects(sqlSelects);
-  const mergedFilters = strictPlan ? zuzuMergePlanFilters(sqlFilterPlan.filters, p.filters || {}) : zuzuMergePlanFilters(localPlan.filters || {}, sqlFilterPlan.filters, p.filters || {});
+  const mergedFilters = strictPlan ? zuzuMergePlanFilters(p.filters || {}) : zuzuMergePlanFilters(localPlan.filters || {}, p.filters || {});
   const filters = allRowsMode ? { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], anios: [], estado: [] } : zuzuSanitizeFiltersForPrompt(userPrompt, modules, mergedFilters);
   if (!strictPlan) eventIds = zuzuApplyEventFilters(eventIds, safeState, filters);
   if (!eventIds.length && modules.some(m => eventScopedModules.includes(m) || m === 'EVENTOS')) {
@@ -1740,7 +1740,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v22_prod: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
-    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_EJECUCION_REAL' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes },
+    planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_EJECUCION_REAL' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes, notaFiltrosSql: 'Los literales de las SELECTs no se usan como filtros CE automáticos; la SQL se ejecuta literalmente y los módulos oficiales quedan como respaldo/auditoría.' },
     eventosObjetivo: eventRows,
     modulosExtraidos: modulos,
     metricasCanonicas,

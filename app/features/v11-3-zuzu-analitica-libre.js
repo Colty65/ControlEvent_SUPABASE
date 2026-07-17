@@ -341,12 +341,26 @@
   function autoChartsFromTables(tables){
     var out=[]; (tables||[]).some(function(tb){
       var cols=tb.columns||[], rows=tb.rows||[]; if(!cols.length || !rows.length) return false;
-      var labelIdx=0, numIdx=-1;
-      for(var c=cols.length-1;c>=0;c--){ if(rows.some(function(r){ return !isNaN(Number(String(r[c]||'').replace(',','.').replace(/[^0-9.-]/g,''))); })){ numIdx=c; break; } }
-      if(numIdx<=0) return false;
+      var title=String(tb.title||'');
+      function cn(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+      var titleN=cn(title);
+      var metricCols=/total|unidades|importe|valor|coste|saldo|registros|personas|cantidad|suma|media|promedio/.test(cols.map(cn).join(' '));
+      if(/^Resultado SELECT Zuzu/i.test(title) && !metricCols) return false;
+      if(/documentos|tickets|public url|image key|descripcion/.test(titleN+' '+cols.map(cn).join(' '))) return false;
+      var labelIdx=-1, numIdx=-1;
+      for(var l=0;l<cols.length;l++){ if(/producto|articulo|evento|tienda|donante|responsable|colaborador|persona|nombre|label/i.test(cols[l])){ labelIdx=l; break; } }
+      if(labelIdx<0) labelIdx=0;
+      for(var c=cols.length-1;c>=0;c--){
+        if(c===labelIdx) continue;
+        var cnm=cn(cols[c]);
+        if(!/total|unidades|importe|valor|coste|saldo|registros|personas|cantidad|suma|media|promedio|precio/.test(cnm)) continue;
+        if(rows.some(function(r){ var v=String(r[c]||'').replace(',','.').replace(/[^0-9.-]/g,''); return v!=='' && !isNaN(Number(v)); })){ numIdx=c; break; }
+      }
+      if(numIdx<0 || numIdx===labelIdx) return false;
       var labels=rows.slice(0,20).map(function(r){return String(r[labelIdx]||'');});
       var values=rows.slice(0,20).map(function(r){return Number(String(r[numIdx]||'0').replace(',','.').replace(/[^0-9.-]/g,''))||0;});
-      out.push({title:'Gráfica generada desde '+(tb.title||'tabla'),type:'horizontalBar',labels:labels,values:values,unit:/€|importe|valor|precio|total/i.test(cols[numIdx]||'')?'€':''});
+      if(!values.some(function(v){return v!==0;})) return false;
+      out.push({title:'Gráfica generada desde '+(tb.title||'tabla'),type:'horizontalBar',labels:labels,values:values,unit:/€|importe|valor|precio|coste|saldo/i.test(cols[numIdx]||'')?'€':(/unidad|cantidad/i.test(cols[numIdx]||'')?'uds':'')});
       return true;
     }); return out;
   }
