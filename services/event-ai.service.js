@@ -1797,8 +1797,99 @@ function directEventReportIfApplicable(prompt, context) {
   };
 }
 
+function groupSumRows(rows, keyFn, valueFn) {
+  const map = new Map();
+  arr(rows).forEach(r => {
+    const key = trim(keyFn(r)) || 'Sin dato';
+    const old = map.get(key) || { Nombre: key, Registros: 0, Importe: 0 };
+    old.Registros += 1;
+    old.Importe += num(valueFn(r));
+    map.set(key, old);
+  });
+  return [...map.values()].map(r => ({ ...r, Importe: round(r.Importe, 2) })).sort((a,b)=>num(b.Importe)-num(a.Importe) || b.Registros-a.Registros || String(a.Nombre).localeCompare(String(b.Nombre),'es'));
+}
+function directOperationalRankingResultIfApplicable(prompt, context) {
+  if (!context || context.needsClarification) return null;
+  const p = norm(prompt);
+  if (!/\b(ranking|top|clasificaci[oó]n|rank|informe\s+ejecutivo|alta\s+direcci[oó]n|semaforo|sem[aá]foro)\b/.test(p)) return null;
+  if (!/\b(ingresos?|donaciones?|compras?|tiendas?|responsables?|donantes?)\b/.test(p)) return null;
+  const mods = context.modulosExtraidos || {};
+  const ingresos = arr(mods.INGRESOS);
+  const compras = arr(mods.COMPRAS);
+  const donaciones = arr(mods.DONACIONES);
+  if (!ingresos.length && !compras.length && !donaciones.length) return null;
+  const isPaid = v => /^(BANCO|EFECTIVO|BIZUM)$/i.test(norm(v));
+  const incomeValue = r => num(r['Importe obligatorio']) + num(r['Importe voluntario']);
+  const ingresosPrevistos = ingresos.reduce((a,r)=>a+incomeValue(r),0);
+  const ingresosRealizados = ingresos.filter(r=>isPaid(r.Ingreso)).reduce((a,r)=>a+incomeValue(r),0);
+  const ingresosPendientes = Math.max(0, ingresosPrevistos - ingresosRealizados);
+  const compraValue = r => num(r.Importe);
+  const isPendingPurchase = r => /PTE|PENDIENT/i.test(norm(r['Ticket u otros gastos']));
+  const comprasPrevistas = compras.reduce((a,r)=>a+compraValue(r),0);
+  const comprasPendientes = compras.filter(isPendingPurchase).reduce((a,r)=>a+compraValue(r),0);
+  const comprasRealizadas = Math.max(0, comprasPrevistas - comprasPendientes);
+  const donacionesValor = donaciones.reduce((a,r)=>a+num(r.Valor),0);
+  const saldoActual = ingresosRealizados - comprasRealizadas;
+  const saldoOperativo = ingresosPrevistos - comprasPrevistas;
+  const semaforo = saldoOperativo < 0 ? 'ROJO' : (ingresosPendientes > ingresosRealizados || comprasPendientes > comprasRealizadas ? 'AMARILLO' : 'VERDE');
+  const semaforoTexto = semaforo === 'ROJO'
+    ? 'riesgo: saldo operativo negativo o desequilibrio previsto.'
+    : semaforo === 'AMARILLO'
+      ? 'favorable pero con seguimiento: saldo previsto positivo, aunque quedan ingresos/compras pendientes relevantes.'
+      : 'favorable: situación equilibrada con baja incertidumbre pendiente.';
+  const rankings = [];
+  const tables = [];
+  const charts = [];
+  function addRanking(title, rows, unit = '€') {
+    if (!rows.length) return;
+    const top = rows.slice(0, 15);
+    tables.push({ title, columns: ['Nombre','Registros','Importe (€)'], rows: top.map(r => [r.Nombre, String(r.Registros), String(round(r.Importe,2))]) });
+    charts.push({ title, type: 'horizontalBar', labels: top.map(r=>r.Nombre), values: top.map(r=>round(r.Importe,2)), unit });
+  }
+  if (ingresos.length) {
+    addRanking('Ranking de ingresos previstos por colaborador', groupSumRows(ingresos, r => r.Nombre, incomeValue));
+    addRanking('Ranking de ingresos realizados por colaborador', groupSumRows(ingresos.filter(r=>isPaid(r.Ingreso)), r => r.Nombre, incomeValue));
+  }
+  if (donaciones.length) {
+    addRanking('Ranking de donaciones por donante', groupSumRows(donaciones, r => r.Donante, r => num(r.Valor)));
+    addRanking('Ranking de donaciones por responsable', groupSumRows(donaciones, r => r.Responsable, r => num(r.Valor)));
+  }
+  if (compras.length) {
+    addRanking('Ranking de compras por tienda', groupSumRows(compras, r => r.Tienda, compraValue));
+    addRanking('Ranking de compras por responsable', groupSumRows(compras, r => r.Responsable, compraValue));
+  }
+  const resumenColumns = ['Indicador','Valor'];
+  const resumenRows = [
+    ['Semáforo', `${semaforo} · ${semaforoTexto}`],
+    ['Ingresos previstos (€)', String(round(ingresosPrevistos,2))],
+    ['Ingresos realizados (€)', String(round(ingresosRealizados,2))],
+    ['Ingresos pendientes (€)', String(round(ingresosPendientes,2))],
+    ['Compras previstas (€)', String(round(comprasPrevistas,2))],
+    ['Compras realizadas (€)', String(round(comprasRealizadas,2))],
+    ['Compras pendientes (€)', String(round(comprasPendientes,2))],
+    ['Donaciones valoradas (€)', String(round(donacionesValor,2))],
+    ['Saldo actual (€)', String(round(saldoActual,2))],
+    ['Saldo operativo (€)', String(round(saldoOperativo,2))]
+  ];
+  tables.unshift({ title: 'Resumen ejecutivo y semáforo operativo', columns: resumenColumns, rows: resumenRows });
+  charts.unshift({ title: 'Semáforo financiero · componentes principales', type: 'bar', labels: ['Ingresos realizados','Ingresos pendientes','Compras realizadas','Compras pendientes','Donaciones','Saldo operativo'], values: [round(ingresosRealizados,2), round(ingresosPendientes,2), round(comprasRealizadas,2), round(comprasPendientes,2), round(donacionesValor,2), round(saldoOperativo,2)], unit: '€' });
+  return {
+    ok: true,
+    rejected: false,
+    title: 'Informe ejecutivo de rankings operativos',
+    answer: `Informe ejecutivo calculado con datos ControlEvent. Semáforo ${semaforo}: ${semaforoTexto} Saldo actual ${round(saldoActual,2)} € y saldo operativo ${round(saldoOperativo,2)} €. Incluyo rankings de ingresos, donaciones y compras por entidad/responsable según los módulos disponibles.`,
+    warnings: arr(context.advertencias),
+    charts,
+    tables,
+    files: [{ filename: fileSafe('Rankings_operativos_v22_prod.csv'), mime:'text/csv;charset=utf-8', content: csvFromRows(['Seccion','Nombre','Registros','Importe'], tables.flatMap(t => t.columns.includes('Importe (€)') ? t.rows.map(r => ({ Seccion:t.title, Nombre:r[0], Registros:r[1], Importe:r[2] })) : [])) }],
+    provider: 'control-event-local-ranking-operativo',
+    model: 'calculo-local-oficial'
+  };
+}
+
 function directHighConfidenceResultIfApplicable(prompt, context) {
   return directCashEvolutionIfApplicable(prompt, context)
+    || directOperationalRankingResultIfApplicable(prompt, context)
     || directEventReportIfApplicable(prompt, context)
     || directPersonIdentityIfApplicable(prompt, context)
     || directPersonsCatalogIfApplicable(prompt, context)
@@ -2968,6 +3059,8 @@ SEMANTICA_CONTROL_EVENT:
 - Pago voluntario confirmado = situacion en BANCO, EFECTIVO o BIZUM Y importe > 0.
 - Exento = socio/colaborador con numero = 0 o cuota obligatoria 0. No lo llames pagado normal si el importe obligatorio y voluntario son 0.
 - Pendiente = situacion PENDIENTE. No lo mezcles con pagado.
+- En SQL, normaliza SIEMPRE textos de estado con UPPER(TRIM(campo)). Ejemplo: UPPER(TRIM(c.situacion)) IN ('BANCO','EFECTIVO','BIZUM'). Los datos reales pueden venir como Banco/Pendiente y una comparación literal en mayúsculas puede devolver NULL/0 por error.
+- En agregados SUM/COUNT, usa COALESCE para evitar filas vacías: COALESCE(SUM(...),0) AS importe_total. Si una métrica puede salir NULL, no es válida para un informe ejecutivo.
 - En ce_compras, el valor económico de línea es unidades * precio, salvo que preguntes solo precio unitario.
 - ticket_donacion = 'Pte. Compra' o similar significa compra prevista/provisional, no ausencia de compra.
 - Si el usuario dice que consideres eventos En curso como finalizados/provisionales, INCLUYE Pte. Compra y PENDIENTE en el análisis, indicando que son provisionales.
@@ -2984,6 +3077,8 @@ REGLAS_PARA_SELECTS_PROPUESTOS:
 - Evita devolver id/persona_id/event_id/producto_id/tienda_id/donor_ref si no son imprescindibles.
 - Para donor_ref, resuelve P: con ce_personas y T: con ce_tiendas, devolviendo el nombre del donante, no el código.
 - En consultas analíticas, usa SELECT_PRINCIPAL agregado y, si procede, SELECT_VALIDACION para comprobar que hay filas base.
+- Evita SELECTs duplicadas: no repitas el mismo SELECT como SELECT_PRINCIPAL y SELECTS_PROPUESTOS.
+- Si la pregunta pide ranking/informe ejecutivo, devuelve SELECTs agregadas por entidad solicitada: ingresos por colaborador, donaciones por donante/responsable, compras por tienda/responsable, además de totales.
 - Devuelve CRITERIO_INCLUSION y CRITERIO_EXCLUSION explicando qué entra y qué queda fuera según el prompt.
 - Incluye LIMIT razonable si pides detalle amplio.`;
 }
@@ -2995,6 +3090,30 @@ function cleanPlannerSqlText(value) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+function sqlLooksSyntacticallyComplete(s0) {
+  const q = String(s0 || '');
+  let par = 0;
+  let inStr = false;
+  for (let i = 0; i < q.length; i += 1) {
+    const ch = q[i];
+    if (ch === "'") {
+      if (inStr && q[i + 1] === "'") { i += 1; continue; }
+      inStr = !inStr;
+      continue;
+    }
+    if (inStr) continue;
+    if (ch === '(') par += 1;
+    if (ch === ')') par -= 1;
+    if (par < 0) return { ok: false, reason: 'paréntesis desbalanceado' };
+  }
+  if (inStr) return { ok: false, reason: 'comillas sin cerrar' };
+  if (par !== 0) return { ok: false, reason: 'paréntesis sin cerrar' };
+  const tail = q.replace(/;\s*$/,'').trim();
+  if (/[.,=+\-*\/<>]$/.test(tail)) return { ok: false, reason: 'SELECT incompleta al final' };
+  if (/\b(AND|OR|WHERE|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|INNER\s+JOIN|ON|IN|LIKE|NOT|GROUP\s+BY|ORDER\s+BY|HAVING|AS|FROM|SELECT|UNION\s+ALL|UNION)\s*$/i.test(tail)) return { ok: false, reason: 'SELECT truncada por palabra clave final' };
+  if (/\b(MODULOS_NECESARIOS|MOTIVO|MODELO|TOKENS|CRITERIO_INCLUSION|CRITERIO_EXCLUSION|SELECTS_PROPUESTOS)\s*:/i.test(tail)) return { ok: false, reason: 'mezcla texto no SQL' };
+  return { ok: true };
+}
 function isSafePlannerSelect(sql) {
   const s0 = cleanPlannerSqlText(sql).replace(/;\s*$/, '').trim();
   if (!s0 || /^(NINGUNO|NINGUNA|NO|NONE)$/i.test(s0)) return { ok: false, reason: 'vacío/NINGUNO' };
@@ -3003,7 +3122,9 @@ function isSafePlannerSelect(sql) {
   if (/--|\/\*|\*\/|#/i.test(s0)) return { ok: false, reason: 'contiene comentarios' };
   if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|UPSERT|CALL|EXEC|EXECUTE|DO|COPY|GRANT|REVOKE|VACUUM|ANALYZE|REFRESH)\b/i.test(s0)) return { ok: false, reason: 'contiene verbo no permitido' };
   if (/\b(AUTH|STORAGE|VAULT|SECRET|SECRETS|PG_|INFORMATION_SCHEMA|HTTP|NET|EXTENSION)\b/i.test(s0)) return { ok: false, reason: 'referencia a esquema/función no permitido' };
-  if (s0.length > 1800) return { ok: false, reason: 'SELECT demasiado largo' };
+  if (s0.length > 2600) return { ok: false, reason: 'SELECT demasiado largo' };
+  const complete = sqlLooksSyntacticallyComplete(s0);
+  if (!complete.ok) return complete;
   return { ok: true, sql: s0 };
 }
 function splitPlannerSelects(section) {
@@ -3015,14 +3136,22 @@ function splitPlannerSelects(section) {
   else candidates.push(...raw.split(/;(?=\s*SELECT\b|\s*$)/i).map(trim).filter(Boolean));
   return candidates;
 }
+function sqlDedupeKey(sql) {
+  return cleanPlannerSqlText(sql).replace(/;\s*$/,'').replace(/\s+/g,' ').trim().toUpperCase();
+}
 function plannerSelectsFromText(raw) {
   const section = [plannerSection(raw, ['SELECT_PRINCIPAL']), plannerSection(raw, ['SELECT_VALIDACION', 'SELECT_VALIDACIÓN']), plannerSection(raw, ['SELECTS_PROPUESTOS', 'CONSULTAS_SELECT', 'SQL_SELECTS', 'SELECTS'])].map(trim).filter(Boolean).join('; ');
   const out = [];
   const rejected = [];
+  const seen = new Set();
   splitPlannerSelects(section).forEach(candidate => {
     const safe = isSafePlannerSelect(candidate);
-    if (safe.ok) out.push(safe.sql);
-    else if (trim(candidate) && !/^(NINGUNO|NINGUNA|NO|NONE)$/i.test(trim(candidate))) rejected.push({ sql: trim(candidate).slice(0, 300), motivo: safe.reason });
+    if (safe.ok) {
+      const key = sqlDedupeKey(safe.sql);
+      if (!seen.has(key)) { seen.add(key); out.push(safe.sql); }
+    } else if (trim(candidate) && !/^(NINGUNO|NINGUNA|NO|NONE)$/i.test(trim(candidate))) {
+      rejected.push({ sql: trim(candidate).slice(0, 300), motivo: safe.reason });
+    }
   });
   return { selects: out.slice(0, 5), rejected };
 }
@@ -3128,6 +3257,26 @@ function rowsToTableRows(rows, max = 100) {
   });
   return { columns: cols.slice(0, 24), rows: list.map(row => cols.slice(0, 24).map(c => text(row?.[c]))) };
 }
+function sqlResultHasNullMetric(rows = []) {
+  return arr(rows).some(row => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
+    const keys = Object.keys(row);
+    const metricKeys = keys.filter(k => /(^|_|)(total|importe|valor|saldo|unidades|cantidad|count|sum|media|promedio)(_|\b|$)/i.test(k));
+    const hasLabel = keys.some(k => /(tipo|movimiento|nombre|producto|evento|colaborador|donante|responsable|tienda|label)/i.test(k) && trim(row[k]));
+    return hasLabel && metricKeys.some(k => row[k] === null || row[k] === undefined || trim(row[k]) === '');
+  });
+}
+function sqlResultLooksAggregate(rows = []) {
+  const first = arr(rows).find(r => r && typeof r === 'object' && !Array.isArray(r));
+  if (!first) return false;
+  const keys = Object.keys(first).join(' ');
+  return /(total|importe|valor|saldo|unidades|cantidad|count|sum|media|promedio)/i.test(keys) && /(nombre|producto|evento|colaborador|donante|responsable|tienda|tipo|movimiento|label)/i.test(keys);
+}
+function allSqlRowsEmpty(executed = []) {
+  const ok = arr(executed).filter(x => x && x.ok);
+  return ok.length > 0 && ok.every(x => (Number(x.rowCount) || arr(x.rows).length || 0) === 0);
+}
+
 async function executeZuzuSqlSelects(context, flowTrace = []) {
   const selects = arr(context?.planZuzu?.selectsPropuestos).map(trim).filter(Boolean);
   if (!selects.length) return context;
@@ -3147,8 +3296,9 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
       if (error) throw error;
       const payload = data && typeof data === 'object' ? data : { ok: true, rows: data };
       const rows = arr(payload.rows || payload.data || payload.resultados);
-      executed.push({ indice: i + 1, ok: payload.ok !== false, sql, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, error: trim(payload.error || '') });
-      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', payload.ok === false ? 'KO' : 'OK', `SELECT #${i + 1}: ${payload.ok === false ? trim(payload.error || 'KO') : `${rows.length} fila(s) devuelta(s)`}.`);
+      const suspect = payload.ok !== false && sqlResultHasNullMetric(rows);
+      executed.push({ indice: i + 1, ok: payload.ok !== false, sql, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, error: trim(payload.error || ''), suspect, suspectReason: suspect ? 'Métrica agregada nula/vacía en filas con etiqueta; posible filtro de estado mal normalizado o SELECT incompleta.' : '' });
+      zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', payload.ok === false ? 'KO' : (suspect ? 'INFO' : 'OK'), `SELECT #${i + 1}: ${payload.ok === false ? trim(payload.error || 'KO') : `${rows.length} fila(s) devuelta(s)${suspect ? ' · advertencia: métrica nula/vacía detectada' : ''}`}.`);
     } catch (error) {
       executed.push({ indice: i + 1, ok: false, sql, rows: [], rowCount: 0, error: trim(error?.message || error) });
       zuzuTracePush(flowTrace, 'Paso 2s · SELECT SQL Zuzu', 'KO', `SELECT #${i + 1} no ejecutado: ${trim(error?.message || error)}`);
@@ -3162,7 +3312,7 @@ async function executeZuzuSqlSelects(context, flowTrace = []) {
     context.modulosExtraidos = { ...(context.modulosExtraidos || {}), SELECTS_SQL_ZUZU: flat };
     context.totalesRegistrosPorModulo = { ...(context.totalesRegistrosPorModulo || {}), SELECTS_SQL_ZUZU: flat.length };
   }
-  context.planZuzu = { ...(context.planZuzu || {}), modoExtraccion: 'EJECUCION_REAL_SELECTS_PROPUESTOS_ZUZU', selectsEjecutados: executed.map(x => ({ indice: x.indice, ok: x.ok, filas: x.rowCount, error: x.error || '', sql: x.sql })) };
+  context.planZuzu = { ...(context.planZuzu || {}), modoExtraccion: 'EJECUCION_REAL_SELECTS_PROPUESTOS_ZUZU', selectsEjecutados: executed.map(x => ({ indice: x.indice, ok: x.ok, filas: x.rowCount, error: x.error || '', sospechoso: x.suspect === true, motivoSospecha: x.suspectReason || '', sql: x.sql })) };
   context.instruccionesFuncionalesZuzu = arr(context.instruccionesFuncionalesZuzu).concat({ id: 'V22-SQL-REAL', regla: 'En v22_prod experimental, si hay SELECTS_PROPUESTOS válidos se han ejecutado literalmente como SELECT de solo lectura mediante ce_zuzu_select. Prioriza modulosExtraidos.SELECTS_SQL_ZUZU y planZuzu.selectsEjecutados para responder.' });
   return context;
 }
@@ -3170,13 +3320,15 @@ function directSqlSelectResultIfApplicable(prompt, context) {
   const executed = arr(context?.sqlSelectsEjecutados?.executed).filter(x => x && x.ok);
   if (!executed.length) return null;
   const totalSqlRows = executed.reduce((a, x) => a + (Number(x?.rowCount) || arr(x?.rows).length || 0), 0);
+  const totals = context?.totalesRegistrosPorModulo || {};
+  const officialRows = Object.entries(totals).filter(([k]) => k !== 'SELECTS_SQL_ZUZU').reduce((a, [,v]) => a + (Number(v) || 0), 0);
   if (totalSqlRows === 0) {
-    const totals = context?.totalesRegistrosPorModulo || {};
-    const officialRows = Object.entries(totals).filter(([k]) => k !== 'SELECTS_SQL_ZUZU').reduce((a, [,v]) => a + (Number(v) || 0), 0);
-    if (officialRows > 0) {
-      context.advertencias = arr(context.advertencias).concat('Las SELECTs propuestas por Zuzu devolvieron 0 filas, pero los módulos oficiales de ControlEvent contienen datos. Se descarta la salida SQL vacía y se usa el cálculo local/plantillas como contraste.');
-      return null;
-    }
+    context.advertencias = arr(context.advertencias).concat('Las SELECTs propuestas por Zuzu devolvieron 0 filas. No se usará esa salida SQL para concluir que no hay datos; se intenta cálculo local/plantillas si hay módulos oficiales disponibles.');
+    return null;
+  }
+  if (executed.some(x => x.suspect)) {
+    context.advertencias = arr(context.advertencias).concat('Una o más SELECTs de Zuzu devuelven métricas nulas/vacías en filas con etiqueta. Se considera SQL sospechosa y se prioriza cálculo local/plantillas para evitar conclusiones falsas.');
+    return null;
   }
   const tables = [];
   const files = [];
@@ -3313,9 +3465,67 @@ Reglas:
 - La parte inteligente de deducir SELECT la haces tú: usa el esquema real, la semántica y las condiciones del prompt para proponer SELECT exactos cuando sea posible.
 - Si el usuario pide datos provisionales, eventos En curso como finalizados o consumo previsto, no excluyas Pte. Compra/PENDIENTE. Si el usuario pide solo compras realizadas/cerradas, entonces sí exclúyelos.
 - Para rankings o gráficas, la SELECT principal debe devolver al menos una columna de etiqueta humana y una métrica numérica agregada.
+- Para semáforo ejecutivo, calcula indicadores suficientes: ingresos realizados, ingresos pendientes, compras realizadas, compras pendientes, donaciones valoradas, saldo actual y saldo operativo. No basta con totales agregados sueltos.
 
 PREGUNTA_USUARIO:
 ${trim(userPrompt).slice(0, 1800)}`;
+}
+
+function plannerSelectOnlyPrompt(userPrompt, catalog, partialPlanText = '') {
+  const selected = catalog?.eventoActivo || null;
+  const activeLine = selected?.id ? `${trim(selected.titulo)} | id=${trim(selected.id)} | ${trim(selected.fechaInicio)} a ${trim(selected.fechaFin)} | ${trim(selected.situacion)}` : 'SIN EVENTO ACTIVO';
+  const eventList = arr(catalog?.eventos)
+    .map(e => `${trim(e.titulo)} | id=${trim(e.id)} | ${trim(e.fechaInicio)}-${trim(e.fechaFin)} | ${trim(e.situacion)}`)
+    .join('\n');
+  return `Eres Zuzu planificador SQL de ControlEvent. Tu respuesta anterior pudo quedar cortada.
+Devuelve SOLO SELECTs completas y ejecutables de solo lectura. No redactes nada para el usuario final.
+
+FECHA_ACTUAL: ${todayIsoMadrid()}
+EVENTO_EN_PANTALLA: ${activeLine}
+
+EVENTOS_DISPONIBLES:
+${eventList}
+
+${plannerDatabaseSchemaText()}
+
+INSTRUCCIONES_CRITICAS:
+- Devuelve SELECTS_PROPUESTOS con SELECTs completos. Ninguna SELECT puede terminar en punto, coma, AND, OR, WHERE, JOIN, ON, GROUP BY, ORDER BY, FROM o AS.
+- Normaliza estados con UPPER(TRIM(campo)). Ejemplo: UPPER(TRIM(c.situacion)) IN ('BANCO','EFECTIVO','BIZUM').
+- Usa COALESCE(SUM(...),0) en agregados.
+- No repitas SELECTs duplicadas.
+- Para rankings, cada SELECT debe devolver etiqueta humana y métrica numérica agregada.
+- Para evento en pantalla usa id='${trim(selected?.id || '')}'.
+- Solo SELECT. Prohibido cualquier escritura.
+
+PLAN_PARCIAL_RECIBIDO:
+${trim(partialPlanText).slice(0, 1500)}
+
+PREGUNTA_USUARIO:
+${trim(userPrompt).slice(0, 1800)}
+
+FORMATO_EXACTO:
+SELECTS_PROPUESTOS: SELECT ...; SELECT ...`;
+}
+async function repairPlannerSelectsWithGemini(userPrompt, catalog, model, apiKey, flowTrace = [], partialPlanText = '') {
+  const prompt = plannerSelectOnlyPrompt(userPrompt, catalog, partialPlanText);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_SELECT_REPAIR_MAX_TOKENS || 2048), thinkingConfig: { thinkingBudget: 0 } }
+  };
+  zuzuTracePush(flowTrace, 'Paso 1b · Zuzu SELECT completas', 'RUN', `Planificador anterior truncado: se pide a ${model} devolver solo SELECTs completas.`);
+  sizeTrace(flowTrace, 'Paso 1b · Zuzu SELECT completas', 'Contexto enviado para reparación de SELECTs', prompt);
+  const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 22000));
+  logGeminiUsage('PASO 1b reparación SELECTs', model, payload);
+  if (!res.ok) { const e = new Error(payload?.error?.message || `Zuzu select repair HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+  const outText = trim(geminiOutText(payload));
+  if (!outText) throw new Error('Reparación de SELECTs no devolvió texto.');
+  const finish = trim(payload?.candidates?.[0]?.finishReason || '');
+  const sp = plannerSelectsFromText(outText);
+  if (/MAX_TOKENS/i.test(finish) && !arr(sp.selects).length) throw new Error(`Reparación de SELECTs truncada por límite de tokens. Recibido: ${outText.slice(0, 240)}`);
+  zuzuTracePush(flowTrace, 'Paso 1b · Zuzu SELECT completas', 'OK', `Respuesta: ${outText.slice(0, 900)}`, { model, usage: usageSmall(payload, model) });
+  zuzuTracePush(flowTrace, 'Paso 1b · Zuzu SELECT completas validado', 'OK', `SELECTs válidos=${arr(sp.selects).length}; SELECTs rechazados=${arr(sp.rejected).length}`);
+  return { ...sp, raw: outText, finishReason: finish };
 }
 
 function mergePlannerFilters(...items) {
@@ -3337,7 +3547,7 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-      generationConfig: { temperature: 0.0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_TOKENS || 1024), thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: { temperature: 0.0, maxOutputTokens: Number(process.env.CONTROLEVENT_ZUZU_PLANNER_MAX_TOKENS || 2048), thinkingConfig: { thinkingBudget: 0 } }
     };
     try {
       zuzuTracePush(flowTrace, 'Paso 1 · Zuzu planificador', 'RUN', `Modelo ${model}. Petición texto simple: eventos, módulos, alcance y motivo; sin datos operativos.`);
@@ -3351,7 +3561,28 @@ async function callGeminiPlanner(userPrompt, catalog, flowTrace = [], localModul
       const parsed = parsePlannerText(outText, catalog, userPrompt, localModules);
       if (/MAX_TOKENS/i.test(finish) && !arr(parsed.modules).length) throw new Error(`Respuesta de Zuzu planificador truncada por límite de tokens. Recibido: ${outText.slice(0, 240)}`);
       if (!arr(parsed.modules).length) throw new Error(`Zuzu planificador no indicó módulos utilizables. Respuesta recibida: ${outText.slice(0, 500)}`);
-      if (/MAX_TOKENS/i.test(finish)) parsed.plannerWarning = `Zuzu planificador acabó por MAX_TOKENS, pero ControlEvent pudo leer módulos/filtros. Respuesta parcial: ${outText.slice(0, 240)}`;
+      if (/MAX_TOKENS/i.test(finish)) {
+        parsed.plannerWarning = `Zuzu planificador acabó por MAX_TOKENS. ControlEvent NO ejecuta SELECTs parciales; pide una segunda respuesta solo con SELECTs completas. Respuesta parcial: ${outText.slice(0, 240)}`;
+        const oldRejected = arr(parsed.selectsRechazados);
+        parsed.selectsPropuestos = [];
+        parsed.selectsRechazados = oldRejected;
+        try {
+          const repaired = await repairPlannerSelectsWithGemini(userPrompt, catalog, model, apiKey, flowTrace, outText);
+          if (arr(repaired.selects).length) {
+            parsed.selectsPropuestos = arr(repaired.selects);
+            parsed.selectsRechazados = oldRejected.concat(arr(repaired.rejected));
+            parsed.reasoning = `${trim(parsed.reasoning)} SELECTs completas obtenidas en Paso 1b tras truncado del planificador.`;
+            parsed.plannerWarning = `Zuzu planificador acabó por MAX_TOKENS, pero las SELECTs se pidieron de nuevo completas en Paso 1b; solo se ejecutan esas SELECTs reparadas.`;
+          } else {
+            parsed.reasoning = `${trim(parsed.reasoning)} No se ejecutan SELECTs porque el planificador original quedó truncado y la reparación no devolvió SELECTs completas.`;
+            parsed.plannerWarning = `${parsed.plannerWarning} La reparación no devolvió SELECTs completas; se usará extracción CE/local.`;
+          }
+        } catch (repairError) {
+          zuzuTracePush(flowTrace, 'Paso 1b · Zuzu SELECT completas', 'KO', cleanGeminiError(repairError), { model });
+          parsed.reasoning = `${trim(parsed.reasoning)} No se ejecutan SELECTs porque el planificador original quedó truncado y falló la reparación de SELECTs.`;
+          parsed.plannerWarning = `${parsed.plannerWarning} Falló Paso 1b: ${friendlyZuzuErrorMessage(repairError)}. Se usará extracción CE/local.`;
+        }
+      }
       parsed.__zuzuPlannerModel = model;
       parsed.__zuzuPlannerUsage = usageSmall(payload, model);
       parsed.__rawPlannerText = outText.slice(0, 2000);
