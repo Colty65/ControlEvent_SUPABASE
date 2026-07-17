@@ -1715,7 +1715,7 @@ function directEventReportIfApplicable(prompt, context) {
     const tk = rowsForEvent(arr(mods.TICKETS), ev);
     const doc = rowsForEvent(arr(mods.DOCUMENTOS), ev);
     const ingresos = round(can['Ingresos total'] ?? ing.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
-    const ingresosRealizados = round(ing.filter(r=>!/pendiente/i.test(trim(r?.Ingreso || r?.ingreso || ''))).reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
+    const ingresosRealizados = round(ing.filter(r=>/^(BANCO|EFECTIVO|BIZUM)$/i.test(trim(r?.Ingreso || r?.ingreso || ''))).reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
     const ingresosPendientes = round(Math.max(0, ingresos - ingresosRealizados), 2);
     const compras = round(can['Compras realizadas'] ?? sumField(com.filter(r=>!/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
     const pendientes = round(can['Compras pendientes'] ?? sumField(com.filter(r=>/pte\.?\s*compra|pendiente/i.test(trim(r?.['Ticket u otros gastos']))),'Importe'),2);
@@ -1750,8 +1750,21 @@ function directEventReportIfApplicable(prompt, context) {
       'Documentos': can['Documentos numero'] ?? doc.length
     };
   });
-  const columns = ['Evento','Estado','Nota estado','Ingresos total (€)','Ingresos realizados (€)','Ingresos pendientes (€)','Compras realizadas (€)','Compras pendientes (€)','Compras previstas (€)','Donaciones valoradas (€)','Saldo actual (€)','Saldo operativo (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
-  const rowsTable = rows.map(r => columns.map(c => text(r[c])));
+  // FIX6: el resumen anterior tenía 22 columnas y quedaba cortado al imprimir en A4.
+  // Se divide en dos tablas legibles para usuario final, sin perder información.
+  const financeColumns = ['Evento','Estado','Ingresos previstos (€)','Ingresos cobrados (€)','Ingresos pendientes (€)','Compras realizadas (€)','Compras pendientes (€)','Compras previstas (€)','Donaciones valoradas (€)','Saldo actual (€)','Saldo previsto al cierre (€)'];
+  const financeRows = rows.map(r => [
+    r.Evento, r.Estado, r['Ingresos total (€)'], r['Ingresos realizados (€)'], r['Ingresos pendientes (€)'],
+    r['Compras realizadas (€)'], r['Compras pendientes (€)'], r['Compras previstas (€)'], r['Donaciones valoradas (€)'],
+    r['Saldo actual (€)'], r['Saldo operativo (€)']
+  ].map(text));
+  const activityColumns = ['Evento','Situación','Colaboradores','Socios','Socios asistentes','Socios no asistentes','Asistentes / personas','Líneas de compra','Líneas de donación','Tickets','Documentos'];
+  const activityRows = rows.map(r => [
+    r.Evento, isEventInProgressValue(r.Estado) ? 'Datos provisionales' : 'Cierre definitivo', r.Colaboradores,
+    r['Socios canónicos'], r['Socios asistentes canónicos'], r['Socios no asistentes canónicos'], r['Asistentes / número'],
+    r['Líneas compras'], r['Líneas donaciones'], r.Tickets, r.Documentos
+  ].map(text));
+  const exportColumns = ['Evento','Estado','Nota estado','Ingresos total (€)','Ingresos realizados (€)','Ingresos pendientes (€)','Compras realizadas (€)','Compras pendientes (€)','Compras previstas (€)','Donaciones valoradas (€)','Saldo actual (€)','Saldo operativo (€)','Valor compras + donaciones (€)','Colaboradores','Socios canónicos','Socios asistentes canónicos','Socios no asistentes canónicos','Asistentes / número','Líneas compras','Líneas donaciones','Tickets','Documentos'];
   const chartLabels = rows.map(r => eventLabelWithState(r.Evento, metaByEvent));
   const hasInProgressEvents = rows.some(r => isEventInProgressValue(r.Estado));
   const charts = [
@@ -1790,8 +1803,12 @@ function directEventReportIfApplicable(prompt, context) {
     answer,
     warnings: arr(context.advertencias).concat(arr(missingPack.warnings)),
     charts,
-    tables: [{ title: 'Resumen operativo por evento', columns, rows: rowsTable }, ...detailTables],
-    files: [{ filename: fileSafe(`Informe_eventos_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, rows) }],
+    tables: [
+      { title: 'Resumen económico por evento', columns: financeColumns, rows: financeRows },
+      { title: 'Participación y documentación por evento', columns: activityColumns, rows: activityRows },
+      ...detailTables
+    ],
+    files: [{ filename: fileSafe(`Informe_eventos_v22_prod.csv`), mime: 'text/csv;charset=utf-8', content: csvFromRows(exportColumns, rows) }],
     provider: 'control-event-local-informe-eventos',
     model: 'calculo-local-oficial'
   };
@@ -3171,8 +3188,8 @@ function plannerSelectsFromText(raw) {
 
 function normalizeSqlIdCode(value) {
   return text(value)
-    .replace(/id[￾￿ -]+([A-Za-z0-9])/g, 'id-$1')
-    .replace(/[￾￿ -]+/g, '')
+    .replace(/id[\uFFFE\uFFFF\x00-\x1F]+([A-Za-z0-9])/g, 'id-$1')
+    .replace(/[\uFFFE\uFFFF\x00-\x1F]+/g, '')
     .trim();
 }
 function normalizeLookupKey(value) {
@@ -3820,7 +3837,7 @@ function sortResultTables(result) {
 }
 function scopeMetaFromContext(context) {
   const evs = arr(context?.eventosObjetivo);
-  const strictMode = /ALCANCE_ESTRICTO|PLANTILLAS_CERRADAS/i.test(trim(context?.planZuzu?.modoExtraccion || ''));
+  const p = norm(context?.promptUsuario || '');
   if (evs.length === 1) {
     const e = evs[0] || {};
     const title = trim(e['Titulo del evento'] || e.titulo || e.Evento || '');
@@ -3828,7 +3845,8 @@ function scopeMetaFromContext(context) {
     return { eventHeader: [title, estado].filter(Boolean).join(' · '), scopeKind: 'single-event', eventCount: 1 };
   }
   if (evs.length > 1) {
-    return { eventHeader: `${strictMode ? 'Consulta restringida' : 'Consulta global'} · ${evs.length} eventos`, scopeKind: strictMode ? 'multi-event-restricted' : 'multi-event', eventCount: evs.length };
+    const label = /\b(compara|comparativa|comparar|frente\s+a|versus|vs)\b/.test(p) ? 'Comparativa' : 'Varios eventos';
+    return { eventHeader: `${label} · ${evs.length} eventos`, scopeKind: 'multi-event', eventCount: evs.length };
   }
   return { eventHeader: '', scopeKind: 'global-or-master', eventCount: 0 };
 }

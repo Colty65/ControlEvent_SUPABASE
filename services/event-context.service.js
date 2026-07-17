@@ -1713,27 +1713,61 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   // Flujo Zuzu v21: Zuzu/plan de consulta decide módulos; ControlEvent ejecuta plantillas cerradas y parametrizadas.
   const sqlFilterPlan = zuzuFiltersFromSqlSelects(sqlSelects);
   const mergedFilters = strictPlan ? zuzuMergePlanFilters(p.filters || {}) : zuzuMergePlanFilters(localPlan.filters || {}, p.filters || {});
-  const filters = allRowsMode ? { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], anios: [], estado: [] } : zuzuSanitizeFiltersForPrompt(userPrompt, modules, mergedFilters);
+  const filters = allRowsMode ? { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] } : zuzuSanitizeFiltersForPrompt(userPrompt, modules, mergedFilters);
+  // FIX6: cuando el usuario pide expresamente "toda la información" de varios eventos,
+  // los títulos/años sirven para elegir eventos, pero NO deben convertirse en filtros de
+  // las filas operativas. Una condición mal interpretada (p. ej. "En curso") podía
+  // vaciar INGRESOS/COMPRAS/DONACIONES aunque los eventos sí tuvieran datos.
+  const promptNormFullData = norm(userPrompt);
+  const fullEventDataRequested = /\b(toda\s+la\s+info(?:rmaci[oó]n)?(?:\s+disponible)?|informaci[oó]n\s+completa|datos\s+completos|informe\s+(?:completo|exhaustivo)|dossier\s+completo)\b/.test(promptNormFullData)
+    && /\b(evento|eventos|compara|comparativa|comparar)\b/.test(promptNormFullData);
+  const emptyOperationalFilters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
+  const operationalFilters = fullEventDataRequested ? emptyOperationalFilters : filters;
   if (!strictPlan) eventIds = zuzuApplyEventFilters(eventIds, safeState, filters);
   if (!eventIds.length && modules.some(m => eventScopedModules.includes(m) || m === 'EVENTOS')) {
     return { needsClarification: true, clarification: 'Zuzu ha identificado módulos y filtros, pero ControlEvent no ha encontrado eventos con esos filtros. Revisa el título/año del evento o pide todos los eventos.' };
   }
   const modulos = {};
   if (extractModules.includes('EVENTOS')) modulos.EVENTOS = zuzuModuleEventos(safeState, eventIds, ticketImages, { includeDocuments: modules.includes('DOCUMENTOS') || /\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt) });
-  if (extractModules.includes('INGRESOS')) modulos.INGRESOS = zuzuModuleIngresos(safeState, eventIds, filters, helpers, ticketImages);
-  if (extractModules.includes('DONACIONES')) modulos.DONACIONES = zuzuModuleCompras(safeState, eventIds, filters, helpers, ticketImages, true);
-  if (extractModules.includes('COMPRAS')) modulos.COMPRAS = zuzuModuleCompras(safeState, eventIds, filters, helpers, ticketImages, false);
-  if (extractModules.includes('TICKETS')) modulos.TICKETS = zuzuModuleTickets(safeState, eventIds, filters, helpers, ticketImages);
+  if (extractModules.includes('INGRESOS')) modulos.INGRESOS = zuzuModuleIngresos(safeState, eventIds, operationalFilters, helpers, ticketImages);
+  if (extractModules.includes('DONACIONES')) modulos.DONACIONES = zuzuModuleCompras(safeState, eventIds, operationalFilters, helpers, ticketImages, true);
+  if (extractModules.includes('COMPRAS')) modulos.COMPRAS = zuzuModuleCompras(safeState, eventIds, operationalFilters, helpers, ticketImages, false);
+  if (extractModules.includes('TICKETS')) modulos.TICKETS = zuzuModuleTickets(safeState, eventIds, operationalFilters, helpers, ticketImages);
   if (extractModules.includes('DOCUMENTOS')) modulos.DOCUMENTOS = zuzuModuleDocumentos(safeState, eventIds, ticketImages);
   if (extractModules.includes('PRODUCTOS')) modulos.PRODUCTOS = zuzuModuleProductos(safeState, filters, helpers);
   if (extractModules.includes('TIENDAS')) modulos.TIENDAS = zuzuModuleTiendas(safeState, filters, helpers);
   if (extractModules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
+
+  // Segunda red de seguridad: en informes completos no se admite concluir "todo a cero"
+  // si el estado bruto contiene filas de los eventos objetivo. Recuperamos solo el módulo
+  // afectado, sin filtros, y dejamos constancia en advertencias internas de auditoría.
+  const recoveredOperationalModules = [];
+  if (fullEventDataRequested) {
+    const rawExpected = moduleName => zuzuModuleRawExpected(safeState, moduleName, eventIds);
+    if (extractModules.includes('INGRESOS') && !arr(modulos.INGRESOS).length && rawExpected('INGRESOS') > 0) {
+      modulos.INGRESOS = zuzuModuleIngresos(safeState, eventIds, emptyOperationalFilters, helpers, ticketImages);
+      if (modulos.INGRESOS.length) recoveredOperationalModules.push('INGRESOS');
+    }
+    if (extractModules.includes('DONACIONES') && !arr(modulos.DONACIONES).length && rawExpected('DONACIONES') > 0) {
+      modulos.DONACIONES = zuzuModuleCompras(safeState, eventIds, emptyOperationalFilters, helpers, ticketImages, true);
+      if (modulos.DONACIONES.length) recoveredOperationalModules.push('DONACIONES');
+    }
+    if (extractModules.includes('COMPRAS') && !arr(modulos.COMPRAS).length && rawExpected('COMPRAS') > 0) {
+      modulos.COMPRAS = zuzuModuleCompras(safeState, eventIds, emptyOperationalFilters, helpers, ticketImages, false);
+      if (modulos.COMPRAS.length) recoveredOperationalModules.push('COMPRAS');
+    }
+    if (extractModules.includes('TICKETS') && !arr(modulos.TICKETS).length && rawExpected('TICKETS') > 0) {
+      modulos.TICKETS = zuzuModuleTickets(safeState, eventIds, emptyOperationalFilters, helpers, ticketImages);
+      if (modulos.TICKETS.length) recoveredOperationalModules.push('TICKETS');
+    }
+  }
   const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos);
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
+  if (recoveredOperationalModules.length) advertenciasAuditoria.push(`ControlEvent recuperó sin filtros los módulos ${recoveredOperationalModules.join(', ')} porque la petición exigía toda la información de los eventos y el primer filtrado había dejado filas fuera.`);
   const context = {
     versionContexto: 'ControlEvent Zuzu Modules v22_prod',
     generatedAt: new Date().toISOString(),
