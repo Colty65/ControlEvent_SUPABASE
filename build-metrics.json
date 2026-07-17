@@ -1,8 +1,10 @@
 {
   "version": "15.0.0-prod",
-  "notes": "v22_prod: versión unificada, INFOEVENTO saneado, cierre de fotos y sin bucles periódicos añadidos.",
+  "notes": "v22_prod FIX8: ColtyLAB contextual, versión de ficha centralizada y comparativas con familia exacta/sin anexos no pedidos.",
   "versionLabel": "ControlEvent v22_prod",
-  "generatedAt": "2026-06-01T00:00:00+02:00",
+  "generatedAt": "2026-07-17T22:10:00+02:00",
   "build": "v22_prod",
-  "versionFile": "ControlEvent_v22_prod"
+  "versionFile": "ControlEvent_v22_prod",
+  "fix": "fix8",
+  "buildLabel": "v22_prod_fix8"
 }

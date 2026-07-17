@@ -1897,6 +1897,9 @@ function directEventReportIfApplicable(prompt, context) {
   ];
   const weatherAsked = /\b(que\s+tal\s+tiempo|tiempo\s+va\s+a\s+hacer|parte\s+meteorolog|parte\s+metereolog|meteorolog|metereolog|meteo|previsi[oó]n|lluvia|temperatura|calor|fr[ií]o|viento)\b/.test(p);
   const missingAttendeesAsked = asksMissingAttendees(prompt);
+  // Los anexos línea a línea solo se añaden cuando el usuario los pide. Una comparativa crítica
+  // normal debe ser ejecutiva y legible, no convertirse automáticamente en 20-30 páginas.
+  const wantsDetailedAnnex = /\b(toda\s+la\s+info(?:rmaci[oó]n)?(?:\s+disponible)?|informaci[oó]n\s+completa|datos\s+completos|informe\s+(?:completo|exhaustivo)|dossier\s+completo|detalle(?:s)?\s+(?:completo|completos|de\s+todo)|desglosa(?:r|me)?|desglose|linea\s+por\s+linea|línea\s+por\s+línea|registro\s+por\s+registro|listado\s+completo|anexo(?:s)?\s+detallado)\b/.test(p);
   const detailTables = [];
   function addModuleDetail(moduleName, title, limit = 120) {
     const data = arr(mods[moduleName]);
@@ -1904,16 +1907,18 @@ function directEventReportIfApplicable(prompt, context) {
     const cols = orderedColumnsForModule(moduleName, data);
     detailTables.push({ title, columns: cols, rows: data.slice(0, limit).map(r => cols.map(c => { const v = r?.[c]; if (Array.isArray(v)) return v.map(x => typeof x === 'object' ? JSON.stringify(x) : text(x)).join(' | '); return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v); })) });
   }
-  addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
-  addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
-  addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
+  if (wantsDetailedAnnex) {
+    addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
+    addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
+    addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
+  }
   if (/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
   if (/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
   const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context, prompt) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
   const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${wantsDetailedAnnex ? ', con anexos línea a línea porque se han pedido expresamente' : ', en formato ejecutivo sin volcar todos los registros'}${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
@@ -3100,6 +3105,44 @@ function exactEventTitlesFromPrompt(prompt, catalogEvents) {
   });
   return out;
 }
+function requestedEventCountFromPrompt(prompt) {
+  const m = text(prompt).match(/\b(?:los|las)?\s*(\d{1,2})\s+(?:eventos?|ediciones?|jornadas?)\b/i);
+  const n = m ? Number(m[1]) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 20) : 0;
+}
+function familyEventTitlesFromPrompt(prompt, catalogEvents) {
+  const events = arr(catalogEvents || []);
+  const quoted = [...text(prompt).matchAll(/["“”'‘’]([^"“”'‘’]{2,120})["“”'‘’]/g)].map(m => cleanPotentialEventTitle(m[1])).filter(Boolean);
+  if (!quoted.length) return [];
+  const requestedCount = requestedEventCountFromPrompt(prompt);
+  const comparison = /\b(compara|comparar|comparativa|comparativo|frente\s+a|versus|\bvs\b)\b/.test(norm(prompt));
+  if (!comparison && !requestedCount) return [];
+  const out = [];
+  for (const fragment of quoted) {
+    const fn = norm(fragment);
+    if (!fn) continue;
+    // Una cita que ya es el título exacto la resuelve exactEventTitlesFromPrompt.
+    if (events.some(e => norm(e?.titulo) === fn)) continue;
+    const requiredWords = norm(fragment).split(/\s+/).filter(w => w.length >= 2)
+      .filter(w => !['evento','eventos','edicion','ediciones','los','las','del','de'].includes(w));
+    if (requiredWords.length < 2) continue;
+    const matches = events
+      .filter(ev => {
+        const titleNorm = norm(ev?.titulo);
+        if (!titleNorm) return false;
+        if (titleNorm.includes(fn)) return true;
+        const titleWords = new Set(norm(ev?.titulo).split(/\s+/).filter(w => w.length >= 2));
+        return requiredWords.every(w => titleWords.has(w));
+      })
+      .map(ev => ({ id: trim(ev?.id), titulo: trim(ev?.titulo), date: parseEventDateForSort(ev?.fechaInicio || ev?.fechaIni || ev?.fecha || '') }))
+      .filter(ev => ev.id && ev.titulo)
+      .sort((a,b) => b.date - a.date || a.titulo.localeCompare(b.titulo, 'es', { sensitivity:'base' }));
+    matches.forEach(ev => { if (!out.some(x => x.id === ev.id)) out.push(ev); });
+  }
+  const limit = requestedCount || Math.min(out.length, 10);
+  return out.slice(0, limit).map(({id,titulo}) => ({id,titulo}));
+}
+
 function eventsFromPlannerText(raw, catalogEvents, activeEvent = null) {
   const section = plannerSection(raw, ['EVENTOS_SOLICITADOS', 'EVENTOS_NECESARIOS', 'EVENTOS']);
   const scope = plannerSection(raw, ['ALCANCE_EVENTOS', 'ALCANCE']);
@@ -3797,7 +3840,9 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   const local = buildZuzuLocalPlan(state, selectedEventId, userPrompt);
   const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
   const exactEvents = exactEventTitlesFromPrompt(userPrompt, arr(catalog?.eventos));
-  const strictRequested = strictScopeRequested(userPrompt) || exactEvents.length > 0;
+  const familyEvents = exactEvents.length ? [] : familyEventTitlesFromPrompt(userPrompt, arr(catalog?.eventos));
+  const promptResolvedEvents = exactEvents.length ? exactEvents : familyEvents;
+  const strictRequested = strictScopeRequested(userPrompt) || promptResolvedEvents.length > 0;
 
   if (!shouldUseGeminiPlanner(userPrompt, local)) {
     return {
@@ -3810,12 +3855,12 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
 
   // FIX27: si ControlEvent ya resuelve eventos exactos del prompt, no se llama a Zuzu planificador.
   // Evita el KO repetido por respuesta truncada del planificador y ahorra tiempo/tokens.
-  if (false && exactEvents.length && strictRequested) {
+  if (false && promptResolvedEvents.length && strictRequested) {
     let modules = ensurePlannerDependencies(inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
     if (!/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'TICKETS');
     if (!/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(userPrompt)) modules = modules.filter(m => m !== 'DOCUMENTOS');
-    const chosenTitles = exactEvents.map(e => e.titulo);
-    const chosenIds = exactEvents.map(e => e.id);
+    const chosenTitles = promptResolvedEvents.map(e => e.titulo);
+    const chosenIds = promptResolvedEvents.map(e => e.id);
     const queryTemplates = queryTemplatesForPlan(modules, userPrompt);
     zuzuTracePush(flowTrace, 'Paso 1 · Planificador CE', 'OK', `Eventos exactos detectados en el prompt; no se invoca Zuzu planificador. Plantillas cerradas sobre: ${chosenTitles.join(' | ')}. Módulos=${modules.join(', ')}.`);
     return {
@@ -3855,8 +3900,10 @@ async function buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace = [])
   const aiEventIds = arr(ai?.eventIds).map(trim).filter(Boolean);
   const aiEventTitles = arr(ai?.eventos).map(trim).filter(Boolean);
   const localEventIds = arr(local.eventos).map(trim).filter(Boolean);
-  const chosenIds = aiEventIds.length ? aiEventIds : (exactEvents.length ? exactEvents.map(e => e.id) : localEventIds);
-  const chosenTitles = aiEventTitles.length ? aiEventTitles : (exactEvents.length ? exactEvents.map(e => e.titulo) : []);
+  // El alcance nombrado por el usuario manda siempre sobre el planificador.
+  // Incluye familias entrecomilladas (p. ej. "Jornada Solidaria vs ELA") y respeta el número pedido.
+  const chosenIds = promptResolvedEvents.length ? promptResolvedEvents.map(e => e.id) : (aiEventIds.length ? aiEventIds : localEventIds);
+  const chosenTitles = promptResolvedEvents.length ? promptResolvedEvents.map(e => e.titulo) : aiEventTitles;
   let modules = ensurePlannerDependencies(arr(ai?.modules).length ? arr(ai.modules) : inferPlannerModulesFromPrompt(userPrompt, local.modules), userPrompt);
   // FIX25: aunque Zuzu o el detector local sugieran módulos accesorios, no se extraen TICKETS/DOCUMENTOS
   // salvo petición explícita. Evita anexos gigantes y datos que no venían a cuento en comparativas.

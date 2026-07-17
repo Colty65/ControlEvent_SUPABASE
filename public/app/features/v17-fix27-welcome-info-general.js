@@ -1,15 +1,22 @@
 /* ControlEvent v22_prod
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
-   - Bienvenida sin evento en cualquier dispositivo: ColtyLAB muestra ficha informativa en vez de avance vacío. */
+   - Sin evento: ColtyLAB muestra ficha informativa/version.
+   - Con evento elegido: ColtyLAB deja paso a AVANCE DEL EVENTO. */
 (function(){
   'use strict';
   if(window.__ceV17Fix27WelcomeInfoGeneral) return;
   window.__ceV17Fix27WelcomeInfoGeneral = true;
-  window.__ceColtyLabAlwaysInfoCard = true;
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const VERSION_LABEL = 'v22_prod_fix5';
+  const DEFAULT_VERSION_LABEL = 'v22_prod_fix8';
+  function currentVersionLabel(){
+    try{
+      const meta = document.querySelector('meta[name="controlevent-build"]');
+      const value = String(meta?.getAttribute('content') || document.documentElement?.dataset?.controleventBuild || window.__CONTROL_EVENT_BUILD_LABEL__ || '').trim();
+      return value || DEFAULT_VERSION_LABEL;
+    }catch(_){ return DEFAULT_VERSION_LABEL; }
+  }
   const $ = id => document.getElementById(id);
 
   function isPhoneOnly(){
@@ -61,7 +68,7 @@
   }
   function syncLogoTitle(){
     try{
-      const title = 'Ver información de ControlEvent';
+      const title = hasSelectedEvent() ? 'Ver avance del evento' : 'Ver información de ControlEvent';
       document.querySelectorAll('.brand,.brand-user,#brandCurrentUserName,#brandCurrentUserMeta,img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large').forEach(el => {
         try{ el.title = title; el.setAttribute('title', title); el.style.cursor='pointer'; }catch(_){ }
       });
@@ -142,7 +149,7 @@
             </ul>
           </section>
         </div>
-        <div class="modal-footer">** (c)oltyLAB '26 - ${VERSION_LABEL} **</div>
+        <div class="modal-footer">** (c)oltyLAB '26 - ${currentVersionLabel()} **</div>
       </div>
     </div>`;
     layer.classList.add('visible');
@@ -166,6 +173,12 @@
   function handleLogo(ev){
     if(loginVisible()) return false;
     if(!isColtyLogo(ev.target)) return false;
+    // Con evento elegido no interceptamos: el manejador de AVANCE DEL EVENTO toma el control.
+    if(hasSelectedEvent()){
+      closeInfo();
+      syncLogoTitle();
+      return false;
+    }
     stopEvent(ev);
     const t = Date.now();
     // Evita el doble disparo pointerup+click, pero permite abrir con cualquiera de ellos.
@@ -177,11 +190,15 @@
   }
 
   ['pointerup','touchend','click'].forEach(type => {
-    // En window/captura se ejecuta antes que los handlers antiguos de AVANCE DEL EVENTO.
-    // Así ColtyLAB abre siempre su ficha, también después de seleccionar un evento.
+    // En la pantalla inicial intercepta antes que AVANCE; con evento elegido deja pasar el gesto.
     window.addEventListener(type, ev => { try{ handleLogo(ev); }catch(_){ } }, {capture:true, passive:false});
   });
   document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeInfo(); }, true);
+  document.addEventListener('change', ev => {
+    if(ev.target?.id !== 'selectedEvent') return;
+    if(hasSelectedEvent()) closeInfo();
+    syncLogoTitle();
+  }, true);
 
   function bindAutoWelcome(){
     const runLater = delay => setTimeout(() => { try{ maybeAutoShowInfo(); }catch(_){ } }, delay);
@@ -199,5 +216,5 @@
   }
   bindAutoWelcome();
 
-  window.ControlEventV17Fix27WelcomeInfoGeneral = {version:VERSION_LABEL, showInfo, closeInfo, isPhoneOnly, welcomeActive, maybeAutoShowInfo, syncLogoTitle};
+  window.ControlEventV17Fix27WelcomeInfoGeneral = {version:currentVersionLabel(), showInfo, closeInfo, isPhoneOnly, welcomeActive, maybeAutoShowInfo, syncLogoTitle, hasSelectedEvent};
 })();

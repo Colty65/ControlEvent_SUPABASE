@@ -279,7 +279,6 @@
   }
   function toggleAvance(ev){
     if(ev){ ev.preventDefault?.(); ev.stopPropagation?.(); ev.stopImmediatePropagation?.(); }
-    if(window.__ceColtyLabAlwaysInfoCard){ openWelcomeInfoInstead(); return false; }
     if(noSelectedEvent()){ openWelcomeInfoInstead(); return false; }
     const now=Date.now();
     if(now-lastToggle<260) return false;
@@ -291,6 +290,7 @@
   function showAvance(){
     // Por si algún handler antiguo se ha disparado, limpiamos sus capas sin tocar el resto.
     try{ $('ceHf47AvanceBubbleLayer')?.remove(); $('ceHf48AvanceLayer')?.remove(); }catch(_){ }
+    try{ window.ControlEventV17Fix27WelcomeInfoGeneral?.closeInfo?.(); }catch(_){ }
     let layer=$('ceV16Hf5AvanceLayer');
     if(!layer){ layer=document.createElement('div'); layer.id='ceV16Hf5AvanceLayer'; document.body.appendChild(layer); }
     const rows=avanceRows(); const cls=finalizado()?'finalizado':'curso';
@@ -313,7 +313,7 @@
       const clone=old.cloneNode(true);
       clone.className='ce-brand-logo-safe';
       clone.alt='Logo';
-      clone.title=window.__ceColtyLabAlwaysInfoCard?'Ver información de ControlEvent':(noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento');
+      clone.title=noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento';
       try{ clone.style.cssText=(old.getAttribute('style')||'')+';cursor:pointer;'; }catch(_){ }
       old.replaceWith(clone);
     }
