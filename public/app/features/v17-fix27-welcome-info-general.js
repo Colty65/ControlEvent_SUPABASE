@@ -9,7 +9,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const DEFAULT_VERSION_LABEL = 'v22_prod_fix8';
+  const DEFAULT_VERSION_LABEL = 'v22_prod_voz1';
   function currentVersionLabel(){
     try{
       const meta = document.querySelector('meta[name="controlevent-build"]');
