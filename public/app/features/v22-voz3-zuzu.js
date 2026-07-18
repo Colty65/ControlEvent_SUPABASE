@@ -1,4 +1,4 @@
-/* ControlEvent v22_prod · VOZ3 GRATIS
+/* ControlEvent v22_prod · VOZ4 MOVIL ESTABLE
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -11,7 +11,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu = true;
 
-  var BUILD = 'v22_prod_voz3';
+  var BUILD = 'v22_prod_voz4';
   var STYLE_ID = 'ceV22Voz3Style';
   var PANEL_ID = 'ceV22Voz3Panel';
   var STORAGE = {
@@ -42,7 +42,10 @@
     voicesLoaded: false,
     voiceRetryTimer: null,
     voiceRetryCount: 0,
-    selectedVoiceLabel: ''
+    selectedVoiceLabel: '',
+    finalSegments: [],
+    recognitionEndWaiters: [],
+    submitBypass: false
   };
 
   function $(id){ return document.getElementById(id); }
@@ -51,6 +54,41 @@
   function clean(v){ return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); }
   function joinText(){
     return Array.prototype.slice.call(arguments).map(clean).filter(Boolean).join(' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+  }
+  function normalizedTranscript(value){
+    return clean(value).toLocaleLowerCase('es-ES').replace(/[.,;:!?¿¡]+/g,'').trim();
+  }
+  function appendFinalTranscript(text){
+    text=clean(text); if(!text) return;
+    var key=normalizedTranscript(text);
+    if(!key) return;
+    var segments=state.finalSegments;
+    if(segments.some(function(item){ return item.key===key; })) return;
+    var last=segments.length?segments[segments.length-1]:null;
+    if(last && (last.key.indexOf(key)>=0 || key.indexOf(last.key)>=0)){
+      if(key.length>last.key.length) segments[segments.length-1]={key:key,text:text};
+    }else{
+      segments.push({key:key,text:text});
+    }
+    state.finalText=segments.map(function(item){return item.text;}).join(' ');
+  }
+  function resolveRecognitionEnd(){
+    var waiters=state.recognitionEndWaiters.splice(0);
+    waiters.forEach(function(resolve){try{resolve();}catch(_){}});
+  }
+  function stopListeningAndWait(maxWait){
+    maxWait=Number(maxWait)||750;
+    state.wantListening=false;
+    state.recognitionStarting=false;
+    setMicUi(false);
+    return new Promise(function(resolve){
+      var done=false;
+      function finish(){if(done)return;done=true;resolve();}
+      state.recognitionEndWaiters.push(finish);
+      try{ if(state.recognition) state.recognition.stop(); else finish(); }
+      catch(_){ try{state.recognition&&state.recognition.abort();}catch(__){} setTimeout(finish,30); }
+      setTimeout(finish,maxWait);
+    });
   }
   function safeGet(key, fallback){
     try{ var value = localStorage.getItem(key); return value == null ? fallback : value; }catch(_){ return fallback; }
@@ -86,7 +124,8 @@
       '.ce-voz3-help-card{width:min(620px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:20px;color:#0f172a}\n'+
       '.ce-voz3-help-card h3{margin:0 0 10px;font-size:20px}.ce-voz3-help-card p{line-height:1.5;margin:8px 0}.ce-voz3-help-card ol{padding-left:22px;line-height:1.55}.ce-voz3-help-card button{margin-top:12px;border:0;border-radius:10px;padding:9px 14px;background:#0f172a;color:#fff;font-weight:850;cursor:pointer}\n'+
       '@keyframes ceVoz3Pulse{0%,100%{box-shadow:0 0 0 4px rgba(220,38,38,.12)}50%{box-shadow:0 0 0 9px rgba(220,38,38,.04)}}\n'+
-      '@media(max-width:760px){#'+PANEL_ID+'{padding:9px}#'+PANEL_ID+' .ce-voz3-row{align-items:stretch}#'+PANEL_ID+' .ce-voz3-btn{flex:1 1 auto}#'+PANEL_ID+' .ce-voz3-status{flex-basis:100%}#'+PANEL_ID+' select{max-width:100%;flex:1 1 170px}}\n';
+      '#ceGeminiLibreOverlay #ceAiResult{flex:1 1 240px;min-height:170px;overflow:auto;-webkit-overflow-scrolling:touch}\n'+
+      '@media(max-width:760px){#'+PANEL_ID+'{padding:9px;max-height:36vh;overflow:auto;-webkit-overflow-scrolling:touch;flex:0 1 auto}#ceGeminiLibreOverlay .ce-ai-modal{overflow:hidden}#ceGeminiLibreOverlay .ce-ai-prompt{flex:0 0 auto}#ceGeminiLibreOverlay #ceAiResult{flex:1 1 210px;min-height:180px}#'+PANEL_ID+' .ce-voz3-row{align-items:stretch}#'+PANEL_ID+' .ce-voz3-btn{flex:1 1 auto}#'+PANEL_ID+' .ce-voz3-status{flex-basis:100%}#'+PANEL_ID+' select{max-width:100%;flex:1 1 170px}}\n';
     document.head.appendChild(st);
   }
 
@@ -144,7 +183,7 @@
       for(var i=ev.resultIndex; i<ev.results.length; i++){
         var text = clean(ev.results[i] && ev.results[i][0] && ev.results[i][0].transcript);
         if(!text) continue;
-        if(ev.results[i].isFinal) state.finalText = joinText(state.finalText, text);
+        if(ev.results[i].isFinal) appendFinalTranscript(text);
         else interim = joinText(interim, text);
       }
       updatePrompt(interim);
@@ -161,6 +200,7 @@
     };
     rec.onend = function(){
       state.recognitionStarting = false;
+      resolveRecognitionEnd();
       if(state.wantListening && document.getElementById('ceGeminiLibreOverlay')){
         setMicUi(true);
         setVoiceStatus('Micrófono abierto. Reanudando la escucha…', 'ok');
@@ -195,6 +235,7 @@
     var p = promptEl();
     state.baseText = clean(p && p.value);
     state.finalText = '';
+    state.finalSegments = [];
     state.wantListening = true;
     setMicUi(true);
     setVoiceStatus('Solicitando acceso al micrófono…', '');
@@ -690,8 +731,23 @@
 
   document.addEventListener('click',function(ev){
     var target=ev&&ev.target;
-    if(target&&target.closest&&target.closest('#ceAiRun')){
-      stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+    var runButton=target&&target.closest&&target.closest('#ceAiRun');
+    if(runButton){
+      if(state.submitBypass){
+        state.submitBypass=false;
+        stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+      }else if(state.wantListening || state.recognitionStarting){
+        ev.preventDefault(); ev.stopPropagation();
+        try{ev.stopImmediatePropagation();}catch(_){}
+        setVoiceStatus('Cerrando el micrófono antes de enviar…','');
+        stopListeningAndWait(850).then(function(){
+          state.submitBypass=true;
+          setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+          runButton.click();
+        });
+      }else{
+        stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+      }
     }
     if(target&&target.closest&&target.closest('#ceAiClear')){
       stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Campo limpio. Puedes volver a hablar.','');
@@ -716,7 +772,7 @@
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
 
-  window.ControlEventV22Voz3={
+  window.ControlEventV22Voz4={
     version:BUILD,
     startListening:startListening,
     stopListening:stopListening,
@@ -729,4 +785,5 @@
     refreshVoices:loadLocalVoices,
     selectedDeviceVoice:selectedDeviceVoice
   };
+  window.ControlEventV22Voz3=window.ControlEventV22Voz4;
 })();

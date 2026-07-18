@@ -1,0 +1,8 @@
+ControlEvent v22_prod_voz4 · VOZ MÓVIL ESTABLE
+
+Correcciones aplicadas sobre VOZ3:
+1. iPhone/iPad: al pulsar Zuzu se detiene el reconocimiento y se espera a su cierre real antes de iniciar la consulta. Se impide que Safari reabra el micrófono durante el envío.
+2. Android: se deduplican resultados finales repetidos por webkitSpeechRecognition.
+3. Android/iPhone: la zona de respuesta mantiene una altura mínima y desplazamiento táctil; el panel de voz ya no puede ocultar la respuesta aunque el PDF exista.
+4. Se mantiene la voz local gratuita, lectura automática, PDF y toda la lógica de Zuzu.
+5. Se conserva el alias ControlEventV22Voz3 por compatibilidad, exponiendo también ControlEventV22Voz4.
