@@ -14,7 +14,7 @@ export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
 export const APP_VERSION = 'ControlEvent v22_prod';
 
-export const APP_VERSION_LABEL = 'v22_prod';
-export const APP_VERSION_FILE = 'ControlEvent_v22_prod';
-export const BUILD_ID = '20260708-200500';
-export const ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';
+export const APP_VERSION_LABEL = 'v22_prod_voz3';
+export const APP_VERSION_FILE = 'ControlEvent_v22_prod_voz3';
+export const BUILD_ID = '20260718-VOZ3-GRATIS';
+export const ZIP_NAME = 'CE_v22_PROD_VOZ3_GRATIS_VOCES_LOCALES.zip';

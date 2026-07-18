@@ -294,6 +294,8 @@ app.post('/api/event-ai/analyze', async (req, res) => {
 });
 
 
+
+
 app.get('/api/diagnostics', async (req, res) => {
   const raw = await fs.readFile(STATE_FILE, 'utf8').catch(() => '{}');
   const state = await readJson(STATE_FILE, {});
