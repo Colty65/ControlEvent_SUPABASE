@@ -386,6 +386,7 @@ Reglas obligatorias:
 - Si el usuario cita eventos concretos entre comillas o por título, filtra la respuesta a esos eventos exactos. No mezcles otros eventos aunque aparezcan en el contexto.
 - Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
 - Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
+- Si el usuario pide un informe general, información para socios, estado del evento o cómo va el evento, considera obligatorios EVENTOS/Descripción, INGRESOS separados entre SOCIOS y NO SOCIOS, COMPRAS, DONACIONES, SALDOS, TICKETS/FACTURAS y DOCUMENTOS, aunque no los enumere uno a uno.
 - Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
 - Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
@@ -409,6 +410,9 @@ Reglas obligatorias:
 - Respeta el tono solicitado por el usuario. Si pide informe coloquial, informal, simpático, con chascarrillos o para socios, escribe una lectura cercana y humana antes de las tablas, con humor ligero y sin perder rigor. Si pide informe técnico, financiero, auditoría, Dirección o justificación formal, escribe en tono ejecutivo, preciso y sobrio, con conclusiones, salvedades y criterios de cálculo.
 - Personaliza la respuesta con usuarioLogado si está en el contexto: usa Identificacion/apodo en conversación informal y Nombre en informes serios o formales. Si el usuario pregunta por una persona, revisa también usuarioLogado además de PERSONAS, INGRESOS, COMPRAS y DONACIONES.
 - No entregues solo datos crudos cuando el usuario pida un informe: primero redacta un texto de interpretación que explique las líneas generales y responda con el estilo pedido; después deja tablas, gráficas y ficheros como soporte.
+- Antes de cerrar la respuesta, verifica internamente cada concepto solicitado. Si falta uno, añádelo; nunca respondas con menos apartados de los pedidos.
+- EVENTOS.Descripción debe analizarse expresamente: explica objetivo, programa, fechas y consecuencias organizativas. DOCUMENTOS no se limitan a listar: comenta su finalidad, reintegros, autorizaciones, justificantes y pendientes.
+- Cuando el usuario pida detalle, desglosa compras y donaciones por producto, destino, tienda/responsable y donante; una cifra global no satisface una petición de detalle.
 
 - En v19 TODA respuesta final debe parecer escrita por Zuzu: interpreta el prompt completo del usuario, su intención, tono y destinatario. ControlEvent solo te ha preparado los datos; no copies su carcasa.
 - No devuelvas una plantilla mecánica repetida. Cambia estructura, vocabulario y enfoque según cada petición y cada persona/evento consultado.
@@ -1901,24 +1905,70 @@ function directEventReportIfApplicable(prompt, context) {
   // normal debe ser ejecutiva y legible, no convertirse automáticamente en 20-30 páginas.
   const wantsDetailedAnnex = /\b(toda\s+la\s+info(?:rmaci[oó]n)?(?:\s+disponible)?|informaci[oó]n\s+completa|datos\s+completos|informe\s+(?:completo|exhaustivo)|dossier\s+completo|detalle(?:s)?\s+(?:completo|completos|de\s+todo)|desglosa(?:r|me)?|desglose|linea\s+por\s+linea|línea\s+por\s+línea|registro\s+por\s+registro|listado\s+completo|anexo(?:s)?\s+detallado)\b/.test(p);
   const detailTables = [];
-  function addModuleDetail(moduleName, title, limit = 120) {
-    const data = arr(mods[moduleName]);
-    if (!data.length) return;
-    const cols = orderedColumnsForModule(moduleName, data);
-    detailTables.push({ title, columns: cols, rows: data.slice(0, limit).map(r => cols.map(c => { const v = r?.[c]; if (Array.isArray(v)) return v.map(x => typeof x === 'object' ? JSON.stringify(x) : text(x)).join(' | '); return typeof v === 'object' && v !== null ? JSON.stringify(v) : text(v); })) });
+  const reportAsked = /\b(informe|informaci[oó]n|resumen|estado|c[oó]mo\s+va|situaci[oó]n)\b/i.test(prompt);
+  const asksIncome = reportAsked || /\b(ingreso|ingresos|colaborador|colaboradores|socio|socios|no\s+socios)\b/i.test(prompt);
+  const asksPurchases = reportAsked || /\b(compra|compras|gasto|gastos|ticket|tickets|factura|facturas)\b/i.test(prompt);
+  const asksDonations = reportAsked || /\b(donaci[oó]n|donaciones|donante|donantes)\b/i.test(prompt);
+  const asksDocuments = reportAsked || /\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(prompt);
+
+  function sumBy(data, key, valueKey, label) {
+    const map = new Map();
+    arr(data).forEach(r => {
+      const k = trim(r?.[key]) || label || 'Sin dato';
+      const old = map.get(k) || { nombre:k, registros:0, total:0 };
+      old.registros += 1; old.total += num(r?.[valueKey]); map.set(k, old);
+    });
+    return [...map.values()].sort((a,b)=>b.total-a.total || b.registros-a.registros || a.nombre.localeCompare(b.nombre,'es'));
   }
-  if (wantsDetailedAnnex) {
-    addModuleDetail('INGRESOS', 'Detalle de INGRESOS / colaboradores del evento', 120);
-    addModuleDetail('COMPRAS', 'Detalle de COMPRAS / gastos del evento', 160);
-    addModuleDetail('DONACIONES', 'Detalle de DONACIONES de producto del evento', 160);
+  function addGrouped(title, data, key, valueKey, limit=40) {
+    const grouped = sumBy(data,key,valueKey);
+    if (!grouped.length) return;
+    detailTables.push({ title, columns:['Concepto','Registros','Importe / valor (€)'], rows:grouped.slice(0,limit).map(x=>[x.nombre,String(x.registros),String(round(x.total,2))]) });
   }
-  if (/\b(ticket|tickets|fototicket|fototickets|tk\s*\d*)\b/i.test(prompt)) addModuleDetail('TICKETS', 'Fototickets / tickets del evento', 120);
-  if (/\b(documento|documentos|doc\s*\d+|adjunto|adjuntos)\b/i.test(prompt)) addModuleDetail('DOCUMENTOS', 'Documentos del evento', 120);
+  function addReadableRows(title, columns, data, limit=80) {
+    if (!arr(data).length) return;
+    detailTables.push({ title, columns, rows:arr(data).slice(0,limit).map(r=>columns.map(c=>text(r?.[c]))) });
+  }
+
+  if (asksIncome) {
+    const incomes = arr(mods.INGRESOS);
+    const socio = incomes.filter(r=>/^SOCIO$/i.test(trim(r.Rango)));
+    const noSocio = incomes.filter(r=>!/^SOCIO$/i.test(trim(r.Rango)));
+    const incomeRows = [
+      ['Socios', String(socio.length), String(round(socio.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2))],
+      ['No socios', String(noSocio.length), String(round(noSocio.reduce((a,r)=>a+num(r['Importe obligatorio'])+num(r['Importe voluntario']),0),2))]
+    ];
+    detailTables.push({ title:'Ingresos de socios y no socios', columns:['Grupo','Colaboradores','Ingresos previstos (€)'], rows:incomeRows });
+    if (wantsDetailedAnnex || /\b(detalle|desglosa|exhaustiv|completo)\b/i.test(prompt)) {
+      addReadableRows('Detalle legible de ingresos / colaboradores', ['Nombre','Rango','Numero','Importe obligatorio','Importe voluntario','Ingreso','Just.ing.'], incomes, 120);
+    }
+  }
+  if (asksPurchases) {
+    const purchases = arr(mods.COMPRAS);
+    addGrouped('Compras por destino', purchases, 'Destino', 'Importe');
+    addGrouped('Compras por segmento', purchases, 'Segmento', 'Importe');
+    addGrouped('Compras por tienda', purchases, 'Tienda', 'Importe');
+    addGrouped('Compras por responsable', purchases, 'Responsable', 'Importe');
+    const tickets = arr(mods.TICKETS);
+    if (tickets.length) addReadableRows('Tickets y facturas del evento', ['TKxx','Tienda','Responsable','Total ticket','Nº líneas','Ticket SI/NO'], tickets, 120);
+    if (wantsDetailedAnnex || /\b(detalle|producto|productos|exhaustiv|completo)\b/i.test(prompt)) addReadableRows('Detalle de compras por producto', ['Producto','Segmento','Destino','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable','Ticket SI/NO'], purchases, 160);
+  }
+  if (asksDonations) {
+    const donations = arr(mods.DONACIONES);
+    addGrouped('Donaciones por donante', donations, 'Donante', 'Valor');
+    addGrouped('Donaciones por destino', donations, 'Destino', 'Valor');
+    addGrouped('Donaciones por producto', donations, 'Producto', 'Valor', 60);
+    if (wantsDetailedAnnex || /\b(detalle|producto|productos|exhaustiv|completo)\b/i.test(prompt)) addReadableRows('Detalle legible de donaciones', ['Donante','Producto','Unidades','Precio','Valor','Tipo de donación','Responsable'], donations, 160);
+  }
+  if (asksDocuments) addReadableRows('Documentos del evento', ['DOCxxx','Fecha','Descripcion','Tiene imagen'], arr(mods.DOCUMENTOS), 120);
   const missingPack = missingAttendeesAsked ? missingAttendeesTablesAndCharts(context, prompt) : { tables: [], charts: [], resumenTexto: '', warnings: [] };
   if (missingPack.tables.length) detailTables.unshift(...missingPack.tables);
   if (missingPack.charts.length) charts.push(...missingPack.charts);
   const inProgressText = hasInProgressEvents ? ' Hay evento(s) En curso: sus saldos y comparativas se interpretan como foto provisional, no como cierre definitivo.' : '';
-  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. Incluyo lo operativo del evento: ingresos/colaboradores, compras, donaciones y saldos${wantsDetailedAnnex ? ', con anexos línea a línea porque se han pedido expresamente' : ', en formato ejecutivo sin volcar todos los registros'}${missingPack.resumenTexto ? `. Socios no asistentes/no registrados: ${missingPack.resumenTexto}` : ''}${weatherAsked ? ', más meteorología externa si ControlEvent la ha podido consultar' : ''}. Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas (realizadas + pendientes). Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
+  const eventDescriptions = arr(mods.EVENTOS).map(e=>trim(e['Descripción'] || e.Descripcion || e.descripcion)).filter(Boolean);
+  const docNotes = arr(mods.DOCUMENTOS).map(d=>trim(d.Descripcion)).filter(Boolean);
+  const coverage = [asksIncome?'ingresos separados entre socios y no socios':'', asksPurchases?'compras y tickets desglosados':'', asksDonations?'donaciones por donante/producto':'', asksDocuments?'documentos comentables':'', weatherAsked?'meteorología':''].filter(Boolean).join(', ');
+  const answer = `Informe de ${rows.length} evento(s): ${events.join(' | ')}. ${eventDescriptions.length ? `Descripción del evento: ${eventDescriptions.join(' | ').slice(0,900)}. ` : ''}Se cubren ${coverage || 'los datos económicos y operativos principales'}. Los anexos están transformados en tablas legibles: nunca se vuelca JSON técnico de tickets. ${docNotes.length ? `Documentación registrada: ${docNotes.slice(0,8).join('; ')}. ` : ''}Saldo actual = ingresos efectivamente realizados menos compras realizadas; saldo operativo = ingresos previstos menos compras previstas. Las donaciones se valoran aparte y no se suman al saldo financiero.${inProgressText}`;
   return {
     ok: true, rejected: false,
     title: `${wantsComparison ? 'Comparativa operativa de eventos' : 'Informe operativo de evento'}`,
