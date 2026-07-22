@@ -1,4 +1,4 @@
-/* ControlEvent v22_prod - HOTFIX mínimo: documentos con título evento, descarga ticket en resumen y botones sin heredar rojo. */
+/* ControlEvent v23_prod - HOTFIX mínimo: documentos con título evento, descarga ticket en resumen y botones sin heredar rojo. */
 (function(){
   'use strict';
   if(window.__ceV105HotfixFotosDocsBotones) return;

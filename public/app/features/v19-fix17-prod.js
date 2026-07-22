@@ -1,4 +1,4 @@
-// ControlEvent v22_prod · FIX17 mínimo
+// ControlEvent v23_prod · FIX17 mínimo
 // Solo Vista aérea: activo único, ancho de tabla, sin Limpiar; Zuzu: sin badge flotante y texto normal.
 (function(){
   'use strict';
@@ -107,5 +107,5 @@
 
   function install(){ injectCss(); installActiveHandlers(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
-  window.ControlEventV19Fix17={version:'v22_prod_FIX17'};
+  window.ControlEventV19Fix17={version:'v23_prod_FIX17'};
 })();

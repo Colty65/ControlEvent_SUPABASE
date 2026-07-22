@@ -1,10 +1,10 @@
-// ControlEvent v22_prod · FIX14
+// ControlEvent v23_prod · FIX14
 // Desbloqueo de login: evita que los parches de selector/boot intercepten la entrada antes de autenticar.
 (function(){
   'use strict';
   if(window.__CE_V19_FIX14_LOGIN_UNBLOCK__) return;
   window.__CE_V19_FIX14_LOGIN_UNBLOCK__ = true;
-  const VERSION = 'v22_prod_FIX14_login_unblock';
+  const VERSION = 'v23_prod_FIX14_login_unblock';
   const $ = id => document.getElementById(id);
   const trim = v => String(v == null ? '' : v).trim();
   const arr = v => Array.isArray(v) ? v : [];
@@ -29,8 +29,8 @@
     window.__CONTROL_EVENT_LOGIN_USER__ = u;
     window.__CONTROL_EVENT_CE_ACCESO__ = u.ce_acceso;
     try{ if(window.ControlEventApp){ window.ControlEventApp.authUser = u; window.ControlEventApp.ceAccesoUsuario = u.ce_acceso; } }catch(_){ }
-    try{ sessionStorage.setItem('ControlEvent_v22_prod_login_user', JSON.stringify(u)); sessionStorage.setItem('ControlEvent_ce_acceso_usuario', JSON.stringify(u.ce_acceso)); }catch(_){ }
-    try{ localStorage.setItem('ControlEvent_v22_prod_login_user', JSON.stringify(u)); localStorage.setItem('ControlEvent_ce_acceso_usuario', JSON.stringify(u.ce_acceso)); }catch(_){ }
+    try{ sessionStorage.setItem('ControlEvent_v23_prod_login_user', JSON.stringify(u)); sessionStorage.setItem('ControlEvent_ce_acceso_usuario', JSON.stringify(u.ce_acceso)); }catch(_){ }
+    try{ localStorage.setItem('ControlEvent_v23_prod_login_user', JSON.stringify(u)); localStorage.setItem('ControlEvent_ce_acceso_usuario', JSON.stringify(u.ce_acceso)); }catch(_){ }
     setText('currentUserName', userName(u));
     setText('brandCurrentUserName', userName(u));
     setText('currentUserLevel', userLevel(u) ? '('+userLevel(u)+')' : '');

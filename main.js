@@ -1,8 +1,8 @@
-/* ControlEvent v22_prod - Mapa de recursos
+/* ControlEvent v23_prod - Mapa de recursos
    Cruza compras + donaciones, filtro por responsables SOCIO y zona única de productos donados. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v22_prod';
+  const VERSION = 'ControlEvent v23_prod';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';

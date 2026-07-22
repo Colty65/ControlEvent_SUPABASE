@@ -1,4 +1,4 @@
-// ControlEvent v22_prod · FIX16
+// ControlEvent v23_prod · FIX16
 // Objetivo: quitar torpeza introducida por FIX13-15, estabilizar INGRESOS visual y nombres TK.
 (function(){
   'use strict';
@@ -151,5 +151,5 @@
 
   function install(){ injectCss(); installVistaActiveFix(); installDownloadFix(); installStateGuard(); installLoginLightener(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
-  window.ControlEventV19Fix16={version:'v22_prod_FIX16'};
+  window.ControlEventV19Fix16={version:'v23_prod_FIX16'};
 })();

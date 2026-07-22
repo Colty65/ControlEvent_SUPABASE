@@ -1,9 +1,9 @@
-/* ControlEvent v22_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v23_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v22_prod';
+  var VERSION='v23_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -68,7 +68,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || userFacingTitle(data,prompt) || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v22_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v23_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -132,7 +132,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v22_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v23_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -183,7 +183,7 @@
   function clearZuzu(ev){
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
-    var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu lista</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
+    var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
     try{ if(p) p.focus(); }catch(_){ }
@@ -438,7 +438,7 @@
     var rows=Array.isArray(ch.weatherRows)?ch.weatherRows:[];
     if(!rows.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Meteorología')+'</h3><div class="ce-ai-answer">Sin datos meteorológicos disponibles.</div></div>';
     var cards=rows.map(function(r){
-      var fecha=esc(r.fecha||''), cielo=esc(r.cielo||''), loc=esc(r.localidad||'');
+      var fecha=esc(r.fechaLabel||((r.dia?String(r.dia)+' ':'')+(r.fecha||''))), cielo=esc(r.cielo||''), loc=esc(r.localidad||'');
       return '<div style="border:1px solid #dbeafe;border-radius:16px;padding:14px;background:linear-gradient(180deg,#ffffff,#f8fafc);box-shadow:0 3px 10px rgba(15,23,42,.06);min-width:210px;flex:1">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px"><div style="font-weight:900;color:#075985">'+fecha+'</div><div style="font-size:30px">'+weatherIcon(r.cielo)+'</div></div>'
         +'<div style="font-weight:850;color:#0f172a;margin-bottom:6px">'+cielo+'</div>'
@@ -464,11 +464,32 @@
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
   function lineChartHtml(ch, labels, values){
-    var w=900,h=300,pad=34,max=Math.max.apply(null, values.concat([1])), min=Math.min.apply(null, values.concat([0]));
-    var pts=values.map(function(v,i){ var x=pad + (labels.length<=1?0:(i*(w-pad*2)/(labels.length-1))); var y=h-pad-((Number(v)-min)/(max-min||1))*(h-pad*2); return [x,y]; });
-    var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
-    var dots=pts.map(function(pt,i){return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="4" fill="'+chartColor(i)+'"><title>'+esc(labels[i]+' '+formatNumber(values[i])+' '+(ch.unit||''))+'</title></circle>';}).join('');
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+'</svg></div>';
+    var series=Array.isArray(ch.series)&&ch.series.length?ch.series:[{name:ch.title||'Serie',values:values}];
+    var all=[]; series.forEach(function(sr){(sr.values||[]).forEach(function(v){var n=Number(v);if(Number.isFinite(n)) all.push(n);});});
+    if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
+    var w=940,h=390,left=76,right=28,top=36,bottom=82;
+    var min=Math.min.apply(null,all),max=Math.max.apply(null,all);
+    if(min===max){min-=1;max+=1;} else {var margin=(max-min)*0.12;min-=margin;max+=margin;}
+    var plotW=w-left-right,plotH=h-top-bottom;
+    function xFor(i){return left+(labels.length<=1?plotW/2:i*plotW/(labels.length-1));}
+    function yFor(v){return top+(max-Number(v))*plotH/(max-min);}
+    var grid='';
+    for(var g=0;g<=4;g++){
+      var val=max-(max-min)*g/4,y=top+plotH*g/4;
+      grid+='<line x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(w-right)+'" y2="'+y.toFixed(1)+'" stroke="#e2e8f0" stroke-width="1"/>';
+      grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val))+'</text>';
+    }
+    var xLabels=labels.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
+    var paths='',dots='',legend='';
+    series.forEach(function(sr,si){
+      var vals=(sr.values||[]).map(Number),color=chartColor(si);
+      var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
+      var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
+      paths+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>';
+      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v))+'</text>';}).join('');
+      legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-weight:850"><i style="display:inline-block;width:22px;height:4px;border-radius:4px;background:'+color+'"></i>'+esc(sr.name||('Serie '+(si+1)))+'</span>';
+    });
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
   }
   function stackedChartHtml(ch){
     var labels=(ch.labels||[]).map(String); var series=(ch.series||[]);
