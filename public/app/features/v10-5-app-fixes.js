@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
+/* ControlEvent v23_prod_r1 - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
 (function(){
   'use strict';
   if(window.__ceV105ProdFixes) return; window.__ceV105ProdFixes=true;
-  var VERSION='v23_prod';
-  var VERSION_TEXT='ControlEvent v23_prod';
-  var VERSION_FILE='ControlEvent_v23_prod';
+  var VERSION='v23_prod_r1';
+  var VERSION_TEXT='ControlEvent v23_prod_r1';
+  var VERSION_FILE='ControlEvent_v23_prod_r1';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -58,11 +58,12 @@
   }
   function normalizeDownloadName(name){
     var n=text(name);
-    n=n.replace(/ControlEvent_v10_4(?:_\d+)?_prod/ig, VERSION_FILE)
+    n=n.replace(/ControlEvent_v23_prod_r1(?:_r1)?/ig, VERSION_FILE)
+       .replace(/ControlEvent_v10_4(?:_\d+)?_prod/ig, VERSION_FILE)
        .replace(/ControlEvent_v18(?:_1)?_prod/ig, VERSION_FILE)
        .replace(/ControlEvent_v\d+(?:_\d+){1,4}_prod/ig, VERSION_FILE)
        .replace(/ControlEvent\s+v10\.4(?:\.\d+)?_prod/ig, VERSION_TEXT)
-       .replace(/ControlEvent\s+v23_prod/ig, VERSION_TEXT)
+       .replace(/ControlEvent\s+v23_prod(?:_r1)?/ig, VERSION_TEXT)
        .replace(/ControlEvent\s+v\d+(?:\.\d+){1,4}_prod/ig, VERSION_TEXT);
     return n;
   }
@@ -92,9 +93,9 @@
     safe(function(){ window.__ceVersion=VERSION_TEXT; window.VERSION=VERSION_TEXT; window.VERSION_FILE=VERSION_FILE; window.ControlEventVersion={version:VERSION_TEXT,versionFile:VERSION_FILE}; });
     document.querySelectorAll('.ce-v104-brand-mini,.ce-v1045-brand-mini,.ce-v1047-brand-mini,[data-ce-version-label]').forEach(function(el){
       if(el.classList && /ce-v104/.test(el.className||'')) el.innerHTML='<img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>'+VERSION+'</span>';
-      else if(/v\d+[._]\d+/i.test(el.textContent||'')) el.textContent=(el.textContent||'').replace(/v\d+(?:[._]\d+){1,4}_prod/ig, VERSION);
+      else if(/v\d/i.test(el.textContent||'')) el.textContent=(el.textContent||'').replace(/v23_prod(?:_r1)?|v\d+(?:[._]\d+){1,4}_prod/ig, VERSION);
     });
-    document.querySelectorAll('.appname-stack span,.appname span').forEach(function(el){ if(/v\d/i.test(el.textContent||'')) el.textContent=(el.textContent||'').replace(/v\d+(?:[._]\d+){1,4}_prod/ig, VERSION); });
+    document.querySelectorAll('.appname-stack span,.appname span').forEach(function(el){ if(/v\d/i.test(el.textContent||'')) el.textContent=(el.textContent||'').replace(/v23_prod(?:_r1)?|v\d+(?:[._]\d+){1,4}_prod/ig, VERSION); });
   }
   function isDownloadButton(btn){
     if(!btn || btn.tagName!=='BUTTON') return false;

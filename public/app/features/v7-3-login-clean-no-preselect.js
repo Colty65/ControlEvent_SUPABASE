@@ -1,20 +1,20 @@
-/* ControlEvent v23_prod - login limpio sin preselección y salida sin recarga pesada.
+/* ControlEvent v23_prod_r1 - login limpio sin preselección y salida sin recarga pesada.
    Alcance: tras Salir/Login, fuerza selector en "Selecciona evento..." hasta que el usuario elija evento. Sin bucles ni MutationObserver. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod';
-  const VERSION_FILE = 'ControlEvent_v23_prod';
+  const VERSION = 'ControlEvent v23_prod_r1';
+  const VERSION_FILE = 'ControlEvent_v23_prod_r1';
   if(window.__ceV73LoginCleanNoPreselect) return;
   window.__ceV73LoginCleanNoPreselect = true;
 
   const FORCE_KEY = 'ce_v73_force_no_event_after_login_until';
   const PICKED_KEY = 'ce_v73_user_picked_event';
-  const LOGOUT_AT_KEY = 'ControlEvent_v23_prod_soft_logout_at';
+  const LOGOUT_AT_KEY = 'ControlEvent_v23_prod_r1_soft_logout_at';
   const CHOSEN_KEYS = [
     'ce_v250_event_chosen','ce_event_chosen','controlevent_v44_event_chosen_after_login',
     'ce_v5017_event_chosen','ce_v5016_event_chosen','ce_v5015_event_chosen','ce_v5013_user_picked_event',
-    'controlevent_v5022_user_picked_event','ControlEvent_v23_prod_event_chosen','ControlEvent_v23_prod_selected_event',
-    'ControlEvent_v23_prod_event_chosen','ControlEvent_v23_prod_selected_event','controlevent_v229_selected_event_id'
+    'controlevent_v5022_user_picked_event','ControlEvent_v23_prod_r1_event_chosen','ControlEvent_v23_prod_r1_selected_event',
+    'ControlEvent_v23_prod_r1_event_chosen','ControlEvent_v23_prod_r1_selected_event','controlevent_v229_selected_event_id'
   ];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };

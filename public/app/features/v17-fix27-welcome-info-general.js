@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod
+/* ControlEvent v23_prod_r1
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Sin evento: ColtyLAB muestra ficha informativa/version.
    - Con evento elegido: ColtyLAB deja paso a AVANCE DEL EVENTO. */
@@ -9,7 +9,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const DEFAULT_VERSION_LABEL = 'v23_prod_voz3';
+  const DEFAULT_VERSION_LABEL = 'v23_prod_r1';
   function currentVersionLabel(){
     try{
       const meta = document.querySelector('meta[name="controlevent-build"]');

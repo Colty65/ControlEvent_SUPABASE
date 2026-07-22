@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod - logo inicial Peña El Arrastre fijo por CSS, sin ficha/texto ni cambios de tamaño. */
+/* ControlEvent v23_prod_r1 - logo inicial Peña El Arrastre fijo por CSS, sin ficha/texto ni cambios de tamaño. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17LogoFijoUnaVezFinal';

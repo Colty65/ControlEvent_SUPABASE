@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod · VOZ3 GRATIS
+/* ControlEvent v23_prod_r1 · VOZ3 GRATIS
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.

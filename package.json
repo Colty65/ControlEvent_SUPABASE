@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v23-prod",
-  "version": "23.0.0",
+  "name": "controlevent-v23-prod-r1",
+  "version": "23.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "node scripts/dev-server.js",
     "dev:supabase": "node scripts/dev-server-supabase.js",
     "supabase:check": "node scripts/check-supabase-schema.js",
-    "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js"
+    "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js",
+    "test:zuzu": "node scripts/test-zuzu-v23-1.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -1,9 +1,9 @@
-/* ControlEvent v23_prod - LowResourceBoot
+/* ControlEvent v23_prod_r1 - LowResourceBoot
    Modo tactil/turbo para iPad/Android modestos.
    En produccion trabaja sin indicador visible; el panel aparece solo con ?ceDiag=1. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod';
+  const VERSION = 'ControlEvent v23_prod_r1';
   const params = new URLSearchParams(location.search || '');
   const ua = navigator.userAgent || '';
   const platform = navigator.platform || '';

@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod OPT2E - GRAFICAS: un solo pintado final sin retemblores.
+/* ControlEvent v23_prod_r1 OPT2E - GRAFICAS: un solo pintado final sin retemblores.
    Alcance cerrado: solo estabilización visual de GRAFICAS durante cambio de evento.
    - No cambia planificación, compras, ingresos, documentos, tickets ni avance.
    - Mantiene la última gráfica válida durante el cambio.

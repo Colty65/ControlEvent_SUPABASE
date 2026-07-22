@@ -1,4 +1,4 @@
-// ControlEvent v23_prod · FIX18 mínimo
+// ControlEvent v23_prod_r1 · FIX18 mínimo
 // Solo: Vista aérea (saldo descuentos, activo único y ancho), selector eventos por fecha/color, descripción para Zuzu ya va en backend.
 (function(){
   'use strict';

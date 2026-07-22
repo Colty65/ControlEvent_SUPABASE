@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod FIX24 - modo reposo: reduce ventilador/longtasks en PC y móviles.
+/* ControlEvent v23_prod_r1 FIX24 - modo reposo: reduce ventilador/longtasks en PC y móviles.
    No toca datos, fotos, permisos ni cálculos. */
 (function(){
   'use strict';

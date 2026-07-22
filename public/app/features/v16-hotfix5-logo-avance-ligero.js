@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v23_prod_r1 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    FIX7: asistencia ampliada + no socios, y no actuar durante logon.
    - Mantiene selector/orden de FIX4.
    - La lógica de avance se ejecuta solo con sesión activa. */
@@ -123,7 +123,7 @@
       const same = sameNorm(c.name,group.name) || (c.pid && String(c.pid)===String(group.id));
       if(!same) return false;
       const rawNumero = rowNumeroRaw(c.row);
-      return rawNumero === 0 || rowNumero(c.row) >= group.size;
+      return (rawNumero === 0 && /^(BANCO|EFECTIVO|BIZUM|EXENTO|EXENTA|INVITADO|INVITADA|CONFIRMADO|CONFIRMADA|ASISTE|SI|SÍ|PAGADO|PAGADA)$/.test(up(c.row?.situacion||c.row?.estado||c.row?.ingreso||c.row?.formaPago||''))) || rowNumero(c.row) >= group.size;
     });
   }
   function directSingleAttend(name, personId, colNames){
@@ -141,6 +141,19 @@
     return [...byName.values()].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
   }
   function socioDisplay(canonicos, colaboradores){
+    // Fuente única cliente. AVANCE DEL EVENTO no mantiene un cálculo paralelo.
+    const canonical=safe(()=>window.ControlEventCanonicalAttendance?.calculate?.(st(),evId()),null);
+    if(canonical){
+      return {
+        asistentes:Array.isArray(canonical.asistentes)?canonical.asistentes:[],
+        noAsisten:Array.isArray(canonical.noAsisten)?canonical.noAsisten:[],
+        noSocios:Array.isArray(canonical.noSocios)?canonical.noSocios:[],
+        total:num(canonical.total),
+        totalAs:num(canonical.totalAs),
+        totalNo:num(canonical.totalNo),
+        totalNoSocios:num(canonical.totalNoSocios)
+      };
+    }
     const colNames=colaboradoresSocioEvento(colaboradores);
     const asistentes=[]; const noAsisten=[];
     canonicos.forEach(item=>{
@@ -305,7 +318,7 @@
     const rows=avanceRows(); const cls=finalizado()?'finalizado':'curso';
     layer.innerHTML=`<div class="ce-v16hf5-bubble ${cls}" role="dialog" aria-live="polite">
       <button type="button" class="ce-v16hf5-close" aria-label="Cerrar">×</button>
-      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod</span><strong>${esc(title())}</strong></div>
+      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod_r1</span><strong>${esc(title())}</strong></div>
       <div class="ce-v16hf5-rows">${rows.map(r=>{const p=palette[r.color]||palette.blue; const pct=Math.max(0,Math.min(100,num(r.p))); return `<div class="ce-v16hf5-row" style="--ce-av-color:${p[0]};--ce-av-bg:${p[1]}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${pct.toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-v16hf5-bar"><i style="width:${pct}%"></i></span>${r.html||''}</div>`;}).join('')}</div>
     </div>`;
     layer.classList.add('visible');

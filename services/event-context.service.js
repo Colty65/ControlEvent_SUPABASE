@@ -1,5 +1,7 @@
-/* ControlEvent v23_prod - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v23_prod_r1 - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
+import { analyzeZuzuReportRequest, isBroadEventReportRequest } from './zuzu-report-policy.service.js';
+import { buildCanonicalAttendance } from './zuzu-attendance.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -720,7 +722,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v23_prod - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v23_prod_r1 - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -773,7 +775,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v23_prod - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v23_prod_r1 - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','METEO'];
@@ -1209,7 +1211,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v23_prod',
+    version: 'ControlEvent Zuzu Planner v23_prod_r1',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null,
@@ -1568,89 +1570,9 @@ function zuzuCanonicalSocioCensusFromState(state) {
   }
   return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 }
-function zuzuCanonicalAttendanceFromState(state, eventIds, helpers) {
-  const census = zuzuCanonicalSocioCensusFromState(state);
-  const eventMap = new Map(arr(state?.eventos).map(ev => [trim(ev?.id), trim(ev?.titulo || ev?.Titulo || ev?.nombre || ev?.id)]));
-  const porEvento = [];
-  for (const eventId of arr(eventIds).map(trim).filter(Boolean)) {
-    const incomes = arr(state?.colaboradores).filter(row => rowEventId(row) === eventId);
-    const normalizedRows = incomes.map(row => {
-      const personaId = rowPersonaId(row);
-      const person = helpers?.people?.get?.(personaId) || {};
-      const name = trim(person?.nombre || person?.Nombre || row?.nombre || row?.Nombre || row?.personaNombre || row?.colaborador || personaId);
-      const rango = norm(person?.rango || person?.Rango || row?.rango || row?.Rango || row?.personaRango || '');
-      return { row, personaId, name, key:zuzuAttendanceNameKey(name), rango, rawNumber:zuzuAttendanceRawNumber(row), size:zuzuAttendanceRowSize(row,name) };
-    }).filter(x => x.name && !zuzuAttendanceExcludedName(x.name));
-
-    const socioRows = normalizedRows.filter(x => x.rango === 'socio' && x.rawNumber !== null && x.rawNumber >= 0);
-    const asistentesSocios = [];
-    const noAsistenSocios = [];
-    function matches(item, row) {
-      return (row.personaId && item.id && row.personaId === item.id) || row.key === item.key;
-    }
-    function directPair(item) {
-      return socioRows.some(row => matches(item,row) && (row.rawNumber === 0 || row.size >= item.size));
-    }
-    function directSingle(name, id='') {
-      const key = zuzuAttendanceNameKey(name);
-      return socioRows.some(row => (id && row.personaId && row.personaId === id) || row.key === key);
-    }
-    for (const item of census) {
-      if (item.kind === 'pair') {
-        if (directPair(item)) {
-          asistentesSocios.push({ nombre:item.name, personas:item.size, tipo:'pareja canónica' });
-          continue;
-        }
-        const presentes = [], ausentes = [];
-        for (const part of item.parts) (directSingle(part) ? presentes : ausentes).push(part);
-        if (!presentes.length) noAsistenSocios.push({ nombre:item.name, personas:item.size, tipo:'pareja canónica' });
-        else {
-          presentes.forEach(nombre => asistentesSocios.push({ nombre, personas:1, tipo:'socio individual' }));
-          ausentes.forEach(nombre => noAsistenSocios.push({ nombre, personas:1, tipo:'socio individual' }));
-        }
-        continue;
-      }
-      if (directSingle(item.name,item.id)) asistentesSocios.push({ nombre:item.name, personas:1, tipo:'socio individual' });
-      else noAsistenSocios.push({ nombre:item.name, personas:1, tipo:'socio individual' });
-    }
-
-    const noSocioByKey = new Map();
-    for (const row of normalizedRows.filter(x => x.rango !== 'socio')) {
-      const key = row.key || row.personaId;
-      if (!key) continue;
-      const old = noSocioByKey.get(key);
-      const item = { nombre:row.name, personas:Math.max(1,row.size), tipo:'no socio asistente' };
-      if (!old || item.personas > old.personas) noSocioByKey.set(key,item);
-    }
-    const asistentesNoSocios = [...noSocioByKey.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'}));
-    asistentesSocios.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'}));
-    noAsistenSocios.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'}));
-    const totalSociosCenso = census.reduce((a,x)=>a+num(x.size),0);
-    const totalSociosAsistentes = asistentesSocios.reduce((a,x)=>a+num(x.personas),0);
-    const totalSociosNoAsistentes = noAsistenSocios.reduce((a,x)=>a+num(x.personas),0);
-    const totalNoSociosAsistentes = asistentesNoSocios.reduce((a,x)=>a+num(x.personas),0);
-    porEvento.push({
-      Evento: eventMap.get(eventId) || eventId,
-      eventId,
-      registrosIngreso: incomes.length,
-      registrosSocios: normalizedRows.filter(x=>x.rango==='socio').length,
-      registrosNoSocios: normalizedRows.filter(x=>x.rango!=='socio').length,
-      sociosCensoPersonas: totalSociosCenso,
-      sociosAsistentesPersonas: totalSociosAsistentes,
-      noSociosAsistentesPersonas: totalNoSociosAsistentes,
-      totalAsistentesPersonas: totalSociosAsistentes + totalNoSociosAsistentes,
-      sociosNoAsistentesPersonas: totalSociosNoAsistentes,
-      sociosAsistentes: asistentesSocios,
-      noSociosAsistentes: asistentesNoSocios,
-      sociosNoAsistentes: noAsistenSocios,
-      criterio: 'Cálculo canónico: PERSONAS con Rango=SOCIO; excluye registros técnicos Grupo/Peña/Personas/z_DEV; parejas con " y " cuentan por sus personas y sustituyen individuales duplicados; colaboradores se clasifican por el rango maestro. Los registros de ingreso nunca se presentan como número de asistentes.'
-    });
-  }
-  return {
-    fuente: 'ControlEvent · cálculo canónico único de asistencia',
-    regla: 'Siempre comunicar personas: socios asistentes + no socios asistentes = total asistentes. Mostrar registros de ingreso solo como dato administrativo separado.',
-    porEvento
-  };
+function zuzuCanonicalAttendanceFromState(state, eventIds) {
+  // Compatibilidad interna: delega siempre en la única implementación canónica.
+  return buildCanonicalAttendance(state, eventIds);
 }
 
 function zuzuCanonicalMetricsFromModules(modulos, asistenciaCanonica = null) {
@@ -1836,11 +1758,16 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (p.needsClarification && !localPlan.modules?.length && !arr(p.modules || p.modulos).length) return { needsClarification: true, clarification: p.clarification || 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres.' };
   const strictPlan = p.__strictEventScope === true || p.__queryTemplatePlan === true;
   const sqlSelects = arr(p.selectsPropuestos || p.selectsPropuestas || p.sqlSelects || p.selects).map(trim).filter(Boolean);
+  const reportPolicy = analyzeZuzuReportRequest(userPrompt);
   const sqlModules = zuzuModulesFromSqlSelects(sqlSelects).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
-  const rawPlanModules = zuzuUnique([].concat(arr(p.modules || p.modulos).map(zuzuUpperModule), sqlModules)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  const policyModules = arr(reportPolicy.modules).map(zuzuUpperModule).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  const rawPlanModules = zuzuUnique([].concat(arr(p.modules || p.modulos).map(zuzuUpperModule), sqlModules, policyModules)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+  // La política estructural del informe prevalece también con plan estricto: si el usuario
+  // pide un informe general/detallado, ningún planificador puede dejar fuera compras,
+  // donaciones, tickets o documentos. El alcance de eventos sigue siendo estricto.
   const modules = strictPlan
     ? zuzuUnique(rawPlanModules)
-    : zuzuUnique([].concat(rawPlanModules, arr(localPlan.modules)).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
+    : zuzuUnique([].concat(rawPlanModules, arr(localPlan.modules), policyModules).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
   if (!modules.length) return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: indica si quieres ingresos, compras, donaciones, productos, personas, meteo o eventos.' };
   const extractModules = modules.filter(m => m !== 'METEO');
   const helpers = makeHelpers(safeState);
@@ -1876,8 +1803,11 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   // las filas operativas. Una condición mal interpretada (p. ej. "En curso") podía
   // vaciar INGRESOS/COMPRAS/DONACIONES aunque los eventos sí tuvieran datos.
   const promptNormFullData = norm(userPrompt);
-  const fullEventDataRequested = /\b(toda\s+la\s+info(?:rmaci[oó]n)?(?:\s+disponible)?|informaci[oó]n\s+completa|datos\s+completos|informe\s+(?:completo|exhaustivo)|dossier\s+completo)\b/.test(promptNormFullData)
-    && /\b(evento|eventos|compara|comparativa|comparar)\b/.test(promptNormFullData);
+  const fullEventDataRequested = isBroadEventReportRequest(userPrompt)
+    || reportPolicy.detailLevel === 'detailed'
+    || reportPolicy.detailLevel === 'exhaustive'
+    || (/\b(toda\s+la\s+info(?:rmaci[oó]n)?(?:\s+disponible)?|informaci[oó]n\s+completa|datos\s+completos|informe\s+(?:completo|exhaustivo)|dossier\s+completo)\b/.test(promptNormFullData)
+      && /\b(evento|eventos|compara|comparativa|comparar)\b/.test(promptNormFullData));
   const emptyOperationalFilters = { personas: [], productos: [], tiendas: [], responsables: [], donantes: [], tickets: [], segmentos: [], destinos: [], rangos: [], anios: [], estado: [] };
   const operationalFilters = fullEventDataRequested ? emptyOperationalFilters : filters;
   if (!strictPlan) eventIds = zuzuApplyEventFilters(eventIds, safeState, filters);
@@ -1917,20 +1847,25 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       modulos.TICKETS = zuzuModuleTickets(safeState, eventIds, emptyOperationalFilters, helpers, ticketImages);
       if (modulos.TICKETS.length) recoveredOperationalModules.push('TICKETS');
     }
+    if (extractModules.includes('DOCUMENTOS') && !arr(modulos.DOCUMENTOS).length && rawExpected('DOCUMENTOS') > 0) {
+      modulos.DOCUMENTOS = zuzuModuleDocumentos(safeState, eventIds, ticketImages);
+      if (modulos.DOCUMENTOS.length) recoveredOperationalModules.push('DOCUMENTOS');
+    }
   }
   const eventRows = masterCatalogOnly ? [] : arr(safeState.eventos).filter(e => eventIds.includes(trim(e?.id))).map(e => ({ 'Titulo del evento': trim(e?.titulo), Precio: round(e?.precio, 2), 'fecha ini': trim(e?.fechaIni), 'fecha fin': trim(e?.fechaFin), Estado: trim(e?.situacion || 'En curso'), 'Descripción': trim(e?.descripcion || '') }));
   const totals = Object.fromEntries(Object.entries(modulos).map(([k,v]) => [k, arr(v).length]));
   const auditoriaModulos = zuzuBuildModuleAudit(safeState, eventIds, filters, modulos);
-  const asistenciaCanonica = zuzuCanonicalAttendanceFromState(safeState, eventIds, helpers);
+  const asistenciaCanonica = buildCanonicalAttendance(safeState, eventIds);
   const metricasCanonicas = zuzuCanonicalMetricsFromModules(modulos, asistenciaCanonica);
   const advertenciasAuditoria = auditoriaModulos.filter(a => !a.filtrosAplicados && a.registrosEntregados !== a.registrosFuenteSinFiltros && a.modulo !== 'EVENTOS')
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   if (recoveredOperationalModules.length) advertenciasAuditoria.push(`ControlEvent recuperó sin filtros los módulos ${recoveredOperationalModules.join(', ')} porque la petición exigía toda la información de los eventos y el primer filtrado había dejado filas fuera.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v23_prod',
+    versionContexto: 'ControlEvent Zuzu Modules v23_prod_r1',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v23_prod: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
+    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v23_prod_r1: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
+    politicaInforme: reportPolicy,
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
     planZuzu: { modules, plantillasConsulta: arr(p.queryTemplates || p.query_templates), eventosObjetivo: eventRows.map(e => e['Titulo del evento']), filtrosHumanos: filters, modoExtraccion: sqlSelects.length ? 'SELECTS_PROPUESTOS_ZUZU_EJECUCION_REAL' : (strictPlan ? 'PLANTILLAS_CERRADAS_ALCANCE_ESTRICTO' : (allRowsMode ? 'MODULOS_COMPLETOS_SIN_FILTROS_DE_REDUCCION' : 'SELECTIVO')), planificador: trim(p.__zuzuPlannerProvider || 'local'), razonamiento: trim(p.reasoning || p.razonamiento || localPlan.reasoning || ''), selectsPropuestos: sqlSelects, selectsRechazados: arr(p.selectsRechazados), selectsAplicados: sqlFilterPlan.notes, notaFiltrosSql: 'Los literales de las SELECTs no se usan como filtros CE automáticos; la SQL se ejecuta literalmente y los módulos oficiales quedan como respaldo/auditoría.' },
     eventosObjetivo: eventRows,
@@ -1946,8 +1881,10 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
       { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' },
-      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v23_prod experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
-      { id: 'V23-ASISTENCIA-CANONICA', regla: 'Toda cifra o listado de asistentes y no asistentes debe salir exclusivamente de asistenciaCanonica.porEvento. registrosIngreso/Colaboradores registros son filas administrativas, no personas. Comunicar siempre socios asistentes, no socios asistentes y total de personas por separado.' }
+      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v23_prod_r1 experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
+      { id: 'V23_1-ASISTENCIA-UNICA', regla: 'Toda cifra o listado de asistentes y no asistentes sale exclusivamente de asistenciaCanonica.porEvento. Numero>0 confirma; Numero=0 solo cuenta con estado explícito de asistencia/exención/invitación. Registros de ingreso son filas administrativas, no personas.' },
+      { id: 'V23_1-COBERTURA-INFORME', regla: 'politicaInforme define todos los módulos exigidos por la petición. Un informe general o con detalles incluye descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia; METEO si se pide. No cerrar la respuesta si falta uno.' },
+      { id: 'V23_1-NO-REDUNDANCIA', regla: 'En un solo evento, nombrar el título completo una vez. Cada persona o pareja se menciona una sola vez. No repetir en prosa listados que ya se muestran en una tabla.' }
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',
@@ -1957,7 +1894,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',
-      asistenciaCanonica: 'Para asistencia usa SOLO asistenciaCanonica.porEvento. Nunca equipares 14/15 registros de colaboradores con asistentes. Una pareja puede ser un registro y dos personas. Informa: socios asistentes + no socios asistentes = total asistentes; y usa el listado canónico de socios no asistentes.',
+      asistenciaCanonica: 'Para asistencia usa SOLO asistenciaCanonica.porEvento. Numero>0 confirma asistencia; Numero=0 solo si la situación lo confirma. Parejas cuentan por personas. Informa una sola vez: socios asistentes + no socios asistentes = total asistentes. Los nombres se muestran una sola vez y únicamente si se piden.',
+      coberturaInforme: 'Usa politicaInforme. Para informe/detalles generales, no omitas descripción, ingresos, compras, donaciones, saldos, tickets/facturas ni documentos aunque el prompt no los enumere. Interpreta los datos; no vuelques información técnica cruda.',
+      noRedundancia: 'No repitas el nombre del evento ni nombres de personas en varios párrafos/tablas. En evento único, elimina la columna Evento de anexos cuando no aporta comparación.',
       usuarioLogado: 'Personaliza la respuesta con usuarioLogado cuando encaje: Nombre para contexto serio/informe y Identificacion para charla informal. No digas que no tienes datos de una persona sin haber revisado PERSONAS, INGRESOS, COMPRAS, DONACIONES y usuarioLogado.'
     },
     advertencias: advertenciasAuditoria

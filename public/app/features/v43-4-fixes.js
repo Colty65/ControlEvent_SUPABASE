@@ -1,9 +1,9 @@
-/* ControlEvent v23_prod - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
+/* ControlEvent v23_prod_r1 - gráficas estables sin parpadeo, buscadores, resumen y etiquetas de Mapa de recursos. */
 (function(){
   'use strict';
   window.__ceDisableLegacyBarGraficas = true;
-  const VERSION = 'ControlEvent v23_prod';
-  const VERSION_FILE = 'ControlEvent_v23_prod';
+  const VERSION = 'ControlEvent v23_prod_r1';
+  const VERSION_FILE = 'ControlEvent_v23_prod_r1';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const fold = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();

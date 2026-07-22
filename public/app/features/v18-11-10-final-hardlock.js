@@ -1,15 +1,36 @@
-/* ControlEvent v23_prod - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v23_prod_r1 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v23_prod';
-  var VERSION_TEXT='ControlEvent v23_prod';
-  var VERSION_FILE='ControlEvent_v23_prod';
-  var BUILD_ID='20260708-200500';
-  var ZIP_NAME='CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';
+  var VERSION_LABEL='v23_prod_r1';
+  var VERSION_TEXT='ControlEvent v23_prod_r1';
+  var VERSION_FILE='ControlEvent_v23_prod_r1';
+  var BUILD_ID='20260722-V23-PROD-R1-INFORMES';
+  var ZIP_NAME='CE_v23_PROD_R1_ZUZU_INFORMES_DEPURADOS.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
+  function normalizeVersionValue(value){
+    return String(value||'')
+      .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
+      .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
+      .replace(/v23_prod(?:_r1)?/ig,VERSION_LABEL);
+  }
+  function patchDownloadNames(){
+    safe(function(){
+      var proto=HTMLAnchorElement.prototype;
+      if(proto.click && !proto.click.__ceV23R1NameLock){
+        var old=proto.click;
+        var wrapped=function(){ try{ if(this.download) this.download=normalizeVersionValue(this.download); }catch(_){ } return old.apply(this,arguments); };
+        wrapped.__ceV23R1NameLock=true; proto.click=wrapped;
+      }
+      ['makeInfoEventoFilename','xlsxFilename'].forEach(function(name){
+        var fn=window[name]; if(typeof fn!=='function'||fn.__ceV23R1NameLock)return;
+        var wrapped=function(){ return normalizeVersionValue(fn.apply(this,arguments)); };
+        wrapped.__ceV23R1NameLock=true; window[name]=wrapped;
+      });
+    });
+  }
   function installStyle(){
     if(document.getElementById('ceV181110FinalHardlockStyle')) return;
     var st=document.createElement('style'); st.id='ceV181110FinalHardlockStyle';
@@ -33,7 +54,7 @@
   function setGlobals(){
     safe(function(){
       window.__ceVersionLabel=VERSION_LABEL; window.__ceVersion=VERSION_TEXT; window.VERSION=VERSION_TEXT; window.VERSION_FILE=VERSION_FILE;
-      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v19-final-hardlock'};
+      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v23-prod-r1-hardlock'};
       document.title=VERSION_TEXT;
       if(document.body){ document.body.dataset.ceVersion=VERSION_TEXT; document.body.dataset.ceBuild=BUILD_ID; document.body.dataset.ceZip=ZIP_NAME; }
     });
@@ -69,9 +90,9 @@
       // FIX10: se elimina la etiqueta técnica visible del informe Zuzu.
     });
   }
-  function apply(){ installStyle(); setGlobals(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }
+  function apply(){ installStyle(); setGlobals(); patchDownloadNames(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }
   window.ControlEventVersionCheck=function(){
-    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v19-final-hardlock'};
+    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v23-prod-r1-hardlock'};
     return fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(api){ var out={front:front,api:api,ok:!!(api&&api.version===VERSION_TEXT&&api.label===VERSION_LABEL)}; console.log('[ControlEvent version check]',out); return out; }).catch(function(error){ var out={front:front,api:null,ok:false,error:String(error&&error.message||error)}; console.warn('[ControlEvent version check]',out); return out; });
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();

@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
+/* ControlEvent v23_prod_r1 - Diagnóstico precio referencia PRODUCTOS tras importar BACKUP */
 (function(){
   const VERSION = 'v30.7';
   const num = v => {

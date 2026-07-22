@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod - versión centralizada */
-export const VERSION = 'v23_prod';
-export const VERSION_LABEL = 'v23_prod';
-export const VERSION_TEXT = 'ControlEvent v23_prod';
-export const VERSION_FILE = 'ControlEvent_v23_prod';
-export const BUILD_ID = '20260721-V23-PROD-CANONICO';
-export const ZIP_NAME = 'CE_v23_PROD_CANONICO_ZUZU_METEO.zip';
+/* ControlEvent v23_prod_r1 - versión centralizada */
+export const VERSION = 'v23_prod_r1';
+export const VERSION_LABEL = 'v23_prod_r1';
+export const VERSION_TEXT = 'ControlEvent v23_prod_r1';
+export const VERSION_FILE = 'ControlEvent_v23_prod_r1';
+export const BUILD_ID = '20260722-V23-PROD-R1-INFORMES';
+export const ZIP_NAME = 'CE_v23_PROD_R1_ZUZU_INFORMES_DEPURADOS.zip';
 
 try {
   window.__ceVersion = VERSION;

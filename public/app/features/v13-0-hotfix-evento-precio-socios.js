@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod hotfix - mantenimiento EVENTOS robusto y planificación socios obligatorios.
+/* ControlEvent v23_prod_r1 hotfix - mantenimiento EVENTOS robusto y planificación socios obligatorios.
    - Guarda todos los campos de EVENTOS con CRUD fila-a-fila, aunque el evento activo esté Finalizado.
    - Captura click/pointer/touch sobre Modificar para evitar que otros bloqueos de Finalizado lo anulen.
 */
