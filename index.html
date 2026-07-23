@@ -7,7 +7,7 @@
   <title>ControlEvent v23_prod_r2</title>
   <!-- ControlEvent v23_prod_r2 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
-  <meta name="controlevent-build" content="20260722-V23-PROD-R2-HITOS1" />
+  <meta name="controlevent-build" content="20260723-V23-PROD-R2-HITOS2-MENU" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,7 +44,7 @@
   <style id="ce-login-overlay-clean-head">#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
 
     <link rel="stylesheet" href="./app/styles/app.css" />
-    <link rel="stylesheet" href="./app/styles/hitos-control.css?v=v23_prod_r2_HITOS1" />
+    <link rel="stylesheet" href="./app/styles/hitos-control.css?v=v23_prod_r2_HITOS2_MENU" />
     <script src="./app/features/v8-5-compras-rpc-head-fix40.js?v=v23_prod_20260708170000"></script>
     <script src="./app/features/v8-5-crud-root-fix28.js?v=v23_prod_20260709194000_FIX16"></script>
 
@@ -549,7 +549,7 @@
       <button type="button" id="btnExportExcel" class="iconbtn outline app-lockable" title="Excel"><img class="footer-img" alt="Excel" src="./assets/embedded/footer-excel.jpg" /></button>
       <button type="button" id="btnOpenImport" class="iconbtn outline app-lockable" title="Carga inicial"><img class="footer-img" alt="Carga inicial" src="./assets/embedded/footer-importacion.jpg" /></button>
       <button type="button" id="btnExportSeed" class="iconbtn outline app-lockable" title="Descarga de datos"><img class="footer-img" alt="Descarga de datos" src="./assets/embedded/footer-descarga-datos.jpg" /></button>
-      <button type="button" id="btnOpenHitos" class="iconbtn outline app-lockable" title="Control de Hitos"><img class="footer-img" alt="Control de Hitos" src="./hitos-evento.jpg" /></button>
+      <button type="button" id="btnOpenHitos" class="iconbtn outline" data-ce-open-hitos="1" aria-controls="ceHitosOverlay" title="Control de Hitos" onclick="return window.ceOpenControlHitos ? window.ceOpenControlHitos(event) : false;"><img class="footer-img" alt="Control de Hitos" src="./hitos-evento.jpg" /></button>
       <button type="button" id="btnToggleMaintenance" class="iconbtn secondary app-lockable maint-btn-closed" title="Mantenimiento de tablas generales"><img class="footer-img maint-footer-img" alt="Mantenimiento de tablas generales" src="./assets/embedded/footer-mantenimiento.png" /></button>
     </div>
   </div></div>
@@ -677,6 +677,6 @@
   <script src="./app/features/v19-fix16-prod.js?v=v23_prod_20260710152000_FIX18"></script>
   <script src="./app/features/v19-fix18-prod.js?v=v23_prod_20260710152000_FIX18"></script>
   <script src="./app/features/v22-voz3-zuzu.js?v=v23_prod_r2_20260722_INFORMES"></script>
-  <script src="./app/features/v23-2-hitos-control.js?v=v23_prod_r2_HITOS1"></script>
+  <script src="./app/features/v23-2-hitos-control.js?v=v23_prod_r2_HITOS2_MENU"></script>
 </body>
 </html>

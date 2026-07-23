@@ -6,7 +6,7 @@ Primera versión funcional del módulo **Control de Hitos y Líneas de Gestión 
 
 1. Abrir **Supabase → SQL Editor**.
 2. Ejecutar completo `ControlEvent_SQL_V23_R2_HITOS.sql`.
-3. Desplegar el contenido de `CE_v23_PROD_R2_CONTROL_HITOS_1.zip` en GitHub/Vercel.
+3. Desplegar el contenido de `CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip` en GitHub/Vercel.
 4. Seleccionar un evento y pulsar el nuevo icono del cronómetro verde en el pie de ControlEvent.
 
 Si las tablas aún no existen, la propia ventana muestra un aviso indicando qué SQL debe ejecutarse.
@@ -91,5 +91,5 @@ El módulo es independiente del estado general para evitar parches sobre pantall
 ## Versión
 
 - Aplicación: `v23_prod_r2`
-- Build: `20260722-V23-PROD-R2-HITOS1`
-- ZIP: `CE_v23_PROD_R2_CONTROL_HITOS_1.zip`
+- Build: `20260723-V23-PROD-R2-HITOS2-MENU`
+- ZIP: `CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip`

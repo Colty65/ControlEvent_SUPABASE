@@ -1,0 +1,36 @@
+{
+  "version": "v23_prod_r2",
+  "build": "20260723-V23-PROD-R2-HITOS2-MENU",
+  "base": "v23_prod_r2-hitos1",
+  "feature": "Corrección estructural del acceso de menú a Control de Hitos",
+  "database": {
+    "sql": "ControlEvent_SQL_V23_R2_HITOS.sql",
+    "schemaChanged": false,
+    "tables": [
+      "ce_hitos",
+      "ce_lg"
+    ]
+  },
+  "fixes": [
+    "El botón abre la ventana mediante enlace directo y delegación en fase de captura",
+    "El enlace se recupera si el DOM sustituye el botón",
+    "El botón no queda bloqueado por el estado finalizado del evento",
+    "El menú lateral reconoce el nuevo icono en PC y móvil",
+    "Nuevo identificador de build para evitar servir JavaScript anterior"
+  ],
+  "modified": [
+    "index.html",
+    "public/index.html",
+    "app/features/v23-2-hitos-control.js",
+    "public/app/features/v23-2-hitos-control.js",
+    "app/features/v18-11-10-final-hardlock.js",
+    "public/app/features/v18-11-10-final-hardlock.js",
+    "version.js",
+    "app/version.js",
+    "public/app/version.js",
+    "server/paths.js"
+  ],
+  "added": [
+    "README_V23_PROD_R2_CONTROL_HITOS_MENU_FIX.md"
+  ]
+}

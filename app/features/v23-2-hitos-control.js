@@ -1,9 +1,9 @@
 /* ControlEvent v23_prod_r2 · Control de Hitos y Líneas de Gestión */
 (function(root){
   'use strict';
-  if(root.ControlEventHitos) return;
+  const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v23_prod_r2-hitos1';
+  const VERSION = 'v23_prod_r2-hitos2-menu';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {
@@ -15,7 +15,7 @@
   const app = () => root.ControlEventApp || root.ControlEventRuntime?.app || null;
   const state = () => app()?.state || root.state || {};
   const auth = () => app()?.authUser || root.authUser || root.__CONTROL_EVENT_USER__ || null;
-  const eventId = () => text(state().selectedEventId || $('selectedEvent')?.value);
+  const eventId = () => text($('selectedEvent')?.value || state().selectedEventId || state().eventoSeleccionadoId || root.selectedEventId);
   const eventName = id => text(arr(state().eventos).find(row => text(row.id) === text(id))?.titulo || $('selectedEvent')?.selectedOptions?.[0]?.textContent || 'Evento');
   const canWrite = () => ['GD','RW'].includes(text(auth()?.nivel).toUpperCase());
   const excludedPerson = name => { const n = norm(name); return !n || /^grupo\b/.test(n) || /^pena\b/.test(n) || /^z\s*_?\s*dev/.test(n) || /^personas\b/.test(n); };
@@ -325,19 +325,77 @@
     try{ await api(`/api/hitos/${encodeURIComponent(id)}`,{method:'DELETE'}); setStatus('Hito eliminado.','ok'); await load(true); }catch(error){alert(error.message||String(error));}
   }
 
-  function installButton(){
-    const button=$('btnOpenHitos');
-    if(button){ button.addEventListener('click',openWindow); button.disabled=false; }
+  function menuHandler(event){
+    try{
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      event?.stopImmediatePropagation?.();
+    }catch(_){ }
+    Promise.resolve(openWindow()).catch(error => {
+      console.error('[ControlEvent Hitos] No se pudo abrir la ventana', error);
+      alert(error?.message || 'No se pudo abrir el Control de Hitos.');
+    });
+    return false;
   }
+
+  function prepareButton(button){
+    if(!button) return;
+    if(button.disabled) button.disabled = false;
+    if(button.hasAttribute('disabled')) button.removeAttribute('disabled');
+    if(button.classList.contains('locked')) button.classList.remove('locked');
+    if(button.style.getPropertyValue('pointer-events') !== 'auto' || button.style.getPropertyPriority('pointer-events') !== 'important') button.style.setProperty('pointer-events','auto','important');
+    if(button.style.getPropertyValue('opacity') !== '1' || button.style.getPropertyPriority('opacity') !== 'important') button.style.setProperty('opacity','1','important');
+    if(button.dataset.ceOpenHitos !== '1') button.dataset.ceOpenHitos = '1';
+    if(button.getAttribute('aria-controls') !== 'ceHitosOverlay') button.setAttribute('aria-controls','ceHitosOverlay');
+    if(button.onclick !== menuHandler) button.onclick = menuHandler;
+    button.__ceHitosBound = VERSION;
+  }
+
+  function installButton(){
+    prepareButton($('btnOpenHitos'));
+  }
+
+  function installDelegatedMenu(){
+    if(root.__ceHitosDelegatedMenuInstalled) return;
+    root.__ceHitosDelegatedMenuInstalled = true;
+    document.addEventListener('click', event => {
+      const button = event.target?.closest?.('#btnOpenHitos,[data-ce-open-hitos="1"]');
+      if(!button) return;
+      menuHandler(event);
+    }, true);
+  }
+
+  function keepMenuConnected(){
+    installButton();
+    try{
+      if(!root.__ceHitosMenuObserver){
+        root.__ceHitosMenuObserver = new MutationObserver(() => installButton());
+        root.__ceHitosMenuObserver.observe(document.documentElement,{childList:true,subtree:true});
+      }
+    }catch(_){ }
+  }
+
   function eventChanged(){
+    installButton();
     if($('ceHitosOverlay') && !$('ceHitosOverlay').classList.contains('hidden')) load(true);
   }
   function install(){
-    installDom(); installButton();
-    $('selectedEvent')?.addEventListener('change',()=>setTimeout(eventChanged,120));
-    root.addEventListener('controlevent:event-changed',eventChanged);
+    installDom(); installDelegatedMenu(); keepMenuConnected();
+    const select=$('selectedEvent');
+    if(select && !select.__ceHitosEventBound){
+      select.__ceHitosEventBound=true;
+      select.addEventListener('change',()=>setTimeout(eventChanged,120));
+    }
+    if(!root.__ceHitosWindowEventsBound){
+      root.__ceHitosWindowEventsBound=true;
+      ['controlevent:event-changed','controlevent:event-ready','controlevent:event-loaded','controlevent:app-ready','controlevent:runtime-ready'].forEach(name => root.addEventListener(name,()=>setTimeout(eventChanged,40)));
+    }
   }
 
-  root.ControlEventHitos={version:VERSION,open:openWindow,close:closeWindow,refresh:()=>load(true),state:store,canonicalIndividuals};
+  root.ceOpenControlHitos = menuHandler;
+  root.ControlEventHitos={version:VERSION,open:openWindow,close:closeWindow,refresh:()=>load(true),state:store,canonicalIndividuals,previous:PREVIOUS_API};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
+  root.addEventListener('load',()=>setTimeout(install,0),{once:true});
+  setTimeout(install,250);
+  setTimeout(install,1200);
 })(window);

@@ -16,5 +16,5 @@ export const APP_VERSION = 'ControlEvent v23_prod_r2';
 
 export const APP_VERSION_LABEL = 'v23_prod_r2';
 export const APP_VERSION_FILE = 'ControlEvent_v23_prod_r2';
-export const BUILD_ID = '20260722-V23-PROD-R2-HITOS1';
-export const ZIP_NAME = 'CE_v23_PROD_R2_CONTROL_HITOS_1.zip';
+export const BUILD_ID = '20260723-V23-PROD-R2-HITOS2-MENU';
+export const ZIP_NAME = 'CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip';
