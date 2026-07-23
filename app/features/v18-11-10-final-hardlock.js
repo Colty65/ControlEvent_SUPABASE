@@ -5,7 +5,7 @@
   var VERSION_LABEL='v23_prod_r2';
   var VERSION_TEXT='ControlEvent v23_prod_r2';
   var VERSION_FILE='ControlEvent_v23_prod_r2';
-  var BUILD_ID='20260723-V23-PROD-R2-HITOS2-MENU';
+  var BUILD_ID='20260723-V23-PROD-R2-HITOS3-MENU-REAL';
   var ZIP_NAME='CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }

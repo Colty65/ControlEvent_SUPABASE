@@ -3,7 +3,7 @@ export const VERSION = 'v23_prod_r2';
 export const VERSION_LABEL = 'v23_prod_r2';
 export const VERSION_TEXT = 'ControlEvent v23_prod_r2';
 export const VERSION_FILE = 'ControlEvent_v23_prod_r2';
-export const BUILD_ID = '20260723-V23-PROD-R2-HITOS2-MENU';
+export const BUILD_ID = '20260723-V23-PROD-R2-HITOS3-MENU-REAL';
 export const ZIP_NAME = 'CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip';
 
 try {

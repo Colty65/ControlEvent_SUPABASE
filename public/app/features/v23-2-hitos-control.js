@@ -3,7 +3,7 @@
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v23_prod_r2-hitos2-menu';
+  const VERSION = 'v23_prod_r2-hitos3-menu-real';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {
@@ -338,8 +338,22 @@
     return false;
   }
 
+  const LEGACY_TOOLTIP_ATTRS = [
+    'title','data-ce-tip-v21','data-ce-tip-layout-v21','data-tip-bg-v21',
+    'data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip',
+    'data-ce-tip-layout-v20','data-tip-bg-v196','data-tip-bg-v1952','data-tip-bg'
+  ];
+
+  function neutralizeLegacyTooltip(button){
+    if(!button) return;
+    LEGACY_TOOLTIP_ATTRS.forEach(attr => button.removeAttribute(attr));
+    button.setAttribute('aria-label','Control de Hitos');
+    button.dataset.ceNoTooltip = '1';
+  }
+
   function prepareButton(button){
     if(!button) return;
+    neutralizeLegacyTooltip(button);
     if(button.disabled) button.disabled = false;
     if(button.hasAttribute('disabled')) button.removeAttribute('disabled');
     if(button.classList.contains('locked')) button.classList.remove('locked');
@@ -348,6 +362,13 @@
     if(button.dataset.ceOpenHitos !== '1') button.dataset.ceOpenHitos = '1';
     if(button.getAttribute('aria-controls') !== 'ceHitosOverlay') button.setAttribute('aria-controls','ceHitosOverlay');
     if(button.onclick !== menuHandler) button.onclick = menuHandler;
+    if(button.__ceHitosPointerGuard !== VERSION){
+      const guard = () => neutralizeLegacyTooltip(button);
+      button.addEventListener('pointerdown', guard, true);
+      button.addEventListener('mousedown', guard, true);
+      button.addEventListener('touchstart', guard, {capture:true, passive:true});
+      button.__ceHitosPointerGuard = VERSION;
+    }
     button.__ceHitosBound = VERSION;
   }
 
@@ -358,6 +379,10 @@
   function installDelegatedMenu(){
     if(root.__ceHitosDelegatedMenuInstalled) return;
     root.__ceHitosDelegatedMenuInstalled = true;
+    ['pointerdown','mousedown','touchstart'].forEach(type => root.addEventListener(type, event => {
+      const button = event.target?.closest?.('#btnOpenHitos,[data-ce-open-hitos="1"]');
+      if(button) neutralizeLegacyTooltip(button);
+    }, true));
     document.addEventListener('click', event => {
       const button = event.target?.closest?.('#btnOpenHitos,[data-ce-open-hitos="1"]');
       if(!button) return;
