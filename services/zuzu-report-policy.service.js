@@ -9,7 +9,7 @@ function norm(value){
 }
 
 export const ZUZU_REPORT_CORE_MODULES = Object.freeze([
-  'EVENTOS','INGRESOS','PERSONAS','COMPRAS','DONACIONES','PRODUCTOS','TIENDAS','TICKETS','DOCUMENTOS'
+  'EVENTOS','INGRESOS','PERSONAS','COMPRAS','DONACIONES','PRODUCTOS','TIENDAS','TICKETS','DOCUMENTOS','HITOS','LG'
 ]);
 
 export function analyzeZuzuReportRequest(prompt=''){
@@ -29,6 +29,8 @@ export function analyzeZuzuReportRequest(prompt=''){
     TIENDAS: /\b(tiendas?|proveedores?)\b/.test(p),
     TICKETS: /\b(tickets?|fototickets?|facturas?|tk\s*\d+)\b/.test(p),
     DOCUMENTOS: /\b(documentos?|adjuntos?|doc\s*\d+|autorizaciones?|solicitudes?|reintegros?)\b/.test(p),
+    HITOS: /\b(hitos?|control\s+de\s+hitos?|control\s+de\s+tareas?)\b/.test(p),
+    LG: /\b(lg|lgs|lineas?\s+de\s+gestion|lineas?\s+gestion|tareas?|dependencias?\s+previas?|dependencias?\s+posteriores?)\b/.test(p),
     METEO: /\b(meteo|meteorolog|metereolog|tiempo|clima|lluvia|temperatura|viento|prevision|pronostico)\b/.test(p)
   };
   const explicitOperational = Object.entries(explicit).filter(([k,v])=>v && !['EVENTOS','METEO'].includes(k)).map(([k])=>k);
@@ -41,6 +43,7 @@ export function analyzeZuzuReportRequest(prompt=''){
   if (modules.has('INGRESOS') || modules.has('PERSONAS')) { modules.add('EVENTOS'); modules.add('INGRESOS'); modules.add('PERSONAS'); }
   if (modules.has('COMPRAS') || modules.has('DONACIONES') || modules.has('TICKETS')) { modules.add('EVENTOS'); modules.add('PRODUCTOS'); modules.add('TIENDAS'); }
   if (modules.has('DOCUMENTOS')) modules.add('EVENTOS');
+  if (modules.has('HITOS') || modules.has('LG')) { modules.add('EVENTOS'); modules.add('HITOS'); modules.add('LG'); }
 
   const greetOneByOne = /\b(?:saluda|saludar)\b[\s\S]{0,80}\b(?:uno\s+por\s+uno|a\s+todos|socios|asistentes)\b/.test(p) || /\buno\s+por\s+uno\b/.test(p);
   const wantsNames = greetOneByOne || /\b(?:enumera|lista|listado|nombres?|quienes|quiénes)\b/.test(p);

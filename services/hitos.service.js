@@ -22,6 +22,52 @@ function normalizeMode(value){ return text(value).toUpperCase() === 'HITO_COMPLE
 function refKey(ref){ return `${normalizeType(ref?.tipo)}:${text(ref?.id)}`; }
 function currentRef(id){ return { tipo: 'LG', id: text(id) }; }
 
+function normIdentity(value){
+  const s = text(value);
+  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function normalizeActor(actor = {}){
+  const raw = actor && typeof actor === 'object' ? actor : {};
+  return {
+    nivel: text(raw.nivel || raw.Nivel).toUpperCase(),
+    identificacion: text(raw.identificacion || raw.Identificacion),
+    nombre: text(raw.nombre || raw.Nombre),
+    responsableId: text(raw.responsableId || raw.responsable_id),
+    responsableNombre: text(raw.responsableNombre || raw.responsable_nombre)
+  };
+}
+function actorCanManageAll(actor){ return ['GD','RW'].includes(normalizeActor(actor).nivel); }
+function actorIsRo(actor){ return normalizeActor(actor).nivel === 'RO'; }
+function requireKnownActor(actor){
+  const a = normalizeActor(actor);
+  if(!['GD','RW','RO'].includes(a.nivel)) fail('No se ha podido identificar el nivel del usuario para modificar Control de Hitos.', 403, 'HITOS_ACTOR_REQUIRED');
+  return a;
+}
+function requireFullAccess(actor){
+  const a = requireKnownActor(actor);
+  if(!actorCanManageAll(a)) fail('Los usuarios RO no pueden crear, modificar ni eliminar Hitos. Sí pueden gestionar las LG de su responsabilidad.', 403, 'HITOS_HITO_FORBIDDEN');
+  return a;
+}
+function actorOwnsLg(actor, row){
+  const a = normalizeActor(actor);
+  if(actorCanManageAll(a)) return true;
+  if(!actorIsRo(a) || !row) return false;
+  const rowId = text(row.responsableId || row.responsable_id);
+  if(a.responsableId && rowId && a.responsableId === rowId) return true;
+  const rowName = normIdentity(row.responsableNombre || row.responsable_nombre);
+  const names = [a.responsableNombre, a.nombre, a.identificacion].map(normIdentity).filter(Boolean);
+  return !!rowName && names.includes(rowName);
+}
+function enforceLgActor(actor, next, old = null){
+  const a = requireKnownActor(actor);
+  if(actorCanManageAll(a)) return next;
+  if(old && !actorOwnsLg(a, old)) fail('Solo puedes modificar LG asignadas a tu responsabilidad.', 403, 'HITOS_LG_NOT_OWNED');
+  if(!a.responsableId && !text(a.responsableNombre || a.nombre || a.identificacion)) fail('No se ha podido resolver tu usuario para asignarte la LG.', 403, 'HITOS_RO_WITHOUT_IDENTITY');
+  next.responsableId = a.responsableId || '';
+  next.responsableNombre = a.responsableNombre || a.nombre || a.identificacion;
+  return next;
+}
+
 function normalizeRefs(value){
   const input = Array.isArray(value) ? value : [];
   const map = new Map();
@@ -58,6 +104,87 @@ function removeRef(list, ref){
 function stripRefs(list, keys){
   return normalizeRefs(list).filter(item => !keys.has(refKey(item)));
 }
+
+function canonicalizeDependencyGraph(hitoRows = [], lgRows = []){
+  const hitos = new Map(arrSafe(hitoRows).map(row => [text(row.id), { ...row }]));
+  const lgs = new Map(arrSafe(lgRows).map(row => [text(row.id), {
+    ...row,
+    dependenciasPrevias: normalizeRefs(row.dependenciasPrevias),
+    dependenciasPosteriores: []
+  }]));
+
+  for(const row of lgs.values()){
+    const own = refKey(currentRef(row.id));
+    row.dependenciasPrevias = normalizeRefs(row.dependenciasPrevias).filter(ref => {
+      if(refKey(ref) === own) return false;
+      if(ref.tipo === 'HITO') return hitos.has(ref.id) && ref.id !== text(row.hitoId);
+      return lgs.has(ref.id);
+    });
+  }
+
+  // Saneado de datos heredados: versiones anteriores permitían editar también las
+  // “posteriores” y podían terminar creando A→B y B→A. Conservamos primero la relación
+  // cronológicamente coherente y omitimos cualquier referencia que cierre un ciclo.
+  const adjacency = new Map([...lgs.keys()].map(id => [id, new Set()]));
+  const warnings = [];
+  const candidates = [];
+  const dateKey = row => dateOrNull(row?.fechaMinima) || dateOrNull(row?.fechaMaxima) || '9999-12-31';
+  for(const row of lgs.values()){
+    normalizeRefs(row.dependenciasPrevias).forEach((ref, index) => {
+      const targets = targetsForRef(ref, lgs).filter(id => id !== row.id);
+      const laterTargets = targets.filter(id => dateKey(lgs.get(id)) > dateKey(row));
+      candidates.push({ row, ref, index, targets, chronologyPenalty: laterTargets.length ? 1 : 0 });
+    });
+    row.dependenciasPrevias = [];
+  }
+  candidates.sort((a,b) => a.chronologyPenalty - b.chronologyPenalty
+    || dateKey(a.row).localeCompare(dateKey(b.row))
+    || integer(a.row.orden,0) - integer(b.row.orden,0)
+    || a.index - b.index);
+  function hasPath(from, to){
+    if(from === to) return true;
+    const seen = new Set();
+    const stack = [from];
+    while(stack.length){
+      const id = stack.pop();
+      if(seen.has(id)) continue;
+      seen.add(id);
+      for(const next of adjacency.get(id) || []){
+        if(next === to) return true;
+        if(!seen.has(next)) stack.push(next);
+      }
+    }
+    return false;
+  }
+  for(const candidate of candidates){
+    const createsCycle = candidate.targets.some(targetId => hasPath(candidate.row.id, targetId));
+    if(createsCycle){
+      warnings.push({
+        lgId: candidate.row.id,
+        descripcion: candidate.row.descripcion,
+        referencia: { ...candidate.ref },
+        motivo: 'Dependencia circular heredada omitida del resultado.'
+      });
+      continue;
+    }
+    candidate.row.dependenciasPrevias = addRef(candidate.row.dependenciasPrevias, candidate.ref);
+    candidate.targets.forEach(targetId => adjacency.get(targetId)?.add(candidate.row.id));
+  }
+
+  // Fuente canónica: dependencias_previas. Las posteriores se derivan siempre de ella.
+  // Así desaparecen relaciones antiguas/huérfanas guardadas solo como “posteriores”.
+  for(const row of lgs.values()){
+    for(const ref of row.dependenciasPrevias){
+      for(const targetId of targetsForRef(ref, lgs)){
+        if(targetId === row.id) continue;
+        const target = lgs.get(targetId);
+        if(target) target.dependenciasPosteriores = addRef(target.dependenciasPosteriores, currentRef(row.id));
+      }
+    }
+  }
+  return { hitos: [...hitos.values()], lgs: [...lgs.values()], dependencyWarnings: warnings };
+}
+function arrSafe(value){ return Array.isArray(value) ? value : []; }
 
 function friendlyDbError(error){
   const msg = text(error?.message || error);
@@ -143,10 +270,10 @@ async function selectEventRows(eventId){
     ]);
     if(hError) throw hError;
     if(lError) throw lError;
-    return {
-      hitos: (hitos || []).map(hitoFromDb),
-      lgs: (lgs || []).map(lgFromDb)
-    };
+    return canonicalizeDependencyGraph(
+      (hitos || []).map(hitoFromDb),
+      (lgs || []).map(lgFromDb)
+    );
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -269,10 +396,35 @@ export async function listHitos(eventId){
       cumplido: lineas.length > 0 && lineas.every(row => row.cumplida)
     };
   });
-  return { ok: true, eventId: ev, hitos, lgs: data.lgs };
+  return { ok: true, eventId: ev, hitos, lgs: data.lgs, dependencyWarnings: arrSafe(data.dependencyWarnings) };
 }
 
-export async function saveHito(id, payload = {}){
+export async function listAllHitosState(){
+  try{
+    const [{ data: hitos, error: hError }, { data: lgs, error: lError }] = await Promise.all([
+      db().from(HITO_TABLE).select('*').order('event_id').order('orden').order('created_at'),
+      db().from(LG_TABLE).select('*').order('event_id').order('orden').order('created_at')
+    ]);
+    if(hError) throw hError;
+    if(lError) throw lError;
+    const hitoRows = (hitos || []).map(hitoFromDb);
+    const lgRows = (lgs || []).map(lgFromDb);
+    const eventIds = [...new Set([...hitoRows.map(row => row.eventId), ...lgRows.map(row => row.eventId)].filter(Boolean))];
+    const out = { hitos: [], lgs: [] };
+    for(const eventId of eventIds){
+      const canonical = canonicalizeDependencyGraph(
+        hitoRows.filter(row => row.eventId === eventId),
+        lgRows.filter(row => row.eventId === eventId)
+      );
+      out.hitos.push(...canonical.hitos);
+      out.lgs.push(...canonical.lgs);
+    }
+    return out;
+  }catch(error){ throw friendlyDbError(error); }
+}
+
+export async function saveHito(id, payload = {}, actor = {}){
+  requireFullAccess(actor);
   const requestedId = text(id || payload.id);
   const rowId = requestedId || randomUUID();
   const eventId = text(payload.eventId || payload.event_id);
@@ -314,7 +466,7 @@ function cloneLgMap(lgs){
   }]));
 }
 
-export async function saveLg(id, payload = {}){
+export async function saveLg(id, payload = {}, actor = {}){
   const requestedId = text(id || payload.id);
   const rowId = requestedId || randomUUID();
   const eventId = text(payload.eventId || payload.event_id);
@@ -347,14 +499,17 @@ export async function saveLg(id, payload = {}){
     fechaMaxima: fechaMaxima || '',
     notas: text(payload.notas ?? old?.notas),
     dependenciaTipo: normalizeMode(payload.dependenciaTipo ?? payload.dependencia_tipo ?? old?.dependenciaTipo),
+    // Fuente única y auditable: el usuario selecciona SOLO dependencias previas.
+    // Las posteriores se calculan siempre a partir de ellas; no se aceptan desde el cliente.
     dependenciasPrevias: normalizeRefs(payload.dependenciasPrevias ?? payload.dependencias_previas ?? old?.dependenciasPrevias),
-    dependenciasPosteriores: normalizeRefs(payload.dependenciasPosteriores ?? payload.dependencias_posteriores ?? old?.dependenciasPosteriores),
+    dependenciasPosteriores: [],
     responsableId: text(payload.responsableId ?? payload.responsable_id ?? old?.responsableId),
     responsableNombre: text(payload.responsableNombre ?? payload.responsable_nombre ?? old?.responsableNombre),
     cumplida: payload.cumplida === undefined ? !!old?.cumplida : bool(payload.cumplida),
     cumplidaAt: payload.cumplidaAt || payload.cumplida_at || old?.cumplidaAt || '',
     orden: integer(payload.orden ?? old?.orden, 0)
   };
+  enforceLgActor(actor, next, old);
 
   const ownRef = currentRef(rowId);
   next.dependenciasPrevias = removeRef(next.dependenciasPrevias, ownRef);
@@ -362,40 +517,23 @@ export async function saveLg(id, payload = {}){
   lgs.set(rowId, next);
   validateRefs(next, hitos, lgs);
 
-  const changed = new Set([rowId]);
-  const oldPrev = old ? normalizeRefs(old.dependenciasPrevias) : [];
-  const oldPost = old ? normalizeRefs(old.dependenciasPosteriores) : [];
-  for(const ref of oldPrev){
-    for(const targetId of targetsForRef(ref, lgs)){
-      if(targetId === rowId) continue;
-      const target = lgs.get(targetId); if(!target) continue;
-      target.dependenciasPosteriores = removeRef(target.dependenciasPosteriores, ownRef);
-      changed.add(targetId);
+  const changed = new Set([rowId, ...arrSafe(snapshot.dependencyWarnings).map(item => text(item?.lgId)).filter(Boolean)]);
+  const previousPosteriorById = new Map(snapshot.lgs.map(row => [row.id, JSON.stringify(normalizeRefs(row.dependenciasPosteriores))]));
+
+  // Recalcular TODAS las posteriores desde las previas canónicas. Nunca se crea una
+  // dependencia previa por haber quedado marcada una posterior en otro formulario.
+  for(const row of lgs.values()) row.dependenciasPosteriores = [];
+  for(const row of lgs.values()){
+    for(const ref of normalizeRefs(row.dependenciasPrevias)){
+      for(const targetId of targetsForRef(ref, lgs)){
+        if(targetId === row.id) continue;
+        const target = lgs.get(targetId);
+        if(target) target.dependenciasPosteriores = addRef(target.dependenciasPosteriores, currentRef(row.id));
+      }
     }
   }
-  for(const ref of oldPost){
-    for(const targetId of targetsForRef(ref, lgs)){
-      if(targetId === rowId) continue;
-      const target = lgs.get(targetId); if(!target) continue;
-      target.dependenciasPrevias = removeRef(target.dependenciasPrevias, ownRef);
-      changed.add(targetId);
-    }
-  }
-  for(const ref of next.dependenciasPrevias){
-    for(const targetId of targetsForRef(ref, lgs)){
-      if(targetId === rowId) continue;
-      const target = lgs.get(targetId); if(!target) continue;
-      target.dependenciasPosteriores = addRef(target.dependenciasPosteriores, ownRef);
-      changed.add(targetId);
-    }
-  }
-  for(const ref of next.dependenciasPosteriores){
-    for(const targetId of targetsForRef(ref, lgs)){
-      if(targetId === rowId) continue;
-      const target = lgs.get(targetId); if(!target) continue;
-      target.dependenciasPrevias = addRef(target.dependenciasPrevias, ownRef);
-      changed.add(targetId);
-    }
+  for(const row of lgs.values()){
+    if((previousPosteriorById.get(row.id) || '[]') !== JSON.stringify(normalizeRefs(row.dependenciasPosteriores))) changed.add(row.id);
   }
 
   for(const row of lgs.values()) validateRefs(row, hitos, lgs);
@@ -427,7 +565,7 @@ export async function saveLg(id, payload = {}){
   }catch(error){ throw friendlyDbError(error); }
 }
 
-export async function toggleLg(id, cumplida){
+export async function toggleLg(id, cumplida, actor = {}){
   const rowId = text(id);
   if(!rowId) fail('Falta la LG que se quiere actualizar.');
   try{
@@ -435,11 +573,13 @@ export async function toggleLg(id, cumplida){
     if(error) throw error;
     if(!data?.id) fail('La LG ya no existe.', 404, 'HITOS_LG_NOT_FOUND');
     const current = lgFromDb(data);
-    return saveLg(rowId, { ...current, cumplida: bool(cumplida) });
+    const snapshot = await selectEventRows(current.eventId);
+    const canonical = snapshot.lgs.find(row => row.id === rowId) || current;
+    return saveLg(rowId, { ...canonical, cumplida: bool(cumplida) }, actor);
   }catch(error){ throw friendlyDbError(error); }
 }
 
-export async function deleteLg(id){
+export async function deleteLg(id, actor = {}){
   const rowId = text(id);
   if(!rowId) fail('Falta la LG que se quiere eliminar.');
   try{
@@ -447,6 +587,8 @@ export async function deleteLg(id){
     if(existingError) throw existingError;
     if(!existing?.id) return { ok: true, deleted: 0 };
     const current = lgFromDb(existing);
+    const acting = requireKnownActor(actor);
+    if(!actorOwnsLg(acting, current)) fail('Solo puedes eliminar LG asignadas a tu responsabilidad.', 403, 'HITOS_LG_NOT_OWNED');
     const snapshot = await selectEventRows(current.eventId);
     const keys = new Set([refKey({ tipo: 'LG', id: rowId })]);
     const updates = snapshot.lgs.filter(row => row.id !== rowId).map(row => ({
@@ -468,7 +610,8 @@ export async function deleteLg(id){
   }catch(error){ throw friendlyDbError(error); }
 }
 
-export async function deleteHito(id){
+export async function deleteHito(id, actor = {}){
+  requireFullAccess(actor);
   const hitoId = text(id);
   if(!hitoId) fail('Falta el Hito que se quiere eliminar.');
   try{

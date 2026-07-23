@@ -3,7 +3,7 @@
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v23_prod_r2-hitos3-menu-real';
+  const VERSION = 'v23_prod_r2-hitos4-orden-permisos-zuzu';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {
@@ -17,14 +17,18 @@
   const auth = () => app()?.authUser || root.authUser || root.__CONTROL_EVENT_USER__ || null;
   const eventId = () => text($('selectedEvent')?.value || state().selectedEventId || state().eventoSeleccionadoId || root.selectedEventId);
   const eventName = id => text(arr(state().eventos).find(row => text(row.id) === text(id))?.titulo || $('selectedEvent')?.selectedOptions?.[0]?.textContent || 'Evento');
-  const canWrite = () => ['GD','RW'].includes(text(auth()?.nivel).toUpperCase());
+  const authLevel = () => text(auth()?.nivel || auth()?.Nivel).toUpperCase();
+  const canManageAll = () => ['GD','RW'].includes(authLevel());
+  const isRo = () => authLevel() === 'RO';
   const excludedPerson = name => { const n = norm(name); return !n || /^grupo\b/.test(n) || /^pena\b/.test(n) || /^z\s*_?\s*dev/.test(n) || /^personas\b/.test(n); };
   const isPair = name => /\s+y\s+/i.test(text(name));
   const pairParts = name => text(name).split(/\s+y\s+/i).map(text).filter(Boolean);
   const today = () => { const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
   const formatDate = value => { const s=text(value); if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return 'Sin fecha'; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
 
-  const store = { eventId:'', hitos:[], lgs:[], loading:false, editing:null, lastError:'' };
+  const SORT_KEY = 'ControlEvent_Hitos_sort_v23_r2';
+  const savedSort = (() => { try{ return localStorage.getItem(SORT_KEY) || ''; }catch(_){ return ''; } })();
+  const store = { eventId:'', hitos:[], lgs:[], dependencyWarnings:[], loading:false, editing:null, lastError:'', sortBy:['descripcion','fechaMinima','responsable'].includes(savedSort)?savedSort:'descripcion' };
 
   function canonicalIndividuals(){
     const people = arr(state().personas).filter(row => norm(row?.rango) === 'socio' && !excludedPerson(row?.nombre));
@@ -42,11 +46,40 @@
     return [...out.values()].sort((a,b) => a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'}));
   }
 
+  function ownResponsible(){
+    const user=auth() || {};
+    const names=[user.nombre,user.Nombre,user.identificacion,user.Identificacion].map(norm).filter(Boolean);
+    const people=canonicalIndividuals();
+    const match=people.find(person=>names.includes(norm(person.nombre)));
+    if(match) return match;
+    const anyPerson=arr(state().personas).find(person=>!excludedPerson(person?.nombre) && names.includes(norm(person?.nombre)));
+    return anyPerson ? {id:text(anyPerson.id),nombre:text(anyPerson.nombre)} : { id:'', nombre:text(user.nombre || user.Nombre || user.identificacion || user.Identificacion) };
+  }
+  function ownsLg(row){
+    if(canManageAll()) return true;
+    if(!isRo() || !row) return false;
+    const own=ownResponsible();
+    if(own.id && text(row.responsableId) && own.id===text(row.responsableId)) return true;
+    return !!norm(own.nombre) && norm(own.nombre)===norm(row.responsableNombre);
+  }
+  function canAddLg(){ return canManageAll() || (isRo() && !!text(ownResponsible().nombre)); }
+  function canEditLg(row){ return canManageAll() || ownsLg(row); }
+  function actorPayload(){
+    const user=auth() || {}, own=ownResponsible();
+    return {
+      nivel:authLevel(),
+      identificacion:text(user.identificacion || user.Identificacion),
+      nombre:text(user.nombre || user.Nombre),
+      responsableId:text(own.id),
+      responsableNombre:text(own.nombre)
+    };
+  }
+
   async function api(path, options = {}){
     const response = await fetch(path, {
       cache:'no-store',
       ...options,
-      headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'hitos-v23-r2', ...(options.headers || {})}
+      headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'hitos-v23-r2','X-ControlEvent-Actor':encodeURIComponent(JSON.stringify(actorPayload())), ...(options.headers || {})}
     });
     let payload = null;
     try{ payload = await response.json(); }catch(_){ payload = null; }
@@ -69,11 +102,12 @@
         <header class="ce-hitos-header">
           <img src="./hitos-evento.jpg" alt="Control de Hitos">
           <div class="ce-hitos-title-wrap"><h2 id="ceHitosTitle">Control de Hitos</h2><div id="ceHitosEvent" class="ce-hitos-event"></div></div>
-          <button type="button" id="ceHitosClose" class="ce-hitos-close" title="Cerrar">×</button>
+          <button type="button" id="ceHitosClose" class="ce-hitos-close" title="Cerrar" aria-label="Cerrar Control de Hitos" onclick="return window.ceCloseControlHitos ? window.ceCloseControlHitos(event) : false;">×</button>
         </header>
         <div class="ce-hitos-toolbar">
           <button type="button" id="ceHitosAdd">＋ Nuevo Hito</button>
           <button type="button" id="ceHitosRefresh" class="outline">↻ Actualizar</button>
+          <label class="ce-hitos-sort"><span>Ordenar LG por</span><select id="ceHitosSort"><option value="descripcion">Descripción de la LG</option><option value="fechaMinima">Fecha mínima</option><option value="responsable">Responsable</option></select></label>
           <span class="ce-spacer"></span>
           <span id="ceHitosStatus" class="ce-hitos-status"></span>
           <span class="ce-hitos-toolbar-note">Fechas del Hito calculadas desde sus LG</span>
@@ -82,9 +116,15 @@
         <div id="ceHitosFormOverlay" class="ce-hitos-form-overlay hidden"></div>
       </section>`;
     document.body.appendChild(overlay);
-    $('ceHitosClose').addEventListener('click', closeWindow);
+    const closeButton=$('ceHitosClose');
+    ['pointerup','touchend','click'].forEach(type=>closeButton?.addEventListener(type, closeWindow, {capture:true, passive:false}));
     $('ceHitosRefresh').addEventListener('click', () => load(true));
     $('ceHitosAdd').addEventListener('click', () => openHitoForm());
+    const sort=$('ceHitosSort');
+    if(sort){
+      sort.value=store.sortBy;
+      sort.addEventListener('change',()=>{ store.sortBy=sort.value; try{localStorage.setItem(SORT_KEY,store.sortBy);}catch(_){} render(); });
+    }
     overlay.addEventListener('click', event => { if(event.target === overlay) closeWindow(); });
     document.addEventListener('keydown', event => { if(event.key === 'Escape' && !overlay.classList.contains('hidden')){ if(!$('ceHitosFormOverlay').classList.contains('hidden')) closeForm(); else closeWindow(); } });
   }
@@ -105,10 +145,12 @@
     document.body.style.overflow = 'hidden';
     await load(false);
   }
-  function closeWindow(){
+  function closeWindow(event){
+    try{ event?.preventDefault?.(); event?.stopPropagation?.(); event?.stopImmediatePropagation?.(); }catch(_){}
     closeForm();
     $('ceHitosOverlay')?.classList.add('hidden');
     document.body.style.overflow = '';
+    return false;
   }
 
   async function load(force){
@@ -123,8 +165,10 @@
       const data = await api(`/api/hitos?eventId=${encodeURIComponent(ev)}${force ? `&_=${Date.now()}` : ''}`);
       store.hitos = arr(data.hitos);
       store.lgs = arr(data.lgs);
+      store.dependencyWarnings = arr(data.dependencyWarnings);
       store.lastError = '';
-      setStatus(`${store.hitos.length} hitos · ${store.lgs.length} LG`, 'ok');
+      const dependencyWarningCount=store.dependencyWarnings.length;
+      setStatus(`${store.hitos.length} hitos · ${store.lgs.length} LG${dependencyWarningCount ? ` · ${dependencyWarningCount} dependencia(s) circular(es) omitida(s)` : ''}`, dependencyWarningCount ? 'warning' : 'ok');
       render();
     }catch(error){
       store.lastError = error.message || String(error);
@@ -134,7 +178,25 @@
   }
 
   function renderError(message){ $('ceHitosBody').innerHTML = `<div class="ce-hitos-error">${esc(message)}</div>`; }
-  function lgForHito(hitoId){ return store.lgs.filter(row => text(row.hitoId) === text(hitoId)).sort((a,b) => Number(a.orden||0)-Number(b.orden||0) || text(a.descripcion).localeCompare(text(b.descripcion),'es')); }
+  function compareLg(a,b){
+    const desc=()=>text(a.descripcion).localeCompare(text(b.descripcion),'es',{sensitivity:'base'});
+    if(store.sortBy==='fechaMinima'){
+      const ad=text(a.fechaMinima), bd=text(b.fechaMinima);
+      if(ad && bd && ad!==bd) return ad.localeCompare(bd);
+      if(ad&&!bd) return -1;
+      if(!ad&&bd) return 1;
+      return desc();
+    }
+    if(store.sortBy==='responsable'){
+      const ar=text(a.responsableNombre), br=text(b.responsableNombre);
+      if(ar&&br){ const c=ar.localeCompare(br,'es',{sensitivity:'base'}); if(c) return c; }
+      else if(ar&&!br) return -1;
+      else if(!ar&&br) return 1;
+      return desc();
+    }
+    return desc();
+  }
+  function lgForHito(hitoId){ return store.lgs.filter(row => text(row.hitoId) === text(hitoId)).sort(compareLg); }
   function hitoById(id){ return store.hitos.find(row => text(row.id) === text(id)); }
   function lgById(id){ return store.lgs.find(row => text(row.id) === text(id)); }
   function hitoComplete(id){ const rows=lgForHito(id); return rows.length>0 && rows.every(row => row.cumplida); }
@@ -158,12 +220,13 @@
 
   function render(){
     const body=$('ceHitosBody');
-    $('ceHitosAdd').disabled = !canWrite();
+    $('ceHitosAdd').disabled = !canManageAll();
     if(!store.hitos.length){
-      body.innerHTML = `<div class="ce-hitos-empty">Todavía no hay Hitos para este evento.${canWrite() ? '<br><br>Pulsa «Nuevo Hito» para crear el primero.' : ''}</div>`;
+      body.innerHTML = `<div class="ce-hitos-empty">Todavía no hay Hitos para este evento.${canManageAll() ? '<br><br>Pulsa «Nuevo Hito» para crear el primero.' : ''}</div>`;
       return;
     }
-    body.innerHTML = store.hitos.sort((a,b)=>Number(a.orden||0)-Number(b.orden||0)||text(a.nombreHito).localeCompare(text(b.nombreHito),'es')).map(hito => {
+    const dependencyWarning = store.dependencyWarnings.length ? `<div class="ce-hitos-dependency-warning"><strong>Dependencias revisadas:</strong> se han omitido ${store.dependencyWarnings.length} relación(es) circular(es) heredada(s). Las posteriores se calculan ahora automáticamente desde las previas para que no vuelvan a aparecer dependencias no seleccionadas.</div>` : '';
+    body.innerHTML = dependencyWarning + store.hitos.sort((a,b)=>Number(a.orden||0)-Number(b.orden||0)||text(a.nombreHito).localeCompare(text(b.nombreHito),'es')).map(hito => {
       const rows=lgForHito(hito.id), done=rows.filter(row=>row.cumplida).length, completed=rows.length>0&&done===rows.length;
       return `<article class="ce-hito-card" data-hito-id="${esc(hito.id)}">
         <div class="ce-hito-head">
@@ -174,9 +237,9 @@
             <span class="ce-hito-progress ${completed?'done':''}">${done}/${rows.length} LG cumplidas</span>
           </div>
           <div class="ce-hito-actions">
-            <button type="button" class="outline ce-add-lg" ${canWrite()?'':'disabled'}>＋ LG</button>
-            <button type="button" class="outline ce-edit-hito" ${canWrite()?'':'disabled'}>Editar</button>
-            <button type="button" class="danger ce-delete-hito" ${canWrite()?'':'disabled'}>Eliminar</button>
+            <button type="button" class="outline ce-add-lg" ${canAddLg()?'':'disabled'}>＋ LG</button>
+            <button type="button" class="outline ce-edit-hito" ${canManageAll()?'':'disabled'}>Editar</button>
+            <button type="button" class="danger ce-delete-hito" ${canManageAll()?'':'disabled'}>Eliminar</button>
           </div>
         </div>
         <div class="ce-lg-list">${rows.length ? rows.map(renderLg).join('') : '<div class="ce-hitos-empty">Este Hito todavía no tiene Líneas de Gestión.</div>'}</div>
@@ -203,18 +266,22 @@
     const dateBlocked=!row.cumplida && outsideDateWindow(row);
     const checkTitle = blocked&&!row.cumplida ? 'No se puede cerrar: hay dependencias previas pendientes' : (dateBlocked ? (row.fechaMinima&&today()<row.fechaMinima ? `No se puede cerrar antes del ${formatDate(row.fechaMinima)}` : `Plazo vencido el ${formatDate(row.fechaMaxima)}; modifica la fecha máxima antes de cerrar`) : 'Marcar o desmarcar como cumplida');
     return `<div class="ce-lg-row ${lgClass(row)}" data-lg-id="${esc(row.id)}">
-      <input class="ce-lg-check" type="checkbox" ${row.cumplida?'checked':''} ${(canWrite() && ((!blocked && !dateBlocked) || row.cumplida))?'':'disabled'} title="${esc(checkTitle)}">
+      <input class="ce-lg-check" type="checkbox" ${row.cumplida?'checked':''} ${(canEditLg(row) && ((!blocked && !dateBlocked) || row.cumplida))?'':'disabled'} title="${esc(checkTitle)}">
       <div class="ce-lg-main"><div class="ce-lg-description">${esc(row.descripcion)}</div>${row.notas?`<div class="ce-lg-notes">${esc(row.notas)}</div>`:''}<div class="ce-lg-badges"><span class="ce-lg-badge">${esc(lgStateLabel(row))}</span>${blocked?`<span class="ce-lg-badge blocked">Bloqueada por ${pending.length} dependencia(s)</span>`:''}${row.fechaMaxima&&!row.cumplida&&today()>row.fechaMaxima?'<span class="ce-lg-badge overdue">Fuera de plazo</span>':''}${pre.slice(0,3).map(ref=>`<span class="ce-lg-badge">← ${esc(refLabel(ref))}</span>`).join('')}${post.slice(0,2).map(ref=>`<span class="ce-lg-badge">→ ${esc(refLabel(ref))}</span>`).join('')}</div></div>
       <div class="ce-lg-dates"><strong>Fechas</strong><span>${esc(formatDate(row.fechaMinima))} → ${esc(formatDate(row.fechaMaxima))}</span></div>
       <div class="ce-lg-responsible"><strong>Responsable</strong><span>${esc(row.responsableNombre || 'Sin asignar')}</span></div>
-      <div class="ce-lg-actions"><button type="button" class="outline ce-edit-lg" ${canWrite()?'':'disabled'}>Editar</button><button type="button" class="danger ce-delete-lg" ${canWrite()?'':'disabled'}>Eliminar</button></div>
+      <div class="ce-lg-actions"><button type="button" class="outline ce-edit-lg" ${canEditLg(row)?'':'disabled'}>Editar</button><button type="button" class="danger ce-delete-lg" ${canEditLg(row)?'':'disabled'}>Eliminar</button></div>
     </div>`;
   }
 
-  function responsibleOptions(selectedName=''){
-    return `<option value="">Sin asignar</option>` + canonicalIndividuals().map(person => {
+  function responsibleOptions(selectedName='', onlyOwn=false){
+    const people=onlyOwn ? [ownResponsible()].filter(person=>text(person.nombre)) : canonicalIndividuals();
+    const empty=onlyOwn ? '' : '<option value="">Sin asignar</option>';
+    if(onlyOwn && !people.length) return '<option value="" disabled selected>Usuario no identificado</option>';
+    return empty + people.map(person => {
       const value=encodeURIComponent(JSON.stringify(person));
-      return `<option value="${esc(value)}" ${norm(person.nombre)===norm(selectedName)?'selected':''}>${esc(person.nombre)}</option>`;
+      const selected=onlyOwn || norm(person.nombre)===norm(selectedName);
+      return `<option value="${esc(value)}" ${selected?'selected':''}>${esc(person.nombre)}</option>`;
     }).join('');
   }
   function readResponsible(select){
@@ -223,7 +290,7 @@
   }
 
   function openHitoForm(item=null){
-    if(!canWrite()) return;
+    if(!canManageAll()) return;
     store.editing={type:'hito',id:item?.id||''};
     const overlay=$('ceHitosFormOverlay');
     overlay.innerHTML=`<form class="ce-hitos-form" id="ceHitoForm">
@@ -251,8 +318,15 @@
     return store.lgs.filter(row=>row.id!==ownId).map(row=>`<label class="ce-dep-option"><input type="checkbox" data-ref-type="LG" value="${esc(row.id)}" ${selectedKeys.has(`LG:${row.id}`)?'checked':''}><span>${esc(row.descripcion)}<em>${esc(hitoById(row.hitoId)?.nombreHito||'Sin Hito')}</em></span></label>`).join('') || '<span>No hay otras LG disponibles.</span>';
   }
 
+  function posteriorReadOnly(refs){
+    const items=arr(refs).map(ref=>refLabel(ref)).filter(Boolean);
+    return items.length
+      ? `<div class="ce-dep-readonly">${items.map(label=>`<span>→ ${esc(label)}</span>`).join('')}</div>`
+      : '<div class="ce-dep-readonly empty">Ninguna. Se calcula automáticamente desde las dependencias previas de otras LG.</div>';
+  }
+
   function openLgForm(item=null,hitoId=''){
-    if(!canWrite()) return;
+    if(item ? !canEditLg(item) : !canAddLg()) return;
     const parentId=text(hitoId||item?.hitoId);
     store.editing={type:'lg',id:item?.id||'',hitoId:parentId};
     const mode=text(item?.dependenciaTipo).toUpperCase()==='HITO_COMPLETO'?'HITO_COMPLETO':'LG';
@@ -266,11 +340,11 @@
         <div><label>Fecha mínima</label><input id="ceLgMin" type="date" value="${esc(item?.fechaMinima||'')}"></div>
         <div><label>Fecha máxima</label><input id="ceLgMax" type="date" value="${esc(item?.fechaMaxima||'')}"></div>
         <div class="wide"><label>Notas</label><textarea id="ceLgNotes" maxlength="12000">${esc(item?.notas||'')}</textarea></div>
-        <div><label>Responsable</label><select id="ceLgResponsible">${responsibleOptions(item?.responsableNombre)}</select></div>
+        <div><label>Responsable</label><select id="ceLgResponsible" ${isRo()?'disabled':''}>${responsibleOptions(item?.responsableNombre,isRo())}</select>${isRo()?'<div class="ce-hitos-readonly-note">En nivel RO la LG queda asignada obligatoriamente a tu usuario.</div>':''}</div>
         <div><label>Orden dentro del Hito</label><input id="ceLgOrder" type="number" step="1" value="${Number(item?.orden||0)}"></div>
         <div class="wide"><label>Dependencia</label><select id="ceLgDependencyMode"><option value="LG" ${mode==='LG'?'selected':''}>LG — una o varias</option><option value="HITO_COMPLETO" ${mode==='HITO_COMPLETO'?'selected':''}>Hito completo</option></select></div>
         <div><label>Dependencias previas</label><details class="ce-dep-picker" open><summary>Seleccionar dependencias previas</summary><div id="cePrevOptions" class="ce-dep-options">${dependencyOptions(optionType,item?.id||'',parentId,item?.dependenciasPrevias)}</div></details></div>
-        <div><label>Dependencias posteriores</label><details class="ce-dep-picker"><summary>Seleccionar dependencias posteriores</summary><div id="cePostOptions" class="ce-dep-options">${dependencyOptions(optionType,item?.id||'',parentId,item?.dependenciasPosteriores)}</div></details></div>
+        <div><label>Dependencias posteriores (calculadas)</label>${posteriorReadOnly(item?.dependenciasPosteriores)}</div>
         <div class="wide ce-completion-box"><input id="ceLgCompleted" type="checkbox" ${item?.cumplida?'checked':''}><div><strong>LG cumplida</strong><div class="ce-completion-help">Al activarla se comprueba que todas las dependencias previas estén cumplidas. Al cerrarse, las LG posteriores se actualizan automáticamente.</div></div></div>
       </div></div>
       <div class="ce-hitos-form-actions"><button type="button" class="outline" id="ceFormCancel">Cancelar</button><button type="submit">Guardar LG</button></div>
@@ -286,9 +360,8 @@
   function collectRefs(containerId){ return [...($(containerId)?.querySelectorAll('input[type=checkbox]:checked')||[])].map(input=>({tipo:input.dataset.refType,id:input.value})); }
   function refreshDependencyPickers(item){
     const mode=$('ceLgDependencyMode').value, type=mode==='HITO_COMPLETO'?'HITO':'LG', ownId=store.editing?.id||'', ownHitoId=$('ceLgHito').value;
-    const prev=collectRefs('cePrevOptions'), post=collectRefs('cePostOptions');
-    $('cePrevOptions').innerHTML=dependencyOptions(type,ownId,ownHitoId,prev.length?prev:item?.dependenciasPrevias);
-    $('cePostOptions').innerHTML=dependencyOptions(type,ownId,ownHitoId,post.length?post:item?.dependenciasPosteriores);
+    const prev=collectRefs('cePrevOptions');
+    $('cePrevOptions').innerHTML=dependencyOptions(type,ownId,ownHitoId,prev.filter(ref=>text(ref.tipo).toUpperCase()===type));
   }
 
   function closeForm(){ const node=$('ceHitosFormOverlay'); if(node){node.classList.add('hidden');node.innerHTML='';} store.editing=null; }
@@ -301,8 +374,10 @@
   }
   async function saveLgForm(event){
     event.preventDefault();
-    const edit=store.editing, responsible=readResponsible($('ceLgResponsible'));
-    const payload={eventId:store.eventId,hitoId:$('ceLgHito').value,descripcion:$('ceLgDescription').value,fechaMinima:$('ceLgMin').value,fechaMaxima:$('ceLgMax').value,notas:$('ceLgNotes').value,dependenciaTipo:$('ceLgDependencyMode').value,dependenciasPrevias:collectRefs('cePrevOptions'),dependenciasPosteriores:collectRefs('cePostOptions'),cumplida:$('ceLgCompleted').checked,orden:Number($('ceLgOrder').value||0),...responsible};
+    const edit=store.editing;
+    const own=ownResponsible();
+    const responsible=isRo()?{responsableId:own.id,responsableNombre:own.nombre}:readResponsible($('ceLgResponsible'));
+    const payload={eventId:store.eventId,hitoId:$('ceLgHito').value,descripcion:$('ceLgDescription').value,fechaMinima:$('ceLgMin').value,fechaMaxima:$('ceLgMax').value,notas:$('ceLgNotes').value,dependenciaTipo:$('ceLgDependencyMode').value,dependenciasPrevias:collectRefs('cePrevOptions'),cumplida:$('ceLgCompleted').checked,orden:Number($('ceLgOrder').value||0),...responsible};
     await runSave(async()=>api(edit?.id?`/api/lg/${encodeURIComponent(edit.id)}`:'/api/lg',{method:edit?.id?'PUT':'POST',body:JSON.stringify(payload)}),'LG guardada y dependencias sincronizadas.');
   }
   async function runSave(task,success){
@@ -317,11 +392,11 @@
     catch(error){ input.checked=!checked; input.disabled=false; alert(error.message||String(error)); setStatus('No se pudo cambiar el estado','error'); }
   }
   async function removeLg(id){
-    const row=lgById(id); if(!row||!confirm(`¿Eliminar la LG «${row.descripcion}»? También se limpiarán sus dependencias cruzadas.`)) return;
+    const row=lgById(id); if(!row||!canEditLg(row)||!confirm(`¿Eliminar la LG «${row.descripcion}»? También se limpiarán sus dependencias cruzadas.`)) return;
     try{ await api(`/api/lg/${encodeURIComponent(id)}`,{method:'DELETE'}); setStatus('LG eliminada.','ok'); await load(true); }catch(error){alert(error.message||String(error));}
   }
   async function removeHito(id){
-    const row=hitoById(id), count=lgForHito(id).length; if(!row||!confirm(`¿Eliminar el Hito «${row.nombreHito}» y sus ${count} LG? Esta acción no se puede deshacer.`)) return;
+    const row=hitoById(id), count=lgForHito(id).length; if(!canManageAll()||!row||!confirm(`¿Eliminar el Hito «${row.nombreHito}» y sus ${count} LG? Esta acción no se puede deshacer.`)) return;
     try{ await api(`/api/hitos/${encodeURIComponent(id)}`,{method:'DELETE'}); setStatus('Hito eliminado.','ok'); await load(true); }catch(error){alert(error.message||String(error));}
   }
 
@@ -356,7 +431,12 @@
     neutralizeLegacyTooltip(button);
     if(button.disabled) button.disabled = false;
     if(button.hasAttribute('disabled')) button.removeAttribute('disabled');
+    if(button.hasAttribute('hidden')) button.removeAttribute('hidden');
+    button.hidden = false;
     if(button.classList.contains('locked')) button.classList.remove('locked');
+    if(button.classList.contains('hidden')) button.classList.remove('hidden');
+    if(button.style.getPropertyValue('display') !== 'flex' || button.style.getPropertyPriority('display') !== 'important') button.style.setProperty('display','flex','important');
+    if(button.style.getPropertyValue('visibility') !== 'visible' || button.style.getPropertyPriority('visibility') !== 'important') button.style.setProperty('visibility','visible','important');
     if(button.style.getPropertyValue('pointer-events') !== 'auto' || button.style.getPropertyPriority('pointer-events') !== 'important') button.style.setProperty('pointer-events','auto','important');
     if(button.style.getPropertyValue('opacity') !== '1' || button.style.getPropertyPriority('opacity') !== 'important') button.style.setProperty('opacity','1','important');
     if(button.dataset.ceOpenHitos !== '1') button.dataset.ceOpenHitos = '1';
@@ -395,7 +475,7 @@
     try{
       if(!root.__ceHitosMenuObserver){
         root.__ceHitosMenuObserver = new MutationObserver(() => installButton());
-        root.__ceHitosMenuObserver.observe(document.documentElement,{childList:true,subtree:true});
+        root.__ceHitosMenuObserver.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','hidden','class','style']});
       }
     }catch(_){ }
   }
@@ -418,6 +498,7 @@
   }
 
   root.ceOpenControlHitos = menuHandler;
+  root.ceCloseControlHitos = closeWindow;
   root.ControlEventHitos={version:VERSION,open:openWindow,close:closeWindow,refresh:()=>load(true),state:store,canonicalIndividuals,previous:PREVIOUS_API};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
   root.addEventListener('load',()=>setTimeout(install,0),{once:true});

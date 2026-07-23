@@ -128,6 +128,7 @@
               <li>Compras, tickets y gastos pendientes.</li>
               <li>Donaciones de producto y valoración.</li>
               <li>Documentos, tiendas, productos y personas.</li>
+              <li>Control del hitos (tareas).</li>
             </ul>
           </section>
           <section class="modal-col ia-col">

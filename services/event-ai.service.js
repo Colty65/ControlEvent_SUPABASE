@@ -6,6 +6,7 @@ import { buildZuzuModuleContext, buildZuzuPlanningCatalog, buildZuzuLocalPlan } 
 import { analyzeZuzuReportRequest } from './zuzu-report-policy.service.js';
 import { canonicalAttendanceFromContext } from './zuzu-attendance.service.js';
 import { buildRelevantPeopleContext } from './zuzu-people-context.service.js';
+import { listAllHitosState } from './hitos.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -391,9 +392,9 @@ Reglas obligatorias:
 - Si el usuario cita eventos concretos entre comillas o por título, filtra la respuesta a esos eventos exactos. No mezcles otros eventos aunque aparezcan en el contexto.
 - Si el usuario pide "todos los eventos", entonces sí puedes usar todos los eventos del contexto.
 - Si el usuario menciona varios módulos o conceptos, responde a todos: por ejemplo DONACIONES, COMPRAS, COLABORADORES/INGRESOS, TICKETS y DOCUMENTOS deben aparecer todos si los pidió.
-- Si el usuario pide un informe general, información para socios, estado del evento o cómo va el evento, considera obligatorios EVENTOS/Descripción, INGRESOS separados entre SOCIOS y NO SOCIOS, COMPRAS, DONACIONES, SALDOS, TICKETS/FACTURAS y DOCUMENTOS, aunque no los enumere uno a uno.
+- Si el usuario pide un informe general, información para socios, estado del evento o cómo va el evento, considera obligatorios EVENTOS/Descripción, INGRESOS separados entre SOCIOS y NO SOCIOS, COMPRAS, DONACIONES, SALDOS, TICKETS/FACTURAS, DOCUMENTOS, HITOS y LG/tareas, aunque no los enumere uno a uno.
 - Si el usuario pide comparativa, crea una tabla comparativa por evento y por módulo solicitado. No te quedes solo con el primer módulo.
-- Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
+- Si el usuario pide informe de cada evento, "cosas que ocurrieron", crónica, celebración o datos de todos los eventos registrados, ordena SIEMPRE por fecha ini/fecha de celebración y cuenta lo operativo de cada evento: INGRESOS/colaboradores, COMPRAS, DONACIONES, TICKETS/Fototickets, DOCUMENTOS, HITOS y LG/tareas. No respondas con una gráfica genérica ni con la ficha técnica de EVENTOS.
 - Si pide agrupar, totalizar, calcular, ordenar, resumir o graficar, hazlo sobre TODOS los registros entregados del módulo correspondiente, no sobre una muestra.
 - Si el usuario pide una gráfica, devuelve al menos un objeto en charts. No digas que has pintado una gráfica si charts está vacío.
 - Si el usuario pregunta por el tiempo/clima/meteorología de un evento, usa infoIndirecta.meteorologia si existe. Devuelve una lectura útil para la organización del evento y al menos una tabla/gráfica meteorológica si hay datos externos.
@@ -1746,6 +1747,10 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
     const don = rowsForEvent(arr(mods.DONACIONES), eventName);
     const tk = rowsForEvent(arr(mods.TICKETS), eventName);
     const doc = rowsForEvent(arr(mods.DOCUMENTOS), eventName);
+    const hitos = rowsForEvent(arr(mods.HITOS), eventName);
+    const lgs = rowsForEvent(arr(mods.LG), eventName);
+    const lgCumplidas = lgs.filter(r => /^cumplid/i.test(trim(r?.Estado))).length;
+    const lgPendientes = Math.max(0, lgs.length - lgCumplidas);
     const ingresos = round(can['Ingresos total'] ?? calcIngresosTotal(ing), 2);
     const compras = round(can['Compras realizadas'] ?? sumField(comReal, 'Importe'), 2);
     const pendientes = round(can['Compras pendientes'] ?? sumField(comPend, 'Importe'), 2);
@@ -1767,14 +1772,17 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
     if (don.length || donaciones) facts.push(`${don.length} línea(s) de donación valoradas en ${formatMoneyText(donaciones)}`);
     if (tk.length) facts.push(`${tk.length} ticket(s)/fototicket(s)`);
     if (doc.length) facts.push(`${doc.length} documento(s)`);
+    if (hitos.length || lgs.length) facts.push(`${hitos.length} hito(s) y ${lgCumplidas}/${lgs.length} LG/tarea(s) cumplidas (${lgPendientes} pendiente(s))`);
     const occurred = facts.length ? facts.join('; ') + '.' : 'No hay actividad operativa registrada en los módulos extraídos.';
+    const lgPendingList = lgs.filter(r => !/^cumplid/i.test(trim(r?.Estado))).slice(0, 5).map(r => `${trim(r?.['Descripción LG']) || 'Tarea sin descripción'}${trim(r?.Responsable) ? ' — ' + trim(r?.Responsable) : ''}`).join(' | ');
     const highlights = [
       comprasTop ? `Compras destacadas: ${comprasTop}.` : '',
       tiendasTop ? `Tiendas principales: ${tiendasTop}.` : '',
       donTopProd ? `Donaciones destacadas: ${donTopProd}.` : '',
       donTopDonantes ? `Donantes principales: ${donTopDonantes}.` : '',
       docsList ? `Documentos: ${docsList}.` : '',
-      tkList ? `Tickets: ${tkList}.` : ''
+      tkList ? `Tickets: ${tkList}.` : '',
+      lgPendingList ? `Tareas pendientes: ${lgPendingList}.` : ''
     ].filter(Boolean).join(' ');
     summaryRows.push({
       Orden: idx + 1,
@@ -1791,6 +1799,10 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
       'Asistentes / número': asistentes,
       Tickets: tk.length,
       Documentos: doc.length,
+      Hitos: hitos.length,
+      'LG totales': lgs.length,
+      'LG cumplidas': lgCumplidas,
+      'LG pendientes': lgPendientes,
       'Qué ocurrió': `${occurred} ${highlights}`.trim()
     });
     moduleRows.push(
@@ -1798,17 +1810,19 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
       { Orden: idx + 1, Evento: eventName, Módulo: 'COMPRAS', Registros: comAll.length, Total: compras, Detalle: comAll.length ? `Realizadas ${formatMoneyText(compras)}; pendientes ${formatMoneyText(pendientes)}. ${comprasTop ? 'Productos: ' + comprasTop + '.' : ''} ${tiendasTop ? 'Tiendas: ' + tiendasTop + '.' : ''}`.trim() : 'Sin compras registradas.' },
       { Orden: idx + 1, Evento: eventName, Módulo: 'DONACIONES', Registros: don.length, Total: donaciones, Detalle: don.length ? `${don.length} línea(s), ${formatMoneyText(donaciones)} valorado. ${donTopProd ? 'Productos: ' + donTopProd + '.' : ''} ${donTopDonantes ? 'Donantes: ' + donTopDonantes + '.' : ''}`.trim() : 'Sin donaciones registradas.' },
       { Orden: idx + 1, Evento: eventName, Módulo: 'TICKETS', Registros: tk.length, Total: round(sumField(tk, 'Total ticket'),2), Detalle: tk.length ? (tkList || `${tk.length} ticket(s) registrados.`) : 'Sin fototickets/tickets registrados.' },
-      { Orden: idx + 1, Evento: eventName, Módulo: 'DOCUMENTOS', Registros: doc.length, Total: doc.length, Detalle: doc.length ? (docsList || `${doc.length} documento(s) registrados.`) : 'Sin documentos registrados.' }
+      { Orden: idx + 1, Evento: eventName, Módulo: 'DOCUMENTOS', Registros: doc.length, Total: doc.length, Detalle: doc.length ? (docsList || `${doc.length} documento(s) registrados.`) : 'Sin documentos registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'HITOS', Registros: hitos.length, Total: hitos.length, Detalle: hitos.length ? `${hitos.length} hito(s) de control registrados.` : 'Sin hitos registrados.' },
+      { Orden: idx + 1, Evento: eventName, Módulo: 'LG', Registros: lgs.length, Total: lgCumplidas, Detalle: lgs.length ? `${lgCumplidas}/${lgs.length} LG/tarea(s) cumplidas; ${lgPendientes} pendiente(s). ${lgPendingList ? 'Pendientes: ' + lgPendingList + '.' : ''}`.trim() : 'Sin LG/tareas registradas.' }
     );
   });
-  const columns = ['Orden','Fecha inicio','Fecha fin','Evento','Estado','Ingresos (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo (€)','Colaboradores','Asistentes / número','Tickets','Documentos','Qué ocurrió'];
+  const columns = ['Orden','Fecha inicio','Fecha fin','Evento','Estado','Ingresos (€)','Compras realizadas (€)','Compras pendientes (€)','Donaciones valoradas (€)','Saldo (€)','Colaboradores','Asistentes / número','Tickets','Documentos','Hitos','LG totales','LG cumplidas','LG pendientes','Qué ocurrió'];
   const moduleColumns = ['Orden','Evento','Módulo','Registros','Total','Detalle'];
   const labels = summaryRows.map(r => `${r['Fecha inicio'] || '?'} · ${r.Evento}`);
   return {
     ok: true,
     rejected: false,
     title: 'Informe cronológico de eventos',
-    answer: `He ordenado ${summaryRows.length} evento(s) por fecha de inicio/celebración y he preparado una crónica operativa de lo que ocurrió en cada uno. No uso EVENTOS como respuesta final: EVENTOS solo ordena e identifica; el contenido sale de INGRESOS, COMPRAS, DONACIONES, TICKETS/Fototickets y DOCUMENTOS.`,
+    answer: `He ordenado ${summaryRows.length} evento(s) por fecha de inicio/celebración y he preparado una crónica operativa de lo que ocurrió en cada uno. No uso EVENTOS como respuesta final: EVENTOS solo ordena e identifica; el contenido sale de INGRESOS, COMPRAS, DONACIONES, TICKETS/Fototickets, DOCUMENTOS, HITOS y LG/tareas.`,
     warnings: arr(context.advertencias),
     charts: [
       { title: 'Cronología económica por evento', type: 'stackedBar', labels, values: summaryRows.map(r=>round(r['Ingresos (€)'],2)), unit: '€', series: [
@@ -1816,7 +1830,7 @@ function directChronologicalEventNarrativeIfApplicable(prompt, context) {
         { name: 'Compras realizadas', values: summaryRows.map(r=>round(r['Compras realizadas (€)'],2)) },
         { name: 'Donaciones valoradas', values: summaryRows.map(r=>round(r['Donaciones valoradas (€)'],2)) }
       ]},
-      { title: 'Actividad registrada por evento', type: 'bar', labels, values: summaryRows.map(r=>num(r.Colaboradores)+num(r.Tickets)+num(r.Documentos)+num(r['Asistentes / número'])), unit: 'registros/unidades' }
+      { title: 'Actividad registrada por evento', type: 'bar', labels, values: summaryRows.map(r=>num(r.Colaboradores)+num(r.Tickets)+num(r.Documentos)+num(r.Hitos)+num(r['LG totales'])+num(r['Asistentes / número'])), unit: 'registros/unidades' }
     ],
     tables: [
       { title: 'Crónica ordenada por fecha de celebración', columns, rows: summaryRows.map(r=>columns.map(c=>text(r[c]))) },
@@ -1857,6 +1871,8 @@ function directEventReportIfApplicable(prompt, context) {
     const donations = rowsForEvent(arr(mods.DONACIONES), eventName);
     const tickets = rowsForEvent(arr(mods.TICKETS), eventName);
     const documents = rowsForEvent(arr(mods.DOCUMENTOS), eventName);
+    const hitos = rowsForEvent(arr(mods.HITOS), eventName);
+    const lgs = rowsForEvent(arr(mods.LG), eventName);
     const meta = arr(mods.EVENTOS).find(r => norm(r?.['Titulo del evento']) === norm(eventName)) || {};
     const expectedIncome = round(can['Ingresos total'] ?? incomes.reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
     const collectedIncome = round(incomes.filter(r=>/^(BANCO|EFECTIVO|BIZUM)$/i.test(trim(r?.Ingreso || r?.ingreso || ''))).reduce((a,r)=>a+num(r?.['Importe obligatorio'])+num(r?.['Importe voluntario']),0),2);
@@ -1889,7 +1905,11 @@ function directEventReportIfApplicable(prompt, context) {
       LineasDonacion:donations.length,
       Tickets:Math.max(num(can['Tickets numero']),tickets.length),
       Documentos:Math.max(num(can['Documentos numero']),documents.length),
-      incomes,purchases,donations,tickets,documents,att
+      Hitos:hitos.length,
+      LgTotales:lgs.length,
+      LgCumplidas:lgs.filter(row=>/^cumplid/i.test(trim(row?.Estado))).length,
+      LgPendientes:lgs.filter(row=>!/^cumplid/i.test(trim(row?.Estado))).length,
+      incomes,purchases,donations,tickets,documents,hitos,lgs,att
     };
   });
 
@@ -1918,7 +1938,8 @@ function directEventReportIfApplicable(prompt, context) {
         [prefix+'Donaciones',r.Donaciones>0?'🟢':'🟠',`${formatMoneyText(r.Donaciones)} de valor recibido`],
         [prefix+'Saldo previsto',r.SaldoPrevisto>=0?'🟢':r.SaldoPrevisto>=-100?'🟠':'🔴',formatMoneyText(r.SaldoPrevisto)],
         [prefix+'Asistencia',r.TotalAsistentes>0?'🟢':'🟠',`${r.TotalAsistentes} personas: ${r.SociosAsistentes} socios + ${r.NoSociosAsistentes} no socios`],
-        [prefix+'Tickets y documentos',(r.Tickets+r.Documentos)>0?'🟢':'🟠',`${r.Tickets} tickets · ${r.Documentos} documentos`]
+        [prefix+'Tickets y documentos',(r.Tickets+r.Documentos)>0?'🟢':'🟠',`${r.Tickets} tickets · ${r.Documentos} documentos`],
+        [prefix+'Hitos y tareas',r.LgPendientes>0?'🟠':(r.LgTotales>0?'🟢':'⚪'),`${r.Hitos} hitos · ${r.LgCumplidas}/${r.LgTotales} LG cumplidas · ${r.LgPendientes} pendientes`]
       );
     });
     if (policy.wantsWeather) weatherRows.slice(0,3).forEach(w=>{
@@ -1926,7 +1947,7 @@ function directEventReportIfApplicable(prompt, context) {
       executiveRows.push([`Meteorología · ${trim(w.Día||w.Dia||spanishWeekdayFromIso(w.Fecha))}`,max>=35||rain>=40?'🟠':'🟢',`${trim(w.Cielo)} · ${max} / ${num(w['Temp. mín'])} ºC · lluvia ${rain} % · viento ${num(w['Viento km/h'])} km/h`]);
     });
     const r=rows[0];
-    const answer = `La situación está ${isEventInProgressValue(r?.Estado)?'en curso y las cifras son provisionales':'analizada con datos consolidados'}. Cobros, compras, donaciones, saldo, asistencia, tickets y documentos quedan reunidos una sola vez en el cuadro ejecutivo${policy.wantsWeather?' junto con la previsión meteorológica':''}.`;
+    const answer = `La situación está ${isEventInProgressValue(r?.Estado)?'en curso y las cifras son provisionales':'analizada con datos consolidados'}. Cobros, compras, donaciones, saldo, asistencia, tickets, documentos, hitos y tareas quedan reunidos una sola vez en el cuadro ejecutivo${policy.wantsWeather?' junto con la previsión meteorológica':''}.`;
     return {
       ok:true,rejected:false,compactOnePage:true,
       title:singleEvent?'Informe ejecutivo':'Informe ejecutivo comparativo',
@@ -1941,8 +1962,8 @@ function directEventReportIfApplicable(prompt, context) {
   const financeObjs=rows.map(r=>({'Evento':r.Evento,'Estado':r.Estado,'Ingresos previstos (€)':r.IngresosPrevistos,'Ingresos cobrados (€)':r.IngresosCobrados,'Ingresos pendientes (€)':r.IngresosPendientes,'Compras realizadas (€)':r.ComprasRealizadas,'Compras pendientes (€)':r.ComprasPendientes,'Compras previstas (€)':r.ComprasPrevistas,'Donaciones valoradas (€)':r.Donaciones,'Saldo actual (€)':r.SaldoActual,'Saldo previsto al cierre (€)':r.SaldoPrevisto}));
   detailTables.push(table(singleEvent?'Resumen financiero':'Resumen financiero comparativo',maybeEventColumns(financeCols),maybeEventRows(financeCols,financeObjs)));
 
-  const activityCols=['Evento','Estado','Socios asistentes','No socios asistentes','Total asistentes','Socios no asistentes','Líneas de compra','Líneas de donación','Tickets','Documentos'];
-  const activityObjs=rows.map(r=>({'Evento':r.Evento,'Estado':isEventInProgressValue(r.Estado)?'Datos provisionales':'Cierre','Socios asistentes':r.SociosAsistentes,'No socios asistentes':r.NoSociosAsistentes,'Total asistentes':r.TotalAsistentes,'Socios no asistentes':r.SociosNoAsistentes,'Líneas de compra':r.LineasCompra,'Líneas de donación':r.LineasDonacion,'Tickets':r.Tickets,'Documentos':r.Documentos}));
+  const activityCols=['Evento','Estado','Socios asistentes','No socios asistentes','Total asistentes','Socios no asistentes','Líneas de compra','Líneas de donación','Tickets','Documentos','Hitos','LG totales','LG cumplidas','LG pendientes'];
+  const activityObjs=rows.map(r=>({'Evento':r.Evento,'Estado':isEventInProgressValue(r.Estado)?'Datos provisionales':'Cierre','Socios asistentes':r.SociosAsistentes,'No socios asistentes':r.NoSociosAsistentes,'Total asistentes':r.TotalAsistentes,'Socios no asistentes':r.SociosNoAsistentes,'Líneas de compra':r.LineasCompra,'Líneas de donación':r.LineasDonacion,'Tickets':r.Tickets,'Documentos':r.Documentos,'Hitos':r.Hitos,'LG totales':r.LgTotales,'LG cumplidas':r.LgCumplidas,'LG pendientes':r.LgPendientes}));
   detailTables.push(table(singleEvent?'Participación y documentación':'Participación y documentación por evento',maybeEventColumns(activityCols),maybeEventRows(activityCols,activityObjs)));
 
   if (singleEvent) {
@@ -1982,6 +2003,13 @@ function directEventReportIfApplicable(prompt, context) {
       if (policy.detailLevel==='exhaustive') detailTables.push(table(`Detalle completo de donaciones${suffix}`,['Donante','Producto','Unidades','Precio','Valor','Tipo de donación','Responsable'],readableRows(r.donations,['Donante','Producto','Unidades','Precio','Valor','Tipo de donación','Responsable'],220)));
     }
     if (policy.includeDocuments) detailTables.push(table(`Documentos${suffix}`,['DOCxxx','Fecha','Descripcion','Tiene imagen'],readableRows(r.documents,['DOCxxx','Fecha','Descripcion','Tiene imagen'],120)));
+    if (policy.modules.includes('HITOS') || policy.modules.includes('LG')) {
+      detailTables.push(table(`Control de Hitos${suffix}`,['Hito','Descripción','Fecha mínima','Fecha máxima','Responsable general','LG totales','LG cumplidas','Estado'],readableRows(r.hitos,['Hito','Descripción','Fecha mínima','Fecha máxima','Responsable general','LG totales','LG cumplidas','Estado'],120)));
+      if (policy.detailLevel==='detailed'||policy.detailLevel==='exhaustive'||/\b(hito|hitos|lg|lgs|tarea|tareas|dependencias?)\b/.test(p)) {
+        const orderedLg=[...r.lgs].sort((a,b)=>(/^cumplid/i.test(trim(a?.Estado))?1:0)-(/^cumplid/i.test(trim(b?.Estado))?1:0)||trim(a?.['Fecha mínima']).localeCompare(trim(b?.['Fecha mínima']))||trim(a?.['Descripción LG']).localeCompare(trim(b?.['Descripción LG']),'es'));
+        detailTables.push(table(`Líneas de Gestión (tareas)${suffix}`,['Hito','Descripción LG','Fecha mínima','Fecha máxima','Responsable','Estado','Dependencias previas','Dependencias posteriores'],readableRows(orderedLg,['Hito','Descripción LG','Fecha mínima','Fecha máxima','Responsable','Estado','Dependencias previas','Dependencias posteriores'],policy.detailLevel==='exhaustive'?250:80)));
+      }
+    }
     if (policy.wantsNames && !policy.greetOneByOne) {
       const nameRows=[];
       arr(r.att.asistentes).forEach(x=>nameRows.push(['Socio asistente',x.name,x.size]));
@@ -2005,8 +2033,8 @@ function directEventReportIfApplicable(prompt, context) {
 
   const r0=rows[0];
   const scope=singleEvent?'El informe':`${rows.length} eventos`;
-  const answer=`${scope} reúne una sola vez descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia${policy.wantsWeather?' más meteorología':''}. ${rows.some(r=>isEventInProgressValue(r.Estado))?'Las cifras en curso son provisionales.':''}`.trim();
-  const exportColumns=['Evento','Estado','IngresosPrevistos','IngresosCobrados','IngresosPendientes','ComprasRealizadas','ComprasPendientes','Donaciones','SaldoActual','SaldoPrevisto','SociosAsistentes','NoSociosAsistentes','TotalAsistentes','Tickets','Documentos'];
+  const answer=`${scope} reúne una sola vez descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos, asistencia, hitos y LG/tareas${policy.wantsWeather?' más meteorología':''}. ${rows.some(r=>isEventInProgressValue(r.Estado))?'Las cifras en curso son provisionales.':''}`.trim();
+  const exportColumns=['Evento','Estado','IngresosPrevistos','IngresosCobrados','IngresosPendientes','ComprasRealizadas','ComprasPendientes','Donaciones','SaldoActual','SaldoPrevisto','SociosAsistentes','NoSociosAsistentes','TotalAsistentes','Tickets','Documentos','Hitos','LgTotales','LgCumplidas','LgPendientes'];
   return {
     ok:true,rejected:false,compactOnePage:false,
     title:singleEvent?'Informe operativo':'Informe operativo comparativo',answer,
@@ -2928,6 +2956,7 @@ REGLAS OBLIGATORIAS:
 - Para una petición de informe general o detalles, comenta TODOS los bloques requeridos por politicaInforme: ${coverage}${policy.wantsWeather ? ', METEO' : ''}. No te limites a ingresos y donaciones: incluye compras, tickets/facturas y documentos, aunque sea para indicar su estado o ausencia.
 - Distingue saldo actual (ingresos cobrados menos compras realizadas) y saldo previsto al cierre (ingresos previstos menos compras previstas). Las donaciones son valor recibido, no dinero de caja. Si aparece compras + donaciones, llámalo «valor operativo de producto», nunca saldo.
 - Interpreta descripción, tickets y documentos: no te limites a contar filas. Señala qué acreditan o qué queda pendiente, con prudencia.
+- Si HITOS/LG están pedidos, explica avance, tareas pendientes, responsables y dependencias relevantes usando nombres humanos; no cites códigos ni relaciones descartadas por incoherencia.
 - No menciones códigos internos (id, persona_id, event_id, producto_id, tienda_id, donor_ref, P:id, T:id, SQL, SELECT, módulos o tokens).
 - contextoPersonas es privado y minimizado. Úsalo solo si la pregunta lo hace pertinente; nunca vuelques perfiles, edades, parentescos, salud o rasgos personales en un informe operativo general. Las alertas alimentarias relevantes sí prevalecen al planificar comida.
 - Si hay evento En curso, di una sola vez que las cifras son provisionales.
@@ -3039,7 +3068,9 @@ function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
     COMPRAS:/\b(compras?|gastos?|adquisiciones?)\b/,
     DONACIONES:/\b(donaciones?|donantes?|aportaciones?\s+en\s+especie)\b/,
     TICKETS:/\b(tickets?|facturas?|justificantes?\s+de\s+compra)\b/,
-    DOCUMENTOS:/\b(documentos?|autorizaciones?|solicitudes?|reintegros?|documentacion)\b/
+    DOCUMENTOS:/\b(documentos?|autorizaciones?|solicitudes?|reintegros?|documentacion)\b/,
+    HITOS:/\b(hitos?|control\s+de\s+hitos?)\b/,
+    LG:/\b(lg|lgs|tareas?|lineas?\s+de\s+gestion|pendientes?\s+de\s+gestion)\b/
   };
   if (policy.broadReport || policy.detailLevel === 'detailed' || policy.detailLevel === 'exhaustive' || policy.onePage) {
     for (const moduleName of policy.modules) {
@@ -3053,7 +3084,7 @@ function narrativeMissingRequestedBlocks(answer, userPrompt, context) {
 function narrativeCorrectionInstruction(userPrompt, context) {
   const rows = goodWeatherRowsFromContext(context);
   const policy = analyzeZuzuReportRequest(userPrompt);
-  const labels = {EVENTOS:'descripción y organización',INGRESOS:'ingresos/cobros',PERSONAS:'asistencia',COMPRAS:'compras',DONACIONES:'donaciones',TICKETS:'tickets/facturas',DOCUMENTOS:'documentos',METEO:'meteorología'};
+  const labels = {EVENTOS:'descripción y organización',INGRESOS:'ingresos/cobros',PERSONAS:'asistencia',COMPRAS:'compras',DONACIONES:'donaciones',TICKETS:'tickets/facturas',DOCUMENTOS:'documentos',HITOS:'hitos',LG:'tareas y líneas de gestión',METEO:'meteorología'};
   const required = policy.modules.map(m=>labels[m]).filter(Boolean);
   if (policy.wantsWeather && !required.includes('meteorología')) required.push('meteorología');
   const weather = rows.length ? ` Datos meteorológicos verificados: ${rows.map(r => `${trim(r.Día || r.Dia || spanishWeekdayFromIso(r.Fecha))} ${trim(r.Fecha)} ${trim(r.Cielo)} max ${r['Temp. máx']} min ${r['Temp. mín']} lluvia ${r['Prob. lluvia %']}% viento ${r['Viento km/h']}km/h`).join(' | ')}.` : '';
@@ -3169,7 +3200,7 @@ async function maybeEnrichLocalResultWithZuzu(userPrompt, context, localResult, 
   return out;
 }
 
-const ZUZU_PLAN_MODULES = ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PRODUCTOS','PERSONAS','METEO','DOCUMENTOS','TICKETS','TIENDAS'];
+const ZUZU_PLAN_MODULES = ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PRODUCTOS','PERSONAS','METEO','DOCUMENTOS','TICKETS','TIENDAS','HITOS','LG'];
 function plannerModule(value) {
   const raw = trim(value).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const map = {
@@ -3179,7 +3210,8 @@ function plannerModule(value) {
     PRODUCTO: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS',
     SOCIOS: 'PERSONAS', SOCIO: 'PERSONAS', PERSONAS: 'PERSONAS', PERSON: 'PERSONAS', PERSONA: 'PERSONAS',
     METEOROLOGIA: 'METEO', METEREOLOGIA: 'METEO', CLIMA: 'METEO', TIEMPO: 'METEO', PREVISION: 'METEO', PRONOSTICO: 'METEO',
-    TICKET: 'TICKETS', TKS: 'TICKETS', DOCUMENTO: 'DOCUMENTOS'
+    TICKET: 'TICKETS', TKS: 'TICKETS', DOCUMENTO: 'DOCUMENTOS',
+    HITO: 'HITOS', CONTROL_HITOS: 'HITOS', TAREA: 'LG', TAREAS: 'LG', LGS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG'
   };
   return map[raw] || raw;
 }
@@ -3328,6 +3360,8 @@ function inferPlannerModulesFromPrompt(prompt, localModules = []) {
   if (/producto\s+disponible|compras?\s+realiz|compras?\s+pend|donaciones?\s+de\s+producto|comparativa/.test(p)) ['EVENTOS','COMPRAS','DONACIONES','PRODUCTOS','TIENDAS'].forEach(m => mods.add(m));
   if (/socio|socios|asistent|no\s+asistent|colaborador/.test(p)) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m => mods.add(m));
   if (/meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) ['EVENTOS','METEO'].forEach(m => mods.add(m));
+  if (/\b(hito|hitos|control\s+de\s+hitos|control\s+de\s+tareas)\b/.test(p)) ['EVENTOS','HITOS','LG'].forEach(m => mods.add(m));
+  if (/\b(lg|lgs|lineas?\s+de\s+gestion|lineas?\s+gestion|tarea|tareas|dependencias?\s+previas?|dependencias?\s+posteriores?)\b/.test(p)) ['EVENTOS','HITOS','LG'].forEach(m => mods.add(m));
   if (!mods.size) arr(localModules).map(plannerModule).filter(Boolean).forEach(m => mods.add(m));
   if (!mods.size) mods.add('EVENTOS');
   return plannerUnique([...mods]);
@@ -3339,6 +3373,7 @@ function ensurePlannerDependencies(modules, prompt) {
   if (mods.has('COMPRAS') || mods.has('DONACIONES') || /producto\s+disponible/.test(p)) { mods.add('EVENTOS'); mods.add('PRODUCTOS'); }
   if (mods.has('PERSONAS') || /socio|asistent/.test(p)) { mods.add('INGRESOS'); mods.add('PERSONAS'); mods.add('EVENTOS'); }
   if (mods.has('METEO') || /meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) { mods.add('EVENTOS'); mods.add('METEO'); }
+  if (mods.has('HITOS') || mods.has('LG') || /\b(hito|hitos|lg|lgs|tarea|tareas|lineas?\s+de\s+gestion|dependencias?)\b/.test(p)) { mods.add('EVENTOS'); mods.add('HITOS'); mods.add('LG'); }
   return plannerUnique([...mods]);
 }
 function queryTemplatesForPlan(modules, prompt) {
@@ -3348,6 +3383,7 @@ function queryTemplatesForPlan(modules, prompt) {
   if (mods.has('COMPRAS') || mods.has('DONACIONES') || /producto\s+disponible/.test(p)) out.push('producto_disponible_por_evento', 'compras_realizadas_pendientes_por_evento', 'donaciones_producto_por_evento');
   if (mods.has('INGRESOS') || mods.has('PERSONAS') || /socio|asistent/.test(p)) out.push('asistencia_socios_canonica');
   if (mods.has('METEO') || /meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|previsi|pronost/.test(p)) out.push('meteorologia_por_fechas_evento');
+  if (mods.has('HITOS') || mods.has('LG')) out.push('control_hitos_y_lg_por_evento');
   if (mods.has('EVENTOS')) out.push('eventos_objetivo');
   return [...new Set(out)];
 }
@@ -3361,6 +3397,8 @@ function plannerDatabaseSchemaText() {
 - ce_productos(id, nombre, segmento, destino, default_precio, default_tienda_id, created_at, updated_at)
 - ce_tiendas(id, nombre, created_at, updated_at)
 - ce_ticket_images(image_key, event_id, label, storage_path, public_url, pathname, content_type, size_bytes, created_at, updated_at)
+- ce_hitos(id, event_id, nombre_hito, descripcion, fecha_minima, fecha_maxima, responsable_id, responsable_nombre, orden, created_at, updated_at)
+- ce_lg(id, event_id, hito_id, descripcion, fecha_minima, fecha_maxima, notas, dependencia_tipo, dependencias_previas, dependencias_posteriores, responsable_id, responsable_nombre, cumplida, cumplida_at, orden, created_at, updated_at)
 - ce_users(identificacion, nombre, clave, nivel, created_at, updated_at) [NO consultar clave]
 
 MAPEO_DE_DOMINIO:
@@ -3374,9 +3412,14 @@ MAPEO_DE_DOMINIO:
 - PRODUCTOS = ce_productos.
 - TIENDAS = ce_tiendas.
 - TICKETS/DOCUMENTOS = ce_ticket_images y ce_compras.ticket_donacion.
+- HITOS = ce_hitos, enlazados al evento por event_id.
+- LG = ce_lg, enlazadas a su Hito por hito_id y al evento por event_id. Son las tareas o Líneas de Gestión.
 
 SEMANTICA_CONTROL_EVENT:
 - ce_colaboradores.numero = número de personas asociadas al colaborador. En parejas normalmente 2; en exentos puede ser 0.
+- Las fechas fecha_minima/fecha_maxima de ce_hitos son calculadas desde sus LG. Para el detalle operativo usa ce_lg.
+- ce_lg.cumplida=true significa tarea cumplida. responsable_nombre es el texto humano; responsable_id enlaza con ce_personas.
+- ce_lg.dependencias_previas y dependencias_posteriores son JSONB con referencias {tipo:'LG'|'HITO', id:'...'}. Para secuencia operativa, las previas son la fuente canónica; las posteriores se derivan de ellas.
 - ce_eventos.precio = cuota obligatoria por persona.
 - Importe obligatorio de una colaboración = ce_colaboradores.numero * ce_eventos.precio. NO uses ce_colaboradores.importe para esto.
 - ce_colaboradores.importe = importe voluntario/aportación adicional cuando exista.
@@ -3714,7 +3757,9 @@ function plannerModulesFromSelects(selects) {
     PRODUCTO: 'PRODUCTOS', PRODUCTOS: 'PRODUCTOS', CE_PRODUCTOS: 'PRODUCTOS',
     TIENDA: 'TIENDAS', TIENDAS: 'TIENDAS', CE_TIENDAS: 'TIENDAS',
     DOCUMENTO: 'DOCUMENTOS', DOCUMENTOS: 'DOCUMENTOS', CE_DOCUMENTOS: 'DOCUMENTOS',
-    TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS'
+    TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS',
+    HITO: 'HITOS', HITOS: 'HITOS', CE_HITOS: 'HITOS',
+    LG: 'LG', LGS: 'LG', CE_LG: 'LG', TAREA: 'LG', TAREAS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG'
   };
   const mods = [];
   arr(selects).forEach(sql => {
@@ -3784,6 +3829,8 @@ MODULOS_A_ELEGIR:
 - METEO: previsión/tiempo por fechas del evento.
 - DOCUMENTOS: documentos DOC del evento.
 - TICKETS: justificantes/tickets de compra.
+- HITOS: bloques de control del evento, descripción, fechas calculadas, responsable general y avance.
+- LG: tareas o Líneas de Gestión de cada Hito, responsable, cumplimiento y dependencias.
 
 EVENTOS_DISPONIBLES:
 ${eventList}
@@ -4355,6 +4402,19 @@ async function hydrateStateForExactEvents(baseState, plan, flowTrace = []) {
   return merged;
 }
 
+async function attachHitosState(baseState, flowTrace = []) {
+  const current = baseState && typeof baseState === 'object' ? baseState : {};
+  if (Array.isArray(current.hitos) && Array.isArray(current.lgs)) return current;
+  try {
+    const extra = await listAllHitosState();
+    zuzuTracePush(flowTrace, 'Paso 0a · Control de Hitos', 'OK', `Cargados hitos=${arr(extra?.hitos).length}, LG=${arr(extra?.lgs).length}.`);
+    return { ...current, hitos: arr(extra?.hitos), lgs: arr(extra?.lgs) };
+  } catch (error) {
+    zuzuTracePush(flowTrace, 'Paso 0a · Control de Hitos', 'INFO', `No se pudieron cargar ce_hitos/ce_lg: ${cleanGeminiError(error)}. Zuzu continúa con el resto de módulos.`);
+    return { ...current, hitos: arr(current?.hitos), lgs: arr(current?.lgs) };
+  }
+}
+
 function normalizeLoggedUserFix10(payload = {}) {
   const raw = payload?.usuarioLogado || payload?.user || payload?.authUser || payload?.ce_acceso || payload?.ceAcceso || payload?.loggedUser || null;
   if (!raw || typeof raw !== 'object') return null;
@@ -4545,14 +4605,15 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // v19: se permiten preguntas indirectas si están vinculadas a eventos.
   // Solo bloqueamos intentos técnicos peligrosos o secretos; no bloqueamos clima, tono, informes, opiniones, etc.
   const hardForbidden = /(contraseña|password|clave api|api key|token|sql\b|drop table|delete from|insert into|hack|exfiltra|sistema operativo)/i;
-  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|persona|personas|usuario|usuarios|identificaci[oó]n|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)/i;
+  const eventish = /(evento|eventos|celebraci[oó]n|celebraciones|jornada|peña|arrastre|compra|compras|donaci[oó]n|donaciones|ingreso|ingresos|producto|productos|ticket|tk\d+|tienda|responsable|socio|persona|personas|usuario|usuarios|identificaci[oó]n|donante|colaborador|gr[aá]fica|estad[ií]stica|presupuesto|segmento|destino|coste|cantidad|valoraci[oó]n|recurso|mapa|resumen|compar|tiempo|meteorolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico|hito|hitos|\blg\b|lgs|tarea|tareas|l[ií]neas?\s+de\s+gesti[oó]n|dependencia|dependencias)/i;
   if (hardForbidden.test(userPrompt) && !eventish.test(userPrompt)) {
     zuzuTracePush(flowTrace, 'Guardia de ámbito', 'KO', 'Petición bloqueada por contenido técnico/peligroso sin relación con eventos.');
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
   }
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
-  zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}.`);
+  state = await attachHitosState(state, flowTrace);
+  zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}, hitos=${arr(state?.hitos).length}, LG=${arr(state?.lgs).length}.`);
   const plan = await buildZuzuPlan(userPrompt, state, selectedEventId, flowTrace);
   state = await hydrateStateForExactEvents(state, plan, flowTrace);
   const context = buildZuzuModuleContext(state, selectedEventId, userPrompt, plan);

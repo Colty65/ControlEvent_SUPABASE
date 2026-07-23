@@ -1,0 +1,22 @@
+{
+  "version": "v23_prod_r2-hitos4-orden-permisos-zuzu",
+  "base": "CE_v23_PROD_R2_CONTROL_HITOS_3_MENU_REAL_FIX",
+  "feature": "Ordenación de LG, saneado de dependencias, permisos GD/RW/RO, integración Zuzu y cierre de ventana",
+  "database_migration_required": false,
+  "existing_schema_file": "ControlEvent_SQL_V23_R2_HITOS.sql",
+  "modified_files": [
+    "services/hitos.service.js",
+    "routes/hitos.routes.js",
+    "services/event-ai.service.js",
+    "services/event-context.service.js",
+    "services/zuzu-report-policy.service.js",
+    "app/features/v23-2-hitos-control.js",
+    "public/app/features/v23-2-hitos-control.js",
+    "app/styles/hitos-control.css",
+    "public/app/styles/hitos-control.css",
+    "app/features/v17-fix27-welcome-info-general.js",
+    "public/app/features/v17-fix27-welcome-info-general.js",
+    "index.html",
+    "public/index.html"
+  ]
+}
