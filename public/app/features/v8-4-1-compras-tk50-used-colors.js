@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - Parche quirurgico COMPRAS: TK01..TK50 + tickets usados en verde.
+/* ControlEvent v23_prod_r2 - Parche quirurgico COMPRAS: TK01..TK50 + tickets usados en verde.
    No cambia version ni toca la logica de guardado/carga. */
 (function(){
   'use strict';

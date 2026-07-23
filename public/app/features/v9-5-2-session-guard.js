@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod_r1 - guardia de sesión visible.
+/* ControlEvent v23_prod_r2 - guardia de sesión visible.
    Evita que la cabecera quede en "Sin acceso" dentro de una sesión activa por refrescos/renderizados tardíos. */
 (function(){
   'use strict';
   if(window.__ceV952SessionGuard) return;
   window.__ceV952SessionGuard = true;
-  var KEY='ControlEvent_v23_prod_r1_auth_shadow';
+  var KEY='ControlEvent_v23_prod_r2_auth_shadow';
   var LOGOUT_UNTIL=0;
   function text(v){ return v==null?'':String(v); }
   function $(id){ return document.getElementById(id); }

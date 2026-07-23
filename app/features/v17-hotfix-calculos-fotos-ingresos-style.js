@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - Cálculos por tienda/ticket: fotos con método tipo Documentos.
+/* ControlEvent v23_prod_r2 - Cálculos por tienda/ticket: fotos con método tipo Documentos.
    FIX12: las miniaturas del cálculo abren visor propio con detalle completo; se evita que los visores antiguos intercepten el clic. No cambia versión. */
 (function(){
   'use strict';
@@ -165,7 +165,7 @@
     fetchingEvent=ev;
     fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev),{cache:'no-store'})
       .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); normalizeApiImages(json.images||{}); loadedEvent=ev; return serverImages;})
-      .catch(err=>{console.warn('[ControlEvent v23_prod_r1] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
+      .catch(err=>{console.warn('[ControlEvent v23_prod_r2] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
       .finally(()=>{fetchPromise=null;});
     return fetchPromise;
   }
@@ -531,7 +531,7 @@
       const bkey=canonicalKey(label); busy.add(bkey); beginTombstone(label); clearStateAliases(label); await clearIndexedDbAliases(label); refreshAfterAction(label,'');
       try{
         const dataUrl=await fileToCompressedDataUrl(file);
-        await deleteServer(label).catch(err=>console.warn('[ControlEvent v23_prod_r1] Limpieza previa TK:',err?.message||err));
+        await deleteServer(label).catch(err=>console.warn('[ControlEvent v23_prod_r2] Limpieza previa TK:',err?.message||err));
         clearStateAliases(label); await clearIndexedDbAliases(label);
         const uploaded=await uploadServer(label,dataUrl);
         endTombstone(label); setServerImage(label,uploaded.src); clearStateAliases(label);

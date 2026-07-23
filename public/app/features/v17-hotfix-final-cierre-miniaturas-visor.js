@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - FIX13 puntual (cargado realmente desde index):
+/* ControlEvent v23_prod_r2 - FIX13 puntual (cargado realmente desde index):
    1) cerrar globo detalle con X/Escape; 2) evitar miniaturas duplicadas;
    3) visor ticket con detalle a la izquierda y Cerrar abajo derecha;
    4) título del evento en visor: verde En curso, rojo Finalizado.

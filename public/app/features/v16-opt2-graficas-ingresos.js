@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 OPT2D - Gráficas sin avisos negros y con repintado estabilizado.
+/* ControlEvent v23_prod_r2 OPT2D - Gráficas sin avisos negros y con repintado estabilizado.
    Alcance cerrado: GRAFICAS + hidratación de justificantes al cambiar evento.
    Estrategia:
    - No pinta estados intermedios vacíos durante el cambio de evento.

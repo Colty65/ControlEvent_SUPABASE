@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v23_prod_r2 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    FIX7: asistencia ampliada + no socios, y no actuar durante logon.
    - Mantiene selector/orden de FIX4.
    - La lógica de avance se ejecuta solo con sesión activa. */
@@ -318,7 +318,7 @@
     const rows=avanceRows(); const cls=finalizado()?'finalizado':'curso';
     layer.innerHTML=`<div class="ce-v16hf5-bubble ${cls}" role="dialog" aria-live="polite">
       <button type="button" class="ce-v16hf5-close" aria-label="Cerrar">×</button>
-      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod_r1</span><strong>${esc(title())}</strong></div>
+      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod_r2</span><strong>${esc(title())}</strong></div>
       <div class="ce-v16hf5-rows">${rows.map(r=>{const p=palette[r.color]||palette.blue; const pct=Math.max(0,Math.min(100,num(r.p))); return `<div class="ce-v16hf5-row" style="--ce-av-color:${p[0]};--ce-av-bg:${p[1]}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${pct.toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-v16hf5-bar"><i style="width:${pct}%"></i></span>${r.html||''}</div>`;}).join('')}</div>
     </div>`;
     layer.classList.add('visible');

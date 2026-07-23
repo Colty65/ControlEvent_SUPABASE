@@ -1,4 +1,4 @@
-// ControlEvent v23_prod_r1 · FIX13 base + FIX14 login guard
+// ControlEvent v23_prod_r2 · FIX13 base + FIX14 login guard
 // Refuerzos: desplegable eventos completo, refresco real de INGRESOS/fotos, Vista aérea legible y estados activos.
 (function(){
   'use strict';

@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 FIX48_SALDO_ACTUAL_REALIZADO
+/* ControlEvent v23_prod_r2 FIX48_SALDO_ACTUAL_REALIZADO
    Corrección mínima: SALDO ACTUAL = ingresos realmente cobrados - gastos realizados.
    Solo se considera ingreso realizado si la situación es Banco, Bizum o Efectivo.
    El resto queda como pendiente para este cálculo. */

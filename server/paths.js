@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v23_prod_r1';
+export const APP_VERSION = 'ControlEvent v23_prod_r2';
 
-export const APP_VERSION_LABEL = 'v23_prod_r1';
-export const APP_VERSION_FILE = 'ControlEvent_v23_prod_r1';
-export const BUILD_ID = '20260722-V23-PROD-R1-INFORMES';
-export const ZIP_NAME = 'CE_v23_PROD_R1_ZUZU_INFORMES_DEPURADOS.zip';
+export const APP_VERSION_LABEL = 'v23_prod_r2';
+export const APP_VERSION_FILE = 'ControlEvent_v23_prod_r2';
+export const BUILD_ID = '20260722-V23-PROD-R2-HITOS1';
+export const ZIP_NAME = 'CE_v23_PROD_R2_CONTROL_HITOS_1.zip';

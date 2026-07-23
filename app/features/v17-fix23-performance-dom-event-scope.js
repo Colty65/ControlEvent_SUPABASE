@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 FIX23 - rendimiento real:
+/* ControlEvent v23_prod_r2 FIX23 - rendimiento real:
    - evita cargas /api/state globales sin evento (boot ligero)
    - reduce DOM de Compras/Donaciones: filas compactas y edición bajo demanda
    - no cambia cálculos, fotos, permisos ni versión visible. */

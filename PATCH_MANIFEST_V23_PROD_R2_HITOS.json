@@ -1,0 +1,25 @@
+{
+  "version": "v23_prod_r2",
+  "build": "20260722-V23-PROD-R2-HITOS1",
+  "base": "v23_prod_r1",
+  "feature": "Control de Hitos y Líneas de Gestión",
+  "database": {
+    "sql": "ControlEvent_SQL_V23_R2_HITOS.sql",
+    "tables": ["ce_hitos", "ce_lg"]
+  },
+  "added": [
+    "services/hitos.service.js",
+    "routes/hitos.routes.js",
+    "public/app/features/v23-2-hitos-control.js",
+    "public/app/styles/hitos-control.css",
+    "public/ControlEvent_SQL_V23_R2_HITOS.sql",
+    "README_V23_PROD_R2_CONTROL_HITOS.md"
+  ],
+  "modified": [
+    "server/app.js",
+    "public/index.html",
+    "public/app/version.js",
+    "server/paths.js",
+    "package.json"
+  ]
+}

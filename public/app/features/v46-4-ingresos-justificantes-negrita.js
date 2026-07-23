@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod_r1 - justificantes de INGRESOS y marca negrita post-modificación.
+/* ControlEvent v23_prod_r2 - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r1';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r1';
+  const VERSION = 'ControlEvent v23_prod_r2';
+  const VERSION_FILE = 'ControlEvent_v23_prod_r2';
   const INSTALLED = '__ceV464JustificantesNegrita';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

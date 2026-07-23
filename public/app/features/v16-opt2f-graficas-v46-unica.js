@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 OPT2F - GRAFICAS: renderer único v46 / 3 quesos de ancho.
+/* ControlEvent v23_prod_r2 OPT2F - GRAFICAS: renderer único v46 / 3 quesos de ancho.
    Alcance cerrado: solo estabilización visual de GRAFICAS.
    Objetivo: bloquear la gráfica antigua de 4 quesos / 2 columnas que se pintaba antes
    y dejar un único pintado final con la gráfica v46 (6 quesos / 3 columnas).

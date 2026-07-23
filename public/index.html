@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v23_prod_r1</title>
-  <!-- ControlEvent v23_prod_r1 PWA / instalación móvil -->
+  <title>ControlEvent v23_prod_r2</title>
+  <!-- ControlEvent v23_prod_r2 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
-  <meta name="controlevent-build" content="20260722-V23-PROD-R1-INFORMES" />
+  <meta name="controlevent-build" content="20260722-V23-PROD-R2-HITOS1" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,6 +44,7 @@
   <style id="ce-login-overlay-clean-head">#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
 
     <link rel="stylesheet" href="./app/styles/app.css" />
+    <link rel="stylesheet" href="./app/styles/hitos-control.css?v=v23_prod_r2_HITOS1" />
     <script src="./app/features/v8-5-compras-rpc-head-fix40.js?v=v23_prod_20260708170000"></script>
     <script src="./app/features/v8-5-crud-root-fix28.js?v=v23_prod_20260709194000_FIX16"></script>
 
@@ -106,7 +107,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span class="ce-v104-brand-mini"><img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>v23_prod_r1</span></span>
+          <span class="ce-v104-brand-mini"><img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>v23_prod_r2</span></span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -548,6 +549,7 @@
       <button type="button" id="btnExportExcel" class="iconbtn outline app-lockable" title="Excel"><img class="footer-img" alt="Excel" src="./assets/embedded/footer-excel.jpg" /></button>
       <button type="button" id="btnOpenImport" class="iconbtn outline app-lockable" title="Carga inicial"><img class="footer-img" alt="Carga inicial" src="./assets/embedded/footer-importacion.jpg" /></button>
       <button type="button" id="btnExportSeed" class="iconbtn outline app-lockable" title="Descarga de datos"><img class="footer-img" alt="Descarga de datos" src="./assets/embedded/footer-descarga-datos.jpg" /></button>
+      <button type="button" id="btnOpenHitos" class="iconbtn outline app-lockable" title="Control de Hitos"><img class="footer-img" alt="Control de Hitos" src="./hitos-evento.jpg" /></button>
       <button type="button" id="btnToggleMaintenance" class="iconbtn secondary app-lockable maint-btn-closed" title="Mantenimiento de tablas generales"><img class="footer-img maint-footer-img" alt="Mantenimiento de tablas generales" src="./assets/embedded/footer-mantenimiento.png" /></button>
     </div>
   </div></div>
@@ -634,7 +636,7 @@
   <script src="./app/features/v10-5-hotfix-busqueda-recarga-compartir.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v10-5-hotfix-fotos-docs-botones.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v11-1-hotfix-ticketauto-no-autopen.js?v=v23_prod_20260708170000"></script>
-  <script src="./app/features/v11-3-zuzu-analitica-libre.js?v=v23_prod_r1_20260722_INFORMES"></script>
+  <script src="./app/features/v11-3-zuzu-analitica-libre.js?v=v23_prod_r2_20260722_INFORMES"></script>
   <script src="./app/features/v12-0-finalizado-herramientas-consulta.js?v=v23_prod_20260708213700"></script>
   <script src="./app/features/v13-0-hotfix-evento-precio-socios.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v15-hotfix6-resumen-avance-manto.js?v=v23_prod_20260708170000"></script>
@@ -647,8 +649,8 @@
   <script src="./app/features/v15-hotfix25-rebase49-correcciones.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v15-hotfix26-estabilidad-dropdown-saldo-avance52.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v16-hotfix1-saldo-avance-version.js?v=v23_prod_20260708170000"></script>
-  <script src="./app/features/v23-canonical-attendance.js?v=v23_prod_r1_20260722_INFORMES"></script>
-  <script src="./app/features/v16-hotfix5-logo-avance-ligero.js?v=v23_prod_r1_20260722_INFORMES"></script>
+  <script src="./app/features/v23-canonical-attendance.js?v=v23_prod_r2_20260722_INFORMES"></script>
+  <script src="./app/features/v16-hotfix5-logo-avance-ligero.js?v=v23_prod_r2_20260722_INFORMES"></script>
   <script src="./app/features/v16-opt1-event-load-stabilizer.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v16-opt2-graficas-ingresos.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v16-opt2e-graficas-unico-render.js?v=v23_prod_20260708170000"></script>
@@ -667,13 +669,14 @@
   <script src="./app/features/v17-fix40-human-labels-planificacion.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v17-fix48-saldo-actual-realizado.js?v=v23_prod_20260714103000_FIX7_DONACIONES"></script>
   <script src="./app/features/v18-11-9-layout-left-tools.js?v=v23_prod_20260708174500"></script>
-<script src="./app/features/v18-11-10-final-hardlock.js?v=v23_prod_r1_20260722_INFORMES"></script>
+<script src="./app/features/v18-11-10-final-hardlock.js?v=v23_prod_r2_20260722_INFORMES"></script>
   <script src="./app/features/v19-fix10-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix12-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix13-prod.js?v=v23_prod_20260713193000_FIX7"></script>
   <script src="./app/features/v19-fix15-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix16-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix17-prod.js?v=v23_prod_20260709204000_FIX17"></script>
-  <script src="./app/features/v22-voz3-zuzu.js?v=v23_prod_r1_20260722_INFORMES"></script>
+  <script src="./app/features/v22-voz3-zuzu.js?v=v23_prod_r2_20260722_INFORMES"></script>
+  <script src="./app/features/v23-2-hitos-control.js?v=v23_prod_r2_HITOS1"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 · VOZ4 MOVIL ESTABLE
+/* ControlEvent v23_prod_r2 · VOZ4 MOVIL ESTABLE
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -11,7 +11,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu = true;
 
-  var BUILD = 'v23_prod_r1';
+  var BUILD = 'v23_prod_r2';
   var STYLE_ID = 'ceV22Voz3Style';
   var PANEL_ID = 'ceV22Voz3Panel';
   var STORAGE = {

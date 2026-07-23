@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - única fuente canónica de asistencia.
+/* ControlEvent v23_prod_r2 - única fuente canónica de asistencia.
    Evita duplicar cálculos entre contexto, tablas, PDF y redacción. */
 
 function text(v){ return v == null ? '' : String(v); }

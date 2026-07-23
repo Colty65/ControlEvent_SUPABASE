@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - Contexto privado de personas para Zuzu.
+/* ControlEvent v23_prod_r2 - Contexto privado de personas para Zuzu.
    Este fichero permanece en servidor: no se exporta a BACKUP/INFOEVENTO ni al navegador.
    Zuzu recibe solo perfiles pertinentes al prompt y minimizados por sensibilidad. */
 

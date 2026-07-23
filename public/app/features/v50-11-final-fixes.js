@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - ajuste quirurgico sobre v50.19.
+/* ControlEvent v23_prod_r2 - ajuste quirurgico sobre v50.19.
    - Salir: muestra siempre la ventana de login real y limpia cualquier estado autenticado.
    - Version: fija una unica version visible sin cargar v50.19.
    - INGRESOS/COMPRAS: filas pendientes en rojo; el resto queda en negro.
@@ -7,18 +7,18 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v23_prod_r1';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r1';
+  const VERSION = 'ControlEvent v23_prod_r2';
+  const VERSION_FILE = 'ControlEvent_v23_prod_r2';
   const INSTALLED = '__ceV5011FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
 
-  const SESSION_KEYS = ['ControlEvent_v23_prod_r1_session'];
+  const SESSION_KEYS = ['ControlEvent_v23_prod_r2_session'];
   const LOGOUT_KEYS = [
-    'ControlEvent_v23_prod_r1_logout_at',
-    'ControlEvent_v23_prod_r1_logout_at',
-    'ControlEvent_v23_prod_r1_logout_at',
-    'ControlEvent_v23_prod_r1_logout_at'
+    'ControlEvent_v23_prod_r2_logout_at',
+    'ControlEvent_v23_prod_r2_logout_at',
+    'ControlEvent_v23_prod_r2_logout_at',
+    'ControlEvent_v23_prod_r2_logout_at'
   ];
   const $ = id => document.getElementById(id);
   const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };

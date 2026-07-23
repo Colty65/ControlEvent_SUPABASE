@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
+/* ControlEvent v23_prod_r2 - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
    Alcance: solo visor iOS/iPadOS para fotos de INGRESOS en evento Finalizado. Sin cambios de datos, Excel, cache ni render general. */
 (function(){
   'use strict';

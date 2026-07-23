@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod_r1 - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
+/* ControlEvent v23_prod_r2 - ajustes quirurgicos: version, INFOEVENTO/BACKUP, fotos ingresos/docs, resumen sin descarga. */
 (function(){
   'use strict';
   if(window.__ceV105ProdFixes) return; window.__ceV105ProdFixes=true;
-  var VERSION='v23_prod_r1';
-  var VERSION_TEXT='ControlEvent v23_prod_r1';
-  var VERSION_FILE='ControlEvent_v23_prod_r1';
+  var VERSION='v23_prod_r2';
+  var VERSION_TEXT='ControlEvent v23_prod_r2';
+  var VERSION_FILE='ControlEvent_v23_prod_r2';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -58,7 +58,7 @@
   }
   function normalizeDownloadName(name){
     var n=text(name);
-    n=n.replace(/ControlEvent_v23_prod_r1(?:_r1)?/ig, VERSION_FILE)
+    n=n.replace(/ControlEvent_v23_prod_r2(?:_r1)?/ig, VERSION_FILE)
        .replace(/ControlEvent_v10_4(?:_\d+)?_prod/ig, VERSION_FILE)
        .replace(/ControlEvent_v18(?:_1)?_prod/ig, VERSION_FILE)
        .replace(/ControlEvent_v\d+(?:_\d+){1,4}_prod/ig, VERSION_FILE)

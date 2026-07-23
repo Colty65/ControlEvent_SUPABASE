@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 - carga fiable por evento sin refrescos en bucle.
+/* ControlEvent v23_prod_r2 - carga fiable por evento sin refrescos en bucle.
    Al cambiar de evento hace una única lectura /api/state?eventId=... y repinta la ventana activa. */
 (function(){
   'use strict';
@@ -77,7 +77,7 @@
       lastOk = id;
       renderActive(reason || 'event-change');
     }catch(err){
-      console.warn('[ControlEvent v23_prod_r1] Carga por evento fallida:', err && err.message || err);
+      console.warn('[ControlEvent v23_prod_r2] Carga por evento fallida:', err && err.message || err);
     }finally{
       if(mySeq === seq){ busyId = ''; try{ document.body.classList.remove('ce-v120-event-loading'); }catch(_){} }
     }

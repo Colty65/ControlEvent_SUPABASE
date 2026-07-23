@@ -1,8 +1,8 @@
-/* ControlEvent v23_prod_r1 - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
+/* ControlEvent v23_prod_r2 - visor común de tickets, carga estable por evento, compartir, búsquedas y cabecera. */
 (function(){
   'use strict';
   if(window.__ceV102AppFixes) return; window.__ceV102AppFixes=true;
-  var VERSION='v23_prod_r1';
+  var VERSION='v23_prod_r2';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

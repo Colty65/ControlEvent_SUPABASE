@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r1 OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
+/* ControlEvent v23_prod_r2 OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
    Objetivo: que nunca se vea la gráfica antigua de 4 quesos / 2 columnas.
    Estrategia:
    - Se carga muy pronto y también al final para reengancharse.
