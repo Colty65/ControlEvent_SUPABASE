@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r2 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v23_prod_r4 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    FIX7: asistencia ampliada + no socios, y no actuar durante logon.
    - Mantiene selector/orden de FIX4.
    - La lógica de avance se ejecuta solo con sesión activa. */
@@ -199,6 +199,64 @@
     return null;
   }
 
+  const hitosSummaryCache = new Map();
+  function summarizeHitosPayload(payload){
+    const hitos=Array.isArray(payload?.hitos)?payload.hitos:[];
+    const lgs=Array.isArray(payload?.lgs)?payload.lgs:[];
+    const cumplidas=lgs.filter(row=>!!row?.cumplida).length;
+    return {hitos:hitos.length,lgs:lgs.length,cumplidas,pendientes:Math.max(0,lgs.length-cumplidas),error:''};
+  }
+  function cachedHitosSummary(id){
+    const key=txt(id);
+    try{
+      const hs=window.ControlEventHitos?.state;
+      if(hs && txt(hs.eventId)===key && Array.isArray(hs.hitos) && Array.isArray(hs.lgs) && !hs.loading){
+        const summary=summarizeHitosPayload(hs);
+        if(hs.lastError) summary.error=txt(hs.lastError);
+        hitosSummaryCache.set(key,summary);
+        return summary;
+      }
+    }catch(_){ }
+    return hitosSummaryCache.get(key)||null;
+  }
+  function controlHitosRow(id){
+    const summary=cachedHitosSummary(id);
+    if(!summary) return {t:'CONTROL DE HITOS',color:'purple',p:0,d:'Cargando Hitos y Líneas de Gestión…'};
+    if(summary.error) return {t:'CONTROL DE HITOS',color:'purple',p:0,d:'No se pudo cargar el Control de Hitos'};
+    const pct=summary.lgs?summary.cumplidas/summary.lgs*100:0;
+    return {t:'CONTROL DE HITOS',color:'purple',p:pct,d:`Hitos: ${summary.hitos} · LG: ${summary.lgs} · Cumplidas: ${summary.cumplidas} · Pendientes: ${summary.pendientes}`};
+  }
+  async function loadHitosSummary(id){
+    const key=txt(id);
+    if(!key) return null;
+    try{
+      const response=await fetch(`/api/hitos?eventId=${encodeURIComponent(key)}&_=${Date.now()}`,{cache:'no-store'});
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload=await response.json();
+      const summary=summarizeHitosPayload(payload);
+      hitosSummaryCache.set(key,summary);
+      return summary;
+    }catch(error){
+      const summary={hitos:0,lgs:0,cumplidas:0,pendientes:0,error:txt(error?.message||error||'No disponible')};
+      hitosSummaryCache.set(key,summary);
+      return summary;
+    }
+  }
+  function rowsMarkup(rows){
+    return rows.map(r=>{
+      const p=palette[r.color]||palette.blue;
+      const pct=Math.max(0,Math.min(100,num(r.p)));
+      return `<div class="ce-v16hf5-row" style="--ce-av-color:${p[0]};--ce-av-bg:${p[1]}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${pct.toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-v16hf5-bar"><i style="width:${pct}%"></i></span>${r.html||''}</div>`;
+    }).join('');
+  }
+  function refreshHitosInVisibleAvance(layer,id){
+    loadHitosSummary(id).then(()=>{
+      if(!layer?.classList?.contains('visible') || txt(evId())!==txt(id)) return;
+      const rowsNode=layer.querySelector('.ce-v16hf5-rows');
+      if(rowsNode) rowsNode.innerHTML=rowsMarkup(avanceRows());
+    });
+  }
+
   function avanceRows(){
     const id=evId(); const ev=selectedEvent(); const precio=num(ev.precio||0);
     const col=arr('colaboradores').filter(c=>rowEventId(c)===id || String(c.eventId||c.event_id||'')===id);
@@ -225,13 +283,14 @@
     const ticketPhotos=tickets.filter(tk=>Object.keys(st().ticketImages||{}).some(k=>k.startsWith(id+'|')&&k.toUpperCase().includes(tk))).length;
     const socios=socioDisplay(sociosCanonicos(),col);
     return [
+      {t:'ASISTENCIA',color:'slate',p:socios.total?socios.totalAs/socios.total*100:0,d:`Asistentes: ${socios.totalAs+socios.totalNoSocios} personas · ${socios.totalAs} socios + ${socios.totalNoSocios} no socios · ${col.length} registros de ingreso · Socios no asistentes: ${socios.totalNo}`,html:infoSociosHtml(socios)},
+      controlHitosRow(id),
       {t:'INGRESOS',color:'blue',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${eur(ingresado)} de ${eur(previsto)} ingresados`},
       {t:'JUSTIFICANTES DE INGRESOS',color:'green',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos con justificante`},
       {t:'DONACIONES',color:'orange',p:don.length?100:0,d:`Donaciones registradas: ${don.length} · Valor estimado: ${eur(totalDon)}`},
       {t:'COMPRAS',color:'red',p:comp.length?tkGastos.length/comp.length*100:0,d:`TKxx/gastos corrientes: ${tkGastos.length} · ${eur(totalTk)} · Pte. compra: ${ptes.length} · ${eur(totalPte)} · Total líneas: ${comp.length} · ${eur(totalComp)}`},
       {t:'JUSTIFICANTES DE COMPRA',color:'purple',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`},
-      {t:'DOCUMENTOS',color:'green',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`},
-      {t:'ASISTENCIA',color:'slate',p:socios.total?socios.totalAs/socios.total*100:0,d:`Asistentes: ${socios.totalAs+socios.totalNoSocios} personas · ${socios.totalAs} socios + ${socios.totalNoSocios} no socios · ${col.length} registros de ingreso · Socios no asistentes: ${socios.totalNo}`,html:infoSociosHtml(socios)}
+      {t:'DOCUMENTOS',color:'green',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`}
     ];
   }
 
@@ -306,9 +365,10 @@
     layer.innerHTML=`<div class="ce-v16hf5-bubble ${cls}" role="dialog" aria-live="polite">
       <button type="button" class="ce-v16hf5-close" aria-label="Cerrar">×</button>
       <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod</span><strong>${esc(title())}</strong></div>
-      <div class="ce-v16hf5-rows">${rows.map(r=>{const p=palette[r.color]||palette.blue; const pct=Math.max(0,Math.min(100,num(r.p))); return `<div class="ce-v16hf5-row" style="--ce-av-color:${p[0]};--ce-av-bg:${p[1]}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${pct.toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-v16hf5-bar"><i style="width:${pct}%"></i></span>${r.html||''}</div>`;}).join('')}</div>
+      <div class="ce-v16hf5-rows">${rowsMarkup(rows)}</div>
     </div>`;
     layer.classList.add('visible');
+    refreshHitosInVisibleAvance(layer,evId());
     layer.querySelector('.ce-v16hf5-close')?.addEventListener('click',ev=>{ev.preventDefault(); ev.stopPropagation(); closeAvance();},{once:true});
     const bubble=layer.querySelector('.ce-v16hf5-bubble');
     bubble?.addEventListener('click',ev=>ev.stopPropagation());

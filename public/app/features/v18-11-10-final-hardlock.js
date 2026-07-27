@@ -1,12 +1,12 @@
-/* ControlEvent v23_prod_r2 - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v23_prod_r4 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v23_prod_r2';
-  var VERSION_TEXT='ControlEvent v23_prod_r2';
-  var VERSION_FILE='ControlEvent_v23_prod_r2';
-  var BUILD_ID='20260723-V23-PROD-R2-HITOS3-MENU-REAL';
-  var ZIP_NAME='CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip';
+  var VERSION_LABEL='v23_prod_r4';
+  var VERSION_TEXT='ControlEvent v23_prod_r4';
+  var VERSION_FILE='ControlEvent_v23_prod_r4';
+  var BUILD_ID='20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR';
+  var ZIP_NAME='CE_v23_PROD_R4_AVANCE_HITOS_TOPBAR.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }

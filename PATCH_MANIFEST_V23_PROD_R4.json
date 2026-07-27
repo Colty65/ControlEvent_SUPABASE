@@ -1,0 +1,32 @@
+{
+  "version": "v23_prod_r4",
+  "build": "20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR",
+  "zip": "CE_v23_PROD_R4_AVANCE_HITOS_TOPBAR.zip",
+  "changes": [
+    "ASISTENCIA first in event progress",
+    "CONTROL DE HITOS second with live event summary",
+    "upper header version text hidden"
+  ],
+  "modifiedFiles": [
+    "app/features/v16-hotfix5-logo-avance-ligero.js",
+    "public/app/features/v16-hotfix5-logo-avance-ligero.js",
+    "index.html",
+    "public/index.html",
+    "app/version.js",
+    "public/app/version.js",
+    "server/paths.js",
+    "routes/export.routes.js",
+    "public/sw.js",
+    "app/features/v18-11-9-version-trace.js",
+    "public/app/features/v18-11-9-version-trace.js",
+    "app/features/v17-fix27-welcome-info-general.js",
+    "public/app/features/v17-fix27-welcome-info-general.js",
+    "app/features/v17-fix48-saldo-actual-realizado.js",
+    "public/app/features/v17-fix48-saldo-actual-realizado.js",
+    "README_V23_PROD_R4_AVANCE_HITOS_TOPBAR.md",
+    "app/features/v18-11-10-final-hardlock.js",
+    "public/app/features/v18-11-10-final-hardlock.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

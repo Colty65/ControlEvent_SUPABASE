@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ControlEvent v23_prod_r3</title>
-  <!-- ControlEvent v23_prod_r3 PWA / instalación móvil -->
+  <title>ControlEvent v23_prod_r4</title>
+  <!-- ControlEvent v23_prod_r4 PWA / instalación móvil -->
   <meta name="theme-color" content="#111827" />
-  <meta name="controlevent-build" content="20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION" />
+  <meta name="controlevent-build" content="20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR" />
   <meta name="application-name" content="ControlEvent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,15 +44,26 @@
   <style id="ce-login-overlay-clean-head">#authOverlay:not(.hidden) ~ .header,#authOverlay:not(.hidden) ~ .app,#authOverlay:not(.hidden) ~ .footer{visibility:hidden!important}#authOverlay:not(.hidden){visibility:visible!important}</style>
 
     <link rel="stylesheet" href="./app/styles/app.css" />
-    <link rel="stylesheet" href="./app/styles/hitos-control.css?v=v23_prod_r3_HITOS4_ORDEN_RO_ZUZU" />
+    <link rel="stylesheet" href="./app/styles/hitos-control.css?v=v23_prod_r4_HITOS4_ORDEN_RO_ZUZU" />
     <script src="./app/features/v8-5-compras-rpc-head-fix40.js?v=v23_prod_20260708170000"></script>
-    <script src="./app/features/v8-5-crud-root-fix28.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+    <script src="./app/features/v8-5-crud-root-fix28.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
 
   <!-- HOTFIX26_CACHE_BUST_PLANIFICACION -->
 
   <style id="ce-v17-fix19-early-graph-guard">
     #eventChartWrap .chart-bars,#eventChartWrap .vbars-wrap,#eventChartWrap .vbars-grid{display:none!important;visibility:hidden!important;pointer-events:none!important;}
     #eventChartWrap.ce-v17-fix19-guarding{min-height:540px!important;contain:layout paint!important;}
+  </style>
+
+  <style id="ce-v23-r4-hide-top-version">
+    .appname-stack .ce-v104-brand-mini > span,
+    .appname-stack .ce-v1045-brand-mini > span,
+    .appname-stack .ce-v1047-brand-mini > span,
+    .appname-stack [class*="brand-mini"] > span,
+    .appname-stack [data-ce-version-label]{display:none!important;}
+    .appname-stack .ce-v104-brand-mini,
+    .appname-stack .ce-v1045-brand-mini,
+    .appname-stack .ce-v1047-brand-mini{gap:0!important;}
   </style>
 </head>
 <body class="ce-v17-fix22-no-event">
@@ -107,7 +118,7 @@
       </div>
       <div class="appname">
         <div class="appname-stack">
-          <span class="ce-v104-brand-mini"><img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>v23_prod_r3</span></span>
+          <span class="ce-v104-brand-mini"><img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>v23_prod_r4</span></span>
           <div id="headerDateTime" class="appclock"></div>
                     <div class="user-actions">
             <button type="button" class="outline small hidden" id="btnLogout" onclick="doLogout(); return false;">Salir</button>
@@ -557,15 +568,15 @@
 <script>window.__ceDisableLegacyBarGraficas=true;window.__ceV16Opt2HGraphHardLock=true;</script>
 <script src="./app/performance/low-resource-boot.js"></script>
 <script src="/api/bootstrap.js"></script>
-<script src="./app/features/v18-11-9-version-trace.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+<script src="./app/features/v18-11-9-version-trace.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
 <script src="./app/features/event-delete-cascade-v33.7.js?v=v23_prod_20260708170000"></script>
-<script id="legacy-bundle-before-modules-v307" src="./app/legacy/legacy-bundle-before-modules-v30.7.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+<script id="legacy-bundle-before-modules-v307" src="./app/legacy/legacy-bundle-before-modules-v30.7.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
 
 <script type="module" src="./modules/module-loader.js"></script>
 <script>window.__ceDisableLegacyBarGraficas=true;window.__ceV16Opt2HGraphHardLock=true;</script>
 <script src="./app/features/v16-opt2h-graficas-v46-hardlock.js?v=v23_prod_20260708170000"></script>
 <script>window.__ceDisableLegacyBarGraficas=true;</script>
-<script id="legacy-bundle-after-modules-v307" src="./app/legacy/legacy-bundle-after-modules-v30.7.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+<script id="legacy-bundle-after-modules-v307" src="./app/legacy/legacy-bundle-after-modules-v30.7.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
 <script src="./app/features/mapa-productos.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v19-mapa-recursos-global.js?v=v23_prod_20260709194000_FIX16"></script>
 <script src="./app/features/planificacion-inicial.js?v=v23_prod_20260708170000"></script>
@@ -636,7 +647,7 @@
   <script src="./app/features/v10-5-hotfix-busqueda-recarga-compartir.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v10-5-hotfix-fotos-docs-botones.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v11-1-hotfix-ticketauto-no-autopen.js?v=v23_prod_20260708170000"></script>
-  <script src="./app/features/v11-3-zuzu-analitica-libre.js?v=v23_prod_r3_20260722_INFORMES"></script>
+  <script src="./app/features/v11-3-zuzu-analitica-libre.js?v=v23_prod_r4_20260722_INFORMES"></script>
   <script src="./app/features/v12-0-finalizado-herramientas-consulta.js?v=v23_prod_20260708213700"></script>
   <script src="./app/features/v13-0-hotfix-evento-precio-socios.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v15-hotfix6-resumen-avance-manto.js?v=v23_prod_20260708170000"></script>
@@ -649,8 +660,8 @@
   <script src="./app/features/v15-hotfix25-rebase49-correcciones.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v15-hotfix26-estabilidad-dropdown-saldo-avance52.js?v=v23_prod_20260708170000"></script>
   <script src="./app/features/v16-hotfix1-saldo-avance-version.js?v=v23_prod_20260708170000"></script>
-  <script src="./app/features/v23-canonical-attendance.js?v=v23_prod_r3_20260722_INFORMES"></script>
-  <script src="./app/features/v16-hotfix5-logo-avance-ligero.js?v=v23_prod_r3_20260722_INFORMES"></script>
+  <script src="./app/features/v23-canonical-attendance.js?v=v23_prod_r4_20260722_INFORMES"></script>
+  <script src="./app/features/v16-hotfix5-logo-avance-ligero.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
   <script src="./app/features/v16-opt1-event-load-stabilizer.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v16-opt2-graficas-ingresos.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v16-opt2e-graficas-unico-render.js?v=v23_prod_20260708170000"></script>
@@ -665,18 +676,18 @@
 <script src="./app/features/v17-fix23-performance-dom-event-scope.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v17-fix24-idle-quiet.js?v=v23_prod_20260708170000"></script>
 <script src="./app/features/v17-fix25-welcome-elarrastre.js?v=v23_prod_20260708170000"></script>
-<script src="./app/features/v17-fix27-welcome-info-general.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+<script src="./app/features/v17-fix27-welcome-info-general.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
   <script src="./app/features/v17-fix40-human-labels-planificacion.js?v=v23_prod_20260708170000"></script>
-  <script src="./app/features/v17-fix48-saldo-actual-realizado.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+  <script src="./app/features/v17-fix48-saldo-actual-realizado.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
   <script src="./app/features/v18-11-9-layout-left-tools.js?v=v23_prod_20260708174500"></script>
-<script src="./app/features/v18-11-10-final-hardlock.js?v=v23_prod_r3_20260722_INFORMES"></script>
+<script src="./app/features/v18-11-10-final-hardlock.js?v=v23_prod_r4_20260722_INFORMES"></script>
   <script src="./app/features/v19-fix10-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix12-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix13-prod.js?v=v23_prod_20260713193000_FIX7"></script>
   <script src="./app/features/v19-fix15-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix16-prod.js?v=v23_prod_20260709194000_FIX16"></script>
   <script src="./app/features/v19-fix17-prod.js?v=v23_prod_20260709204000_FIX17"></script>
-  <script src="./app/features/v22-voz3-zuzu.js?v=v23_prod_r3_20260722_INFORMES"></script>
-  <script src="./app/features/v23-2-hitos-control.js?v=20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION"></script>
+  <script src="./app/features/v22-voz3-zuzu.js?v=v23_prod_r4_20260722_INFORMES"></script>
+  <script src="./app/features/v23-2-hitos-control.js?v=20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR"></script>
 </body>
 </html>
