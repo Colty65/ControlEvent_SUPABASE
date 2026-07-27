@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod_r2 - versión centralizada */
-export const VERSION = 'v23_prod_r2';
-export const VERSION_LABEL = 'v23_prod_r2';
-export const VERSION_TEXT = 'ControlEvent v23_prod_r2';
-export const VERSION_FILE = 'ControlEvent_v23_prod_r2';
-export const BUILD_ID = '20260723-V23-PROD-R2-HITOS3-MENU-REAL';
-export const ZIP_NAME = 'CE_v23_PROD_R2_CONTROL_HITOS_2_MENU_FIX.zip';
+/* ControlEvent v23_prod_r3 - versión centralizada */
+export const VERSION = 'v23_prod_r3';
+export const VERSION_LABEL = 'v23_prod_r3';
+export const VERSION_TEXT = 'ControlEvent v23_prod_r3';
+export const VERSION_FILE = 'ControlEvent_v23_prod_r3';
+export const BUILD_ID = '20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION';
+export const ZIP_NAME = 'CE_v23_PROD_R3_SEGMENTO_DESTINO_ESTADO_VERSION.zip';
 
 try {
   window.__ceVersion = VERSION;

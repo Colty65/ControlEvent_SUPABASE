@@ -1,0 +1,22 @@
+{
+  "version": "ControlEvent v23_prod_r3",
+  "label": "v23_prod_r3",
+  "build": "20260727-V23-PROD-R3-SEGDEST-ESTADO-VERSION",
+  "zip": "CE_v23_PROD_R3_SEGMENTO_DESTINO_ESTADO_VERSION.zip",
+  "changes": [
+    "SEGMENTO/DESTINO: estructura moderna label/comprado/donado/pendiente/total, sin Undefined.",
+    "INFOEVENTO: recalculo local de agrupaciones si recibe formato legacy; cifras, hojas y graficas restauradas.",
+    "Ficha inicial ColtyLAB: texto Control de hitos (tareas) y version canonica.",
+    "Eventos Finalizados: cambio a En curso mediante RPC exclusiva de situacion, conservando el resto de campos."
+  ],
+  "modified_files": [
+    "public/app/features/v17-fix48-saldo-actual-realizado.js",
+    "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+    "public/app/features/v17-fix27-welcome-info-general.js",
+    "lib/supabase-normalized.js",
+    "public/app/version.js",
+    "server/paths.js",
+    "routes/export.routes.js",
+    "public/index.html"
+  ]
+}

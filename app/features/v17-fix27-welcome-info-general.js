@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r2
+/* ControlEvent v23_prod_r3
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Sin evento: ColtyLAB muestra ficha informativa/version.
    - Con evento elegido: ColtyLAB deja paso a AVANCE DEL EVENTO. */
@@ -12,8 +12,7 @@
   const DEFAULT_VERSION_LABEL = 'v23_prod_voz3';
   function currentVersionLabel(){
     try{
-      const meta = document.querySelector('meta[name="controlevent-build"]');
-      const value = String(meta?.getAttribute('content') || document.documentElement?.dataset?.controleventBuild || window.__CONTROL_EVENT_BUILD_LABEL__ || '').trim();
+      const value = String(window.__ceVersionLabel || window.ControlEventVersion?.label || window.__ceVersionInfo?.label || DEFAULT_VERSION_LABEL).trim();
       return value || DEFAULT_VERSION_LABEL;
     }catch(_){ return DEFAULT_VERSION_LABEL; }
   }
@@ -128,7 +127,7 @@
               <li>Compras, tickets y gastos pendientes.</li>
               <li>Donaciones de producto y valoración.</li>
               <li>Documentos, tiendas, productos y personas.</li>
-              <li>Control del hitos (tareas).</li>
+              <li>Control de hitos (tareas).</li>
             </ul>
           </section>
           <section class="modal-col ia-col">

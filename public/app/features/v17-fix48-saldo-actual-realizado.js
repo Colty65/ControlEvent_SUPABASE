@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r2 FIX48_SALDO_ACTUAL_REALIZADO
+/* ControlEvent v23_prod_r3 FIX48_SALDO_ACTUAL_REALIZADO
    Corrección mínima: SALDO ACTUAL = ingresos realmente cobrados - gastos realizados.
    Solo se considera ingreso realizado si la situación es Banco, Bizum o Efectivo.
    El resto queda como pendiente para este cálculo. */
@@ -9,7 +9,7 @@
 
   const PAID = new Set(['BANCO','BIZUM','EFECTIVO']);
   const DONATION_TYPES = new Set(['DONADO TIENDA','DONADO SOCIO','DONADO OTROS']);
-  const VERSION = 'v23_prod_FIX48_SALDO_ACTUAL_REALIZADO';
+  const VERSION = 'v23_prod_r3';
 
   const text = value => String(value ?? '').trim();
   const up = value => text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -97,20 +97,72 @@
     const donadoOtros = sum('DONADO OTROS');
     return {donadoTienda, donadoSocio, donadoOtros, valorDonado: money(donadoTienda + donadoSocio + donadoOtros)};
   }
+  function purchaseProductName(row){
+    return text(row?.producto?.nombre || purchaseProduct(row)?.nombre || row?.productoNombre || 'Producto');
+  }
+  function purchaseStoreName(row){
+    const product = purchaseProduct(row);
+    const storeId = row?.tiendaId || row?.tienda_id || product?.tiendaId || product?.defaultTiendaId || product?.tienda_id || product?.default_tienda_id || '';
+    const store = row?.tienda || byId('tiendas', storeId) || {};
+    return text(store?.nombre || row?.tiendaNombre || 'Sin tienda asignada');
+  }
+  function purchaseDonorName(row){
+    const raw = text(row?.donorRef || row?.donor_ref || row?.donante || row?.donanteNombre || '');
+    if(raw.startsWith('P:')) return text(byId('personas', raw.slice(2))?.nombre || 'Sin donante');
+    if(raw.startsWith('T:')) return text(byId('tiendas', raw.slice(2))?.nombre || 'Sin donante');
+    return raw || text(row?.responsable?.nombre || byId('personas', row?.responsableId || row?.responsable_id)?.nombre || 'Sin donante');
+  }
+  function purchaseDetailLine(row, donated = false){
+    const units = num(row?.unidades ?? row?.uds ?? row?.cantidad ?? 0);
+    const price = productPrice(row);
+    const total = purchaseValue(row);
+    if(donated){
+      return `${purchaseDonorName(row)} | ${purchaseProductName(row)} | ${units} | ${price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € | ${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`;
+    }
+    return `${ticketText(row) || 'PTE.COMPRA'} | ${purchaseStoreName(row)} | ${purchaseProductName(row)} | ${units} | ${price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € | ${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`;
+  }
   function summaryRowsBy(field){
     const rows = eventPurchases();
-    const opts = field === 'segmento'
-      ? (window.SEGMENT_OPTIONS || ['COMIDA','BEBIDA','INFRAESTRUCTURA'])
-      : (window.DESTINO_OPTIONS || ['APERITIVO','COMIDA','CENA','CUBATAS','INFRAESTRUCTURA']);
-    return (Array.isArray(opts) ? opts : []).flatMap(label => {
-      const bought = rows.filter(r => up(field === 'segmento' ? rowSegment(r) : rowDestino(r)) === up(label) && !isPendingPurchaseTicket(r));
-      const pending = rows.filter(r => up(field === 'segmento' ? rowSegment(r) : rowDestino(r)) === up(label) && isPendingPurchaseTicket(r) && !isDonationTicket(ticketText(r)));
-      const comprado = money(bought.reduce((a,r) => a + purchaseValue(r), 0));
-      const pdte = money(pending.reduce((a,r) => a + purchaseValue(r), 0));
-      return [
-        {k: `${label} Comprado o donado`, v: comprado, pending:false, donated:false},
-        {k: `${label} Pte.Compra u otros gastos`, v: pdte, pending:true, donated:false}
-      ];
+    const defaults = field === 'segmento'
+      ? ['COMIDA','BEBIDA','INFRAESTRUCTURA']
+      : ['APERITIVO','COMIDA','CENA','CUBATAS','INFRAESTRUCTURA'];
+    const configured = field === 'segmento' ? window.SEGMENT_OPTIONS : window.DESTINO_OPTIONS;
+    const labels = [];
+    const seen = new Set();
+    const addLabel = value => {
+      const label = text(value);
+      const key = up(label);
+      if(!label || seen.has(key)) return;
+      seen.add(key);
+      labels.push(label);
+    };
+    (Array.isArray(configured) && configured.length ? configured : defaults).forEach(addLabel);
+    rows.forEach(row => addLabel(field === 'segmento' ? rowSegment(row) : rowDestino(row)));
+
+    return labels.map(label => {
+      const sameGroup = row => up(field === 'segmento' ? rowSegment(row) : rowDestino(row)) === up(label);
+      const bought = rows.filter(row => sameGroup(row) && !isDonationTicket(ticketText(row)) && !isPendingPurchaseTicket(row));
+      const donated = rows.filter(row => sameGroup(row) && isDonationTicket(ticketText(row)));
+      const pending = rows.filter(row => sameGroup(row) && !isDonationTicket(ticketText(row)) && isPendingPurchaseTicket(row));
+      const comprado = money(bought.reduce((a,row) => a + purchaseValue(row), 0));
+      const donado = money(donated.reduce((a,row) => a + purchaseValue(row), 0));
+      const pendiente = money(pending.reduce((a,row) => a + purchaseValue(row), 0));
+      const total = money(comprado + donado + pendiente);
+      return {
+        label,
+        comprado,
+        donado,
+        pendiente,
+        total,
+        listComprado: bought.map(row => purchaseDetailLine(row, false)),
+        listDonado: donated.map(row => purchaseDetailLine(row, true)),
+        listPendiente: pending.map(row => purchaseDetailLine(row, false)),
+        // Compatibilidad con renderizadores antiguos, sin perder la estructura moderna.
+        k: label,
+        v: total,
+        pending: pendiente !== 0,
+        donated: donado !== 0
+      };
     });
   }
 
