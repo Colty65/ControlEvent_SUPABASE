@@ -1,10 +1,10 @@
-/* ControlEvent v23_prod_r4 - versión centralizada */
-export const VERSION = 'v23_prod_r4';
-export const VERSION_LABEL = 'v23_prod_r4';
-export const VERSION_TEXT = 'ControlEvent v23_prod_r4';
-export const VERSION_FILE = 'ControlEvent_v23_prod_r4';
-export const BUILD_ID = '20260728-V23-PROD-R4-AVANCE-HITOS-TOPBAR';
-export const ZIP_NAME = 'CE_v23_PROD_R4_AVANCE_HITOS_TOPBAR.zip';
+/* ControlEvent v23_prod_r5 - versión centralizada */
+export const VERSION = 'v23_prod_r5';
+export const VERSION_LABEL = 'v23_prod_r5';
+export const VERSION_TEXT = 'ControlEvent v23_prod_r5';
+export const VERSION_FILE = 'ControlEvent_v23_prod_r5';
+export const BUILD_ID = '20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE';
+export const ZIP_NAME = 'CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip';
 
 try {
   window.__ceVersion = VERSION;

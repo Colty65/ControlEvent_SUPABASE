@@ -1,0 +1,29 @@
+{
+  "version": "v23_prod_r5",
+  "build": "20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE",
+  "zip": "CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip",
+  "changes": [
+    "Zuzu and graphical reports respect signed voluntary income adjustments, including negative values",
+    "Canonical income totals now match Resumen presupuestario (example: 220 - 110 = 110)",
+    "Version removed from AVANCE DEL EVENTO card title"
+  ],
+  "modifiedFiles": [
+    "services/event-context.service.js",
+    "services/event-ai.service.js",
+    "app/features/v16-hotfix5-logo-avance-ligero.js",
+    "public/app/features/v16-hotfix5-logo-avance-ligero.js",
+    "app/version.js",
+    "public/app/version.js",
+    "server/paths.js",
+    "routes/export.routes.js",
+    "index.html",
+    "public/index.html",
+    "public/sw.js",
+    "app/features/v18-11-9-version-trace.js",
+    "public/app/features/v18-11-9-version-trace.js",
+    "app/features/v18-11-10-final-hardlock.js",
+    "public/app/features/v18-11-10-final-hardlock.js",
+    "package.json",
+    "package-lock.json"
+  ]
+}

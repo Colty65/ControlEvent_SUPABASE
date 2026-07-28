@@ -1,12 +1,6 @@
-Version app: v22_prod
-Version texto: ControlEvent v22_prod
-Version fichero: ControlEvent_v22_prod
-Build: 20260708-200500
-ZIP: CE_v19_PROD_MAPA_GLOBAL_FIX3.zip
-Objetivo: recuperar evidencias de versión, trazabilidad Zuzu/CE, nombre PDF correcto, menú lateral y mejorar interpretación de socios no asistentes + meteorología.
-Comprobaciones:
-- Front final hardlock: public/app/features/v18-11-10-final-hardlock.js (hardlock v22_prod, sin versión emergente)
-- /api/version actualiza v22_prod
-- Zuzu modal muestra badge v22_prod
-- Traza técnica queda abierta por defecto
-- PDF usa ControlEvent_v22_prod-responde_Zuzu_a_<asunto>-aaaammdd-hhmmss.pdf
+Version app: v23_prod_r5
+Version texto: ControlEvent v23_prod_r5
+Version fichero: ControlEvent_v23_prod_r5
+Build: 20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE
+ZIP: CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip
+Objetivo: corregir los ingresos de Zuzu respetando ajustes voluntarios negativos y quitar la versión de AVANCE DEL EVENTO.

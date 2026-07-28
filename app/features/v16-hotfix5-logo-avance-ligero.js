@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r4 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
+/* ControlEvent v23_prod_r5 - HOTFIX5: avance ColtyLAB ligero y sin bloqueo.
    FIX7: asistencia ampliada + no socios, y no actuar durante logon.
    - Mantiene selector/orden de FIX4.
    - La lógica de avance se ejecuta solo con sesión activa. */
@@ -364,7 +364,7 @@
     const rows=avanceRows(); const cls=finalizado()?'finalizado':'curso';
     layer.innerHTML=`<div class="ce-v16hf5-bubble ${cls}" role="dialog" aria-live="polite">
       <button type="button" class="ce-v16hf5-close" aria-label="Cerrar">×</button>
-      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO · v23_prod</span><strong>${esc(title())}</strong></div>
+      <div class="ce-v16hf5-title"><span>AVANCE DEL EVENTO</span><strong>${esc(title())}</strong></div>
       <div class="ce-v16hf5-rows">${rowsMarkup(rows)}</div>
     </div>`;
     layer.classList.add('visible');

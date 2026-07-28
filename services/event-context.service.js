@@ -1,4 +1,4 @@
-/* ControlEvent v23_prod_r2 - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v23_prod_r5 - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 import { analyzeZuzuReportRequest, isBroadEventReportRequest } from './zuzu-report-policy.service.js';
 import { buildCanonicalAttendance } from './zuzu-attendance.service.js';
@@ -722,7 +722,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v23_prod_r2 - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v23_prod_r5 - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -775,7 +775,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v23_prod_r2 - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v23_prod_r5 - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','HITOS','LG','METEO'];
@@ -829,13 +829,32 @@ function zuzuIncomeAmounts(row, ev, helpers) {
   const numero = num(row?.numero);
   const isSocio = rango === 'SOCIO';
   const obligatorio = isSocio ? round(numero * num(ev?.precio), 2) : 0;
-  // Misma regla que RESUMEN PRESUPUESTARIO: si existe TOTAL calculado en la fila, es la fuente canónica.
-  // En socios, se descompone como obligatorio + voluntario. En no socios/donantes, todo va a voluntario/importe.
-  let total = 0;
-  if (rowHasNumber(row, ['total','importeTotal','importe_total'])) total = firstNumber(row, ['total','importeTotal','importe_total'], 0);
-  else total = obligatorio + firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
-  const voluntario = isSocio ? Math.max(0, round(total - obligatorio, 2)) : round(total, 2);
-  return { rango, numero: round(numero, 3), obligatorio: round(obligatorio, 2), voluntario: round(voluntario, 2), total: round(obligatorio + voluntario, 2) };
+  const voluntaryKeys = ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'];
+  const totalKeys = ['total','importeTotal','importe_total'];
+
+  // Regla canónica idéntica al RESUMEN PRESUPUESTARIO:
+  // 1) Si existe un importe voluntario explícito, se respeta literalmente, incluso si es negativo.
+  //    Los negativos son ajustes válidos para reducir el obligatorio calculado (p. ej. pareja que paga una sola cuota).
+  // 2) Solo si no existe importe voluntario explícito se recupera desde TOTAL - obligatorio.
+  // 3) Nunca se fuerza el voluntario a cero: hacerlo inflaba los informes de Zuzu.
+  let voluntario;
+  if (rowHasNumber(row, voluntaryKeys)) {
+    voluntario = firstNumber(row, voluntaryKeys, 0);
+  } else if (rowHasNumber(row, totalKeys)) {
+    const totalGuardado = firstNumber(row, totalKeys, 0);
+    voluntario = isSocio ? round(totalGuardado - obligatorio, 2) : round(totalGuardado, 2);
+  } else {
+    voluntario = 0;
+  }
+
+  voluntario = round(voluntario, 2);
+  return {
+    rango,
+    numero: round(numero, 3),
+    obligatorio: round(obligatorio, 2),
+    voluntario,
+    total: round(obligatorio + voluntario, 2)
+  };
 }
 
 function rowEventId(row) { return trim(row?.eventId || row?.event_id || row?.eventoId || row?.evento_id || row?.idEvento || row?.evento || ''); }
@@ -1213,7 +1232,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v23_prod_r2',
+    version: 'ControlEvent Zuzu Planner v23_prod_r5',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null,
@@ -1685,7 +1704,7 @@ function zuzuCanonicalMetricsFromModules(modulos, asistenciaCanonica = null) {
   });
   return {
     fuente: 'ControlEvent calculado sobre módulos extraídos con reglas de RESUMEN PRESUPUESTARIO',
-    reglaIngresos: 'Ingresos total = suma de Importe obligatorio + Importe voluntario de INGRESOS.',
+    reglaIngresos: 'Ingresos total = suma de Importe obligatorio + Importe voluntario de INGRESOS. El importe voluntario puede ser positivo, cero o negativo y nunca debe recortarse a cero.',
     reglaCompras: 'Compras realizadas = suma de Importe de COMPRAS excluyendo Pte. Compra. Incluye TKxx y GASTOS CORRIENTES.',
     reglaDonaciones: 'Donaciones valor = suma de Valor de DONACIONES.',
     reglaSaldoActual: 'Saldo actual = Ingresos total - Compras realizadas. No sumar donaciones al saldo financiero.',
@@ -1937,9 +1956,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   if (recoveredOperationalModules.length) advertenciasAuditoria.push(`ControlEvent recuperó sin filtros los módulos ${recoveredOperationalModules.join(', ')} porque la petición exigía toda la información de los eventos y el primer filtrado había dejado filas fuera.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v23_prod_r2',
+    versionContexto: 'ControlEvent Zuzu Modules v23_prod_r5',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v23_prod_r2: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
+    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v23_prod_r5: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     politicaInforme: reportPolicy,
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
@@ -1957,7 +1976,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
       { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' },
-      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v23_prod_r2 experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
+      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v23_prod_r5 experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
       { id: 'V23_1-ASISTENCIA-UNICA', regla: 'Toda cifra o listado de asistentes y no asistentes sale exclusivamente de asistenciaCanonica.porEvento. Numero>0 confirma; Numero=0 solo cuenta con estado explícito de asistencia/exención/invitación. Registros de ingreso son filas administrativas, no personas.' },
       { id: 'V23_1-COBERTURA-INFORME', regla: 'politicaInforme define todos los módulos exigidos por la petición. Un informe general o con detalles incluye descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia; METEO si se pide. No cerrar la respuesta si falta uno.' },
       { id: 'V23_R2-HITOS-LG', regla: 'HITOS y LG son las fuentes del Control de Hitos. HITOS resume cada bloque; LG contiene cada tarea, responsable, estado y dependencias. Las dependencias posteriores son derivadas de las previas canónicas y no deben inventarse.' },
@@ -1965,7 +1984,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     ],
     instrucciones: {
       veracidad: 'Usa exclusivamente modulosExtraidos. Si un módulo no está presente, no inventes sus datos.',
-      ingresos: 'INGRESOS usa la salida probada: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Just.ing. En socios, Importe obligatorio = Numero * Precio del evento.',
+      ingresos: 'INGRESOS usa la salida probada: Evento; Nombre; Numero; Importe obligatorio; Importe voluntario; Ingreso; Just.ing. En socios, Importe obligatorio = Numero * Precio del evento. Importe voluntario puede ser negativo como ajuste y debe conservarse literalmente.',
       compras: 'COMPRAS usa la salida probada: Evento; Producto; Unidades; Precio; Importe; Ticket u otros gastos; Tienda; Responsable. Excluye DONADO SOCIO/TIENDA/OTROS.',
       donaciones: 'DONACIONES usa la salida probada: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable. El donante se resuelve por P:/T:/id contra personas o tiendas y nunca debe mostrarse como código técnico.',
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
