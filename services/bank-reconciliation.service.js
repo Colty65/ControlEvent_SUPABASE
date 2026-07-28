@@ -224,7 +224,8 @@ function linkFromDb(row){
     ticketCode:normalizeTicket(row.ticket_code),
     ticketAmountSnapshot:cents(row.ticket_amount_snapshot),
     createdBy:row.created_by || '',
-    createdAt:row.created_at || ''
+    createdAt:row.created_at || '',
+    forcedSquare:row.forced_square === true
   };
 }
 function batchFromDb(row){
@@ -264,40 +265,112 @@ function summaryFor(movements){
   };
 }
 
-export async function listBankReconciliation({accountId=''} = {}){
+function dateOnly(value){ return text(value).slice(0,10); }
+function eventFromDb(row = {}){
+  return {
+    id:text(row.id),
+    title:text(row.titulo || row.nombre || row.descripcion) || 'Evento',
+    description:text(row.descripcion),
+    startDate:dateOnly(row.fecha_ini || row.fecha_inicio || row.fechaIni),
+    endDate:dateOnly(row.fecha_fin || row.fecha_final || row.fechaFin),
+    status:text(row.situacion || row.estado || 'En curso'),
+    finalized:/FINALIZADO/i.test(text(row.situacion || row.estado))
+  };
+}
+async function loadEvent(eventId){
+  const id=text(eventId);
+  if(!id) fail('Selecciona un evento antes de abrir Cuadre Banco.',409,'BANK_EVENT_REQUIRED');
+  const {data,error}=await db().from('ce_eventos').select('*').eq('id',id).maybeSingle();
+  if(error) throw error;
+  if(!data) fail('El evento activo no existe.',404,'BANK_EVENT_NOT_FOUND');
+  return eventFromDb(data);
+}
+
+export async function assertBankEventWritable(eventId){
   try{
+    const event=await loadEvent(eventId);
+    if(event.finalized) fail(`El evento «${event.title}» está Finalizado. Cuadre Banco queda disponible únicamente en modo consulta.`,409,'BANK_EVENT_FINALIZED');
+    return event;
+  }catch(error){ throw friendlyDbError(error); }
+}
+function inEventDates(movement,event){
+  const day=dateOnly(movement.executedAt);
+  if(!day) return false;
+  if(event.startDate && day < event.startDate) return false;
+  if(event.endDate && day > event.endDate) return false;
+  return !!(event.startDate || event.endDate);
+}
+function reconcileMovement(row,links){
+  const target=row.amount < 0 ? Math.abs(row.amount) : 0;
+  const justified=cents(links.reduce((sum,link)=>sum + num(link.ticketAmount),0));
+  const difference=cents(target - justified);
+  const forcedSquare=links.some(link=>link.forcedSquare === true);
+  const justificationStatus=row.amount >= 0
+    ? 'NO_APLICA'
+    : (!links.length ? 'SIN_JUSTIFICAR'
+      : (forcedSquare ? 'CUADRADO_FORZADO'
+        : (Math.abs(difference) <= 0.01 ? 'CUADRADO' : (difference > 0 ? 'PENDIENTE' : 'EXCESO'))));
+  return {...row,links,targetAmount:cents(target),justifiedAmount:justified,difference,forcedSquare,justificationStatus};
+}
+function eventTicketSummary(catalog,eventId){
+  const tickets=catalog.filter(item=>item.eventId===eventId);
+  const linked=tickets.filter(item=>item.linked).length;
+  const total=tickets.length;
+  const ratio=total ? linked / total : 0;
+  const traffic=total && linked===total ? 'GREEN' : (ratio >= .5 ? 'ORANGE' : 'RED');
+  return {total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified:total>0&&linked===total,traffic};
+}
+function linkedPeriod(movements){
+  const linked=movements.filter(row=>row.links.length).sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt)));
+  return {start:dateOnly(linked[0]?.executedAt),end:dateOnly(linked[linked.length-1]?.executedAt)};
+}
+
+export async function listBankReconciliation({accountId='',eventId=''} = {}){
+  try{
+    const event=await loadEvent(eventId);
     const [movementRows, linkRows, catalog] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {order:'executed_at', ascending:false}),
       selectPaged(LINKS_TABLE, {order:'created_at', ascending:true}),
       ticketCatalog()
     ]);
-    const all = movementRows.map(movementFromDb);
-    const accounts = [...new Map(all.map(row => [row.accountId, {id:row.accountId,label:row.accountLabel || row.accountId,lastAt:row.executedAt}])).values()]
-      .sort((a,b) => String(b.lastAt).localeCompare(String(a.lastAt)));
-    const requestedAccount = text(accountId);
-    const selectedAccount = requestedAccount === 'TODOS' ? 'TODOS' : (requestedAccount || accounts[0]?.id || '');
-    const filtered = selectedAccount && selectedAccount !== 'TODOS' ? all.filter(row => row.accountId === selectedAccount) : all;
-    const catalogMap = new Map(catalog.map(item => [`${item.eventId}|${item.ticketCode}`, item]));
-    const linksByMovement = new Map();
-    for(const row of linkRows.map(linkFromDb)){
-      if(!linksByMovement.has(row.movementId)) linksByMovement.set(row.movementId, []);
-      const current = catalogMap.get(`${row.eventId}|${row.ticketCode}`);
-      linksByMovement.get(row.movementId).push({...row,
-        eventTitle:current?.eventTitle || row.eventId,
-        ticketAmount:cents(current?.amount ?? row.ticketAmountSnapshot),
-        stores:current?.stores || [],
-        responsibles:current?.responsibles || []
+    const all=movementRows.map(movementFromDb);
+    const accounts=[...new Map(all.map(row=>[row.accountId,{id:row.accountId,label:row.accountLabel||row.accountId,lastAt:row.executedAt}])).values()]
+      .sort((a,b)=>String(b.lastAt).localeCompare(String(a.lastAt)));
+    const requestedAccount=text(accountId);
+    const selectedAccount=requestedAccount&&requestedAccount!=='TODOS'?requestedAccount:'TODOS';
+    const accountMovements=selectedAccount&&selectedAccount!=='TODOS'?all.filter(row=>row.accountId===selectedAccount):all;
+    const globalSummary=summaryFor(accountMovements);
+    const catalogMap=new Map(catalog.map(item=>[`${item.eventId}|${item.ticketCode}`,item]));
+    const eventLinksByMovement=new Map();
+    for(const row of linkRows.map(linkFromDb).filter(link=>link.eventId===event.id)){
+      if(!eventLinksByMovement.has(row.movementId)) eventLinksByMovement.set(row.movementId,[]);
+      const current=catalogMap.get(`${row.eventId}|${row.ticketCode}`);
+      eventLinksByMovement.get(row.movementId).push({...row,
+        eventTitle:current?.eventTitle||event.title,
+        ticketAmount:cents(current?.amount??row.ticketAmountSnapshot),
+        stores:current?.stores||[],
+        responsibles:current?.responsibles||[]
       });
     }
-    const movements = filtered.map(row => {
-      const links = linksByMovement.get(row.id) || [];
-      const target = row.amount < 0 ? Math.abs(row.amount) : 0;
-      const justified = cents(links.reduce((sum,link) => sum + num(link.ticketAmount),0));
-      const difference = cents(target - justified);
-      const justificationStatus = row.amount >= 0 ? 'NO_APLICA' : (!links.length ? 'SIN_JUSTIFICAR' : (Math.abs(difference) <= 0.01 ? 'CUADRADO' : (difference > 0 ? 'PENDIENTE' : 'EXCESO')));
-      return {...row,links,targetAmount:cents(target),justifiedAmount:justified,difference,justificationStatus};
-    });
-    return {ok:true,accounts,selectedAccount,movements,summary:summaryFor(movements)};
+    const eventLinkedMovements=all
+      .filter(row=>eventLinksByMovement.has(row.id))
+      .map(row=>reconcileMovement(row,eventLinksByMovement.get(row.id)||[]));
+    const movements=accountMovements
+      .filter(row=>eventLinksByMovement.has(row.id)||inEventDates(row,event))
+      .map(row=>reconcileMovement(row,eventLinksByMovement.get(row.id)||[]));
+    const eventSummary=summaryFor(movements);
+    const period=linkedPeriod(eventLinkedMovements);
+    const ticketSummary=eventTicketSummary(catalog,event.id);
+    return {
+      ok:true,
+      event:{...event,reconciliationStart:period.start||event.startDate,reconciliationEnd:period.end||event.endDate},
+      readOnly:event.finalized,
+      ticketSummary,
+      accounts,
+      selectedAccount,
+      movements,
+      summary:{...eventSummary,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
+    };
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -373,16 +446,33 @@ export async function setMovementIncluded(id, included){
   }catch(error){ throw friendlyDbError(error); }
 }
 
-export async function listPaidTickets({movementId='',q=''} = {}){
+export async function setMovementForced(movementId,eventId,forced){
+  const id=text(movementId);
+  const selectedEvent=text(eventId);
+  if(!id||!selectedEvent) fail('Movimiento y evento son obligatorios.');
   try{
-    const catalog = await ticketCatalog();
-    const query = text(q).toLowerCase();
-    const items = catalog.filter(item => {
-      if(item.linked && item.linkedMovementId !== text(movementId)) return false;
+    const {data:links,error:linksError}=await db().from(LINKS_TABLE).select('id').eq('movement_id',id).eq('event_id',selectedEvent);
+    if(linksError) throw linksError;
+    if(!(links||[]).length) fail('Vincula al menos un TKxx antes de marcar el cuadre forzado.',409,'BANK_FORCE_REQUIRES_TICKET');
+    const {data,error}=await db().from(LINKS_TABLE).update({forced_square:forced===true}).eq('movement_id',id).eq('event_id',selectedEvent).select('*');
+    if(error) throw error;
+    return {ok:true,forced:forced===true,links:(data||[]).map(linkFromDb)};
+  }catch(error){ throw friendlyDbError(error); }
+}
+
+export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
+  try{
+    const selectedEvent=text(eventId);
+    if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
+    const catalog=await ticketCatalog();
+    const query=text(q).toLowerCase();
+    const items=catalog.filter(item=>{
+      if(item.eventId!==selectedEvent) return false;
+      if(item.linked&&item.linkedMovementId!==text(movementId)) return false;
       if(!query) return true;
       return [item.ticketCode,item.eventTitle,...item.stores,...item.responsibles].join(' ').toLowerCase().includes(query);
     });
-    return {ok:true,items};
+    return {ok:true,eventId:selectedEvent,items};
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -417,30 +507,32 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
   }
 }
 
-export async function deleteTicketLink(linkId){
-  const id = text(linkId);
+export async function deleteTicketLink(linkId,eventId=''){
+  const id=text(linkId);
+  const selectedEvent=text(eventId);
   if(!id) fail('Falta el vínculo bancario.');
   try{
+    const {data:link,error:findError}=await db().from(LINKS_TABLE).select('*').eq('id',id).maybeSingle();
+    if(findError) throw findError;
+    if(!link) return {ok:true,already:true};
+    if(selectedEvent&&text(link.event_id)!==selectedEvent) fail('El TKxx no pertenece al evento activo.',409,'BANK_EVENT_MISMATCH');
+    const wasForced=link.forced_square===true;
+    const movementId=text(link.movement_id);
+    const linkEvent=text(link.event_id);
     const {error}=await db().from(LINKS_TABLE).delete().eq('id',id);
     if(error) throw error;
+    if(wasForced){
+      const {error:propagateError}=await db().from(LINKS_TABLE).update({forced_square:true}).eq('movement_id',movementId).eq('event_id',linkEvent);
+      if(propagateError) throw propagateError;
+    }
     return {ok:true};
   }catch(error){ throw friendlyDbError(error); }
 }
 
 export async function exportBankData({accountId='',eventId=''} = {}){
-  const [data,batchRows] = await Promise.all([
-    listBankReconciliation({accountId}),
-    selectPaged(BATCHES_TABLE, {order:'imported_at', ascending:false})
+  const [data,batchRows]=await Promise.all([
+    listBankReconciliation({accountId,eventId}),
+    selectPaged(BATCHES_TABLE,{order:'imported_at',ascending:false})
   ]);
-  const batches = batchRows.map(batchFromDb);
-  const selectedEvent = text(eventId);
-  const movements = data.movements.map(row => {
-    const links = selectedEvent ? row.links.filter(link => link.eventId === selectedEvent) : row.links;
-    const target = row.amount < 0 ? Math.abs(row.amount) : 0;
-    const justified = cents(links.reduce((sum,link) => sum + num(link.ticketAmount),0));
-    const difference = cents(target - justified);
-    const justificationStatus = row.amount >= 0 ? 'NO_APLICA' : (!links.length ? 'SIN_JUSTIFICAR' : (Math.abs(difference) <= 0.01 ? 'CUADRADO' : (difference > 0 ? 'PENDIENTE' : 'EXCESO')));
-    return {...row,links,targetAmount:cents(target),justifiedAmount:justified,difference,justificationStatus};
-  }).filter(row => !selectedEvent || row.links.length > 0);
-  return {...data,batches,movements,summary:summaryFor(movements)};
+  return {...data,batches:batchRows.map(batchFromDb)};
 }

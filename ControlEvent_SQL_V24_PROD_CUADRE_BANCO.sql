@@ -48,12 +48,19 @@ create table if not exists public.ce_bank_ticket_links (
   event_id text not null references public.ce_eventos(id) on update cascade on delete cascade,
   ticket_code text not null,
   ticket_amount_snapshot numeric(14,2) not null default 0,
+  forced_square boolean not null default false,
   created_by text,
   created_at timestamptz not null default now(),
   constraint ce_bank_ticket_code_valid check (ticket_code ~ '^TK[0-9]{2,}$'),
   constraint ce_bank_ticket_one_use unique (event_id, ticket_code),
   constraint ce_bank_ticket_no_duplicate unique (movement_id, event_id, ticket_code)
 );
+
+
+
+-- Actualización segura para instalaciones que ya tenían la versión v24_prod-02.
+alter table public.ce_bank_ticket_links
+  add column if not exists forced_square boolean not null default false;
 
 create index if not exists ce_bank_movements_account_date_idx on public.ce_bank_movements(account_id, executed_at desc);
 create index if not exists ce_bank_movements_included_idx on public.ce_bank_movements(account_id, included, executed_at desc);
@@ -79,5 +86,6 @@ for each row execute function public.ce_bank_set_updated_at();
 comment on table public.ce_bank_movements is 'Movimientos importados de CSV bancario para el Cuadre Banco de ControlEvent.';
 comment on column public.ce_bank_movements.included is 'Si es false, el movimiento no participa en el saldo calculado.';
 comment on table public.ce_bank_ticket_links is 'Vinculación de movimientos bancarios negativos con TKxx pagados. Un TKxx solo puede justificar un movimiento.';
+comment on column public.ce_bank_ticket_links.forced_square is 'Permite aceptar manualmente diferencias entre el movimiento y la suma de TKxx para un evento.';
 
 commit;
