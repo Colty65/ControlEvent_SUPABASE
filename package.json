@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v23-prod-r5",
-  "version": "23.5.0",
+  "name": "controlevent-v23-prod-r6",
+  "version": "23.6.0",
   "private": true,
   "type": "module",
   "scripts": {

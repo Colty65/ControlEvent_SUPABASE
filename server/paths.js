@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v23_prod_r5';
+export const APP_VERSION = 'ControlEvent v23_prod_r6';
 
-export const APP_VERSION_LABEL = 'v23_prod_r5';
-export const APP_VERSION_FILE = 'ControlEvent_v23_prod_r5';
-export const BUILD_ID = '20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE';
+export const APP_VERSION_LABEL = 'v23_prod_r6';
+export const APP_VERSION_FILE = 'ControlEvent_v23_prod_r6';
+export const BUILD_ID = '20260728-V23-PROD-R6-ZUZU-BIENVENIDA-HITOS-EXCEL';
 export const ZIP_NAME = 'CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip';

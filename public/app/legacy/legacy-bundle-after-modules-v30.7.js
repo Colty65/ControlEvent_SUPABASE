@@ -2853,6 +2853,98 @@ window.__ceDisableLegacyBarGraficas = true;
     function euro(ws,r,c,v,fill='white',bold=false){ const cell = ws.getCell(r,c); cell.value = num(v); cell.numFmt = moneyFmt; paint(cell,fill,bold); cell.alignment = {vertical:'middle', horizontal:'right', wrapText:false}; return cell; }
     return {wb, sheet, title, headers, text, number, euro};
   }
+  function infoHitosDate(value){
+    const raw=norm(value);
+    const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : raw;
+  }
+  function infoHitosRefLabel(ref, hitoById, lgById){
+    const type=up(ref?.tipo || ref?.type || 'LG')==='HITO'?'HITO':'LG';
+    const id=norm(ref?.id || ref?.value || '');
+    if(!id) return '';
+    if(type==='HITO') return `Hito: ${norm(hitoById.get(id)?.nombreHito || 'eliminado')}`;
+    return `LG: ${norm(lgById.get(id)?.descripcion || 'eliminada')}`;
+  }
+  async function loadInfoHitos(eventId){
+    const response=await fetch(`/api/hitos?eventId=${encodeURIComponent(eventId)}&_=${Date.now()}`,{cache:'no-store'});
+    let data={};
+    try{ data=await response.json(); }catch(_){ data={}; }
+    if(!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+    return {hitos:Array.isArray(data?.hitos)?data.hitos:[],lgs:Array.isArray(data?.lgs)?data.lgs:[],dependencyWarnings:Array.isArray(data?.dependencyWarnings)?data.dependencyWarnings:[]};
+  }
+  async function addHitosInfoEventoV23R6(wb, x, ev){
+    const ws=x.sheet('HITOS',[28,48,16,16,25,15,16,44,44]);
+    ws.mergeCells(1,1,1,9); x.text(ws,1,1,emitted(new Date()),'soft',true); ws.getRow(1).height=22;
+    x.title(ws,2,'CONTROL DE HITOS (TAREAS)',9);
+    x.text(ws,4,1,'Evento','white',true); ws.mergeCells(4,2,4,9); x.text(ws,4,2,ev?.titulo || '','white',true);
+    let data={hitos:[],lgs:[],dependencyWarnings:[]};
+    try{ data=await loadInfoHitos(ev?.id); }
+    catch(error){
+      x.text(ws,6,1,'No se pudo cargar Control de Hitos','bad',true,'FF991B1B'); ws.mergeCells(6,2,6,9); x.text(ws,6,2,error?.message || String(error),'bad');
+      return ws;
+    }
+    const hitos=data.hitos.slice().sort((a,b)=>num(a?.orden)-num(b?.orden)||norm(a?.nombreHito).localeCompare(norm(b?.nombreHito),'es'));
+    const lgs=data.lgs.slice().sort((a,b)=>num(a?.orden)-num(b?.orden)||norm(a?.fechaMinima).localeCompare(norm(b?.fechaMinima))||norm(a?.descripcion).localeCompare(norm(b?.descripcion),'es'));
+    const hitoById=new Map(hitos.map(row=>[norm(row?.id),row]));
+    const lgById=new Map(lgs.map(row=>[norm(row?.id),row]));
+    const completed=lgs.filter(row=>row?.cumplida===true).length;
+    x.text(ws,6,1,'Hitos','soft',true); x.number(ws,6,2,hitos.length,'soft',true);
+    x.text(ws,6,3,'LG totales','soft',true); x.number(ws,6,4,lgs.length,'soft',true);
+    x.text(ws,6,5,'LG cumplidas','ok',true); x.number(ws,6,6,completed,'ok',true);
+    x.text(ws,6,7,'LG pendientes',completed===lgs.length?'ok':'warn',true); x.number(ws,6,8,Math.max(0,lgs.length-completed),completed===lgs.length?'ok':'warn',true);
+    let r=8;
+    x.title(ws,r++,'HITOS',9);
+    x.headers(ws,r,['Hito','Descripción','Fecha mínima','Fecha máxima','Responsable general','LG totales','LG cumplidas','Estado']); r++;
+    if(!hitos.length){ x.text(ws,r,1,'No hay Hitos registrados para este evento.','soft'); ws.mergeCells(r,1,r,9); r+=2; }
+    else{
+      for(const hito of hitos){
+        const children=lgs.filter(row=>norm(row?.hitoId)===norm(hito?.id));
+        const done=children.filter(row=>row?.cumplida===true).length;
+        const state=children.length&&done===children.length?'Cumplido':done?'En progreso':'Pendiente';
+        const fill=state==='Cumplido'?'ok':(state==='En progreso'?'soft':'warn');
+        x.text(ws,r,1,hito?.nombreHito || '',fill,true);
+        x.text(ws,r,2,hito?.descripcion || '',fill);
+        x.text(ws,r,3,infoHitosDate(hito?.fechaMinima),fill);
+        x.text(ws,r,4,infoHitosDate(hito?.fechaMaxima),fill);
+        x.text(ws,r,5,hito?.responsableNombre || 'Sin responsable',fill);
+        x.number(ws,r,6,children.length,fill);
+        x.number(ws,r,7,done,fill);
+        x.text(ws,r,8,state,fill,true);
+        x.text(ws,r,9,'',fill);
+        ws.getRow(r).height=Math.max(24,Math.min(82,22+Math.ceil(Math.max(norm(hito?.descripcion).length,1)/55)*12));
+        r++;
+      }
+      r++;
+    }
+    x.title(ws,r++,'LÍNEAS DE GESTIÓN (TAREAS)',9);
+    x.headers(ws,r,['Hito','Descripción LG','Fecha mínima','Fecha máxima','Responsable','Estado','Notas','Dependencias previas','Dependencias posteriores']);
+    const lgHeaderRow=r; r++;
+    if(!lgs.length){ x.text(ws,r,1,'No hay Líneas de Gestión registradas para este evento.','soft'); ws.mergeCells(r,1,r,9); }
+    else{
+      for(const lg of lgs){
+        const fill=lg?.cumplida===true?'ok':'warn';
+        const pre=(Array.isArray(lg?.dependenciasPrevias)?lg.dependenciasPrevias:[]).map(ref=>infoHitosRefLabel(ref,hitoById,lgById)).filter(Boolean).join(' | ') || 'Ninguna';
+        const post=(Array.isArray(lg?.dependenciasPosteriores)?lg.dependenciasPosteriores:[]).map(ref=>infoHitosRefLabel(ref,hitoById,lgById)).filter(Boolean).join(' | ') || 'Ninguna';
+        x.text(ws,r,1,hitoById.get(norm(lg?.hitoId))?.nombreHito || 'Sin Hito',fill);
+        x.text(ws,r,2,lg?.descripcion || '',fill,true);
+        x.text(ws,r,3,infoHitosDate(lg?.fechaMinima),fill);
+        x.text(ws,r,4,infoHitosDate(lg?.fechaMaxima),fill);
+        x.text(ws,r,5,lg?.responsableNombre || 'Sin responsable',fill);
+        x.text(ws,r,6,lg?.cumplida===true?'Cumplida':'Pendiente',fill,true);
+        x.text(ws,r,7,lg?.notas || '',fill);
+        x.text(ws,r,8,pre,fill);
+        x.text(ws,r,9,post,fill);
+        ws.getRow(r).height=Math.max(28,Math.min(112,24+Math.ceil(Math.max(norm(lg?.descripcion).length,norm(lg?.notas).length,pre.length,post.length,1)/48)*12));
+        r++;
+      }
+    }
+    try{ ws.views=[{state:'frozen',ySplit:lgHeaderRow}]; }catch(_){ }
+    try{ ws.autoFilter={from:{row:lgHeaderRow,column:1},to:{row:lgHeaderRow,column:9}}; }catch(_){ }
+    if(data.dependencyWarnings.length){
+      r+=2; x.text(ws,r,1,'Avisos de dependencias saneadas','warn',true); ws.mergeCells(r,2,r,9); x.text(ws,r,2,`${data.dependencyWarnings.length} relación(es) circular(es) heredada(s) fueron omitidas por ControlEvent.`,'warn');
+    }
+    return ws;
+  }
   function makeCodes(items, prefix){
     const out = {};
     (items || []).forEach((item, i) => { out[item.id] = prefix + String(i + 1).padStart(prefix === 'EV' ? 3 : 4, '0'); });
@@ -3096,6 +3188,7 @@ window.__ceDisableLegacyBarGraficas = true;
     if(!ev || !ev.id){ alert('Elige un evento antes de sacar INFOEVENTO.'); return; }
     const ExcelJS = await cleanExcelJS();
     const x = setupWorkbook(ExcelJS), wb = x.wb;
+    await addHitosInfoEventoV23R6(wb, x, ev);
     const op = opValues();
     let r = 1;
     const wsRes = x.sheet('RESUMEN', [30,42,18,18,18,4,4]);

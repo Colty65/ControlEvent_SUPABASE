@@ -3,7 +3,7 @@
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v23_prod_r2';
+  var VERSION='v23_prod_r6';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -13,6 +13,13 @@
   function arr(k){ var s=st(); return Array.isArray(s[k])?s[k]:[]; }
   function selectedEventId(){ return trim((st().selectedEventId)||(($('selectedEvent')||{}).value)||''); }
   function currentEvent(){ var id=selectedEventId(); return arr('eventos').find(function(e){ return trim(e.id)===id; }) || null; }
+  function loggedUserPayload(){
+    var u=window.authUser || window.__CONTROL_EVENT_USER__ || (window.ControlEventApp&&window.ControlEventApp.authUser) || {};
+    var identificacion=trim(u.identificacion||u.Identificacion||u.usuario||u.user||'');
+    var nombre=trim(u.nombre||u.Nombre||u.name||identificacion||'');
+    var nivel=trim(u.nivel||u.Nivel||'').toUpperCase();
+    return (identificacion||nombre)?{identificacion:identificacion,nombre:nombre,nivel:nivel}:null;
+  }
   function isFinalized(ev){ return /^finalizado$/i.test(trim(ev&&ev.situacion)); }
   function eventTitleHtml(){
     var ev=currentEvent();
@@ -68,7 +75,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || userFacingTitle(data,prompt) || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v23_prod_r2-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v23_prod_r6-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -132,7 +139,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v23_prod_r2</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v23_prod_r6</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -304,7 +311,7 @@
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId()})});
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload()})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }

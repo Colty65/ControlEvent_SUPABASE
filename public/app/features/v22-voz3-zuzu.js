@@ -366,7 +366,13 @@
     return clean(s);
   }
 
+  function welcomePromptText(){
+    var prompt=$('ceAiPrompt');
+    if(!prompt || prompt.getAttribute('data-ce-zuzu-welcome')!=='1') return '';
+    return clean(prompt.value||prompt.textContent||'');
+  }
   function visibleAnswerText(){
+    var welcome=welcomePromptText(); if(welcome) return welcome;
     var result = $('ceAiResult');
     if(!result) return '';
     var cards = qa('.ce-ai-card', result).filter(function(card){

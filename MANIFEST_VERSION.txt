@@ -1,6 +1,1 @@
-Version app: v23_prod_r5
-Version texto: ControlEvent v23_prod_r5
-Version fichero: ControlEvent_v23_prod_r5
-Build: 20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE
-ZIP: CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip
-Objetivo: corregir los ingresos de Zuzu respetando ajustes voluntarios negativos y quitar la versión de AVANCE DEL EVENTO.
+ControlEvent v23_prod_r6

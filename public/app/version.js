@@ -1,9 +1,9 @@
-/* ControlEvent v23_prod_r5 - versión centralizada */
-export const VERSION = 'v23_prod_r5';
-export const VERSION_LABEL = 'v23_prod_r5';
-export const VERSION_TEXT = 'ControlEvent v23_prod_r5';
-export const VERSION_FILE = 'ControlEvent_v23_prod_r5';
-export const BUILD_ID = '20260728-V23-PROD-R5-INGRESOS-AJUSTE-AVANCE';
+/* ControlEvent v23_prod_r6 - versión centralizada */
+export const VERSION = 'v23_prod_r6';
+export const VERSION_LABEL = 'v23_prod_r6';
+export const VERSION_TEXT = 'ControlEvent v23_prod_r6';
+export const VERSION_FILE = 'ControlEvent_v23_prod_r6';
+export const BUILD_ID = '20260728-V23-PROD-R6-ZUZU-BIENVENIDA-HITOS-EXCEL';
 export const ZIP_NAME = 'CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip';
 
 try {
