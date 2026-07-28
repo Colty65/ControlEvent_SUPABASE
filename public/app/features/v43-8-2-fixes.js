@@ -1,9 +1,9 @@
-/* ControlEvent v24_prod - menú móvil estable y versión unificada.
+/* ControlEvent v24_prod-01 - menú móvil estable y versión unificada.
    Parche defensivo: no toca INFOEVENTO, BACKUP, COMPRAS ni DONACIONES. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod';
-  const VERSION_FILE = 'ControlEvent_v24_prod';
+  const VERSION = 'ControlEvent v24_prod-01';
+  const VERSION_FILE = 'ControlEvent_v24_prod-01';
   const MOBILE_MAX = 760;
   const $ = id => document.getElementById(id);
 

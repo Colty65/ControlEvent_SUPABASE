@@ -1,4 +1,4 @@
-// ControlEvent v24_prod · FIX17 mínimo
+// ControlEvent v24_prod-01 · FIX17 mínimo
 // Solo Vista aérea: activo único, ancho de tabla, sin Limpiar; Zuzu: sin badge flotante y texto normal.
 (function(){
   'use strict';

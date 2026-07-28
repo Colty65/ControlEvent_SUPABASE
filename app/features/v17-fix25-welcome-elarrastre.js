@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
+/* ControlEvent v24_prod-01 FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
    No refresca datos ni toca cálculos: solo pinta el logo si no hay evento elegido y lo oculta antes de cargar GRAFICAS. */
 (function(){
   'use strict';

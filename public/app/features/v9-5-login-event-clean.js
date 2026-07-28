@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod - limpieza visual real del selector de evento tras login.
+/* ControlEvent v24_prod-01 - limpieza visual real del selector de evento tras login.
    Evita que el desplegable muestre un evento aparente cuando todavía no se ha elegido ninguno. */
 (function(){
   'use strict';

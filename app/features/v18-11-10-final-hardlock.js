@@ -1,12 +1,12 @@
-/* ControlEvent v24_prod - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v24_prod-01 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v24_prod';
-  var VERSION_TEXT='ControlEvent v24_prod';
-  var VERSION_FILE='ControlEvent_v24_prod';
-  var BUILD_ID='20260728-V24-PROD-CUADRE-BANCO';
-  var ZIP_NAME='CE_V24_PROD_CUADRE_BANCO.zip';
+  var VERSION_LABEL='v24_prod-01';
+  var VERSION_TEXT='ControlEvent v24_prod-01';
+  var VERSION_FILE='ControlEvent_v24_prod-01';
+  var BUILD_ID='20260728-V24-PROD-01-BANK-UX';
+  var ZIP_NAME='CE_V24_PROD_01_CUADRE_BANCO_UX.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -17,11 +17,11 @@
       '#ceVersionProof{display:none!important;visibility:hidden!important;pointer-events:none!important}',
       'body.ce-v181110-left-tools .footer{position:fixed!important;left:10px!important;top:156px!important;right:auto!important;bottom:auto!important;width:66px!important;height:auto!important;z-index:9990!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;display:block!important;pointer-events:none!important;transform:none!important}',
       'body.ce-v181110-left-tools .footer-inner{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;width:64px!important;max-width:64px!important;margin:0!important;padding:8px 5px!important;background:rgba(255,255,255,.90)!important;border:1px solid rgba(148,163,184,.55)!important;border-radius:18px!important;box-shadow:0 14px 34px rgba(15,23,42,.16)!important;pointer-events:auto!important;backdrop-filter:blur(4px)!important}',
-      'body.ce-v181110-left-tools #btnExportExcel,body.ce-v181110-left-tools #btnOpenImport,body.ce-v181110-left-tools #btnExportSeed,body.ce-v181110-left-tools #btnOpenHitos,body.ce-v181110-left-tools #btnToggleMaintenance{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;border-radius:16px!important;padding:4px!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;top:auto!important;transform:none!important}',
+      'body.ce-v181110-left-tools #btnExportExcel,body.ce-v181110-left-tools #btnOpenImport,body.ce-v181110-left-tools #btnExportSeed,body.ce-v181110-left-tools #btnOpenHitos,body.ce-v181110-left-tools #btnOpenBankReconciliation,body.ce-v181110-left-tools #btnToggleMaintenance{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;border-radius:16px!important;padding:4px!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;top:auto!important;transform:none!important}',
       'body.ce-v181110-left-tools .footer-img,body.ce-v181110-left-tools .maint-footer-img{width:44px!important;height:44px!important;object-fit:contain!important;pointer-events:none!important}',
       'body.ce-v181110-left-tools .main{padding-left:86px!important}',
       '#ceGeminiLibreOverlay .ce-ai-version-badge{font-size:12px!important;font-weight:950!important;color:#075985!important;background:#e0f2fe!important;border:1px solid #7dd3fc!important;border-radius:999px!important;padding:3px 9px!important;white-space:nowrap!important}',
-      '@media(max-width:760px){body.ce-v181110-left-tools .footer{left:6px!important;top:116px!important;width:54px!important}body.ce-v181110-left-tools .footer-inner{width:54px!important;max-width:54px!important;gap:7px!important;padding:6px 4px!important;border-radius:16px!important}body.ce-v181110-left-tools #btnExportExcel,body.ce-v181110-left-tools #btnOpenImport,body.ce-v181110-left-tools #btnExportSeed,body.ce-v181110-left-tools #btnOpenHitos,body.ce-v181110-left-tools #btnToggleMaintenance{width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important}body.ce-v181110-left-tools .footer-img,body.ce-v181110-left-tools .maint-footer-img{width:38px!important;height:38px!important}body.ce-v181110-left-tools .main{padding-left:64px!important}}',
+      '@media(max-width:760px){body.ce-v181110-left-tools .footer{left:6px!important;top:116px!important;width:54px!important}body.ce-v181110-left-tools .footer-inner{width:54px!important;max-width:54px!important;gap:7px!important;padding:6px 4px!important;border-radius:16px!important}body.ce-v181110-left-tools #btnExportExcel,body.ce-v181110-left-tools #btnOpenImport,body.ce-v181110-left-tools #btnExportSeed,body.ce-v181110-left-tools #btnOpenHitos,body.ce-v181110-left-tools #btnOpenBankReconciliation,body.ce-v181110-left-tools #btnToggleMaintenance{width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important}body.ce-v181110-left-tools .footer-img,body.ce-v181110-left-tools .maint-footer-img{width:38px!important;height:38px!important}body.ce-v181110-left-tools .main{padding-left:64px!important}}',
       '@media print{#ceVersionProof,.footer{display:none!important}}'
     ].join('\n');
     document.head.appendChild(st);

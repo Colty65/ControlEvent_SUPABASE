@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod · Control de Hitos y Líneas de Gestión */
+/* ControlEvent v24_prod-01 · Control de Hitos y Líneas de Gestión */
 (function(root){
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;

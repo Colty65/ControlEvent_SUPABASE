@@ -1,5 +1,5 @@
 {
-  "version": "v24_prod",
+  "version": "v24_prod-01",
   "date": "2026-07-28",
   "changes": [
     "Nueva ventana Cuadre Banco exclusiva para GD",
@@ -7,6 +7,6 @@
     "Saldo calculado con movimientos incluidos/excluidos",
     "Justificación de movimientos negativos mediante uno o varios TKxx pagados",
     "Cuadre Banco incorporado a INFOEVENTO y BACKUP",
-    "Versión v24_prod unificada en interfaz, trazas, INFOEVENTO y BACKUP"
+    "Versión v24_prod-01 unificada en interfaz, trazas, INFOEVENTO y BACKUP"
   ]
 }

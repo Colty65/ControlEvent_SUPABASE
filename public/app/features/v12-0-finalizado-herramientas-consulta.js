@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod - desbloqueo real de herramientas de consulta con evento Finalizado.
+/* ControlEvent v24_prod-01 - desbloqueo real de herramientas de consulta con evento Finalizado.
    Permite Zuzu, mantenimientos generales, BACKUP/Excel/importación/descarga. No cambia reglas backend de datos del evento finalizado. */
 (function(){
   'use strict';

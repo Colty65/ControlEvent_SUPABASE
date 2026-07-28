@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod_r1 - Diagnóstico de carga móvil/rendimiento.
+/* ControlEvent v24_prod-01 - Diagnóstico de carga móvil/rendimiento.
    Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
 import { VERSION } from '../version.js';
 

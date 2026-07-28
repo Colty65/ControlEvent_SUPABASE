@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod - HOTFIX46: avance único, rendimiento, títulos de modales y fuente Inter. */
+/* ControlEvent v24_prod-01 - HOTFIX46: avance único, rendimiento, títulos de modales y fuente Inter. */
 (function(){
   'use strict';
   const INSTALLED = '__ceV15Hotfix21SaldoAvanceRendimiento';

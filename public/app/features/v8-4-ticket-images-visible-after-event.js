@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod - v8.4 ticket image hydrator disabled by FIX6.
+/* ControlEvent v24_prod-01 - v8.4 ticket image hydrator disabled by FIX6.
    Motivo: Resumen/Cálculos usa el controlador único v17. Evita rehidrataciones antiguas,
    renderBudget repetidos y recuperación de URLs viejas de TKxx. */
 (function(){

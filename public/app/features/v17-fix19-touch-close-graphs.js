@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod FIX22 - menú oculto desde login hasta elegir evento,
+/* ControlEvent v24_prod-01 FIX22 - menú oculto desde login hasta elegir evento,
    doble toque real móvil en Por tienda y Ticket, cierre visor a la izquierda, deduplicación de miniaturas
    y bloqueo visual de gráficas antiguas. No cambia cálculos ni datos. */
 (function(){

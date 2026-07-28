@@ -1,0 +1,14 @@
+{
+  "version": "v24_prod-01",
+  "date": "2026-07-28",
+  "build": "20260728-V24-PROD-01-BANK-UX",
+  "zip": "CE_V24_PROD_01_CUADRE_BANCO_UX.zip",
+  "changes": [
+    "Apertura directa de Cuadre Banco en la primera pulsación",
+    "Exclusión del icono de Cuadre Banco del sistema de globos informativos",
+    "Versión compacta v24_prod-01 recuperada junto al icono CE",
+    "Cuadre bancario añadido a Operativa en la ficha inicial ColtyLAB",
+    "Rediseño integral de la interfaz de Cuadre Banco",
+    "Versión unificada en aplicación, servidor, INFOEVENTO y BACKUP"
+  ]
+}

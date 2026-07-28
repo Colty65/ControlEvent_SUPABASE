@@ -1,11 +1,11 @@
-/* ControlEvent v24_prod - parche mínimo sobre v50.24.
+/* ControlEvent v24_prod-01 - parche mínimo sobre v50.24.
    - Cambio de usuario tras Salir: al elegir evento se fuerza estado de evento listo y globos rehidratados.
-   - Versión única visible y en descargas: ControlEvent v24_prod.
+   - Versión única visible y en descargas: ControlEvent v24_prod-01.
    - Sin MutationObserver global ni bucles permanentes. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod';
-  const VERSION_FILE = 'ControlEvent_v24_prod';
+  const VERSION = 'ControlEvent v24_prod-01';
+  const VERSION_FILE = 'ControlEvent_v24_prod-01';
   const INSTALLED = '__ceV5025FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

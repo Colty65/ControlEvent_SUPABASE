@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod
+/* ControlEvent v24_prod-01
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Sin evento: ColtyLAB muestra ficha informativa/version.
    - Con evento elegido: ColtyLAB deja paso a AVANCE DEL EVENTO. */
@@ -9,7 +9,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const DEFAULT_VERSION_LABEL = 'v24_prod_voz3';
+  const DEFAULT_VERSION_LABEL = 'v24_prod-01';
   function currentVersionLabel(){
     try{
       const value = String(window.__ceVersionLabel || window.ControlEventVersion?.label || window.__ceVersionInfo?.label || DEFAULT_VERSION_LABEL).trim();
@@ -143,6 +143,7 @@
             <h2>Operativa</h2>
             <ul>
               <li>Resumen presupuestario y saldos.</li>
+              <li>Cuadre bancario.</li>
               <li>Mapa de recursos y vista aérea.</li>
               <li>INFOEVENTO, BACKUP y archivos de control.</li>
               <li>Roles GD, RW y RO con permisos.</li>

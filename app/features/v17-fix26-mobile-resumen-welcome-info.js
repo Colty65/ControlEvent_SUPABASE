@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod FIX26
+/* ControlEvent v24_prod-01 FIX26
    - Solo móviles tipo teléfono: doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO.
    - Solo bienvenida móvil sin evento: ColtyLAB muestra ficha informativa en vez de avance vacío. */
 (function(){

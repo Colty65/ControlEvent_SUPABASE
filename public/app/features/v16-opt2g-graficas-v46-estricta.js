@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod OPT2G - GRAFICAS: solo renderer V46 estricto.
+/* ControlEvent v24_prod-01 OPT2G - GRAFICAS: solo renderer V46 estricto.
    Corrige el caso en el que se cuela la gráfica antigua de 2 quesos de ancho.
    La única gráfica aceptada en #eventChartWrap debe contener .ce-v46-pies con 6 tarjetas.
 */
