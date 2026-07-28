@@ -1,12 +1,12 @@
-/* ControlEvent v24_prod-01 - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v24_prod-02 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v24_prod-01';
-  var VERSION_TEXT='ControlEvent v24_prod-01';
-  var VERSION_FILE='ControlEvent_v24_prod-01';
-  var BUILD_ID='20260728-V24-PROD-01-BANK-UX';
-  var ZIP_NAME='CE_V24_PROD_01_CUADRE_BANCO_UX.zip';
+  var VERSION_LABEL='v24_prod-02';
+  var VERSION_TEXT='ControlEvent v24_prod-02';
+  var VERSION_FILE='ControlEvent_v24_prod-02';
+  var BUILD_ID='20260728-V24-PROD-02-BANK-UX';
+  var ZIP_NAME='CE_V24_PROD_02_CUADRE_BANCO_UX.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -14,7 +14,7 @@
     return String(value||'')
       .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
       .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
-      .replace(/\bv24_prod-01\b/ig,VERSION_LABEL);
+      .replace(/\bv24_prod-02\b/ig,VERSION_LABEL);
   }
   function patchDownloadNames(){
     safe(function(){

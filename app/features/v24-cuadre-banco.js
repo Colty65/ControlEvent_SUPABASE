@@ -1,10 +1,10 @@
-/* ControlEvent v24_prod-01 · Cuadre Banco (solo GD). */
+/* ControlEvent v24_prod-02 · Cuadre Banco (solo GD). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v24_prod-01';
+  const VERSION = 'v24_prod-02';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -19,7 +19,7 @@
     return {nivel:level(),identificacion:text(user.identificacion||user.Identificacion),nombre:text(user.nombre||user.Nombre)};
   };
   const actorHeader = () => encodeURIComponent(JSON.stringify(actor()));
-  const store = {loading:false,data:null,accountId:'',filter:'TODOS',search:'',ticketMovement:null,tickets:[],openGestureAt:0};
+  const store = {loading:false,importing:false,data:null,accountId:'',filter:'TODOS',search:'',ticketMovement:null,tickets:[],openGestureAt:0,lastAction:'',lastActionAt:0};
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
   async function api(path, options={}){
@@ -56,6 +56,45 @@
     node.setAttribute('data-ce-no-tooltip','1');
     node.onclick = function(event){ return root.ceOpenCuadreBanco ? root.ceOpenCuadreBanco(event) : false; };
   }
+  function stopEvent(event){
+    try{ event?.preventDefault?.(); event?.stopPropagation?.(); event?.stopImmediatePropagation?.(); }catch(_){ }
+  }
+  function actionAllowed(key,wait=420){
+    const now=Date.now();
+    if(store.lastAction===key && now-store.lastActionAt<wait) return false;
+    store.lastAction=key; store.lastActionAt=now; return true;
+  }
+  function ensureInteractive(){
+    const overlay=$('ceBankOverlay'); if(!overlay) return;
+    [overlay,overlay.querySelector('.ce-bank-window'),...overlay.querySelectorAll('button,label,input,select,textarea')].filter(Boolean).forEach(node=>{
+      try{ node.style.setProperty('pointer-events','auto','important'); node.style.setProperty('touch-action','manipulation','important'); }catch(_){ }
+    });
+  }
+  function triggerCsvPicker(event){
+    stopEvent(event);
+    const input=$('ceBankCsvFile');
+    if(!input) return false;
+    try{ input.value=''; }catch(_){ }
+    try{
+      if(typeof input.showPicker==='function') input.showPicker();
+      else input.click();
+    }catch(_){
+      try{ setTimeout(()=>input.click(),0); }catch(__){ }
+    }
+    return false;
+  }
+  function bindInterfaceControls(overlay){
+    if(!overlay || overlay.dataset.ceBankBound==='1') return;
+    overlay.dataset.ceBankBound='1';
+    $('ceBankClose')?.addEventListener('click',event=>{stopEvent(event);close();},true);
+    $('ceBankImport')?.addEventListener('click',event=>{if(actionAllowed('csv-click',650))triggerCsvPicker(event);else stopEvent(event);},true);
+    $('ceBankImport')?.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){if(actionAllowed('csv-key',650))triggerCsvPicker(event);else stopEvent(event);}},true);
+    $('ceBankCsvFile')?.addEventListener('change',importCsv,true);
+    $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',450))load(true);},true);
+    $('ceBankAccount')?.addEventListener('change',()=>{store.accountId=$('ceBankAccount').value;load(true);},true);
+    $('ceBankFilter')?.addEventListener('change',()=>{store.filter=$('ceBankFilter').value;renderBody();},true);
+    $('ceBankSearch')?.addEventListener('input',()=>{store.search=$('ceBankSearch').value;renderBody();},true);
+  }
   function installDom(){
     let desktop=$('btnOpenBankReconciliation');
     if(!desktop){
@@ -86,8 +125,8 @@
         </header>
         <div class="ce-bank-command-deck">
           <div class="ce-bank-command-primary">
-            <button type="button" id="ceBankImport" class="ce-bank-import-btn"><span>↑</span><b>Cargar CSV</b><small>Añade solo movimientos nuevos</small></button>
-            <input id="ceBankCsvFile" type="file" accept=".csv,text/csv" hidden>
+            <label id="ceBankImport" class="ce-bank-import-btn" for="ceBankCsvFile" role="button" tabindex="0"><span>↑</span><b>Cargar CSV</b><small>Añade solo movimientos nuevos</small></label>
+            <input id="ceBankCsvFile" class="ce-bank-file-native" type="file" accept=".csv,text/csv,.txt">
             <button type="button" id="ceBankRefresh" class="ce-bank-refresh-btn" aria-label="Actualizar movimientos"><span>↻</span><b>Actualizar</b></button>
           </div>
           <div class="ce-bank-command-fields">
@@ -103,15 +142,11 @@
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
       </section>`;
       document.body.appendChild(overlay);
-      $('ceBankClose').addEventListener('click',close);
-      overlay.addEventListener('click',event=>{ if(event.target===overlay) close(); });
-      $('ceBankImport').addEventListener('click',()=>$('ceBankCsvFile').click());
-      $('ceBankCsvFile').addEventListener('change',importCsv);
-      $('ceBankRefresh').addEventListener('click',()=>load(true));
-      $('ceBankAccount').addEventListener('change',()=>{store.accountId=$('ceBankAccount').value;load(true);});
-      $('ceBankFilter').addEventListener('change',()=>{store.filter=$('ceBankFilter').value;renderBody();});
-      $('ceBankSearch').addEventListener('input',()=>{store.search=$('ceBankSearch').value;renderBody();});
+      overlay.addEventListener('click',event=>{ if(event.target===overlay) close(); },true);
+      bindInterfaceControls(overlay);
     }
+    bindInterfaceControls($('ceBankOverlay'));
+    ensureInteractive();
     installMobileEntry();
     document.querySelectorAll('.ce-bank-entry').forEach(prepareEntry);
     applyRole();
@@ -144,8 +179,9 @@
     installDom();
     if(!isGd()){ alert('Cuadre Banco es una opción exclusiva para usuarios GD.'); return false; }
     const overlay=$('ceBankOverlay');
+    ensureInteractive();
     overlay.classList.remove('hidden');
-    requestAnimationFrame(()=>overlay.classList.add('visible'));
+    requestAnimationFrame(()=>{overlay.classList.add('visible');ensureInteractive();});
     document.body.classList.add('ce-bank-open');
     document.body.style.overflow='hidden';
     await load(false);
@@ -159,9 +195,9 @@
     document.body.classList.remove('ce-bank-open');
     document.body.style.overflow='';
   }
-  async function load(force){
+  async function load(force,preserveNotice=false){
     if(store.loading) return;
-    store.loading=true; notice('');
+    store.loading=true; if(!preserveNotice) notice('');
     $('ceBankBody').innerHTML='<div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Sincronizando la cronología bancaria…</strong></div>';
     try{
       const query=store.accountId?`?accountId=${encodeURIComponent(store.accountId)}${force?`&_=${Date.now()}`:''}`:(force?`?_=${Date.now()}`:'');
@@ -234,16 +270,20 @@
     }).join('');
   }
   async function importCsv(event){
-    const file=event.target.files?.[0]; event.target.value=''; if(!file) return;
-    if(!/\.csv$/i.test(file.name)){ alert('Selecciona un fichero CSV.'); return; }
+    if(store.importing) return;
+    const input=event?.target||$('ceBankCsvFile');
+    const file=input?.files?.[0]; if(!file) return;
+    store.importing=true;
+    if(!/\.(csv|txt)$/i.test(file.name)){ alert('Selecciona un fichero CSV.'); store.importing=false; try{input.value='';}catch(_){ } return; }
     notice(`Leyendo ${file.name}…`);
     try{
       const csvText=await file.text();
       const result=await api('/api/bank-reconciliation/import',{method:'POST',body:JSON.stringify({filename:file.name,csvText})});
       store.accountId=result.accountId||store.accountId;
       notice(`CSV incorporado: ${result.inserted} movimiento(s) nuevo(s), ${result.duplicates} repetido(s) omitido(s)${arr(result.warnings).length?` y ${result.warnings.length} aviso(s)`:''}.`,'ok');
-      await load(true);
+      await load(true,true);
     }catch(error){ notice(error.message,'error'); }
+    finally{ try{input.value='';}catch(_){ } store.importing=false; }
   }
   async function toggleIncluded(id,included,input){
     input.disabled=true;
@@ -298,6 +338,35 @@
   }
   root.ceOpenCuadreBanco=openFromEntry;
   root.addEventListener('click',event=>{if(event.target?.closest?.('#btnOpenBankReconciliation,[data-ce-open-bank="1"]'))openFromEntry(event);},true);
+
+  function captureBankControls(event){
+    const overlay=$('ceBankOverlay');
+    if(!overlay || overlay.classList.contains('hidden')) return;
+    const target=event.target?.closest?.('#ceBankClose,#ceBankImport,#ceBankRefresh');
+    if(!target) return;
+    if(target.id==='ceBankClose'){
+      stopEvent(event);
+      if(actionAllowed('close',300)) close();
+      return;
+    }
+    if(target.id==='ceBankImport'){
+      stopEvent(event);
+      if(actionAllowed('csv-global',700)) triggerCsvPicker(event);
+      return;
+    }
+    if(target.id==='ceBankRefresh'){
+      stopEvent(event);
+      if(actionAllowed('refresh-global',450)) load(true);
+    }
+  }
+  ['pointerdown','mousedown','touchend','click'].forEach(type=>root.addEventListener(type,captureBankControls,true));
+  root.addEventListener('change',event=>{
+    const target=event.target;
+    if(target?.id==='ceBankCsvFile'){ importCsv(event); return; }
+    if(target?.id==='ceBankAccount'){ store.accountId=target.value; load(true); return; }
+    if(target?.id==='ceBankFilter'){ store.filter=target.value; renderBody(); }
+  },true);
+  root.addEventListener('input',event=>{if(event.target?.id==='ceBankSearch'){store.search=event.target.value;renderBody();}},true);
 
   document.addEventListener('click',event=>{
     const included=event.target?.closest?.('[data-ce-bank-included]');

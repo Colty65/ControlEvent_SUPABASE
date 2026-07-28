@@ -1,4 +1,4 @@
-// ControlEvent v24_prod-01 · FIX18 mínimo
+// ControlEvent v24_prod-02 · FIX18 mínimo
 // Solo: Vista aérea (saldo descuentos, activo único y ancho), selector eventos por fecha/color, descripción para Zuzu ya va en backend.
 (function(){
   'use strict';
@@ -33,7 +33,7 @@
   function injectCss(){
     if($('ce-v19-fix18-style')) return;
     const css = `
-      /* v24_prod-01: recuperar la versión compacta junto al icono CE de la cabecera. */
+      /* v24_prod-02: recuperar la versión compacta junto al icono CE de la cabecera. */
       .appname-stack .ce-v104-brand-mini{display:inline-flex!important;align-items:center!important;gap:8px!important;}
       .appname-stack .ce-v104-brand-mini>span{display:inline-block!important;font-size:12px!important;font-weight:900!important;color:#334155!important;white-space:nowrap!important;}
 

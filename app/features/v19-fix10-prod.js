@@ -1,4 +1,4 @@
-// ControlEvent v24_prod-01 · FIX11
+// ControlEvent v24_prod-02 · FIX11
 // Ajustes: usuario ce_acceso en sesión, casa estándar Vista aérea, nombres de descarga y blindajes ligeros.
 (function(){
   'use strict';

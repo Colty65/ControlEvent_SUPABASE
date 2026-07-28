@@ -1,9 +1,9 @@
-/* ControlEvent v24_prod-01 - login limpio sin preselección y salida sin recarga pesada.
+/* ControlEvent v24_prod-02 - login limpio sin preselección y salida sin recarga pesada.
    Alcance: tras Salir/Login, fuerza selector en "Selecciona evento..." hasta que el usuario elija evento. Sin bucles ni MutationObserver. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod-01';
-  const VERSION_FILE = 'ControlEvent_v24_prod-01';
+  const VERSION = 'ControlEvent v24_prod-02';
+  const VERSION_FILE = 'ControlEvent_v24_prod-02';
   if(window.__ceV73LoginCleanNoPreselect) return;
   window.__ceV73LoginCleanNoPreselect = true;
 

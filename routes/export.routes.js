@@ -6,8 +6,8 @@ import { getSupabaseAdmin } from '../lib/supabase.js';
 import { exportBankData } from '../services/bank-reconciliation.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v24_prod-01';
-const BACKUP_VERSION_FILE = 'ControlEvent_v24_prod-01';
+const BACKUP_VERSION = 'ControlEvent v24_prod-02';
+const BACKUP_VERSION_FILE = 'ControlEvent_v24_prod-02';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -659,7 +659,7 @@ async function buildBackupWorkbook(fullState, scope){
     ]));
     addRows('BANCO_TK_LINKS', ['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'], bankLinks);
   }catch(bankError){
-    console.warn('[ControlEvent v24_prod-01] No se pudo añadir Cuadre Banco al BACKUP de servidor.', bankError?.message || bankError);
+    console.warn('[ControlEvent v24_prod-02] No se pudo añadir Cuadre Banco al BACKUP de servidor.', bankError?.message || bankError);
     addRows('BANCO_MVTOS', ['AVISO'], [[bankError?.message || String(bankError)]]);
   }
   await protectWorkbook(wb);

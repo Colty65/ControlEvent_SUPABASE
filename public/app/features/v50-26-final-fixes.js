@@ -1,12 +1,12 @@
-/* ControlEvent v24_prod-01 - logon limpio y globos rehidratados sin bucles pesados.
+/* ControlEvent v24_prod-02 - logon limpio y globos rehidratados sin bucles pesados.
    - Marca TODAS las claves de evento elegido, incluida la antigua ce_v250_event_chosen.
    - Tras cambio de usuario + eleccion de evento, rehidrata globos de Resumen y Graficas.
    - No usa MutationObserver global ni setInterval.
    - Mantiene Refres en sitio y version unificada. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod-01';
-  const VERSION_FILE = 'ControlEvent_v24_prod-01';
+  const VERSION = 'ControlEvent v24_prod-02';
+  const VERSION_FILE = 'ControlEvent_v24_prod-02';
   const INSTALLED = '__ceV5026FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

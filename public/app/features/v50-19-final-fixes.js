@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod-01 - estabilización final de login, selección de evento y globos.
+/* ControlEvent v24_prod-02 - estabilización final de login, selección de evento y globos.
    Objetivo: no sumar capas conflictivas. Se apoya en v44-7-event-switcher como único flujo de evento.
    - La app siempre arranca pidiendo login: se desactiva la reanudación automática por localStorage.
    - Tras login: pantalla CE grande + selector "Selecciona evento...", sin evento precargado.
@@ -8,8 +8,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod-01';
-  const VERSION_FILE = 'ControlEvent_v24_prod-01';
+  const VERSION = 'ControlEvent v24_prod-02';
+  const VERSION_FILE = 'ControlEvent_v24_prod-02';
   const INSTALLED = '__ceV5019FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

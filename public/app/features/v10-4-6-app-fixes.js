@@ -1,9 +1,9 @@
-/* ControlEvent v24_prod-01 - Rescate afinado: descargas, búsquedas, carga COMPRAS y mapa iPad.
+/* ControlEvent v24_prod-02 - Rescate afinado: descargas, búsquedas, carga COMPRAS y mapa iPad.
    No usa intervalos ni refrescos en bucle. Solo actúa por eventos o cambios reales del DOM. */
 (function(){
   'use strict';
   if(window.__ceV1046RescueFixes) return; window.__ceV1046RescueFixes=true;
-  var VERSION='v24_prod-01';
+  var VERSION='v24_prod-02';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

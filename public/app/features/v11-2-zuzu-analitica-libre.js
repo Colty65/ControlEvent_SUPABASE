@@ -1,9 +1,9 @@
-/* ControlEvent v24_prod-01 - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v24_prod-02 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV112ZuzuAnalitica) return; window.__ceV112ZuzuAnalitica=true;
-  var VERSION='v24_prod-01';
+  var VERSION='v24_prod-02';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }

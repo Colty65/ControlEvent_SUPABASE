@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod-01 - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v24_prod-02 - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
 (function(){
   'use strict';
