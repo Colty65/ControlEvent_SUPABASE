@@ -3,10 +3,11 @@ import ExcelJS from 'exceljs';
 import { asyncHandler } from './_async.js';
 import { getState } from '../services/state.service.js';
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { exportBankData } from '../services/bank-reconciliation.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v23_prod_r6';
-const BACKUP_VERSION_FILE = 'ControlEvent_v23_prod_r6';
+const BACKUP_VERSION = 'ControlEvent v24_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v24_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -636,6 +637,31 @@ async function buildBackupWorkbook(fullState, scope){
   });
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
+  try{
+    const bank = await exportBankData({accountId:'TODOS'});
+    const selectedEventId = scope === 'TODOS' ? '' : String(scope || '');
+    const bankMovements = (Array.isArray(bank?.movements) ? bank.movements : []).map(movement => {
+      const links = (Array.isArray(movement?.links) ? movement.links : []).filter(link => !selectedEventId || String(link?.eventId || '') === selectedEventId);
+      return {...movement, links};
+    }).filter(movement => !selectedEventId || movement.links.length > 0);
+    const bankLinks = [];
+    bankMovements.forEach(movement => movement.links.forEach(link => bankLinks.push([
+      link.id || '', movement.id || '', link.eventId || '', eventCode[link.eventId] || link.eventId || '',
+      link.ticketCode || '', num(link.ticketAmountSnapshot ?? link.ticketAmount), link.createdBy || '', link.createdAt || ''
+    ])));
+    addRows('BANCO_IMPORTACIONES', ['LOTE_ID','FICHERO_ORIGEN','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_DESDE','FECHA_HASTA','LEIDOS','INSERTADOS','DUPLICADOS','AVISOS','IMPORTADO_POR','FECHA_IMPORTACION'], (Array.isArray(bank?.batches) ? bank.batches : []).map(batch => [
+      batch.id || '', batch.sourceFilename || '', batch.accountId || '', batch.accountLabel || '', batch.dateFrom || '', batch.dateTo || '',
+      num(batch.parsedCount), num(batch.insertedCount), num(batch.duplicateCount), num(batch.warningCount), batch.importedBy || '', batch.importedAt || ''
+    ]));
+    addRows('BANCO_MVTOS', ['MOVIMIENTO_ID','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_EJECUCION','FECHA_VALOR','DESCRIPCION','IMPORTE','SALDO_BANCO','INCLUIDO_EN_SALDO','SOURCE_HASH','FICHERO_ORIGEN','CREADO_POR'], bankMovements.map(m => [
+      m.id || '', m.accountId || '', m.accountLabel || '', m.executedAt || '', m.valueDate || '', m.description || '',
+      num(m.amount), num(m.bankBalance), m.included === false ? 'NO' : 'SI', m.sourceHash || '', m.sourceFilename || '', m.createdBy || ''
+    ]));
+    addRows('BANCO_TK_LINKS', ['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'], bankLinks);
+  }catch(bankError){
+    console.warn('[ControlEvent v24_prod] No se pudo añadir Cuadre Banco al BACKUP de servidor.', bankError?.message || bankError);
+    addRows('BANCO_MVTOS', ['AVISO'], [[bankError?.message || String(bankError)]]);
+  }
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
   return {wb, filename: backupFileName(scope, selectedTitle), counts: {...scopedCounts, compras: backupCompraCount, ticketImages: backupTicketCount}};

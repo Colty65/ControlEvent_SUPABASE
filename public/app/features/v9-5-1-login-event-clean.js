@@ -1,11 +1,11 @@
-/* ControlEvent v23_prod_r2 - limpieza visual real del selector de evento tras login.
+/* ControlEvent v24_prod - limpieza visual real del selector de evento tras login.
    Evita que el desplegable muestre un evento aparente cuando todavía no se ha elegido ninguno. */
 (function(){
   'use strict';
   if(window.__ceV951LoginEventClean) return;
   window.__ceV951LoginEventClean = true;
 
-  var PICKED_KEY = 'ControlEvent_v23_prod_r2_event_user_picked';
+  var PICKED_KEY = 'ControlEvent_v24_prod_event_user_picked';
   var LOGIN_CLEAN_UNTIL = 0;
   function $(id){ return document.getElementById(id); }
   function text(v){ return v == null ? '' : String(v); }

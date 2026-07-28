@@ -13,6 +13,7 @@ import crudRoutes from '../routes/crud.routes.js';
 import receiptAiRoutes from '../routes/receipt-ai.routes.js';
 import eventAiRoutes from '../routes/event-ai.routes.js';
 import hitosRoutes from '../routes/hitos.routes.js';
+import bankReconciliationRoutes from '../routes/bank-reconciliation.routes.js';
 import { BACKEND_NAME, NODE_MODULES_DIR, PUBLIC_DIR, ROOT } from './paths.js';
 
 export function createApp() {
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api', receiptAiRoutes);
   app.use('/api', eventAiRoutes);
   app.use('/api', hitosRoutes);
+  app.use('/api', bankReconciliationRoutes);
   app.use('/api', crudRoutes);
   app.use('/api', exportRoutes);
   app.use('/api', healthRoutes);
@@ -80,7 +82,7 @@ export function createApp() {
   app.use((err, req, res, next) => {
     const status = err?.status || (/clave/i.test(err?.message || '') ? 401 : 500);
     if (status >= 500) console.error(`[${req.method} ${req.originalUrl}]`, err);
-    res.status(status).json({ ok: false, error: err?.message || 'Error interno' });
+    res.status(status).json({ ok: false, code: err?.code || '', error: err?.message || 'Error interno' });
   });
 
   return app;

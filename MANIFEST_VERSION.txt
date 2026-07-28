@@ -1,1 +1,1 @@
-ControlEvent v23_prod_r6
+ControlEvent v24_prod

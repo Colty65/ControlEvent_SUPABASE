@@ -1,11 +1,11 @@
-/* ControlEvent v23_prod_r2 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v24_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v23_prod_r2';
-  var VERSION_TEXT = 'ControlEvent v23_prod_r2';
-  var VERSION_FILE = 'ControlEvent_v23_prod_r2';
+  var VERSION_LABEL = 'v24_prod';
+  var VERSION_TEXT = 'ControlEvent v24_prod';
+  var VERSION_FILE = 'ControlEvent_v24_prod';
   var BUILD_ID = '20260706-173000';
   var ZIP_NAME = 'CE_v19_PROD_MAPA_GLOBAL_FIX3.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;

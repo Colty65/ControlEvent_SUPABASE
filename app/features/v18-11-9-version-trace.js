@@ -1,13 +1,13 @@
-/* ControlEvent v23_prod_r6 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v24_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v23_prod_r6';
-  var VERSION_TEXT = 'ControlEvent v23_prod_r6';
-  var VERSION_FILE = 'ControlEvent_v23_prod_r6';
-  var BUILD_ID = '20260728-V23-PROD-R6-ZUZU-BIENVENIDA-HITOS-EXCEL';
-  var ZIP_NAME = 'CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip';
+  var VERSION_LABEL = 'v24_prod';
+  var VERSION_TEXT = 'ControlEvent v24_prod';
+  var VERSION_FILE = 'ControlEvent_v24_prod';
+  var BUILD_ID = '20260728-V24-PROD-CUADRE-BANCO';
+  var ZIP_NAME = 'CE_V24_PROD_CUADRE_BANCO.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;

@@ -1,9 +1,9 @@
-/* ControlEvent v23_prod_r2 · Control de Hitos y Líneas de Gestión */
+/* ControlEvent v24_prod · Control de Hitos y Líneas de Gestión */
 (function(root){
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v23_prod_r2-hitos4-orden-permisos-zuzu';
+  const VERSION = 'v24_prod-hitos4-orden-permisos-zuzu';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {

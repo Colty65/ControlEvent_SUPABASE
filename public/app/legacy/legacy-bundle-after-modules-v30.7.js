@@ -1,15 +1,15 @@
 window.__ceDisableLegacyBarGraficas = true;
-/* ControlEvent v23_prod_r4 - Bundle legacy generado desde scripts legacy-inline extraídos. */
+/* ControlEvent v24_prod - Bundle legacy generado desde scripts legacy-inline extraídos. */
 /* Mantiene el orden original de ejecución para compatibilidad. */
 
 ;/* ===== BEGIN legacy-inline-55-v250-core.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #55. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #55. */
 /* ==== v25.0: entrada sin evento, render ligero y base modular ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const CHOSEN_KEY = 'ce_v250_event_chosen';
   const LEGACY_EVENT_KEY = 'controlevent_v229_selected_event_id';
   const tipStore = new WeakMap();
@@ -239,12 +239,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-56-v251-core.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #56. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #56. */
 /* ==== v25.1: operativa, zooms y RESUMEN Excel ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const $ = id => document.getElementById(id);
   const COLORS = {
     income:'#eef6ff',
@@ -587,12 +587,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-57-v252-core.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #57. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #57. */
 /* ==== v25.2: limpieza RESUMEN Excel, zooms donacion y barras ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -876,12 +876,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-58-v253-core.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #58. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #58. */
 /* ==== v25.9: cabeceras RESUMEN, donaciones especificas y foto+ticket ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1231,12 +1231,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-59-v253-final-clean.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #59. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #59. */
 /* ==== v25.9 hotfix: RESUMEN Excel limpio y DONACION DE PRODUCTO separada ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const CREAM = '#fff7e8';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
@@ -1556,12 +1556,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-60-v254-fixes.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #60. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #60. */
 /* ==== v25.9: graficas con VALORACION y donacion de producto por categoria ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const CREAM = '#fff7e8';
   const previousGraphPartsV254 = (typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null;
   const previousGraphDataV254 = (typeof window.graphData === 'function') ? window.graphData : null;
@@ -1994,12 +1994,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-61-v255-fixes.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #61. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #61. */
 /* ==== v25.9: cierre modal foto, RESUMEN/GRAFICAS Excel limpios y VALORACION en pantalla ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const previousGraphPartsV255 = (window.__ceV254 && typeof window.__ceV254.graphParts === 'function')
     ? window.__ceV254.graphParts
     : ((typeof window.graphPartsV171 === 'function') ? window.graphPartsV171 : null);
@@ -2415,12 +2415,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-62-v257-fixes.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #62. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #62. */
 /* ==== v25.9: exportadores Excel aislados y precio referencia editable ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -2945,6 +2945,65 @@ window.__ceDisableLegacyBarGraficas = true;
     }
     return ws;
   }
+
+  function bankActorHeaderV24(){
+    let user={};
+    try{ user=(typeof authUser!=='undefined'&&authUser)||window.authUser||window.ControlEventApp?.authUser||window.__CONTROL_EVENT_USER__||{}; }catch(_){ user=window.authUser||{}; }
+    const payload={nivel:up(user?.nivel||user?.Nivel||''),identificacion:norm(user?.identificacion||user?.Identificacion||''),nombre:norm(user?.nombre||user?.Nombre||'')};
+    return encodeURIComponent(JSON.stringify(payload));
+  }
+  async function loadBankExportV24(options={}){
+    const params=new URLSearchParams();
+    if(options.accountId) params.set('accountId',options.accountId);
+    if(options.eventId) params.set('eventId',options.eventId);
+    const response=await fetch(`/api/bank-reconciliation/export${params.toString()?`?${params.toString()}`:''}`,{cache:'no-store',headers:{'X-ControlEvent-Actor':bankActorHeaderV24(),'X-ControlEvent-Feature':'cuadre-banco-v24-excel'}});
+    let data={}; try{data=await response.json();}catch(_){data={};}
+    if(!response.ok) throw new Error(data?.error||`HTTP ${response.status}`);
+    return data;
+  }
+  function bankDateV24(value){
+    const raw=norm(value).replace('T',' '); const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    return m?`${m[3]}/${m[2]}/${m[1]}${m[4]?` ${m[4]}:${m[5]}`:''}`:raw;
+  }
+  async function addBankInfoEventoV24(wb,x,ev){
+    let userRole='';
+    try{
+      const actorRaw=decodeURIComponent(bankActorHeaderV24());
+      userRole=up(JSON.parse(actorRaw||'{}')?.nivel||'');
+    }catch(_){ userRole=''; }
+    if(userRole!=='GD') return null;
+    let data={movements:[],summary:{}};
+    try{ data=await loadBankExportV24({eventId:ev?.id}); }
+    catch(error){
+      const ws=x.sheet('CUADRE BANCO',[30,60,18,18,18,24,28]);
+      x.title(ws,1,'CUADRE BANCO',7); x.text(ws,3,1,'No disponible','bad',true); ws.mergeCells(3,2,3,7); x.text(ws,3,2,error?.message||String(error),'bad');
+      return ws;
+    }
+    const ws=x.sheet('CUADRE BANCO',[18,58,18,16,18,24,34]);
+    x.title(ws,1,'CUADRE BANCO · JUSTIFICACIÓN DEL EVENTO',7);
+    x.text(ws,2,1,'Evento','soft',true); ws.mergeCells(2,2,2,7); x.text(ws,2,2,ev?.titulo||ev?.id||'','soft',true);
+    x.headers(ws,4,['Fecha movimiento','Descripción bancaria','Importe movimiento','En saldo','Saldo banco','TKxx e importe','Estado del movimiento']);
+    let r=5;
+    const movements=Array.isArray(data?.movements)?data.movements:[];
+    if(!movements.length){ x.text(ws,r,1,'Sin movimientos vinculados','soft',true); ws.mergeCells(r,2,r,7); x.text(ws,r,2,'No hay TKxx de este evento asociados todavía a movimientos de Cuadre Banco.','soft'); }
+    for(const movement of movements){
+      const links=Array.isArray(movement?.links)?movement.links:[];
+      const ticketText=links.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||0)}`).join(' | ');
+      const status=movement.justificationStatus==='CUADRADO'?'Cuadrado':movement.justificationStatus==='PENDIENTE'?`Pendiente ${money(Math.max(0,num(movement.difference)))}`:movement.justificationStatus==='EXCESO'?`Exceso ${money(Math.abs(num(movement.difference)))}`:'Sin justificar';
+      const fill=movement.justificationStatus==='CUADRADO'?'ok':(movement.justificationStatus==='EXCESO'?'bad':'warn');
+      x.text(ws,r,1,bankDateV24(movement.executedAt),fill);
+      x.text(ws,r,2,movement.description||'',fill);
+      x.euro(ws,r,3,movement.amount,fill,true);
+      x.text(ws,r,4,movement.included===false?'NO':'SÍ',movement.included===false?'warn':fill,true);
+      x.euro(ws,r,5,movement.bankBalance,fill);
+      x.text(ws,r,6,ticketText,fill,true);
+      x.text(ws,r,7,status,fill,true);
+      ws.getRow(r).height=Math.max(26,Math.min(90,24+Math.ceil(Math.max(String(movement.description||'').length,ticketText.length,1)/55)*12)); r++;
+    }
+    try{ws.views=[{state:'frozen',ySplit:4}];ws.autoFilter={from:{row:4,column:1},to:{row:4,column:7}};}catch(_){ }
+    return ws;
+  }
+
   function makeCodes(items, prefix){
     const out = {};
     (items || []).forEach((item, i) => { out[item.id] = prefix + String(i + 1).padStart(prefix === 'EV' ? 3 : 4, '0'); });
@@ -3103,6 +3162,18 @@ window.__ceDisableLegacyBarGraficas = true;
     });
     make('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
     make('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
+    try{
+      const bank=await loadBankExportV24({accountId:'TODOS'});
+      const bankMovements=Array.isArray(bank?.movements)?bank.movements:[];
+      const bankLinks=[];
+      bankMovements.forEach(movement=>(Array.isArray(movement?.links)?movement.links:[]).forEach(link=>bankLinks.push([link.id||'',movement.id||'',link.eventId||'',eventCode[link.eventId]||'',link.ticketCode||'',num(link.ticketAmountSnapshot??link.ticketAmount),link.createdBy||'',link.createdAt||''])));
+      make('BANCO_IMPORTACIONES',['LOTE_ID','FICHERO_ORIGEN','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_DESDE','FECHA_HASTA','LEIDOS','INSERTADOS','DUPLICADOS','AVISOS','IMPORTADO_POR','FECHA_IMPORTACION'],(Array.isArray(bank?.batches)?bank.batches:[]).map(batch=>[batch.id||'',batch.sourceFilename||'',batch.accountId||'',batch.accountLabel||'',batch.dateFrom||'',batch.dateTo||'',num(batch.parsedCount),num(batch.insertedCount),num(batch.duplicateCount),num(batch.warningCount),batch.importedBy||'',batch.importedAt||'']));
+      make('BANCO_MVTOS',['MOVIMIENTO_ID','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_EJECUCION','FECHA_VALOR','DESCRIPCION','IMPORTE','SALDO_BANCO','INCLUIDO_EN_SALDO','SOURCE_HASH','FICHERO_ORIGEN','CREADO_POR'],bankMovements.map(m=>[m.id||'',m.accountId||'',m.accountLabel||'',m.executedAt||'',m.valueDate||'',m.description||'',num(m.amount),num(m.bankBalance),m.included===false?'NO':'SI',m.sourceHash||'',m.sourceFilename||'',m.createdBy||'']));
+      make('BANCO_TK_LINKS',['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'],bankLinks);
+    }catch(bankBackupError){
+      console.warn('[ControlEvent v24_prod] No se pudo añadir Cuadre Banco al BACKUP.',bankBackupError);
+      make('BANCO_MVTOS',['AVISO'],[[bankBackupError?.message||String(bankBackupError)]]);
+    }
     for(const ws of wb.worksheets){
       try{
         ws.eachRow(row => row.eachCell(cell => { cell.protection = {locked:true}; }));
@@ -3179,7 +3250,7 @@ window.__ceDisableLegacyBarGraficas = true;
       }
       try{ ws.autoFilter = {from:{row:4,column:1}, to:{row:4,column:5}}; }catch(_){ }
     }catch(error){
-      console.warn('[ControlEvent v23_prod_r4] No se pudo añadir DOCUMENTOS DEL EVENTO al INFOEVENTO.', error);
+      console.warn('[ControlEvent v24_prod] No se pudo añadir DOCUMENTOS DEL EVENTO al INFOEVENTO.', error);
     }
   }
 
@@ -3189,6 +3260,7 @@ window.__ceDisableLegacyBarGraficas = true;
     const ExcelJS = await cleanExcelJS();
     const x = setupWorkbook(ExcelJS), wb = x.wb;
     await addHitosInfoEventoV23R6(wb, x, ev);
+    await addBankInfoEventoV24(wb, x, ev);
     const op = opValues();
     let r = 1;
     const wsRes = x.sheet('RESUMEN', [30,42,18,18,18,4,4]);
@@ -3283,12 +3355,12 @@ window.__ceDisableLegacyBarGraficas = true;
               sort:false, autoFilter:false, pivotTables:false, objects:false, scenarios:false
             });
           }catch(protectError){
-            console.warn('[ControlEvent v23_prod_r4] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
+            console.warn('[ControlEvent v24_prod] No se pudo proteger hoja INFOEVENTO', ws?.name, protectError);
           }
         }
       }
     }catch(error){
-      console.warn('[ControlEvent v23_prod_r4] No se pudo aplicar protección final al INFOEVENTO.', error);
+      console.warn('[ControlEvent v24_prod] No se pudo aplicar protección final al INFOEVENTO.', error);
     }
     await downloadWorkbook(wb, infoFileName(ev));
   }
@@ -3363,12 +3435,12 @@ window.__ceDisableLegacyBarGraficas = true;
 
 ;/* ===== BEGIN legacy-inline-63-v259-app-facade.js ===== */
 
-/* ControlEvent v23_prod_r4 - JS legacy extraido de public/index.html. Bloque inline #63. */
+/* ControlEvent v24_prod - JS legacy extraido de public/index.html. Bloque inline #63. */
 /* ==== v25.9: fachada estable para modularizacion progresiva ==== */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v23_prod_r4';
-  const VERSION_FILE = 'ControlEvent_v23_prod_r4';
+  const VERSION = 'ControlEvent v24_prod';
+  const VERSION_FILE = 'ControlEvent_v24_prod';
   const call = fn => typeof fn === 'function' ? (...args) => fn(...args) : undefined;
   function applyVersion(){
     try{ document.title = VERSION; }catch(_){ }

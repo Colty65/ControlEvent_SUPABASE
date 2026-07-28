@@ -1,12 +1,12 @@
-/* ControlEvent v23_prod_r6 - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v24_prod - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v23_prod_r6';
-  var VERSION_TEXT='ControlEvent v23_prod_r6';
-  var VERSION_FILE='ControlEvent_v23_prod_r6';
-  var BUILD_ID='20260728-V23-PROD-R6-ZUZU-BIENVENIDA-HITOS-EXCEL';
-  var ZIP_NAME='CE_v23_PROD_R5_INGRESOS_AJUSTE_SIN_VERSION_AVANCE.zip';
+  var VERSION_LABEL='v24_prod';
+  var VERSION_TEXT='ControlEvent v24_prod';
+  var VERSION_FILE='ControlEvent_v24_prod';
+  var BUILD_ID='20260728-V24-PROD-CUADRE-BANCO';
+  var ZIP_NAME='CE_V24_PROD_CUADRE_BANCO.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -14,7 +14,7 @@
     return String(value||'')
       .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
       .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
-      .replace(/v23_prod(?:_r1)?/ig,VERSION_LABEL);
+      .replace(/\bv24_prod\b/ig,VERSION_LABEL);
   }
   function patchDownloadNames(){
     safe(function(){
@@ -54,7 +54,7 @@
   function setGlobals(){
     safe(function(){
       window.__ceVersionLabel=VERSION_LABEL; window.__ceVersion=VERSION_TEXT; window.VERSION=VERSION_TEXT; window.VERSION_FILE=VERSION_FILE;
-      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v23-prod-r1-hardlock'};
+      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v24-prod-cuadre-banco'};
       document.title=VERSION_TEXT;
       if(document.body){ document.body.dataset.ceVersion=VERSION_TEXT; document.body.dataset.ceBuild=BUILD_ID; document.body.dataset.ceZip=ZIP_NAME; }
     });
@@ -92,7 +92,7 @@
   }
   function apply(){ installStyle(); setGlobals(); patchDownloadNames(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }
   window.ControlEventVersionCheck=function(){
-    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v23-prod-r1-hardlock'};
+    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v24-prod-cuadre-banco'};
     return fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(api){ var out={front:front,api:api,ok:!!(api&&api.version===VERSION_TEXT&&api.label===VERSION_LABEL)}; console.log('[ControlEvent version check]',out); return out; }).catch(function(error){ var out={front:front,api:null,ok:false,error:String(error&&error.message||error)}; console.warn('[ControlEvent version check]',out); return out; });
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();
