@@ -1,4 +1,4 @@
-// ControlEvent v24_prod-02 · FIX12
+// ControlEvent v25_prod · FIX12
 // Refuerzos: refresco inmediato de INGRESOS, nombres DOC/TK, vista aérea y personalización Zuzu.
 (function(){
   'use strict';

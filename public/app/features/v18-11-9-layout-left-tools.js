@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod-02 - herramientas laterales izquierdas sin ficha, pequeñas y repartidas. */
+/* ControlEvent v25_prod - herramientas laterales izquierdas sin ficha, pequeñas y repartidas. */
 (function(){
   'use strict';
   if(window.__ceV18119LeftTools) return; window.__ceV18119LeftTools=true;

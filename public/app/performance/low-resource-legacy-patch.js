@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod-02 - LowResourceLegacyPatch
+/* ControlEvent v25_prod - LowResourceLegacyPatch
    Parche clasico posterior al legacy: puede reasignar el render global heredado.
    V29.4 conserva el rendimiento de v29.2/v29.3, pero protege el arranque post-login:
    - primer render autenticado y cambio de evento hacen un bootstrap completo controlado;
@@ -7,7 +7,7 @@
 (function(){
   'use strict';
   const root = window.ControlEventLowResource;
-  const VERSION = 'ControlEvent v24_prod-02';
+  const VERSION = 'ControlEvent v25_prod';
   if(!root || !root.enabled){
     window.ControlEventLowResourceLegacy = {version:VERSION, installed:false, reason:'LowResource no activo', inspect(){return this;}, print(){console.info(this); return this;}};
     return;
@@ -396,7 +396,7 @@
   }
   function print(){
     const report = inspect();
-    console.group('[ControlEventLowResourceLegacy/ControlEvent v24_prod-02]');
+    console.group('[ControlEventLowResourceLegacy/ControlEvent v25_prod]');
     console.info(report);
     try{ console.table(report.executed); }catch(_){ }
     console.groupEnd();
@@ -412,5 +412,5 @@
     activateCurrentModule
   };
   window.__ceV294RoleSync = applyCriticalRoleUi;
-  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v24_prod-02] Render legacy recortado + Mapa de recursos activado.'); }catch(_){ }
+  try{ console.info('[ControlEventLowResourceLegacy/ControlEvent v25_prod] Render legacy recortado + Mapa de recursos activado.'); }catch(_){ }
 })();

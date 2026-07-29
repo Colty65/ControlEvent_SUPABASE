@@ -1,0 +1,1511 @@
+{
+  "release": "v25_prod",
+  "versionText": "ControlEvent v25_prod",
+  "versionFile": "ControlEvent_v25_prod",
+  "build": "20260729-V25-PROD-COMPACT-BANK",
+  "zip": "CE_V25_PROD_CUADRE_BANCO_COMPACTO.zip",
+  "base": "CE_V24_PROD_05_CUADRE_BANCO_FLUIDEZ_CSV.zip",
+  "databaseMigrationRequired": false,
+  "changes": [
+    "Cuadre Banco compacto y cronología situada más arriba",
+    "Fichas bancarias aproximadamente a mitad de altura en escritorio",
+    "Conciliación situada en paralelo a los datos del movimiento en pantallas anchas",
+    "Versión única v25_prod en cliente, servidor, ColtyLAB, INFOEVENTO y BACKUP",
+    "Nombres externos de INFOEVENTO, BACKUP, descarga de datos y PDF de Zuzu actualizados",
+    "Cache-busting global renovado y compatibilidad con sesiones anteriores"
+  ],
+  "verification": {
+    "bankTestSuite": "passed",
+    "cssParse": "passed",
+    "criticalJavaScriptSyntax": "passed",
+    "appPublicCopies": "synchronized",
+    "broadZuzuRuntimeTest": "not_run_missing_node_modules"
+  },
+  "changedFileCount": 247,
+  "deletedFiles": [],
+  "files": [
+    {
+      "path": "LEEME_SUBIDA_GITHUB_V25_PROD.txt",
+      "bytes": 772,
+      "sha256": "9742de5b6033978cd3bd476c1cbd9cd5507857529542e450e527d5aba5e68a19",
+      "status": "new"
+    },
+    {
+      "path": "MANIFEST_VERSION.txt",
+      "bytes": 22,
+      "sha256": "35e4cb54b2dafa2a51aa2752382ba848573d1d25a6cc2f1db71a5fc504b5abfa",
+      "status": "modified"
+    },
+    {
+      "path": "README_V25_PROD_CUADRE_BANCO_COMPACTO_VERSION_UNICA.md",
+      "bytes": 2989,
+      "sha256": "90ac145e6a8cee1720d2b52d5ae807291561da9747884c81646e34162d11b850",
+      "status": "new"
+    },
+    {
+      "path": "_excel-runtime.js",
+      "bytes": 14883,
+      "sha256": "a464c0ed9ecb81fc640a08fe1e0e1fcde9284253a006c4e8d4e7806c6f081f72",
+      "status": "modified"
+    },
+    {
+      "path": "active-render.js",
+      "bytes": 7348,
+      "sha256": "22c392b3043c0356b558d6f677b81a49af39b59250e91843015b150147e8c09a",
+      "status": "modified"
+    },
+    {
+      "path": "app.css",
+      "bytes": 4449,
+      "sha256": "4a36e4559985359b379d237c8041efa2a4a959cb61cc375ee14a60df710a5ef5",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/planificacion-inicial.js",
+      "bytes": 308028,
+      "sha256": "5af4f6a3c92ab18016d0c9bc29464e0078bb52b6d623e2ea3da01f1bebdb218b",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/summary-tienda-sort-fix.js",
+      "bytes": 6017,
+      "sha256": "f6001cba19068f6fe6144b2f2f1802808d85d4bedf7f97e618065f6c03207fa4",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v10-5-hotfix-fotos-docs-botones.js",
+      "bytes": 11087,
+      "sha256": "a6b12ee2737190dc1e5a3a5f94bbd738c01cce2f2757fb499d754ee017182873",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v11-3-zuzu-analitica-libre.js",
+      "bytes": 56623,
+      "sha256": "4f0912a554c97fa8274f192374594c3350c884dbbdff6a5e00867695af5de903",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v16-hotfix5-logo-avance-ligero.js",
+      "bytes": 28192,
+      "sha256": "bce9d7749642fcb5f43846e58480a4d167f30f0c8a68ff131a2a8237425b8538",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix23-performance-dom-event-scope.js",
+      "bytes": 21108,
+      "sha256": "e6d210642f6c3ae7cc6657ae53c4bf8f96b2f600d0694d481403f82f93440159",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix24-idle-quiet.js",
+      "bytes": 1800,
+      "sha256": "bdf0987337969449cd70d8d5ed97b47fefa8929e8756fb73ff7f78f5814077ff",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix25-welcome-elarrastre.js",
+      "bytes": 8346,
+      "sha256": "78925c66945a3a2f6b326a59834b44a93161ac99ba8baedb37521be9e6f94a6f",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix26-mobile-resumen-welcome-info.js",
+      "bytes": 7510,
+      "sha256": "9d32abc9be7fbc838c5b7081d49b20277500397930d2a9ff4e5056bd141bf3b0",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix27-welcome-info-general.js",
+      "bytes": 12516,
+      "sha256": "6d04e4f0fb6290dc979dcfc19170e13cc0ab9496c4e6c354a39170b354b647ae",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix40-human-labels-planificacion.js",
+      "bytes": 2538,
+      "sha256": "68692d7cdd875b921c9026d52513fc00651080f612c6180293c80bc1cf44da4e",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-fix48-saldo-actual-realizado.js",
+      "bytes": 16284,
+      "sha256": "993f4aa5fa7cdd76dfd8fe44c82f64c10bf063ced455a42e0113394738955e48",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v17-hotfix-calculos-fotos-ingresos-style.js",
+      "bytes": 47146,
+      "sha256": "dd5710affd296c66a11842b55f4a6bd31ca12b60a26995e90198327aa5ef7799",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v18-11-10-final-hardlock.js",
+      "bytes": 8255,
+      "sha256": "fb24708aad8f44a499a34a0021676cfc30b00856771d162a4678138794d9e3b1",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v18-11-4-version-trace.js",
+      "bytes": 3660,
+      "sha256": "6ab540a7582d1e43846f10e981c84336cd233a3360a2dcd35baa00229b9e722d",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v18-11-9-layout-left-tools.js",
+      "bytes": 4468,
+      "sha256": "20350d1b954d4832d5f3e3deee6ccca293c02f1e5f2ac0afc978e314bf37a0b0",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v18-11-9-version-trace.js",
+      "bytes": 3670,
+      "sha256": "181dfabde952ecc7176d57ca1779e5a7dc5accf25be3208cab04e3c15bdce155",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix10-prod.js",
+      "bytes": 12305,
+      "sha256": "c658ccaf4e5c6720287d5f9cee3e4bf683b54524397e24a144f2c0a2d14796d7",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix12-prod.js",
+      "bytes": 12812,
+      "sha256": "4977b937601c77bedd0eedfa0a8a473083e664291cb1f82e1833d4515dad8c88",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix13-prod.js",
+      "bytes": 25573,
+      "sha256": "84b38c0bd991086031a0965eee7026ecb1f1cf4c530419d9705b274a6d2062ae",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix14-login-unblock.js",
+      "bytes": 8606,
+      "sha256": "37be987cc452776039d0928396841f27599eeab43e9fa918a051645e545c2f81",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix15-prod.js",
+      "bytes": 4020,
+      "sha256": "8df5a9b8d78187274cc9245edc7980fa0f7533d81e1274bafc7127bf61011a45",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-fix16-prod.js",
+      "bytes": 9947,
+      "sha256": "60651b4ef92cbcf26cda62099bd5a70bc7809fbd4d3f7da26b99715058650933",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v19-mapa-recursos-global.js",
+      "bytes": 69014,
+      "sha256": "ab25a1bdcfe57c1c9013e8e3c4891919b2c8c5515b1f156f15675c67ee1483f0",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v22-voz3-zuzu.js",
+      "bytes": 40794,
+      "sha256": "e5e7a877f28ef8f21f8ea8ab2d42aefb9db2ee4c2792a8360cb230263d90ff4e",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v23-2-hitos-control.js",
+      "bytes": 33723,
+      "sha256": "8736dfb944ddfa8ea821a13a9f8d31c77ae749892bd75ef26c3378f6b8d2dfef",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v23-3-zuzu-bienvenida-infoevento-hitos.js",
+      "bytes": 7506,
+      "sha256": "47d6eafb3c3229d89b676710950ba0230cef4a642b81c4296c65cc61735f3e39",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v24-cuadre-banco.js",
+      "bytes": 45535,
+      "sha256": "6fdd5be2cc29b8bf1d575fb3e6bd024358fe6575895a20fd2e64dd43b9524b40",
+      "status": "modified"
+    },
+    {
+      "path": "app/features/v8-5-crud-root-fix28.js",
+      "bytes": 31910,
+      "sha256": "6b33d0688ba656afb17af4086064fbae3f1ed7fb306167efa1dc625b8dbbeb49",
+      "status": "modified"
+    },
+    {
+      "path": "app/styles/cuadre-banco.css",
+      "bytes": 47219,
+      "sha256": "3ab595059d2d49db34eb3be829ab0af68430606ebc2099f48daf020affcd234c",
+      "status": "modified"
+    },
+    {
+      "path": "app/styles/hitos-control.css",
+      "bytes": 8509,
+      "sha256": "b68436e6d47ec58e7c7b10a28a1c3408abed7a76864dc6a1e696da73683f8086",
+      "status": "modified"
+    },
+    {
+      "path": "app/version.js",
+      "bytes": 636,
+      "sha256": "8714e208d5eef498fb562178a36f601f911a48e3c7e73f228bafa2bda82458e2",
+      "status": "modified"
+    },
+    {
+      "path": "budget-tooltips-lite.js",
+      "bytes": 32213,
+      "sha256": "4923416463018872bfdbf727386484b7ce13006edc19cdbe93c54d01461be81e",
+      "status": "modified"
+    },
+    {
+      "path": "build-metrics.json",
+      "bytes": 440,
+      "sha256": "7b25cde1d0be5e8ba400a0539f4108d41d2d0804444997d328a990db9e6d7240",
+      "status": "modified"
+    },
+    {
+      "path": "compras.js",
+      "bytes": 22663,
+      "sha256": "73df12e423365b46720a566f95c1d32d05d18dec670b280a049e29c54041e21a",
+      "status": "modified"
+    },
+    {
+      "path": "data-integrity.js",
+      "bytes": 101,
+      "sha256": "fb490acce244a4f9741f29e22249d8cb4db4fe462347159e9856b43aa2b1b837",
+      "status": "modified"
+    },
+    {
+      "path": "index.html",
+      "bytes": 43808,
+      "sha256": "b6b8502eebd0b6cf8665c53da283b2800f040eaef3057c760306b4dd4442a6cf",
+      "status": "modified"
+    },
+    {
+      "path": "ingresos-select-fix.js",
+      "bytes": 7733,
+      "sha256": "ffd671d3ae1d0daaa953b9257cbb5d18f43bdddba7491301aa12505f49ffb7ad",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-bundle-after-modules-v30.7.js",
+      "bytes": 204993,
+      "sha256": "e2a7f16c57f0dbe63130c79f19c5d3834ce1caba4a707f5babb2b5b73016a227",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-bundle-after-modules-v30.9.js",
+      "bytes": 3737,
+      "sha256": "0dd72e77af1ec91e9b43fb99c98c3559a9105489895c46cb41541027d70e8fad",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-bundle-before-modules-v30.7.js",
+      "bytes": 6494,
+      "sha256": "646cbfa6c4673af78e453f9f17461004e30665573013b4465291cf11d00a76f9",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-bundle-before-modules-v30.9.js",
+      "bytes": 7348,
+      "sha256": "22c392b3043c0356b558d6f677b81a49af39b59250e91843015b150147e8c09a",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-hotpath.js",
+      "bytes": 981339,
+      "sha256": "ac36104c0763118f2f09e7323489b3b416f0c1c613b79b4c7b8c24529498f28c",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-usage.js",
+      "bytes": 504,
+      "sha256": "40392fd5c4d60f168d5a2b28433e2d1996913676cd31188485c1f8881c910dae",
+      "status": "modified"
+    },
+    {
+      "path": "legacy-weight.js",
+      "bytes": 480,
+      "sha256": "09161d7fa073284805e45197f4a7022fb8cf4bee2ee65315f1fb85c2ea970932",
+      "status": "modified"
+    },
+    {
+      "path": "low-resource-boot.js",
+      "bytes": 17418,
+      "sha256": "760cc4e28e1c92f51f9472e8bbbf8db68a694ed0ab0f4e345c2133219008e5ea",
+      "status": "modified"
+    },
+    {
+      "path": "low-resource-legacy-patch.js",
+      "bytes": 982361,
+      "sha256": "d4c8d7b02ea76e11b475a0925eee5d0daac3cedf4d64db77acf7d96532bc85d0",
+      "status": "modified"
+    },
+    {
+      "path": "main.js",
+      "bytes": 45473,
+      "sha256": "64cf1a7dc84a54a3863047cc5c32cea3a99ba09d9034cf74e013f579626b2ac6",
+      "status": "modified"
+    },
+    {
+      "path": "maintenance-diagnostics.js",
+      "bytes": 6961,
+      "sha256": "5faedcba4d7aeb7408e4cdd603e6498cb404cb3ee1243a8143cbacf0bf05baa6",
+      "status": "modified"
+    },
+    {
+      "path": "maintenance-duplicates-v31.6.js",
+      "bytes": 11700,
+      "sha256": "34baeefa0727f5b6c91115ff3d1a499954b99c9a29b1b7a5139cc932fa2763cc",
+      "status": "modified"
+    },
+    {
+      "path": "mapa-productos (1).js",
+      "bytes": 18743,
+      "sha256": "a372876150011bbbd39cda826e6424eccefa8d46d3bd5261d0a467d76ba5bc4c",
+      "status": "modified"
+    },
+    {
+      "path": "mobile-performance.js",
+      "bytes": 1667,
+      "sha256": "b9029680aa3ee05af40822c6668603fff0198b66665f79e7d007b7c3b92be278",
+      "status": "modified"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 72230,
+      "sha256": "62b3148a33779a66a58d930cd60d446bcb80cbb7fc33b348f8b36932b4ccf07c",
+      "status": "modified"
+    },
+    {
+      "path": "package.json",
+      "bytes": 965,
+      "sha256": "24fc73dd957d1ffc1fc3b072d511fc48e0fe4a7fcf65046048290582b21654d7",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/diagnostics/build-metrics.json",
+      "bytes": 440,
+      "sha256": "7b25cde1d0be5e8ba400a0539f4108d41d2d0804444997d328a990db9e6d7240",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/budget-tooltips-lite.js",
+      "bytes": 32213,
+      "sha256": "4923416463018872bfdbf727386484b7ce13006edc19cdbe93c54d01461be81e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/event-delete-cascade-v33.7.js",
+      "bytes": 6903,
+      "sha256": "6e02fac10d7dfd6f10c5c942a597008edf8a117cc45eec1408f12280e1ad9a3f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/ingresos-select-fix.js",
+      "bytes": 2890,
+      "sha256": "135e9ab4f4eb4ed32de030dd2b8e47fe4ec676cea8f664763d475e219ae29911",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/maintenance-duplicates-v32.1.js",
+      "bytes": 6494,
+      "sha256": "646cbfa6c4673af78e453f9f17461004e30665573013b4465291cf11d00a76f9",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/mapa-productos.js",
+      "bytes": 58449,
+      "sha256": "c7ac4719fc60c09496b4c8824931f140565a7cefb152e0af8456530d7136e7a0",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/planificacion-inicial.js",
+      "bytes": 308028,
+      "sha256": "5af4f6a3c92ab18016d0c9bc29464e0078bb52b6d623e2ea3da01f1bebdb218b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/summary-tienda-sort-fix.js",
+      "bytes": 6017,
+      "sha256": "f6001cba19068f6fe6144b2f2f1802808d85d4bedf7f97e618065f6c03207fa4",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-0-app-fixes.js",
+      "bytes": 19097,
+      "sha256": "540c40e6fd6dbacea3477146caaf7752bd53c3210adc73465eeaad69c688f169",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-0-ticketauto-compras.js",
+      "bytes": 65620,
+      "sha256": "85ddddb45a69818df031d76d6a0bc2e2b3738878d6221c29114ef63efec0ff6d",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-1-app-fixes.js",
+      "bytes": 27513,
+      "sha256": "f990867b774beb4ebda1116923668b2d2afb5d55f47319ed7f041b2576a0cd0b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-1-ticketauto-compras.js",
+      "bytes": 66301,
+      "sha256": "deb0fb486265d129bab44f4c187caa0bdb75c3a197d2da6e8e6531b89e2cfe4f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-2-app-fixes.js",
+      "bytes": 31002,
+      "sha256": "7843e5affeb65cec79fe08f3bff77d03c90e365b42e59351266e9203874291fa",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-2-ticketauto-compras.js",
+      "bytes": 69225,
+      "sha256": "19c020226dbfc0ad5132736a0753f5cc0b0efda41ffbd0fb33d27a303372e1c9",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-3-app-fixes.js",
+      "bytes": 29545,
+      "sha256": "725eab87dd6179bc33d403d485282d9061cf4a233917fa4cd828c99c2b251cfc",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-3-ticketauto-compras.js",
+      "bytes": 70538,
+      "sha256": "f2883e89d92e8e119b8d928d80eb257ad1bbff71d38023aacfafd9b494171c0e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-1-app-fixes.js",
+      "bytes": 19398,
+      "sha256": "f78a11b42bb994050b848f3973b9a5324126450ffb4747437f87133494c34f9d",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-2-app-fixes.js",
+      "bytes": 17103,
+      "sha256": "acb886ffa7dea91031ed055e88fc87aba919acf21033569055aad56df0ecae2f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-2-ticketauto-compras.js",
+      "bytes": 74751,
+      "sha256": "70ba84087f68c7750b85143d7c63d50a59582beed30d7b07aa208aafbddc76fd",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-3-app-fixes.js",
+      "bytes": 6906,
+      "sha256": "4de97f8690a891c97be74dd8e0742e39cd3357a559e33a17883afc2fd89853d5",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-3-ticketauto-compras.js",
+      "bytes": 74751,
+      "sha256": "70ba84087f68c7750b85143d7c63d50a59582beed30d7b07aa208aafbddc76fd",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-4-app-fixes.js",
+      "bytes": 8110,
+      "sha256": "c9077c062d5c698c3b5b00964914e7fd90b5d1adec5917e3215da7f965437886",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-4-ticketauto-compras.js",
+      "bytes": 75471,
+      "sha256": "5266750405fd9ae82d11030ce6dfde854f6e73a71b93f2341856716ea1bc1955",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-5-app-fixes.js",
+      "bytes": 10212,
+      "sha256": "1372a73fb15cafa04db5723136424237493983abe8091fe7f25f3888a6e3df50",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-5-ticketauto-compras.js",
+      "bytes": 76667,
+      "sha256": "ea3d232e33a1b90333d6879aa7c22b4ec9cdbb3f5186cb68f07b8ba38a72bf88",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-6-app-fixes.js",
+      "bytes": 12382,
+      "sha256": "56fbeb7a8f9e2941853e8389f6d637458a66ecbeb05bf05b077ad101c7361015",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-6-ticketauto-compras.js",
+      "bytes": 79794,
+      "sha256": "6d1dba08bbe6d3ca11d3dfa5e9a54166adf71ce275f2b37b15c0634c89b3ad69",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-7-app-fixes.js",
+      "bytes": 18436,
+      "sha256": "363b986ccb09d302a9494f67cfb0372c504f997ff150793ed1a5d045f8d2ab3a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-7-ticketauto-compras.js",
+      "bytes": 80322,
+      "sha256": "4d48947a17101ed978619d0efcb16354f3edfc36d2fecba8a04de27b74bc3e38",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-app-fixes.js",
+      "bytes": 33105,
+      "sha256": "97fd1a103ae368eaf71e22a37db6aabef8d03217678cf7b3a31811b9db5d9168",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-4-ticketauto-compras.js",
+      "bytes": 70695,
+      "sha256": "95da09683bcbba207fd93c3203410c8c50d1e7eee042453c982bcf15d2755c2e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-5-app-fixes.js",
+      "bytes": 17484,
+      "sha256": "e6f454bcece23b4f480f233cdda9e2ec942abb80797690651fd13418e78b2d9a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-5-hotfix-busqueda-recarga-compartir.js",
+      "bytes": 19211,
+      "sha256": "1dd6fd067da7dfcf760126b9867c5d7d24fd443220fdbb15898679f2218fff16",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-5-hotfix-fotos-docs-botones.js",
+      "bytes": 11087,
+      "sha256": "a6b12ee2737190dc1e5a3a5f94bbd738c01cce2f2757fb499d754ee017182873",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v10-5-ticketauto-compras.js",
+      "bytes": 83229,
+      "sha256": "3c16c70a9f98d2d9d2464e4f47dc6bf5aecbe872c4c79b17dec3eebbb8eca7bf",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-0-gemini-libre-evento.js",
+      "bytes": 15962,
+      "sha256": "2db7ed8dff5c83c847e9647211ae654d7239f5b9832d6420a639ea76184f6c54",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-0-hotfix-ticketauto-no-autopen.js",
+      "bytes": 5419,
+      "sha256": "00f30e7b006d40a0fdc4631e811bed4b9a36a3ed1f15f6b3e5adab3a33b1a55e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-1-gemini-libre-evento.js",
+      "bytes": 17466,
+      "sha256": "98fddc791bff01a75e9e0441febeecf77f1eac063a9011709546f2776e540fce",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-1-hotfix-ticketauto-no-autopen.js",
+      "bytes": 5468,
+      "sha256": "0f5ef2d7a73db33a447beaf7936913b3edf785dedb9db60563dc2e437286d094",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-2-zuzu-analitica-libre.js",
+      "bytes": 17902,
+      "sha256": "19a89b7ac38d7ba2bfef501b3cfcd01693b2dfb26ce74423233da4157490b736",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-3-3-finalizado-herramientas-consulta.js",
+      "bytes": 8196,
+      "sha256": "22e4fbeef60c2f1abb2bcf2cd8119627ef97f6df1bbf5ff32767f9a9e85895c0",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v11-3-zuzu-analitica-libre.js",
+      "bytes": 57623,
+      "sha256": "751967b690206547ca7d34610782613326230eadc74978358c80d2a9e0a82447",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v12-0-event-scoped-loader.js",
+      "bytes": 6370,
+      "sha256": "6cf86016151818ccd63bfe8fcc1c94acd41920e7727fcc074e403ff43a96494a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v12-0-finalizado-herramientas-consulta.js",
+      "bytes": 14232,
+      "sha256": "5624dbea8afbd681c4e7799587be12c017650ac5dff3a515d3fb6b28185b36b1",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v13-0-hotfix-evento-precio-socios.js",
+      "bytes": 7477,
+      "sha256": "a966cd953dd2888bcee54be0a961b0aed00294e1d7f8650b627ba8ea4ac1bcfb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v14-hotfix-catalogo-resumen-planificacion.js",
+      "bytes": 7138,
+      "sha256": "d39e43587e20fd1d50e6af682ef1d7002be0c6856aafcea19e309be4dca9c375",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix20-documentos-espera-titulos-avance.js",
+      "bytes": 14545,
+      "sha256": "1029fce857026bf138bc559895fa79817b9b8d9050fae65d2358baf328877808",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix21-saldo-avance-rendimiento.js",
+      "bytes": 18135,
+      "sha256": "94fc8ee4e85827a383e02cea32d58ed9bae44de61b862d9ca93727f76f9a7c51",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix22-logo-avance-eventos-docs.js",
+      "bytes": 18710,
+      "sha256": "b5b8fcdf61f283c8ad114159445ee1a8143a005a25a538d13362def133eb2464",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix23-avance-logo-modales-globos.js",
+      "bytes": 24403,
+      "sha256": "2551e75eaad97a10f80879a1267140974700c16a2fb531c1cfa3f57a1a42e06a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix24-modal-avance-saldo49.js",
+      "bytes": 10028,
+      "sha256": "bffb75f967841deb7269b14dec3b00521ee10e20ae77f6d145fc4dc21c6ee095",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix25-rebase49-correcciones.js",
+      "bytes": 12674,
+      "sha256": "788e2c0637f899d7b670d3201abbede2059ea5d0f5c7eb35dca9bd9845f25e25",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix26-estabilidad-dropdown-saldo-avance52.js",
+      "bytes": 6133,
+      "sha256": "c39bcb5d914ef72bc47ef3fc74b12d8fb491ff3549c25357d8078acf3ba49844",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v15-hotfix6-resumen-avance-manto.js",
+      "bytes": 19553,
+      "sha256": "d400b2681e8a0fb6f657261ee8adf0b8f9af1d69926ba11e070d0489bdccb94c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-hotfix1-saldo-avance-version.js",
+      "bytes": 10685,
+      "sha256": "b82b41355a7cfade7ad20ce2d58d7b08dc0d6e82e6c75551420ebf256c915f4b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-hotfix5-logo-avance-ligero.js",
+      "bytes": 29016,
+      "sha256": "dc5e7eb91f31727ed001621d75bdfa41bd7c9eaaebaaeeea51c44112185b74b8",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt1-event-load-stabilizer.js",
+      "bytes": 10947,
+      "sha256": "e40a2b53585d92fa406e06f7fd666a2b93b3d3217e5dac08f96a514c958295ae",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2-graficas-ingresos.js",
+      "bytes": 19375,
+      "sha256": "d7504e27a78143334962cf01b3072b7d4d0ca2b1bfcb1b949b6062ec999b8db2",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2e-graficas-unico-render.js",
+      "bytes": 13441,
+      "sha256": "65c855805aa5e254e80a27af5ffa417776eeda248f82fa595d8a5e9b9213f146",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2f-graficas-v46-unica.js",
+      "bytes": 12097,
+      "sha256": "35ec014ac8616bbabae58e9d42869f8ab6dd7066c5459503286527ceb8914c7f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2g-graficas-v46-estricta.js",
+      "bytes": 14419,
+      "sha256": "7a599b5103e075d4b6a2a4d7c4d550fd87158e9c152b4448e011767aac99be63",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2h-graficas-v46-hardlock.js",
+      "bytes": 16268,
+      "sha256": "b750c7dd960ef82e61430af6082fd57e5eea4a55702e88615373b2c9b5e2ba63",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v16-opt2i-graficas-anti-retemblor.js",
+      "bytes": 10496,
+      "sha256": "9e0dce63483aefe9519fcb74f43f2c1fd8299333a15ae9a4bc69fe638c29ef24",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix19-touch-close-graphs.js",
+      "bytes": 25353,
+      "sha256": "153ca83733e3ec2166a821e3045713f65470092b948f99682527cf394a4d1854",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix23-performance-dom-event-scope.js",
+      "bytes": 21108,
+      "sha256": "e6d210642f6c3ae7cc6657ae53c4bf8f96b2f600d0694d481403f82f93440159",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix24-idle-quiet.js",
+      "bytes": 1800,
+      "sha256": "bdf0987337969449cd70d8d5ed97b47fefa8929e8756fb73ff7f78f5814077ff",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix25-welcome-elarrastre.js",
+      "bytes": 8346,
+      "sha256": "78925c66945a3a2f6b326a59834b44a93161ac99ba8baedb37521be9e6f94a6f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix26-mobile-resumen-welcome-info.js",
+      "bytes": 7510,
+      "sha256": "9d32abc9be7fbc838c5b7081d49b20277500397930d2a9ff4e5056bd141bf3b0",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix27-welcome-info-general.js",
+      "bytes": 12516,
+      "sha256": "6d04e4f0fb6290dc979dcfc19170e13cc0ab9496c4e6c354a39170b354b647ae",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix40-human-labels-planificacion.js",
+      "bytes": 2538,
+      "sha256": "68692d7cdd875b921c9026d52513fc00651080f612c6180293c80bc1cf44da4e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-fix48-saldo-actual-realizado.js",
+      "bytes": 16284,
+      "sha256": "993f4aa5fa7cdd76dfd8fe44c82f64c10bf063ced455a42e0113394738955e48",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-hotfix-calculos-fotos-ingresos-style.js",
+      "bytes": 47146,
+      "sha256": "dd5710affd296c66a11842b55f4a6bd31ca12b60a26995e90198327aa5ef7799",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-hotfix-final-cierre-miniaturas-visor.js",
+      "bytes": 21180,
+      "sha256": "e0459d83a2c1b599fc6b1a3596bfdea88d07a4cef6eca412340e8d0322e8bb07",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v17-hotfix-logo-graficas-clean.js",
+      "bytes": 4647,
+      "sha256": "04b26b4723316d27ec464138100bb3228c4676d3fe3f25c6835bc50924ffdaa3",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v18-11-10-final-hardlock.js",
+      "bytes": 9315,
+      "sha256": "ec95571d4c39c3f8426d7bf14f5a07163be45a1595a122c82f6cf5e2ac3a498b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v18-11-8-version-trace.js",
+      "bytes": 3660,
+      "sha256": "501bfc0dd1278e87289ba26650d570e1f48ee3f0ae10fb2aac90bb168007a0d1",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v18-11-9-layout-left-tools.js",
+      "bytes": 4468,
+      "sha256": "20350d1b954d4832d5f3e3deee6ccca293c02f1e5f2ac0afc978e314bf37a0b0",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v18-11-9-version-trace.js",
+      "bytes": 3670,
+      "sha256": "181dfabde952ecc7176d57ca1779e5a7dc5accf25be3208cab04e3c15bdce155",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix10-prod.js",
+      "bytes": 13105,
+      "sha256": "78c65a241368450700321e315b218c0d1da10566cff01f86508a56dbabfa2bbf",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix12-prod.js",
+      "bytes": 12812,
+      "sha256": "4977b937601c77bedd0eedfa0a8a473083e664291cb1f82e1833d4515dad8c88",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix13-prod.js",
+      "bytes": 25573,
+      "sha256": "84b38c0bd991086031a0965eee7026ecb1f1cf4c530419d9705b274a6d2062ae",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix14-login-unblock.js",
+      "bytes": 8606,
+      "sha256": "37be987cc452776039d0928396841f27599eeab43e9fa918a051645e545c2f81",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix15-prod.js",
+      "bytes": 4020,
+      "sha256": "8df5a9b8d78187274cc9245edc7980fa0f7533d81e1274bafc7127bf61011a45",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix16-prod.js",
+      "bytes": 9947,
+      "sha256": "60651b4ef92cbcf26cda62099bd5a70bc7809fbd4d3f7da26b99715058650933",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix17-prod.js",
+      "bytes": 6363,
+      "sha256": "0bc131dbabc72ebef1cb4969766020be304aa2285b49d3de2f90f1fce3065259",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-fix18-prod.js",
+      "bytes": 11251,
+      "sha256": "f9279b9f173de38de08863e6d5e83d5ec2c6ee934c52d2341bc81d63f41c717c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v19-mapa-recursos-global.js",
+      "bytes": 69066,
+      "sha256": "ece8f62d2702da0e584528fccd1cca2afe22e082d50ffe25f07ad6413811f9a6",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v22-voz3-zuzu.js",
+      "bytes": 43515,
+      "sha256": "31cdc47fa6e4802ad3ca3d25e4b35d496101b4007419d09905d6c0f852b78853",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v23-2-hitos-control.js",
+      "bytes": 33723,
+      "sha256": "8736dfb944ddfa8ea821a13a9f8d31c77ae749892bd75ef26c3378f6b8d2dfef",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v23-3-zuzu-bienvenida-infoevento-hitos.js",
+      "bytes": 7506,
+      "sha256": "47d6eafb3c3229d89b676710950ba0230cef4a642b81c4296c65cc61735f3e39",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v23-canonical-attendance.js",
+      "bytes": 6351,
+      "sha256": "cbbd610054a8a21028d8d53d88b9a3d81b23e0852370a02ed088f3ee7934d76b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v24-cuadre-banco.js",
+      "bytes": 45535,
+      "sha256": "6fdd5be2cc29b8bf1d575fb3e6bd024358fe6575895a20fd2e64dd43b9524b40",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v3-0-photo-viewers.js",
+      "bytes": 19519,
+      "sha256": "d44cd65efb13f2e289e6b09aef7467a9859746465fc19f2389a7770aae1bfa65",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v3-5-data-recovery-guard.js",
+      "bytes": 11427,
+      "sha256": "0cd8e59d76f21b4c345f57eaee01f5ec67c10158a6754a9626bc379dee4c13da",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v4-0-1-pc-photo-fix.js",
+      "bytes": 24830,
+      "sha256": "16a6c510d75d062fcd73a98e02cf32cd6afc8e9a1eac406adb104a0d47aa1430",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v4-0-prod-photo-sync.js",
+      "bytes": 24293,
+      "sha256": "b33ccc43801dd7f8ec339122c25b4ac801fabf853873560f796d3726fd600ebb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v40-fixes.js",
+      "bytes": 41223,
+      "sha256": "f308e78b287134bceb29835eca2bb4a51abb388c15a5a49f82d7e680855a24be",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v41-1-fixes.js",
+      "bytes": 11800,
+      "sha256": "d108e48326e3520f814e4716b810132ed25a2636770e07e9181e9439470e69db",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v41-2-fixes.js",
+      "bytes": 18483,
+      "sha256": "343093ad0455143ba29f183f6ac16844cee86c68f3aac815c9278002fd18ef18",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v41-3-fixes.js",
+      "bytes": 33339,
+      "sha256": "5a7be9c5aa62bb4f8bfba04f1061e21133dce77e2238cd5e2db26646ca11b038",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v43-4-fixes.js",
+      "bytes": 31702,
+      "sha256": "2197d89362dd5d3e5ce5d3dff41cc64611a500ee22299a0cb01f82acc28ee800",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v43-7-fixes.js",
+      "bytes": 21732,
+      "sha256": "16a3ffed791fcc3b98ecf99932a42122653c728c90e3de3adabcd35bec70d8d7",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v43-8-1-fixes.js",
+      "bytes": 7973,
+      "sha256": "4d1fd41379a48772cdd27c0ee3714cbaebd0fdccd6adf267e06d712275148a9e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v43-8-2-fixes.js",
+      "bytes": 5762,
+      "sha256": "b6ddbdbcc2d867ea6318c57a75bec527e40e4053be2ef84c1fa367126e6a69cb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v44-0-fixes.js",
+      "bytes": 10042,
+      "sha256": "a5a2dd97b507faeb3d926c488bac823032ed148880cc88c6a8f32a9732a05f13",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v44-3-perf-fixes.js",
+      "bytes": 10242,
+      "sha256": "db79655ecadeb13bf41c765966af088b1191aeece6bbbfbc1bb65686cc12cbd2",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v44-7-event-switcher.js",
+      "bytes": 41308,
+      "sha256": "9fbcdc610d9caa016bedf55a560d3c2286db66b340e4363e880c6a9fa8fa3342",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v45-0-maintenance-fixes.js",
+      "bytes": 17648,
+      "sha256": "1ee4ba42ef328d1ec1602738dcb7aa363a89e37680ae3a9f4ce65858e57a41db",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v45-1-budget-labels.js",
+      "bytes": 3656,
+      "sha256": "6aedad522a037309f16da17e40de6574b2bc9a6962bec2267eb146b24e05117f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v45-2-role-refresh.js",
+      "bytes": 19435,
+      "sha256": "0648650002e4aa0c6d59894e90d7a28580f9b77634e0d21c31dbef45f08b3b2a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v46-4-final-fixes.js",
+      "bytes": 64597,
+      "sha256": "65b2b67559110199e053bba78ae043b9ff43691d59e98acf836944e7e4c3dfc0",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v46-4-ingresos-justificantes-negrita.js",
+      "bytes": 12188,
+      "sha256": "e4ed03e0d75628a296f2f6831372fcaec33d81a762a7741f4e9f890dbccfc2cc",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v46-7-final-fixes.js",
+      "bytes": 24533,
+      "sha256": "a333f1d911201a43732c2c34c19d85994f5c95fdb83e924334722cf9f458b411",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v46-9-final-fixes.js",
+      "bytes": 32592,
+      "sha256": "ae45b806c839c0260b3ba9356267d85f54b8ca242b2d17afa9bb9907e49e29e8",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v5-0-0-prod-final-fix.js",
+      "bytes": 127,
+      "sha256": "77f1cbc9c2455a9f348acceda9280015f6aafa79829ab5db02098219107be052",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v5-1-0-ios-finalizado-ingresos-photo-fix.js",
+      "bytes": 12447,
+      "sha256": "0c14c469effc879098f330d2eeca53dae7f5346253c4162fc1488609720e8c58",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v5-1-0-prod-final-fix.js",
+      "bytes": 9961,
+      "sha256": "4440ff56b874ddff689f08117160f6b92bf0a02c98c33ce7d1c3f1a77919583f",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-1-final-fixes.js",
+      "bytes": 21605,
+      "sha256": "bd1bb469d73f981bf10071af940fb611df830fe031c59be4595e5f73e81666ea",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-10-final-fixes.js",
+      "bytes": 9981,
+      "sha256": "ccfb3bd550c0c3b8f2e674301b46762770532ca424d8729d21d9f93630119782",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-11-final-fixes.js",
+      "bytes": 15182,
+      "sha256": "77d5617cbe127bc092a1dbf1a2d7b94c15546932ce7e065bd0097c8ff0b56cd1",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-19-final-fixes.js",
+      "bytes": 27768,
+      "sha256": "72ad855e17c3859347657005a67c515c35ed3fc9ece70c58f78f184f252ae984",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-2-final-fixes.js",
+      "bytes": 37873,
+      "sha256": "c498c66e8db98108748f37a1c5743c65f7ac1dda0b85f9775f10b545d14efe3b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-20-final-fixes.js",
+      "bytes": 16095,
+      "sha256": "ee1c4cbd88f3c2242664c7c4d1c3564ce470977b7a97a4f816aa650f6529b214",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-22-final-fixes.js",
+      "bytes": 13212,
+      "sha256": "ca261c37c20b04f8a22dd7c8abad381919ce8374b04eba15854626a604f0c7d3",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-24-final-fixes.js",
+      "bytes": 9218,
+      "sha256": "e9979c8b1b24ba9fdd4ef760dbdd9122fe3ed21e40b33b222513d387cbaf8c06",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-25-final-fixes.js",
+      "bytes": 5880,
+      "sha256": "9525a332b0f4c7eb4f19cfdde560c40ec6a5dc8574db9a0b762a77476a6f535b",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-26-final-fixes.js",
+      "bytes": 13088,
+      "sha256": "a33ef614ed3fbd229948678ffae9d0abd23a990377c9a52733b18eb6d2c18452",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-27-hard-logout.js",
+      "bytes": 10705,
+      "sha256": "bbf84794f4c85087eb759572a4fd5b7a3e4bcea29c84d731c34bcd99295947eb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-4-final-fixes.js",
+      "bytes": 29813,
+      "sha256": "28b359a7d40e8c5437aea5f967ae9ddc1027dbbb3329f36f4383e56b894b85f4",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v50-9-final-fixes.js",
+      "bytes": 30222,
+      "sha256": "719d6620574d97a90c2f84fd274af88b30fb70c0f9535edc798985efb9fd1964",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v7-3-graficas-photo-restore-thumbs.js",
+      "bytes": 9065,
+      "sha256": "4616fe8b475fd7baa8a513f87e31ccb6446fb634d821933c753538e5e25f1b67",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v7-3-ios-finalizado-ingresos-photo-fix.js",
+      "bytes": 20659,
+      "sha256": "57d2a0ab5fa10fae02422fe78ef0327eb434286c6990f096964353ce27020870",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v7-3-login-clean-no-preselect.js",
+      "bytes": 8639,
+      "sha256": "fcaa0409ecea2f08373eca6f339f338717771c9f339afe01ea769fd8a02e0855",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v7-3-prod-final-fix.js",
+      "bytes": 9548,
+      "sha256": "1ba5f0d414328b7e4bc4c28b97f41ed3542a7b0be9f179ad062a460ca0e9aa80",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-4-1-backup-eventid-format.js",
+      "bytes": 20582,
+      "sha256": "df8771908d2a344ed0cf9604bb63cce7c765bb735b822fd668c01750baaa2206",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-4-1-compras-tk50-used-colors.js",
+      "bytes": 6183,
+      "sha256": "454859ef711523a638321dcfbd808bce139f8edd192459439e9b590605b955af",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-4-ticket-image-scope-backup-fix.js",
+      "bytes": 8448,
+      "sha256": "54487dac17f4d05e71dee6d908a9d5f3d8e941562a29b4f8ffa74bd685a08e1c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-4-ticket-images-visible-after-event.js",
+      "bytes": 547,
+      "sha256": "7f2ab2d46d8b98e4498f04d1b6084377827cbdc7657f1d0df00d1c39a403cb5c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-compras-rpc-head-fix38.js",
+      "bytes": 24582,
+      "sha256": "9470ce0aa771724a37d2a9c4644898e1b396c4008d6b04ed4685af7ba7e1d16a",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-compras-rpc-head-fix39.js",
+      "bytes": 26690,
+      "sha256": "62aab0df324158d50113ed95aa28b35892681e7c1104ff007b638c5ff8d85001",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-compras-rpc-head-fix40.js",
+      "bytes": 32580,
+      "sha256": "c6857a9e6e01db3855bc311afac124e2e0959086d1dde566a0a2a8b9b7507cdf",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-crud-root-fix28.js",
+      "bytes": 31910,
+      "sha256": "6b33d0688ba656afb17af4086064fbae3f1ed7fb306167efa1dc625b8dbbeb49",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-documentos-excel.js",
+      "bytes": 15652,
+      "sha256": "2155ba099e886f35113f692800407099a364630120006895a2a4c5b64f735945",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-event-documents.js",
+      "bytes": 69725,
+      "sha256": "9238b6eb17c71ca36f20472628618a09f953f639e085551f9852b076993857d1",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-mapa-readonly-controls.js",
+      "bytes": 8560,
+      "sha256": "7107ab51a70ad31fd86b567ca9bff75102c3a62bade4aadd592c389c00f2492e",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v8-5-ticket-images-write-guard.js",
+      "bytes": 4184,
+      "sha256": "5f90670f402e23b3e348dd16d849302c5cd0a5c5a37f7f16a7442eb547408e42",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-0-ticket-ia-compras.js",
+      "bytes": 22616,
+      "sha256": "d15137a75935d6a2f811df0a3f0b9b30dc502e72b1514f11ad5dedef38034230",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-4-ticketauto-compras.js",
+      "bytes": 53278,
+      "sha256": "232c576a56af68e47feb3cce469faa72f1de6fba4a3ed8dc294b0ae5bd684681",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-1-login-event-clean.js",
+      "bytes": 4620,
+      "sha256": "4e5afbf9ae529260a71201f5a0cb82f8be0390980dbdb45fc7c080de4ab83883",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-1-ticketauto-compras.js",
+      "bytes": 59552,
+      "sha256": "bd0127f0d1df422e0ad59476e1ce3f73a898c71ed9a3604aec641031d2a57864",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-2-session-guard.js",
+      "bytes": 5192,
+      "sha256": "ca61c25b051c1e41d4e811b171ef1b56bf04ad9dac9071463d3ca3295b4d0004",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-2-ticketauto-compras.js",
+      "bytes": 61075,
+      "sha256": "bf6fa6308463b8691a71fef5eece6700f3cfaf651c8515e339ca079cbdaf2148",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-login-event-clean.js",
+      "bytes": 4615,
+      "sha256": "57d12d6420e5105f485c7cfdc06434d8b305e188c588459947b5d13d32fa5f05",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-5-ticketauto-compras.js",
+      "bytes": 56758,
+      "sha256": "fa53249ab07a7b5d62e4e7e7cd63e9c6de06e821d2a6d2df402f56c7b8ff2ae1",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-6-app-fixes.js",
+      "bytes": 10409,
+      "sha256": "58cd277d64656bddda781bc7c8f393c24d84fcc931ab9791569311320cb8f93d",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-6-session-guard.js",
+      "bytes": 5179,
+      "sha256": "1140873b417dcebc8148577b08a07f479be940cfa5a31f3b175edffdc1091bdb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/v9-6-ticketauto-compras.js",
+      "bytes": 65078,
+      "sha256": "98f9a2e9b2ae894ba8fe195636889468f7f20143ed86caa17bc07222ff7b5496",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/features/view-refresh-stabilizer.js",
+      "bytes": 1554,
+      "sha256": "986a56bcc0953e7c79d1a2e3284d797567073bc55197b1d3121ce20f2d5e1fdb",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/legacy/legacy-bundle-after-modules-v30.7.js",
+      "bytes": 204993,
+      "sha256": "e2a7f16c57f0dbe63130c79f19c5d3834ce1caba4a707f5babb2b5b73016a227",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/legacy/legacy-bundle-before-modules-v30.7.js",
+      "bytes": 987265,
+      "sha256": "72a0b31db49d7d400c0b688167bc0c124010d364a8cdbd4df657b7afa68579a2",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/performance/low-resource-boot.js",
+      "bytes": 17418,
+      "sha256": "760cc4e28e1c92f51f9472e8bbbf8db68a694ed0ab0f4e345c2133219008e5ea",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/performance/low-resource-legacy-patch.js",
+      "bytes": 16719,
+      "sha256": "2dc1e85d99c576a666a37f18d0a992c039cb142a7f7a7a90bcb7675804a6c20c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/performance/perf-diagnostics-v44-2.js",
+      "bytes": 27441,
+      "sha256": "d8d5fd74bddc554f7187e8556178eaecbfdc033b624c9b4d972db8ca436afcb3",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/styles/app.css",
+      "bytes": 118881,
+      "sha256": "5692aa1ea1dbb534f9b2b9eba4e59d37bdaa7b970eb1cedd42ee6fe7715e8473",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/styles/cuadre-banco.css",
+      "bytes": 47219,
+      "sha256": "3ab595059d2d49db34eb3be829ab0af68430606ebc2099f48daf020affcd234c",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/styles/hitos-control.css",
+      "bytes": 8509,
+      "sha256": "b68436e6d47ec58e7c7b10a28a1c3408abed7a76864dc6a1e696da73683f8086",
+      "status": "modified"
+    },
+    {
+      "path": "public/app/version.js",
+      "bytes": 636,
+      "sha256": "8714e208d5eef498fb562178a36f601f911a48e3c7e73f228bafa2bda82458e2",
+      "status": "modified"
+    },
+    {
+      "path": "public/index.html",
+      "bytes": 43808,
+      "sha256": "b6b8502eebd0b6cf8665c53da283b2800f040eaef3057c760306b4dd4442a6cf",
+      "status": "modified"
+    },
+    {
+      "path": "public/modules/excel/backup.js",
+      "bytes": 35163,
+      "sha256": "7bb4699919218189291d979fd556f3de7972debb835655af49e55f2121008afb",
+      "status": "modified"
+    },
+    {
+      "path": "public/sw.js",
+      "bytes": 469,
+      "sha256": "471f7c08b29c6009eee86de3df67320e2bacb7c86dea2741f21b94262926c6c4",
+      "status": "modified"
+    },
+    {
+      "path": "routes/export.routes.js",
+      "bytes": 36863,
+      "sha256": "34291caddddd73783fca1efbbfbd0d7297e3046d56d8ba3cedd2a3738d680dab",
+      "status": "modified"
+    },
+    {
+      "path": "runtime-diagnostics.js",
+      "bytes": 8163,
+      "sha256": "864418abece43305e22538cf7cae4b659284938c4fc8d855b7161315c935be42",
+      "status": "modified"
+    },
+    {
+      "path": "screen-lazy.js",
+      "bytes": 3737,
+      "sha256": "79dfa6830dac561252e25a03490b9950d1f289012325b5318b7e9672cc4fe54b",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/test-bank-reconciliation-v24-5-large-csv.js",
+      "bytes": 2421,
+      "sha256": "83eb0b7e78ce86ee4c30ea0e59dcc3b762975398d87dbc74a373d4509dd25d73",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/test-bank-reconciliation-v24-5-ui.js",
+      "bytes": 1659,
+      "sha256": "eba15bd773c48f5f2d46a0b8dada7ba2dbd16140a3a38ee3dc0d1694bf281584",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/test-v25-compact-version.js",
+      "bytes": 3136,
+      "sha256": "bcfc33df6a7f6533fe0d43666e0b4cc7eaac282af2accc11488dfcf069583473",
+      "status": "new"
+    },
+    {
+      "path": "scripts/test-zuzu-v23-1.js",
+      "bytes": 10912,
+      "sha256": "5dcd3f4a2f7cf952fbd8011c7ea57628d0c016e48a0dd02f47d441bff703b2ca",
+      "status": "modified"
+    },
+    {
+      "path": "server/paths.js",
+      "bytes": 885,
+      "sha256": "f5deede1822614cfdc7b339d5bfb82956b9570168a382072a8f51dcbe08ba7fa",
+      "status": "modified"
+    },
+    {
+      "path": "services/event-ai.service.js",
+      "bytes": 514854,
+      "sha256": "9feb6756c823f35731899d7e9d1db482cbdfbb8b3d66c0e6cfc12b32e78bf09a",
+      "status": "modified"
+    },
+    {
+      "path": "services/event-context.service.js",
+      "bytes": 126931,
+      "sha256": "614935d34467735781fdc2c91c197f5aec7846265cd7d7e2b082cd4f0aa9af2f",
+      "status": "modified"
+    },
+    {
+      "path": "services/receipt-ai.service.js",
+      "bytes": 21746,
+      "sha256": "776ac2fc64ed8e359d28f72af5fc0b9027a71e5f186990c7bf2753ebb5e0223d",
+      "status": "modified"
+    },
+    {
+      "path": "services/zuzu-attendance.service.js",
+      "bytes": 8529,
+      "sha256": "53888b73700690d09bb6735232f7b102af1b484c0c82ca0f5018243e421e249c",
+      "status": "modified"
+    },
+    {
+      "path": "services/zuzu-people-context.service.js",
+      "bytes": 15672,
+      "sha256": "37233dfe496968b38e2f7da3f16303c3fcac62fcf373677ad9cc6d2de636e430",
+      "status": "modified"
+    },
+    {
+      "path": "services/zuzu-report-policy.service.js",
+      "bytes": 5249,
+      "sha256": "a25e292a1dc233fd2b951be2f90140d29483e36484fbefd39b28cabacd43761d",
+      "status": "modified"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 469,
+      "sha256": "471f7c08b29c6009eee86de3df67320e2bacb7c86dea2741f21b94262926c6c4",
+      "status": "modified"
+    },
+    {
+      "path": "version.js",
+      "bytes": 4499,
+      "sha256": "22129d08e09db70430cf77805f8979b1598b62d8f7645e433df80cffdb8cb35a",
+      "status": "modified"
+    },
+    {
+      "path": "view-refresh-stabilizer.js",
+      "bytes": 22680,
+      "sha256": "530fb789e101df22033efc85b94e2e2a564d86b90e76cfffab667a1a064019df",
+      "status": "modified"
+    }
+  ],
+  "manifestSelfHashExcluded": true
+}

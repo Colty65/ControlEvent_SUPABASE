@@ -1,8 +1,8 @@
-/* ControlEvent v24_prod-02 - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
+/* ControlEvent v25_prod - correcciones de navegación, casitas, menú, backup y Mapa de recursos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod-02';
-  const VERSION_FILE = 'ControlEvent_v24_prod-02';
+  const VERSION = 'ControlEvent v25_prod';
+  const VERSION_FILE = 'ControlEvent_v25_prod';
   const $ = id => document.getElementById(id);
   const now = () => Date.now();
   let lastHomeAt = 0;

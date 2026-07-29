@@ -1,4 +1,4 @@
-// ControlEvent v24_prod-02 · FIX14
+// ControlEvent v25_prod · FIX14
 // Desbloqueo de login: evita que los parches de selector/boot intercepten la entrada antes de autenticar.
 (function(){
   'use strict';

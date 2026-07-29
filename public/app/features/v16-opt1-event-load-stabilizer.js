@@ -1,4 +1,4 @@
-/* ControlEvent v24_prod-02 OPT1 - estabilizador de carga/cambio de evento.
+/* ControlEvent v25_prod OPT1 - estabilizador de carga/cambio de evento.
    Objetivo: una sola selección efectiva, sin guardados globales, sin renders duplicados
    y con protección del desplegable principal. No modifica cálculos ni ventanas. */
 (function(){

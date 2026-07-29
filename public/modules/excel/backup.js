@@ -7,8 +7,8 @@ export const meta = {
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v24_prod-02';
-const BACKUP_VERSION_FILE = 'ControlEvent_v24_prod-02';
+const BACKUP_VERSION = 'ControlEvent v25_prod';
+const BACKUP_VERSION_FILE = 'ControlEvent_v25_prod';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -633,7 +633,7 @@ export async function run(options = {}){
     ]));
     addRows('BANCO_TK_LINKS', ['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'], bankLinks);
   }catch(bankError){
-    console.warn('[ControlEvent v24_prod-02] No se pudo añadir Cuadre Banco al BACKUP cliente.', bankError);
+    console.warn('[ControlEvent v25_prod] No se pudo añadir Cuadre Banco al BACKUP cliente.', bankError);
     addRows('BANCO_MVTOS', ['AVISO'], [[bankError?.message || String(bankError)]]);
   }
   await protectWorkbook(wb);

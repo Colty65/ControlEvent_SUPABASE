@@ -1,4 +1,4 @@
-// ControlEvent v24_prod-02 · FIX16
+// ControlEvent v25_prod · FIX16
 // Objetivo: quitar torpeza introducida por FIX13-15, estabilizar INGRESOS visual y nombres TK.
 (function(){
   'use strict';

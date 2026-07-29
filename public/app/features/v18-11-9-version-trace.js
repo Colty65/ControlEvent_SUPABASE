@@ -1,14 +1,14 @@
-/* ControlEvent v24_prod-02 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v25_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v24_prod-02';
-  var VERSION_TEXT = 'ControlEvent v24_prod-02';
-  var VERSION_FILE = 'ControlEvent_v24_prod-02';
-  var BUILD_ID = '20260728-V24-PROD-02-BANK-UX';
-  var ZIP_NAME = 'CE_V24_PROD_02_CUADRE_BANCO_UX.zip';
-  var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
+  var VERSION_LABEL = 'v25_prod';
+  var VERSION_TEXT = 'ControlEvent v25_prod';
+  var VERSION_FILE = 'ControlEvent_v25_prod';
+  var BUILD_ID = '20260729-V25-PROD-COMPACT-BANK';
+  var ZIP_NAME = 'CE_V25_PROD_CUADRE_BANCO_COMPACTO.zip';
+  var OLD_RE = /(ControlEvent\s+)?v\d+(?:[._-][0-9A-Za-z]+)*_prod(?:[._-][0-9A-Za-z]+)*/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;
   function setAttr(el, name, value){ try{ if(el && el.getAttribute(name)!==String(value)) el.setAttribute(name, String(value)); }catch(_){} }

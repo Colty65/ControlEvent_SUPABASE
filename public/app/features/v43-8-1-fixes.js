@@ -1,9 +1,9 @@
-/* ControlEvent v24_prod-02 - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v25_prod - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v24_prod-02';
-  const VERSION_FILE = 'ControlEvent_v24_prod-02';
+  const VERSION = 'ControlEvent v25_prod';
+  const VERSION_FILE = 'ControlEvent_v25_prod';
   const $ = id => document.getElementById(id);
 
   function st(){

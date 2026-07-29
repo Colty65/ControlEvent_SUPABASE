@@ -1,11 +1,11 @@
-/* ControlEvent v24_prod-02 - selector de evento unificado y render activo único.
+/* ControlEvent v25_prod - selector de evento unificado y render activo único.
    Objetivo: que elegir evento tras login y cambiar evento durante el uso sigan el mismo flujo:
    cambiar selectedEventId rápido, limpiar DOM pesado de otras ventanas y renderizar solo la ventana activa. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v24_prod-02';
-  const VERSION_FILE = 'ControlEvent_v24_prod-02';
+  const VERSION = 'ControlEvent v25_prod';
+  const VERSION_FILE = 'ControlEvent_v25_prod';
   const SELECT_KEY = 'controlevent_v229_selected_event_id';
   const CHOSEN_KEY = 'controlevent_v44_event_chosen_after_login';
   const FRESH_LOGIN_KEY = 'controlevent_v447_fresh_login';

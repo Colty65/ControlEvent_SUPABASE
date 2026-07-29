@@ -1,10 +1,10 @@
-/* ControlEvent v24_prod-05 · Cuadre Banco fluido con grandes periodos (GD/RW). */
+/* ControlEvent v25_prod · Cuadre Banco compacto, fluido y por evento (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v24_prod-05';
+  const VERSION = 'v25_prod';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -138,7 +138,7 @@
           </div>
           <div id="ceBankTraffic" class="ce-bank-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 TKxx</b><small>Sin datos</small></div></div>
           <div class="ce-bank-header-balance"><span>Saldo final del evento</span><strong id="ceBankHeaderBalance">—</strong><small id="ceBankHeaderCount">Sincronizando movimientos</small></div>
-          <span class="ce-bank-version">v24_prod-05</span>
+          <span class="ce-bank-version">v25_prod</span>
           <button type="button" id="ceBankClose" class="ce-bank-close" aria-label="Cerrar Cuadre Banco"><span>×</span></button>
         </header>
         <div id="ceBankReadOnly" class="ce-bank-readonly hidden"><b>EVENTO FINALIZADO</b><span>Consulta completa disponible; altas, bajas y cambios están bloqueados.</span></div>
