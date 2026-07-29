@@ -2971,7 +2971,7 @@ window.__ceDisableLegacyBarGraficas = true;
       const actorRaw=decodeURIComponent(bankActorHeaderV24());
       userRole=up(JSON.parse(actorRaw||'{}')?.nivel||'');
     }catch(_){ userRole=''; }
-    if(userRole!=='GD') return null;
+    if(!['GD','RW'].includes(userRole)) return null;
     let data={movements:[],summary:{}};
     try{ data=await loadBankExportV24({eventId:ev?.id}); }
     catch(error){
@@ -2984,13 +2984,15 @@ window.__ceDisableLegacyBarGraficas = true;
     x.text(ws,2,1,'Evento','soft',true); ws.mergeCells(2,2,2,7); x.text(ws,2,2,ev?.titulo||ev?.id||'','soft',true);
     x.headers(ws,4,['Fecha movimiento','Descripción bancaria','Importe movimiento','En saldo','Saldo banco','TKxx e importe','Estado del movimiento']);
     let r=5;
-    const movements=Array.isArray(data?.movements)?data.movements:[];
-    if(!movements.length){ x.text(ws,r,1,'Sin movimientos vinculados','soft',true); ws.mergeCells(r,2,r,7); x.text(ws,r,2,'No hay TKxx de este evento asociados todavía a movimientos de Cuadre Banco.','soft'); }
+    const movements=(Array.isArray(data?.movements)?data.movements:[]).filter(movement=>movement?.included!==false);
+    if(!movements.length){ x.text(ws,r,1,'Sin movimientos incluidos en saldo','soft',true); ws.mergeCells(r,2,r,7); x.text(ws,r,2,'No hay movimientos marcados «En saldo» para este evento.','soft'); }
     for(const movement of movements){
       const links=Array.isArray(movement?.links)?movement.links:[];
-      const ticketText=links.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||0)}`).join(' | ');
-      const status=movement.justificationStatus==='CUADRADO'?'Cuadrado':movement.justificationStatus==='PENDIENTE'?`Pendiente ${money(Math.max(0,num(movement.difference)))}`:movement.justificationStatus==='EXCESO'?`Exceso ${money(Math.abs(num(movement.difference)))}`:'Sin justificar';
-      const fill=movement.justificationStatus==='CUADRADO'?'ok':(movement.justificationStatus==='EXCESO'?'bad':'warn');
+      const ticketText=links.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||link.ticketAmountSnapshot||0)}`).join(' | ');
+      const positive=num(movement.amount)>=0;
+      const justified=['CUADRADO','CUADRADO_FORZADO'].includes(String(movement.justificationStatus||''));
+      const status=positive?'Movimiento positivo conciliado':justified?'Justificado':movement.justificationStatus==='PENDIENTE'?`Pendiente ${money(Math.max(0,num(movement.difference)))}`:movement.justificationStatus==='EXCESO'?`Exceso ${money(Math.abs(num(movement.difference)))}`:'Sin justificar';
+      const fill=(positive||justified)?'ok':(movement.justificationStatus==='EXCESO'?'bad':'warn');
       x.text(ws,r,1,bankDateV24(movement.executedAt),fill);
       x.text(ws,r,2,movement.description||'',fill);
       x.euro(ws,r,3,movement.amount,fill,true);

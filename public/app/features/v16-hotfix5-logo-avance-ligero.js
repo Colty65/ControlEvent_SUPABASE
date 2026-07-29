@@ -213,6 +213,33 @@
   }
 
   const hitosSummaryCache = new Map();
+  const bankSummaryCache = new Map();
+  function actorHeader(){
+    const user=window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{};
+    return encodeURIComponent(JSON.stringify({nivel:txt(user?.nivel||user?.Nivel).toUpperCase(),identificacion:txt(user?.identificacion||user?.Identificacion),nombre:txt(user?.nombre||user?.Nombre)}));
+  }
+  function bankRoleAllowed(){
+    try{const user=window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{};return ['GD','RW'].includes(up(user?.nivel||user?.Nivel));}catch(_){return false;}
+  }
+  function bankRow(id){
+    if(!bankRoleAllowed()) return {t:'CONCILIACIÓN BANCARIA',color:'slate',p:0,d:'Disponible para usuarios GD y RW'};
+    const summary=bankSummaryCache.get(txt(id));
+    if(!summary) return {t:'CONCILIACIÓN BANCARIA',color:'blue',p:0,d:'Cargando conciliación de TKxx…'};
+    if(summary.error) return {t:'CONCILIACIÓN BANCARIA',color:'blue',p:0,d:'No se pudo cargar la conciliación bancaria'};
+    return {t:'CONCILIACIÓN BANCARIA',color:summary.percentage>=100?'green':(summary.percentage>=50?'orange':'red'),p:summary.percentage,d:`TKxx conciliados: ${summary.linked} de ${summary.total} · Pendientes: ${summary.pending}${summary.forced?` · Cuadres forzados: ${summary.forced}`:''}`};
+  }
+  async function loadBankSummary(id){
+    const key=txt(id); if(!key||!bankRoleAllowed()) return null;
+    try{
+      const response=await fetch(`/api/bank-reconciliation?eventId=${encodeURIComponent(key)}&_=${Date.now()}`,{cache:'no-store',headers:{'X-ControlEvent-Actor':actorHeader(),'X-ControlEvent-Feature':'avance-conciliacion-v25'}});
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload=await response.json();
+      const ts=payload?.ticketSummary||{};
+      const forced=(Array.isArray(payload?.movements)?payload.movements:[]).filter(m=>m?.forcedSquare===true).length;
+      const summary={total:num(ts.total),linked:num(ts.linked),pending:num(ts.pending),percentage:num(ts.percentage),forced,error:''};
+      bankSummaryCache.set(key,summary); return summary;
+    }catch(error){const summary={total:0,linked:0,pending:0,percentage:0,forced:0,error:txt(error?.message||error)};bankSummaryCache.set(key,summary);return summary;}
+  }
   function summarizeHitosPayload(payload){
     const hitos=Array.isArray(payload?.hitos)?payload.hitos:[];
     const lgs=Array.isArray(payload?.lgs)?payload.lgs:[];
@@ -262,8 +289,8 @@
       return `<div class="ce-v16hf5-row" style="--ce-av-color:${p[0]};--ce-av-bg:${p[1]}"><div><b>${esc(r.t)}</b><small>${esc(r.d)}</small></div><strong>${pct.toLocaleString('es-ES',{maximumFractionDigits:2})}%</strong><span class="ce-v16hf5-bar"><i style="width:${pct}%"></i></span>${r.html||''}</div>`;
     }).join('');
   }
-  function refreshHitosInVisibleAvance(layer,id){
-    loadHitosSummary(id).then(()=>{
+  function refreshOperationalRowsInVisibleAvance(layer,id){
+    Promise.all([loadHitosSummary(id),loadBankSummary(id)]).then(()=>{
       if(!layer?.classList?.contains('visible') || txt(evId())!==txt(id)) return;
       const rowsNode=layer.querySelector('.ce-v16hf5-rows');
       if(rowsNode) rowsNode.innerHTML=rowsMarkup(avanceRows());
@@ -298,6 +325,7 @@
     return [
       {t:'ASISTENCIA',color:'slate',p:socios.total?socios.totalAs/socios.total*100:0,d:`Asistentes: ${socios.totalAs+socios.totalNoSocios} personas · ${socios.totalAs} socios + ${socios.totalNoSocios} no socios · ${col.length} registros de ingreso · Socios no asistentes: ${socios.totalNo}`,html:infoSociosHtml(socios)},
       controlHitosRow(id),
+      bankRow(id),
       {t:'INGRESOS',color:'blue',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${eur(ingresado)} de ${eur(previsto)} ingresados`},
       {t:'JUSTIFICANTES DE INGRESOS',color:'green',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos con justificante`},
       {t:'DONACIONES',color:'orange',p:don.length?100:0,d:`Donaciones registradas: ${don.length} · Valor estimado: ${eur(totalDon)}`},
@@ -381,7 +409,7 @@
       <div class="ce-v16hf5-rows">${rowsMarkup(rows)}</div>
     </div>`;
     layer.classList.add('visible');
-    refreshHitosInVisibleAvance(layer,evId());
+    refreshOperationalRowsInVisibleAvance(layer,evId());
     layer.querySelector('.ce-v16hf5-close')?.addEventListener('click',ev=>{ev.preventDefault(); ev.stopPropagation(); closeAvance();},{once:true});
     const bubble=layer.querySelector('.ce-v16hf5-bubble');
     bubble?.addEventListener('click',ev=>ev.stopPropagation());

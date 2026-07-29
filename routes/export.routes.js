@@ -82,7 +82,7 @@ async function mergeTicketImagesFromDb(state, scope){
   try{
     let query = getSupabaseAdmin()
       .from('ce_ticket_images')
-      .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
+      .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes,created_at,updated_at')
       .order('image_key');
     query = scopeIsAll ? query.in('event_id', wantedIds) : query.eq('event_id', scopeText);
     const { data, error } = await query;
@@ -138,7 +138,7 @@ async function rawTicketImageRowsForBackup(scope){
     const data = await fetchAllSupabaseRows(() => {
       let query = getSupabaseAdmin()
         .from('ce_ticket_images')
-        .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes')
+        .select('image_key,event_id,label,public_url,pathname,storage_path,content_type,size_bytes,created_at,updated_at')
         .order('event_id')
         .order('image_key');
       if(!scopeIsAll) query = query.eq('event_id', scopeText);
@@ -152,7 +152,9 @@ async function rawTicketImageRowsForBackup(scope){
       pathname: norm(row?.pathname),
       storage_path: norm(row?.storage_path),
       content_type: norm(row?.content_type),
-      size_bytes: row?.size_bytes == null ? '' : row.size_bytes
+      size_bytes: row?.size_bytes == null ? '' : row.size_bytes,
+      created_at: norm(row?.created_at),
+      updated_at: norm(row?.updated_at)
     })).filter(row => row.image_key || row.event_id || row.label || row.storage_path || row.public_url || row.pathname);
   }catch(err){
     console.warn('[backup v8.5 FIX41] No se pudo leer ce_ticket_images completo:', err?.message || err);
@@ -192,6 +194,50 @@ async function rawCompraRowsForBackup(scope){
     return [];
   }
 }
+
+async function rawHitosRowsForBackup(scope){
+  const scopeText=norm(scope||'TODOS'); const all=!scopeText||scopeText==='TODOS';
+  const [hitos,lgs]=await Promise.all([
+    fetchAllSupabaseRows(()=>{let q=getSupabaseAdmin().from('ce_hitos').select('*').order('event_id').order('orden').order('id'); if(!all) q=q.eq('event_id',scopeText); return q;}),
+    fetchAllSupabaseRows(()=>{let q=getSupabaseAdmin().from('ce_lg').select('*').order('event_id').order('hito_id').order('orden').order('id'); if(!all) q=q.eq('event_id',scopeText); return q;})
+  ]);
+  return {hitos:hitos||[],lgs:lgs||[]};
+}
+async function rawGlobalRowsForBackup(scope){
+  const all=!norm(scope)||norm(scope)==='TODOS';
+  if(!all) return {users:[],meta:[]};
+  const [users,meta]=await Promise.all([
+    fetchAllSupabaseRows(()=>getSupabaseAdmin().from('ce_users').select('*').order('identificacion')),
+    fetchAllSupabaseRows(()=>getSupabaseAdmin().from('ce_meta').select('*').order('key'))
+  ]);
+  return {users:users||[],meta:meta||[]};
+}
+function jsonCell(value){ if(value==null) return ''; if(typeof value==='string') return value; try{return JSON.stringify(value);}catch(_){return String(value);} }
+function actorFromBackupRequest(req){
+  const raw=String(req.get('X-ControlEvent-Actor')||''); if(!raw) return {};
+  try{return JSON.parse(decodeURIComponent(raw));}catch(_){try{return JSON.parse(raw);}catch(__){return {};}}
+}
+function requireBackupRestoreGd(req){
+  const actor=actorFromBackupRequest(req); const role=norm(actor?.nivel||actor?.Nivel).toUpperCase();
+  if(role!=='GD'){const err=new Error('Solo un usuario GD puede restaurar un BACKUP completo.');err.status=403;throw err;} return actor;
+}
+async function upsertChunks(table, rows, onConflict, size=300){
+  const clean=Array.isArray(rows)?rows.filter(row=>row&&typeof row==='object'):[];
+  for(let i=0;i<clean.length;i+=size){const {error}=await getSupabaseAdmin().from(table).upsert(clean.slice(i,i+size),{onConflict});if(error) throw error;} return clean.length;
+}
+async function deleteRowsByPk(table, pk, apply=null){
+  const rows=await fetchAllSupabaseRows(()=>{let q=getSupabaseAdmin().from(table).select(pk).order(pk);if(typeof apply==='function')q=apply(q);return q;});
+  const ids=[...new Set(rows.map(row=>row?.[pk]).filter(Boolean))];
+  for(let i=0;i<ids.length;i+=300){let q=getSupabaseAdmin().from(table).delete().in(pk,ids.slice(i,i+300));if(typeof apply==='function')q=apply(q);const {error}=await q;if(error)throw error;} return ids.length;
+}
+async function deleteRowsNotInPk(table,pk,keepValues){
+  const keep=new Set((Array.isArray(keepValues)?keepValues:[]).map(value=>norm(value)).filter(Boolean));
+  const rows=await fetchAllSupabaseRows(()=>getSupabaseAdmin().from(table).select(pk).order(pk));
+  const remove=[...new Set(rows.map(row=>norm(row?.[pk])).filter(value=>value&&!keep.has(value)))];
+  for(let i=0;i<remove.length;i+=300){const {error}=await getSupabaseAdmin().from(table).delete().in(pk,remove.slice(i,i+300));if(error)throw error;}
+  return remove.length;
+}
+
 function dbCompraToStateRow(row){
   return {
     id: row?.id || '',
@@ -606,7 +652,7 @@ async function buildBackupWorkbook(fullState, scope){
     const imageText = typeof image === 'object' ? (image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || image.dataUrl || image.base64 || '') : String(image || '');
     return [eventCode[doc?.eventId] || doc?.eventId || '', code, doc?.id || key, doc?.fecha || '', doc?.descripcion || '', code, imageText || doc?.imageUrl || ''];
   }));
-  addRows('CE_TICKET_IMAGES_BBDD', ['EVENT_ID','IMAGE_KEY','LABEL','PUBLIC_URL','PATHNAME','STORAGE_PATH','CONTENT_TYPE','SIZE_BYTES'], rawTicketImageRows.map(img => [
+  addRows('CE_TICKET_IMAGES_BBDD', ['EVENT_ID','IMAGE_KEY','LABEL','PUBLIC_URL','PATHNAME','STORAGE_PATH','CONTENT_TYPE','SIZE_BYTES','CREATED_AT','UPDATED_AT'], rawTicketImageRows.map(img => [
     img.event_id || ticketEventIdFromKey(img.image_key) || '',
     img.image_key || '',
     img.label || ticketInnerKeyFromKey(img.image_key) || '',
@@ -614,7 +660,9 @@ async function buildBackupWorkbook(fullState, scope){
     img.pathname || '',
     img.storage_path || '',
     img.content_type || '',
-    img.size_bytes || ''
+    img.size_bytes || '',
+    img.created_at || '',
+    img.updated_at || ''
   ]));
   const ticketRows = [], partRows = [];
   const rawSource = rawTicketImageRows.length ? rawTicketImageRows : Object.entries(scoped.ticketImages || {}).map(([fullKey, image]) => ({
@@ -638,29 +686,55 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
   try{
-    const bank = await exportBankData({accountId:'TODOS'});
-    const selectedEventId = scope === 'TODOS' ? '' : String(scope || '');
-    const bankMovements = (Array.isArray(bank?.movements) ? bank.movements : []).map(movement => {
-      const links = (Array.isArray(movement?.links) ? movement.links : []).filter(link => !selectedEventId || String(link?.eventId || '') === selectedEventId);
-      return {...movement, links};
-    }).filter(movement => !selectedEventId || movement.links.length > 0);
-    const bankLinks = [];
-    bankMovements.forEach(movement => movement.links.forEach(link => bankLinks.push([
-      link.id || '', movement.id || '', link.eventId || '', eventCode[link.eventId] || link.eventId || '',
-      link.ticketCode || '', num(link.ticketAmountSnapshot ?? link.ticketAmount), link.createdBy || '', link.createdAt || ''
-    ])));
-    addRows('BANCO_IMPORTACIONES', ['LOTE_ID','FICHERO_ORIGEN','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_DESDE','FECHA_HASTA','LEIDOS','INSERTADOS','DUPLICADOS','AVISOS','IMPORTADO_POR','FECHA_IMPORTACION'], (Array.isArray(bank?.batches) ? bank.batches : []).map(batch => [
-      batch.id || '', batch.sourceFilename || '', batch.accountId || '', batch.accountLabel || '', batch.dateFrom || '', batch.dateTo || '',
-      num(batch.parsedCount), num(batch.insertedCount), num(batch.duplicateCount), num(batch.warningCount), batch.importedBy || '', batch.importedAt || ''
+    const globals=await rawGlobalRowsForBackup(scope);
+    addRows('ACCESOS', ['IDENTIFICACION','NOMBRE','CLAVE','NIVEL','CREATED_AT','UPDATED_AT'], globals.users.map(row=>[
+      row.identificacion||'',row.nombre||'',row.clave||'',row.nivel||'RO',row.created_at||'',row.updated_at||''
     ]));
-    addRows('BANCO_MVTOS', ['MOVIMIENTO_ID','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_EJECUCION','FECHA_VALOR','DESCRIPCION','IMPORTE','SALDO_BANCO','INCLUIDO_EN_SALDO','SOURCE_HASH','FICHERO_ORIGEN','CREADO_POR'], bankMovements.map(m => [
-      m.id || '', m.accountId || '', m.accountLabel || '', m.executedAt || '', m.valueDate || '', m.description || '',
-      num(m.amount), num(m.bankBalance), m.included === false ? 'NO' : 'SI', m.sourceHash || '', m.sourceFilename || '', m.createdBy || ''
+    addRows('META_BBDD', ['KEY','VALUE_JSON','UPDATED_AT'], globals.meta.map(row=>[
+      row.key||'',jsonCell(row.value),row.updated_at||''
     ]));
-    addRows('BANCO_TK_LINKS', ['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'], bankLinks);
+  }catch(globalError){
+    console.warn('[ControlEvent v25_prod] No se pudieron añadir ACCESOS/META al BACKUP.',globalError?.message||globalError);
+    addRows('ACCESOS',['AVISO'],[[globalError?.message||String(globalError)]]);
+    addRows('META_BBDD',['AVISO'],[[globalError?.message||String(globalError)]]);
+  }
+  try{
+    const operational=await rawHitosRowsForBackup(scope);
+    addRows('HITOS', ['ID','EVENT_ID','NOMBRE_HITO','DESCRIPCION','FECHA_MINIMA','FECHA_MAXIMA','RESPONSABLE_ID','RESPONSABLE_NOMBRE','ORDEN','CREATED_AT','UPDATED_AT'], operational.hitos.map(row=>[
+      row.id||'',row.event_id||'',row.nombre_hito||'',row.descripcion||'',row.fecha_minima||'',row.fecha_maxima||'',row.responsable_id||'',row.responsable_nombre||'',row.orden??'',row.created_at||'',row.updated_at||''
+    ]));
+    addRows('LG', ['ID','EVENT_ID','HITO_ID','DESCRIPCION','FECHA_MINIMA','FECHA_MAXIMA','NOTAS','DEPENDENCIA_TIPO','DEPENDENCIAS_PREVIAS','DEPENDENCIAS_POSTERIORES','RESPONSABLE_ID','RESPONSABLE_NOMBRE','CUMPLIDA','CUMPLIDA_AT','ORDEN','CREATED_AT','UPDATED_AT'], operational.lgs.map(row=>[
+      row.id||'',row.event_id||'',row.hito_id||'',row.descripcion||'',row.fecha_minima||'',row.fecha_maxima||'',row.notas||'',row.dependencia_tipo||'',jsonCell(row.dependencias_previas),jsonCell(row.dependencias_posteriores),row.responsable_id||'',row.responsable_nombre||'',row.cumplida===true?'SI':'NO',row.cumplida_at||'',row.orden??'',row.created_at||'',row.updated_at||''
+    ]));
+  }catch(operationalError){
+    console.warn('[ControlEvent v25_prod] No se pudieron añadir HITOS/LG al BACKUP.',operationalError?.message||operationalError);
+    addRows('HITOS',['AVISO'],[[operationalError?.message||String(operationalError)]]);
+    addRows('LG',['AVISO'],[[operationalError?.message||String(operationalError)]]);
+  }
+  try{
+    const bank=await exportBankData({accountId:'TODOS',eventId:scope==='TODOS'?'':scope});
+    const bankMovements=Array.isArray(bank?.movements)?bank.movements:[];
+    const bankLinks=Array.isArray(bank?.links)?bank.links:[];
+    const bankSettings=Array.isArray(bank?.eventSettings)?bank.eventSettings:[];
+    const bankStates=Array.isArray(bank?.movementStates)?bank.movementStates:[];
+    addRows('BANCO_IMPORTACIONES', ['ID','SOURCE_FILENAME','ACCOUNT_ID','ACCOUNT_LABEL','DATE_FROM','DATE_TO','PARSED_COUNT','INSERTED_COUNT','DUPLICATE_COUNT','WARNING_COUNT','IMPORTED_BY','IMPORTED_AT'], (Array.isArray(bank?.batches)?bank.batches:[]).map(row=>[
+      row.id||'',row.sourceFilename||'',row.accountId||'',row.accountLabel||'',row.dateFrom||'',row.dateTo||'',num(row.parsedCount),num(row.insertedCount),num(row.duplicateCount),num(row.warningCount),row.importedBy||'',row.importedAt||''
+    ]));
+    addRows('BANCO_MVTOS', ['ID','ACCOUNT_ID','ACCOUNT_LABEL','EXECUTED_AT','VALUE_DATE','DESCRIPTION','AMOUNT','BANK_BALANCE','INCLUDED','SOURCE_FILENAME','SOURCE_HASH','IMPORT_BATCH_ID','CREATED_BY','CREATED_AT','UPDATED_AT'], bankMovements.map(row=>[
+      row.id||'',row.accountId||'',row.accountLabel||'',row.executedAt||'',row.valueDate||'',row.description||'',num(row.amount),num(row.bankBalance),row.included===false?'NO':'SI',row.sourceFilename||'',row.sourceHash||'',row.importBatchId||'',row.createdBy||'',row.createdAt||'',row.updatedAt||''
+    ]));
+    addRows('BANCO_TK_LINKS', ['ID','MOVEMENT_ID','EVENT_ID','TICKET_CODE','TICKET_AMOUNT_SNAPSHOT','FORCED_SQUARE','CREATED_BY','CREATED_AT'], bankLinks.map(row=>[
+      row.id||'',row.movementId||'',row.eventId||'',row.ticketCode||'',num(row.ticketAmountSnapshot),row.forcedSquare===true?'SI':'NO',row.createdBy||'',row.createdAt||''
+    ]));
+    addRows('BANCO_PERIODOS', ['EVENT_ID','DATE_FROM','DATE_TO','UPDATED_BY','UPDATED_AT'], bankSettings.map(row=>[
+      row.eventId||'',row.dateFrom||'',row.dateTo||'',row.updatedBy||'',row.updatedAt||''
+    ]));
+    addRows('BANCO_ESTADO_MVTO', ['EVENT_ID','MOVEMENT_ID','INCLUDED','UPDATED_BY','CREATED_AT','UPDATED_AT'], bankStates.map(row=>[
+      row.eventId||'',row.movementId||'',row.included===false?'NO':'SI',row.updatedBy||'',row.createdAt||'',row.updatedAt||''
+    ]));
   }catch(bankError){
-    console.warn('[ControlEvent v25_prod] No se pudo añadir Cuadre Banco al BACKUP de servidor.', bankError?.message || bankError);
-    addRows('BANCO_MVTOS', ['AVISO'], [[bankError?.message || String(bankError)]]);
+    console.warn('[ControlEvent v25_prod] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
+    ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
@@ -680,6 +754,51 @@ router.get('/export/backup', asyncHandler(async (req, res) => {
   res.setHeader('X-ControlEvent-Backup-Version', BACKUP_VERSION_FILE);
   res.setHeader('X-ControlEvent-Backup-Counts', encodeURIComponent(JSON.stringify(counts)));
   res.send(Buffer.from(buffer));
+}));
+
+
+router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
+  const actor=requireBackupRestoreGd(req);
+  const body=req.body&&typeof req.body==='object'?req.body:{};
+  const scope=norm(body.scope||'TODOS'); const all=scope==='TODOS';
+  const tables=body.tables&&typeof body.tables==='object'?body.tables:{};
+  const accessUsers=Array.isArray(tables.accessUsers)?tables.accessUsers.filter(row=>row&&norm(row.identificacion)):[];
+  const metaRows=Array.isArray(tables.metaRows)?tables.metaRows.filter(row=>row&&norm(row.key)):[];
+  if(all && (!accessUsers.length || !accessUsers.some(row=>norm(row.nivel).toUpperCase()==='GD'))){
+    const err=new Error('El BACKUP total no contiene una tabla ACCESOS válida con al menos un usuario GD. Restauración cancelada.');err.status=400;throw err;
+  }
+  if(all){
+    await deleteRowsByPk('ce_bank_ticket_links','id');
+    await deleteRowsByPk('ce_bank_event_movement_state','movement_id');
+    await deleteRowsByPk('ce_bank_event_settings','event_id');
+    await deleteRowsByPk('ce_bank_movements','id');
+    await deleteRowsByPk('ce_bank_import_batches','id');
+    await deleteRowsByPk('ce_lg','id');
+    await deleteRowsByPk('ce_hitos','id');
+  }else{
+    await deleteRowsByPk('ce_bank_ticket_links','id',q=>q.eq('event_id',scope));
+    await deleteRowsByPk('ce_bank_event_movement_state','movement_id',q=>q.eq('event_id',scope));
+    await deleteRowsByPk('ce_bank_event_settings','event_id',q=>q.eq('event_id',scope));
+    await deleteRowsByPk('ce_lg','id',q=>q.eq('event_id',scope));
+    await deleteRowsByPk('ce_hitos','id',q=>q.eq('event_id',scope));
+  }
+  const counts={};
+  if(all){
+    counts.accessUsers=await upsertChunks('ce_users',accessUsers,'identificacion');
+    await deleteRowsNotInPk('ce_users','identificacion',accessUsers.map(row=>row.identificacion));
+    counts.metaRows=await upsertChunks('ce_meta',metaRows,'key');
+    await deleteRowsNotInPk('ce_meta','key',metaRows.map(row=>row.key));
+    counts.ticketImageRows=await upsertChunks('ce_ticket_images',tables.ticketImageRows,'image_key');
+    await deleteRowsNotInPk('ce_ticket_images','image_key',(Array.isArray(tables.ticketImageRows)?tables.ticketImageRows:[]).map(row=>row.image_key));
+  }
+  counts.bankImportBatches=await upsertChunks('ce_bank_import_batches',tables.bankImportBatches,'id');
+  counts.bankMovements=await upsertChunks('ce_bank_movements',tables.bankMovements,'id');
+  counts.bankEventSettings=await upsertChunks('ce_bank_event_settings',tables.bankEventSettings,'event_id');
+  counts.bankMovementStates=await upsertChunks('ce_bank_event_movement_state',tables.bankMovementStates,'event_id,movement_id');
+  counts.bankTicketLinks=await upsertChunks('ce_bank_ticket_links',tables.bankTicketLinks,'id');
+  counts.hitos=await upsertChunks('ce_hitos',tables.hitos,'id');
+  counts.lgs=await upsertChunks('ce_lg',tables.lgs,'id');
+  res.json({ok:true,scope,restoredBy:norm(actor?.identificacion||actor?.nombre),counts});
 }));
 
 export default router;

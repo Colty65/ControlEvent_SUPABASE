@@ -1,6 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const GRAFICAS_SHEET_VERSION = 'v30.7';
+const PRODUCT_VERSION = 'v25_prod';
 const AUDIT_STORAGE_KEY = 'controlevent:v28.0:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
@@ -357,7 +358,7 @@ function makeGraficasChartImage(model){
   });
   ctx.textAlign = 'right';
   ctx.fillStyle = '#6b7280';
-  ctx.fillText(`©oltyLAB ’26_ControlEvent_${GRAFICAS_SHEET_VERSION}`, width - 28, legendY - 2);
+  ctx.fillText(`©oltyLAB ’26_ControlEvent_${PRODUCT_VERSION}`, width - 28, legendY - 2);
   ctx.textAlign = 'left';
   return canvas.toDataURL('image/png');
 }
@@ -440,7 +441,7 @@ export function writeGraficasWorksheet(workbook, options = {}){
   styleTitle(ws.getCell(r,1));
   ws.getRow(r).height = 24;
   r += 1;
-  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${GRAFICAS_SHEET_VERSION}`, '', '', '', model.generatedAt], styleCell);
+  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${PRODUCT_VERSION}`, '', '', '', model.generatedAt], styleCell);
   putRow(ws, r++, ['Situación', model.event.situacion, '', '', '', ''], styleCell);
   r += 1;
   r = writeChartBlock(ws, r, 'RESUMEN ECONÓMICO', model.charts.resumen.map(item => ['RESUMEN', item.label, '', '', '', item.value]), ['BLOQUE','CONCEPTO','COMPRADO','DONADO','PENDIENTE','TOTAL']);

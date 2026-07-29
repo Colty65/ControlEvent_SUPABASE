@@ -778,10 +778,10 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
 /* ControlEvent v25_prod - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
-const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','HITOS','LG','METEO'];
+const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','HITOS','LG','BANCO','METEO'];
 function zuzuUpperModule(value) {
   const raw = trim(value).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const map = { RECAUDACION: 'INGRESOS', RECAUDACIÓN: 'INGRESOS', ASISTENTES: 'INGRESOS', ASISTENCIA: 'INGRESOS', ENTRADAS: 'INGRESOS', DONACION: 'DONACIONES', DONACIONES_PRODUCTO: 'DONACIONES', PRODUCTO_DONADO: 'DONACIONES', GASTOS: 'COMPRAS', PRODUCTO_DISPONIBLE: 'COMPRAS', TICKET: 'TICKETS', DOCUMENTO: 'DOCUMENTOS', CATALOGOS: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS', METEOROLOGIA: 'METEO', METEREOLOGIA: 'METEO', CLIMA: 'METEO', TIEMPO: 'METEO', HITO: 'HITOS', CONTROL_HITOS: 'HITOS', TAREA: 'LG', TAREAS: 'LG', LGS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG' };
+  const map = { RECAUDACION: 'INGRESOS', RECAUDACIÓN: 'INGRESOS', ASISTENTES: 'INGRESOS', ASISTENCIA: 'INGRESOS', ENTRADAS: 'INGRESOS', DONACION: 'DONACIONES', DONACIONES_PRODUCTO: 'DONACIONES', PRODUCTO_DONADO: 'DONACIONES', GASTOS: 'COMPRAS', PRODUCTO_DISPONIBLE: 'COMPRAS', TICKET: 'TICKETS', DOCUMENTO: 'DOCUMENTOS', CATALOGOS: 'PRODUCTOS', CATALOGO_PRODUCTOS: 'PRODUCTOS', METEOROLOGIA: 'METEO', METEREOLOGIA: 'METEO', CLIMA: 'METEO', TIEMPO: 'METEO', HITO: 'HITOS', CONTROL_HITOS: 'HITOS', TAREA: 'LG', TAREAS: 'LG', LGS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG', BANCO: 'BANCO', CONCILIACION_BANCARIA: 'BANCO', CUADRE_BANCARIO: 'BANCO', MOVIMIENTOS_BANCARIOS: 'BANCO' };
   return map[raw] || raw;
 }
 function zuzuUnique(list) { const out=[]; arr(list).forEach(x=>{ const v=trim(x); if(v && !out.includes(v)) out.push(v); }); return out; }
@@ -1091,14 +1091,14 @@ function zuzuInferModulesLocal(prompt) {
   const missingAttendeesAnalytic = zuzuAsksMissingAttendees(prompt);
   const personIdentityAnalytic = zuzuPersonIdentityCue(prompt);
 
-  if (activeEventCue) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG'].forEach(m => mods.add(m));
+  if (activeEventCue) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG','BANCO'].forEach(m => mods.add(m));
   if (cashAnalytic) { mods.add('EVENTOS'); mods.add('INGRESOS'); mods.add('COMPRAS'); }
   if (personRoleAnalytic || participationAnalytic || personIdentityAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','PERSONAS'].forEach(m=>mods.add(m));
-  if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG'].forEach(m=>mods.add(m));
+  if (eventComparisonAnalytic || eventDossierAnalytic) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG','BANCO'].forEach(m=>mods.add(m));
   // FIX11: preguntar "qué tal fue el evento X", "háblame del evento X" o "dime cosas de este evento" no es una consulta de COMPRAS.
   // Es una valoración del evento completo: siempre debe entrar INGRESOS + DONACIONES además de COMPRAS.
   if ((/\b(evento|celebracion|celebración|jornada)\b/.test(p) || quotedFragmentsCount > 0) && /\b(que\s+tal\s+fue|qué\s+tal\s+fue|como\s+fue|cómo\s+fue|cuentame|cuéntame|hablame|háblame|dime\s+cositas?|dime\s+cosas?|valoracion|valoración|balance|resumen|informe)\b/.test(p)) {
-    ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG'].forEach(m=>mods.add(m));
+    ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG','BANCO'].forEach(m=>mods.add(m));
   }
   if (missingAttendeesAnalytic) ['EVENTOS','INGRESOS','PERSONAS'].forEach(m=>mods.add(m));
   if (/\b(ingreso|ingresos|recaudacion|recaudado|asistente|asistentes|entrada|entradas|banco|bizum|efectivo)\b/.test(p)) mods.add('INGRESOS');
@@ -1110,6 +1110,7 @@ function zuzuInferModulesLocal(prompt) {
   if (/\b(ticket|tickets|tk\s*\d+|factura|facturas)\b/.test(p)) { mods.add('TICKETS'); mods.add('COMPRAS'); }
   if (/\b(documento|documentos|doc\s*\d+|descripcion|archivo|adjunto|adjuntos)\b/.test(p)) { mods.add('DOCUMENTOS'); mods.add('EVENTOS'); }
   if (/\b(hito|hitos|control\s+de\s+hitos|control\s+de\s+tareas)\b/.test(p)) { mods.add('HITOS'); mods.add('LG'); mods.add('EVENTOS'); }
+  if (/\b(conciliaci[oó]n|cuadre\s+bancario|movimientos?\s+bancarios?|saldo\s+bancario|abonos?\s+bancarios?)\b/.test(p)) { mods.add('BANCO'); mods.add('EVENTOS'); mods.add('COMPRAS'); }
   if (/\b(lg|lgs|lineas?\s+de\s+gestion|lineas?\s+gestion|tarea|tareas|dependencias?\s+previas?|dependencias?\s+posteriores?)\b/.test(p)) { mods.add('LG'); mods.add('HITOS'); mods.add('EVENTOS'); }
   if (/\b(evento|eventos|fecha|fechas|situacion|finalizado|curso|precio\s+entrada|precio\s+del\s+evento|evento\s+mas\s+barato|evento\s+mas\s+costoso|evento\s+m[aá]s\s+barato|evento\s+m[aá]s\s+costoso)\b/.test(p)) mods.add('EVENTOS');
   if (asksCatalogProduct || (/\b(producto|productos|articulo|articulos)\b/.test(p) && !/\b(en\s+el\s+evento|del\s+evento|comprado|comprados|donado|donados|compras?|donaciones?)\b/.test(p))) mods.add('PRODUCTOS');
@@ -1122,7 +1123,7 @@ function zuzuInferModulesLocal(prompt) {
   }
   const productAnalytic = /\b(producto|productos|articulo|articulos|consumo|consumidos|consumidas|comprado|comprados|donado|donados)\b/.test(p) && /\b(ranking|top|grafica|gráfica|estadistica|estadística|comparativa|compara|comparar|temporal|evolucion|evolución|unidades|coste|importe)\b/.test(p);
   if (/\b(informe|exhaustivo|exhaustiva|valoracion|valoración|dashboard|grafica|gráfica|graficamente|gráficamente|estadistica|estadística|comparativa|comparativas|compara|comparar)\b/.test(p) && !productAnalytic && !cashAnalytic && !personRoleAnalytic) {
-    if (/\b(todo|todos|todas|global|general|informe|exhaustivo|exhaustiva|evento|eventos|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|gasto|gastos|tk|ticket|tickets|documento|documentos|donacion|donaciones|jornada|jornadas)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG'].forEach(m=>mods.add(m));
+    if (/\b(todo|todos|todas|global|general|informe|exhaustivo|exhaustiva|evento|eventos|colaborador|colaboradores|justificante|justificantes|ingreso|ingresos|compra|compras|gasto|gastos|tk|ticket|tickets|documento|documentos|donacion|donaciones|jornada|jornadas)\b/.test(p)) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES','TICKETS','DOCUMENTOS','HITOS','LG','BANCO'].forEach(m=>mods.add(m));
     else if (!mods.size) ['EVENTOS','INGRESOS','COMPRAS','DONACIONES'].forEach(m=>mods.add(m));
   }
   if (!mods.size) ['EVENTOS'].forEach(m=>mods.add(m));
@@ -1247,7 +1248,8 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       TIENDAS: 'catálogo maestro de tiendas',
       PERSONAS: 'catálogo maestro de personas y rango',
       HITOS: 'hitos del evento, descripción, fechas calculadas, responsable general y avance',
-      LG: 'líneas de gestión/tareas, fechas, responsable, cumplimiento y dependencias previas/posteriores'
+      LG: 'líneas de gestión/tareas, fechas, responsable, cumplimiento y dependencias previas/posteriores',
+      BANCO: 'conciliación bancaria por evento: período, movimientos En saldo, abonos, cargos, TKxx asociados, cuadre exacto o forzado y evolución del saldo'
     },
     eventoActivo: selected,
     eventos: events,
@@ -1578,6 +1580,50 @@ function zuzuModuleLg(state, eventIds) {
     });
 }
 
+function zuzuModuleBanco(state, eventIds) {
+  const ids=new Set(arr(eventIds).map(trim).filter(Boolean));
+  const movements=arr(state?.bankMovements);
+  const links=arr(state?.bankTicketLinks).filter(link=>ids.has(trim(link?.eventId||link?.event_id)));
+  const settings=arr(state?.bankEventSettings).filter(row=>ids.has(trim(row?.eventId||row?.event_id)));
+  const states=arr(state?.bankMovementStates).filter(row=>ids.has(trim(row?.eventId||row?.event_id)));
+  const eventById=new Map(arr(state?.eventos).map(ev=>[trim(ev?.id),ev]));
+  const linksByEventMovement=new Map();
+  links.forEach(link=>{
+    const key=`${trim(link?.eventId||link?.event_id)}|${trim(link?.movementId||link?.movement_id)}`;
+    if(!linksByEventMovement.has(key)) linksByEventMovement.set(key,[]);
+    linksByEventMovement.get(key).push(link);
+  });
+  const stateMap=new Map(states.map(row=>[`${trim(row?.eventId||row?.event_id)}|${trim(row?.movementId||row?.movement_id)}`,row?.included!==false]));
+  const out=[];
+  for(const eventId of ids){
+    const setting=settings.find(row=>trim(row?.eventId||row?.event_id)===eventId)||null;
+    const from=trim(setting?.dateFrom||setting?.date_from); const to=trim(setting?.dateTo||setting?.date_to);
+    const relevant=movements.filter(m=>{
+      const mid=trim(m?.id); const day=trim(m?.executedAt||m?.executed_at).slice(0,10);
+      return (!!from&&!!to&&day>=from&&day<=to)||linksByEventMovement.has(`${eventId}|${mid}`)||stateMap.has(`${eventId}|${mid}`);
+    }).sort((a,b)=>trim(a?.executedAt||a?.executed_at).localeCompare(trim(b?.executedAt||b?.executed_at)));
+    for(const m of relevant){
+      const mid=trim(m?.id); const eventLinks=linksByEventMovement.get(`${eventId}|${mid}`)||[];
+      const included=stateMap.has(`${eventId}|${mid}`)?stateMap.get(`${eventId}|${mid}`):m?.included!==false;
+      const amount=num(m?.amount); const target=amount<0?Math.abs(amount):0;
+      const justified=eventLinks.reduce((sum,link)=>sum+num(link?.ticketAmountSnapshot??link?.ticket_amount_snapshot??link?.ticketAmount),0);
+      const forced=eventLinks.some(link=>link?.forcedSquare===true||link?.forced_square===true);
+      const diff=Math.round((target-justified)*100)/100;
+      const status=amount>=0?(included?'Movimiento positivo conciliado':'Abono fuera de saldo'):
+        (!eventLinks.length?'Sin justificar':(forced?'Justificado (cuadre forzado)':(Math.abs(diff)<=0.01?'Justificado':'Pendiente de cuadre')));
+      out.push({
+        Evento:trim(eventById.get(eventId)?.titulo||eventId), 'Evento ID':eventId,
+        'Fecha movimiento':trim(m?.executedAt||m?.executed_at), Descripción:trim(m?.description), Importe:amount,
+        'Saldo banco':num(m?.bankBalance??m?.bank_balance), 'En saldo':included?'Sí':'No',
+        TKxx:eventLinks.map(link=>trim(link?.ticketCode||link?.ticket_code)).filter(Boolean).join(', '),
+        'Importe TKxx':Math.round(justified*100)/100, 'Cuadre forzado':forced?'Sí':'No', Estado:status,
+        'Fecha inicio bancaria':from, 'Fecha final bancaria':to
+      });
+    }
+  }
+  return out;
+}
+
 function zuzuModuleRawExpected(state, moduleName, eventIds) {
   if (moduleName === 'INGRESOS') return arr(state?.colaboradores).filter(r => eventIds.includes(rowEventId(r))).length;
   if (moduleName === 'COMPRAS') return arr(state?.compras).filter(r => eventIds.includes(rowEventId(r)) && !isDonationTicket(ticketText(r))).length;
@@ -1594,6 +1640,7 @@ function zuzuModuleRawExpected(state, moduleName, eventIds) {
   if (moduleName === 'PERSONAS') return arr(state?.personas).filter(p => trim(p?.nombre)).length;
   if (moduleName === 'HITOS') return arr(state?.hitos).filter(h => eventIds.includes(trim(h?.eventId || h?.event_id))).length;
   if (moduleName === 'LG') return arr(state?.lgs).filter(lg => eventIds.includes(trim(lg?.eventId || lg?.event_id))).length;
+  if (moduleName === 'BANCO') return arr(state?.bankTicketLinks).filter(link => eventIds.includes(trim(link?.eventId || link?.event_id))).length + arr(state?.bankMovementStates).filter(row => eventIds.includes(trim(row?.eventId || row?.event_id))).length;
   return 0;
 }
 function zuzuFilterSummary(filters) {
@@ -1736,7 +1783,8 @@ function zuzuSqlTableToModule(name) {
     DOCUMENTO: 'DOCUMENTOS', DOCUMENTOS: 'DOCUMENTOS', CE_DOCUMENTOS: 'DOCUMENTOS',
     TICKET: 'TICKETS', TICKETS: 'TICKETS', CE_TICKETS: 'TICKETS',
     HITO: 'HITOS', HITOS: 'HITOS', CE_HITOS: 'HITOS',
-    LG: 'LG', LGS: 'LG', CE_LG: 'LG', TAREA: 'LG', TAREAS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG'
+    LG: 'LG', LGS: 'LG', CE_LG: 'LG', TAREA: 'LG', TAREAS: 'LG', LINEA_GESTION: 'LG', LINEAS_GESTION: 'LG',
+    CE_BANK_MOVEMENTS: 'BANCO', CE_BANK_TICKET_LINKS: 'BANCO', CE_BANK_EVENT_SETTINGS: 'BANCO', CE_BANK_EVENT_MOVEMENT_STATE: 'BANCO', CE_BANK_IMPORT_BATCHES: 'BANCO'
   };
   return map[t] || '';
 }
@@ -1853,11 +1901,11 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   const modules = strictPlan
     ? zuzuUnique(rawPlanModules)
     : zuzuUnique([].concat(rawPlanModules, arr(localPlan.modules), policyModules).map(zuzuUpperModule)).filter(m => ZUZU_ALLOWED_MODULES.includes(m));
-  if (!modules.length) return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: indica si quieres ingresos, compras, donaciones, hitos/LG, productos, personas, meteo o eventos.' };
+  if (!modules.length) return { needsClarification: true, clarification: 'Debes ser más concreto en tu petición. Piensa un poco más lo que quieres: indica si quieres ingresos, compras, donaciones, conciliación bancaria, hitos/LG, productos, personas, meteo o eventos.' };
   const extractModules = modules.filter(m => m !== 'METEO');
   const helpers = makeHelpers(safeState);
   const ticketImages = safeState.ticketImages || safeState.ticketImageRefs || {};
-  const eventScopedModules = ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','HITOS','LG'];
+  const eventScopedModules = ['INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','HITOS','LG','BANCO'];
   const hasEventScopedModules = extractModules.some(m => eventScopedModules.includes(m));
   const masterCatalogOnly = !hasEventScopedModules && !extractModules.includes('EVENTOS');
   let eventIds = [];
@@ -1911,6 +1959,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
   if (extractModules.includes('PERSONAS')) modulos.PERSONAS = zuzuModulePersonas(safeState, filters, helpers);
   if (extractModules.includes('HITOS')) modulos.HITOS = zuzuModuleHitos(safeState, eventIds);
   if (extractModules.includes('LG')) modulos.LG = zuzuModuleLg(safeState, eventIds);
+  if (extractModules.includes('BANCO')) modulos.BANCO = zuzuModuleBanco(safeState, eventIds);
 
   // Segunda red de seguridad: en informes completos no se admite concluir "todo a cero"
   // si el estado bruto contiene filas de los eventos objetivo. Recuperamos solo el módulo
@@ -1979,6 +2028,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v25_prod experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
       { id: 'V23_1-ASISTENCIA-UNICA', regla: 'Toda cifra o listado de asistentes y no asistentes sale exclusivamente de asistenciaCanonica.porEvento. Numero>0 confirma; Numero=0 solo cuenta con estado explícito de asistencia/exención/invitación. Registros de ingreso son filas administrativas, no personas.' },
       { id: 'V23_1-COBERTURA-INFORME', regla: 'politicaInforme define todos los módulos exigidos por la petición. Un informe general o con detalles incluye descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia; METEO si se pide. No cerrar la respuesta si falta uno.' },
+      { id: 'V25-CONCILIACION-BANCO', regla: 'BANCO es la fuente de conciliación por evento. En saldo es específico del evento; los abonos incluidos son movimientos positivos conciliados; forced_square cuenta como justificado; el saldo se calcula cronológicamente solo con movimientos incluidos.' },
       { id: 'V23_R2-HITOS-LG', regla: 'HITOS y LG son las fuentes del Control de Hitos. HITOS resume cada bloque; LG contiene cada tarea, responsable, estado y dependencias. Las dependencias posteriores son derivadas de las previas canónicas y no deben inventarse.' },
       { id: 'V23_1-NO-REDUNDANCIA', regla: 'En un solo evento, nombrar el título completo una vez. Cada persona o pareja se menciona una sola vez. No repetir en prosa listados que ya se muestran en una tabla.' }
     ],
@@ -1989,6 +2039,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       donaciones: 'DONACIONES usa la salida probada: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable. El donante se resuelve por P:/T:/id contra personas o tiendas y nunca debe mostrarse como código técnico.',
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       hitos: 'HITOS resume los Hitos del evento, sus fechas calculadas desde las LG, responsable general y avance.',
+      banco: 'BANCO contiene el período bancario, cargos y abonos, decisión En saldo, saldo real, TKxx asociados y estado exacto/forzado. Para conciliación usa esta fuente y no infieras desde INGRESOS.',
       lg: 'LG contiene las tareas/Líneas de Gestión con fechas, responsable, cumplimiento y dependencias previas/posteriores humanizadas. Usa esta fuente para responder sobre trabajo pendiente, responsables y secuencia.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',

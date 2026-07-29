@@ -76,8 +76,9 @@ function bankActorHeaderV24(){
     nombre:norm(user?.nombre || '')
   }));
 }
-async function bankBackupDataV24(){
-  const response = await fetch('/api/bank-reconciliation/export?accountId=TODOS', {
+async function bankBackupDataV24(eventId=''){
+  const params=new URLSearchParams({accountId:'TODOS'});if(eventId)params.set('eventId',eventId);
+  const response = await fetch('/api/bank-reconciliation/export?'+params.toString(), {
     cache:'no-store',
     headers:{'X-ControlEvent-Actor':bankActorHeaderV24(),'X-ControlEvent-Feature':'cuadre-banco-v24-backup'}
   });
@@ -85,6 +86,14 @@ async function bankBackupDataV24(){
   try{ data = await response.json(); }catch(_){ data = {}; }
   if(!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
   return data;
+}
+async function operationalBackupData(scope,eventos=[]){
+  const ids=scope==='TODOS'?(eventos||[]).map(e=>norm(e?.id)).filter(Boolean):[norm(scope)].filter(Boolean);
+  const hitos=[],lgs=[];
+  for(const eventId of ids){
+    try{const response=await fetch(`/api/hitos?eventId=${encodeURIComponent(eventId)}&_=${Date.now()}`,{cache:'no-store'});if(!response.ok)continue;const data=await response.json();hitos.push(...(Array.isArray(data?.hitos)?data.hitos:[]));lgs.push(...(Array.isArray(data?.lgs)?data.lgs:[]));}catch(_){ }
+  }
+  return {hitos,lgs};
 }
 async function ensureExcelJS(){
   return ensureRuntimeExcelJS();
@@ -590,6 +599,7 @@ export async function run(options = {}){
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
   addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
+  addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], scoped.compras.map(c=>[c.id||'',c.eventId||'',c.productoId||'',num(c.unidades),num(c.precio),ticket(c),c.tiendaId||'',c.responsableId||'',c.donorRef||'',c.createdAt||'',c.updatedAt||'']));
   addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
   addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));
   addRows('DOCUMENTOS', ['EVENTO_CODIGO','DOC_CODIGO','DOC_ID','FECHA','DESCRIPCION','CLAVE_IMAGEN','FOTO_URL'], (scoped.eventDocuments || []).map(doc => {
@@ -599,6 +609,7 @@ export async function run(options = {}){
     const imageText = typeof image === 'object' ? (image.url || image.public_url || image.publicUrl || image.pathname || image.path || image.storage_path || image.dataUrl || image.base64 || '') : String(image || '');
     return [eventCode[doc?.eventId] || doc?.eventId || '', code, doc?.id || key, doc?.fecha || '', doc?.descripcion || '', code, imageText || doc?.imageUrl || ''];
   }));
+  addRows('CE_TICKET_IMAGES_BBDD', ['EVENT_ID','IMAGE_KEY','LABEL','PUBLIC_URL','PATHNAME','STORAGE_PATH','CONTENT_TYPE','SIZE_BYTES'], Object.entries(scoped.ticketImages||{}).map(([fullKey,image])=>{const src=typeof image==='object'?image:{};const val=typeof image==='string'?image:'';return [ticketEventIdFromKey(fullKey),fullKey,ticketInnerKeyFromKey(fullKey),src.public_url||src.publicUrl||src.url||val,src.pathname||'',src.storage_path||src.path||'',src.content_type||src.contentType||'',src.size_bytes||src.size||''];}));
   const ticketRows = [], partRows = [];
   Object.entries(scoped.ticketImages || {}).forEach(([fullKey, image]) => {
     const ticketPartsInfo = ticketBackupParts(fullKey, image, eventCode);
@@ -612,30 +623,19 @@ export async function run(options = {}){
   addRows('TICKETS', ['EVENTO_CODIGO','CLAVE_RESUMEN','ARCHIVO_IMAGEN','IMAGEN_BASE64','OBSERVACIONES'], ticketRows);
   addRows('TICKETS_PARTES', ['EVENTO_CODIGO','CLAVE_RESUMEN','PARTE','TOTAL_PARTES','IMAGEN_BASE64_PARTE'], partRows);
   try{
-    const bank = await bankBackupDataV24();
-    const selectedEventId = scope === 'TODOS' ? '' : String(scope || '');
-    const bankMovements = (Array.isArray(bank?.movements) ? bank.movements : []).map(movement => {
-      const links = (Array.isArray(movement?.links) ? movement.links : []).filter(link => !selectedEventId || String(link?.eventId || '') === selectedEventId);
-      return {...movement, links};
-    }).filter(movement => !selectedEventId || movement.links.length > 0);
-    const bankLinks = [];
-    bankMovements.forEach(movement => movement.links.forEach(link => bankLinks.push([
-      link.id || '', movement.id || '', link.eventId || '', eventCode[link.eventId] || link.eventId || '',
-      link.ticketCode || '', num(link.ticketAmountSnapshot ?? link.ticketAmount), link.createdBy || '', link.createdAt || ''
-    ])));
-    addRows('BANCO_IMPORTACIONES', ['LOTE_ID','FICHERO_ORIGEN','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_DESDE','FECHA_HASTA','LEIDOS','INSERTADOS','DUPLICADOS','AVISOS','IMPORTADO_POR','FECHA_IMPORTACION'], (Array.isArray(bank?.batches) ? bank.batches : []).map(batch => [
-      batch.id || '', batch.sourceFilename || '', batch.accountId || '', batch.accountLabel || '', batch.dateFrom || '', batch.dateTo || '',
-      num(batch.parsedCount), num(batch.insertedCount), num(batch.duplicateCount), num(batch.warningCount), batch.importedBy || '', batch.importedAt || ''
-    ]));
-    addRows('BANCO_MVTOS', ['MOVIMIENTO_ID','CUENTA_ID','CUENTA_DESCRIPCION','FECHA_EJECUCION','FECHA_VALOR','DESCRIPCION','IMPORTE','SALDO_BANCO','INCLUIDO_EN_SALDO','SOURCE_HASH','FICHERO_ORIGEN','CREADO_POR'], bankMovements.map(m => [
-      m.id || '', m.accountId || '', m.accountLabel || '', m.executedAt || '', m.valueDate || '', m.description || '',
-      num(m.amount), num(m.bankBalance), m.included === false ? 'NO' : 'SI', m.sourceHash || '', m.sourceFilename || '', m.createdBy || ''
-    ]));
-    addRows('BANCO_TK_LINKS', ['LINK_ID','MOVIMIENTO_ID','EVENTO_ID','EVENTO_CODIGO','TKXX','IMPORTE_SNAPSHOT','CREADO_POR','FECHA_CREACION'], bankLinks);
-  }catch(bankError){
-    console.warn('[ControlEvent v25_prod] No se pudo añadir Cuadre Banco al BACKUP cliente.', bankError);
-    addRows('BANCO_MVTOS', ['AVISO'], [[bankError?.message || String(bankError)]]);
-  }
+    const operational=await operationalBackupData(scope,scoped.eventos);
+    addRows('HITOS',['ID','EVENT_ID','NOMBRE_HITO','DESCRIPCION','FECHA_MINIMA','FECHA_MAXIMA','RESPONSABLE_ID','RESPONSABLE_NOMBRE','ORDEN','CREATED_AT','UPDATED_AT'],operational.hitos.map(r=>[r.id||'',r.eventId||r.event_id||'',r.nombreHito||r.nombre_hito||'',r.descripcion||'',r.fechaMinima||r.fecha_minima||'',r.fechaMaxima||r.fecha_maxima||'',r.responsableId||r.responsable_id||'',r.responsableNombre||r.responsable_nombre||'',r.orden??'',r.createdAt||r.created_at||'',r.updatedAt||r.updated_at||'']));
+    addRows('LG',['ID','EVENT_ID','HITO_ID','DESCRIPCION','FECHA_MINIMA','FECHA_MAXIMA','NOTAS','DEPENDENCIA_TIPO','DEPENDENCIAS_PREVIAS','DEPENDENCIAS_POSTERIORES','RESPONSABLE_ID','RESPONSABLE_NOMBRE','CUMPLIDA','CUMPLIDA_AT','ORDEN','CREATED_AT','UPDATED_AT'],operational.lgs.map(r=>[r.id||'',r.eventId||r.event_id||'',r.hitoId||r.hito_id||'',r.descripcion||'',r.fechaMinima||r.fecha_minima||'',r.fechaMaxima||r.fecha_maxima||'',r.notas||'',r.dependenciaTipo||r.dependencia_tipo||'',JSON.stringify(r.dependenciasPrevias||r.dependencias_previas||[]),JSON.stringify(r.dependenciasPosteriores||r.dependencias_posteriores||[]),r.responsableId||r.responsable_id||'',r.responsableNombre||r.responsable_nombre||'',r.cumplida?'SI':'NO',r.cumplidaAt||r.cumplida_at||'',r.orden??'',r.createdAt||r.created_at||'',r.updatedAt||r.updated_at||'']));
+  }catch(error){addRows('HITOS',['AVISO'],[[error?.message||String(error)]]);addRows('LG',['AVISO'],[[error?.message||String(error)]]);}
+  try{
+    const bank=await bankBackupDataV24(scope==='TODOS'?'':scope);
+    const movements=Array.isArray(bank?.movements)?bank.movements:[];const links=Array.isArray(bank?.links)?bank.links:[];
+    addRows('BANCO_IMPORTACIONES',['ID','SOURCE_FILENAME','ACCOUNT_ID','ACCOUNT_LABEL','DATE_FROM','DATE_TO','PARSED_COUNT','INSERTED_COUNT','DUPLICATE_COUNT','WARNING_COUNT','IMPORTED_BY','IMPORTED_AT'],(bank.batches||[]).map(r=>[r.id||'',r.sourceFilename||'',r.accountId||'',r.accountLabel||'',r.dateFrom||'',r.dateTo||'',num(r.parsedCount),num(r.insertedCount),num(r.duplicateCount),num(r.warningCount),r.importedBy||'',r.importedAt||'']));
+    addRows('BANCO_MVTOS',['ID','ACCOUNT_ID','ACCOUNT_LABEL','EXECUTED_AT','VALUE_DATE','DESCRIPTION','AMOUNT','BANK_BALANCE','INCLUDED','SOURCE_FILENAME','SOURCE_HASH','IMPORT_BATCH_ID','CREATED_BY','CREATED_AT','UPDATED_AT'],movements.map(r=>[r.id||'',r.accountId||'',r.accountLabel||'',r.executedAt||'',r.valueDate||'',r.description||'',num(r.amount),num(r.bankBalance),r.included===false?'NO':'SI',r.sourceFilename||'',r.sourceHash||'',r.importBatchId||'',r.createdBy||'',r.createdAt||'',r.updatedAt||'']));
+    addRows('BANCO_TK_LINKS',['ID','MOVEMENT_ID','EVENT_ID','TICKET_CODE','TICKET_AMOUNT_SNAPSHOT','FORCED_SQUARE','CREATED_BY','CREATED_AT'],links.map(r=>[r.id||'',r.movementId||'',r.eventId||'',r.ticketCode||'',num(r.ticketAmountSnapshot),r.forcedSquare?'SI':'NO',r.createdBy||'',r.createdAt||'']));
+    addRows('BANCO_PERIODOS',['EVENT_ID','DATE_FROM','DATE_TO','UPDATED_BY','UPDATED_AT'],(bank.eventSettings||[]).map(r=>[r.eventId||'',r.dateFrom||'',r.dateTo||'',r.updatedBy||'',r.updatedAt||'']));
+    addRows('BANCO_ESTADO_MVTO',['EVENT_ID','MOVEMENT_ID','INCLUDED','UPDATED_BY','CREATED_AT','UPDATED_AT'],(bank.movementStates||[]).map(r=>[r.eventId||'',r.movementId||'',r.included===false?'NO':'SI',r.updatedBy||'',r.createdAt||'',r.updatedAt||'']));
+  }catch(bankError){['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));}
   await protectWorkbook(wb);
   await downloadWorkbook(wb, backupFileName(scope, selectedTitle));
   return {ok:true, source, scope, counts, scopedCounts, filename: backupFileName(scope, selectedTitle)};

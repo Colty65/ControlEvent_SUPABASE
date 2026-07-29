@@ -1,6 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const RESUMEN_SHEET_VERSION = 'v30.7';
+const PRODUCT_VERSION = 'v25_prod';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
@@ -347,7 +348,7 @@ function makeResumenChartImage(model){
   ctx.fillRect(28, height - 44, width - 56, 1);
   ctx.fillStyle = '#6b7280';
   ctx.font = '500 13px system-ui, -apple-system, Segoe UI, Arial';
-  ctx.fillText(`©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, 28, height - 18);
+  ctx.fillText(`©oltyLAB ’26_ControlEvent_${PRODUCT_VERSION}`, 28, height - 18);
   return canvas.toDataURL('image/png');
 }
 function addResumenChartImage(workbook, worksheet, model){
@@ -393,7 +394,7 @@ export function writeResumenWorksheet(workbook, options = {}){
   ws.getRow(r).height = 24;
   r += 1;
 
-  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${RESUMEN_SHEET_VERSION}`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
+  putRow(ws, r++, ['Emitido por', `©oltyLAB ’26_ControlEvent_${PRODUCT_VERSION}`, model.generatedAt], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   putRow(ws, r++, ['Fechas', `${model.event.fechaIni || ''}${model.event.fechaFin ? ' - ' + model.event.fechaFin : ''}`, model.event.situacion], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   putRow(ws, r++, ['Precio evento', model.event.precio, model.event.descripcion || ''], (cell, index) => index === 0 ? styleLabel(cell) : styleValue(cell));
   r += 1;

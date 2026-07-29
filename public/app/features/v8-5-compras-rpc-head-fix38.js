@@ -1,4 +1,4 @@
-/* ControlEvent v8.5_prod FIX38 - COMPRAS RPC + RECARGA DETERMINISTA tras baja
+/* ControlEvent v25_prod FIX38 - COMPRAS RPC + RECARGA DETERMINISTA tras baja
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras

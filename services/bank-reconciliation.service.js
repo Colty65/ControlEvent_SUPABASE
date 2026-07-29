@@ -447,12 +447,18 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const eventLinkedMovements=all.filter(row=>eventLinksByMovement.has(row.id));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
     const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
-    const scoped=accountMovements
+    const scopedAll=accountMovements
       .filter(row=>inPeriod(row,period))
       .map(row=>reconcileMovement({...row,included:stateByMovement.has(row.id)?stateByMovement.get(row.id):row.included},eventLinksByMovement.get(row.id)||[]));
-    const ledger=buildEventLedger(scoped);
+    // En eventos Finalizados la consulta queda cerrada: solo se muestran los movimientos
+    // que forman parte del saldo del evento. En curso se conservan todos para poder activar,
+    // desactivar, importar CSV y seguir conciliando.
+    const visibleScoped=event.finalized ? scopedAll.filter(row=>row.included) : scopedAll;
+    // El cálculo conserva todo el período: los movimientos excluidos se ven solo En curso,
+    // pero siguen determinando cuál era el saldo bancario anterior al primer movimiento.
+    const ledger=buildEventLedger(scopedAll);
     const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
-    const movements=scoped.map(row=>movementById.get(row.id)||row);
+    const movements=visibleScoped.map(row=>movementById.get(row.id)||row);
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id);
     return {
@@ -647,10 +653,44 @@ export async function deleteTicketLink(linkId,eventId=''){
 }
 
 export async function exportBankData({accountId='',eventId=''} = {}){
-  const [data,batchRows]=await Promise.all([
-    listBankReconciliation({accountId,eventId}),
-    selectPaged(BATCHES_TABLE,{order:'imported_at',ascending:false})
-  ]);
-  return {...data,batches:batchRows.map(batchFromDb)};
+  try{
+    const selectedEvent=text(eventId);
+    const [movementRows,linkRows,batchRows,settingRows,stateRows]=await Promise.all([
+      selectPaged(MOVEMENTS_TABLE,{columns:'*',order:'executed_at',ascending:true}),
+      selectPaged(LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
+      selectPaged(BATCHES_TABLE,{columns:'*',order:'imported_at',ascending:true}),
+      selectPaged(EVENT_SETTINGS_TABLE,{columns:'*',order:'updated_at',ascending:true}),
+      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{columns:'*',order:'updated_at',ascending:true})
+    ]);
+    const requestedAccount=text(accountId);
+    let movements=movementRows.map(movementFromDb);
+    if(requestedAccount && requestedAccount!=='TODOS') movements=movements.filter(row=>row.accountId===requestedAccount);
+    const movementIds=new Set(movements.map(row=>text(row.id)));
+    let links=linkRows.map(linkFromDb).filter(row=>movementIds.has(text(row.movementId)));
+    let eventSettings=settingRows.map(eventSettingFromDb);
+    let movementStates=stateRows.map(row=>({
+      eventId:text(row.event_id), movementId:text(row.movement_id), included:row.included!==false,
+      updatedBy:text(row.updated_by), updatedAt:text(row.updated_at), createdAt:text(row.created_at)
+    })).filter(row=>movementIds.has(row.movementId));
+    if(selectedEvent){
+      links=links.filter(row=>row.eventId===selectedEvent);
+      eventSettings=eventSettings.filter(row=>row.eventId===selectedEvent);
+      movementStates=movementStates.filter(row=>row.eventId===selectedEvent);
+      const linkedIds=new Set(links.map(row=>row.movementId));
+      const stateIds=new Set(movementStates.map(row=>row.movementId));
+      const period=eventSettings[0]||null;
+      movements=movements.filter(row=>linkedIds.has(row.id)||stateIds.has(row.id)||(period&&inPeriod(row,period)));
+    }
+    const linksByMovement=new Map();
+    links.forEach(link=>{ if(!linksByMovement.has(link.movementId)) linksByMovement.set(link.movementId,[]); linksByMovement.get(link.movementId).push(link); });
+    return {
+      ok:true,
+      movements:movements.map(row=>({...row,links:linksByMovement.get(row.id)||[]})),
+      links,
+      batches:batchRows.map(batchFromDb),
+      eventSettings,
+      movementStates
+    };
+  }catch(error){ throw friendlyDbError(error); }
 }
 

@@ -1,11 +1,10 @@
 {
-  "version": "25.0.0-prod",
-  "base": "release bancaria anterior",
-  "notes": "v25_prod: Cuadre Banco compacto y versión única en cabecera, ColtyLAB, INFOEVENTO, BACKUP y servidor.",
-  "generatedAt": "2026-07-29T12:36:00+02:00",
-  "build": "20260729-V25-PROD-COMPACT-BANK",
+  "version": "15.0.0-prod",
+  "notes": "v23_prod FIX8: ColtyLAB contextual, versión de ficha centralizada y comparativas con familia exacta/sin anexos no pedidos.",
   "versionLabel": "ControlEvent v25_prod",
-  "versionFile": "ControlEvent_v25_prod",
-  "fix": "cuadre-banco-compacto-version-unica",
-  "buildLabel": "v25_prod"
+  "generatedAt": "2026-07-17T22:10:00+02:00",
+  "build": "v23_prod_r1",
+  "versionFile": "ControlEvent_v23_prod_r1",
+  "fix": "fix8",
+  "buildLabel": "v23_prod_fix8"
 }

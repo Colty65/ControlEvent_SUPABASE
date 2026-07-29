@@ -1,4 +1,4 @@
-/* ControlEvent v3.0_prod - correccion quirurgica sobre v50.4.
+/* ControlEvent v25_prod - correccion quirurgica sobre v50.4.
    - Estabiliza menu RO sin recolocaciones visibles.
    - Salir/Refrescar visibles y utilizables en movil aunque el contenedor original este oculto.
    - Salir no deja pantalla borrosa: fuerza la vuelta limpia al overlay de acceso.
@@ -8,8 +8,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v3.0_prod';
-  const VERSION_FILE = 'ControlEvent_v3_0_prod';
+  const VERSION = 'ControlEvent v25_prod';
+  const VERSION_FILE = 'ControlEvent_v25_prod';
   const INSTALLED = '__ceV505FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
