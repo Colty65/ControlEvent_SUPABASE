@@ -1,4 +1,4 @@
-/* ControlEvent v3.0_prod - entrada limpia tras login y proteccion de globos.
+/* ControlEvent v25_prod - entrada limpia tras login y proteccion de globos.
    - Tras /api/login, el primer /api/state se entrega con selectedEventId='' para obligar a elegir evento.
    - Pantalla neutra con logo CE y selector EVENTO en "Selecciona evento..." hasta que el usuario elija.
    - Evita que en iPhone/iPad el toque que abre el globo de Resumen dispare automaticamente la primera foto.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3.0_prod';
-  const VERSION_FILE = 'ControlEvent_v3_0_prod';
+  const VERSION = 'ControlEvent v25_prod';
+  const VERSION_FILE = 'ControlEvent_v25_prod';
   const INSTALLED = '__ceV5015FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

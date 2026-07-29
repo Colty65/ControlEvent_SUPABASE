@@ -1,11 +1,9 @@
 {
-  "version": "25.0.0-prod",
-  "base": "release bancaria anterior",
-  "notes": "v25_prod: Cuadre Banco compacto y versión única en cabecera, ColtyLAB, INFOEVENTO, BACKUP y servidor.",
-  "generatedAt": "2026-07-29T12:36:00+02:00",
-  "build": "20260729-V25-PROD-COMPACT-BANK",
-  "versionLabel": "ControlEvent v25_prod",
-  "versionFile": "ControlEvent_v25_prod",
-  "fix": "cuadre-banco-compacto-version-unica",
-  "buildLabel": "v25_prod"
+  "version": "5.0.0-prod",
+  "base": "v50.25",
+  "notes": "v7.2_prod: iOS Finalizado con información en visor de INGRESOS, retorno al globo origen y versión activa normalizada.",
+  "generatedAt": "2026-06-01T00:00:00+02:00",
+  "build": "v7.2_prod",
+  "versionLabel": "ControlEvent v7.2_prod",
+  "versionFile": "ControlEvent_v7_2_prod"
 }
