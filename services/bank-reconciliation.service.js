@@ -154,13 +154,14 @@ async function tableRows(table, columns='*'){
   return selectPaged(table, {columns, order:'created_at', ascending:true});
 }
 
-async function ticketCatalog(){
+async function ticketCatalog(eventId='', eventTitle='', suppliedLinks=null){
+  const selectedEvent=text(eventId);
   const [purchases, events, stores, persons, links] = await Promise.all([
-    selectPaged('ce_compras', {order:'created_at'}),
-    selectPaged('ce_eventos', {order:'fecha_ini'}),
+    selectPaged('ce_compras', {order:'created_at',apply:query=>selectedEvent?query.eq('event_id',selectedEvent):query}),
+    selectedEvent ? Promise.resolve([{id:selectedEvent,titulo:eventTitle}]) : selectPaged('ce_eventos', {order:'fecha_ini'}),
     selectPaged('ce_tiendas', {order:'nombre'}),
     selectPaged('ce_personas', {order:'nombre'}),
-    selectPaged(LINKS_TABLE, {order:'created_at'})
+    Array.isArray(suppliedLinks) ? Promise.resolve(suppliedLinks) : selectPaged(LINKS_TABLE, {order:'created_at',apply:query=>selectedEvent?query.eq('event_id',selectedEvent):query})
   ]);
   const eventById = new Map(events.map(row => [text(row.id), row]));
   const storeById = new Map(stores.map(row => [text(row.id), row]));
@@ -172,9 +173,10 @@ async function ticketCatalog(){
     if(!ticketCode) continue;
     const raw = text(row.ticket_donacion).toUpperCase();
     if(/DONADO|PTE\.?\s*COMPRA|PENDIENTE/.test(raw)) continue;
-    const eventId = text(row.event_id);
-    const key = `${eventId}|${ticketCode}`;
-    if(!map.has(key)) map.set(key, {eventId,ticketCode,amount:0,lineCount:0,storeIds:new Set(),responsibleIds:new Set()});
+    const purchaseEventId = text(row.event_id);
+    if(selectedEvent && purchaseEventId!==selectedEvent) continue;
+    const key = `${purchaseEventId}|${ticketCode}`;
+    if(!map.has(key)) map.set(key, {eventId:purchaseEventId,ticketCode,amount:0,lineCount:0,storeIds:new Set(),responsibleIds:new Set()});
     const item = map.get(key);
     item.amount = cents(item.amount + num(row.unidades) * num(row.precio));
     item.lineCount += 1;
@@ -185,7 +187,7 @@ async function ticketCatalog(){
     const link = linkByTicket.get(`${item.eventId}|${item.ticketCode}`);
     return {
       eventId:item.eventId,
-      eventTitle:text(eventById.get(item.eventId)?.titulo) || item.eventId,
+      eventTitle:text(eventById.get(item.eventId)?.titulo) || eventTitle || item.eventId,
       eventDate:text(eventById.get(item.eventId)?.fecha_ini),
       ticketCode:item.ticketCode,
       amount:cents(item.amount),
@@ -411,12 +413,18 @@ function eventTicketSummary(catalog,eventId){
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, linkRows, catalog, stateRows] = await Promise.all([
-      selectPaged(MOVEMENTS_TABLE, {order:'executed_at', ascending:false}),
-      selectPaged(LINKS_TABLE, {order:'created_at', ascending:true}),
-      ticketCatalog(),
+    const [movementRows, rawLinkRows, stateRows] = await Promise.all([
+      selectPaged(MOVEMENTS_TABLE, {
+        columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
+        order:'executed_at', ascending:false
+      }),
+      selectPaged(LINKS_TABLE, {order:'created_at', ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(EVENT_MOVEMENT_STATE_TABLE,{order:'updated_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
     ]);
+    // Solo se construye el catálogo de compras del evento activo. La versión anterior
+    // recorría compras y vínculos de todos los eventos en cada cambio de desplegable.
+    const catalog=await ticketCatalog(event.id,event.title,rawLinkRows);
+    const linkRows=rawLinkRows.map(linkFromDb);
     const all=movementRows.map(movementFromDb);
     const accounts=[...new Map(all.map(row=>[row.accountId,{id:row.accountId,label:row.accountLabel||row.accountId,lastAt:row.executedAt}])).values()]
       .sort((a,b)=>String(b.lastAt).localeCompare(String(a.lastAt)));
@@ -426,7 +434,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const globalSummary=summaryFor(accountMovements);
     const catalogMap=new Map(catalog.map(item=>[`${item.eventId}|${item.ticketCode}`,item]));
     const eventLinksByMovement=new Map();
-    for(const row of linkRows.map(linkFromDb).filter(link=>link.eventId===event.id)){
+    for(const row of linkRows){
       if(!eventLinksByMovement.has(row.movementId)) eventLinksByMovement.set(row.movementId,[]);
       const current=catalogMap.get(`${row.eventId}|${row.ticketCode}`);
       eventLinksByMovement.get(row.movementId).push({...row,
@@ -478,14 +486,17 @@ export async function importBankCsv(payload = {}, actor = {}){
   const batchId = crypto.randomUUID();
   let batchCreated = false;
   try{
-    const hashes = parsed.movements.map(row => row.sourceHash);
+    const uniqueByHash=new Map();
+    for(const row of parsed.movements){ if(!uniqueByHash.has(row.sourceHash)) uniqueByHash.set(row.sourceHash,row); }
+    const uniqueMovements=[...uniqueByHash.values()];
+    const hashes = uniqueMovements.map(row => row.sourceHash);
     const existing = new Set();
     for(let i=0;i<hashes.length;i+=200){
       const {data,error}=await db().from(MOVEMENTS_TABLE).select('source_hash').in('source_hash',hashes.slice(i,i+200));
       if(error) throw error;
       (data||[]).forEach(row=>existing.add(text(row.source_hash)));
     }
-    const fresh = parsed.movements.filter(row => !existing.has(row.sourceHash));
+    const fresh = uniqueMovements.filter(row => !existing.has(row.sourceHash));
     const batch = {
       id:batchId,
       source_filename:text(payload.filename),
@@ -525,7 +536,7 @@ export async function importBankCsv(payload = {}, actor = {}){
         if(error) throw error;
       }
     }
-    return {ok:true,batchId,accountId:parsed.accountId,accountLabel:parsed.accountLabel,parsed:parsed.movements.length,inserted:fresh.length,duplicates:parsed.movements.length-fresh.length,warnings:parsed.warnings};
+    return {ok:true,batchId,accountId:parsed.accountId,accountLabel:parsed.accountLabel,dateFrom:parsed.dateFrom,dateTo:parsed.dateTo,parsed:parsed.movements.length,inserted:fresh.length,duplicates:parsed.movements.length-fresh.length,warnings:parsed.warnings};
   }catch(error){
     if(batchCreated){
       try{ await db().from(BATCHES_TABLE).delete().eq('id',batchId); }catch(_){ /* limpieza no bloqueante */ }
@@ -568,7 +579,8 @@ export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
   try{
     const selectedEvent=text(eventId);
     if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
-    const catalog=await ticketCatalog();
+    const event=await loadEvent(selectedEvent);
+    const catalog=await ticketCatalog(event.id,event.title);
     const query=text(q).toLowerCase();
     const items=catalog.filter(item=>{
       if(item.eventId!==selectedEvent) return false;
@@ -590,7 +602,8 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
     if(movementError) throw movementError;
     if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
     if(num(movement.amount) >= 0) fail('Solo se pueden justificar con TKxx los movimientos bancarios negativos.',409,'BANK_POSITIVE_MOVEMENT');
-    const catalog = await ticketCatalog();
+    const event=await loadEvent(eventId);
+    const catalog = await ticketCatalog(event.id,event.title);
     const ticket = catalog.find(item => item.eventId === eventId && item.ticketCode === ticketCode);
     if(!ticket) fail('El TKxx indicado no existe o todavía no figura como pagado.',409,'BANK_TICKET_NOT_PAID');
     if(ticket.linked && ticket.linkedMovementId !== id) fail(`${ticketCode} ya está vinculado a otro movimiento bancario.`,409,'BANK_TICKET_ALREADY_LINKED');

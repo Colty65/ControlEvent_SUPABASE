@@ -1,10 +1,10 @@
-/* ControlEvent v24_prod-04 · Cuadre Banco por evento y periodo bancario (GD/RW). */
+/* ControlEvent v24_prod-05 · Cuadre Banco fluido con grandes periodos (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v24_prod-04';
+  const VERSION = 'v24_prod-05';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -25,7 +25,9 @@
   const store = {
     loading:false, importing:false, data:null, eventId:'', accountId:'', filter:'TODOS', search:'',
     ticketMovement:null, tickets:[], openGestureAt:0, lastAction:'', lastActionAt:0, readOnly:false,
-    lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:''
+    lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:'',
+    page:1, pageSize:60, dataRevision:0, filteredCacheKey:'', filteredCacheRows:[], searchTimer:0, renderFrame:0,
+    loadSeq:0, loadController:null, totalPages:1
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
@@ -34,7 +36,8 @@
     let payload={};
     try{ payload=await response.json(); }catch(_){ payload={}; }
     if(!response.ok){
-      const error=new Error(payload?.error||`Error ${response.status} en Cuadre Banco`);
+      const fallback=response.status===413?'El CSV es demasiado grande para enviarlo de una sola vez. Descarga periodos más cortos del banco e impórtalos consecutivamente.':`Error ${response.status} en Cuadre Banco`;
+      const error=new Error(payload?.error||fallback);
       error.status=response.status; error.code=payload?.code||''; throw error;
     }
     return payload;
@@ -82,7 +85,8 @@
   }
   function ensureInteractive(){
     const overlay=$('ceBankOverlay'); if(!overlay) return;
-    [overlay,overlay.querySelector('.ce-bank-window'),...overlay.querySelectorAll('button,label,input,select,textarea')].filter(Boolean).forEach(node=>{
+    const selectors=['.ce-bank-window','#ceBankClose','#ceBankImport','#ceBankRefresh','#ceBankAccount','#ceBankFilter','#ceBankSort','#ceBankSearch','#ceBankDateFrom','#ceBankDateTo','#ceBankApplyPeriod','#ceBankPrevPage','#ceBankNextPage'];
+    [overlay,...selectors.map(selector=>overlay.querySelector(selector))].filter(Boolean).forEach(node=>{
       try{ node.style.setProperty('pointer-events','auto','important'); node.style.setProperty('touch-action','manipulation','important'); }catch(_){ }
     });
   }
@@ -93,12 +97,17 @@
   }
   function triggerCsvPicker(event){
     stopEvent(event);
-    if(mutationBlocked()) return false;
+    if(mutationBlocked()||store.importing) return false;
     const input=$('ceBankCsvFile');
     if(!input) return false;
     try{ input.value=''; }catch(_){ }
-    try{ if(typeof input.showPicker==='function') input.showPicker(); else input.click(); }
-    catch(_){ try{ setTimeout(()=>input.click(),0); }catch(__){ } }
+    // input.click() se ejecuta dentro del gesto real del usuario. No se difiere con setTimeout,
+    // porque Safari/Chrome pueden bloquear el selector si se pierde la activación del clic.
+    try{ input.click(); }
+    catch(error){
+      try{ if(typeof input.showPicker==='function') input.showPicker(); else throw error; }
+      catch(_){ notice('El navegador no ha podido abrir el selector. Pulsa de nuevo «Cargar CSV».','warning',true); }
+    }
     return false;
   }
   function installDom(){
@@ -129,7 +138,7 @@
           </div>
           <div id="ceBankTraffic" class="ce-bank-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 TKxx</b><small>Sin datos</small></div></div>
           <div class="ce-bank-header-balance"><span>Saldo final del evento</span><strong id="ceBankHeaderBalance">—</strong><small id="ceBankHeaderCount">Sincronizando movimientos</small></div>
-          <span class="ce-bank-version">v24_prod-04</span>
+          <span class="ce-bank-version">v24_prod-05</span>
           <button type="button" id="ceBankClose" class="ce-bank-close" aria-label="Cerrar Cuadre Banco"><span>×</span></button>
         </header>
         <div id="ceBankReadOnly" class="ce-bank-readonly hidden"><b>EVENTO FINALIZADO</b><span>Consulta completa disponible; altas, bajas y cambios están bloqueados.</span></div>
@@ -155,6 +164,7 @@
         <div id="ceBankSummary" class="ce-bank-summary"></div>
         <div id="ceBankNotice" class="ce-bank-notice hidden"></div>
         <div class="ce-bank-ledger-caption"><span>CRONOLOGÍA BANCARIA DEL EVENTO</span><b>Movimiento</b><b>Concepto</b><b>Importe · saldo banco · saldo evento</b></div>
+        <div class="ce-bank-resultbar"><span id="ceBankResultCount">Preparando movimientos…</span><div><button type="button" id="ceBankPrevPage" aria-label="Página anterior">‹</button><b id="ceBankPageLabel">Página 1 de 1</b><button type="button" id="ceBankNextPage" aria-label="Página siguiente">›</button></div></div>
         <main id="ceBankBody" class="ce-bank-body" tabindex="0" aria-label="Movimientos bancarios del evento"></main>
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
       </section>`;
@@ -184,14 +194,20 @@
     if(!overlay || overlay.dataset.ceBankBound==='1') return;
     overlay.dataset.ceBankBound='1';
     $('ceBankClose')?.addEventListener('click',event=>{stopEvent(event);close();});
-    $('ceBankImport')?.addEventListener('click',event=>{if(actionAllowed('csv-click',500))triggerCsvPicker(event);});
+    $('ceBankImport')?.addEventListener('click',event=>{if(actionAllowed('csv-click',350))triggerCsvPicker(event);});
     $('ceBankCsvFile')?.addEventListener('change',importCsv);
-    $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',350))load({force:true,preserveScroll:true});});
-    $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;load({force:true}).then(focusBody);});
-    $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;renderBody();focusBody();});
-    $('ceBankSort')?.addEventListener('change',event=>{store.sort=event.target.value==='ASC'?'ASC':'DESC';renderBody();focusBody();});
-    $('ceBankSearch')?.addEventListener('input',event=>{store.search=event.target.value;renderBody();});
-    $('ceBankApplyPeriod')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('period',500))savePeriod();});
+    $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',250))load({force:true,preserveScroll:true});});
+    $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;store.page=1;invalidateMovementCache();load({force:true}).then(focusBody);});
+    $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
+    $('ceBankSort')?.addEventListener('change',event=>{store.sort=event.target.value==='ASC'?'ASC':'DESC';store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
+    $('ceBankSearch')?.addEventListener('input',event=>{
+      store.search=event.target.value; store.page=1; invalidateMovementCache();
+      clearTimeout(store.searchTimer);
+      store.searchTimer=setTimeout(()=>scheduleBodyRender(false),140);
+    });
+    $('ceBankPrevPage')?.addEventListener('click',event=>{stopEvent(event);changePage(store.page-1);});
+    $('ceBankNextPage')?.addEventListener('click',event=>{stopEvent(event);changePage(store.page+1);});
+    $('ceBankApplyPeriod')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('period',350))savePeriod();});
     ['ceBankDateFrom','ceBankDateTo'].forEach(id=>$(id)?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();savePeriod();}}));
     overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
   }
@@ -209,6 +225,30 @@
     node.textContent=message||'';
     node.className=`ce-bank-notice${message?'':' hidden'}${type?` ${type}`:''}`;
   }
+  function invalidateMovementCache(){
+    store.filteredCacheKey=''; store.filteredCacheRows=[];
+  }
+  function scheduleBodyRender(focusAfter=false){
+    if(store.renderFrame) cancelAnimationFrame(store.renderFrame);
+    store.renderFrame=requestAnimationFrame(()=>{
+      store.renderFrame=0;
+      renderBody();
+      if(focusAfter) focusBody();
+    });
+  }
+  function clampPage(page,totalPages=store.totalPages){
+    const max=Math.max(1,Number(totalPages)||1);
+    return Math.min(max,Math.max(1,Number(page)||1));
+  }
+  function changePage(page,{toEnd=false}={}){
+    const next=clampPage(page);
+    if(next===store.page && !toEnd) return;
+    store.page=next;
+    renderBody();
+    const body=$('ceBankBody');
+    if(body) body.scrollTop=toEnd?body.scrollHeight:0;
+    focusBody();
+  }
   function currentEventReady(){
     const id=activeEventId();
     if(!id){ alert('Selecciona un evento antes de abrir Cuadre Banco.'); return '';
@@ -219,7 +259,7 @@
     installDom();
     if(!hasBankRole()){ alert('Cuadre Banco está disponible para usuarios GD y RW.'); return false; }
     const eventId=currentEventReady(); if(!eventId) return false;
-    if(store.eventId!==eventId){ store.eventId=eventId; store.accountId=''; store.filter='TODOS'; store.search=''; store.sort='DESC'; store.dateFrom=''; store.dateTo=''; }
+    if(store.eventId!==eventId){ store.eventId=eventId; store.accountId=''; store.filter='TODOS'; store.search=''; store.sort='DESC'; store.dateFrom=''; store.dateTo=''; store.page=1; store.data=null; invalidateMovementCache(); }
     const overlay=$('ceBankOverlay');
     ensureInteractive(); overlay.classList.remove('hidden');
     requestAnimationFrame(()=>{overlay.classList.add('visible');ensureInteractive();});
@@ -242,38 +282,70 @@
     return params.toString();
   }
   async function load({force=false,preserveNotice=false,preserveMovementId='',preserveScroll=false}={}){
-    if(store.loading) return;
     const body=$('ceBankBody');
     if(preserveScroll&&body) store.lastBodyScroll=body.scrollTop;
     store.pendingFocusId=preserveMovementId||'';
-    store.loading=true; if(!preserveNotice){store.noticeLocked=false;notice('');}
-    if(!preserveMovementId && body) body.innerHTML='<div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Sincronizando la cronología del evento…</strong></div>';
+    const seq=++store.loadSeq;
+    try{ store.loadController?.abort?.(); }catch(_){ }
+    const controller=typeof AbortController!=='undefined'?new AbortController():null;
+    store.loadController=controller;
+    store.loading=true;
+    $('ceBankOverlay')?.classList.add('ce-bank-loading-data');
+    if(!preserveNotice){store.noticeLocked=false;notice('');}
+    if(!store.data && !preserveMovementId && body) body.innerHTML='<div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Sincronizando la cronología del evento…</strong><span>Los controles superiores continúan disponibles.</span></div>';
     try{
-      store.data=await api(`/api/bank-reconciliation?${queryString(force)}`);
-      store.accountId=store.data.selectedAccount||store.accountId;
-      store.readOnly=store.data.readOnly===true;
-      store.dateFrom=text(store.data?.period?.dateFrom); store.dateTo=text(store.data?.period?.dateTo);
+      const data=await api(`/api/bank-reconciliation?${queryString(force)}`,controller?{signal:controller.signal}:{});
+      if(seq!==store.loadSeq) return;
+      store.data=data;
+      store.dataRevision+=1;
+      invalidateMovementCache();
+      store.accountId=data.selectedAccount||store.accountId;
+      store.readOnly=data.readOnly===true;
+      store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
     }catch(error){
-      $('ceBankSummary').innerHTML=''; $('ceBankHeaderBalance').textContent='—';
-      body.innerHTML=`<div class="ce-bank-empty error"><strong>No se pudo abrir Cuadre Banco.</strong><span>${esc(error.message)}</span></div>`;
+      if(error?.name==='AbortError'||seq!==store.loadSeq) return;
+      if(!store.data){
+        $('ceBankSummary').innerHTML=''; $('ceBankHeaderBalance').textContent='—';
+        if(body) body.innerHTML=`<div class="ce-bank-empty error"><strong>No se pudo abrir Cuadre Banco.</strong><span>${esc(error.message)}</span></div>`;
+      }
+      notice(error.message,'error',true);
       if(error.code==='BANK_SCHEMA_MISSING') notice('Ejecuta en Supabase el fichero ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql actualizado.','warning',true);
-    }finally{store.loading=false;}
+    }finally{
+      if(seq===store.loadSeq){
+        store.loading=false;
+        store.loadController=null;
+        $('ceBankOverlay')?.classList.remove('ce-bank-loading-data');
+      }
+    }
   }
   function restorePosition(movementId,preserveScroll){
     const body=$('ceBankBody'); if(!body) return;
     if(movementId){
       let row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
       if(!row && (store.filter!=='TODOS'||text(store.search))){
-        store.filter='TODOS'; store.search='';
+        store.filter='TODOS'; store.search=''; store.page=1; invalidateMovementCache();
         if($('ceBankFilter')) $('ceBankFilter').value='TODOS';
         if($('ceBankSearch')) $('ceBankSearch').value='';
         renderBody();
         row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
       }
+      if(!row){
+        const rows=filteredMovements();
+        const index=rows.findIndex(item=>String(item.id)===String(movementId));
+        if(index>=0){
+          store.page=Math.floor(index/store.pageSize)+1;
+          renderBody();
+          row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
+        }
+      }
       if(row){ row.scrollIntoView({block:'center',behavior:'auto'}); row.classList.add('ce-bank-returned'); setTimeout(()=>row.classList.remove('ce-bank-returned'),1800); }
-    }else if(preserveScroll) body.scrollTop=store.lastBodyScroll;
+      store.pendingFocusId='';
+    }else{
+      store.pendingFocusId='';
+      if(preserveScroll) body.scrollTop=store.lastBodyScroll;
+    }
   }
   function render(){
     const data=store.data||{accounts:[],movements:[],summary:{},event:{},ticketSummary:{},period:{}};
@@ -299,7 +371,7 @@
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
-    const importButton=$('ceBankImport'); importButton.disabled=store.readOnly; importButton.setAttribute('aria-disabled',store.readOnly?'true':'false');
+    const importButton=$('ceBankImport'); importButton.disabled=store.readOnly||store.importing; importButton.setAttribute('aria-disabled',(store.readOnly||store.importing)?'true':'false'); importButton.classList.toggle('busy',store.importing);
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const flowMax=Math.max(Math.abs(num(s.income)),Math.abs(num(s.expense)),1);
     const incomePct=Math.round(Math.abs(num(s.income))/flowMax*100); const expensePct=Math.round(Math.abs(num(s.expense))/flowMax*100);
@@ -319,6 +391,8 @@
     renderBody();
   }
   function filteredMovements(){
+    const cacheKey=[store.dataRevision,store.filter,text(store.search).toLowerCase(),store.sort].join('|');
+    if(store.filteredCacheKey===cacheKey) return store.filteredCacheRows;
     let rows=arr(store.data?.movements);
     if(store.filter==='INCLUIDOS') rows=rows.filter(row=>row.included);
     else if(store.filter==='EXCLUIDOS') rows=rows.filter(row=>!row.included);
@@ -330,17 +404,41 @@
       row.description,row.amount,row.bankBalance,row.eventBalanceAfter,formatDate(row.executedAt),formatDate(row.valueDate,false),
       ...arr(row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)])
     ].join(' ').toLowerCase().includes(q));
-    rows.sort((a,b)=>{
+    rows=[...rows].sort((a,b)=>{
       const cmp=String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id));
       return store.sort==='ASC'?cmp:-cmp;
     });
+    store.filteredCacheKey=cacheKey;
+    store.filteredCacheRows=rows;
     return rows;
+  }
+  function updatePager(total,start,end){
+    store.totalPages=Math.max(1,Math.ceil(total/store.pageSize));
+    store.page=clampPage(store.page,store.totalPages);
+    const count=$('ceBankResultCount');
+    const label=$('ceBankPageLabel');
+    const prev=$('ceBankPrevPage');
+    const next=$('ceBankNextPage');
+    if(count) count.textContent=total?`Mostrando ${start+1}–${end} de ${total} movimiento(s)`:'No hay movimientos en esta vista';
+    if(label) label.textContent=`Página ${store.page} de ${store.totalPages}`;
+    if(prev) prev.disabled=store.page<=1;
+    if(next) next.disabled=store.page>=store.totalPages;
   }
   function renderBody(){
     const body=$('ceBankBody'); if(!body) return;
     const rows=filteredMovements();
-    if(!rows.length){ body.innerHTML='<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro o cambia la búsqueda.</span></div>'; return; }
-    body.innerHTML=rows.map((row,index)=>{
+    store.totalPages=Math.max(1,Math.ceil(rows.length/store.pageSize));
+    if(store.pendingFocusId){
+      const index=rows.findIndex(row=>String(row.id)===String(store.pendingFocusId));
+      if(index>=0) store.page=Math.floor(index/store.pageSize)+1;
+    }
+    store.page=clampPage(store.page,store.totalPages);
+    const start=(store.page-1)*store.pageSize;
+    const end=Math.min(rows.length,start+store.pageSize);
+    const pageRows=rows.slice(start,end);
+    updatePager(rows.length,start,end);
+    if(!pageRows.length){ body.innerHTML='<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro, cambia la búsqueda o amplía las fechas.</span></div>'; return; }
+    body.innerHTML=pageRows.map((row,index)=>{
       const status=statusInfo(row); const amountClass=row.amount<0?'negative':'positive';
       const target=Math.max(0,num(row.targetAmount)); const justified=Math.max(0,num(row.justifiedAmount));
       const progress=target?Math.min(100,Math.round(justified/target*100)):0;
@@ -348,7 +446,7 @@
       const links=arr(row.links).map(link=>`<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}" ${disabled}>×</button></span>`).join('');
       const forceControl=row.amount<0&&arr(row.links).length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${disabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
       return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
-        <div class="ce-bank-ledger-node"><span>${String(index+1).padStart(2,'0')}</span><i></i></div>
+        <div class="ce-bank-ledger-node"><span>${String(start+index+1).padStart(2,'0')}</span><i></i></div>
         <div class="ce-bank-movement-main">
           <label class="ce-bank-include"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${row.included?'En saldo':'Inactivo'}</b></label>
           <div class="ce-bank-date"><strong>${formatDate(row.executedAt)}</strong><small>Valor ${formatDate(row.valueDate,false)}</small></div>
@@ -379,17 +477,32 @@
   async function importCsv(event){
     if(store.importing||mutationBlocked()) return;
     const input=event?.target||$('ceBankCsvFile'); const file=input?.files?.[0]; if(!file) return;
+    if(!/\.(csv|txt)$/i.test(file.name)){ alert('Selecciona un fichero CSV.'); try{input.value='';}catch(_){ } return; }
+    if(file.size>30*1024*1024){ notice('El CSV supera 30 MB. Descárgalo desde el banco en varios periodos y cárgalos consecutivamente.','warning',true); try{input.value='';}catch(_){ } return; }
     store.importing=true;
-    if(!/\.(csv|txt)$/i.test(file.name)){ alert('Selecciona un fichero CSV.'); store.importing=false; try{input.value='';}catch(_){ } return; }
-    notice(`Leyendo ${file.name}…`);
+    const button=$('ceBankImport');
+    if(button){button.disabled=true;button.classList.add('busy');button.setAttribute('aria-busy','true');}
+    notice(`Leyendo ${file.name} (${Math.max(1,Math.round(file.size/1024))} KB)…`);
     try{
       const csvText=await file.text();
+      // Cede un frame al navegador para que el aviso se pinte antes de enviar ficheros grandes.
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      notice(`Importando ${file.name}… No cierres esta ventana.`);
       const result=await api('/api/bank-reconciliation/import',{method:'POST',body:JSON.stringify({eventId:store.eventId,filename:file.name,csvText})});
       store.accountId=result.accountId||store.accountId;
-      notice(`CSV incorporado: ${result.inserted} movimiento(s) nuevo(s), ${result.duplicates} repetido(s) omitido(s)${arr(result.warnings).length?` y ${result.warnings.length} aviso(s)`:''}.`,'ok');
+      store.page=1;
+      invalidateMovementCache();
+      const importedPeriod=result.dateFrom&&result.dateTo?` · periodo del fichero ${formatDate(result.dateFrom,false)}–${formatDate(result.dateTo,false)}`:'';
+      const outsideCurrentPeriod=(result.dateFrom&&store.dateFrom&&result.dateFrom<store.dateFrom)||(result.dateTo&&store.dateTo&&result.dateTo>store.dateTo);
+      const visibilityHint=outsideCurrentPeriod?' Los movimientos están cargados; amplía las fechas bancarias del evento para verlos.':'';
+      notice(`CSV incorporado: ${result.inserted} movimiento(s) nuevo(s), ${result.duplicates} repetido(s) omitido(s)${arr(result.warnings).length?` y ${result.warnings.length} aviso(s)`:''}${importedPeriod}.${visibilityHint}`,'ok',true);
       await load({force:true,preserveNotice:true});
     }catch(error){ notice(error.message,'error',true); }
-    finally{ try{input.value='';}catch(_){ } store.importing=false; }
+    finally{
+      try{input.value='';}catch(_){ }
+      store.importing=false;
+      if(button){button.disabled=store.readOnly;button.classList.remove('busy');button.removeAttribute('aria-busy');}
+    }
   }
   async function toggleIncluded(id,included,input){
     if(mutationBlocked()){input.checked=!included;return;}
@@ -450,14 +563,25 @@
     const overlay=$('ceBankOverlay'); const modal=$('ceBankTicketModal');
     if(!overlay||overlay.classList.contains('hidden')||!modal?.classList.contains('hidden')) return;
     const editable=event.target?.matches?.('input,textarea,[contenteditable="true"]');
-    if(editable&&(event.key==='Home'||event.key==='End')) return;
+    if(editable) return;
     if(event.target?.matches?.('select')) return;
     const body=$('ceBankBody'); if(!body) return;
-    const page=Math.max(180,Math.round(body.clientHeight*.82));
-    if(event.key==='PageDown'){event.preventDefault();body.scrollBy({top:page,behavior:'auto'});}
-    else if(event.key==='PageUp'){event.preventDefault();body.scrollBy({top:-page,behavior:'auto'});}
-    else if(event.key==='Home'){event.preventDefault();body.scrollTo({top:0,behavior:'auto'});}
-    else if(event.key==='End'){event.preventDefault();body.scrollTo({top:body.scrollHeight,behavior:'auto'});}
+    const distance=Math.max(180,Math.round(body.clientHeight*.82));
+    if(event.key==='PageDown'){
+      event.preventDefault();
+      const atBottom=body.scrollTop+body.clientHeight>=body.scrollHeight-10;
+      if(atBottom&&store.page<store.totalPages) changePage(store.page+1);
+      else body.scrollBy({top:distance,behavior:'auto'});
+    }else if(event.key==='PageUp'){
+      event.preventDefault();
+      const atTop=body.scrollTop<=10;
+      if(atTop&&store.page>1) changePage(store.page-1,{toEnd:true});
+      else body.scrollBy({top:-distance,behavior:'auto'});
+    }else if(event.key==='Home'){
+      event.preventDefault(); changePage(1); body.scrollTop=0;
+    }else if(event.key==='End'){
+      event.preventDefault(); changePage(store.totalPages,{toEnd:true});
+    }
   }
   function openFromEntry(event){
     const target=event?.target?.closest?.('#btnOpenBankReconciliation,[data-ce-open-bank="1"]');
@@ -490,10 +614,16 @@
   },true);
   document.addEventListener('change',event=>{
     if(event.target?.id==='selectedEvent'&&!$('ceBankOverlay')?.classList.contains('hidden')){
-      const id=activeEventId(); if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';store.sort='DESC';store.dateFrom='';store.dateTo='';load({force:true});}
+      const id=activeEventId(); if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';store.sort='DESC';store.dateFrom='';store.dateTo='';store.page=1;store.data=null;invalidateMovementCache();load({force:true});}
     }
   },true);
-  const observer=root.MutationObserver?new MutationObserver(()=>{installDom();applyRole();}):null;
+  const observer=root.MutationObserver?new MutationObserver(mutations=>{
+    // Los cambios de paginación/búsqueda dentro del propio Cuadre Banco no deben
+    // relanzar installDom ni recorrer otra vez todos sus controles.
+    const external=mutations.some(mutation=>!mutation.target?.closest?.('#ceBankOverlay'));
+    if(!external) return;
+    installDom(); applyRole();
+  }):null;
   if(observer) observer.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',installDom,{once:true});
   [0,100,500,1400].forEach(ms=>setTimeout(installDom,ms));

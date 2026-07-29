@@ -1,0 +1,18 @@
+CONTROLEVENT v24_prod-05 · CUADRE BANCO FLUIDO Y CSV AMPLIO
+
+1. Subir a GitHub/Vercel el contenido completo de este ZIP, conservando carpetas.
+
+2. Confirmar que el despliegue contiene la versión de caché:
+   20260729-V24-PROD-05-BANK-FLUIDO
+
+3. Recargar ControlEvent con Ctrl+F5 en PC. En móvil, cerrar completamente la pestaña y volver a abrirla.
+
+4. Para ver movimientos desde enero de 2024:
+   - importar el CSV;
+   - escribir 01/01/2024 como Fecha inicio bancaria;
+   - seleccionar la fecha final;
+   - pulsar Aplicar fechas.
+
+SUPABASE:
+- Si ya instalaste v24_prod-04, NO hay que ejecutar SQL nuevo.
+- Si vienes de una versión anterior, ejecuta ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql.
