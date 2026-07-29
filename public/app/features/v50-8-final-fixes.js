@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod - correccion de estabilidad sin temporizadores de version.
+/* ControlEvent v3.0_prod - correccion de estabilidad sin temporizadores de version.
    - No se carga v50.7: se evita la restauracion agresiva de globos que los mandaba a la esquina.
    - Version unificada actualizando las constantes de los scripts cargados a v50.19.
    - Salir/Refrescar en movil se mueven a un dock real inferior, fuera del selector de evento.
@@ -7,8 +7,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v25_prod';
-  const VERSION_FILE = 'ControlEvent_v25_prod';
+  const VERSION = 'ControlEvent v3.0_prod';
+  const VERSION_FILE = 'ControlEvent_v3_0_prod';
   const INSTALLED = '__ceV508FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

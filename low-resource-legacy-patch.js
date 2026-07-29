@@ -15525,6 +15525,7 @@ window.addCellNote = addCellNote;
   'use strict';
   const VERSION='ControlEvent v25_prod';
   const SESSION_KEY='ControlEvent_v25_prod_session';
+  const LEGACY_SESSION_KEY='ControlEvent_v24_prod-02_session';
   const $=id=>document.getElementById(id);
   const stateRef=()=>{ try{return state;}catch(_){return window.state||{};} };
   const eventId=()=>String(stateRef().selectedEventId||'');
@@ -15534,8 +15535,8 @@ window.addCellNote = addCellNote;
     document.querySelectorAll('.appname-stack span').forEach(el=>{ if(/ControlEvent/i.test(el.textContent||'')) el.textContent=VERSION; });
   }
   function sessionSave(user){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(user||null)); }catch(_){ } }
-  function sessionLoad(){ try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(_){return null;} }
-  function sessionClear(){ try{localStorage.removeItem(SESSION_KEY);}catch(_){ } }
+  function sessionLoad(){ try{ const current=localStorage.getItem(SESSION_KEY); if(current) return JSON.parse(current); const legacy=localStorage.getItem(LEGACY_SESSION_KEY); if(!legacy) return null; localStorage.setItem(SESSION_KEY,legacy); return JSON.parse(legacy); }catch(_){return null;} }
+  function sessionClear(){ try{localStorage.removeItem(SESSION_KEY);localStorage.removeItem(LEGACY_SESSION_KEY);}catch(_){ } }
 
   // Evita que la app vuelva a guardar/cargar todo el estado en localStorage.
   let saveTimer=null, saveBusy=false, saveQueued=false;

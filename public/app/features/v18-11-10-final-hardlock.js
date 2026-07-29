@@ -6,8 +6,8 @@
   var VERSION_TEXT='ControlEvent v25_prod';
   var VERSION_FILE='ControlEvent_v25_prod';
   var BUILD_ID='20260729-V25-PROD-COMPACT-BANK';
-  var ZIP_NAME='CE_V25_PROD.zip';
-  var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
+  var ZIP_NAME='CE_V25_PROD_CUADRE_BANCO_COMPACTO.zip';
+  var oldRe=/(ControlEvent\s+)?v\d+(?:[._-][0-9A-Za-z]+)*_prod(?:[._-][0-9A-Za-z]+)*/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
   function normalizeVersionValue(value){
@@ -54,7 +54,7 @@
   function setGlobals(){
     safe(function(){
       window.__ceVersionLabel=VERSION_LABEL; window.__ceVersion=VERSION_TEXT; window.VERSION=VERSION_TEXT; window.VERSION_FILE=VERSION_FILE;
-      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v24-prod-cuadre-banco'};
+      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v25-prod-cuadre-banco'};
       document.title=VERSION_TEXT;
       if(document.body){ document.body.dataset.ceVersion=VERSION_TEXT; document.body.dataset.ceBuild=BUILD_ID; document.body.dataset.ceZip=ZIP_NAME; }
     });
@@ -65,7 +65,7 @@
       document.querySelectorAll('body *').forEach(function(el){
         if(el.children && el.children.length) return;
         var t=el.textContent||'';
-        if(/v18[._].*prod/i.test(t) && t.length<80){ el.textContent=t.replace(oldRe,function(m){return /^ControlEvent/i.test(m)?VERSION_TEXT:VERSION_LABEL;}); }
+        if(/v\d+(?:[._-][0-9A-Za-z]+)*_prod/i.test(t) && t.length<80){ el.textContent=t.replace(oldRe,function(m){return /^ControlEvent/i.test(m)?VERSION_TEXT:VERSION_LABEL;}); }
       });
     });
   }
@@ -92,7 +92,7 @@
   }
   function apply(){ installStyle(); setGlobals(); patchDownloadNames(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }
   window.ControlEventVersionCheck=function(){
-    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v24-prod-cuadre-banco'};
+    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v25-prod-cuadre-banco'};
     return fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(api){ var out={front:front,api:api,ok:!!(api&&api.version===VERSION_TEXT&&api.label===VERSION_LABEL)}; console.log('[ControlEvent version check]',out); return out; }).catch(function(error){ var out={front:front,api:null,ok:false,error:String(error&&error.message||error)}; console.warn('[ControlEvent version check]',out); return out; });
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();

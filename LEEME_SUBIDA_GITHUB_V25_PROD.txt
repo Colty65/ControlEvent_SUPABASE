@@ -1,16 +1,15 @@
-CONTROLEVENT v25_prod
+CONTROL EVENT v25_prod
+======================
 
-1. Descomprime CE_V25_PROD.zip.
-2. Sube TODO el contenido al repositorio, sustituyendo los ficheros existentes.
-3. Despliega en Vercel.
-4. En el navegador, pulsa Ctrl + F5 para evitar que queden recursos antiguos.
+1. Descomprime CE_V25_PROD_CUADRE_BANCO_COMPACTO.zip.
+2. Sustituye en GitHub TODO el contenido de la versión anterior por el contenido completo de esta carpeta.
+3. Espera a que Vercel termine el despliegue.
+4. Abre la aplicación y pulsa Ctrl + F5.
+5. Comprueba en la cabecera principal que aparece v25_prod.
+6. Abre ColtyLAB sin evento y confirma que el pie muestra v25_prod.
+7. Abre Cuadre Banco y confirma la nueva distribución compacta.
+8. Genera un INFOEVENTO y un BACKUP de prueba. Ambos deben comenzar por ControlEvent_v25_prod y mostrar v25_prod también en sus propiedades/hojas internas.
 
-NO HAY SQL NUEVO.
-Se mantiene el SQL de Cuadre Banco instalado con v24_prod-04/v24_prod-05.
+No hay que ejecutar SQL nuevo si ya se instaló el SQL de v24_prod-04 o v24_prod-05.
 
-Identificación correcta después del despliegue:
-- Cabecera: v25_prod
-- Cuadre Banco: v25_prod
-- API /api/version: ControlEvent v25_prod
-- INFOEVENTO: ControlEvent_v25_prod_INFOEVENTO-...
-- BACKUP: ControlEvent_v25_prod_BACKUP_...
+BUILD: 20260729-V25-PROD-COMPACT-BANK
