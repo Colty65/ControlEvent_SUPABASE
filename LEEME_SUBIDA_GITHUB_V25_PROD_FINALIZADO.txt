@@ -1,0 +1,10 @@
+CONTROL EVENT v25_prod - CUADRE BANCO / EVENTO FINALIZADO
+
+1. Sustituye en GitHub todo el contenido anterior por el contenido completo de este paquete.
+2. Espera a que Vercel termine el despliegue.
+3. Abre ControlEvent y pulsa Ctrl + F5.
+4. En un evento Finalizado, entra en Cuadre Banco.
+5. Comprueba que Cuenta bancaria, Vista de control, Orden temporal y Buscar movimiento están deshabilitados.
+
+No hay que ejecutar SQL nuevo.
+La versión visible continúa siendo v25_prod.

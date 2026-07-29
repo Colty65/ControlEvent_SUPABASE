@@ -96,3 +96,9 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
   .ce-bank-justification{display:flex;flex-direction:column;justify-content:center;border-top:0;border-left:1px solid #e2eaf1;border-radius:0 13px 13px 0;min-width:0}
   .ce-bank-justification.ok{border-left-color:#b9ead4}.ce-bank-justification.pending,.ce-bank-justification.none{border-left-color:#f1dbad}.ce-bank-justification.excess{border-left-color:#ffc8cf}
 }
+
+/* v25_prod · Evento Finalizado: controles de consulta inmovilizados. */
+.ce-bank-command-fields label.ce-bank-control-locked{opacity:.58}
+.ce-bank-command-fields label.ce-bank-control-locked>span{color:#7d8f9d}
+.ce-bank-command-fields select:disabled,.ce-bank-command-fields input:disabled{cursor:not-allowed!important;background:#eef3f6!important;color:#728494!important;border-color:#d6e0e7!important;box-shadow:none!important;pointer-events:none!important}
+.ce-bank-command-fields label.ce-bank-control-locked .ce-bank-search div,.ce-bank-command-fields .ce-bank-search.ce-bank-control-locked div{background:#eef3f6!important}

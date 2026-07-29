@@ -95,6 +95,17 @@
     notice(message,'warning',true);
     return true;
   }
+  function applyReadOnlyControlState(){
+    const locked=store.readOnly===true;
+    ['ceBankAccount','ceBankFilter','ceBankSort','ceBankSearch'].forEach(id=>{
+      const node=$(id); if(!node) return;
+      node.disabled=locked;
+      node.setAttribute('aria-disabled',locked?'true':'false');
+      node.closest('label')?.classList.toggle('ce-bank-control-locked',locked);
+      if(locked) node.setAttribute('tabindex','-1');
+      else node.removeAttribute('tabindex');
+    });
+  }
   function triggerCsvPicker(event){
     stopEvent(event);
     if(mutationBlocked()||store.importing) return false;
@@ -197,10 +208,20 @@
     $('ceBankImport')?.addEventListener('click',event=>{if(actionAllowed('csv-click',350))triggerCsvPicker(event);});
     $('ceBankCsvFile')?.addEventListener('change',importCsv);
     $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',250))load({force:true,preserveScroll:true});});
-    $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;store.page=1;invalidateMovementCache();load({force:true}).then(focusBody);});
-    $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
-    $('ceBankSort')?.addEventListener('change',event=>{store.sort=event.target.value==='ASC'?'ASC':'DESC';store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
+    $('ceBankAccount')?.addEventListener('change',event=>{
+      if(store.readOnly){event.target.value=store.accountId||'TODOS';return;}
+      store.accountId=event.target.value;store.page=1;invalidateMovementCache();load({force:true}).then(focusBody);
+    });
+    $('ceBankFilter')?.addEventListener('change',event=>{
+      if(store.readOnly){event.target.value=store.filter;return;}
+      store.filter=event.target.value;store.page=1;invalidateMovementCache();scheduleBodyRender(true);
+    });
+    $('ceBankSort')?.addEventListener('change',event=>{
+      if(store.readOnly){event.target.value=store.sort;return;}
+      store.sort=event.target.value==='ASC'?'ASC':'DESC';store.page=1;invalidateMovementCache();scheduleBodyRender(true);
+    });
     $('ceBankSearch')?.addEventListener('input',event=>{
+      if(store.readOnly){event.target.value=store.search;return;}
       store.search=event.target.value; store.page=1; invalidateMovementCache();
       clearTimeout(store.searchTimer);
       store.searchTimer=setTimeout(()=>scheduleBodyRender(false),140);
@@ -301,6 +322,13 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
+      if(store.readOnly){
+        store.filter='TODOS';
+        store.search='';
+        store.sort='DESC';
+        store.page=1;
+        invalidateMovementCache();
+      }
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
@@ -371,6 +399,7 @@
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
+    applyReadOnlyControlState();
     const importButton=$('ceBankImport'); importButton.disabled=store.readOnly||store.importing; importButton.setAttribute('aria-disabled',(store.readOnly||store.importing)?'true':'false'); importButton.classList.toggle('busy',store.importing);
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const flowMax=Math.max(Math.abs(num(s.income)),Math.abs(num(s.expense)),1);
@@ -386,7 +415,7 @@
     }else if(tickets.allJustified){
       notice(store.readOnly?'Todo está justificado. El evento está Finalizado y se muestra en modo de consulta.':'Todo está justificado para este evento. Puedes revisar o modificar las asociaciones mientras continúe En curso.','ok',false);
     }else if(store.readOnly){
-      notice('El evento está Finalizado: se permite consultar, buscar, filtrar y revisar asociaciones, pero no modificarlas.','warning',false);
+      notice('El evento está Finalizado: se muestran todos los movimientos en modo de consulta; filtros, orden y búsqueda están bloqueados.','warning',false);
     }else if(!store.noticeLocked){ notice(''); }
     renderBody();
   }

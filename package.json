@@ -10,8 +10,8 @@
     "supabase:check": "node scripts/check-supabase-schema.js",
     "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js",
     "test:zuzu": "node scripts/test-zuzu-v23-1.js",
-    "test:bank": "node scripts/test-bank-reconciliation-v24-4.js && node scripts/test-bank-reconciliation-v24-4-integration.js && node scripts/test-bank-reconciliation-v24-5-ui.js && node scripts/test-bank-reconciliation-v24-5-large-csv.js && node scripts/test-v25-compact-version.js",
-    "test:v25": "node scripts/test-v25-compact-version.js"
+    "test:bank": "node scripts/test-bank-reconciliation-v24-4.js && node scripts/test-bank-reconciliation-v24-4-integration.js && node scripts/test-bank-reconciliation-v24-5-ui.js && node scripts/test-bank-reconciliation-v24-5-large-csv.js && node scripts/test-v25-compact-version.js && node scripts/test-v25-finalized-readonly.js",
+    "test:v25": "node scripts/test-v25-compact-version.js && node scripts/test-v25-finalized-readonly.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
