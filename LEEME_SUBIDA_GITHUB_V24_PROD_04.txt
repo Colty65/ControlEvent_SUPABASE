@@ -1,0 +1,13 @@
+CONTROLEVENT v24_prod-04 · CUADRE BANCO POR PERIODO Y SALDO DE EVENTO
+
+1. Ejecutar primero en Supabase SQL Editor:
+   ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql
+
+2. Subir a GitHub/Vercel el contenido completo de este ZIP, conservando carpetas.
+
+3. Confirmar que el despliegue contiene la versión de caché:
+   20260729-V24-PROD-04-BANK-PERIODO
+
+4. Recargar ControlEvent con Ctrl+F5 en PC. En móvil, cerrar la pestaña y volver a abrirla.
+
+La actualización SQL es obligatoria: crea el periodo bancario por evento y la inclusión de movimientos independiente para cada evento.

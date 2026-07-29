@@ -8,6 +8,7 @@ import {
   importBankCsv,
   listBankReconciliation,
   listPaidTickets,
+  setBankEventPeriod,
   setMovementForced,
   setMovementIncluded
 } from '../services/bank-reconciliation.service.js';
@@ -48,15 +49,22 @@ router.get('/bank-reconciliation/export', asyncHandler(async (req,res) => {
   requireBankRole(req);
   res.json(await exportBankData({accountId:req.query.accountId,eventId:req.query.eventId}));
 }));
+router.patch('/bank-reconciliation/event-period', asyncHandler(async (req,res) => {
+  const actor = requireBankRole(req);
+  const eventId = eventIdFrom(req);
+  await assertBankEventWritable(eventId);
+  res.json(await setBankEventPeriod(eventId,req.body?.dateFrom,req.body?.dateTo,actor));
+}));
 router.post('/bank-reconciliation/import', asyncHandler(async (req,res) => {
   const actor = requireBankRole(req);
   await assertBankEventWritable(eventIdFrom(req));
   res.json(await importBankCsv(req.body || {}, actor));
 }));
 router.patch('/bank-reconciliation/movements/:id', asyncHandler(async (req,res) => {
-  requireBankRole(req);
-  await assertBankEventWritable(eventIdFrom(req));
-  res.json(await setMovementIncluded(req.params.id, req.body?.included));
+  const actor = requireBankRole(req);
+  const eventId = eventIdFrom(req);
+  await assertBankEventWritable(eventId);
+  res.json(await setMovementIncluded(req.params.id,eventId,req.body?.included,actor));
 }));
 router.patch('/bank-reconciliation/movements/:id/forced', asyncHandler(async (req,res) => {
   requireBankRole(req);

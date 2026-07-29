@@ -1,5 +1,5 @@
 -- ============================================================================
--- ControlEvent v24_prod · CUADRE BANCO
+-- ControlEvent v24_prod-04 · CUADRE BANCO POR EVENTO Y PERIODO BANCARIO
 -- Ejecutar completo en Supabase > SQL Editor antes de utilizar la nueva ventana.
 -- Crea movimientos bancarios, lotes de importación CSV y vínculos con TKxx pagados.
 -- ============================================================================
@@ -58,6 +58,27 @@ create table if not exists public.ce_bank_ticket_links (
 
 
 
+
+create table if not exists public.ce_bank_event_settings (
+  event_id text primary key references public.ce_eventos(id) on update cascade on delete cascade,
+  date_from date not null,
+  date_to date not null,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint ce_bank_event_period_valid check (date_from <= date_to)
+);
+
+create table if not exists public.ce_bank_event_movement_state (
+  event_id text not null references public.ce_eventos(id) on update cascade on delete cascade,
+  movement_id uuid not null references public.ce_bank_movements(id) on update cascade on delete cascade,
+  included boolean not null default true,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (event_id, movement_id)
+);
+
 -- Actualización segura para instalaciones que ya tenían la versión v24_prod-02.
 alter table public.ce_bank_ticket_links
   add column if not exists forced_square boolean not null default false;
@@ -67,6 +88,9 @@ create index if not exists ce_bank_movements_included_idx on public.ce_bank_move
 create index if not exists ce_bank_movements_batch_idx on public.ce_bank_movements(import_batch_id);
 create index if not exists ce_bank_ticket_links_movement_idx on public.ce_bank_ticket_links(movement_id);
 create index if not exists ce_bank_ticket_links_event_idx on public.ce_bank_ticket_links(event_id, ticket_code);
+create index if not exists ce_bank_event_settings_dates_idx on public.ce_bank_event_settings(date_from, date_to);
+create index if not exists ce_bank_event_movement_state_event_idx on public.ce_bank_event_movement_state(event_id, included);
+create index if not exists ce_bank_event_movement_state_movement_idx on public.ce_bank_event_movement_state(movement_id);
 
 create or replace function public.ce_bank_set_updated_at()
 returns trigger
@@ -83,9 +107,22 @@ create trigger ce_bank_movements_updated_at_trg
 before update on public.ce_bank_movements
 for each row execute function public.ce_bank_set_updated_at();
 
+drop trigger if exists ce_bank_event_settings_updated_at_trg on public.ce_bank_event_settings;
+create trigger ce_bank_event_settings_updated_at_trg
+before update on public.ce_bank_event_settings
+for each row execute function public.ce_bank_set_updated_at();
+
+drop trigger if exists ce_bank_event_movement_state_updated_at_trg on public.ce_bank_event_movement_state;
+create trigger ce_bank_event_movement_state_updated_at_trg
+before update on public.ce_bank_event_movement_state
+for each row execute function public.ce_bank_set_updated_at();
+
 comment on table public.ce_bank_movements is 'Movimientos importados de CSV bancario para el Cuadre Banco de ControlEvent.';
-comment on column public.ce_bank_movements.included is 'Si es false, el movimiento no participa en el saldo calculado.';
+comment on column public.ce_bank_movements.included is 'Valor inicial heredado. Desde v24_prod-04 la inclusión efectiva se guarda por evento en ce_bank_event_movement_state.';
 comment on table public.ce_bank_ticket_links is 'Vinculación de movimientos bancarios negativos con TKxx pagados. Un TKxx solo puede justificar un movimiento.';
 comment on column public.ce_bank_ticket_links.forced_square is 'Permite aceptar manualmente diferencias entre el movimiento y la suma de TKxx para un evento.';
+comment on table public.ce_bank_event_settings is 'Periodo bancario editable de cada evento. Define qué movimientos se muestran, incluidos los abonos.';
+comment on table public.ce_bank_event_movement_state is 'Inclusión o exclusión de un movimiento en el cálculo del saldo de un evento concreto.';
+comment on column public.ce_bank_event_movement_state.included is 'Si es false, el movimiento se ve pero no altera el saldo inicial/final calculado del evento.';
 
 commit;

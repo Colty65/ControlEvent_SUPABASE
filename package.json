@@ -1,6 +1,6 @@
 {
   "name": "controlevent-v24-prod",
-  "version": "24.0.3",
+  "version": "24.0.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,13 +9,14 @@
     "dev:supabase": "node scripts/dev-server-supabase.js",
     "supabase:check": "node scripts/check-supabase-schema.js",
     "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js",
-    "test:zuzu": "node scripts/test-zuzu-v23-1.js"
+    "test:zuzu": "node scripts/test-zuzu-v23-1.js",
+    "test:bank": "node scripts/test-bank-reconciliation-v24-4.js && node scripts/test-bank-reconciliation-v24-4-integration.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
     "exceljs": "^4.4.0",
+    "express": "^4.19.2",
     "mime-types": "^2.1.35"
   }
 }

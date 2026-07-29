@@ -1,10 +1,10 @@
-/* ControlEvent v24_prod-03 · Cuadre Banco por evento (GD/RW). */
+/* ControlEvent v24_prod-04 · Cuadre Banco por evento y periodo bancario (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v24_prod-03';
+  const VERSION = 'v24_prod-04';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -25,12 +25,12 @@
   const store = {
     loading:false, importing:false, data:null, eventId:'', accountId:'', filter:'TODOS', search:'',
     ticketMovement:null, tickets:[], openGestureAt:0, lastAction:'', lastActionAt:0, readOnly:false,
-    lastBodyScroll:0, pendingFocusId:'', noticeLocked:false
+    lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:''
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
   async function api(path, options={}){
-    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'cuadre-banco-v24-evento','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
+    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'cuadre-banco-v24-periodo-evento','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
     let payload={};
     try{ payload=await response.json(); }catch(_){ payload={}; }
     if(!response.ok){
@@ -128,8 +128,8 @@
             <p id="ceBankEventPeriod">Se mostrarán únicamente sus movimientos y TKxx.</p>
           </div>
           <div id="ceBankTraffic" class="ce-bank-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 TKxx</b><small>Sin datos</small></div></div>
-          <div class="ce-bank-header-balance"><span>Saldo de control</span><strong id="ceBankHeaderBalance">—</strong><small id="ceBankHeaderCount">Sincronizando movimientos</small></div>
-          <span class="ce-bank-version">v24_prod-03</span>
+          <div class="ce-bank-header-balance"><span>Saldo final del evento</span><strong id="ceBankHeaderBalance">—</strong><small id="ceBankHeaderCount">Sincronizando movimientos</small></div>
+          <span class="ce-bank-version">v24_prod-04</span>
           <button type="button" id="ceBankClose" class="ce-bank-close" aria-label="Cerrar Cuadre Banco"><span>×</span></button>
         </header>
         <div id="ceBankReadOnly" class="ce-bank-readonly hidden"><b>EVENTO FINALIZADO</b><span>Consulta completa disponible; altas, bajas y cambios están bloqueados.</span></div>
@@ -142,12 +142,19 @@
           <div class="ce-bank-command-fields">
             <label><span>Cuenta bancaria</span><select id="ceBankAccount"></select></label>
             <label><span>Vista de control</span><select id="ceBankFilter"><option value="TODOS">Todos los movimientos</option><option value="INCLUIDOS">Incluidos en saldo</option><option value="EXCLUIDOS">Fuera del saldo</option><option value="PENDIENTES">Pendientes de justificar</option><option value="CUADRADOS">Cuadrados</option><option value="FORZADOS">Cuadrados forzados</option></select></label>
+            <label><span>Orden temporal</span><select id="ceBankSort"><option value="DESC">Más joven → más antiguo</option><option value="ASC">Más antiguo → más joven</option></select></label>
             <label class="ce-bank-search"><span>Buscar movimiento</span><div><i>⌕</i><input id="ceBankSearch" autocomplete="off" placeholder="Fecha, concepto, importe, saldo o TKxx"></div></label>
           </div>
         </div>
+        <div class="ce-bank-period-deck">
+          <div class="ce-bank-period-copy"><span>PERIODO BANCARIO DEL EVENTO</span><b>Todos los cargos y abonos de estas fechas se mostrarán en pantalla.</b><small>Las dos fechas son inclusivas. Al desvincular un TKxx, el movimiento seguirá visible mientras permanezca dentro del periodo.</small></div>
+          <label><span>Fecha inicio bancaria</span><input id="ceBankDateFrom" type="date"></label>
+          <label><span>Fecha final bancaria</span><input id="ceBankDateTo" type="date"></label>
+          <button type="button" id="ceBankApplyPeriod"><span>✓</span><b>Aplicar fechas</b></button>
+        </div>
         <div id="ceBankSummary" class="ce-bank-summary"></div>
         <div id="ceBankNotice" class="ce-bank-notice hidden"></div>
-        <div class="ce-bank-ledger-caption"><span>CRONOLOGÍA DEL EVENTO</span><b>Movimiento</b><b>Concepto</b><b>Importe y saldo</b></div>
+        <div class="ce-bank-ledger-caption"><span>CRONOLOGÍA BANCARIA DEL EVENTO</span><b>Movimiento</b><b>Concepto</b><b>Importe · saldo banco · saldo evento</b></div>
         <main id="ceBankBody" class="ce-bank-body" tabindex="0" aria-label="Movimientos bancarios del evento"></main>
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
       </section>`;
@@ -182,7 +189,10 @@
     $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',350))load({force:true,preserveScroll:true});});
     $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;load({force:true}).then(focusBody);});
     $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;renderBody();focusBody();});
+    $('ceBankSort')?.addEventListener('change',event=>{store.sort=event.target.value==='ASC'?'ASC':'DESC';renderBody();focusBody();});
     $('ceBankSearch')?.addEventListener('input',event=>{store.search=event.target.value;renderBody();});
+    $('ceBankApplyPeriod')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('period',500))savePeriod();});
+    ['ceBankDateFrom','ceBankDateTo'].forEach(id=>$(id)?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();savePeriod();}}));
     overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
   }
   function applyRole(){
@@ -209,7 +219,7 @@
     installDom();
     if(!hasBankRole()){ alert('Cuadre Banco está disponible para usuarios GD y RW.'); return false; }
     const eventId=currentEventReady(); if(!eventId) return false;
-    if(store.eventId!==eventId){ store.eventId=eventId; store.accountId=''; store.filter='TODOS'; store.search=''; }
+    if(store.eventId!==eventId){ store.eventId=eventId; store.accountId=''; store.filter='TODOS'; store.search=''; store.sort='DESC'; store.dateFrom=''; store.dateTo=''; }
     const overlay=$('ceBankOverlay');
     ensureInteractive(); overlay.classList.remove('hidden');
     requestAnimationFrame(()=>{overlay.classList.add('visible');ensureInteractive();});
@@ -242,6 +252,7 @@
       store.data=await api(`/api/bank-reconciliation?${queryString(force)}`);
       store.accountId=store.data.selectedAccount||store.accountId;
       store.readOnly=store.data.readOnly===true;
+      store.dateFrom=text(store.data?.period?.dateFrom); store.dateTo=text(store.data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
     }catch(error){
@@ -253,43 +264,58 @@
   function restorePosition(movementId,preserveScroll){
     const body=$('ceBankBody'); if(!body) return;
     if(movementId){
-      const row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
+      let row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
+      if(!row && (store.filter!=='TODOS'||text(store.search))){
+        store.filter='TODOS'; store.search='';
+        if($('ceBankFilter')) $('ceBankFilter').value='TODOS';
+        if($('ceBankSearch')) $('ceBankSearch').value='';
+        renderBody();
+        row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
+      }
       if(row){ row.scrollIntoView({block:'center',behavior:'auto'}); row.classList.add('ce-bank-returned'); setTimeout(()=>row.classList.remove('ce-bank-returned'),1800); }
     }else if(preserveScroll) body.scrollTop=store.lastBodyScroll;
   }
   function render(){
-    const data=store.data||{accounts:[],movements:[],summary:{},event:{},ticketSummary:{}};
+    const data=store.data||{accounts:[],movements:[],summary:{},event:{},ticketSummary:{},period:{}};
     const account=$('ceBankAccount');
     const accountOptions=['<option value="TODOS">Todas las cuentas</option>',...arr(data.accounts).map(item=>`<option value="${esc(item.id)}">${esc(item.label||item.id)}</option>`)].join('');
     account.innerHTML=accountOptions||'<option value="">Sin movimientos</option>';
     account.value=store.accountId||'TODOS';
     $('ceBankFilter').value=store.filter;
+    $('ceBankSort').value=store.sort;
     $('ceBankSearch').value=store.search;
-    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const traffic=trafficInfo(tickets);
-    const balanceClass=num(s.calculatedBalance)<0?'negative':'positive';
-    $('ceBankHeaderBalance').textContent=money(s.calculatedBalance); $('ceBankHeaderBalance').className=balanceClass;
-    $('ceBankHeaderCount').textContent=`${num(s.includedCount)} incluidos · ${num(s.excludedCount)} excluidos`;
+    $('ceBankDateFrom').value=store.dateFrom;
+    $('ceBankDateTo').value=store.dateTo;
+    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const period=data.period||{}; const traffic=trafficInfo(tickets);
+    const finalClass=num(s.calculatedBalance)<0?'negative':'positive';
+    const variationClass=num(s.eventVariation)<0?'negative':'positive';
+    $('ceBankHeaderBalance').textContent=money(s.calculatedBalance); $('ceBankHeaderBalance').className=finalClass;
+    $('ceBankHeaderCount').textContent=`Inicial ${money(s.openingBalance)} · variación ${money(s.eventVariation)}`;
     const headline=$('ceBankEventHeadline');
     headline.className=`ce-bank-event-headline ${event.finalized?'finalized':'in-progress'}`;
     headline.innerHTML=`<strong>${esc(event.title||'Evento')}</strong><span>${esc(event.status||'En curso')}</span>`;
-    $('ceBankEventPeriod').textContent=`Periodo conciliado: ${formatDate(event.reconciliationStart,false)} — ${formatDate(event.reconciliationEnd,false)} · Ventana del evento: ${formatDate(event.startDate,false)} — ${formatDate(event.endDate,false)}`;
+    $('ceBankEventPeriod').textContent=`Periodo bancario: ${formatDate(store.dateFrom,false)} — ${formatDate(store.dateTo,false)} · fechas inclusivas`;
     const trafficNode=$('ceBankTraffic');
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
     const importButton=$('ceBankImport'); importButton.disabled=store.readOnly; importButton.setAttribute('aria-disabled',store.readOnly?'true':'false');
+    ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const flowMax=Math.max(Math.abs(num(s.income)),Math.abs(num(s.expense)),1);
     const incomePct=Math.round(Math.abs(num(s.income))/flowMax*100); const expensePct=Math.round(Math.abs(num(s.expense))/flowMax*100);
+    const objective=num(s.eventVariation)>=0?'El evento deja más saldo que al comenzar':'El evento reduce el saldo de partida';
     $('ceBankSummary').innerHTML=`
-      <article class="ce-bank-kpi ce-bank-kpi-hero ${balanceClass}"><div class="ce-bank-kpi-copy"><span>Saldo calculado en esta vista</span><strong>${money(s.calculatedBalance)}</strong><small>Saldo inicial ${money(s.openingBalance)} + movimientos incluidos</small></div><div class="ce-bank-orbit-visual" aria-hidden="true"><i></i><i></i><i></i><b>${balanceClass==='negative'?'−':'+'}</b></div></article>
-      <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-signal"><i></i><i></i><i></i><i></i><i></i></div></article>
-      <article class="ce-bank-kpi ce-bank-kpi-flow"><span>Flujo visible del evento</span><div class="ce-bank-flow-row income"><b>Entradas</b><i><u style="width:${incomePct}%"></u></i><strong>${money(s.income)}</strong></div><div class="ce-bank-flow-row expense"><b>Salidas</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small>Variación neta ${money(s.includedNet)}</small></article>
-      <article class="ce-bank-kpi ce-bank-kpi-count"><span>Justificación de TKxx</span><strong>${num(tickets.linked)} <em>/ ${num(tickets.total)}</em></strong><small>${num(tickets.pending)} pendientes</small><div class="ce-bank-dots">${Array.from({length:Math.min(18,Math.max(1,num(tickets.total)))},(_,i)=>`<i class="${i<num(tickets.linked)?'on':''}"></i>`).join('')}</div></article>`;
-    if(tickets.allJustified){
+      <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del evento</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
+      <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo final calculado del evento</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div><div class="ce-bank-orbit-visual" aria-hidden="true"><i></i><i></i><i></i><b>${finalClass==='negative'?'−':'+'}</b></div></article>
+      <article class="ce-bank-kpi ce-bank-kpi-flow"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos</b><i><u style="width:${incomePct}%"></u></i><strong>${money(s.income)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${variationClass}">Variación ${money(s.eventVariation)} · ${esc(objective)}</small></article>
+      <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-actual-period">Saldo real al final del periodo: <b>${money(s.actualClosingBalance)}</b></div></article>`;
+    if(num(period.linkedOutsidePeriodCount)>0){
+      notice(`Hay ${num(period.linkedOutsidePeriodCount)} movimiento(s) con TKxx asociados fuera del periodo bancario seleccionado. Amplía las fechas para revisarlos.`,'warning',false);
+    }else if(tickets.allJustified){
       notice(store.readOnly?'Todo está justificado. El evento está Finalizado y se muestra en modo de consulta.':'Todo está justificado para este evento. Puedes revisar o modificar las asociaciones mientras continúe En curso.','ok',false);
     }else if(store.readOnly){
       notice('El evento está Finalizado: se permite consultar, buscar, filtrar y revisar asociaciones, pero no modificarlas.','warning',false);
-    }
+    }else if(!store.noticeLocked){ notice(''); }
     renderBody();
   }
   function filteredMovements(){
@@ -301,9 +327,13 @@
     else if(store.filter==='FORZADOS') rows=rows.filter(row=>row.justificationStatus==='CUADRADO_FORZADO');
     const q=text(store.search).toLowerCase();
     if(q) rows=rows.filter(row=>[
-      row.description,row.amount,row.bankBalance,formatDate(row.executedAt),formatDate(row.valueDate,false),
+      row.description,row.amount,row.bankBalance,row.eventBalanceAfter,formatDate(row.executedAt),formatDate(row.valueDate,false),
       ...arr(row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)])
     ].join(' ').toLowerCase().includes(q));
+    rows.sort((a,b)=>{
+      const cmp=String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id));
+      return store.sort==='ASC'?cmp:-cmp;
+    });
     return rows;
   }
   function renderBody(){
@@ -320,17 +350,31 @@
       return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
         <div class="ce-bank-ledger-node"><span>${String(index+1).padStart(2,'0')}</span><i></i></div>
         <div class="ce-bank-movement-main">
-          <label class="ce-bank-include"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>En saldo</b></label>
+          <label class="ce-bank-include"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${row.included?'En saldo':'Inactivo'}</b></label>
           <div class="ce-bank-date"><strong>${formatDate(row.executedAt)}</strong><small>Valor ${formatDate(row.valueDate,false)}</small></div>
           <div class="ce-bank-description"><div><span>${row.amount<0?'SALIDA':'ENTRADA'}</span><strong>${esc(row.description)}</strong></div></div>
-          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'DÉBITO':'CRÉDITO'}</small><strong>${money(row.amount)}</strong><span>Saldo: <b>${money(row.bankBalance)}</b></span></div>
+          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO':'ABONO'}</small><strong>${money(row.amount)}</strong><span>Banco: <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
         </div>
         <div class="ce-bank-justification ${status.className}">
           <div class="ce-bank-justify-head"><div><span class="ce-bank-justify-icon">${row.amount<0?'⌁':'↗'}</span><div><strong>${row.amount<0?'Trazabilidad de compra':'Movimiento positivo conciliado'}</strong><span class="ce-bank-status ${status.className}">${esc(status.label)}</span></div></div>${row.amount<0?`<div class="ce-bank-justify-numbers"><b>${money(row.justifiedAmount)}</b><span>de ${money(row.targetAmount)}</span></div>`:''}</div>
-          ${row.amount<0?`<div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div><div class="ce-bank-ticket-list">${links||'<span class="ce-bank-no-tickets">Todavía no hay TKxx asociados a este movimiento.</span>'}</div><div class="ce-bank-justify-actions"><button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${disabled}><span>＋</span><b>Vincular TKxx del evento</b></button>${forceControl}</div>`:'<p class="ce-bank-positive-note">Este abono alimenta el saldo y no necesita TKxx de compra.</p>'}
+          ${row.amount<0?`<div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div><div class="ce-bank-ticket-list">${links||'<span class="ce-bank-no-tickets">Todavía no hay TKxx asociados a este movimiento.</span>'}</div><div class="ce-bank-justify-actions"><button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${disabled}><span>＋</span><b>Vincular TKxx del evento</b></button>${forceControl}</div>`:'<p class="ce-bank-positive-note">Este abono se muestra en la evolución del saldo y no necesita TKxx de compra.</p>'}
         </div>
       </article>`;
     }).join('');
+  }
+  async function savePeriod(){
+    if(mutationBlocked()) return;
+    const dateFrom=text($('ceBankDateFrom')?.value); const dateTo=text($('ceBankDateTo')?.value);
+    if(!dateFrom||!dateTo){notice('Indica las dos fechas del periodo bancario.','warning',true);return;}
+    if(dateFrom>dateTo){notice('La fecha de inicio bancaria no puede ser posterior a la fecha final.','warning',true);return;}
+    const button=$('ceBankApplyPeriod'); if(button) button.disabled=true;
+    try{
+      await api('/api/bank-reconciliation/event-period',{method:'PATCH',body:JSON.stringify({eventId:store.eventId,dateFrom,dateTo})});
+      store.dateFrom=dateFrom; store.dateTo=dateTo;
+      notice(`Periodo bancario aplicado: ${formatDate(dateFrom,false)} — ${formatDate(dateTo,false)}.`,'ok',true);
+      await load({force:true,preserveNotice:true});
+    }catch(error){notice(error.message,'error',true);}
+    finally{if(button) button.disabled=store.readOnly;}
   }
   async function importCsv(event){
     if(store.importing||mutationBlocked()) return;
@@ -446,7 +490,7 @@
   },true);
   document.addEventListener('change',event=>{
     if(event.target?.id==='selectedEvent'&&!$('ceBankOverlay')?.classList.contains('hidden')){
-      const id=activeEventId(); if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';load({force:true});}
+      const id=activeEventId(); if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';store.sort='DESC';store.dateFrom='';store.dateTo='';load({force:true});}
     }
   },true);
   const observer=root.MutationObserver?new MutationObserver(()=>{installDom();applyRole();}):null;

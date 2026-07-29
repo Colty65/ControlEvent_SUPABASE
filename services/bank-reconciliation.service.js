@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from '../lib/supabase.js';
 const MOVEMENTS_TABLE = 'ce_bank_movements';
 const LINKS_TABLE = 'ce_bank_ticket_links';
 const BATCHES_TABLE = 'ce_bank_import_batches';
+const EVENT_SETTINGS_TABLE = 'ce_bank_event_settings';
+const EVENT_MOVEMENT_STATE_TABLE = 'ce_bank_event_movement_state';
 
 function db(){ return getSupabaseAdmin(); }
 function text(value){ return value == null ? '' : String(value).trim(); }
@@ -25,7 +27,7 @@ function normalizeTicket(value){
 function ticketNumber(code){ return Number(String(code || '').replace(/\D/g, '')) || 0; }
 function friendlyDbError(error){
   const msg = text(error?.message || error);
-  if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
+  if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|ce_bank_event_settings|ce_bank_event_movement_state|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
     const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
     err.status = 503;
     err.code = 'BANK_SCHEMA_MISSING';
@@ -266,6 +268,99 @@ function summaryFor(movements){
 }
 
 function dateOnly(value){ return text(value).slice(0,10); }
+function validIsoDate(value){
+  const raw=dateOnly(value);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const date=new Date(`${raw}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0,10)===raw ? raw : '';
+}
+function minDate(values){ return arr(values).map(validIsoDate).filter(Boolean).sort()[0] || ''; }
+function maxDate(values){ const rows=arr(values).map(validIsoDate).filter(Boolean).sort(); return rows[rows.length-1] || ''; }
+function normalizePeriod(dateFrom,dateTo){
+  const start=validIsoDate(dateFrom);
+  const end=validIsoDate(dateTo);
+  if(!start||!end) fail('Indica una fecha de inicio y una fecha final válidas.',409,'BANK_PERIOD_INVALID');
+  if(start>end) fail('La fecha de inicio bancaria no puede ser posterior a la fecha final.',409,'BANK_PERIOD_REVERSED');
+  return {dateFrom:start,dateTo:end};
+}
+function defaultPeriod(event,linkedMovements,allMovements){
+  const linkedDays=arr(linkedMovements).map(row=>dateOnly(row.executedAt)).filter(Boolean);
+  const allDays=arr(allMovements).map(row=>dateOnly(row.executedAt)).filter(Boolean);
+  let dateFrom=minDate([event.startDate,...linkedDays]);
+  let dateTo=maxDate([event.endDate,...linkedDays]);
+  if(!dateFrom) dateFrom=minDate(allDays);
+  if(!dateTo) dateTo=maxDate(allDays);
+  if(!dateFrom&&dateTo) dateFrom=dateTo;
+  if(!dateTo&&dateFrom) dateTo=dateFrom;
+  if(!dateFrom||!dateTo){
+    const today=new Date().toISOString().slice(0,10);
+    dateFrom=dateFrom||today;
+    dateTo=dateTo||dateFrom;
+  }
+  if(dateFrom>dateTo) [dateFrom,dateTo]=[dateTo,dateFrom];
+  return {dateFrom,dateTo};
+}
+function eventSettingFromDb(row={}){
+  return {eventId:text(row.event_id),dateFrom:dateOnly(row.date_from),dateTo:dateOnly(row.date_to),updatedBy:text(row.updated_by),updatedAt:text(row.updated_at)};
+}
+async function ensureEventPeriod(event,linkedMovements,allMovements,persist=true){
+  const {data,error}=await db().from(EVENT_SETTINGS_TABLE).select('*').eq('event_id',event.id).maybeSingle();
+  if(error) throw error;
+  if(data) return {...eventSettingFromDb(data),saved:true};
+  const initial=defaultPeriod(event,linkedMovements,allMovements);
+  if(!persist) return {...initial,eventId:event.id,saved:false,initialized:true};
+  const row={event_id:event.id,date_from:initial.dateFrom,date_to:initial.dateTo,updated_by:'INICIALIZACION_AUTOMATICA'};
+  const {data:created,error:createError}=await db().from(EVENT_SETTINGS_TABLE).upsert(row,{onConflict:'event_id'}).select('*').single();
+  if(createError) throw createError;
+  return {...eventSettingFromDb(created),saved:true,initialized:true};
+}
+function inPeriod(movement,period){
+  const day=dateOnly(movement.executedAt);
+  return !!day && day>=period.dateFrom && day<=period.dateTo;
+}
+function buildEventLedger(movements){
+  const sorted=[...arr(movements)].sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id)));
+  const grouped=new Map();
+  for(const row of sorted){
+    const key=text(row.accountId)||'SIN_CUENTA';
+    if(!grouped.has(key)) grouped.set(key,[]);
+    grouped.get(key).push(row);
+  }
+  let openingBalance=0;
+  let actualClosingBalance=0;
+  for(const rows of grouped.values()){
+    const first=rows[0];
+    const last=rows[rows.length-1];
+    openingBalance=cents(openingBalance + (first ? cents(first.bankBalance-first.amount) : 0));
+    actualClosingBalance=cents(actualClosingBalance + (last ? cents(last.bankBalance) : 0));
+  }
+  let running=openingBalance;
+  const enriched=[];
+  for(const row of sorted){
+    const eventBalanceBefore=running;
+    if(row.included) running=cents(running+row.amount);
+    enriched.push({...row,eventBalanceBefore,eventBalanceAfter:running});
+  }
+  const included=enriched.filter(row=>row.included);
+  const latest=sorted[sorted.length-1]||null;
+  const includedNet=cents(included.reduce((sum,row)=>sum+row.amount,0));
+  return {
+    movements:enriched,
+    summary:{
+      openingBalance,
+      includedNet,
+      calculatedBalance:running,
+      eventVariation:cents(running-openingBalance),
+      actualClosingBalance:sorted.length?actualClosingBalance:openingBalance,
+      actualClosingAt:latest?.executedAt||'',
+      movementCount:enriched.length,
+      includedCount:included.length,
+      excludedCount:enriched.length-included.length,
+      income:cents(included.filter(row=>row.amount>0).reduce((sum,row)=>sum+row.amount,0)),
+      expense:cents(included.filter(row=>row.amount<0).reduce((sum,row)=>sum+Math.abs(row.amount),0))
+    }
+  };
+}
 function eventFromDb(row = {}){
   return {
     id:text(row.id),
@@ -293,13 +388,6 @@ export async function assertBankEventWritable(eventId){
     return event;
   }catch(error){ throw friendlyDbError(error); }
 }
-function inEventDates(movement,event){
-  const day=dateOnly(movement.executedAt);
-  if(!day) return false;
-  if(event.startDate && day < event.startDate) return false;
-  if(event.endDate && day > event.endDate) return false;
-  return !!(event.startDate || event.endDate);
-}
 function reconcileMovement(row,links){
   const target=row.amount < 0 ? Math.abs(row.amount) : 0;
   const justified=cents(links.reduce((sum,link)=>sum + num(link.ticketAmount),0));
@@ -320,24 +408,20 @@ function eventTicketSummary(catalog,eventId){
   const traffic=total && linked===total ? 'GREEN' : (ratio >= .5 ? 'ORANGE' : 'RED');
   return {total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified:total>0&&linked===total,traffic};
 }
-function linkedPeriod(movements){
-  const linked=movements.filter(row=>row.links.length).sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt)));
-  return {start:dateOnly(linked[0]?.executedAt),end:dateOnly(linked[linked.length-1]?.executedAt)};
-}
-
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, linkRows, catalog] = await Promise.all([
+    const [movementRows, linkRows, catalog, stateRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {order:'executed_at', ascending:false}),
       selectPaged(LINKS_TABLE, {order:'created_at', ascending:true}),
-      ticketCatalog()
+      ticketCatalog(),
+      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{order:'updated_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
     ]);
     const all=movementRows.map(movementFromDb);
     const accounts=[...new Map(all.map(row=>[row.accountId,{id:row.accountId,label:row.accountLabel||row.accountId,lastAt:row.executedAt}])).values()]
       .sort((a,b)=>String(b.lastAt).localeCompare(String(a.lastAt)));
     const requestedAccount=text(accountId);
-    const selectedAccount=requestedAccount&&requestedAccount!=='TODOS'?requestedAccount:'TODOS';
+    const selectedAccount=requestedAccount||accounts[0]?.id||'TODOS';
     const accountMovements=selectedAccount&&selectedAccount!=='TODOS'?all.filter(row=>row.accountId===selectedAccount):all;
     const globalSummary=summaryFor(accountMovements);
     const catalogMap=new Map(catalog.map(item=>[`${item.eventId}|${item.ticketCode}`,item]));
@@ -352,25 +436,40 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         responsibles:current?.responsibles||[]
       });
     }
-    const eventLinkedMovements=all
-      .filter(row=>eventLinksByMovement.has(row.id))
-      .map(row=>reconcileMovement(row,eventLinksByMovement.get(row.id)||[]));
-    const movements=accountMovements
-      .filter(row=>eventLinksByMovement.has(row.id)||inEventDates(row,event))
-      .map(row=>reconcileMovement(row,eventLinksByMovement.get(row.id)||[]));
-    const eventSummary=summaryFor(movements);
-    const period=linkedPeriod(eventLinkedMovements);
+    const eventLinkedMovements=all.filter(row=>eventLinksByMovement.has(row.id));
+    const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
+    const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
+    const scoped=accountMovements
+      .filter(row=>inPeriod(row,period))
+      .map(row=>reconcileMovement({...row,included:stateByMovement.has(row.id)?stateByMovement.get(row.id):row.included},eventLinksByMovement.get(row.id)||[]));
+    const ledger=buildEventLedger(scoped);
+    const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
+    const movements=scoped.map(row=>movementById.get(row.id)||row);
+    const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id);
     return {
       ok:true,
-      event:{...event,reconciliationStart:period.start||event.startDate,reconciliationEnd:period.end||event.endDate},
+      event:{...event,reconciliationStart:period.dateFrom,reconciliationEnd:period.dateTo},
+      period:{dateFrom:period.dateFrom,dateTo:period.dateTo,linkedOutsidePeriodCount:linkedOutsidePeriod.length},
       readOnly:event.finalized,
       ticketSummary,
       accounts,
       selectedAccount,
       movements,
-      summary:{...eventSummary,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
+      summary:{...ledger.summary,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
     };
+  }catch(error){ throw friendlyDbError(error); }
+}
+
+export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={}){
+  const selectedEvent=text(eventId);
+  if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
+  const period=normalizePeriod(dateFrom,dateTo);
+  try{
+    const row={event_id:selectedEvent,date_from:period.dateFrom,date_to:period.dateTo,updated_by:text(actor.identificacion||actor.nombre)};
+    const {data,error}=await db().from(EVENT_SETTINGS_TABLE).upsert(row,{onConflict:'event_id'}).select('*').single();
+    if(error) throw error;
+    return {ok:true,period:eventSettingFromDb(data)};
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -435,14 +534,19 @@ export async function importBankCsv(payload = {}, actor = {}){
   }
 }
 
-export async function setMovementIncluded(id, included){
+export async function setMovementIncluded(id,eventId,included,actor={}){
   const movementId = text(id);
+  const selectedEvent=text(eventId);
   if(!movementId) fail('Falta el movimiento bancario.');
+  if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
   try{
-    const {data,error}=await db().from(MOVEMENTS_TABLE).update({included:included !== false}).eq('id',movementId).select('*').maybeSingle();
+    const {data:movement,error:movementError}=await db().from(MOVEMENTS_TABLE).select('id').eq('id',movementId).maybeSingle();
+    if(movementError) throw movementError;
+    if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
+    const row={event_id:selectedEvent,movement_id:movementId,included:included!==false,updated_by:text(actor.identificacion||actor.nombre)};
+    const {data,error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(row,{onConflict:'event_id,movement_id'}).select('*').single();
     if(error) throw error;
-    if(!data) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
-    return {ok:true,movement:movementFromDb(data)};
+    return {ok:true,state:{eventId:text(data.event_id),movementId:text(data.movement_id),included:data.included!==false}};
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -536,3 +640,4 @@ export async function exportBankData({accountId='',eventId=''} = {}){
   ]);
   return {...data,batches:batchRows.map(batchFromDb)};
 }
+
