@@ -423,16 +423,17 @@
       const clone=old.cloneNode(true);
       clone.className='ce-brand-logo-safe';
       clone.alt='Logo';
-      clone.title=noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento';
+      clone.removeAttribute('title'); clone.setAttribute('aria-label',noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento');
       try{ clone.style.cssText=(old.getAttribute('style')||'')+';cursor:pointer;'; }catch(_){ }
       old.replaceWith(clone);
     }
-    document.querySelectorAll('.ce-brand-logo-safe,.brand,.brand-user,#brandCurrentUserName,#brandCurrentUserMeta').forEach(logo=>{
-      if(logo.__ceV16Hf5Bound) return;
-      logo.__ceV16Hf5Bound=true;
-      logo.addEventListener('click',toggleAvance, true);
-      logo.addEventListener('pointerup',toggleAvance, true);
-    });
+    const owner=document.querySelector('.brand')||document.querySelector('.brand-user')||document.querySelector('.ce-brand-logo-safe');
+    document.querySelectorAll('.brand,.brand *,img.ce-brand-logo-safe,#brandCurrentUserName,#brandCurrentUserMeta').forEach(el=>{try{el.removeAttribute('title');if('title' in el)el.title='';}catch(_){}});
+    if(owner && !owner.__ceV16Hf5Bound){
+      owner.__ceV16Hf5Bound=true;
+      owner.setAttribute('aria-label',noSelectedEvent()?'Ver información de ControlEvent':'Ver avance del evento');
+      owner.addEventListener('click',toggleAvance,true);
+    }
   }
 
   function bindGlobalClose(){

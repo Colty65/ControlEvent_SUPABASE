@@ -223,7 +223,7 @@
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
     hideLegacyBudgetTooltips();
-    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
+    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div>${table}<div class="ce-budget-lite-total ce-budget-lite-total-final"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>`;
     box.dataset.ceBudgetOpenedAt = String(Date.now());
     box.dataset.ceBudgetLastTitle = String(title || '');
     box.classList.add('open');

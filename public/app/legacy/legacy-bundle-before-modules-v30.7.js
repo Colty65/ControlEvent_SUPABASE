@@ -13093,68 +13093,93 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function normalizeDownloadName(){const proto=HTMLAnchorElement.prototype; if(proto.click.__v210Wrapped)return; const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v210Wrapped=true; proto.click=wrapped;}
   function getTipSource(el){for(const a of ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title']){const v=el.getAttribute?.(a); if(norm(v))return v;} return '';}
   function adoptTips(){document.querySelectorAll('[data-ce-tip-v196],[data-ce-tip-v1952],[data-ce-tip],[data-v181-tip],[data-tip],[title]').forEach(el=>{if(el.closest?.('button[data-action^="delete-"]'))return; const raw=getTipSource(el); if(!norm(raw))return; const layout=el.getAttribute('data-ce-tip-layout-v20')||el.getAttribute('data-ce-tip-layout-v21')||'default'; const bg=el.getAttribute('data-tip-bg-v196')||el.getAttribute('data-tip-bg-v1952')||el.getAttribute('data-tip-bg')||getComputedStyle(el).backgroundColor||'#fff'; el.setAttribute('data-ce-tip-v21',raw); el.setAttribute('data-ce-tip-layout-v21',layout); el.setAttribute('data-tip-bg-v21',bg); ['data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title'].forEach(a=>el.removeAttribute(a));}); ['ceTooltipV190','ceTooltipV1952','ceTooltipV196'].forEach(id=>{const t=$(id); if(t)t.style.display='none';});}
-  let activeOwner=null, closeTimer=null, tipObserver=null;
+  let activeOwner=null, closeTimer=null, tipObserver=null, bodyTipObserver=null;
+  let pinnedTipState=null, repairingTip=false;
+  function forcePinnedTipVisible(tip){
+    if(!tip||tip.dataset.cePinned!=='1'||repairingTip)return;
+    repairingTip=true;
+    try{
+      tip.removeAttribute('aria-hidden');
+      tip.classList.remove('ce-v462-tip-hide');
+      tip.style.setProperty('display','block','important');
+      tip.style.setProperty('visibility','visible','important');
+      tip.style.setProperty('opacity','1','important');
+      tip.style.setProperty('pointer-events','auto','important');
+      tip.style.setProperty('z-index','2147483600','important');
+      if(activeOwner&&activeOwner.isConnected) placeTip(tip,activeOwner);
+      else if(pinnedTipState){
+        if(pinnedTipState.left)tip.style.setProperty('left',pinnedTipState.left,'important');
+        if(pinnedTipState.top)tip.style.setProperty('top',pinnedTipState.top,'important');
+      }
+    }finally{repairingTip=false;}
+  }
+  function installPinnedTipGuards(tip){
+    if(typeof MutationObserver!=='function')return;
+    if(tipObserver)try{tipObserver.disconnect();}catch(_){}
+    tipObserver=new MutationObserver(()=>{
+      if(tip.dataset.cePinned==='1')requestAnimationFrame(()=>forcePinnedTipVisible(tip));
+    });
+    tipObserver.observe(tip,{attributes:true,attributeFilter:['style','class','aria-hidden']});
+    if(!bodyTipObserver){
+      bodyTipObserver=new MutationObserver(()=>{
+        if(!pinnedTipState)return;
+        let current=$('ceTooltipV21');
+        if(!current){
+          current=document.createElement('div'); current.id='ceTooltipV21';
+          current.dataset.cePinned='1'; current.className=pinnedTipState.className||'';
+          current.innerHTML=pinnedTipState.html||'';
+          document.body.appendChild(current); installPinnedTipGuards(current);
+        }
+        current.dataset.cePinned='1'; forcePinnedTipVisible(current);
+      });
+      bodyTipObserver.observe(document.body||document.documentElement,{childList:true,subtree:false});
+    }
+  }
   function getTip(){
     let tip=$('ceTooltipV21');
     if(!tip){tip=document.createElement('div');tip.id='ceTooltipV21';document.body.appendChild(tip);}
-    if(!tipObserver&&typeof MutationObserver==='function'){
-      tipObserver=new MutationObserver(()=>{
-        if(tip.dataset.cePinned==='1'&&tip.style.display==='none'){
-          requestAnimationFrame(()=>{
-            if(tip.dataset.cePinned==='1'){
-              tip.style.display='block';
-              if(activeOwner&&activeOwner.isConnected)placeTip(tip,activeOwner);
-            }
-          });
-        }
-      });
-      tipObserver.observe(tip,{attributes:true,attributeFilter:['style','class']});
-    }
+    installPinnedTipGuards(tip);
     return tip;
   }
-  // Mantiene el orden funcional de la información: cabecera, detalle y total al final.
-  // Los generadores ya entregan el detalle ordenado; aquí no se vuelve a mezclar.
-  function sortTipText(text){
-    const blocks=String(text||'').replace(/\r/g,'').split(/\n\s*\n/).map(block=>block.trim()).filter(Boolean);
-    const output=[];
-    for(let index=0;index<blocks.length;index++){
-      const lines=blocks[index].split('\n').map(line=>line.trimEnd()).filter(line=>line.trim());
-      const totals=lines.filter(line=>/^TOTAL\b/i.test(line.trim()));
-      const header=lines.filter(line=>!/^TOTAL\b/i.test(line.trim()));
-      if(totals.length&&index+1<blocks.length){
-        const detail=blocks[++index].split('\n').map(line=>line.trimEnd()).filter(line=>line.trim());
-        output.push([...header,...detail,'',...totals].join('\n'));
-      }else{
-        output.push([...header,...totals].join('\n'));
-      }
-    }
-    return output.join('\n\n');
-  }
+  // FIX4: conserva el orden entregado por cada generador. Nunca agrupa los totales
+  // de bloques distintos al final del globo.
+  function sortTipText(text){ return String(text||'').replace(/\r/g,'').trim(); }
   function renderTipHtml(text){const lines=sortTipText(text).split('\n'); const parts=[]; let table=[]; const flushTable=()=>{if(!table.length)return; parts.push('<table class="ce-v21-table"><tbody>'+table.map(cells=>'<tr>'+cells.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'); table=[];}; lines.forEach(line=>{if(!line.trim()){flushTable(); parts.push('<div class="ce-v21-blank"></div>'); return;} if(line.includes('|')){table.push(line.split('|').map(s=>s.trim())); return;} flushTable(); const html=esc(line).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*€|\d+(?:,\d{2})?\s*€)/g,'<strong>$1</strong>'); if(/^TOTAL\b/i.test(line.trim()))parts.push('<div class="ce-v21-title ce-v21-total">'+html+'</div>'); else if(/^(INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE|GAST|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS)/i.test(line.trim()))parts.push('<div class="ce-v21-title">'+html+'</div>'); else parts.push('<div class="ce-v21-text">'+html+'</div>');}); flushTable(); return parts.join('');}
   function placeTip(tip,owner){
     if(!owner||!owner.isConnected)return;
     const r=owner.getBoundingClientRect();
-    tip.style.position='fixed';tip.style.display='block';tip.style.left='0px';tip.style.top='0px';
+    tip.style.setProperty('position','fixed','important');
+    tip.style.setProperty('display','block','important');
+    tip.style.setProperty('visibility','visible','important');
+    tip.style.setProperty('left','0px','important');tip.style.setProperty('top','0px','important');
     const tr=tip.getBoundingClientRect();
     let left=Math.min(Math.max(8,r.left),Math.max(8,innerWidth-tr.width-8));
     let top=r.bottom+8;
     if(top+tr.height>innerHeight-8)top=Math.max(8,r.top-tr.height-8);
-    tip.style.left=Math.round(Math.max(8,left))+'px';tip.style.top=Math.round(Math.max(8,top))+'px';
+    const leftPx=Math.round(Math.max(8,left))+'px', topPx=Math.round(Math.max(8,top))+'px';
+    tip.style.setProperty('left',leftPx,'important');tip.style.setProperty('top',topPx,'important');
+    if(pinnedTipState){pinnedTipState.left=leftPx;pinnedTipState.top=topPx;}
   }
   function openTip(owner){
     const text=owner.getAttribute('data-ce-tip-v21'); if(!norm(text))return false;
     const tip=getTip(); activeOwner=owner; clearTimeout(closeTimer);
     tip.dataset.cePinned='1';
     tip.innerHTML='<button type="button" class="ce-v21-tip-close" aria-label="Cerrar información">×</button><div class="ce-v21-tip-content">'+renderTipHtml(text)+'</div>';
-    tip.style.background=owner.getAttribute('data-tip-bg-v21')||'#fff'; tip.style.color='#111827'; tip.style.pointerEvents='auto';
-    Array.from(tip.classList).forEach(c=>{if(c.startsWith('ce-v21-layout-'))tip.classList.remove(c);});
+    tip.style.setProperty('background',owner.getAttribute('data-tip-bg-v21')||'#fff','important');
+    tip.style.setProperty('color','#111827','important');
+    tip.style.setProperty('pointer-events','auto','important');
+    Array.from(tip.classList).forEach(c=>{if(c.startsWith('ce-v21-layout-')||c==='ce-v462-tip-hide'||c==='ce-v462-tip-open')tip.classList.remove(c);});
     tip.classList.add('ce-v21-layout-'+(owner.getAttribute('data-ce-tip-layout-v21')||'default'));
-    placeTip(tip,owner); return true;
+    pinnedTipState={html:tip.innerHTML,className:tip.className,left:'',top:''};
+    placeTip(tip,owner); forcePinnedTipVisible(tip); return true;
   }
   function closeTip(force=false){
     const tip=$('ceTooltipV21'); if(!tip)return;
     if(!force&&tip.dataset.cePinned==='1')return;
-    tip.dataset.cePinned='0';tip.style.display='none';activeOwner=null;clearTimeout(closeTimer);
+    pinnedTipState=null; tip.dataset.cePinned='0';
+    tip.style.setProperty('display','none','important');
+    tip.style.setProperty('visibility','hidden','important');
+    activeOwner=null;clearTimeout(closeTimer);
   }
   function scheduleClose(){
     clearTimeout(closeTimer);
@@ -13214,11 +13239,11 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function lineIngreso(r){const per=r.persona||persona(r.personaId)||{}; const nombre=per.nombre||r.nombre||'Sin nombre'; const precio=Number(ev().precio||0); const n=Number(r.numero||0); const esSocio=normUp(per.rango||'')==='SOCIO'; const socio=esSocio?Number(r.base!=null?r.base:n*precio):0; const vol=Number(r.donation!=null?r.donation:(r.importe||0)); const ing=normUp(r.situacion||'')==='PENDIENTE'?0:totalIngreso(r); const pte=normUp(r.situacion||'')==='PENDIENTE'?totalIngreso(r):0; return `${nombre} | ${num(n)} | ${money(socio)} | ${money(vol)} | ${money(ing)} | ${money(pte)} | ${money(totalIngreso(r))}`;}
   function applyBudgetIncomeTips(){
     const rows=ingresos(); const socios=rows.filter(r=>normUp((r.persona||persona(r.personaId)).rango||'')==='SOCIO'); const nosocios=rows.filter(r=>normUp((r.persona||persona(r.personaId)).rango||'')!=='SOCIO');
-    const make=(title,baseRows,mode)=>{let list=baseRows; if(mode==='ing')list=baseRows.filter(r=>normUp(r.situacion||'')!=='PENDIENTE'); if(mode==='pte')list=baseRows.filter(r=>normUp(r.situacion||'')==='PENDIENTE'); list=list.slice().sort((a,b)=>cmp((a.persona||persona(a.personaId)).nombre,(b.persona||persona(b.personaId)).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return `${title}\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\nTOTAL: ${money(total)}\n\n${list.length?list.map(lineIngreso).join('\n'):'Sin registros'}`;};
+    const make=(title,baseRows,mode)=>{let list=baseRows; if(mode==='ing')list=baseRows.filter(r=>normUp(r.situacion||'')!=='PENDIENTE'); if(mode==='pte')list=baseRows.filter(r=>normUp(r.situacion||'')==='PENDIENTE'); list=list.slice().sort((a,b)=>cmp((a.persona||persona(a.personaId)).nombre,(b.persona||persona(b.personaId)).nombre)); const total=list.reduce((a,b)=>a+totalIngreso(b),0); return `${title}\n\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\n${list.length?list.map(lineIngreso).join('\n'):'Sin registros'}\n\nTOTAL: ${money(total)}`;};
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row=>{const label=norm(row.querySelector('span')?.textContent||''); if(!label)return; const prev=row.closest('.budget-subrows')?.previousElementSibling?.textContent||''; const isNo=/NO\s+SOCIOS/i.test(prev); let text=''; if(label==='Personas')text=make(`${isNo?'NO SOCIOS':'SOCIOS'} / PERSONAS`,isNo?nosocios:socios,'all'); else if(/Importe socios/i.test(label))text=make('SOCIOS / IMPORTE SOCIO',socios,'all'); else if(/Ingresado socios/i.test(label))text=make('SOCIOS / INGRESADO SOCIO',socios,'ing'); else if(/Pendiente socios/i.test(label))text=make('SOCIOS / PENDIENTE SOCIO',socios,'pte'); else if(/Importe no socios|Importe donantes/i.test(label))text=make('NO SOCIOS / IMPORTE NO SOCIO',nosocios,'all'); else if(/Ingresado no socios|Ingresado donantes/i.test(label))text=make('NO SOCIOS / INGRESADO NO SOCIO',nosocios,'ing'); else if(/Pendiente no socios|Pendiente donantes/i.test(label))text=make('NO SOCIOS / PENDIENTE NO SOCIO',nosocios,'pte'); if(text){setTip(row,text,'#fff','incomev211'); row.querySelectorAll('span,strong').forEach(x=>setTip(x,text,'#fff','incomev211'));}});
   }
   function groupingData(label,kind){const rows=compras().filter(c=>{const p=producto(c.productoId); const v=kind==='segmento'?(c.producto?.segmento||p.segmento||''):(c.producto?.destino||p.destino||''); return String(v)===String(label);}); const buy=rows.filter(c=>!isDon(ticket(c))&&ticket(c)!=='').sort((a,b)=>cmp(ticket(a),ticket(b))||cmp(tName(a),tName(b))||cmp(pName(a),pName(b))).map(c=>`${ticket(c)} | ${tName(c)} | ${pName(c)} | ${money(val(c))}`); const pending=rows.filter(c=>!isDon(ticket(c))&&ticket(c)==='').sort((a,b)=>cmp(ticket(a)||'PTE.COMPRA',ticket(b)||'PTE.COMPRA')||cmp(tName(a),tName(b))||cmp(pName(a),pName(b))).map(c=>`${ticket(c)||'PTE.COMPRA'} | ${tName(c)} | ${pName(c)} | ${money(val(c))}`); const donated=rows.filter(c=>isDon(ticket(c))).sort((a,b)=>cmp(donor(a),donor(b))||cmp(pName(a),pName(b))).map(c=>`${donor(c)} | ${pName(c)} | ${money(val(c))}`); return {buy,pending,donated,totalBuy:rows.filter(c=>!isDon(ticket(c))&&ticket(c)!=='').reduce((a,b)=>a+val(b),0),totalPending:rows.filter(c=>!isDon(ticket(c))&&ticket(c)==='').reduce((a,b)=>a+val(b),0),totalDonated:rows.filter(c=>isDon(ticket(c))).reduce((a,b)=>a+val(b),0)};}
-  function applyGroupingTips(){[['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('·')[0]); if(!label)return; const d=groupingData(label,kind); const cols=card.querySelectorAll('.vbar-col'); [[0,'Compra',d.buy,d.totalBuy,'#dc2626','groupingv211buy'],[1,'Donado',d.donated,d.totalDonated,'#f59e0b','groupingv211don'],[2,'Pte.Compra u otros gastos',d.pending,d.totalPending,'#fb7185','groupingv211pending']].forEach(([idx,name,lines,total,bg,layout])=>{const text=`${title}\n${label}\n${name}\nTOTAL: ${money(total)}\n\n${lines.length?lines.join('\n'):'Sin productos'}`; const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});}
+  function applyGroupingTips(){[['summarySegmento','Por segmento','segmento'],['summaryDestino','Por destino','destino']].forEach(([id,title,kind])=>{const wrap=$(id); if(!wrap)return; wrap.querySelectorAll('.vbars-card').forEach(card=>{const label=norm((card.querySelector('.vbars-title')?.textContent||'').split('·')[0]); if(!label)return; const d=groupingData(label,kind); const cols=card.querySelectorAll('.vbar-col'); [[0,'Compra',d.buy,d.totalBuy,'#dc2626','groupingv211buy'],[1,'Donado',d.donated,d.totalDonated,'#f59e0b','groupingv211don'],[2,'Pte.Compra u otros gastos',d.pending,d.totalPending,'#fb7185','groupingv211pending']].forEach(([idx,name,lines,total,bg,layout])=>{const text=`${title}\n${label}\n${name}\n\n${lines.length?lines.join('\n'):'Sin productos'}\n\nTOTAL: ${money(total)}`; const col=cols[idx]; if(col)setTip(col,text,bg,layout); const stick=col?.querySelector?.('.vbar-stick'); if(stick)setTip(stick,text,bg,layout);});});});}
   function closeTip(){const tip=$('ceTooltipV21'); if(tip&&tip.dataset.cePinned!=='1')tip.style.display='none';}
   let hoverTimer=null; function wireCloseOnBlur(){const tip=$('ceTooltipV21'); const check=()=>{clearTimeout(hoverTimer); hoverTimer=setTimeout(()=>{const tip=$('ceTooltipV21'); if(!tip||tip.style.display==='none')return; const insideTip=tip.matches(':hover'); const insideOwner=!!document.querySelector('[data-ce-tip-v21]:hover'); if(!insideTip&&!insideOwner)closeTip();},160);}; document.addEventListener('mousemove',check,true); document.addEventListener('focusin',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},true); document.addEventListener('click',ev=>{const tip=$('ceTooltipV21'); if(tip&&tip.style.display!=='none'&&!tip.contains(ev.target)&&!ev.target.closest?.('[data-ce-tip-v21]'))closeTip();},false);}
   function refreshVersion(){try{document.title=VERSION;}catch(_){} document.querySelectorAll('.appname span,.appname-stack span').forEach(el=>{if(/ControlEvent\s+v[0-9][0-9A-Za-z._\/-]*/i.test(el.textContent||''))el.textContent=VERSION;}); const proto=HTMLAnchorElement.prototype; if(!proto.click.__v211Wrapped){const prev=proto.click; const wrapped=function(){try{if(this.download)this.download=String(this.download).replace(/ControlEvent_v\d+_\d+(?:_\d+)?/ig,VERSION_FILE);}catch(_){} return prev.apply(this,arguments);}; wrapped.__v211Wrapped=true; proto.click=wrapped;}}
@@ -13331,7 +13356,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       list.sort((a,b)=>cmp((a.persona||persona(a.personaId)||{}).nombre,(b.persona||persona(b.personaId)||{}).nombre));
       const total=list.reduce((a,b)=>a+totalIngreso(b),0);
       const body=list.map(r=>{const v=ingresoVals(r); return `${v.nombre} | ${num(v.n)} | ${money(v.socio)} | ${money(v.vol)} | ${money(v.ing)} | ${money(v.pte)} | ${money(v.total)}`;}).join('\n')||'Sin registros';
-      return `${title}\nTOTAL: ${money(total)}\n\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\n${body}`;
+      return `${title}\n\nNombre | Nº | Importe socio | Importe voluntario | Ingresado | Pendiente | Total\n${body}\n\nTOTAL: ${money(total)}`;
     };
     document.querySelectorAll('#budgetLayout .budget-subrow').forEach(row=>{
       const label=norm(row.querySelector('span')?.textContent||''); if(!label)return; const prev=row.closest('.budget-subrows')?.previousElementSibling?.textContent||''; const isNo=/NO\s+SOCIOS/i.test(prev); let text='';
@@ -13362,7 +13387,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     rows.forEach((c,idx)=>{const st=tName(c), tk=kind==='current'?'GASTOS CORRIENTES':(ticket(c)||'PTE.COMPRA'); if(store!==null&&(st!==store||tk!==ticketCur)){closeTicket(); ticketTotal=0;} if(store!==null&&st!==store){closeStore(); storeTotal=0;} store=st; ticketCur=tk; const u=Number(c.unidades||0), pr=price(c), v=val(c); ticketTotal+=v; storeTotal+=v; out.push(`${st} | ${tk} | ${pName(c)} | ${num(u)} uds x ${money(pr)} | ${money(v)}`); if(idx===rows.length-1){closeTicket(); closeStore();}});
     while(out.length&&out[out.length-1]==='')out.pop(); return out;
   }
-  function tipTitle(title,total,lines,header){return `${title}\nTOTAL: ${money(total)}\n\n${header}\n${lines.length?lines.join('\n'):'Sin registros'}`;}
+  function tipTitle(title,total,lines,header){return `${title}\n\n${header}\n${lines.length?lines.join('\n'):'Sin registros'}\n\nTOTAL: ${money(total)}`;}
   function applyGraphTips(){
     const wrap=$('eventChartWrap'); if(!wrap)return; let g=null; try{g=typeof graphPartsV171==='function'?graphPartsV171():null;}catch(_){} if(!g)return; const rows=wrap.querySelectorAll('.chart-row');
     const incomeSegs=rows[0]?.querySelectorAll?.('.chart-seg')||[];
@@ -13424,7 +13449,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   function totalIngreso(r){const per=r.persona||persona(r.personaId)||{}; const n=Number(r.numero||0); const socio=up(per.rango)==='SOCIO'?Number(r.base!=null?r.base:n*Number(ev().precio||0)):0; const vol=Number(r.donation!=null?r.donation:(r.importe||0)); return Number(r.total!=null?r.total:socio+vol);}
   function ingresoVals(r){const per=r.persona||persona(r.personaId)||{}; const nombre=per.nombre||r.nombre||'Sin nombre'; const n=Number(r.numero||0); const socio=up(per.rango)==='SOCIO'?Number(r.base!=null?r.base:n*Number(ev().precio||0)):0; const vol=Number(r.donation!=null?r.donation:(r.importe||0)); const total=totalIngreso(r); const pending=up(r.situacion)==='PENDIENTE'; return {nombre,n,rango:per.rango||'',socio,vol,total,ing:pending?0:total,pte:pending?total:0,situacion:r.situacion||''};}
   function ingresoLine(r,full=true){const v=ingresoVals(r); return full?`${v.nombre} | ${num(v.n)} | ${v.rango||''} | ${money(v.socio)} | ${money(v.vol)} | ${money(v.ing)} | ${money(v.pte)} | ${money(v.total)}`:`${v.nombre} | ${num(v.n)} | ${v.rango||''} | ${money(v.socio)} | ${money(v.vol)} | ${money(v.total)}`;}
-  function titleWithLines(title,total,header,lines){return `${title}: ${money(total)}\n\n${header}\n${lines.length?lines.join('\n'):'Sin registros'}`;}
+  function titleWithLines(title,total,header,lines){return `${title}\n\n${header}\n${lines.length?lines.join('\n'):'Sin registros'}\n\nTOTAL: ${money(total)}`;}
   function setOnSelfAndChildren(el,text,bg,layout){if(!el)return; setTip(el,text,bg,layout); el.querySelectorAll('span,strong,.label,.value').forEach(x=>setTip(x,text,bg,layout));}
   function applySummaryIncomeTips(){
     const grid=$('ingresosSummaryGrid'); if(!grid)return;

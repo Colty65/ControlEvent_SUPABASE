@@ -917,10 +917,12 @@
     injectStyle(); applyVersion(); installGraficas(); installExportGuard(); wrapRender(); addIngresoReceiptTools();
   }
 
-  window.addEventListener('click', handleChartTooltipClick, true);
+  // FIX4: desactivado. El gestor canónico ceTooltipV21 del bundle legacy es el único
+  // que abre/cierra los globos de GRAFICAS; evita dobles globos y cierres inmediatos.
+  window.__ceV464LegacyChartTooltipDisabled = true;
   document.addEventListener('click', handleIngresoReceiptClick, true);
   // v46.8: no cerrar globos al usar ruleta/ascensor; se cierran al perder foco/click fuera.
-  window.addEventListener('resize', () => closeTipV462(false), true);
+  // No cerrar el globo canónico al redimensionar; su gestor lo recoloca.
   window.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleTableAction, true);
   document.addEventListener('click', handleExportClick, true);

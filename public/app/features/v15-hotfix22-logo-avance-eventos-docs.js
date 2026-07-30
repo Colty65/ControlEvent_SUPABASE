@@ -149,11 +149,11 @@
     return document.querySelector('.brand img[alt*="Colty"], img.brand-logo-large, img[alt="ColtyLAB"], .brand-logo-large, .brand');
   }
   function bindLogo(){
+    // FIX4: el acceso al logo lo gestionan exclusivamente v16/v17. Este hotfix antiguo
+    // ya no crea un segundo globo ni vuelve a escribir un title nativo que parpadea.
     const logo = findLogo();
-    if(!logo || logo.__ceHf47LogoBound) return;
-    logo.__ceHf47LogoBound = true;
-    try{ logo.style.cursor = 'pointer'; logo.title = 'Ver avance del evento'; }catch(_){ }
-    logo.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation?.(); showLogoAvanceBubble(); return false; }, true);
+    if(!logo) return;
+    try{ logo.removeAttribute('title'); logo.style.cursor = 'pointer'; }catch(_){ }
   }
   function openMaintenanceFromDocuments(ev){
     const trigger = ev.target?.closest?.('#btnToggleMaintenance,.mobile-menu-action[data-target="btnToggleMaintenance"]');

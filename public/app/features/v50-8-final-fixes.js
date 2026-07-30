@@ -268,7 +268,7 @@
     tooltipRoots().forEach(el => {
       if(!isTooltipOpen(el)) return;
       if(el.id === 'ceBudgetLiteTooltipV307') return;
-      if(el.querySelector(':scope > .ce-v508-tip-close')) return;
+      if(el.querySelector(':scope > .ce-v508-tip-close,:scope > .ce-v21-tip-close')) return;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'ce-v508-tip-close';

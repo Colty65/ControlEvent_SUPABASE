@@ -146,7 +146,8 @@
 
 
   function patchTooltipTables(){
-    document.querySelectorAll('#ceBudgetLiteTooltipV307 table,#ceTooltipV21 table,.ce-budget-lite-tooltip-v306 table,[id*="Tooltip"] table').forEach(sortTableByProduct);
+    // FIX4: no reordenar tablas de globos; cada subtotal debe permanecer tras su detalle.
+    return;
   }
 
   let timer=0;

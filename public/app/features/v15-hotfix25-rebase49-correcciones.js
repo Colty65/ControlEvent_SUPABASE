@@ -190,7 +190,7 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run,{once:true}); else run();
   document.addEventListener('click',(ev)=>{ if(isLikelyModalTarget(ev)) setTimeout(run,80); },true);
-  document.addEventListener('mouseover',(ev)=>{ const tt=ev.target?.closest?.('#ceBudgetLiteTooltipV307,#ceTooltipV21,[id*="Tooltip"]'); if(tt) setTimeout(()=>tt.querySelectorAll('table').forEach(sortTableByProduct),80); },true);
+  // FIX4: no ordenar de nuevo los globos al pasar el ratón; conserva detalle y subtotal juntos.
   window.addEventListener('controlevent:event-loaded',()=>setTimeout(run,80));
   window.addEventListener('controlevent:event-ready',()=>setTimeout(run,80));
   try{ new MutationObserver((muts)=>{ if(mutationIsRelevant(muts)) schedule(); }).observe(document.body||document.documentElement,{childList:true,subtree:true}); }catch(_){ }

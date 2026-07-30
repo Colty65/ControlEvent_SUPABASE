@@ -67,10 +67,12 @@
   }
   function syncLogoTitle(){
     try{
-      const title = hasSelectedEvent() ? 'Ver avance del evento' : 'Ver información de ControlEvent';
-      document.querySelectorAll('.brand,.brand-user,#brandCurrentUserName,#brandCurrentUserMeta,img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],.brand-logo-large').forEach(el => {
-        try{ el.title = title; el.setAttribute('title', title); el.style.cursor='pointer'; }catch(_){ }
+      const label = hasSelectedEvent() ? 'Ver avance del evento' : 'Ver información de ControlEvent';
+      const owner = document.querySelector('.brand') || document.querySelector('.brand-user') || document.querySelector('img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"]');
+      document.querySelectorAll('.brand,.brand *,img.ce-brand-logo-safe,img.brand-logo-large,img[alt*="Colty"],#brandCurrentUserName,#brandCurrentUserMeta').forEach(el => {
+        try{ el.removeAttribute('title'); if('title' in el) el.title=''; }catch(_){ }
       });
+      if(owner){ owner.setAttribute('aria-label',label); owner.setAttribute('data-ce-colty-action',hasSelectedEvent()?'avance':'informacion'); owner.style.cursor='pointer'; }
     }catch(_){ }
   }
   function stopEvent(ev){
@@ -190,10 +192,8 @@
     return true;
   }
 
-  ['pointerup','touchend','click'].forEach(type => {
-    // En la pantalla inicial intercepta antes que AVANCE; con evento elegido deja pasar el gesto.
-    window.addEventListener(type, ev => { try{ handleLogo(ev); }catch(_){ } }, {capture:true, passive:false});
-  });
+  // Un solo gesto estable. pointerup/touchend + click provocaban doble activación y temblor.
+  window.addEventListener('click', ev => { try{ handleLogo(ev); }catch(_){ } }, {capture:true, passive:false});
   document.addEventListener('keydown', ev => { if(ev.key === 'Escape') closeInfo(); }, true);
   document.addEventListener('change', ev => {
     if(ev.target?.id !== 'selectedEvent') return;
@@ -216,6 +216,25 @@
     runLater(300); runLater(1200);
   }
   bindAutoWelcome();
+
+  function guardColtyNativeTitle(){
+    syncLogoTitle();
+    const owner=document.querySelector('.brand')||document.querySelector('.brand-user');
+    if(!owner||owner.__ceNoNativeTitleGuard||!window.MutationObserver) return;
+    owner.__ceNoNativeTitleGuard=true;
+    try{ new MutationObserver(mutations=>{
+      let dirty=false;
+      mutations.forEach(m=>{
+        const nodes=[m.target,...Array.from(m.addedNodes||[])].filter(n=>n&&n.nodeType===1);
+        nodes.forEach(node=>{
+          [node,...Array.from(node.querySelectorAll?.('[title]')||[])].forEach(el=>{if(el.hasAttribute?.('title')){el.removeAttribute('title');dirty=true;}});
+        });
+      });
+      if(dirty) owner.setAttribute('aria-label',hasSelectedEvent()?'Ver avance del evento':'Ver información de ControlEvent');
+    }).observe(owner,{subtree:true,childList:true,attributes:true,attributeFilter:['title']}); }catch(_){ }
+  }
+  ['DOMContentLoaded','load','controlevent:event-loaded','controlevent:event-ready'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(guardColtyNativeTitle,40),true));
+  setTimeout(guardColtyNativeTitle,80);
 
   window.ControlEventV17Fix27WelcomeInfoGeneral = {version:currentVersionLabel(), showInfo, closeInfo, isPhoneOnly, welcomeActive, maybeAutoShowInfo, syncLogoTitle, hasSelectedEvent};
 })();

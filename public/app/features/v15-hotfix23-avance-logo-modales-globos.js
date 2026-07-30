@@ -236,28 +236,8 @@
   }
 
   function patchTooltipTables(){
-    document.querySelectorAll('#ceTooltipV21 table.ce-v21-table,#ceBudgetLiteTooltipV307 table').forEach(table=>{
-      const rows=Array.from(table.rows||[]); if(rows.length<2) return;
-      const headerIndex=rows.findIndex(r=>{
-        const t=Array.from(r.cells||[]).map(c=>up(c.textContent)).join('|');
-        return /PRODUCTO/.test(t) && /(UDS|PRECIO|TOTAL|VALOR|ESTIMADO)/.test(t);
-      });
-      if(headerIndex<0) return;
-      const header=rows[headerIndex];
-      const cells=Array.from(header.cells||[]);
-      const productIdx=Math.max(0,cells.findIndex(c=>/producto/i.test(c.textContent||'')));
-      const parent=header.parentElement; if(!parent) return;
-      const data=rows.filter((r,i)=>i!==headerIndex && r.cells && r.cells.length>productIdx && text(r.cells[productIdx]?.textContent) && !/^(TOTAL|SUBTOTAL)\b/i.test(text(r.cells[0]?.textContent||'')));
-      const totals=rows.filter((r,i)=>i!==headerIndex && /^(TOTAL|SUBTOTAL)\b/i.test(text(r.cells?.[0]?.textContent||'')));
-      data.sort((a,b)=>text(a.cells[productIdx]?.textContent).localeCompare(text(b.cells[productIdx]?.textContent),'es',{sensitivity:'base'}));
-      try{
-        rows.forEach(r=>r.remove());
-        header.classList.add('ce-hf48-table-head');
-        parent.appendChild(header);
-        data.forEach(r=>parent.appendChild(r));
-        totals.forEach(r=>parent.appendChild(r));
-      }catch(_){ }
-    });
+    // FIX4: no reordenar tablas de globos; cada subtotal debe permanecer tras su detalle.
+    return;
   }
 
   function stabilizeEventSwitch(){
@@ -283,8 +263,8 @@
     injectStyle(); stripLogoTitle(); cleanupInlineAvance(); patchModals(); patchTooltipTables(); stabilizeEventSwitch();
   }
 
-  document.addEventListener('click',logoHandler,true);
-  document.addEventListener('pointerup',logoHandler,true);
+  // FIX4: v16/v17 son los únicos propietarios del logo. Se eliminan los dos
+  // manejadores antiguos (click + pointerup) que abrían dos capas y producían temblor.
   document.addEventListener('click',openMaintenanceFromDocuments,true);
   document.addEventListener('click',clearMaintOverrideOnTab,true);
   document.addEventListener('keydown',ev=>{if(ev.key==='Escape') $('ceHf48AvanceLayer')?.classList.remove('visible');},true);

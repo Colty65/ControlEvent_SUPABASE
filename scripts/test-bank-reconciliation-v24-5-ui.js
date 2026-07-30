@@ -11,8 +11,8 @@ assert.match(source,/store\.loadController\?\.abort/,'Debe abortarse la petició
 assert.match(source,/setTimeout\(\(\)=>scheduleBodyRender\(false\),140\)/,'La búsqueda debe estar desacoplada del tecleo');
 assert.match(source,/!mutation\.target\?\.closest\?\.\('#ceBankOverlay'\)/,'El observador debe ignorar reconstrucciones internas');
 assert.doesNotMatch(source,/overlay\.querySelectorAll\('button,label,input,select,textarea'\)/,'No se deben recorrer todos los controles de miles de filas');
-assert.match(source,/input\.click\(\)/,'El selector CSV debe abrirse dentro del gesto del usuario');
-assert.doesNotMatch(source,/setTimeout\(\(\)=>input\.click\(\),0\)/,'No debe perderse la activación del usuario al abrir el CSV');
+assert.match(source,/id="ceBankCsvFile" class="ce-bank-file-native" type="file"/,'La carga CSV debe usar un input nativo sobre el control visible');
+assert.doesNotMatch(source,/showPicker\(|triggerCsvPicker/,'No debe depender de selectores programáticos bloqueables por el navegador');
 
 const pageSize=60;
 const rows=Array.from({length:5000},(_,index)=>index+1);
@@ -23,4 +23,4 @@ assert.equal(visible.length,20);
 assert.equal(visible[0],4981);
 assert.equal(visible.at(-1),5000);
 
-console.log('OK v25_prod UI: CSV directo, recargas cancelables, búsqueda diferida y 5.000 movimientos paginados.');
+console.log('OK v25_prod UI: CSV nativo, recargas cancelables, búsqueda diferida y 5.000 movimientos paginados.');

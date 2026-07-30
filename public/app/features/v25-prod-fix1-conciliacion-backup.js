@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod - FIX3 controles bancarios, globos canónicos y restauración integral. */
+/* ControlEvent v25_prod - FIX4: restauración integral y estilos del globo canónico. */
 (function(){
   'use strict';
   if(window.__ceV25ProdFix1) return; window.__ceV25ProdFix1=true;
@@ -9,33 +9,8 @@
   const number=v=>{if(typeof v==='number')return Number.isFinite(v)?v:0;let s=norm(v).replace(/[^0-9,.-]/g,'');if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');const n=Number(s);return Number.isFinite(n)?n:0;};
   const actorHeader=()=>{const u=window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{};return encodeURIComponent(JSON.stringify({nivel:up(u.nivel||u.Nivel),identificacion:norm(u.identificacion||u.Identificacion),nombre:norm(u.nombre||u.Nombre)}));};
 
-  // Cierre robusto: el aspa funciona aunque una capa heredada capture el click.
-  function closeBankNow(ev){
-    const btn=ev?.target?.closest?.('#ceBankClose'); if(!btn) return;
-    try{ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();}catch(_){ }
-    try{window.ControlEventBankReconciliation?.close?.(true);}catch(_){ }
-    try{window.ceCloseCuadreBanco?.();}catch(_){ }
-    const overlay=$('ceBankOverlay'); if(overlay){overlay.classList.remove('visible');overlay.classList.add('hidden');overlay.style.removeProperty('display');}
-    try{document.body.classList.remove('ce-bank-open');document.body.style.overflow='';}catch(_){ }
-  }
-  ['pointerdown','pointerup','touchend','click'].forEach(type=>document.addEventListener(type,closeBankNow,{capture:true,passive:false}));
-  // La versión FIX1 observaba todos los atributos del cuadro y volvía a escribir
-  // disabled/aria-disabled en cada mutación. Eso generaba un bucle de microtareas que
-  // terminaba bloqueando CSV, búsqueda y desplegables. La disponibilidad se sincroniza
-  // ahora solo cuando cambia realmente el estado.
-  function keepCsvAvailableInCurrentEvent(){
-    const overlay=$('ceBankOverlay');const button=$('ceBankImport');const headline=$('ceBankEventHeadline');
-    if(!overlay||!button||!headline||overlay.classList.contains('hidden'))return;
-    const inProgress=headline.classList.contains('in-progress')&&!/FINALIZADO/i.test(headline.textContent||'');
-    const shouldDisable=!inProgress||button.classList.contains('busy');
-    if(button.disabled!==shouldDisable) button.disabled=shouldDisable;
-    const aria=shouldDisable?'true':'false';
-    if(button.getAttribute('aria-disabled')!==aria) button.setAttribute('aria-disabled',aria);
-  }
-  document.addEventListener('DOMContentLoaded',()=>{
-    keepCsvAvailableInCurrentEvent();
-    document.addEventListener('controlevent:event-loaded',()=>setTimeout(keepCsvAvailableInCurrentEvent,0));
-  },{once:true});
+  // Cuadre Banco gestiona sus controles y su cierre en su propio módulo.
+  // No se instalan capturas globales ni se reescribe el estado de CSV desde aquí.
 
   // FIX3: un único globo canónico. Se elimina el globo oscuro duplicado de FIX2 y
   // se deja la persistencia al gestor ceTooltipV21 del bundle legacy.

@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX3 · Cuadre Banco fluido, controles nativos y vínculos entre eventos (GD/RW). */
+/* ControlEvent v25_prod FIX4 · Cuadre Banco estable: controles nativos, sin capas interceptando y vínculos entre eventos (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -111,23 +111,6 @@
     notice(message,'warning',true);
     return true;
   }
-  function triggerCsvPicker(event){
-    stopEvent(event);
-    if(mutationBlocked()||store.importing) return false;
-    const input=$('ceBankCsvFile');
-    if(!input) return false;
-    try{ input.value=''; }catch(_){ }
-    // El selector se abre dentro del gesto real del usuario. showPicker() es la vía más
-    // fiable en navegadores modernos; input.click() queda como alternativa.
-    try{
-      if(typeof input.showPicker==='function') input.showPicker();
-      else input.click();
-    }catch(error){
-      try{ input.click(); }
-      catch(_){ notice('El navegador no ha podido abrir el selector. Pulsa de nuevo «Cargar CSV».','warning',true); }
-    }
-    return false;
-  }
   function installDom(){
     let desktop=$('btnOpenBankReconciliation');
     if(!desktop){
@@ -162,8 +145,7 @@
         <div id="ceBankReadOnly" class="ce-bank-readonly hidden"><b>EVENTO FINALIZADO</b><span>Consulta completa disponible; altas, bajas y cambios están bloqueados.</span></div>
         <div class="ce-bank-command-deck">
           <div class="ce-bank-command-primary">
-            <button type="button" id="ceBankImport" class="ce-bank-import-btn"><span>↑</span><b>Cargar CSV</b><small>Añade solo movimientos nuevos</small></button>
-            <input id="ceBankCsvFile" class="ce-bank-file-native" type="file" accept=".csv,text/csv,.txt">
+            <label id="ceBankImport" class="ce-bank-import-btn" role="button" tabindex="0" aria-label="Cargar CSV bancario"><span>↑</span><b>Cargar CSV</b><small>Añade solo movimientos nuevos</small><input id="ceBankCsvFile" class="ce-bank-file-native" type="file" accept=".csv,text/csv,.txt" aria-label="Seleccionar CSV bancario"></label>
             <button type="button" id="ceBankRefresh" class="ce-bank-refresh-btn" aria-label="Actualizar movimientos"><span>↻</span><b>Actualizar</b></button>
           </div>
           <div class="ce-bank-command-fields">
@@ -226,8 +208,8 @@
     closeButton?.addEventListener('pointerup',hardClose,true);
     closeButton?.addEventListener('click',hardClose,true);
     closeButton?.addEventListener('touchend',hardClose,{capture:true,passive:false});
-    $('ceBankImport')?.addEventListener('click',event=>{if(actionAllowed('csv-click',350))triggerCsvPicker(event);});
     $('ceBankCsvFile')?.addEventListener('change',importCsv);
+    $('ceBankImport')?.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&!store.readOnly&&!store.importing){event.preventDefault();$('ceBankCsvFile')?.click();}});
     $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',250))load({force:true,preserveScroll:true});});
     $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;store.page=1;invalidateMovementCache();load({force:true}).then(focusBody);});
     $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
@@ -404,7 +386,7 @@
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
-    const importButton=$('ceBankImport'); importButton.disabled=(store.readOnly===true)||store.importing; importButton.setAttribute('aria-disabled',(store.readOnly||store.importing)?'true':'false'); importButton.classList.toggle('busy',store.importing);
+    const importButton=$('ceBankImport'); const importInput=$('ceBankCsvFile'); const importDisabled=(store.readOnly===true)||store.importing; if(importInput) importInput.disabled=importDisabled; if(importButton){importButton.setAttribute('aria-disabled',importDisabled?'true':'false');importButton.classList.toggle('disabled',importDisabled);importButton.classList.toggle('busy',store.importing);importButton.tabIndex=importDisabled?-1:0;}
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const flowMax=Math.max(Math.abs(num(s.income)),Math.abs(num(s.expense)),1);
     const incomePct=Math.round(Math.abs(num(s.income))/flowMax*100); const expensePct=Math.round(Math.abs(num(s.expense))/flowMax*100);
@@ -538,8 +520,9 @@
     if(!/\.(csv|txt)$/i.test(file.name)){ alert('Selecciona un fichero CSV.'); try{input.value='';}catch(_){ } return; }
     if(file.size>30*1024*1024){ notice('El CSV supera 30 MB. Descárgalo desde el banco en varios periodos y cárgalos consecutivamente.','warning',true); try{input.value='';}catch(_){ } return; }
     store.importing=true;
-    const button=$('ceBankImport');
-    if(button){button.disabled=true;button.classList.add('busy');button.setAttribute('aria-busy','true');}
+    const button=$('ceBankImport'); const fileInput=$('ceBankCsvFile');
+    if(fileInput) fileInput.disabled=true;
+    if(button){button.classList.add('busy','disabled');button.setAttribute('aria-busy','true');button.setAttribute('aria-disabled','true');button.tabIndex=-1;}
     notice(`Leyendo ${file.name} (${Math.max(1,Math.round(file.size/1024))} KB)…`);
     try{
       const csvText=await file.text();
@@ -559,7 +542,8 @@
     finally{
       try{input.value='';}catch(_){ }
       store.importing=false;
-      if(button){button.disabled=store.readOnly;button.classList.remove('busy');button.removeAttribute('aria-busy');}
+      if(fileInput) fileInput.disabled=store.readOnly;
+      if(button){button.classList.remove('busy');button.classList.toggle('disabled',store.readOnly);button.removeAttribute('aria-busy');button.setAttribute('aria-disabled',store.readOnly?'true':'false');button.tabIndex=store.readOnly?-1:0;}
     }
   }
   async function toggleIncluded(id,included,input){
