@@ -1,0 +1,12 @@
+CONTROL EVENT v25_prod - FIX3
+
+1. Sube TODO el contenido de este ZIP, sustituyendo la versión anterior.
+2. No ejecutes SQL nuevo: esta revisión solo modifica cliente y servicio.
+3. Después del despliegue, pulsa Ctrl + F5.
+
+COMPROBAR:
+- Cargar CSV abre el selector.
+- Cuenta/Vista/Orden abren sus desplegables.
+- El buscador recibe texto y filtra.
+- Los movimientos conciliados en otro evento muestran su TKxx y evento, pero están inactivos.
+- En GRAFICAS solo sale un globo, permanece abierto y muestra cabecera, detalle y Total.

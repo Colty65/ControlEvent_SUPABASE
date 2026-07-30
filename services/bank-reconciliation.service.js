@@ -413,18 +413,22 @@ function eventTicketSummary(catalog,eventId){
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, rawLinkRows, stateRows] = await Promise.all([
+    const [movementRows, allRawLinkRows, stateRows, eventRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {
         columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
         order:'executed_at', ascending:false
       }),
-      selectPaged(LINKS_TABLE, {order:'created_at', ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{order:'updated_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+      // Se leen todos los vínculos bancarios para que un movimiento que aparezca por
+      // coincidencia de fechas muestre el TKxx y el evento al que ya pertenece.
+      selectPaged(LINKS_TABLE, {order:'created_at', ascending:true}),
+      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{order:'updated_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_eventos',{columns:'id,titulo,fecha_ini,fecha_fin,situacion',order:'fecha_ini',ascending:true})
     ]);
-    // Solo se construye el catálogo de compras del evento activo. La versión anterior
-    // recorría compras y vínculos de todos los eventos en cada cambio de desplegable.
-    const catalog=await ticketCatalog(event.id,event.title,rawLinkRows);
-    const linkRows=rawLinkRows.map(linkFromDb);
+    const activeRawLinkRows=allRawLinkRows.filter(row=>text(row.event_id)===event.id);
+    // El catálogo completo de compras solo se construye para el evento activo. Para los
+    // otros eventos basta el importe snapshot del vínculo y el título de ce_eventos.
+    const catalog=await ticketCatalog(event.id,event.title,activeRawLinkRows);
+    const allLinks=allRawLinkRows.map(linkFromDb);
     const all=movementRows.map(movementFromDb);
     const accounts=[...new Map(all.map(row=>[row.accountId,{id:row.accountId,label:row.accountLabel||row.accountId,lastAt:row.executedAt}])).values()]
       .sort((a,b)=>String(b.lastAt).localeCompare(String(a.lastAt)));
@@ -433,32 +437,62 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const accountMovements=selectedAccount&&selectedAccount!=='TODOS'?all.filter(row=>row.accountId===selectedAccount):all;
     const globalSummary=summaryFor(accountMovements);
     const catalogMap=new Map(catalog.map(item=>[`${item.eventId}|${item.ticketCode}`,item]));
-    const eventLinksByMovement=new Map();
-    for(const row of linkRows){
-      if(!eventLinksByMovement.has(row.movementId)) eventLinksByMovement.set(row.movementId,[]);
-      const current=catalogMap.get(`${row.eventId}|${row.ticketCode}`);
-      eventLinksByMovement.get(row.movementId).push({...row,
-        eventTitle:current?.eventTitle||event.title,
+    const eventTitleById=new Map(eventRows.map(row=>[text(row.id),text(row.titulo)||text(row.id)]));
+    eventTitleById.set(event.id,event.title);
+    const displayLinksByMovement=new Map();
+    for(const row of allLinks){
+      if(!displayLinksByMovement.has(row.movementId)) displayLinksByMovement.set(row.movementId,[]);
+      const isActiveEvent=row.eventId===event.id;
+      const current=isActiveEvent?catalogMap.get(`${row.eventId}|${row.ticketCode}`):null;
+      displayLinksByMovement.get(row.movementId).push({...row,
+        isActiveEvent,
+        eventTitle:current?.eventTitle||eventTitleById.get(row.eventId)||row.eventId,
         ticketAmount:cents(current?.amount??row.ticketAmountSnapshot),
         stores:current?.stores||[],
         responsibles:current?.responsibles||[]
       });
     }
-    const eventLinkedMovements=all.filter(row=>eventLinksByMovement.has(row.id));
+    const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
     const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
     const scopedAll=accountMovements
       .filter(row=>inPeriod(row,period))
-      .map(row=>reconcileMovement({...row,included:stateByMovement.has(row.id)?stateByMovement.get(row.id):row.included},eventLinksByMovement.get(row.id)||[]));
-    // En eventos Finalizados la consulta queda cerrada: solo se muestran los movimientos
-    // que forman parte del saldo del evento. En curso se conservan todos para poder activar,
-    // desactivar, importar CSV y seguir conciliando.
+      .map(row=>{
+        const displayLinks=arr(displayLinksByMovement.get(row.id));
+        const currentLinks=displayLinks.filter(link=>link.isActiveEvent);
+        const foreignLinks=displayLinks.filter(link=>!link.isActiveEvent);
+        const linkedToOtherEvent=foreignLinks.length>0&&currentLinks.length===0;
+        // Un movimiento que ya está conciliado en otro evento no puede entrar por defecto
+        // en el saldo del evento actual, aunque el indicador global histórico sea true.
+        let included=stateByMovement.has(row.id)?stateByMovement.get(row.id):row.included;
+        if(linkedToOtherEvent) included=false;
+        const reconciled=reconcileMovement({...row,included},currentLinks);
+        const foreignTarget=row.amount<0?Math.abs(row.amount):0;
+        const foreignJustified=cents(foreignLinks.reduce((sum,link)=>sum+num(link.ticketAmount),0));
+        const foreignDifference=cents(foreignTarget-foreignJustified);
+        const foreignForced=foreignLinks.some(link=>link.forcedSquare===true);
+        const foreignEvents=[...new Set(foreignLinks.map(link=>link.eventTitle).filter(Boolean))];
+        const foreignStatus=linkedToOtherEvent
+          ? (foreignForced?'CUADRADO_FORZADO':(Math.abs(foreignDifference)<=.01?'CUADRADO':(foreignDifference>0?'PENDIENTE':'EXCESO')))
+          : '';
+        return {...reconciled,
+          displayLinks,
+          foreignLinks,
+          linkedToOtherEvent,
+          inclusionLocked:linkedToOtherEvent,
+          foreignEvents,
+          foreignJustifiedAmount:foreignJustified,
+          foreignDifference,
+          foreignForcedSquare:foreignForced,
+          foreignJustificationStatus:foreignStatus,
+          justificationStatus:linkedToOtherEvent?'OTRO_EVENTO':reconciled.justificationStatus
+        };
+      });
+    // Finalizado = fotografía cerrada del evento: únicamente sus movimientos En saldo.
     const visibleScoped=event.finalized ? scopedAll.filter(row=>row.included) : scopedAll;
-    // El cálculo conserva todo el período: los movimientos excluidos se ven solo En curso,
-    // pero siguen determinando cuál era el saldo bancario anterior al primer movimiento.
     const ledger=buildEventLedger(scopedAll);
     const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
-    const movements=visibleScoped.map(row=>movementById.get(row.id)||row);
+    const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id);
     return {
@@ -560,6 +594,13 @@ export async function setMovementIncluded(id,eventId,included,actor={}){
     const {data:movement,error:movementError}=await db().from(MOVEMENTS_TABLE).select('id').eq('id',movementId).maybeSingle();
     if(movementError) throw movementError;
     if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
+    if(included!==false){
+      const {data:movementLinks,error:linksError}=await db().from(LINKS_TABLE).select('event_id').eq('movement_id',movementId);
+      if(linksError) throw linksError;
+      const foreign=arr(movementLinks).filter(link=>text(link.event_id)!==selectedEvent);
+      const own=arr(movementLinks).filter(link=>text(link.event_id)===selectedEvent);
+      if(foreign.length&&!own.length) fail('Este movimiento ya está conciliado en otro evento y debe permanecer inactivo en el evento actual.',409,'BANK_MOVEMENT_OTHER_EVENT');
+    }
     const row={event_id:selectedEvent,movement_id:movementId,included:included!==false,updated_by:text(actor.identificacion||actor.nombre)};
     const {data,error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(row,{onConflict:'event_id,movement_id'}).select('*').single();
     if(error) throw error;
@@ -609,6 +650,10 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
     if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
     if(num(movement.amount) >= 0) fail('Solo se pueden justificar con TKxx los movimientos bancarios negativos.',409,'BANK_POSITIVE_MOVEMENT');
     const event=await loadEvent(eventId);
+    const {data:existingMovementLinks,error:existingLinksError}=await db().from(LINKS_TABLE).select('event_id').eq('movement_id',id);
+    if(existingLinksError) throw existingLinksError;
+    const foreignEventIds=[...new Set(arr(existingMovementLinks).map(link=>text(link.event_id)).filter(linkEvent=>linkEvent&&linkEvent!==eventId))];
+    if(foreignEventIds.length) fail('Este movimiento bancario ya está conciliado en otro evento. Déjalo inactivo en el evento actual.',409,'BANK_MOVEMENT_OTHER_EVENT');
     const catalog = await ticketCatalog(event.id,event.title);
     const ticket = catalog.find(item => item.eventId === eventId && item.ticketCode === ticketCode);
     if(!ticket) fail('El TKxx indicado no existe o todavía no figura como pagado.',409,'BANK_TICKET_NOT_PAID');

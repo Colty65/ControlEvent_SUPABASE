@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod - FIX2 operativa bancaria, globos persistentes y restauración integral. */
+/* ControlEvent v25_prod - FIX3 controles bancarios, globos canónicos y restauración integral. */
 (function(){
   'use strict';
   if(window.__ceV25ProdFix1) return; window.__ceV25ProdFix1=true;
@@ -37,46 +37,38 @@
     document.addEventListener('controlevent:event-loaded',()=>setTimeout(keepCsvAvailableInCurrentEvent,0));
   },{once:true});
 
-  // Globo de GRAFICAS persistente hasta X/Escape u otro segmento.
-  let pinned=null;
-  let lastGraphActivation=0;
-  function removePinned(){pinned?.remove();pinned=null;}
-  function graphTipText(target){
-    const attrs=['data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-tip','title','aria-label'];
-    for(const attr of attrs){const value=target?.getAttribute?.(attr);if(norm(value))return norm(value);}
-    const owner=target?.closest?.('[data-ce-tip-v21],[data-ce-tip-v196],[data-ce-tip-v1952],[data-ce-tip],[data-tip],[title]');
-    if(owner&&owner!==target) return graphTipText(owner);
-    const visible=['ceTooltipV21','ceTooltipV196','ceTooltipV1952','ceBudgetLiteTooltipV307'].map($).find(node=>node&&getComputedStyle(node).display!=='none'&&getComputedStyle(node).visibility!=='hidden');
-    return norm(visible?.innerText||visible?.textContent||'');
+  // FIX3: un único globo canónico. Se elimina el globo oscuro duplicado de FIX2 y
+  // se deja la persistencia al gestor ceTooltipV21 del bundle legacy.
+  try{ document.getElementById('ceV25PinnedGraphTip')?.remove(); }catch(_){ }
+  if(!document.getElementById('ce-v25-fix3-tooltip-style')){
+    const style=document.createElement('style');
+    style.id='ce-v25-fix3-tooltip-style';
+    style.textContent=`
+      #ceV25PinnedGraphTip{display:none!important}
+      #ceTooltipV21[data-ce-pinned="1"]{
+        pointer-events:auto!important;
+        position:fixed!important;
+        z-index:2147483640!important;
+        padding-top:40px!important;
+        max-height:min(72vh,640px)!important;
+        overflow:auto!important;
+        box-shadow:0 20px 58px rgba(15,23,42,.32)!important
+      }
+      #ceTooltipV21 .ce-v21-tip-close{
+        position:absolute;right:9px;top:8px;width:28px;height:28px;
+        display:grid;place-items:center;border:1px solid rgba(15,23,42,.22);
+        border-radius:999px;background:rgba(255,255,255,.88);color:#172033;
+        font:900 20px/1 system-ui,sans-serif;cursor:pointer;z-index:3
+      }
+      #ceTooltipV21 .ce-v21-tip-close:hover{background:#fff;transform:scale(1.04)}
+      #ceTooltipV21 .ce-v21-tip-content{min-width:0}
+      #ceTooltipV21 .ce-v21-title:last-child{
+        margin-top:10px!important;padding-top:8px!important;
+        border-top:1px solid rgba(15,23,42,.18)!important
+      }
+    `;
+    document.head.appendChild(style);
   }
-  function showPinned(target,ev){
-    const raw=graphTipText(target);
-    if(!norm(raw)) return;
-    removePinned();
-    const box=document.createElement('div'); box.id='ceV25PinnedGraphTip';
-    const pt={x:Number(ev?.clientX||window.innerWidth/2),y:Number(ev?.clientY||window.innerHeight/2)};
-    box.innerHTML=`<button type="button" aria-label="Cerrar">×</button><div>${String(raw).split(/\r?\n/).filter(Boolean).map(line=>`<p>${line.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</p>`).join('')}</div>`;
-    box.style.cssText=`position:fixed;z-index:2147483640;left:${Math.max(12,Math.min(window.innerWidth-390,pt.x+14))}px;top:${Math.max(12,Math.min(window.innerHeight-260,pt.y+14))}px;max-width:min(370px,calc(100vw - 24px));max-height:min(62vh,520px);overflow:auto;background:#0f172a;color:#fff;border:2px solid rgba(255,255,255,.45);border-radius:16px;padding:14px 42px 14px 16px;box-shadow:0 18px 55px rgba(15,23,42,.45);font:800 13px/1.35 system-ui,sans-serif;white-space:normal;pointer-events:auto`;
-    box.querySelector('button').style.cssText='position:absolute;right:8px;top:7px;width:28px;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);color:#fff;font-size:22px;line-height:22px;cursor:pointer';
-    box.querySelectorAll('p').forEach(p=>p.style.cssText='margin:0 0 5px');
-    box.querySelector('button').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();removePinned();});
-    document.body.appendChild(box); pinned=box;
-  }
-  function graphTarget(ev){
-    const candidate=ev.target?.closest?.('#eventChartWrap .chart-seg,#eventChartWrap [data-ce-tip-v21],#eventChartWrap [data-ce-tip-v196],#eventChartWrap [data-ce-tip-v1952],#eventChartWrap [data-ce-tip],#eventChartWrap [data-tip],#eventChartWrap [title],#tabGraficas .chart-seg,#tabGraficas [data-ce-tip-v21],#tabGraficas [data-ce-tip-v196],#tabGraficas [data-ce-tip],#tabGraficas [data-tip],#tabGraficas [title]');
-    return candidate&&candidate.id!=='ceV25PinnedGraphTip'?candidate:null;
-  }
-  function activateGraphTip(ev){
-    const target=graphTarget(ev); if(!target)return;
-    const now=Date.now(); if(now-lastGraphActivation<180&&pinned)return; lastGraphActivation=now;
-    // Se espera un frame para que el tooltip heredado pueda aportar su texto, pero el
-    // globo fijado queda fuera de eventChartWrap y sobrevive a cualquier rerender.
-    requestAnimationFrame(()=>showPinned(target,ev));
-  }
-  document.addEventListener('pointerup',activateGraphTip,true);
-  document.addEventListener('click',activateGraphTip,true);
-  document.addEventListener('keydown',ev=>{if(ev.key==='Escape')removePinned();},true);
-  document.addEventListener('change',ev=>{if(ev.target?.id==='selectedEvent')removePinned();},true);
 
   // Restauración integral de los BACKUP v25_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){

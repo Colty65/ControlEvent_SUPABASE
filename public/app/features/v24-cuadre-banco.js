@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod · Cuadre Banco fluido con grandes periodos (GD/RW). */
+/* ControlEvent v25_prod FIX3 · Cuadre Banco fluido, controles nativos y vínculos entre eventos (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -54,6 +54,11 @@
     if(row.justificationStatus==='PENDIENTE') return {className:'pending',label:`Faltan ${money(Math.max(0,row.difference))}`};
     if(row.justificationStatus==='EXCESO') return {className:'excess',label:`Exceso ${money(Math.abs(row.difference))}`};
     if(row.justificationStatus==='SIN_JUSTIFICAR') return {className:'none',label:'Sin justificar'};
+    if(row.justificationStatus==='OTRO_EVENTO'){
+      const events=arr(row.foreignEvents).join(', ')||'otro evento';
+      const state=row.foreignJustificationStatus==='CUADRADO_FORZADO'?'Cuadre forzado':(row.foreignJustificationStatus==='CUADRADO'?'Cuadrado':'Conciliado');
+      return {className:'other-event',label:`${state} en ${events}`};
+    }
     return {className:'na',label:'Ingreso / abono'};
   }
   function trafficInfo(summary={}){
@@ -112,11 +117,13 @@
     const input=$('ceBankCsvFile');
     if(!input) return false;
     try{ input.value=''; }catch(_){ }
-    // input.click() se ejecuta dentro del gesto real del usuario. No se difiere con setTimeout,
-    // porque Safari/Chrome pueden bloquear el selector si se pierde la activación del clic.
-    try{ input.click(); }
-    catch(error){
-      try{ if(typeof input.showPicker==='function') input.showPicker(); else throw error; }
+    // El selector se abre dentro del gesto real del usuario. showPicker() es la vía más
+    // fiable en navegadores modernos; input.click() queda como alternativa.
+    try{
+      if(typeof input.showPicker==='function') input.showPicker();
+      else input.click();
+    }catch(error){
+      try{ input.click(); }
       catch(_){ notice('El navegador no ha podido abrir el selector. Pulsa de nuevo «Cargar CSV».','warning',true); }
     }
     return false;
@@ -174,7 +181,7 @@
         </div>
         <div id="ceBankSummary" class="ce-bank-summary"></div>
         <div id="ceBankNotice" class="ce-bank-notice hidden"></div>
-        <div class="ce-bank-ledger-caption"><span>CRONOLOGÍA BANCARIA DEL EVENTO</span><b>Movimiento</b><b>Concepto</b><b>Importe · saldo banco · saldo evento</b></div>
+        <div class="ce-bank-ledger-caption"><b>Movimientos bancarios</b><b>Tickets justificantes del mvto bancario</b></div>
         <div class="ce-bank-resultbar"><span id="ceBankResultCount">Preparando movimientos…</span><div><button type="button" id="ceBankPrevPage" aria-label="Página anterior">‹</button><b id="ceBankPageLabel">Página 1 de 1</b><button type="button" id="ceBankNextPage" aria-label="Página siguiente">›</button></div></div>
         <main id="ceBankBody" class="ce-bank-body" tabindex="0" aria-label="Movimientos bancarios del evento"></main>
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
@@ -182,6 +189,7 @@
       document.body.appendChild(overlay);
       bindInterfaceControls(overlay);
     }
+    installCommandFirewall();
     ensureInteractive();
     installMobileEntry();
     document.querySelectorAll('.ce-bank-entry').forEach(prepareEntry);
@@ -201,6 +209,15 @@
     }
     prepareEntry(btn);
   }
+  function installCommandFirewall(){
+    // FIX3: no se interceptan eventos en window/capture. El cortafuegos anterior detenía
+    // pointerdown antes de que select, input y el selector de ficheros alcanzaran su destino,
+    // por eso solo parecían responder los calendarios. Los controles se gestionan directamente
+    // en el diálogo y pueden usar de nuevo su comportamiento nativo.
+    if(root.__ceBankCommandFirewallInstalled) return;
+    root.__ceBankCommandFirewallInstalled=true;
+  }
+
   function bindInterfaceControls(overlay){
     if(!overlay || overlay.dataset.ceBankBound==='1') return;
     overlay.dataset.ceBankBound='1';
@@ -418,7 +435,7 @@
     const q=text(store.search).toLowerCase();
     if(q) rows=rows.filter(row=>[
       row.description,row.amount,row.bankBalance,row.eventBalanceAfter,formatDate(row.executedAt),formatDate(row.valueDate,false),
-      ...arr(row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)])
+      ...arr(row.displayLinks||row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)])
     ].join(' ').toLowerCase().includes(q));
     rows=[...rows].sort((a,b)=>{
       const cmp=String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id));
@@ -456,27 +473,51 @@
     if(!pageRows.length){ body.innerHTML='<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro, cambia la búsqueda o amplía las fechas.</span></div>'; return; }
     body.innerHTML=pageRows.map((row,index)=>{
       const status=statusInfo(row); const amountClass=row.amount<0?'negative':'positive';
-      const target=Math.max(0,num(row.targetAmount)); const justified=Math.max(0,num(row.justifiedAmount));
+      const displayLinks=arr(row.displayLinks||row.links);
+      const activeLinks=displayLinks.filter(link=>link.isActiveEvent!==false);
+      const target=Math.max(0,num(row.targetAmount));
+      const justified=row.linkedToOtherEvent?Math.max(0,num(row.foreignJustifiedAmount)):Math.max(0,num(row.justifiedAmount));
       const progress=target?Math.min(100,Math.round(justified/target*100)):0;
-      const disabled=store.readOnly?'disabled aria-disabled="true"':'';
-      const orderedLinks=arr(row.links).slice().sort((a,b)=>(Number(String(a.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b.ticketCode||'').replace(/\D/g,''))||0)||String(a.ticketCode||'').localeCompare(String(b.ticketCode||''),'es'));
-      const links=orderedLinks.map(link=>`<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}" ${disabled}>×</button></span>`).join('');
-      const forceControl=row.amount<0&&arr(row.links).length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${disabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
-      return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
+      const rowLocked=store.readOnly||row.inclusionLocked===true;
+      const disabled=rowLocked?'disabled aria-disabled="true"':'';
+      const actionDisabled=store.readOnly?'disabled aria-disabled="true"':'';
+      const orderedLinks=displayLinks.slice().sort((a,b)=>
+        String(a.eventTitle||'').localeCompare(String(b.eventTitle||''),'es')||
+        (Number(String(a.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b.ticketCode||'').replace(/\D/g,''))||0)||
+        String(a.ticketCode||'').localeCompare(String(b.ticketCode||''),'es')
+      );
+      const links=orderedLinks.map(link=>{
+        const removable=link.isActiveEvent!==false&&!store.readOnly;
+        return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
+      }).join('');
+      const forceControl=row.amount<0&&!row.linkedToOtherEvent&&activeLinks.length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)
+        ?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${actionDisabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
+      const includeLabel=row.inclusionLocked?'Otro evento':(row.included?'En saldo':'Inactivo');
+      const justificationTitle=row.amount>=0?'Movimiento positivo conciliado':(row.linkedToOtherEvent?'Conciliado en otro evento':'Trazabilidad de compra');
+      const amountSummary=row.amount<0?`<small class="ce-bank-justify-amounts">${money(justified)} de ${money(target)}</small>`:'';
+      const addAction=row.amount<0&&!row.linkedToOtherEvent
+        ?`<button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${actionDisabled}><span>＋</span><b>Vincular TKxx del evento</b></button>`
+        :'';
+      const emptyText=row.linkedToOtherEvent?'Este movimiento está justificado en otro evento.':'Todavía no hay TKxx asociados a este movimiento.';
+      const positiveNote=row.linkedToOtherEvent
+        ?`Movimiento perteneciente a ${esc(arr(row.foreignEvents).join(', ')||'otro evento')}; permanece inactivo en el evento actual.`
+        :'Este abono se muestra en la evolución del saldo y no necesita TKxx de compra.';
+      return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass} ${row.linkedToOtherEvent?'belongs-other-event':''}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
         <div class="ce-bank-ledger-node"><span>${String(start+index+1).padStart(2,'0')}</span><i></i></div>
         <div class="ce-bank-movement-main">
-          <label class="ce-bank-include"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${row.included?'En saldo':'Inactivo'}</b></label>
+          <label class="ce-bank-include ${row.inclusionLocked?'locked':''}" title="${row.inclusionLocked?'Este movimiento ya está conciliado en otro evento.':''}"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${includeLabel}</b></label>
           <div class="ce-bank-date"><strong>${formatDate(row.executedAt)}</strong><small>Valor ${formatDate(row.valueDate,false)}</small></div>
           <div class="ce-bank-description"><div><span>${row.amount<0?'SALIDA':'ENTRADA'}</span><strong>${esc(row.description)}</strong></div></div>
           <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO':'ABONO'}</small><strong>${money(row.amount)}</strong><span>Banco: <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
         </div>
         <div class="ce-bank-justification ${status.className}">
-          <div class="ce-bank-justify-head"><div><span class="ce-bank-justify-icon">${row.amount<0?'⌁':'↗'}</span><div><strong>${row.amount<0?'Trazabilidad de compra':'Movimiento positivo conciliado'}</strong><span class="ce-bank-status ${status.className}">${esc(status.label)}</span></div></div>${row.amount<0?`<div class="ce-bank-justify-numbers"><b>${money(row.justifiedAmount)}</b><span>de ${money(row.targetAmount)}</span></div>`:''}</div>
-          ${row.amount<0?`<div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div><div class="ce-bank-ticket-list">${links||'<span class="ce-bank-no-tickets">Todavía no hay TKxx asociados a este movimiento.</span>'}</div><div class="ce-bank-justify-actions"><button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${disabled}><span>＋</span><b>Vincular TKxx del evento</b></button>${forceControl}</div>`:'<p class="ce-bank-positive-note">Este abono se muestra en la evolución del saldo y no necesita TKxx de compra.</p>'}
+          <div class="ce-bank-justify-head"><span class="ce-bank-justify-icon">${row.amount<0?'⌁':'↗'}</span><div><strong>${justificationTitle}</strong><span class="ce-bank-status ${status.className}">${esc(status.label)}</span>${amountSummary}</div></div>
+          ${row.amount<0?`<div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div><div class="ce-bank-ticket-list">${links||`<span class="ce-bank-no-tickets">${emptyText}</span>`}</div><div class="ce-bank-justify-actions">${addAction}${forceControl}</div>`:`<p class="ce-bank-positive-note">${positiveNote}</p>`}
         </div>
       </article>`;
     }).join('');
   }
+
   async function savePeriod(){
     if(mutationBlocked()) return;
     const dateFrom=text($('ceBankDateFrom')?.value); const dateTo=text($('ceBankDateTo')?.value);

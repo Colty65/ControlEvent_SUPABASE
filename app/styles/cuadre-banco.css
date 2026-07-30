@@ -186,3 +186,132 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
   .ce-bank-date strong,.ce-bank-description strong{font-size:11px!important}.ce-bank-date small{font-size:8px!important}.ce-bank-amount>span{font-size:8px!important}
   .ce-bank-justify-head strong{font-size:10px!important}.ce-bank-status,.ce-bank-ticket-chip,.ce-bank-positive-note{font-size:8px!important}
 }
+
+/* v25_prod FIX3 · controles nativos, columnas sin solapes y vínculos de otros eventos */
+#ceBankOverlay .ce-bank-command-deck,
+#ceBankOverlay .ce-bank-command-primary,
+#ceBankOverlay .ce-bank-command-fields,
+#ceBankOverlay .ce-bank-command-fields label,
+#ceBankOverlay .ce-bank-command-fields select,
+#ceBankOverlay .ce-bank-command-fields input,
+#ceBankOverlay .ce-bank-period-deck,
+#ceBankOverlay .ce-bank-period-deck input,
+#ceBankOverlay .ce-bank-resultbar,
+#ceBankOverlay .ce-bank-resultbar button{
+  pointer-events:auto!important;
+}
+#ceBankOverlay .ce-bank-command-fields select{
+  appearance:auto!important;
+  -webkit-appearance:auto!important;
+  cursor:pointer!important;
+}
+#ceBankOverlay #ceBankSearch{cursor:text!important;user-select:text!important}
+#ceBankOverlay #ceBankImport:not(:disabled){cursor:pointer!important}
+
+.ce-bank-status.other-event{background:#e8f0ff!important;color:#315f9e!important;border:1px solid #c8daf8!important}
+.ce-bank-movement.belongs-other-event{border-color:#b9cbe4!important;background:#f6f9fe!important}
+.ce-bank-movement.belongs-other-event .ce-bank-movement-main{background:linear-gradient(180deg,#f8fbff,#f1f6fc)!important}
+.ce-bank-movement.belongs-other-event .ce-bank-justification{background:linear-gradient(180deg,#f4f8ff,#edf4fe)!important;border-color:#c7d8ef!important}
+.ce-bank-include.locked{cursor:not-allowed!important;color:#647c91!important}
+.ce-bank-include.locked>span{background:#d7e1ea!important;box-shadow:none!important}
+.ce-bank-ticket-chip.foreign{border-color:#b8cce8!important;background:#f2f7ff!important;color:#294f7b!important}
+.ce-bank-ticket-chip.foreign>i{background:#dce9fb!important;color:#315f9e!important}
+.ce-bank-ticket-chip.foreign>span{display:inline-flex!important;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 5px;border-radius:999px;background:#dce9fb;color:#315f9e;font-size:7px;font-weight:900}
+.ce-bank-justify-amounts{display:inline-block!important;margin:0!important;color:#5d7184!important;font-size:7px!important;font-weight:900!important;white-space:nowrap!important}
+
+@media (min-width:1200px){
+  .ce-bank-ledger-caption{
+    display:grid!important;
+    grid-template-columns:minmax(560px,1.03fr) minmax(500px,.97fr)!important;
+    gap:0!important;
+    margin:0 12px 4px 34px!important;
+    padding:0!important;
+    color:#456077!important;
+    font-size:9px!important;
+    font-weight:950!important;
+    letter-spacing:.11em!important;
+    text-transform:uppercase!important;
+  }
+  .ce-bank-ledger-caption>b{display:block!important;padding:0 12px!important;min-width:0!important}
+  .ce-bank-ledger-caption>b:last-child{padding-left:18px!important;border-left:1px solid #cbd9e5!important}
+
+  .ce-bank-movement{
+    grid-template-columns:minmax(560px,1.03fr) minmax(500px,.97fr)!important;
+    min-height:62px!important;
+  }
+  .ce-bank-movement-main{
+    display:grid!important;
+    grid-template-columns:82px 126px minmax(0,1fr) 142px!important;
+    gap:7px!important;
+    min-width:0!important;
+    min-height:62px!important;
+    padding:6px 10px!important;
+    overflow:hidden!important;
+  }
+  .ce-bank-date,.ce-bank-description,.ce-bank-amount{min-width:0!important;overflow:hidden!important}
+  .ce-bank-description>div{min-width:0!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:6px!important}
+  .ce-bank-description strong{display:block!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  .ce-bank-amount{display:flex!important;flex-direction:column!important;align-items:flex-end!important;justify-content:center!important;text-align:right!important}
+  .ce-bank-amount small,.ce-bank-amount strong,.ce-bank-amount>span{position:static!important;transform:none!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  .ce-bank-amount strong{font-size:15px!important;line-height:1.03!important}
+  .ce-bank-amount>span{display:block!important;margin:1px 0 0!important;font-size:7px!important;line-height:1.05!important}
+
+  .ce-bank-movement .ce-bank-justification,
+  .ce-bank-movement.negative .ce-bank-justification,
+  .ce-bank-movement.positive .ce-bank-justification{
+    min-width:0!important;
+    min-height:62px!important;
+    overflow:hidden!important;
+    padding:6px 8px!important;
+  }
+  .ce-bank-movement.negative .ce-bank-justification{
+    display:grid!important;
+    grid-template-columns:minmax(160px,.72fr) minmax(260px,1.28fr)!important;
+    grid-template-rows:27px 25px!important;
+    gap:4px 8px!important;
+    align-items:center!important;
+  }
+  .ce-bank-movement.negative .ce-bank-justify-head{grid-column:1!important;grid-row:1!important;min-width:0!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:5px!important}
+  .ce-bank-justify-head>div{display:flex!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important;min-width:0!important;overflow:hidden!important}
+  .ce-bank-justify-head strong{max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:8px!important}
+  .ce-bank-movement.negative .ce-bank-progress-track{grid-column:1!important;grid-row:2!important;margin:0!important;min-width:0!important}
+  .ce-bank-movement.negative .ce-bank-ticket-list{grid-column:2!important;grid-row:1!important;display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:4px!important;min-width:0!important;overflow-x:auto!important;overflow-y:hidden!important;margin:0!important;padding:1px 0 2px!important}
+  .ce-bank-movement.negative .ce-bank-justify-actions{grid-column:2!important;grid-row:2!important;display:flex!important;align-items:center!important;gap:5px!important;min-width:0!important;overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;margin:0!important;padding-bottom:1px!important}
+  .ce-bank-ticket-chip{flex:0 0 auto!important;max-width:230px!important}
+  .ce-bank-ticket-chip b,.ce-bank-ticket-chip strong{white-space:nowrap!important}
+  .ce-bank-no-tickets{font-size:8px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+
+  .ce-bank-movement.positive .ce-bank-justification{
+    display:grid!important;
+    grid-template-columns:minmax(220px,.9fr) minmax(250px,1.1fr)!important;
+    grid-template-rows:1fr!important;
+    align-items:center!important;
+    gap:8px!important;
+  }
+  .ce-bank-movement.positive .ce-bank-justify-head{grid-column:1!important;grid-row:1!important;min-width:0!important}
+  .ce-bank-movement.positive .ce-bank-positive-note{grid-column:2!important;grid-row:1!important;min-width:0!important;margin:0!important;font-size:8px!important;line-height:1.25!important}
+}
+
+@media (min-width:701px) and (max-width:1199px){
+  .ce-bank-ledger-caption{display:none!important}
+  .ce-bank-movement{display:block!important;overflow:hidden!important}
+  .ce-bank-movement-main{grid-template-columns:82px 125px minmax(0,1fr) 136px!important;min-width:0!important}
+  .ce-bank-description,.ce-bank-description>div,.ce-bank-description strong{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  .ce-bank-amount{min-width:0!important;overflow:hidden!important}
+  .ce-bank-movement .ce-bank-justification{border-left:0!important;border-top:1px solid #d9e4ed!important;border-radius:0 0 12px 12px!important}
+  .ce-bank-justify-head>div{display:flex!important;align-items:center!important;gap:5px!important;flex-wrap:wrap!important;min-width:0!important}
+  .ce-bank-ticket-list{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:4px!important}
+  .ce-bank-ticket-chip.foreign>span{display:inline-flex!important}
+}
+
+@media (max-width:700px){
+  .ce-bank-movement-main{overflow:hidden!important}
+  .ce-bank-description,.ce-bank-description>div,.ce-bank-description strong{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  .ce-bank-amount{min-width:92px!important;overflow:hidden!important}
+  .ce-bank-amount strong{white-space:nowrap!important}
+  .ce-bank-justify-head{display:flex!important;align-items:center!important;gap:5px!important;min-width:0!important}
+  .ce-bank-justify-head>div{display:flex!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important;min-width:0!important}
+  .ce-bank-justify-amounts{font-size:8px!important}
+  .ce-bank-ticket-chip.foreign>span{display:inline-flex!important;max-width:118px!important;font-size:7px!important}
+  .ce-bank-movement.belongs-other-event .ce-bank-positive-note{display:block!important}
+}
