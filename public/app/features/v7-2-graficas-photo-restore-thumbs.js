@@ -1,180 +1,94 @@
-/* ControlEvent v25_prod - GRAFICAS: miniaturas y retorno al globo sin bucles.
-   Alcance: Android restaura el globo al cerrar foto; todos los dispositivos hidratan miniaturas del globo activo bajo demanda. */
-(function(){
+/* ControlEvent v25_prod FIX5 · GRAFICAS: un único panel estable, sin restauraciones ni retemblores. */
+(function(root){
   'use strict';
-  const INSTALLED = '__ceV72GraficasPhotoRestoreThumbs';
-  if(window[INSTALLED]) return;
-  window[INSTALLED] = true;
+  const FLAG='__ceV25StableGraphTipFix5';
+  if(root[FLAG]) return; root[FLAG]=true;
+  const $=id=>document.getElementById(id);
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  let activeOwner=null;
 
-  const VERSION = 'ControlEvent v25_prod';
-  const VERSION_FILE = 'ControlEvent_v8_0_prod';
-  let lastGraphTipSnapshot = null;
-  let hydrateTimer = 0;
-  const observed = new WeakSet();
-
-  const $ = id => document.getElementById(id);
-  const safe = (fn, fb) => { try{ const v = fn(); return v === undefined ? fb : v; }catch(_){ return fb; } };
-  const norm = v => String(v ?? '').trim();
-  function isAndroid(){ return /Android/i.test(navigator.userAgent || ''); }
-  function st(){ return safe(() => (typeof state !== 'undefined' && state) ? state : null, null) || window.state || window.ControlEventApp?.state || {}; }
-  function currentEventId(){ return norm(st().selectedEventId || $('selectedEvent')?.value || ''); }
-  function jsonGet(key){ try{ return JSON.parse(localStorage.getItem(key) || '{}') || {}; }catch(_){ return {}; } }
-  function valueToSrc(value){
-    if(!value) return '';
-    if(typeof value === 'string') return value.trim();
-    if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.dataURL || value.base64 || '');
-    return '';
+  function graphOwner(target){
+    const owner=target?.closest?.('#tabGraficas [data-ce-tip-v21],#eventChartWrap [data-ce-tip-v21]');
+    return owner&&owner.getAttribute('data-ce-tip-v21')?.trim()?owner:null;
   }
-  function receiptKeys(id){
-    const ev = currentEventId();
-    const sid = norm(id);
-    return [`${ev}|INGRESO:${sid}`,`${ev}|INGRESO|${sid}`,`INGRESO:${ev}|${sid}`,`INGRESO:${sid}`,`INGRESO|${sid}`,sid];
+  function photoViewerOpen(){
+    return !!document.querySelector('.ce-v468-modal,.ce-v465-modal,#ceV310PhotoViewer:not(.hidden),#ceV401PcPhotoModal:not(.hidden),[role="dialog"].ce-photo-viewer');
   }
-  function receiptSrc(id){
-    const s = st();
-    const bags = [s.ticketImages || {}, s.ticketImageRefs || {}, jsonGet('ControlEvent_ingreso_receipts_v502'), jsonGet('ControlEvent_ingreso_receipts_v468')];
-    const keys = receiptKeys(id);
-    for(const bag of bags){ for(const key of keys){ const src = valueToSrc(bag && bag[key]); if(src) return src; } }
-    return '';
+  function closeTip(){
+    const tip=$('ceTooltipV21');
+    if(tip?.dataset.ceStableFix5==='1') tip.remove();
+    activeOwner=null;
   }
-  function visible(el){
-    if(!el) return false;
-    const cs = safe(() => getComputedStyle(el), null);
-    if(!cs || cs.display === 'none' || cs.visibility === 'hidden') return false;
-    const r = safe(() => el.getBoundingClientRect(), null);
-    return !!r && r.width > 0 && r.height > 0;
-  }
-  function graphTipFrom(target){
-    const tip = target?.closest?.('#ceTooltipV21');
-    if(tip && visible(tip)) return tip;
-    const globalTip = $('ceTooltipV21');
-    return visible(globalTip) ? globalTip : null;
-  }
-  function captureGraphTip(target){
-    const tip = graphTipFrom(target);
-    if(!tip) return null;
-    const rect = safe(() => tip.getBoundingClientRect(), null);
-    lastGraphTipSnapshot = {
-      id: tip.id || 'ceTooltipV21',
-      html: tip.outerHTML || '',
-      scrollTop: tip.scrollTop || 0,
-      scrollLeft: tip.scrollLeft || 0,
-      left: tip.style.left || '', top: tip.style.top || '', right: tip.style.right || '', bottom: tip.style.bottom || '',
-      display: tip.style.display || '', visibility: tip.style.visibility || '', pointerEvents: tip.style.pointerEvents || '',
-      className: tip.className || '',
-      rectLeft: rect ? rect.left : null,
-      rectTop: rect ? rect.top : null
+  function renderText(raw){
+    const lines=String(raw||'').replace(/\r/g,'').split('\n');
+    const html=[]; let rows=[];
+    const flush=()=>{
+      if(!rows.length) return;
+      html.push('<div class="ce-v25-stable-table-wrap"><table class="ce-v21-table"><tbody>'+rows.map((cells,index)=>'<tr class="'+(index===0?'head':'')+'">'+cells.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>');
+      rows=[];
     };
-    return lastGraphTipSnapshot;
-  }
-  function restoreGraphTip(){
-    const s = lastGraphTipSnapshot;
-    if(!s || !s.html) return;
-    let el = $(s.id);
-    if(visible(el)){ hydrateTooltipThumbs(el); return; }
-    try{ if(el) el.remove(); }catch(_){ }
-    const holder = document.createElement('div');
-    holder.innerHTML = s.html;
-    el = holder.firstElementChild;
-    if(!el) return;
-    el.id = s.id || 'ceTooltipV21';
-    el.className = s.className || el.className || '';
-    el.classList.add('open','ce-v462-tip-open');
-    el.setAttribute('data-ce-v72-restored-graph-tip','1');
-    el.removeAttribute('aria-hidden');
-    el.style.removeProperty('display');
-    el.style.removeProperty('visibility');
-    el.style.removeProperty('pointer-events');
-    el.style.display = (s.display && s.display !== 'none') ? s.display : 'block';
-    el.style.visibility = (s.visibility && s.visibility !== 'hidden') ? s.visibility : 'visible';
-    el.style.pointerEvents = s.pointerEvents || 'auto';
-    if(s.left) el.style.left = s.left;
-    if(s.top) el.style.top = s.top;
-    if(s.right) el.style.right = s.right;
-    if(s.bottom) el.style.bottom = s.bottom;
-    el.style.setProperty('z-index','600000','important');
-    document.body.appendChild(el);
-    try{ el.scrollTop = s.scrollTop || 0; el.scrollLeft = s.scrollLeft || 0; }catch(_){ }
-    hydrateTooltipThumbs(el);
-  }
-  function scheduleRestore(){ [30,110,260].forEach(ms => setTimeout(restoreGraphTip, ms)); }
-
-  function hydrateTooltipThumbs(root){
-    const roots = root ? [root] : ['ceTooltipV21','ceBudgetLiteTooltipV307'].map($).filter(visible);
-    roots.forEach(tip => {
-      tip.querySelectorAll?.('.ce-v465-tip-thumb,[data-action="ingreso-receipt-view-v465"],[data-ce-v512-budget-photo]').forEach(btn => {
-        const id = norm(btn.dataset?.id || btn.getAttribute?.('data-id') || btn.closest?.('[data-id]')?.dataset?.id || '');
-        let img = btn.matches?.('img') ? btn : btn.querySelector?.('img');
-        let src = norm(img?.currentSrc || img?.src || '');
-        if(!src && id) src = receiptSrc(id);
-        if(!src) return;
-        if(!img){
-          img = document.createElement('img');
-          img.alt = 'Justificante';
-          btn.textContent = '';
-          btn.appendChild(img);
-        }
-        if(img.src !== src) img.src = src;
-        try{ img.loading = 'eager'; img.decoding = 'sync'; img.setAttribute('fetchpriority','high'); }catch(_){ }
-        try{
-          btn.style.setProperty('visibility','visible','important');
-          btn.style.setProperty('opacity','1','important');
-          btn.style.setProperty('pointer-events','auto','important');
-          img.style.setProperty('display','block','important');
-          img.style.setProperty('visibility','visible','important');
-          img.style.setProperty('opacity','1','important');
-        }catch(_){ }
-      });
+    lines.forEach((line,index)=>{
+      const clean=String(line||'').trim();
+      if(!clean){flush();return;}
+      if(clean.includes('|')){rows.push(clean.split('|').map(v=>v.trim()));return;}
+      flush();
+      const value=esc(clean).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s*€|\d+(?:,\d{2})?\s*€)/g,'<strong>$1</strong>');
+      if(/^TOTAL\b/i.test(clean)) html.push('<div class="ce-v21-title ce-v21-total">'+value+'</div>');
+      else if(index===0||/^(INGRESOS|DONACI|COMPRADO|DONADO|PENDIENTE|PTE\.?|GAST|POR |SOCIOS|NO SOCIOS|PERSONAS|PRODUCTOS|TIENDA|TICKET)/i.test(clean)) html.push('<div class="ce-v21-title">'+value+'</div>');
+      else html.push('<div class="ce-v21-text">'+value+'</div>');
     });
+    flush(); return html.join('');
   }
-  function requestHydrate(reason){
-    if(hydrateTimer) clearTimeout(hydrateTimer);
-    hydrateTimer = setTimeout(() => {
-      hydrateTimer = 0;
-      safe(() => window.ControlEventV469?.enrichOpenTooltips?.(), null);
-      safe(() => window.ControlEventV467?.enrichOpenTooltips?.(), null);
-      safe(() => window.ControlEventBudgetLiteTips?.sanitize?.(), null);
-      hydrateTooltipThumbs();
-      installTipObservers();
-    }, 55);
+  function addStyle(){
+    if($('ce-v25-stable-graph-tip-style')) return;
+    const style=document.createElement('style'); style.id='ce-v25-stable-graph-tip-style';
+    style.textContent=`
+      #ceTooltipV21[data-ce-stable-fix5="1"]{position:fixed!important;left:50%!important;top:50%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:min(680px,calc(100vw - 32px))!important;max-width:min(680px,calc(100vw - 32px))!important;max-height:min(76vh,720px)!important;display:block!important;visibility:visible!important;opacity:1!important;overflow:auto!important;pointer-events:auto!important;z-index:2147483644!important;padding:48px 18px 18px!important;border:1px solid rgba(15,23,42,.22)!important;border-radius:18px!important;background:#fff!important;color:#172033!important;box-shadow:0 28px 90px rgba(2,8,23,.42)!important;animation:none!important;transition:none!important;contain:layout paint!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-tip-close{position:absolute!important;right:12px!important;top:10px!important;width:32px!important;height:32px!important;display:grid!important;place-items:center!important;border:1px solid #cbd5e1!important;border-radius:999px!important;background:#fff!important;color:#172033!important;font:900 22px/1 system-ui,sans-serif!important;cursor:pointer!important;z-index:4!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-title{margin:0 0 9px!important;font:900 15px/1.25 system-ui,sans-serif!important;color:#0f172a!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-text{margin:5px 0!important;font:700 13px/1.35 system-ui,sans-serif!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-total{margin-top:14px!important;padding-top:11px!important;border-top:2px solid #cbd5e1!important;font-size:16px!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v25-stable-table-wrap{overflow:auto!important;margin:8px 0 12px!important;border:1px solid #dbe3ec!important;border-radius:11px!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] table{width:100%!important;border-collapse:collapse!important;font:700 12px/1.3 system-ui,sans-serif!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] td{padding:7px 8px!important;border-bottom:1px solid #e5eaf0!important;vertical-align:middle!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] tr.head td{position:sticky!important;top:0!important;background:#edf3f8!important;font-weight:950!important}
+      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v465-tip-thumb{width:38px!important;height:38px!important;min-width:38px!important;animation:none!important;transform:none!important}
+      body.ce-v25-graph-tip-open:before{content:"";position:fixed;inset:0;background:rgba(2,8,23,.34);z-index:2147483643;pointer-events:none}
+      @media(max-width:700px){#ceTooltipV21[data-ce-stable-fix5="1"]{width:calc(100vw - 18px)!important;max-width:calc(100vw - 18px)!important;max-height:82vh!important;padding:44px 10px 12px!important}#ceTooltipV21[data-ce-stable-fix5="1"] td{padding:6px 5px!important;font-size:11px!important}}
+    `;
+    document.head.appendChild(style);
   }
-  function installTipObservers(){
-    ['ceTooltipV21','ceBudgetLiteTooltipV307'].map($).filter(Boolean).forEach(tip => {
-      if(observed.has(tip)) return;
-      observed.add(tip);
-      try{
-        const mo = new MutationObserver(() => requestHydrate('tip-mutation'));
-        mo.observe(tip, {childList:true, subtree:true});
-      }catch(_){ }
-    });
+  function openTip(owner){
+    const raw=owner?.getAttribute?.('data-ce-tip-v21'); if(!raw?.trim()) return;
+    closeTip(); addStyle(); activeOwner=owner;
+    const tip=document.createElement('div'); tip.id='ceTooltipV21'; tip.dataset.ceStableFix5='1'; tip.dataset.cePinned='1';
+    tip.innerHTML='<button type="button" class="ce-v21-tip-close" aria-label="Cerrar información">×</button><div class="ce-v21-tip-content">'+renderText(raw)+'</div>';
+    document.body.appendChild(tip); document.body.classList.add('ce-v25-graph-tip-open');
+    // Añade justificantes una sola vez; no se observa ni se restaura el globo.
+    [0,80].forEach(ms=>setTimeout(()=>{
+      if(!$('ceTooltipV21')||$('ceTooltipV21')!==tip||photoViewerOpen()) return;
+      try{root.ControlEventV469?.enrichOpenTooltips?.();}catch(_){ }
+      try{root.ControlEventV467?.enrichOpenTooltips?.();}catch(_){ }
+    },ms));
   }
+  function removeBackdropIfClosed(){if(!$('ceTooltipV21')?.dataset?.ceStableFix5)document.body.classList.remove('ce-v25-graph-tip-open');}
 
-  function shouldCaptureOpen(ev){
-    if(!isAndroid()) return false;
-    const t = ev.target;
-    return !!t?.closest?.('#ceTooltipV21 .ce-v465-tip-thumb,#ceTooltipV21 [data-action="ingreso-receipt-view-v465"],#ceTooltipV21 [data-ce-v512-budget-photo]');
-  }
-  function isPhotoClose(ev){
-    const t = ev.target;
-    if(!t) return false;
-    return !!(
-      t.closest?.('#ceV310PhotoViewer .ce-v310-photo-close,#ceV310PhotoViewer [data-close],.ce-v468-modal [data-close],.ce-v465-modal [data-close],#ceV401PcPhotoModal [data-close]') ||
-      t === $('ceV310PhotoViewer') || t.closest?.('.ce-v468-modal') === t || t.closest?.('.ce-v465-modal') === t
-    );
-  }
-  function pointerHandler(ev){
-    if(shouldCaptureOpen(ev)) captureGraphTip(ev.target);
-    requestHydrate('pointer');
-    if(isAndroid() && isPhotoClose(ev)) scheduleRestore();
-  }
-  ['pointerdown','touchstart','click','pointerup','touchend'].forEach(type => window.addEventListener(type, pointerHandler, {capture:true, passive:true}));
-  ['pointerover','mouseover','touchstart','click'].forEach(type => document.addEventListener(type, ev => {
-    if(ev.target?.closest?.('#tabGraficas,#eventChartWrap,#ceTooltipV21,#ceBudgetLiteTooltipV307')) requestHydrate(type);
-  }, {capture:true, passive:true}));
-  document.addEventListener('keydown', ev => { if(isAndroid() && ev.key === 'Escape') scheduleRestore(); }, true);
-  ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-loaded'].forEach(evt => window.addEventListener(evt, () => setTimeout(() => { requestHydrate(evt); installTipObservers(); }, 80)));
-  document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') setTimeout(() => { lastGraphTipSnapshot = null; requestHydrate('event-change'); }, 120); }, true);
-  [160,900].forEach(ms => setTimeout(() => { requestHydrate('boot'); installTipObservers(); }, ms));
-
-  window.ControlEventV72GraficasPhotoRestoreThumbs = {version:VERSION, versionFile:VERSION_FILE, hydrate:hydrateTooltipThumbs, restore:restoreGraphTip};
-})();
+  // window/capture se ejecuta antes que todos los gestores antiguos del documento.
+  root.addEventListener('click',event=>{
+    const close=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-tip-close');
+    if(close){event.preventDefault();event.stopImmediatePropagation();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');return;}
+    const photo=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix5="1"] .ce-v465-tip-thumb,#ceTooltipV21[data-ce-stable-fix5="1"] [data-action="ingreso-receipt-view-v465"],#ceTooltipV21[data-ce-stable-fix5="1"] [data-ce-v512-budget-photo]');
+    if(photo){
+      // El visor de fotos recibe el clic; el globo se retira después y nunca se reconstruye.
+      setTimeout(()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');},70);
+      return;
+    }
+    const owner=graphOwner(event.target);
+    if(owner){event.preventDefault();event.stopImmediatePropagation();openTip(owner);return;}
+  },true);
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('ceTooltipV21')?.dataset?.ceStableFix5==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
+  document.addEventListener('change',event=>{if(event.target?.id==='selectedEvent'){closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
+  root.addEventListener('pagehide',()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');});
+  setInterval(removeBackdropIfClosed,1500);
+  root.ControlEventStableGraphTipFix5={open:openTip,close:closeTip};
+})(window);

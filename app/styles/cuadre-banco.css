@@ -332,3 +332,111 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-command-fields select,#ceBankOverlay #ceBankSearch{position:relative!important;z-index:304!important}
 
 #ceBankOverlay #ceBankImport{position:relative!important;overflow:hidden!important;cursor:pointer!important}
+
+
+/* v25_prod FIX5 · cierre definitivo de Cuadre Banco: lectura, controles y legibilidad. */
+#ceBankOverlay .ce-bank-command-fields label>span,
+#ceBankOverlay .ce-bank-period-deck label>span{font-size:10px!important;line-height:1.2!important;letter-spacing:.08em!important}
+#ceBankOverlay .ce-bank-command-fields select,
+#ceBankOverlay .ce-bank-command-fields input{height:38px!important;font-size:13px!important;line-height:38px!important;padding-inline:11px!important}
+#ceBankOverlay .ce-bank-search input{padding-left:36px!important}
+#ceBankOverlay .ce-bank-period-copy>span{font-size:9px!important}
+#ceBankOverlay .ce-bank-period-copy>b{font-size:12px!important;line-height:1.25!important}
+#ceBankOverlay .ce-bank-period-deck input,
+#ceBankOverlay #ceBankApplyPeriod{height:36px!important;font-size:12px!important}
+#ceBankOverlay .ce-bank-kpi>span,#ceBankOverlay .ce-bank-kpi-copy>span{font-size:9px!important}
+#ceBankOverlay .ce-bank-kpi small,#ceBankOverlay .ce-bank-kpi-copy small{font-size:10px!important;line-height:1.25!important}
+#ceBankOverlay .ce-bank-kpi-formula,#ceBankOverlay .ce-bank-actual-period{font-size:8px!important}
+#ceBankOverlay .ce-bank-notice{font-size:11px!important;line-height:1.3!important}
+#ceBankOverlay .ce-bank-resultbar{font-size:10px!important}
+#ceBankOverlay .ce-bank-resultbar b{font-size:10px!important}
+#ceBankOverlay .ce-bank-ledger-caption{font-size:10px!important;line-height:1.2!important}
+#ceBankOverlay .ce-bank-date strong{font-size:12px!important}
+#ceBankOverlay .ce-bank-date small{font-size:9px!important}
+#ceBankOverlay .ce-bank-description>div>span{font-size:8px!important}
+#ceBankOverlay .ce-bank-description strong{font-size:12px!important;line-height:1.2!important}
+#ceBankOverlay .ce-bank-include{font-size:10px!important}
+#ceBankOverlay .ce-bank-amount small{font-size:8px!important}
+#ceBankOverlay .ce-bank-amount strong{font-size:18px!important;line-height:1.08!important}
+#ceBankOverlay .ce-bank-amount>span,#ceBankOverlay .ce-bank-amount>span b{font-size:9px!important;line-height:1.2!important}
+#ceBankOverlay .ce-bank-justify-head strong{font-size:10px!important;line-height:1.2!important}
+#ceBankOverlay .ce-bank-status{font-size:8px!important;line-height:1.1!important}
+#ceBankOverlay .ce-bank-justify-amounts{font-size:9px!important}
+#ceBankOverlay .ce-bank-progress-track span{font-size:8px!important}
+#ceBankOverlay .ce-bank-ticket-chip{font-size:9px!important;min-height:29px!important}
+#ceBankOverlay .ce-bank-ticket-chip>i{font-size:8px!important}
+#ceBankOverlay .ce-bank-ticket-chip>span{font-size:8px!important;max-width:150px!important}
+#ceBankOverlay .ce-bank-no-tickets,#ceBankOverlay .ce-bank-positive-note{font-size:10px!important;line-height:1.3!important}
+#ceBankOverlay .ce-bank-add-ticket b,#ceBankOverlay .ce-bank-force-square>b{font-size:9px!important}
+#ceBankOverlay .ce-bank-force-square>small{font-size:8px!important}
+
+/* Los campos de consulta nunca quedan inutilizados por estilos/atributos heredados. */
+#ceBankOverlay #ceBankAccount:not(:disabled),
+#ceBankOverlay #ceBankFilter:not(:disabled),
+#ceBankOverlay #ceBankSort:not(:disabled),
+#ceBankOverlay #ceBankSearch:not(:disabled){opacity:1!important;filter:none!important;pointer-events:auto!important;touch-action:auto!important;cursor:pointer!important}
+#ceBankOverlay #ceBankSearch:not(:disabled){cursor:text!important}
+
+/* Finalizado: todos los TKxx se ven, sin barra horizontal, manteniendo búsqueda y orden. */
+#ceBankOverlay.ce-bank-readonly-mode #ceBankSort,
+#ceBankOverlay.ce-bank-readonly-mode #ceBankSearch,
+#ceBankOverlay.ce-bank-readonly-mode #ceBankAccount{pointer-events:auto!important;opacity:1!important;filter:none!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-movement{min-height:76px!important;overflow:visible!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-movement .ce-bank-justification{min-height:76px!important;height:auto!important;overflow:visible!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-movement.negative .ce-bank-justification{
+  display:grid!important;grid-template-columns:minmax(190px,.65fr) minmax(300px,1.35fr)!important;
+  grid-template-rows:auto auto!important;align-items:start!important;overflow:visible!important;padding:8px 10px!important
+}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-movement.negative .ce-bank-ticket-list{
+  display:flex!important;flex-wrap:wrap!important;align-content:flex-start!important;overflow:visible!important;
+  white-space:normal!important;max-height:none!important;height:auto!important;padding:0!important;gap:6px!important
+}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-chip{flex:0 0 auto!important;max-width:none!important;white-space:nowrap!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-chip>span{display:inline-flex!important;max-width:190px!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-justify-actions{display:none!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-progress-track{height:16px!important}
+
+@media (min-width:1200px){
+  #ceBankOverlay .ce-bank-movement{min-height:72px!important}
+  #ceBankOverlay .ce-bank-movement-main{min-height:72px!important;grid-template-columns:88px 132px minmax(0,1fr) 160px!important;padding:8px 11px!important}
+  #ceBankOverlay .ce-bank-movement .ce-bank-justification{min-height:72px!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-justification{grid-template-rows:31px 29px!important}
+}
+@media (max-width:700px){
+  #ceBankOverlay .ce-bank-command-fields label>span,#ceBankOverlay .ce-bank-period-deck label>span{font-size:9px!important}
+  #ceBankOverlay .ce-bank-command-fields select,#ceBankOverlay .ce-bank-command-fields input{height:42px!important;font-size:14px!important}
+  #ceBankOverlay .ce-bank-date strong,#ceBankOverlay .ce-bank-description strong{font-size:12px!important}
+  #ceBankOverlay .ce-bank-amount strong{font-size:17px!important}
+  #ceBankOverlay .ce-bank-ticket-chip{font-size:9px!important;min-height:30px!important}
+  #ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-list{flex-wrap:wrap!important;overflow:visible!important}
+}
+
+/* v25_prod FIX5.1 · legibilidad final solicitada */
+#ceBankOverlay .ce-bank-command-fields label>span,
+#ceBankOverlay .ce-bank-period-fields label>span{font-size:11px!important;line-height:1.15!important;letter-spacing:.045em!important}
+#ceBankOverlay #ceBankAccount,
+#ceBankOverlay #ceBankFilter,
+#ceBankOverlay #ceBankSort,
+#ceBankOverlay #ceBankSearch{font-size:14px!important;line-height:1.25!important;min-height:40px!important}
+#ceBankOverlay .ce-bank-period-copy strong{font-size:12px!important;line-height:1.25!important}
+#ceBankOverlay .ce-bank-period-copy span{font-size:12px!important;line-height:1.3!important}
+#ceBankOverlay .ce-bank-kpi small,
+#ceBankOverlay .ce-bank-kpi-note,
+#ceBankOverlay .ce-bank-notice,
+#ceBankOverlay .ce-bank-resultbar,
+#ceBankOverlay .ce-bank-column-head{font-size:11px!important;line-height:1.25!important}
+#ceBankOverlay .ce-bank-movement-date,
+#ceBankOverlay .ce-bank-movement-desc{font-size:13px!important;line-height:1.25!important}
+#ceBankOverlay .ce-bank-movement-value{font-size:19px!important;line-height:1.05!important}
+#ceBankOverlay .ce-bank-ticket-chip{font-size:11px!important;line-height:1.2!important;min-height:31px!important;padding:6px 8px!important}
+#ceBankOverlay .ce-bank-justification-title,
+#ceBankOverlay .ce-bank-justification-copy,
+#ceBankOverlay .ce-bank-progress-label{font-size:11px!important;line-height:1.25!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-list{display:flex!important;flex-wrap:wrap!important;align-content:flex-start!important;gap:6px!important;width:100%!important;max-width:100%!important;overflow:visible!important;white-space:normal!important;scrollbar-width:none!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-list::-webkit-scrollbar{display:none!important}
+#ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-chip{flex:0 1 auto!important;max-width:100%!important;white-space:normal!important}
+@media (max-width:700px){
+  #ceBankOverlay #ceBankAccount,#ceBankOverlay #ceBankFilter,#ceBankOverlay #ceBankSort,#ceBankOverlay #ceBankSearch{font-size:15px!important;min-height:44px!important}
+  #ceBankOverlay .ce-bank-movement-date,#ceBankOverlay .ce-bank-movement-desc{font-size:13px!important}
+  #ceBankOverlay .ce-bank-ticket-chip{font-size:11px!important}
+}

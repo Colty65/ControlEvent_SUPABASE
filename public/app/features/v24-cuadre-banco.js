@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX4 · Cuadre Banco estable: controles nativos, sin capas interceptando y vínculos entre eventos (GD/RW). */
+/* ControlEvent v25_prod FIX5 · Cuadre Banco: controles blindados, lectura finalizada y textos legibles (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -172,7 +172,9 @@
       bindInterfaceControls(overlay);
     }
     installCommandFirewall();
+    installCommandCapture();
     ensureInteractive();
+    wireCommandControls();
     installMobileEntry();
     document.querySelectorAll('.ce-bank-entry').forEach(prepareEntry);
     applyRole();
@@ -200,6 +202,76 @@
     root.__ceBankCommandFirewallInstalled=true;
   }
 
+  function applyCommandValue(target){
+    if(!target) return;
+    if(target.id==='ceBankAccount'){
+      const next=text(target.value)||'TODOS';
+      if(store.accountId===next) return;
+      store.accountId=next; store.page=1; invalidateMovementCache();
+      load({force:true}).then(focusBody);
+      return;
+    }
+    if(target.id==='ceBankFilter'){
+      const next=text(target.value)||'TODOS';
+      // En un evento finalizado solo se muestran los movimientos elegidos En saldo.
+      store.filter=store.readOnly?'INCLUIDOS':next;
+      target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
+      return;
+    }
+    if(target.id==='ceBankSort'){
+      store.sort=target.value==='ASC'?'ASC':'DESC'; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
+      return;
+    }
+    if(target.id==='ceBankSearch'){
+      store.search=target.value||''; store.page=1; invalidateMovementCache();
+      clearTimeout(store.searchTimer);
+      store.searchTimer=setTimeout(()=>scheduleBodyRender(false),140);
+    }
+  }
+  function wireCommandControls(){
+    const account=$('ceBankAccount'), filter=$('ceBankFilter'), sort=$('ceBankSort'), search=$('ceBankSearch');
+    [account,sort,search].filter(Boolean).forEach(node=>{
+      node.disabled=false; node.removeAttribute('disabled'); node.setAttribute('aria-disabled','false');
+      if(node===search){node.readOnly=false;node.removeAttribute('readonly');node.tabIndex=0;}
+    });
+    if(filter){
+      filter.disabled=!!store.readOnly;
+      filter.setAttribute('aria-disabled',store.readOnly?'true':'false');
+      filter.value=store.readOnly?'INCLUIDOS':store.filter;
+    }
+    if(account){account.onchange=event=>applyCommandValue(event.currentTarget||event.target);}
+    if(filter){filter.onchange=event=>applyCommandValue(event.currentTarget||event.target);}
+    if(sort){sort.onchange=event=>applyCommandValue(event.currentTarget||event.target);}
+    if(search){
+      search.oninput=event=>applyCommandValue(event.currentTarget||event.target);
+      search.onsearch=event=>applyCommandValue(event.currentTarget||event.target);
+    }
+  }
+  function installCommandCapture(){
+    if(root.__ceBankCommandCaptureInstalled) return;
+    root.__ceBankCommandCaptureInstalled=true;
+    // Se ejecuta en window antes que los manejadores heredados de ControlEvent.
+    // De esta forma un render o una captura antigua no puede anular select/búsqueda.
+    root.addEventListener('pointerdown',event=>{
+      const target=event.target;
+      if(!$('ceBankOverlay')||$('ceBankOverlay').classList.contains('hidden')) return;
+      if(target?.id==='ceBankSearch'){
+        try{target.focus({preventScroll:true});}catch(_){try{target.focus();}catch(__){}}
+        return;
+      }
+      if(target?.matches?.('#ceBankAccount,#ceBankFilter,#ceBankSort')){
+        if(target.disabled) return;
+        try{target.focus({preventScroll:true});}catch(_){try{target.focus();}catch(__){}}
+      }
+    },true);
+    root.addEventListener('change',event=>{
+      if(event.target?.matches?.('#ceBankAccount,#ceBankFilter,#ceBankSort')) applyCommandValue(event.target);
+    },true);
+    root.addEventListener('input',event=>{
+      if(event.target?.id==='ceBankSearch') applyCommandValue(event.target);
+    },true);
+  }
+
   function bindInterfaceControls(overlay){
     if(!overlay || overlay.dataset.ceBankBound==='1') return;
     overlay.dataset.ceBankBound='1';
@@ -211,14 +283,7 @@
     $('ceBankCsvFile')?.addEventListener('change',importCsv);
     $('ceBankImport')?.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&!store.readOnly&&!store.importing){event.preventDefault();$('ceBankCsvFile')?.click();}});
     $('ceBankRefresh')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('refresh',250))load({force:true,preserveScroll:true});});
-    $('ceBankAccount')?.addEventListener('change',event=>{store.accountId=event.target.value;store.page=1;invalidateMovementCache();load({force:true}).then(focusBody);});
-    $('ceBankFilter')?.addEventListener('change',event=>{store.filter=event.target.value;store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
-    $('ceBankSort')?.addEventListener('change',event=>{store.sort=event.target.value==='ASC'?'ASC':'DESC';store.page=1;invalidateMovementCache();scheduleBodyRender(true);});
-    $('ceBankSearch')?.addEventListener('input',event=>{
-      store.search=event.target.value; store.page=1; invalidateMovementCache();
-      clearTimeout(store.searchTimer);
-      store.searchTimer=setTimeout(()=>scheduleBodyRender(false),140);
-    });
+    wireCommandControls();
     $('ceBankPrevPage')?.addEventListener('click',event=>{stopEvent(event);changePage(store.page-1);});
     $('ceBankNextPage')?.addEventListener('click',event=>{stopEvent(event);changePage(store.page+1);});
     $('ceBankApplyPeriod')?.addEventListener('click',event=>{stopEvent(event);if(actionAllowed('period',350))savePeriod();});
@@ -386,6 +451,9 @@
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
+    $('ceBankOverlay')?.classList.toggle('ce-bank-readonly-mode',store.readOnly);
+    if(store.readOnly){store.filter='INCLUIDOS';if($('ceBankFilter'))$('ceBankFilter').value='INCLUIDOS';}
+    wireCommandControls();
     const importButton=$('ceBankImport'); const importInput=$('ceBankCsvFile'); const importDisabled=(store.readOnly===true)||store.importing; if(importInput) importInput.disabled=importDisabled; if(importButton){importButton.setAttribute('aria-disabled',importDisabled?'true':'false');importButton.classList.toggle('disabled',importDisabled);importButton.classList.toggle('busy',store.importing);importButton.tabIndex=importDisabled?-1:0;}
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const flowMax=Math.max(Math.abs(num(s.income)),Math.abs(num(s.expense)),1);
@@ -404,6 +472,7 @@
       notice('El evento está Finalizado: se permite consultar, buscar, filtrar y revisar asociaciones, pero no modificarlas.','warning',false);
     }else if(!store.noticeLocked){ notice(''); }
     renderBody();
+    wireCommandControls();
   }
   function filteredMovements(){
     const cacheKey=[store.dataRevision,store.filter,text(store.search).toLowerCase(),store.sort].join('|');
@@ -470,7 +539,7 @@
       );
       const links=orderedLinks.map(link=>{
         const removable=link.isActiveEvent!==false&&!store.readOnly;
-        return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
+        return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}" title="${esc(link.ticketCode)} · ${esc(link.eventTitle)} · ${money(link.ticketAmount)}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
       }).join('');
       const forceControl=row.amount<0&&!row.linkedToOtherEvent&&activeLinks.length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)
         ?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${actionDisabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
@@ -667,7 +736,7 @@
     installDom(); applyRole();
   }):null;
   if(observer) observer.observe(document.documentElement,{childList:true,subtree:true});
-  document.addEventListener('DOMContentLoaded',installDom,{once:true});
+  document.addEventListener('DOMContentLoaded',()=>{installDom();installCommandCapture();},{once:true});
   [0,100,500,1400].forEach(ms=>setTimeout(installDom,ms));
   root.ControlEventBankReconciliation={version:VERSION,open,close,load,exportData,parseMoney:num,state:store};
 })(window);

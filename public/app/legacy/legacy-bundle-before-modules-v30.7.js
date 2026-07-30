@@ -13114,6 +13114,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
     }finally{repairingTip=false;}
   }
   function installPinnedTipGuards(tip){
+    return;
     if(typeof MutationObserver!=='function')return;
     if(tipObserver)try{tipObserver.disconnect();}catch(_){}
     tipObserver=new MutationObserver(()=>{
@@ -13197,8 +13198,8 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
   document.addEventListener('mouseover',ev=>{const el=ev.target.closest?.('[data-ce-tip-v21]'); if(el&&activeOwner===el)clearTimeout(closeTimer);},true);
   document.addEventListener('mouseout',ev=>{const el=ev.target.closest?.('[data-ce-tip-v21]'); const tip=$('ceTooltipV21'); if(el&&activeOwner===el&&tip?.dataset.cePinned!=='1')scheduleClose();},true);
   document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeTip(true);},true);
-  window.addEventListener('resize',()=>{const tip=$('ceTooltipV21');if(tip?.dataset.cePinned==='1'&&activeOwner?.isConnected)placeTip(tip,activeOwner);},true);
-  window.addEventListener('scroll',()=>{const tip=$('ceTooltipV21');if(tip?.dataset.cePinned==='1'&&activeOwner?.isConnected)placeTip(tip,activeOwner);},true);
+  window.addEventListener('resize',()=>{},true);
+  window.addEventListener('scroll',()=>{},true);
   function afterRender(){refreshVersion(); normalizeDownloadName(); setTimeout(adoptTips,80); setTimeout(adoptTips,340); setTimeout(adoptTips,900);} const prevRender=typeof render==='function'?render:null; if(prevRender&&!prevRender.__v210Wrapped){const wrapped=function(){const ret=prevRender.apply(this,arguments); afterRender(); return ret;}; wrapped.__v210Wrapped=true; render=wrapped; window.render=render;} ['DOMContentLoaded','load'].forEach(evt=>window.addEventListener(evt,()=>{afterRender(); setTimeout(afterRender,1200);})); afterRender(); setTimeout(afterRender,1200);
 })();
 
