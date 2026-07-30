@@ -655,6 +655,24 @@ export async function deleteTicketLink(linkId,eventId=''){
 export async function exportBankData({accountId='',eventId=''} = {}){
   try{
     const selectedEvent=text(eventId);
+    // INFOEVENTO necesita exactamente la foto de conciliación del evento: estado
+    // «En saldo» por evento, cuadre normal/forzado y abonos conciliados. El exportador
+    // antiguo devolvía el indicador global del movimiento y no calculaba el estado,
+    // por eso aparecían registros ajenos y cargos exactos en rojo.
+    if(selectedEvent){
+      const reconciliation=await listBankReconciliation({accountId:text(accountId)||'TODOS',eventId:selectedEvent});
+      const movements=arr(reconciliation.movements).filter(row=>row.included===true).map(row=>({
+        ...row,
+        links:arr(row.links).slice().sort((a,b)=>ticketNumber(a.ticketCode)-ticketNumber(b.ticketCode)||String(a.ticketCode||'').localeCompare(String(b.ticketCode||''),'es'))
+      }));
+      const links=movements.flatMap(row=>arr(row.links));
+      return {
+        ok:true,event:reconciliation.event,period:reconciliation.period,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
+        movements,links,batches:[],
+        eventSettings:[{eventId:selectedEvent,dateFrom:reconciliation.period?.dateFrom||'',dateTo:reconciliation.period?.dateTo||''}],
+        movementStates:movements.map(row=>({eventId:selectedEvent,movementId:row.id,included:true}))
+      };
+    }
     const [movementRows,linkRows,batchRows,settingRows,stateRows]=await Promise.all([
       selectPaged(MOVEMENTS_TABLE,{columns:'*',order:'executed_at',ascending:true}),
       selectPaged(LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),

@@ -11,7 +11,8 @@
     "migrate:supabase": "node scripts/migrate-v23-local-to-supabase.js",
     "test:zuzu": "node scripts/test-zuzu-v23-1.js",
     "test:bank": "node scripts/test-bank-reconciliation-v24-4.js && node scripts/test-bank-reconciliation-v24-4-integration.js && node scripts/test-bank-reconciliation-v24-5-ui.js && node scripts/test-bank-reconciliation-v24-5-large-csv.js",
-    "test:v25-fix1": "node scripts/test-v25-prod-fix1-conciliacion-backup.js"
+    "test:v25-fix1": "node scripts/test-v25-prod-fix1-conciliacion-backup.js",
+    "test:v25-fix2": "node scripts/test-v25-prod-fix2-cuadre-banco.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

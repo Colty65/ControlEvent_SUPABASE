@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod - FIX1 conciliación, globos persistentes y restauración integral. */
+/* ControlEvent v25_prod - FIX2 operativa bancaria, globos persistentes y restauración integral. */
 (function(){
   'use strict';
   if(window.__ceV25ProdFix1) return; window.__ceV25ProdFix1=true;
@@ -19,38 +19,64 @@
     try{document.body.classList.remove('ce-bank-open');document.body.style.overflow='';}catch(_){ }
   }
   ['pointerdown','pointerup','touchend','click'].forEach(type=>document.addEventListener(type,closeBankNow,{capture:true,passive:false}));
+  // La versión FIX1 observaba todos los atributos del cuadro y volvía a escribir
+  // disabled/aria-disabled en cada mutación. Eso generaba un bucle de microtareas que
+  // terminaba bloqueando CSV, búsqueda y desplegables. La disponibilidad se sincroniza
+  // ahora solo cuando cambia realmente el estado.
   function keepCsvAvailableInCurrentEvent(){
     const overlay=$('ceBankOverlay');const button=$('ceBankImport');const headline=$('ceBankEventHeadline');
     if(!overlay||!button||!headline||overlay.classList.contains('hidden'))return;
     const inProgress=headline.classList.contains('in-progress')&&!/FINALIZADO/i.test(headline.textContent||'');
-    if(inProgress&&!button.classList.contains('busy')){button.disabled=false;button.setAttribute('aria-disabled','false');}
+    const shouldDisable=!inProgress||button.classList.contains('busy');
+    if(button.disabled!==shouldDisable) button.disabled=shouldDisable;
+    const aria=shouldDisable?'true':'false';
+    if(button.getAttribute('aria-disabled')!==aria) button.setAttribute('aria-disabled',aria);
   }
-  const bankUiObserver=new MutationObserver(()=>keepCsvAvailableInCurrentEvent());
-  document.addEventListener('DOMContentLoaded',()=>{const overlay=$('ceBankOverlay');if(overlay)bankUiObserver.observe(overlay,{subtree:true,attributes:true,childList:true});setInterval(keepCsvAvailableInCurrentEvent,900);},{once:true});
+  document.addEventListener('DOMContentLoaded',()=>{
+    keepCsvAvailableInCurrentEvent();
+    document.addEventListener('controlevent:event-loaded',()=>setTimeout(keepCsvAvailableInCurrentEvent,0));
+  },{once:true});
 
   // Globo de GRAFICAS persistente hasta X/Escape u otro segmento.
   let pinned=null;
+  let lastGraphActivation=0;
   function removePinned(){pinned?.remove();pinned=null;}
+  function graphTipText(target){
+    const attrs=['data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-tip','title','aria-label'];
+    for(const attr of attrs){const value=target?.getAttribute?.(attr);if(norm(value))return norm(value);}
+    const owner=target?.closest?.('[data-ce-tip-v21],[data-ce-tip-v196],[data-ce-tip-v1952],[data-ce-tip],[data-tip],[title]');
+    if(owner&&owner!==target) return graphTipText(owner);
+    const visible=['ceTooltipV21','ceTooltipV196','ceTooltipV1952','ceBudgetLiteTooltipV307'].map($).find(node=>node&&getComputedStyle(node).display!=='none'&&getComputedStyle(node).visibility!=='hidden');
+    return norm(visible?.innerText||visible?.textContent||'');
+  }
   function showPinned(target,ev){
-    const raw=target?.getAttribute?.('data-ce-tip-v21')||target?.getAttribute?.('data-ce-tip')||target?.getAttribute?.('title')||'';
+    const raw=graphTipText(target);
     if(!norm(raw)) return;
     removePinned();
     const box=document.createElement('div'); box.id='ceV25PinnedGraphTip';
     const pt={x:Number(ev?.clientX||window.innerWidth/2),y:Number(ev?.clientY||window.innerHeight/2)};
-    box.innerHTML=`<button type="button" aria-label="Cerrar">×</button><div>${String(raw).split(/\n/).map(line=>`<p>${line.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</p>`).join('')}</div>`;
+    box.innerHTML=`<button type="button" aria-label="Cerrar">×</button><div>${String(raw).split(/\r?\n/).filter(Boolean).map(line=>`<p>${line.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</p>`).join('')}</div>`;
     box.style.cssText=`position:fixed;z-index:2147483640;left:${Math.max(12,Math.min(window.innerWidth-390,pt.x+14))}px;top:${Math.max(12,Math.min(window.innerHeight-260,pt.y+14))}px;max-width:min(370px,calc(100vw - 24px));max-height:min(62vh,520px);overflow:auto;background:#0f172a;color:#fff;border:2px solid rgba(255,255,255,.45);border-radius:16px;padding:14px 42px 14px 16px;box-shadow:0 18px 55px rgba(15,23,42,.45);font:800 13px/1.35 system-ui,sans-serif;white-space:normal;pointer-events:auto`;
     box.querySelector('button').style.cssText='position:absolute;right:8px;top:7px;width:28px;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);color:#fff;font-size:22px;line-height:22px;cursor:pointer';
     box.querySelectorAll('p').forEach(p=>p.style.cssText='margin:0 0 5px');
     box.querySelector('button').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();removePinned();});
     document.body.appendChild(box); pinned=box;
   }
-  document.addEventListener('click',ev=>{
-    const target=ev.target?.closest?.('#eventChartWrap [data-ce-tip-v21],#tabGraficas [data-ce-tip-v21],#eventChartWrap [data-ce-tip],#tabGraficas [data-ce-tip]');
-    if(!target) return;
-    setTimeout(()=>showPinned(target,ev),0);
-  },true);
+  function graphTarget(ev){
+    const candidate=ev.target?.closest?.('#eventChartWrap .chart-seg,#eventChartWrap [data-ce-tip-v21],#eventChartWrap [data-ce-tip-v196],#eventChartWrap [data-ce-tip-v1952],#eventChartWrap [data-ce-tip],#eventChartWrap [data-tip],#eventChartWrap [title],#tabGraficas .chart-seg,#tabGraficas [data-ce-tip-v21],#tabGraficas [data-ce-tip-v196],#tabGraficas [data-ce-tip],#tabGraficas [data-tip],#tabGraficas [title]');
+    return candidate&&candidate.id!=='ceV25PinnedGraphTip'?candidate:null;
+  }
+  function activateGraphTip(ev){
+    const target=graphTarget(ev); if(!target)return;
+    const now=Date.now(); if(now-lastGraphActivation<180&&pinned)return; lastGraphActivation=now;
+    // Se espera un frame para que el tooltip heredado pueda aportar su texto, pero el
+    // globo fijado queda fuera de eventChartWrap y sobrevive a cualquier rerender.
+    requestAnimationFrame(()=>showPinned(target,ev));
+  }
+  document.addEventListener('pointerup',activateGraphTip,true);
+  document.addEventListener('click',activateGraphTip,true);
   document.addEventListener('keydown',ev=>{if(ev.key==='Escape')removePinned();},true);
-  window.addEventListener('controlevent:event-loaded',removePinned);
+  document.addEventListener('change',ev=>{if(ev.target?.id==='selectedEvent')removePinned();},true);
 
   // Restauración integral de los BACKUP v25_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){

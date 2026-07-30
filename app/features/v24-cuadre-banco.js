@@ -85,9 +85,20 @@
   }
   function ensureInteractive(){
     const overlay=$('ceBankOverlay'); if(!overlay) return;
-    const selectors=['.ce-bank-window','#ceBankClose','#ceBankImport','#ceBankRefresh','#ceBankAccount','#ceBankFilter','#ceBankSort','#ceBankSearch','#ceBankDateFrom','#ceBankDateTo','#ceBankApplyPeriod','#ceBankPrevPage','#ceBankNextPage'];
+    const selectors=['.ce-bank-window','.ce-bank-command-deck','.ce-bank-command-primary','.ce-bank-command-fields','.ce-bank-period-deck','#ceBankClose','#ceBankImport','#ceBankRefresh','#ceBankAccount','#ceBankFilter','#ceBankSort','#ceBankSearch','#ceBankDateFrom','#ceBankDateTo','#ceBankApplyPeriod','#ceBankPrevPage','#ceBankNextPage'];
     [overlay,...selectors.map(selector=>overlay.querySelector(selector))].filter(Boolean).forEach(node=>{
       try{ node.style.setProperty('pointer-events','auto','important'); node.style.setProperty('touch-action','manipulation','important'); }catch(_){ }
+    });
+    const command=overlay.querySelector('.ce-bank-command-deck');
+    if(command){
+      command.style.setProperty('position','relative','important');
+      command.style.setProperty('z-index','40','important');
+      command.style.setProperty('isolation','isolate','important');
+    }
+    // Los tooltips heredados no pueden quedar como una lámina transparente encima de
+    // la botonera bancaria.
+    ['ceTooltipV21','ceTooltipV196','ceTooltipV1952','ceTooltipV190','ceTooltipV181','ceBudgetLiteTooltipV307'].forEach(id=>{
+      const tip=$(id); if(tip&&!tip.contains(document.activeElement)){try{tip.style.pointerEvents='none';}catch(_){}}
     });
   }
   function mutationBlocked(message='Este evento está Finalizado. Cuadre Banco está disponible en modo de solo lectura.'){
@@ -305,6 +316,7 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
+      if(store.readOnly && store.filter==='TODOS') store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
@@ -447,7 +459,8 @@
       const target=Math.max(0,num(row.targetAmount)); const justified=Math.max(0,num(row.justifiedAmount));
       const progress=target?Math.min(100,Math.round(justified/target*100)):0;
       const disabled=store.readOnly?'disabled aria-disabled="true"':'';
-      const links=arr(row.links).map(link=>`<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}" ${disabled}>×</button></span>`).join('');
+      const orderedLinks=arr(row.links).slice().sort((a,b)=>(Number(String(a.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b.ticketCode||'').replace(/\D/g,''))||0)||String(a.ticketCode||'').localeCompare(String(b.ticketCode||''),'es'));
+      const links=orderedLinks.map(link=>`<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}" ${disabled}>×</button></span>`).join('');
       const forceControl=row.amount<0&&arr(row.links).length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${disabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
       return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
         <div class="ce-bank-ledger-node"><span>${String(start+index+1).padStart(2,'0')}</span><i></i></div>

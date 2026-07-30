@@ -113,3 +113,76 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
   .ce-bank-justify-actions{grid-column:1/-1;justify-content:flex-start}
   .ce-bank-ticket-chip>span{display:none}
 }
+
+
+/* v25_prod FIX2 · operativa desbloqueada, fichas izquierda/derecha y móvil práctico */
+#ceBankOverlay .ce-bank-command-deck{z-index:40!important;isolation:isolate!important;pointer-events:auto!important}
+#ceBankOverlay .ce-bank-command-deck:before,#ceBankOverlay .ce-bank-command-deck:after{pointer-events:none!important}
+#ceBankOverlay .ce-bank-command-primary,#ceBankOverlay .ce-bank-command-fields,#ceBankOverlay .ce-bank-command-fields label,#ceBankOverlay .ce-bank-command-fields select,#ceBankOverlay .ce-bank-command-fields input{pointer-events:auto!important;position:relative!important;z-index:42!important}
+#ceBankOverlay .ce-bank-period-deck{z-index:30!important}
+
+@media (min-width:851px){
+  .ce-bank-command-fields label>span,.ce-bank-period-deck label>span{font-size:9px!important;letter-spacing:.08em!important}
+  .ce-bank-command-fields select,.ce-bank-command-fields input{height:33px!important;font-size:11px!important}
+  .ce-bank-import-btn b{font-size:11px!important}.ce-bank-import-btn small{font-size:8px!important}.ce-bank-refresh-btn b{font-size:10px!important}
+  .ce-bank-period-copy>span{font-size:8px!important}.ce-bank-period-copy>b{font-size:10px!important}.ce-bank-period-deck input{height:33px!important;font-size:10px!important}#ceBankApplyPeriod{height:33px!important}#ceBankApplyPeriod b{font-size:9px!important}
+}
+
+@media (min-width:1200px){
+  .ce-bank-body{padding-left:34px!important}
+  .ce-bank-movement{display:grid!important;grid-template-columns:minmax(560px,1.03fr) minmax(500px,.97fr);align-items:stretch!important;min-height:58px!important;margin-bottom:5px!important;overflow:hidden!important}
+  .ce-bank-movement-main{grid-template-columns:84px 122px minmax(210px,1fr) 132px!important;gap:7px!important;min-height:58px!important;padding:5px 9px!important}
+  .ce-bank-include{grid-template-columns:29px auto!important;gap:5px!important;font-size:8px!important}.ce-bank-include>span{width:29px!important;height:16px!important}.ce-bank-include>span i{width:10px!important;height:10px!important;top:3px!important}.ce-bank-include input:checked+span i{transform:translateX(13px)!important}
+  .ce-bank-date strong{font-size:10px!important}.ce-bank-date small{font-size:7px!important}.ce-bank-description strong{font-size:10px!important;line-height:1.08!important}.ce-bank-description>div>span{font-size:6px!important;padding:2px 5px!important}
+  .ce-bank-amount strong{font-size:15px!important}.ce-bank-amount small{font-size:6px!important}.ce-bank-amount>span{font-size:7px!important;margin-top:1px!important}.ce-bank-amount>span b{font-size:7px!important}
+  .ce-bank-movement .ce-bank-justification,.ce-bank-movement.positive .ce-bank-justification,.ce-bank-movement.negative .ce-bank-justification{display:grid!important;border-top:0!important;border-left:1px solid #dbe6ee!important;border-radius:0 13px 13px 0!important;min-width:0!important;padding:5px 7px!important}
+  .ce-bank-movement.negative .ce-bank-justification{grid-template-columns:minmax(145px,.72fr) minmax(220px,1.28fr)!important;grid-template-rows:auto auto!important;align-items:center!important;gap:3px 7px!important}
+  .ce-bank-movement.negative .ce-bank-justify-head{grid-column:1;grid-row:1!important}.ce-bank-movement.negative .ce-bank-progress-track{grid-column:1;grid-row:2!important}.ce-bank-movement.negative .ce-bank-ticket-list{grid-column:2;grid-row:1!important}.ce-bank-movement.negative .ce-bank-justify-actions{grid-column:2;grid-row:2!important}
+  .ce-bank-movement.positive .ce-bank-justification{grid-template-columns:minmax(210px,.9fr) minmax(190px,1.1fr)!important;align-items:center!important;gap:7px!important;background:linear-gradient(180deg,#effbf6,#e9f8f2)!important;border-left-color:#b9ead4!important}.ce-bank-movement.positive .ce-bank-positive-note{margin:0!important;font-size:8px!important;line-height:1.2!important}
+  .ce-bank-justify-head{min-width:0!important}.ce-bank-justify-icon{width:20px!important;height:20px!important;font-size:12px!important}.ce-bank-justify-head strong{font-size:8px!important}.ce-bank-status{font-size:6px!important;padding:2px 5px!important}.ce-bank-justify-numbers b{font-size:10px!important}.ce-bank-justify-numbers span{font-size:7px!important}
+  .ce-bank-progress-track{height:11px!important;margin:0!important}.ce-bank-progress-track span{font-size:6px!important}
+  .ce-bank-ticket-list{display:flex!important;flex-wrap:nowrap!important;gap:4px!important;min-width:0!important;margin:0!important;overflow-x:auto!important;overflow-y:hidden!important;padding:1px 0!important}.ce-bank-ticket-chip{grid-template-columns:18px auto auto auto 16px!important;gap:3px!important;min-height:22px!important;padding:1px 3px!important;border-radius:7px!important;font-size:7px!important;white-space:nowrap!important}.ce-bank-ticket-chip>i{width:17px!important;height:17px!important;font-size:6px!important}.ce-bank-ticket-chip>span{display:none!important}.ce-bank-ticket-chip button{width:15px!important;height:15px!important;font-size:11px!important}
+  .ce-bank-justify-actions{gap:4px!important;flex-wrap:nowrap!important;justify-content:flex-start!important;min-width:0!important}.ce-bank-add-ticket{height:23px!important;padding:0 6px!important;border-radius:7px!important;white-space:nowrap!important}.ce-bank-add-ticket b{font-size:7px!important}.ce-bank-force-square{min-height:23px!important;padding:1px 5px 1px 2px!important;white-space:nowrap!important}.ce-bank-force-square>span{width:18px!important;height:18px!important}.ce-bank-force-square>b{font-size:7px!important}.ce-bank-force-square>small{display:none!important}
+}
+
+@media (max-width:700px){
+  .ce-bank-overlay{padding:0!important;align-items:stretch!important}.ce-bank-window{width:100vw!important;height:100dvh!important;max-height:none!important;border-radius:0!important;border:0!important}
+  .ce-bank-header{min-height:68px!important;padding:7px 8px!important;gap:7px!important}.ce-bank-brand-orbit{flex-basis:38px!important;width:38px!important;height:38px!important}.ce-bank-brand-orbit img{width:34px!important;height:34px!important;border-radius:10px!important}.ce-bank-eyebrow>b{display:none!important}.ce-bank-eyebrow>span{font-size:7px!important}.ce-bank-header h2{font-size:17px!important}.ce-bank-event-headline strong{max-width:54vw!important;font-size:13px!important}.ce-bank-header-balance{min-width:110px!important;padding:5px 7px!important;border-radius:10px!important}.ce-bank-header-balance span{font-size:6px!important}.ce-bank-header-balance strong{font-size:15px!important}.ce-bank-header-balance small{display:none!important}.ce-bank-close{flex-basis:34px!important;width:34px!important;height:34px!important;border-radius:10px!important}.ce-bank-close span{font-size:23px!important}
+  .ce-bank-command-deck{display:block!important;padding:6px!important}.ce-bank-command-primary{display:grid!important;grid-template-columns:1fr 88px!important;gap:5px!important;margin-bottom:6px!important}.ce-bank-import-btn,.ce-bank-refresh-btn{height:38px!important;border-radius:10px!important}.ce-bank-import-btn{grid-template-columns:25px auto!important;padding:3px 7px 3px 4px!important}.ce-bank-import-btn>span{width:25px!important;height:25px!important;font-size:17px!important}.ce-bank-import-btn b{font-size:10px!important}.ce-bank-import-btn small{font-size:7px!important}.ce-bank-refresh-btn b{font-size:9px!important}
+  .ce-bank-command-fields{display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important}.ce-bank-command-fields label{gap:2px!important}.ce-bank-command-fields label>span{font-size:8px!important}.ce-bank-command-fields select,.ce-bank-command-fields input{height:35px!important;font-size:11px!important;border-radius:9px!important}.ce-bank-search{grid-column:1/-1!important}.ce-bank-search>div i{top:3px!important}
+  .ce-bank-period-deck{grid-template-columns:1fr 1fr!important;gap:5px!important;padding:6px!important}.ce-bank-period-copy{grid-column:1/-1!important}.ce-bank-period-copy>span{font-size:8px!important}.ce-bank-period-copy>b{font-size:10px!important;white-space:normal!important}.ce-bank-period-deck label>span{font-size:8px!important}.ce-bank-period-deck input,#ceBankApplyPeriod{height:35px!important;font-size:11px!important}#ceBankApplyPeriod{grid-column:1/-1!important}#ceBankApplyPeriod b{font-size:10px!important}
+  .ce-bank-summary{display:flex!important;overflow-x:auto!important;gap:6px!important;padding:6px!important;scroll-snap-type:x proximity!important}.ce-bank-kpi{flex:0 0 185px!important;min-height:72px!important;max-height:78px!important;padding:7px 8px!important;border-radius:12px!important;scroll-snap-align:start!important}.ce-bank-kpi>span,.ce-bank-kpi-copy>span{font-size:7px!important}.ce-bank-kpi>strong,.ce-bank-kpi-copy>strong{font-size:17px!important}.ce-bank-kpi small,.ce-bank-kpi-copy small{font-size:7px!important}.ce-bank-kpi-formula,.ce-bank-actual-period,.ce-bank-orbit-visual{display:none!important}.ce-bank-kpi-hero{display:flex!important}.ce-bank-flow-row{font-size:7px!important}
+  .ce-bank-notice{margin:0 6px 5px!important;font-size:9px!important;padding:6px 8px 6px 30px!important}.ce-bank-ledger-caption{display:none!important}.ce-bank-resultbar{margin:0 6px 5px!important;font-size:8px!important}.ce-bank-body{padding:0 6px 76px 28px!important}.ce-bank-body:before{left:17px!important}.ce-bank-ledger-node{left:-23px!important;top:10px!important;width:20px!important;height:20px!important}
+  .ce-bank-movement{display:block!important;margin-bottom:6px!important;border-radius:12px!important;overflow:hidden!important}.ce-bank-movement-main{display:grid!important;grid-template-columns:70px minmax(0,1fr) auto!important;grid-template-areas:'include date amount' 'include description description'!important;gap:3px 6px!important;min-height:58px!important;padding:6px 7px!important}.ce-bank-include{grid-area:include!important;align-self:center!important;font-size:8px!important}.ce-bank-date{grid-area:date!important}.ce-bank-description{grid-area:description!important}.ce-bank-amount{grid-area:amount!important}.ce-bank-date strong,.ce-bank-description strong{font-size:10px!important}.ce-bank-date small{font-size:7px!important}.ce-bank-description strong{white-space:nowrap!important}.ce-bank-amount strong{font-size:14px!important}.ce-bank-amount>span{font-size:7px!important}.ce-bank-amount>span.ce-bank-event-running{display:none!important}
+  .ce-bank-movement .ce-bank-justification,.ce-bank-movement.positive .ce-bank-justification{display:block!important;padding:6px 7px!important;border-left:0!important;border-top:1px solid #dbe6ee!important;border-radius:0 0 12px 12px!important}.ce-bank-movement.positive .ce-bank-justification{background:#eaf9f2!important}.ce-bank-justify-head strong{font-size:9px!important}.ce-bank-status{font-size:7px!important}.ce-bank-progress-track{height:13px!important;margin:5px 0!important}.ce-bank-ticket-list{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:4px!important;margin:4px 0!important}.ce-bank-ticket-chip{white-space:nowrap!important;min-height:25px!important;font-size:7px!important}.ce-bank-ticket-chip>span{display:none!important}.ce-bank-justify-actions{display:flex!important;gap:5px!important;flex-wrap:wrap!important}.ce-bank-add-ticket{height:29px!important}.ce-bank-force-square{min-height:29px!important}.ce-bank-positive-note{font-size:8px!important;margin:4px 0 0!important}
+}
+
+
+/* FIX2B · zona fija legible sin perder densidad */
+@media (min-width:851px){
+  .ce-bank-command-deck{padding-top:8px!important;padding-bottom:8px!important}
+  .ce-bank-import-btn,.ce-bank-refresh-btn{height:44px!important}
+  .ce-bank-import-btn b{font-size:12px!important}.ce-bank-import-btn small{font-size:9px!important}.ce-bank-refresh-btn b{font-size:11px!important}
+  .ce-bank-command-fields label>span,.ce-bank-period-deck label>span{font-size:10px!important;letter-spacing:.07em!important}
+  .ce-bank-command-fields select,.ce-bank-command-fields input{height:35px!important;font-size:13px!important}
+  .ce-bank-period-deck{padding-top:7px!important;padding-bottom:7px!important}
+  .ce-bank-period-copy>span{font-size:9px!important}.ce-bank-period-copy>b{font-size:11px!important}
+  .ce-bank-period-deck input,#ceBankApplyPeriod{height:35px!important;font-size:12px!important}#ceBankApplyPeriod b{font-size:10px!important}
+  .ce-bank-kpi>span,.ce-bank-kpi-copy>span{font-size:8px!important}.ce-bank-kpi>strong,.ce-bank-kpi-copy>strong{font-size:19px!important}.ce-bank-kpi small,.ce-bank-kpi-copy small{font-size:9px!important}
+  .ce-bank-flow-row{font-size:8px!important}.ce-bank-flow-row>strong{font-size:9px!important}
+  .ce-bank-notice{font-size:10px!important}.ce-bank-resultbar{font-size:9px!important}.ce-bank-resultbar b{font-size:9px!important}
+}
+@media (min-width:1200px){
+  .ce-bank-date strong,.ce-bank-description strong{font-size:11px!important}.ce-bank-date small{font-size:8px!important}
+  .ce-bank-description>div>span{font-size:7px!important}.ce-bank-amount strong{font-size:16px!important}.ce-bank-amount small{font-size:7px!important}.ce-bank-amount>span,.ce-bank-amount>span b{font-size:8px!important}
+  .ce-bank-justify-head strong{font-size:9px!important}.ce-bank-status{font-size:7px!important}.ce-bank-justify-numbers b{font-size:11px!important}.ce-bank-justify-numbers span{font-size:8px!important}
+  .ce-bank-ticket-chip{font-size:8px!important}.ce-bank-add-ticket b,.ce-bank-force-square>b{font-size:8px!important}.ce-bank-positive-note{font-size:9px!important}
+}
+@media (max-width:700px){
+  .ce-bank-command-fields label>span,.ce-bank-period-deck label>span{font-size:9px!important}
+  .ce-bank-command-fields select,.ce-bank-command-fields input,.ce-bank-period-deck input{font-size:12px!important}
+  .ce-bank-period-copy>span{font-size:9px!important}.ce-bank-period-copy>b{font-size:11px!important}
+  .ce-bank-kpi>span,.ce-bank-kpi-copy>span{font-size:8px!important}.ce-bank-kpi small,.ce-bank-kpi-copy small{font-size:8px!important}
+  .ce-bank-date strong,.ce-bank-description strong{font-size:11px!important}.ce-bank-date small{font-size:8px!important}.ce-bank-amount>span{font-size:8px!important}
+  .ce-bank-justify-head strong{font-size:10px!important}.ce-bank-status,.ce-bank-ticket-chip,.ce-bank-positive-note{font-size:8px!important}
+}
