@@ -1,7 +1,7 @@
-/* ControlEvent v25_prod FIX5 · GRAFICAS: un único panel estable, sin restauraciones ni retemblores. */
+/* ControlEvent v25_prod FIX6 · GRAFICAS: panel estable con miniaturas de justificantes. */
 (function(root){
   'use strict';
-  const FLAG='__ceV25StableGraphTipFix5';
+  const FLAG='__ceV25StableGraphTipFix6';
   if(root[FLAG]) return; root[FLAG]=true;
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -16,7 +16,7 @@
   }
   function closeTip(){
     const tip=$('ceTooltipV21');
-    if(tip?.dataset.ceStableFix5==='1') tip.remove();
+    if(tip?.dataset.ceStableFix6==='1') tip.remove();
     activeOwner=null;
   }
   function renderText(raw){
@@ -43,35 +43,52 @@
     if($('ce-v25-stable-graph-tip-style')) return;
     const style=document.createElement('style'); style.id='ce-v25-stable-graph-tip-style';
     style.textContent=`
-      #ceTooltipV21[data-ce-stable-fix5="1"]{position:fixed!important;left:50%!important;top:50%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:min(680px,calc(100vw - 32px))!important;max-width:min(680px,calc(100vw - 32px))!important;max-height:min(76vh,720px)!important;display:block!important;visibility:visible!important;opacity:1!important;overflow:auto!important;pointer-events:auto!important;z-index:2147483644!important;padding:48px 18px 18px!important;border:1px solid rgba(15,23,42,.22)!important;border-radius:18px!important;background:#fff!important;color:#172033!important;box-shadow:0 28px 90px rgba(2,8,23,.42)!important;animation:none!important;transition:none!important;contain:layout paint!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-tip-close{position:absolute!important;right:12px!important;top:10px!important;width:32px!important;height:32px!important;display:grid!important;place-items:center!important;border:1px solid #cbd5e1!important;border-radius:999px!important;background:#fff!important;color:#172033!important;font:900 22px/1 system-ui,sans-serif!important;cursor:pointer!important;z-index:4!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-title{margin:0 0 9px!important;font:900 15px/1.25 system-ui,sans-serif!important;color:#0f172a!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-text{margin:5px 0!important;font:700 13px/1.35 system-ui,sans-serif!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-total{margin-top:14px!important;padding-top:11px!important;border-top:2px solid #cbd5e1!important;font-size:16px!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v25-stable-table-wrap{overflow:auto!important;margin:8px 0 12px!important;border:1px solid #dbe3ec!important;border-radius:11px!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] table{width:100%!important;border-collapse:collapse!important;font:700 12px/1.3 system-ui,sans-serif!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] td{padding:7px 8px!important;border-bottom:1px solid #e5eaf0!important;vertical-align:middle!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] tr.head td{position:sticky!important;top:0!important;background:#edf3f8!important;font-weight:950!important}
-      #ceTooltipV21[data-ce-stable-fix5="1"] .ce-v465-tip-thumb{width:38px!important;height:38px!important;min-width:38px!important;animation:none!important;transform:none!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"]{position:fixed!important;left:50%!important;top:50%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:min(680px,calc(100vw - 32px))!important;max-width:min(680px,calc(100vw - 32px))!important;max-height:min(76vh,720px)!important;display:block!important;visibility:visible!important;opacity:1!important;overflow:auto!important;pointer-events:auto!important;z-index:2147483644!important;padding:48px 18px 18px!important;border:1px solid rgba(15,23,42,.22)!important;border-radius:18px!important;background:#fff!important;color:#172033!important;box-shadow:0 28px 90px rgba(2,8,23,.42)!important;animation:none!important;transition:none!important;contain:layout paint!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-tip-close{position:absolute!important;right:12px!important;top:10px!important;width:32px!important;height:32px!important;display:grid!important;place-items:center!important;border:1px solid #cbd5e1!important;border-radius:999px!important;background:#fff!important;color:#172033!important;font:900 22px/1 system-ui,sans-serif!important;cursor:pointer!important;z-index:4!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-title{margin:0 0 9px!important;font:900 15px/1.25 system-ui,sans-serif!important;color:#0f172a!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-text{margin:5px 0!important;font:700 13px/1.35 system-ui,sans-serif!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-total{margin-top:14px!important;padding-top:11px!important;border-top:2px solid #cbd5e1!important;font-size:16px!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v25-stable-table-wrap{overflow:auto!important;margin:8px 0 12px!important;border:1px solid #dbe3ec!important;border-radius:11px!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] table{width:100%!important;border-collapse:collapse!important;font:700 12px/1.3 system-ui,sans-serif!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] td{padding:7px 8px!important;border-bottom:1px solid #e5eaf0!important;vertical-align:middle!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] tr.head td{position:sticky!important;top:0!important;background:#edf3f8!important;font-weight:950!important}
+      #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v465-tip-thumb{width:46px!important;height:46px!important;min-width:46px!important;animation:none!important;transform:none!important}
       body.ce-v25-graph-tip-open:before{content:"";position:fixed;inset:0;background:rgba(2,8,23,.34);z-index:2147483643;pointer-events:none}
-      @media(max-width:700px){#ceTooltipV21[data-ce-stable-fix5="1"]{width:calc(100vw - 18px)!important;max-width:calc(100vw - 18px)!important;max-height:82vh!important;padding:44px 10px 12px!important}#ceTooltipV21[data-ce-stable-fix5="1"] td{padding:6px 5px!important;font-size:11px!important}}
+      @media(max-width:700px){#ceTooltipV21[data-ce-stable-fix6="1"]{width:calc(100vw - 18px)!important;max-width:calc(100vw - 18px)!important;max-height:82vh!important;padding:44px 10px 12px!important}#ceTooltipV21[data-ce-stable-fix6="1"] td{padding:6px 5px!important;font-size:11px!important}}
     `;
     document.head.appendChild(style);
+  }
+  async function refreshReceiptThumbs(tip){
+    if(!tip||!tip.isConnected||photoViewerOpen()) return;
+    try{
+      tip.querySelectorAll('table.ce-v21-table').forEach(table=>{
+        table.removeAttribute('data-ce-v468-receipts');
+        table.removeAttribute('data-ce-v465-receipts');
+        const rows=Array.from(table.querySelectorAll('tr'));
+        rows.forEach(row=>Array.from(row.children).forEach(cell=>{
+          if(cell.classList?.contains('ce-v465-thumb-cell')||/^\s*JUST\.?\s*$/i.test(String(cell.textContent||''))) cell.remove();
+        }));
+      });
+      await root.ControlEventV469?.hydrateEventReceipts?.(false);
+      if(!tip.isConnected||photoViewerOpen()) return;
+      root.ControlEventV469?.enrichOpenTooltips?.();
+      root.ControlEventV467?.enrichOpenTooltips?.();
+    }catch(_){ }
   }
   function openTip(owner){
     const raw=owner?.getAttribute?.('data-ce-tip-v21'); if(!raw?.trim()) return;
     closeTip(); addStyle(); activeOwner=owner;
-    const tip=document.createElement('div'); tip.id='ceTooltipV21'; tip.dataset.ceStableFix5='1'; tip.dataset.cePinned='1';
+    const tip=document.createElement('div'); tip.id='ceTooltipV21'; tip.dataset.ceStableFix6='1'; tip.dataset.cePinned='1';
     tip.innerHTML='<button type="button" class="ce-v21-tip-close" aria-label="Cerrar información">×</button><div class="ce-v21-tip-content">'+renderText(raw)+'</div>';
     document.body.appendChild(tip); document.body.classList.add('ce-v25-graph-tip-open');
-    // Añade justificantes una sola vez; no se observa ni se restaura el globo.
-    [0,80].forEach(ms=>setTimeout(()=>{
+    // La hidratación de justificantes es asíncrona. Se fuerza una actualización limpia
+    // después de cargar las imágenes para que la columna «Just.» no quede marcada vacía.
+    [0,120,520].forEach(ms=>setTimeout(()=>{
       if(!$('ceTooltipV21')||$('ceTooltipV21')!==tip||photoViewerOpen()) return;
-      try{root.ControlEventV469?.enrichOpenTooltips?.();}catch(_){ }
-      try{root.ControlEventV467?.enrichOpenTooltips?.();}catch(_){ }
+      refreshReceiptThumbs(tip);
     },ms));
   }
-  function removeBackdropIfClosed(){if(!$('ceTooltipV21')?.dataset?.ceStableFix5)document.body.classList.remove('ce-v25-graph-tip-open');}
+  function removeBackdropIfClosed(){if(!$('ceTooltipV21')?.dataset?.ceStableFix6)document.body.classList.remove('ce-v25-graph-tip-open');}
 
   // pointerdown/window se ejecuta antes que todos los gestores antiguos del documento.
   root.addEventListener('pointerdown',event=>{
@@ -82,9 +99,9 @@
   },true);
   // click cubre activación por teclado y anula el clic posterior al pointerdown.
   root.addEventListener('click',event=>{
-    const close=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix5="1"] .ce-v21-tip-close');
+    const close=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-tip-close');
     if(close){event.preventDefault();event.stopImmediatePropagation();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');return;}
-    const photo=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix5="1"] .ce-v465-tip-thumb,#ceTooltipV21[data-ce-stable-fix5="1"] [data-action="ingreso-receipt-view-v465"],#ceTooltipV21[data-ce-stable-fix5="1"] [data-ce-v512-budget-photo]');
+    const photo=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix6="1"] .ce-v465-tip-thumb,#ceTooltipV21[data-ce-stable-fix6="1"] [data-action="ingreso-receipt-view-v465"],#ceTooltipV21[data-ce-stable-fix6="1"] [data-ce-v512-budget-photo]');
     if(photo){
       // El visor de fotos recibe el clic; el globo se retira después y nunca se reconstruye.
       setTimeout(()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');},70);
@@ -97,18 +114,18 @@
       return;
     }
     // El panel es modal: un clic exterior no lo cierra ni activa gestores antiguos.
-    if($('ceTooltipV21')?.dataset?.ceStableFix5==='1'){
+    if($('ceTooltipV21')?.dataset?.ceStableFix6==='1'){
       event.preventDefault(); event.stopImmediatePropagation();
     }
   },true);
   // Los gestores heredados cerraban/recolocaban el globo en resize, scroll, focusout y mouseout.
   // Al registrarse este fichero antes del bundle legacy, estas capturas los neutralizan sin restauraciones.
   ['resize','scroll','focusout','mouseout'].forEach(type=>root.addEventListener(type,event=>{
-    if($('ceTooltipV21')?.dataset?.ceStableFix5==='1') event.stopImmediatePropagation();
+    if($('ceTooltipV21')?.dataset?.ceStableFix6==='1') event.stopImmediatePropagation();
   },true));
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('ceTooltipV21')?.dataset?.ceStableFix5==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('ceTooltipV21')?.dataset?.ceStableFix6==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
   document.addEventListener('change',event=>{if(event.target?.id==='selectedEvent'){closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
   root.addEventListener('pagehide',()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');});
   setInterval(removeBackdropIfClosed,1500);
-  root.ControlEventStableGraphTipFix5={open:openTip,close:closeTip};
+  root.ControlEventStableGraphTipFix6={open:openTip,close:closeTip};
 })(window);
