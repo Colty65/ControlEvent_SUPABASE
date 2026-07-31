@@ -3,8 +3,8 @@ export const VERSION = 'v25_prod';
 export const VERSION_LABEL = 'v25_prod';
 export const VERSION_TEXT = 'ControlEvent v25_prod';
 export const VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260729-V25-PROD-COMPACT-BANK';
-export const ZIP_NAME = 'CE_V25_PROD.zip';
+export const BUILD_ID = '20260731-V25-PROD-FIX9-1-ACCESO-GRAFICA-SALDO';
+export const ZIP_NAME = 'CE_V25_PROD_FIX9_1_ACCESO_GRAFICA_SALDO.zip';
 
 try {
   window.__ceVersion = VERSION;

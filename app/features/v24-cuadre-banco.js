@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX9 · Cuadre Banco: efectivo, TKxx completos y edición de asociaciones. */
+/* ControlEvent v25_prod FIX9.1 · Cuadre Banco: acceso RO finalizado y gráfica temporal del saldo. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -15,7 +15,23 @@
   const auth = () => root.ControlEventApp?.authUser || root.authUser || root.__CONTROL_EVENT_USER__ || {};
   const state = () => root.ControlEventApp?.state || root.appState || root.__CONTROL_EVENT_STATE__ || {};
   const level = () => text(auth()?.nivel || auth()?.Nivel).toUpperCase();
-  const hasBankRole = () => ['GD','RW'].includes(level());
+  function selectedEventSnapshot(){
+    const id=activeEventId();
+    const currentState=state()||{};
+    const events=arr(currentState.eventos||currentState.events||currentState.eventList);
+    let event=events.find(item=>text(item?.id||item?.ID)===id)||null;
+    if(!event&&typeof root.selectedEvent==='function'){
+      try{event=root.selectedEvent()||null;}catch(_){event=null;}
+    }
+    return event||{};
+  }
+  function selectedEventFinalized(){
+    const event=selectedEventSnapshot();
+    const status=text(event.situacion||event.estado||event.status||event.SITUACION||event.ESTADO).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    if(status) return status==='FINALIZADO';
+    return document.body.classList.contains('ce-event-finalized');
+  }
+  const hasBankRole = () => ['GD','RW'].includes(level()) || (level()==='RO'&&selectedEventFinalized());
   const activeEventId = () => text($('selectedEvent')?.value || state().selectedEventId || state().eventoSeleccionadoId || root.selectedEventId);
   const actor = () => {
     const user=auth()||{};
@@ -27,7 +43,7 @@
     ticketMovement:null, tickets:[], ticketOriginalLinks:[], incomeMovement:null, incomes:[], openGestureAt:0, lastAction:'', lastActionAt:0, readOnly:false,
     lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:'',
     page:1, pageSize:60, dataRevision:0, filteredCacheKey:'', filteredCacheRows:[], searchTimer:0, renderFrame:0,
-    loadSeq:0, loadController:null, totalPages:1
+    loadSeq:0, loadController:null, totalPages:1, balanceChartOpen:false
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
@@ -183,6 +199,7 @@
         <div class="ce-bank-ledger-caption"><b>Movimientos bancarios</b><b>TICKETS DE COMPRA O DE INGRESO JUSTIFICANTES DEL MVTO BANCARIO</b></div>
         <div class="ce-bank-resultbar"><span id="ceBankResultCount">Preparando movimientos…</span><div><button type="button" id="ceBankPrevPage" aria-label="Página anterior">‹</button><b id="ceBankPageLabel">Página 1 de 1</b><button type="button" id="ceBankNextPage" aria-label="Página siguiente">›</button></div></div>
         <main id="ceBankBody" class="ce-bank-body" tabindex="0" aria-label="Movimientos bancarios del evento"></main>
+        <div id="ceBankBalanceChartOverlay" class="ce-bank-balance-chart-overlay hidden" aria-hidden="true"></div>
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
       </section>`;
       document.body.appendChild(overlay);
@@ -318,11 +335,11 @@
     overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
   }
   function applyRole(){
+    const show=hasBankRole();
     document.querySelectorAll('.ce-bank-entry').forEach(node=>{
-      const show=hasBankRole();
       node.classList.toggle('hidden',!show); node.style.display=show?'':'none'; node.disabled=!show; node.setAttribute('aria-hidden',show?'false':'true');
     });
-    if(!hasBankRole() && !$('ceBankOverlay')?.classList.contains('hidden')) close();
+    if(!show && !$('ceBankOverlay')?.classList.contains('hidden')) close();
   }
   function notice(message,type='',lock=false){
     const node=$('ceBankNotice'); if(!node) return;
@@ -363,7 +380,7 @@
   }
   async function open(){
     installDom();
-    if(!hasBankRole()){ alert('Cuadre Banco está disponible para usuarios GD y RW.'); return false; }
+    if(!hasBankRole()){ alert(level()==='RO'?'Los usuarios RO solo pueden consultar Cuadre Banco cuando el evento está Finalizado.':'Cuadre Banco no está disponible para este usuario.'); return false; }
     const eventId=currentEventReady(); if(!eventId) return false;
     if(store.eventId!==eventId){ store.eventId=eventId; store.accountId=''; store.filter='TODOS'; store.search=''; store.sort='DESC'; store.dateFrom=''; store.dateTo=''; store.page=1; store.data=null; invalidateMovementCache(); }
     const overlay=$('ceBankOverlay');
@@ -375,6 +392,7 @@
     return false;
   }
   function close(immediate=false){
+    closeBalanceChart(true);
     closeBankTicketPhoto();
     const overlay=$('ceBankOverlay');
     overlay?.classList.remove('visible'); $('ceBankTicketModal')?.classList.add('hidden');
@@ -498,7 +516,7 @@
     $('ceBankSummary').innerHTML=`
       <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del evento</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
       <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo final calculado del evento</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div></article>
-      <article class="ce-bank-kpi ce-bank-kpi-flow"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Variación económica ${money(economicVariation)} · ${esc(objective)}</small></article>
+      <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal de la evolución del saldo"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Variación económica ${money(economicVariation)} · ${esc(objective)}</small><em class="ce-bank-chart-hint">Ver evolución temporal ↗</em></article>
       <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-actual-period">Saldo real al final del periodo: <b>${money(s.actualClosingBalance)}</b></div></article>`;
     if(num(period.linkedOutsidePeriodCount)>0){
       notice(`Hay ${num(period.linkedOutsidePeriodCount)} movimiento(s) con TKxx asociados fuera del periodo bancario seleccionado. Amplía las fechas para revisarlos.`,'warning',false);
@@ -509,7 +527,135 @@
     }else if(!store.noticeLocked){ notice(''); }
     renderBody();
     wireCommandControls();
+    if(store.balanceChartOpen) renderBalanceChart();
   }
+  function parseMoment(value){
+    const raw=text(value);
+    if(!raw) return 0;
+    const parsed=Date.parse(raw.includes('T')?raw:raw.replace(' ','T'));
+    return Number.isFinite(parsed)?parsed:0;
+  }
+  function balanceChartRows(){
+    return arr(store.data?.balanceTimeline).filter(row=>parseMoment(row.executedAt)>0).sort((a,b)=>parseMoment(a.executedAt)-parseMoment(b.executedAt)||String(a.id).localeCompare(String(b.id)));
+  }
+  function buildBalanceSeries(){
+    const rows=balanceChartRows();
+    if(!rows.length) return [];
+    const allAccounts=!store.accountId||store.accountId==='TODOS';
+    if(!allAccounts){
+      const first=rows[0];
+      const opening=num(first.bankBalance)-num(first.amount);
+      return [{time:parseMoment(first.executedAt)-1,balance:opening,opening:true},...rows.map(row=>({time:parseMoment(row.executedAt),balance:num(row.bankBalance),movement:row}))];
+    }
+    const grouped=new Map();
+    for(const row of rows){
+      const key=text(row.accountId)||'SIN_CUENTA';
+      if(!grouped.has(key)) grouped.set(key,[]);
+      grouped.get(key).push(row);
+    }
+    const balances=new Map();
+    for(const [key,items] of grouped){
+      const first=items[0];
+      balances.set(key,num(first.bankBalance)-num(first.amount));
+    }
+    const total=()=>[...balances.values()].reduce((sum,value)=>sum+num(value),0);
+    const series=[{time:parseMoment(rows[0].executedAt)-1,balance:total(),opening:true}];
+    for(const row of rows){
+      balances.set(text(row.accountId)||'SIN_CUENTA',num(row.bankBalance));
+      series.push({time:parseMoment(row.executedAt),balance:total(),movement:row});
+    }
+    return series;
+  }
+  function chartAccountLabel(){
+    if(!store.accountId||store.accountId==='TODOS') return 'Todas las cuentas';
+    const account=arr(store.data?.accounts).find(item=>text(item.id)===text(store.accountId));
+    return text(account?.label||account?.id||store.accountId);
+  }
+  function chartDate(value){
+    const d=new Date(value);
+    return Number.isFinite(d.getTime())?d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  }
+  function chartAmount(value){ return money(value); }
+  function closeBalanceChart(immediate=false){
+    const overlay=$('ceBankBalanceChartOverlay');
+    if(!overlay) return;
+    store.balanceChartOpen=false;
+    overlay.classList.remove('visible');
+    overlay.setAttribute('aria-hidden','true');
+    if(immediate) overlay.classList.add('hidden');
+    else setTimeout(()=>{if(!store.balanceChartOpen)overlay.classList.add('hidden');},140);
+  }
+  function showBalancePointTooltip(circle,event){
+    const overlay=$('ceBankBalanceChartOverlay');
+    const tooltip=overlay?.querySelector('.ce-bank-balance-point-tip');
+    if(!tooltip||!circle) return;
+    const movement=balanceChartRows().find(row=>String(row.id)===String(circle.dataset.movementId));
+    if(!movement) return;
+    const iban=text(movement.accountId||movement.accountLabel||store.accountId)||'Cuenta bancaria';
+    const amount=num(movement.amount);
+    tooltip.innerHTML=`<span>IBAN</span><strong>${esc(iban)}</strong><dl><div><dt>Fecha</dt><dd>${esc(formatDate(movement.executedAt))}</dd></div><div><dt>Movimiento</dt><dd class="${amount<0?'negative':'positive'}">${chartAmount(amount)}</dd></div><div><dt>Saldo de cuenta</dt><dd>${chartAmount(movement.bankBalance)}</dd></div></dl><p>${esc(movement.description||'Movimiento bancario')}</p>`;
+    tooltip.classList.remove('hidden');
+    const plot=overlay.querySelector('.ce-bank-balance-plot');
+    const plotRect=plot?.getBoundingClientRect();
+    const circleRect=circle.getBoundingClientRect();
+    if(plotRect){
+      const left=Math.min(Math.max(12,circleRect.left-plotRect.left+circleRect.width/2),Math.max(12,plotRect.width-280));
+      const top=Math.max(12,circleRect.top-plotRect.top-142);
+      tooltip.style.left=`${left}px`;
+      tooltip.style.top=`${top}px`;
+    }
+  }
+  function hideBalancePointTooltip(){
+    $('ceBankBalanceChartOverlay')?.querySelector('.ce-bank-balance-point-tip')?.classList.add('hidden');
+  }
+  function renderBalanceChart(){
+    const overlay=$('ceBankBalanceChartOverlay');
+    if(!overlay) return;
+    const series=buildBalanceSeries();
+    const highlighted=new Set(arr(store.data?.movements).map(row=>String(row.id)));
+    const title=chartAccountLabel();
+    if(!series.length){
+      overlay.innerHTML=`<section class="ce-bank-balance-chart-card" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header><div><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(title)}</h3></div><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-empty"><strong>No hay movimientos bancarios en el periodo seleccionado.</strong><span>Amplía las fechas o selecciona otra cuenta.</span></div></section>`;
+      return;
+    }
+    const width=1200,height=500,left=92,right=34,top=42,bottom=72;
+    const plotW=width-left-right,plotH=height-top-bottom;
+    const times=series.map(point=>point.time),values=series.map(point=>point.balance);
+    let minT=Math.min(...times),maxT=Math.max(...times); if(minT===maxT)maxT=minT+1;
+    let minV=Math.min(...values),maxV=Math.max(...values); const rawSpan=Math.max(1,maxV-minV); minV-=rawSpan*.14; maxV+=rawSpan*.14;
+    const x=time=>left+(time-minT)/(maxT-minT)*plotW;
+    const y=value=>top+(maxV-value)/(maxV-minV)*plotH;
+    const path=series.map((point,index)=>`${index?'L':'M'} ${x(point.time).toFixed(2)} ${y(point.balance).toFixed(2)}`).join(' ');
+    const area=`${path} L ${x(series[series.length-1].time).toFixed(2)} ${(top+plotH).toFixed(2)} L ${x(series[0].time).toFixed(2)} ${(top+plotH).toFixed(2)} Z`;
+    const yTicks=Array.from({length:5},(_,i)=>maxV-(maxV-minV)*i/4);
+    const xTicks=Array.from({length:5},(_,i)=>minT+(maxT-minT)*i/4);
+    const gridY=yTicks.map(value=>`<g><line x1="${left}" y1="${y(value)}" x2="${left+plotW}" y2="${y(value)}"></line><text x="${left-15}" y="${y(value)+5}" text-anchor="end">${esc(money(value))}</text></g>`).join('');
+    const gridX=xTicks.map(value=>`<g><line x1="${x(value)}" y1="${top}" x2="${x(value)}" y2="${top+plotH}"></line><text x="${x(value)}" y="${top+plotH+34}" text-anchor="middle">${esc(chartDate(value))}</text></g>`).join('');
+    const points=series.filter(point=>point.movement&&highlighted.has(String(point.movement.id))).map(point=>{
+      const amount=num(point.movement.amount);
+      return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time)}" cy="${y(point.balance)}" r="7" tabindex="0" role="button" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}" data-movement-id="${esc(point.movement.id)}"></circle>`;
+    }).join('');
+    const firstValue=series[0].balance,lastValue=series[series.length-1].balance,variation=lastValue-firstValue;
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header><div><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(title)}</h3><p>${esc(formatDate(store.dateFrom,false))} — ${esc(formatDate(store.dateTo,false))} · línea bancaria completa y movimientos del evento destacados</p></div><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos señalados</span><strong>${points?highlighted.size:0}</strong></div></div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfica temporal del saldo de ${esc(title)}"><defs><linearGradient id="ceBankBalanceArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#173a63" stop-opacity=".22"></stop><stop offset="100%" stop-color="#173a63" stop-opacity=".02"></stop></linearGradient><filter id="ceBankPointShadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".22"></feDropShadow></filter></defs><g class="ce-bank-balance-grid">${gridY}${gridX}</g><path class="ce-bank-balance-area" d="${area}"></path><path class="ce-bank-balance-line" d="${path}"></path><g class="ce-bank-balance-event-points">${points}</g></svg><div class="ce-bank-balance-point-tip hidden"></div></div><footer><span><i class="navy"></i>Saldo de la cuenta</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Pasa el cursor o pulsa sobre un punto para ver IBAN, fecha e importe.</small></footer></section>`;
+    overlay.querySelectorAll('.ce-bank-balance-event-point').forEach(circle=>{
+      circle.addEventListener('pointerenter',event=>showBalancePointTooltip(circle,event));
+      circle.addEventListener('focus',event=>showBalancePointTooltip(circle,event));
+      circle.addEventListener('pointerleave',hideBalancePointTooltip);
+      circle.addEventListener('blur',hideBalancePointTooltip);
+      circle.addEventListener('click',event=>{event.stopPropagation();showBalancePointTooltip(circle,event);});
+    });
+  }
+  function openBalanceChart(event){
+    stopEvent(event);
+    const overlay=$('ceBankBalanceChartOverlay');
+    if(!overlay||!store.data) return;
+    store.balanceChartOpen=true;
+    renderBalanceChart();
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden','false');
+    requestAnimationFrame(()=>overlay.classList.add('visible'));
+  }
+
   function filteredMovements(){
     const cacheKey=[store.dataRevision,store.filter,text(store.search).toLowerCase(),store.sort].join('|');
     if(store.filteredCacheKey===cacheKey) return store.filteredCacheRows;
@@ -920,6 +1066,10 @@
   root.ceOpenCuadreBanco=openFromEntry;
   root.addEventListener('click',event=>{if(event.target?.closest?.('#btnOpenBankReconciliation,[data-ce-open-bank="1"]'))openFromEntry(event);},true);
   document.addEventListener('click',event=>{
+    const chartTrigger=event.target?.closest?.('[data-ce-bank-open-balance-chart="1"]');
+    if(chartTrigger){openBalanceChart(event);return;}
+    const chartClose=event.target?.closest?.('[data-ce-bank-close-balance-chart]');
+    if(chartClose||event.target?.id==='ceBankBalanceChartOverlay'){stopEvent(event);closeBalanceChart();return;}
     const included=event.target?.closest?.('[data-ce-bank-included]');
     if(included){toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;}
     const forced=event.target?.closest?.('[data-ce-bank-forced]');
@@ -945,10 +1095,12 @@
   },true);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!$('ceBankOverlay')?.classList.contains('hidden')){
+      if(store.balanceChartOpen){closeBalanceChart();return;}
       if($('ceBankTicketPhoto')){closeBankTicketPhoto();return;}
       if(!$('ceBankTicketModal')?.classList.contains('hidden')){const movement=store.incomeMovement||store.ticketMovement;$('ceBankTicketModal').classList.add('hidden');store.incomeMovement=null;store.ticketMovement=null;restorePosition(movement,false);}else close();
       return;
     }
+    if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-ce-bank-open-balance-chart="1"]')){openBalanceChart(event);return;}
     if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-ce-bank-view-income="1"]')){openBankIncomePhoto(event.target,event);return;}
     if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-ce-bank-view-ticket="1"]')){openBankTicketPhoto(event.target,event);return;}
     pageNavigate(event);
@@ -966,8 +1118,13 @@
       if(item){item.selected=incomeChoice.checked;incomeChoice.closest('.ce-bank-income-choice')?.classList.toggle('selected',item.selected);updateIncomePickerTotal();}
       return;
     }
-    if(event.target?.id==='selectedEvent'&&!$('ceBankOverlay')?.classList.contains('hidden')){
-      const id=activeEventId(); if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';store.sort='DESC';store.dateFrom='';store.dateTo='';store.page=1;store.data=null;invalidateMovementCache();load({force:true});}
+    if(event.target?.id==='selectedEvent'){
+      applyRole();
+      if(!$('ceBankOverlay')?.classList.contains('hidden')){
+        const id=activeEventId();
+        if(!hasBankRole()){close();return;}
+        if(id&&id!==store.eventId){store.eventId=id;store.accountId='';store.filter='TODOS';store.search='';store.sort='DESC';store.dateFrom='';store.dateTo='';store.page=1;store.data=null;invalidateMovementCache();load({force:true});}
+      }
     }
   },true);
   const observer=root.MutationObserver?new MutationObserver(mutations=>{
@@ -980,5 +1137,5 @@
   if(observer) observer.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',()=>{installDom();installCommandCapture();},{once:true});
   [0,100,500,1400].forEach(ms=>setTimeout(installDom,ms));
-  root.ControlEventBankReconciliation={version:VERSION,open,close,load,refresh:refreshBankData,exportData,parseMoney:num,state:store};
+  root.ControlEventBankReconciliation={version:VERSION,open,close,load,refresh:refreshBankData,openBalanceChart,closeBalanceChart,exportData,parseMoney:num,state:store};
 })(window);

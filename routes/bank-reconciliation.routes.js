@@ -2,6 +2,7 @@ import express from 'express';
 import { asyncHandler } from './_async.js';
 import {
   addTicketLink,
+  assertBankEventReadable,
   assertBankEventWritable,
   deleteTicketLink,
   exportBankData,
@@ -28,11 +29,19 @@ function requireBankRole(req){
   const actor = actorFrom(req);
   const role = String(actor.nivel || actor.Nivel || '').toUpperCase();
   if(!['GD','RW'].includes(role)){
-    const err = new Error('Cuadre Banco está disponible para usuarios GD y RW.');
+    const err = new Error('Las modificaciones de Cuadre Banco están disponibles para usuarios GD y RW.');
     err.status = 403;
     err.code = 'BANK_ROLE_FORBIDDEN';
     throw err;
   }
+  return actor;
+}
+async function requireBankReadRole(req){
+  const actor=actorFrom(req);
+  const role=String(actor.nivel||actor.Nivel||'').toUpperCase();
+  // GD/RW conservan también la exportación técnica completa sin eventId usada por BACKUP.
+  if(['GD','RW'].includes(role)) return actor;
+  await assertBankEventReadable(eventIdFrom(req),actor);
   return actor;
 }
 function eventIdFrom(req){
@@ -40,7 +49,7 @@ function eventIdFrom(req){
 }
 
 router.get('/bank-reconciliation', asyncHandler(async (req,res) => {
-  requireBankRole(req);
+  await requireBankReadRole(req);
   res.json(await listBankReconciliation({accountId:req.query.accountId,eventId:req.query.eventId}));
 }));
 router.get('/bank-reconciliation/paid-tickets', asyncHandler(async (req,res) => {
@@ -52,7 +61,7 @@ router.get('/bank-reconciliation/incomes', asyncHandler(async (req,res) => {
   res.json(await listBankIncomes({movementId:req.query.movementId,eventId:req.query.eventId,q:req.query.q}));
 }));
 router.get('/bank-reconciliation/export', asyncHandler(async (req,res) => {
-  requireBankRole(req);
+  await requireBankReadRole(req);
   res.json(await exportBankData({accountId:req.query.accountId,eventId:req.query.eventId}));
 }));
 router.patch('/bank-reconciliation/event-period', asyncHandler(async (req,res) => {

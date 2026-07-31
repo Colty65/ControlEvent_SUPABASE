@@ -801,3 +801,79 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 @media(max-width:850px){
   #ceBankOverlay .ce-bank-kpi-flow{display:flex!important;min-width:210px!important}
 }
+
+
+/* v25_prod FIX9.1 · gráfica temporal del saldo y acceso de consulta RO en Finalizado. */
+#ceBankOverlay .ce-bank-kpi-chart-trigger{position:relative!important;cursor:pointer!important;outline:none!important;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease!important}
+#ceBankOverlay .ce-bank-kpi-chart-trigger:hover,#ceBankOverlay .ce-bank-kpi-chart-trigger:focus-visible{transform:translateY(-2px)!important;border-color:rgba(23,58,99,.42)!important;box-shadow:0 12px 24px rgba(18,49,79,.14)!important}
+#ceBankOverlay .ce-bank-chart-hint{position:absolute;right:8px;bottom:4px;color:#173a63;font-size:7px;font-style:normal;font-weight:950;letter-spacing:.04em;text-transform:uppercase;opacity:.78}
+#ceBankOverlay .ce-bank-balance-chart-overlay{position:absolute;inset:0;z-index:260;display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(7,21,35,.58);backdrop-filter:blur(8px);opacity:0;transition:opacity .14s ease}
+#ceBankOverlay .ce-bank-balance-chart-overlay.hidden{display:none!important}
+#ceBankOverlay .ce-bank-balance-chart-overlay.visible{opacity:1}
+#ceBankOverlay .ce-bank-balance-chart-card{width:min(1260px,96%);max-height:92%;display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(255,255,255,.72);border-radius:26px;background:linear-gradient(180deg,#ffffff 0%,#f7fafc 100%);box-shadow:0 34px 90px rgba(3,18,32,.38)}
+#ceBankOverlay .ce-bank-balance-chart-card>header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px 16px;border-bottom:1px solid #dfe8ef;background:linear-gradient(105deg,#0d253d,#173a63 64%,#215279);color:#fff}
+#ceBankOverlay .ce-bank-balance-chart-card>header>div{min-width:0}
+#ceBankOverlay .ce-bank-balance-chart-card>header span{display:block;margin-bottom:4px;color:#91d8ff;font-size:10px;font-weight:950;letter-spacing:.16em}
+#ceBankOverlay .ce-bank-balance-chart-card>header h3{margin:0;font-size:27px;line-height:1.05;font-weight:950;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ceBankOverlay .ce-bank-balance-chart-card>header p{margin:7px 0 0;color:#c9d9e7;font-size:11px;font-weight:700}
+#ceBankOverlay .ce-bank-balance-chart-card>header button{width:44px;height:44px;flex:0 0 44px;border:1px solid rgba(255,255,255,.32);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:29px;line-height:1;cursor:pointer}
+#ceBankOverlay .ce-bank-balance-chart-card>header button:hover{background:rgba(255,255,255,.2)}
+#ceBankOverlay .ce-bank-balance-chart-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:13px 22px 5px}
+#ceBankOverlay .ce-bank-balance-chart-stats>div{min-width:0;padding:10px 13px;border:1px solid #dde7ee;border-radius:14px;background:#fff}
+#ceBankOverlay .ce-bank-balance-chart-stats span{display:block;color:#698095;font-size:9px;font-weight:950;letter-spacing:.09em;text-transform:uppercase}
+#ceBankOverlay .ce-bank-balance-chart-stats strong{display:block;margin-top:3px;color:#173a63;font-size:19px;font-weight:950;white-space:nowrap}
+#ceBankOverlay .ce-bank-balance-chart-stats .positive strong{color:#158257}
+#ceBankOverlay .ce-bank-balance-chart-stats .negative strong{color:#c73745}
+#ceBankOverlay .ce-bank-balance-plot{position:relative;min-height:360px;flex:1;padding:0 14px 2px}
+#ceBankOverlay .ce-bank-balance-plot svg{display:block;width:100%;height:100%;min-height:360px;overflow:visible}
+#ceBankOverlay .ce-bank-balance-grid line{stroke:#dce6ed;stroke-width:1}
+#ceBankOverlay .ce-bank-balance-grid text{fill:#73889a;font-size:12px;font-weight:750}
+#ceBankOverlay .ce-bank-balance-area{fill:url(#ceBankBalanceArea)}
+#ceBankOverlay .ce-bank-balance-line{fill:none;stroke:#173a63;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+#ceBankOverlay .ce-bank-balance-event-point{stroke:#fff;stroke-width:4;cursor:pointer;filter:url(#ceBankPointShadow);transform-box:fill-box;transform-origin:center;transition:r .12s ease,transform .12s ease}
+#ceBankOverlay .ce-bank-balance-event-point.positive{fill:#21a56f}
+#ceBankOverlay .ce-bank-balance-event-point.negative{fill:#d44752}
+#ceBankOverlay .ce-bank-balance-event-point:hover,#ceBankOverlay .ce-bank-balance-event-point:focus{r:10;outline:none;transform:scale(1.08)}
+#ceBankOverlay .ce-bank-balance-point-tip{position:absolute;z-index:8;width:268px;padding:13px 14px;border:1px solid rgba(255,255,255,.72);border-radius:15px;background:rgba(10,31,50,.96);box-shadow:0 18px 38px rgba(6,25,40,.3);color:#fff;pointer-events:none;transform:translateX(-50%)}
+#ceBankOverlay .ce-bank-balance-point-tip.hidden{display:none!important}
+#ceBankOverlay .ce-bank-balance-point-tip>span{display:block;color:#8ecff3;font-size:8px;font-weight:950;letter-spacing:.14em}
+#ceBankOverlay .ce-bank-balance-point-tip>strong{display:block;margin-top:2px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ceBankOverlay .ce-bank-balance-point-tip dl{display:grid;gap:5px;margin:10px 0 7px}
+#ceBankOverlay .ce-bank-balance-point-tip dl>div{display:flex;justify-content:space-between;gap:12px}
+#ceBankOverlay .ce-bank-balance-point-tip dt{color:#a9bdcc;font-size:10px}
+#ceBankOverlay .ce-bank-balance-point-tip dd{margin:0;font-size:11px;font-weight:950;text-align:right}
+#ceBankOverlay .ce-bank-balance-point-tip dd.positive{color:#72e2ac}
+#ceBankOverlay .ce-bank-balance-point-tip dd.negative{color:#ff8792}
+#ceBankOverlay .ce-bank-balance-point-tip p{margin:0;padding-top:7px;border-top:1px solid rgba(255,255,255,.13);color:#dce8f0;font-size:10px;line-height:1.3}
+#ceBankOverlay .ce-bank-balance-chart-card>footer{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 23px 15px;color:#536b7d;font-size:10px;font-weight:800}
+#ceBankOverlay .ce-bank-balance-chart-card>footer span{display:inline-flex;align-items:center;gap:6px}
+#ceBankOverlay .ce-bank-balance-chart-card>footer i{width:10px;height:10px;border-radius:50%}
+#ceBankOverlay .ce-bank-balance-chart-card>footer i.navy{background:#173a63}
+#ceBankOverlay .ce-bank-balance-chart-card>footer i.green{background:#21a56f}
+#ceBankOverlay .ce-bank-balance-chart-card>footer i.red{background:#d44752}
+#ceBankOverlay .ce-bank-balance-chart-card>footer small{margin-left:auto;color:#73889a}
+#ceBankOverlay .ce-bank-balance-chart-empty{display:flex;min-height:360px;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#173a63}
+#ceBankOverlay .ce-bank-balance-chart-empty strong{font-size:20px}
+#ceBankOverlay .ce-bank-balance-chart-empty span{color:#718597;font-size:13px}
+@media (max-width:900px){
+  #ceBankOverlay .ce-bank-balance-chart-overlay{padding:12px}
+  #ceBankOverlay .ce-bank-balance-chart-card{width:100%;max-height:96%;border-radius:20px}
+  #ceBankOverlay .ce-bank-balance-chart-card>header{padding:15px 16px 13px}
+  #ceBankOverlay .ce-bank-balance-chart-card>header h3{font-size:21px}
+  #ceBankOverlay .ce-bank-balance-chart-stats{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px 12px 0}
+  #ceBankOverlay .ce-bank-balance-plot{min-height:330px;padding:0 2px}
+  #ceBankOverlay .ce-bank-balance-plot svg{min-height:330px}
+  #ceBankOverlay .ce-bank-balance-chart-card>footer{padding:8px 14px 12px;gap:10px}
+  #ceBankOverlay .ce-bank-balance-chart-card>footer small{width:100%;margin-left:0}
+}
+@media (max-width:600px){
+  #ceBankOverlay .ce-bank-chart-hint{display:none}
+  #ceBankOverlay .ce-bank-balance-chart-overlay{position:fixed;padding:0;z-index:9995;background:#071523}
+  #ceBankOverlay .ce-bank-balance-chart-card{height:100dvh;max-height:none;border:0;border-radius:0}
+  #ceBankOverlay .ce-bank-balance-chart-card>header h3{font-size:18px}
+  #ceBankOverlay .ce-bank-balance-chart-card>header p{font-size:9px}
+  #ceBankOverlay .ce-bank-balance-chart-stats strong{font-size:16px}
+  #ceBankOverlay .ce-bank-balance-plot{min-height:300px;overflow:auto}
+  #ceBankOverlay .ce-bank-balance-plot svg{width:760px;min-height:340px}
+  #ceBankOverlay .ce-bank-balance-point-tip{position:fixed;left:50%!important;top:auto!important;bottom:18px;width:min(300px,calc(100vw - 24px))}
+}

@@ -403,6 +403,17 @@ async function loadEvent(eventId){
   return eventFromDb(data);
 }
 
+export async function assertBankEventReadable(eventId,actor={}){
+  try{
+    const event=await loadEvent(eventId);
+    const role=text(actor?.nivel||actor?.Nivel).toUpperCase();
+    if(['GD','RW'].includes(role)) return event;
+    if(role==='RO'&&event.finalized) return event;
+    if(role==='RO') fail('Los usuarios RO solo pueden consultar Cuadre Banco cuando el evento está Finalizado.',403,'BANK_RO_EVENT_IN_PROGRESS');
+    fail('Cuadre Banco no está disponible para este usuario.',403,'BANK_ROLE_FORBIDDEN');
+  }catch(error){ throw friendlyDbError(error); }
+}
+
 export async function assertBankEventWritable(eventId){
   try{
     const event=await loadEvent(eventId);
@@ -662,6 +673,19 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       incomeSummary:incomeTrace.summary,
       accounts,
       selectedAccount,
+      // Cronología bancaria completa del periodo para dibujar la evolución real del
+      // saldo. La interfaz destaca sobre esa línea únicamente los movimientos que
+      // pertenecen a la vista actual del evento.
+      balanceTimeline:accountMovements.filter(row=>inPeriod(row,period)).sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id))).map(row=>({
+        id:row.id,
+        accountId:row.accountId,
+        accountLabel:row.accountLabel,
+        executedAt:row.executedAt,
+        valueDate:row.valueDate,
+        description:row.description,
+        amount:row.amount,
+        bankBalance:row.bankBalance
+      })),
       movements,
       summary:{...ledger.summary,cashIncome,eventIncome,economicVariation,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
     };
