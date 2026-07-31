@@ -20,6 +20,13 @@ function num(value){
 }
 function cents(value){ return Math.round((num(value) + Number.EPSILON) * 100) / 100; }
 function normalizeSpace(value){ return text(value).replace(/\s+/g, ' '); }
+function normalizeWords(value){
+  return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function meaningfulTokens(value){
+  const stop=new Set(['ABONO','TRANS','TRANSFERENCIA','INMEDIATA','INGRESO','CUOTA','PAGO','BANCO','BIZUM','SYSA','EVENTO','PEÑA','PENA','DE','DEL','LA','LAS','EL','LOS','Y']);
+  return normalizeWords(value).split(' ').filter(token=>token.length>=3&&!stop.has(token));
+}
 function normalizeTicket(value){
   const match = text(value).toUpperCase().match(/\bTK\s*0*(\d+)[A-Z0-9_-]*\b/);
   return match ? `TK${String(Number(match[1])).padStart(2, '0')}` : '';
@@ -368,6 +375,7 @@ function eventFromDb(row = {}){
     id:text(row.id),
     title:text(row.titulo || row.nombre || row.descripcion) || 'Evento',
     description:text(row.descripcion),
+    price:cents(row.precio),
     startDate:dateOnly(row.fecha_ini || row.fecha_inicio || row.fechaIni),
     endDate:dateOnly(row.fecha_fin || row.fecha_final || row.fechaFin),
     status:text(row.situacion || row.estado || 'En curso'),
@@ -410,10 +418,103 @@ function eventTicketSummary(catalog,eventId){
   const traffic=total && linked===total ? 'GREEN' : (ratio >= .5 ? 'ORANGE' : 'RED');
   return {total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified:total>0&&linked===total,traffic};
 }
+function confirmedBankIncome(value){
+  const state=normalizeWords(value);
+  return state==='BANCO'||state==='BIZUM'||state==='PAGADO BANCO'||state==='INGRESADO BANCO';
+}
+function incomeImageUrl(images,eventId,incomeId){
+  const expected=[`${eventId}|INGRESO:${incomeId}`,`${eventId}|INGRESO|${incomeId}`,`INGRESO:${eventId}|${incomeId}`,`INGRESO:${incomeId}`].map(normalizeWords);
+  let best={score:-1,url:''};
+  for(const row of arr(images)){
+    const normalizedKeys=[row.image_key,row.label].map(normalizeWords).filter(Boolean);
+    let score=-1;
+    for(const normalized of normalizedKeys){
+      expected.forEach((key,index)=>{ if(normalized===key) score=Math.max(score,1000-index); });
+      if(score<0 && normalized.includes(normalizeWords(`INGRESO ${incomeId}`))) score=700;
+    }
+    const url=text(row.public_url||row.pathname||row.storage_path);
+    if(url&&score>best.score) best={score,url};
+  }
+  return best.url;
+}
+function buildIncomeCatalog(event,collaborators,persons,images){
+  const people=new Map(arr(persons).map(row=>[text(row.id),row]));
+  return arr(collaborators).filter(row=>text(row.event_id)===event.id&&confirmedBankIncome(row.situacion)).map(row=>{
+    const person=people.get(text(row.persona_id))||{};
+    const isMember=normalizeWords(person.rango)==='SOCIO';
+    const mandatory=isMember?cents(num(row.numero)*num(event.price)):0;
+    const amount=cents(mandatory+num(row.importe));
+    return {
+      id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName:text(person.nombre)||text(row.persona_id)||'Ingreso',
+      paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at)
+    };
+  }).filter(row=>row.id&&row.amount>0).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||a.personName.localeCompare(b.personName,'es')||a.id.localeCompare(b.id));
+}
+function incomeNameScore(description,income,executedAt=''){
+  const descriptionNorm=normalizeWords(description);
+  const personNorm=normalizeWords(income.personName);
+  let score=0;
+  if(personNorm&&descriptionNorm.includes(personNorm)) score+=220;
+  for(const token of meaningfulTokens(income.personName)) if(descriptionNorm.includes(token)) score+=35;
+  const movementTime=Date.parse(text(executedAt));
+  const incomeTime=Date.parse(text(income.updatedAt||income.createdAt));
+  if(Number.isFinite(movementTime)&&Number.isFinite(incomeTime)){
+    const days=Math.abs(movementTime-incomeTime)/86400000;
+    score+=Math.max(0,30-Math.min(30,days));
+  }
+  if(income.imageUrl) score+=1;
+  return score;
+}
+function findIncomeCombination(candidates,target,description,executedAt=''){
+  const rows=candidates.filter(row=>row.amount<=target+.01).slice(0,18);
+  let best=null;
+  function visit(index,chosen,total,score){
+    if(Math.abs(total-target)<=.01){
+      const candidate={chosen:[...chosen],score:score+chosen.length};
+      if(!best||candidate.score>best.score) best=candidate;
+      return;
+    }
+    if(total>target+.01||chosen.length>=5) return;
+    for(let i=index;i<rows.length;i+=1){
+      const row=rows[i];
+      visit(i+1,[...chosen,row],cents(total+row.amount),score+incomeNameScore(description,row,executedAt));
+    }
+  }
+  visit(0,[],0,0);
+  return best?.chosen||[];
+}
+function attachIncomeTraceability(rows,incomeCatalog){
+  const used=new Set();
+  const prioritized=[...arr(rows)].sort((a,b)=>Number(b.included)-Number(a.included)||String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id)));
+  const traced=new Map();
+  for(const row of prioritized){
+    if(num(row.amount)<=0){ traced.set(row.id,row); continue; }
+    const target=cents(Math.max(0,num(row.amount)));
+    let matches=[];
+    if(row.included&&!row.linkedToOtherEvent){
+      const available=incomeCatalog.filter(item=>!used.has(item.id));
+      const exact=available.filter(item=>Math.abs(item.amount-target)<=.01).sort((a,b)=>incomeNameScore(row.description,b,row.executedAt)-incomeNameScore(row.description,a,row.executedAt)||String(a.createdAt).localeCompare(String(b.createdAt))||a.id.localeCompare(b.id));
+      if(exact.length) matches=[exact[0]];
+      else matches=findIncomeCombination(available,target,row.description,row.executedAt);
+      matches.forEach(item=>used.add(item.id));
+    }
+    const justified=cents(matches.reduce((sum,item)=>sum+item.amount,0));
+    const difference=cents(target-justified);
+    const status=!row.included?'FUERA_SALDO':(!matches.length?'SIN_JUSTIFICAR':(Math.abs(difference)<=.01?'CUADRADO':(difference>0?'PENDIENTE':'EXCESO')));
+    traced.set(row.id,{...row,incomeLinks:matches,incomeTargetAmount:target,incomeJustifiedAmount:justified,incomeDifference:difference,incomeJustificationStatus:status});
+  }
+  const enriched=arr(rows).map(row=>traced.get(row.id)||row);
+  const positive=enriched.filter(row=>num(row.amount)>0&&row.included);
+  const reconciled=positive.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
+  const total=positive.length;
+  const percentage=total?Math.round(reconciled/total*100):0;
+  const traffic=percentage>80?'GREEN':(percentage>50?'ORANGE':'RED');
+  return {movements:enriched,summary:{total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:0,traffic,allReconciled:total>0&&reconciled===total}};
+}
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, allRawLinkRows, stateRows, eventRows] = await Promise.all([
+    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {
         columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
         order:'executed_at', ascending:false
@@ -422,7 +523,10 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       // coincidencia de fechas muestre el TKxx y el evento al que ya pertenece.
       selectPaged(LINKS_TABLE, {order:'created_at', ascending:true}),
       selectPaged(EVENT_MOVEMENT_STATE_TABLE,{order:'updated_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      selectPaged('ce_eventos',{columns:'id,titulo,fecha_ini,fecha_fin,situacion',order:'fecha_ini',ascending:true})
+      selectPaged('ce_eventos',{columns:'id,titulo,precio,fecha_ini,fecha_fin,situacion',order:'fecha_ini',ascending:true}),
+      selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
+      selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
     ]);
     const activeRawLinkRows=allRawLinkRows.filter(row=>text(row.event_id)===event.id);
     // El catálogo completo de compras solo se construye para el evento activo. Para los
@@ -489,8 +593,12 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         };
       });
     // Finalizado = fotografía cerrada del evento: únicamente sus movimientos En saldo.
-    const visibleScoped=event.finalized ? scopedAll.filter(row=>row.included) : scopedAll;
-    const ledger=buildEventLedger(scopedAll);
+    const incomeCatalog=buildIncomeCatalog(event,collaboratorRows,personRows,incomeImageRows);
+    const incomeTrace=attachIncomeTraceability(scopedAll,incomeCatalog);
+    const tracedById=new Map(incomeTrace.movements.map(row=>[row.id,row]));
+    const tracedScoped=scopedAll.map(row=>tracedById.get(row.id)||row);
+    const visibleScoped=event.finalized ? tracedScoped.filter(row=>row.included) : tracedScoped;
+    const ledger=buildEventLedger(tracedScoped);
     const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
@@ -501,6 +609,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       period:{dateFrom:period.dateFrom,dateTo:period.dateTo,linkedOutsidePeriodCount:linkedOutsidePeriod.length},
       readOnly:event.finalized,
       ticketSummary,
+      incomeSummary:incomeTrace.summary,
       accounts,
       selectedAccount,
       movements,

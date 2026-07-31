@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX6 · Cuadre Banco compacto, responsive y fotos TKxx (GD/RW). */
+/* ControlEvent v25_prod FIX7 · Cuadre Banco: trazabilidad de compras e ingresos (GD/RW). */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -65,6 +65,19 @@
     if(summary.traffic==='GREEN') return {className:'green',label:'Todos los TKxx justificados'};
     if(summary.traffic==='ORANGE') return {className:'orange',label:'Justificación parcial'};
     return {className:'red',label:'Justificación insuficiente'};
+  }
+  function incomeTrafficInfo(summary={}){
+    if(summary.traffic==='GREEN') return {className:'green',label:'Ingresos conciliados'};
+    if(summary.traffic==='ORANGE') return {className:'orange',label:'Conciliación parcial'};
+    return {className:'red',label:'Ingresos pendientes'};
+  }
+  function incomeStatusInfo(row){
+    const status=text(row?.incomeJustificationStatus);
+    if(status==='CUADRADO') return {className:'ok',label:'Cuadrado'};
+    if(status==='PENDIENTE') return {className:'pending',label:`Faltan ${money(Math.max(0,row.incomeDifference))}`};
+    if(status==='EXCESO') return {className:'excess',label:`Exceso ${money(Math.abs(num(row.incomeDifference)))}`};
+    if(status==='FUERA_SALDO') return {className:'na',label:'Fuera del saldo'};
+    return {className:'none',label:'Sin justificar'};
   }
   function purgeTooltip(node){
     if(!node) return;
@@ -139,7 +152,10 @@
             <div id="ceBankEventHeadline" class="ce-bank-event-headline"><strong>Selecciona un evento</strong></div>
             <p id="ceBankEventPeriod">Periodo bancario pendiente</p>
           </div>
-          <div id="ceBankTraffic" class="ce-bank-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 TKxx</b><small>Sin datos</small></div></div>
+          <div class="ce-bank-traffic-group">
+            <div id="ceBankTraffic" class="ce-bank-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 TKxx</b><small>Sin datos</small></div></div>
+            <div id="ceBankIncomeTraffic" class="ce-bank-traffic ce-bank-income-traffic red"><span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>0 / 0 ingresos</b><small>Sin datos</small></div></div>
+          </div>
           <button type="button" id="ceBankClose" class="ce-bank-close" aria-label="Cerrar Cuadre Banco"><span>×</span></button>
         </header>
         <div id="ceBankReadOnly" class="ce-bank-readonly hidden"><b>EVENTO FINALIZADO</b><span>Consulta completa disponible; altas, bajas y cambios están bloqueados.</span></div>
@@ -164,7 +180,7 @@
           </div>
         </div>
         <div id="ceBankNotice" class="ce-bank-notice hidden"></div>
-        <div class="ce-bank-ledger-caption"><b>Movimientos bancarios</b><b>Tickets justificantes del mvto bancario</b></div>
+        <div class="ce-bank-ledger-caption"><b>Movimientos bancarios</b><b>TICKETS DE COMPRA O DE INGRESO JUSTIFICANTES DEL MVTO BANCARIO</b></div>
         <div class="ce-bank-resultbar"><span id="ceBankResultCount">Preparando movimientos…</span><div><button type="button" id="ceBankPrevPage" aria-label="Página anterior">‹</button><b id="ceBankPageLabel">Página 1 de 1</b><button type="button" id="ceBankNextPage" aria-label="Página siguiente">›</button></div></div>
         <main id="ceBankBody" class="ce-bank-body" tabindex="0" aria-label="Movimientos bancarios del evento"></main>
         <div id="ceBankTicketModal" class="ce-bank-ticket-overlay hidden"></div>
@@ -440,7 +456,7 @@
     $('ceBankSearch').value=store.search;
     $('ceBankDateFrom').value=store.dateFrom;
     $('ceBankDateTo').value=store.dateTo;
-    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const period=data.period||{}; const traffic=trafficInfo(tickets);
+    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const incomes=data.incomeSummary||{}; const period=data.period||{}; const traffic=trafficInfo(tickets); const incomeTraffic=incomeTrafficInfo(incomes);
     const finalClass=num(s.calculatedBalance)<0?'negative':'positive';
     const variationClass=num(s.eventVariation)<0?'negative':'positive';
     const headline=$('ceBankEventHeadline');
@@ -450,6 +466,11 @@
     const trafficNode=$('ceBankTraffic');
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
+    const incomeTrafficNode=$('ceBankIncomeTraffic');
+    if(incomeTrafficNode){
+      incomeTrafficNode.className=`ce-bank-traffic ce-bank-income-traffic ${incomeTraffic.className}`;
+      incomeTrafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(incomes.reconciled)} / ${num(incomes.total)} ingresos</b><small>${esc(incomeTraffic.label)} · ${num(incomes.percentage)}%</small></div>`;
+    }
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
     $('ceBankOverlay')?.classList.toggle('ce-bank-readonly-mode',store.readOnly);
     if(store.readOnly){store.filter='INCLUIDOS';if($('ceBankFilter'))$('ceBankFilter').value='INCLUIDOS';}
@@ -480,13 +501,14 @@
     let rows=arr(store.data?.movements);
     if(store.filter==='INCLUIDOS') rows=rows.filter(row=>row.included);
     else if(store.filter==='EXCLUIDOS') rows=rows.filter(row=>!row.included);
-    else if(store.filter==='PENDIENTES') rows=rows.filter(row=>row.amount<0&&!['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus));
-    else if(store.filter==='CUADRADOS') rows=rows.filter(row=>['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus));
+    else if(store.filter==='PENDIENTES') rows=rows.filter(row=>row.amount<0?!['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus):row.incomeJustificationStatus!=='CUADRADO');
+    else if(store.filter==='CUADRADOS') rows=rows.filter(row=>row.amount<0?['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus):row.incomeJustificationStatus==='CUADRADO');
     else if(store.filter==='FORZADOS') rows=rows.filter(row=>row.justificationStatus==='CUADRADO_FORZADO');
     const q=text(store.search).toLowerCase();
     if(q) rows=rows.filter(row=>[
       row.description,row.amount,row.bankBalance,row.eventBalanceAfter,formatDate(row.executedAt),formatDate(row.valueDate,false),
-      ...arr(row.displayLinks||row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)])
+      ...arr(row.displayLinks||row.links).flatMap(link=>[link.ticketCode,link.eventTitle,link.ticketAmount,...arr(link.stores),...arr(link.responsibles)]),
+      ...arr(row.incomeLinks).flatMap(link=>[link.personName,link.amount,link.paymentMethod])
     ].join(' ').toLowerCase().includes(q));
     rows=[...rows].sort((a,b)=>{
       const cmp=String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id));
@@ -523,11 +545,12 @@
     updatePager(rows.length,start,end);
     if(!pageRows.length){ body.innerHTML='<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro, cambia la búsqueda o amplía las fechas.</span></div>'; return; }
     body.innerHTML=pageRows.map((row,index)=>{
-      const status=statusInfo(row); const amountClass=row.amount<0?'negative':'positive';
+      const status=row.amount>=0?incomeStatusInfo(row):statusInfo(row); const amountClass=row.amount<0?'negative':'positive';
       const displayLinks=arr(row.displayLinks||row.links);
       const activeLinks=displayLinks.filter(link=>link.isActiveEvent!==false);
-      const target=Math.max(0,num(row.targetAmount));
-      const justified=row.linkedToOtherEvent?Math.max(0,num(row.foreignJustifiedAmount)):Math.max(0,num(row.justifiedAmount));
+      const incomeLinks=arr(row.incomeLinks);
+      const target=row.amount>=0?Math.max(0,num(row.incomeTargetAmount||row.amount)):Math.max(0,num(row.targetAmount));
+      const justified=row.amount>=0?Math.max(0,num(row.incomeJustifiedAmount)):(row.linkedToOtherEvent?Math.max(0,num(row.foreignJustifiedAmount)):Math.max(0,num(row.justifiedAmount)));
       const progress=target?Math.min(100,Math.round(justified/target*100)):0;
       const rowLocked=store.readOnly||row.inclusionLocked===true;
       const disabled=rowLocked?'disabled aria-disabled="true"':'';
@@ -541,18 +564,17 @@
         const removable=link.isActiveEvent!==false&&!store.readOnly;
         return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}" role="button" tabindex="0" data-ce-bank-view-ticket="1" data-event-id="${esc(link.eventId||store.eventId)}" data-ticket-code="${esc(link.ticketCode)}" data-event-title="${esc(link.eventTitle)}" title="Ver foto de ${esc(link.ticketCode)} · ${esc(link.eventTitle)} · ${money(link.ticketAmount)}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><em aria-hidden="true">📷</em>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
       }).join('');
+      const incomeChips=incomeLinks.map(link=>`<span class="ce-bank-income-chip ${link.imageUrl?'has-photo':''}" ${link.imageUrl?`role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id)}" data-person-name="${esc(link.personName)}" title="Ver justificante de ingreso de ${esc(link.personName)}"`:''}><i>ING</i><b>${esc(link.personName)}</b><strong>${money(link.amount)}</strong>${link.imageUrl?`<img src="${esc(link.imageUrl)}" alt="Justificante de ${esc(link.personName)}">`:''}</span>`).join('');
       const forceControl=row.amount<0&&!row.linkedToOtherEvent&&activeLinks.length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)
         ?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${actionDisabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
       const includeLabel=row.inclusionLocked?'Otro evento':(row.included?'En saldo':'Inactivo');
-      const justificationTitle=row.amount>=0?'Movimiento positivo conciliado':(row.linkedToOtherEvent?'Conciliado en otro evento':'Trazabilidad de compra');
-      const amountSummary=row.amount<0?`<small class="ce-bank-justify-amounts">${money(justified)} de ${money(target)}</small>`:'';
+      const justificationTitle=row.amount>=0?'Trazabilidad del ingreso':(row.linkedToOtherEvent?'Conciliado en otro evento':'Trazabilidad de compra');
+      const amountSummary=`<small class="ce-bank-justify-amounts">${money(justified)} de ${money(target)}</small>`;
       const addAction=row.amount<0&&!row.linkedToOtherEvent
         ?`<button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${actionDisabled}><span>＋</span><b>Vincular TKxx del evento</b></button>`
         :'';
       const emptyText=row.linkedToOtherEvent?'Este movimiento está justificado en otro evento.':'Todavía no hay TKxx asociados a este movimiento.';
-      const positiveNote=row.linkedToOtherEvent
-        ?`Movimiento perteneciente a ${esc(arr(row.foreignEvents).join(', ')||'otro evento')}; permanece inactivo en el evento actual.`
-        :'Este abono se muestra en la evolución del saldo y no necesita TKxx de compra.';
+      const incomeEmpty=row.included?'No se ha encontrado un ingreso bancario del evento que coincida con este abono.':'Este abono está fuera del saldo del evento.';
       return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass} ${row.linkedToOtherEvent?'belongs-other-event':''}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
         <div class="ce-bank-ledger-node"><span>${String(start+index+1).padStart(2,'0')}</span><i></i></div>
         <div class="ce-bank-movement-main">
@@ -563,7 +585,9 @@
         </div>
         <div class="ce-bank-justification ${status.className}">
           <div class="ce-bank-justify-head"><span class="ce-bank-justify-icon">${row.amount<0?'⌁':'↗'}</span><div><strong>${justificationTitle}</strong><span class="ce-bank-status ${status.className}">${esc(status.label)}</span>${amountSummary}</div></div>
-          ${row.amount<0?`<div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div><div class="ce-bank-ticket-list">${links||`<span class="ce-bank-no-tickets">${emptyText}</span>`}</div><div class="ce-bank-justify-actions">${addAction}${forceControl}</div>`:`<p class="ce-bank-positive-note">${positiveNote}</p>`}
+          <div class="ce-bank-progress-track"><i></i><span>${progress}% justificado</span></div>
+          <div class="ce-bank-ticket-list ${row.amount>=0?'ce-bank-income-list':''}">${row.amount<0?(links||`<span class="ce-bank-no-tickets">${emptyText}</span>`):(incomeChips||`<span class="ce-bank-no-tickets">${incomeEmpty}</span>`)}</div>
+          ${row.amount<0?`<div class="ce-bank-justify-actions">${addAction}${forceControl}</div>`:''}
         </div>
       </article>`;
     }).join('');
@@ -611,6 +635,17 @@
     return best.src;
   }
   function closeBankTicketPhoto(){ $('ceBankTicketPhoto')?.remove(); }
+  function openBankIncomePhoto(chip,event){
+    stopEvent(event);
+    const src=text(chip?.dataset?.imageSrc);
+    const person=text(chip?.dataset?.personName||'Ingreso');
+    if(!src) return;
+    closeBankTicketPhoto();
+    const viewer=document.createElement('div');
+    viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
+    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Justificante de ingreso de ${esc(person)}"><div class="ce-bank-photo-head"><div><span>JUSTIFICANTE DE INGRESO</span><strong>${esc(person)}</strong></div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><img class="ce-bank-photo-image" src="${esc(src)}" alt="Justificante de ingreso de ${esc(person)}"></div>`;
+    $('ceBankOverlay')?.appendChild(viewer);
+  }
   async function openBankTicketPhoto(chip,event){
     stopEvent(event);
     const eventId=text(chip?.dataset?.eventId||store.eventId);
@@ -782,6 +817,8 @@
     if(remove){removeLink(remove.dataset.ceBankRemoveLink,remove.dataset.movementId,remove);return;}
     const photoClose=event.target?.closest?.('[data-ce-bank-photo-close]');
     if(photoClose||event.target?.id==='ceBankTicketPhoto'){stopEvent(event);closeBankTicketPhoto();return;}
+    const incomeChip=event.target?.closest?.('[data-ce-bank-view-income="1"]');
+    if(incomeChip){openBankIncomePhoto(incomeChip,event);return;}
     const ticketChip=event.target?.closest?.('[data-ce-bank-view-ticket="1"]');
     if(ticketChip){openBankTicketPhoto(ticketChip,event);return;}
     const choice=event.target?.closest?.('.ce-bank-ticket-choice[data-ticket-code]');
@@ -794,6 +831,7 @@
       if(!$('ceBankTicketModal')?.classList.contains('hidden')){$('ceBankTicketModal').classList.add('hidden');restorePosition(store.ticketMovement,false);}else close();
       return;
     }
+    if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-ce-bank-view-income="1"]')){openBankIncomePhoto(event.target,event);return;}
     if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-ce-bank-view-ticket="1"]')){openBankTicketPhoto(event.target,event);return;}
     pageNavigate(event);
   },true);
