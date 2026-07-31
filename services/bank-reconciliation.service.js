@@ -434,6 +434,21 @@ function confirmedBankIncome(value){
   const state=normalizeWords(value);
   return state==='BANCO'||state==='BIZUM'||state==='PAGADO BANCO'||state==='INGRESADO BANCO';
 }
+function confirmedCashIncome(value){
+  const state=normalizeWords(value);
+  return state==='EFECTIVO'||state==='PAGADO EFECTIVO'||state==='INGRESADO EFECTIVO';
+}
+function collaboratorIncomeAmount(event,row,person={}){
+  const isMember=normalizeWords(person.rango)==='SOCIO';
+  const mandatory=isMember?cents(num(row.numero)*num(event.price)):0;
+  return cents(mandatory+num(row.importe));
+}
+function cashIncomeTotal(event,collaborators,persons){
+  const people=new Map(arr(persons).map(row=>[text(row.id),row]));
+  return cents(arr(collaborators)
+    .filter(row=>text(row.event_id)===event.id&&confirmedCashIncome(row.situacion))
+    .reduce((sum,row)=>sum+collaboratorIncomeAmount(event,row,people.get(text(row.persona_id))||{}),0));
+}
 function incomeImageUrl(images,eventId,incomeId){
   const expected=[`${eventId}|INGRESO:${incomeId}`,`${eventId}|INGRESO|${incomeId}`,`INGRESO:${eventId}|${incomeId}`,`INGRESO:${incomeId}`].map(normalizeWords);
   let best={score:-1,url:''};
@@ -453,9 +468,7 @@ function buildIncomeCatalog(event,collaborators,persons,images){
   const people=new Map(arr(persons).map(row=>[text(row.id),row]));
   return arr(collaborators).filter(row=>text(row.event_id)===event.id&&confirmedBankIncome(row.situacion)).map(row=>{
     const person=people.get(text(row.persona_id))||{};
-    const isMember=normalizeWords(person.rango)==='SOCIO';
-    const mandatory=isMember?cents(num(row.numero)*num(event.price)):0;
-    const amount=cents(mandatory+num(row.importe));
+    const amount=collaboratorIncomeAmount(event,row,person);
     return {
       id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName:text(person.nombre)||text(row.persona_id)||'Ingreso',
       paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at)
@@ -637,6 +650,9 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id);
+    const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows);
+    const eventIncome=cents(ledger.summary.income+cashIncome);
+    const economicVariation=cents(eventIncome-ledger.summary.expense);
     return {
       ok:true,
       event:{...event,reconciliationStart:period.dateFrom,reconciliationEnd:period.dateTo},
@@ -647,7 +663,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       accounts,
       selectedAccount,
       movements,
-      summary:{...ledger.summary,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
+      summary:{...ledger.summary,cashIncome,eventIncome,economicVariation,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
     };
   }catch(error){ throw friendlyDbError(error); }
 }

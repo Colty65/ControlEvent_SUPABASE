@@ -760,3 +760,44 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-justify-right{display:grid!important;margin-top:6px!important}
   #ceBankOverlay .ce-bank-ticket-list{overflow-x:auto!important;flex-wrap:nowrap!important}
 }
+
+
+/* v25_prod FIX9 · efectivo visible y asociaciones de compra completas/modificables. */
+#ceBankOverlay .ce-bank-kpi-flow .ce-bank-flow-row{grid-template-columns:76px minmax(34px,1fr) auto!important;gap:5px!important}
+#ceBankOverlay .ce-bank-flow-row.cash>i u{background:linear-gradient(90deg,#a8d94b,#d4ea78)!important}
+#ceBankOverlay .ce-bank-flow-row.cash>strong{color:#54771c!important}
+#ceBankOverlay .ce-bank-kpi-flow>small{font-size:7px!important;line-height:1.1!important}
+#ceBankOverlay .ce-bank-ticket-edit-modal{width:min(920px,95vw)!important}
+#ceBankOverlay .ce-bank-ticket-edit-choices{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;max-height:min(52vh,500px)!important;padding:3px!important}
+#ceBankOverlay .ce-bank-ticket-edit-choice{position:relative!important;grid-template-columns:22px 35px minmax(0,1fr) auto auto!important;cursor:pointer!important;transform:none!important}
+#ceBankOverlay .ce-bank-ticket-edit-choice>input{width:18px!important;height:18px!important;accent-color:#2baf92!important}
+#ceBankOverlay .ce-bank-ticket-edit-choice.selected{border-color:#42cbb3!important;background:#effbf8!important;box-shadow:0 0 0 2px rgba(66,203,179,.10)!important}
+#ceBankOverlay .ce-bank-ticket-edit-choice>u{color:#71879a!important}
+#ceBankOverlay .ce-bank-ticket-edit-choice.selected>u{color:#148169!important}
+#ceBankOverlay .ce-bank-ticket-edit-footer{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;margin-top:9px!important;padding-top:9px!important;border-top:1px solid #dfe7ed!important}
+#ceBankOverlay .ce-bank-ticket-edit-footer>div{display:flex!important;flex-direction:column!important;margin-right:auto!important}
+#ceBankOverlay .ce-bank-ticket-edit-footer span,#ceBankOverlay .ce-bank-ticket-edit-footer small{font-size:8px!important;color:#708596!important;font-weight:800!important}
+#ceBankOverlay .ce-bank-ticket-edit-footer strong{font-size:18px!important;color:#245ba8!important}
+#ceBankOverlay .ce-bank-ticket-edit-footer button{min-height:36px!important}
+@media(min-width:701px){
+  #ceBankOverlay .ce-bank-movement.negative{overflow:visible!important;height:auto!important;min-height:62px!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-justification{
+    display:grid!important;grid-template-columns:minmax(250px,.72fr) minmax(0,1.28fr)!important;grid-template-rows:auto!important;
+    align-items:start!important;height:auto!important;min-height:62px!important;max-height:none!important;overflow:visible!important;padding:7px 9px!important
+  }
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-justify-left{grid-column:1!important;grid-row:1!important;min-width:0!important;overflow:visible!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-justify-right{grid-column:2!important;grid-row:1!important;display:grid!important;grid-template-rows:auto auto!important;gap:6px!important;min-width:0!important;overflow:visible!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-ticket-list{grid-column:1!important;grid-row:1!important;display:flex!important;flex-wrap:wrap!important;align-items:flex-start!important;gap:5px!important;width:100%!important;max-height:none!important;overflow:visible!important;padding:0!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-justify-actions{grid-column:1!important;grid-row:2!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:5px!important;width:100%!important;overflow:visible!important;padding:0!important}
+  #ceBankOverlay .ce-bank-movement.negative .ce-bank-ticket-chip{flex:0 0 auto!important;max-width:none!important}
+}
+@media(max-width:1050px){#ceBankOverlay .ce-bank-ticket-edit-choices{grid-template-columns:1fr!important}}
+@media(max-width:700px){
+  #ceBankOverlay .ce-bank-kpi-flow{display:flex!important;min-width:210px!important}
+  #ceBankOverlay .ce-bank-ticket-edit-footer{align-items:stretch!important;flex-wrap:wrap!important}
+  #ceBankOverlay .ce-bank-ticket-edit-footer>div{flex:1 0 100%!important}
+  #ceBankOverlay .ce-bank-ticket-edit-footer button{flex:1 1 140px!important}
+}
+@media(max-width:850px){
+  #ceBankOverlay .ce-bank-kpi-flow{display:flex!important;min-width:210px!important}
+}

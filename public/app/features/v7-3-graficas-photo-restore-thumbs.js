@@ -1,23 +1,58 @@
-/* ControlEvent v25_prod FIX8 · GRAFICAS: panel estable y miniaturas de justificantes de ingresos. */
+/* ControlEvent v25_prod FIX9 · GRAFICAS: globo efímero y retorno tras abrir justificantes. */
 (function(root){
   'use strict';
   const FLAG='__ceV25StableGraphTipFix6';
   if(root[FLAG]) return; root[FLAG]=true;
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  let activeOwner=null, suppressGraphClickUntil=0;
+  let activeOwner=null, suppressGraphClickUntil=0, closeTimer=0, suspendedTip=null, suspendedAt=0, viewerSeen=false;
 
   function graphOwner(target){
     const owner=target?.closest?.('#tabGraficas [data-ce-tip-v21],#eventChartWrap [data-ce-tip-v21]');
     return owner&&owner.getAttribute('data-ce-tip-v21')?.trim()?owner:null;
   }
   function photoViewerOpen(){
-    return !!document.querySelector('.ce-v468-modal,.ce-v465-modal,#ceV310PhotoViewer:not(.hidden),#ceV401PcPhotoModal:not(.hidden),[role="dialog"].ce-photo-viewer');
+    return !!document.querySelector('#ceV25GraphReceiptViewer,.ce-v468-modal,.ce-v465-modal,#ceV310PhotoViewer:not(.hidden),#ceV401PcPhotoModal:not(.hidden),[role="dialog"].ce-photo-viewer');
   }
   function closeTip(){
+    clearTimeout(closeTimer);
     const tip=$('ceTooltipV21');
     if(tip?.dataset.ceStableFix6==='1') tip.remove();
+    document.body.classList.remove('ce-v25-graph-tip-open');
     activeOwner=null;
+    suspendedTip=null; viewerSeen=false;
+  }
+  function scheduleTipClose(delay=220){
+    clearTimeout(closeTimer);
+    closeTimer=setTimeout(()=>{
+      const tip=$('ceTooltipV21');
+      if(!tip||suspendedTip||photoViewerOpen()) return;
+      if(tip.matches(':hover')||tip.contains(document.activeElement)) return;
+      closeTip();
+    },delay);
+  }
+  function suspendTipForPhoto(){
+    const tip=$('ceTooltipV21');
+    if(!tip||tip.dataset.ceStableFix6!=='1') return;
+    suspendedTip={tip,owner:activeOwner,scrollTop:tip.scrollTop};
+    suspendedAt=Date.now(); viewerSeen=false;
+    tip.style.setProperty('visibility','hidden','important');
+    tip.style.setProperty('pointer-events','none','important');
+    document.body.classList.remove('ce-v25-graph-tip-open');
+  }
+  function resumeTipAfterPhoto(){
+    if(!suspendedTip) return;
+    const saved=suspendedTip; suspendedTip=null; viewerSeen=false;
+    if(saved.tip?.isConnected){
+      saved.tip.style.removeProperty('visibility');
+      saved.tip.style.removeProperty('pointer-events');
+      saved.tip.scrollTop=saved.scrollTop||0;
+      activeOwner=saved.owner;
+      document.body.classList.add('ce-v25-graph-tip-open');
+      saved.tip.focus?.({preventScroll:true});
+    }else if(saved.owner?.isConnected){
+      openTip(saved.owner,saved.scrollTop||0);
+    }
   }
   function renderText(raw){
     const lines=String(raw||'').replace(/\r/g,'').split('\n');
@@ -139,10 +174,12 @@
       table.dataset.ceV465Receipts='1';table.dataset.ceV468Receipts='1';
     });
   }
-  function closeDirectReceiptViewer(){document.getElementById('ceV25GraphReceiptViewer')?.remove();}
+  function closeDirectReceiptViewer(restoreTip=true){document.getElementById('ceV25GraphReceiptViewer')?.remove();if(restoreTip)setTimeout(resumeTipAfterPhoto,40);}
   function openDirectReceiptViewer(button){
     const src=String(button?.dataset?.imageSrc||button?.querySelector?.('img')?.src||'').trim();if(!src)return false;
-    closeDirectReceiptViewer();
+    // Al sustituir un visor no se restaura todavía el globo: debe permanecer oculto
+    // mientras la fotografía ampliada esté abierta.
+    closeDirectReceiptViewer(false);
     const person=String(button?.dataset?.personName||'Ingreso');
     const method=String(button?.dataset?.incomeMethod||'Banco');
     const amount=number(button?.dataset?.incomeAmount);
@@ -171,12 +208,16 @@
       if(tip.isConnected&&!photoViewerOpen()) directReceiptThumbs(tip);
     }catch(_){ try{directReceiptThumbs(tip);}catch(__){ } }
   }
-  function openTip(owner){
+  function openTip(owner,restoreScroll=0){
     const raw=owner?.getAttribute?.('data-ce-tip-v21'); if(!raw?.trim()) return;
     closeTip(); addStyle(); activeOwner=owner;
-    const tip=document.createElement('div'); tip.id='ceTooltipV21'; tip.dataset.ceStableFix6='1'; tip.dataset.cePinned='1';
+    const tip=document.createElement('div'); tip.id='ceTooltipV21'; tip.dataset.ceStableFix6='1'; tip.tabIndex=-1;
     tip.innerHTML='<button type="button" class="ce-v21-tip-close" aria-label="Cerrar información">×</button><div class="ce-v21-tip-content">'+renderText(raw)+'</div>';
+    tip.addEventListener('mouseenter',()=>clearTimeout(closeTimer));
+    tip.addEventListener('mouseleave',()=>scheduleTipClose(260));
+    tip.addEventListener('focusout',event=>{if(!tip.contains(event.relatedTarget)&&!photoViewerOpen())scheduleTipClose(100);});
     document.body.appendChild(tip); document.body.classList.add('ce-v25-graph-tip-open');
+    requestAnimationFrame(()=>{tip.scrollTop=restoreScroll||0;});
     // La hidratación de justificantes es asíncrona. Se fuerza una actualización limpia
     // después de cargar las imágenes para que la columna «Just.» no quede marcada vacía.
     [0,120,520].forEach(ms=>setTimeout(()=>{
@@ -201,13 +242,10 @@
     if(close){event.preventDefault();event.stopImmediatePropagation();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');return;}
     const photo=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix6="1"] .ce-v465-tip-thumb,#ceTooltipV21[data-ce-stable-fix6="1"] [data-action="ingreso-receipt-view-v465"],#ceTooltipV21[data-ce-stable-fix6="1"] [data-ce-v512-budget-photo]');
     if(photo){
-      // Primero se deja actuar al visor contable ya utilizado en INGRESOS y RESUMEN.
-      // Solo cuando ese visor no aparece se abre el visor local de respaldo.
-      setTimeout(()=>{
-        if(!photoViewerOpen()) openDirectReceiptViewer(photo);
-        closeTip();
-        document.body.classList.remove('ce-v25-graph-tip-open');
-      },140);
+      // Se oculta temporalmente el globo para que el visor quede siempre delante,
+      // también en eventos Finalizados. Al cerrar la foto se recuperan globo y scroll.
+      suspendTipForPhoto();
+      setTimeout(()=>{if(!photoViewerOpen())openDirectReceiptViewer(photo);},160);
       return;
     }
     const owner=graphOwner(event.target);
@@ -216,19 +254,21 @@
       if(Date.now()>suppressGraphClickUntil) openTip(owner);
       return;
     }
-    // El panel es modal: un clic exterior no lo cierra ni activa gestores antiguos.
-    if($('ceTooltipV21')?.dataset?.ceStableFix6==='1'){
-      event.preventDefault(); event.stopImmediatePropagation();
-    }
+    // Un clic fuera del globo retira la información.
+    const tip=$('ceTooltipV21');
+    if(tip?.dataset?.ceStableFix6==='1'&&!tip.contains(event.target)&&!suspendedTip) closeTip();
   },true);
-  // Los gestores heredados cerraban/recolocaban el globo en resize, scroll, focusout y mouseout.
-  // Al registrarse este fichero antes del bundle legacy, estas capturas los neutralizan sin restauraciones.
-  ['resize','scroll','focusout','mouseout'].forEach(type=>root.addEventListener(type,event=>{
-    if($('ceTooltipV21')?.dataset?.ceStableFix6==='1') event.stopImmediatePropagation();
-  },true));
-  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(document.getElementById('ceV25GraphReceiptViewer')){event.preventDefault();closeDirectReceiptViewer();return;}if($('ceTooltipV21')?.dataset?.ceStableFix6==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
+  root.addEventListener('resize',()=>{if($('ceTooltipV21')&&!suspendedTip)closeTip();},true);
+  root.addEventListener('scroll',event=>{if($('ceTooltipV21')&&!suspendedTip&&!event.target?.closest?.('#ceTooltipV21'))scheduleTipClose(80);},true);
+  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(document.getElementById('ceV25GraphReceiptViewer')){event.preventDefault();closeDirectReceiptViewer();return;}if(suspendedTip&&photoViewerOpen())return;if($('ceTooltipV21')?.dataset?.ceStableFix6==='1'){event.preventDefault();closeTip();}},true);
   document.addEventListener('change',event=>{if(event.target?.id==='selectedEvent'){closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
   root.addEventListener('pagehide',()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');});
-  setInterval(removeBackdropIfClosed,1500);
+  const viewerObserver=new MutationObserver(()=>{
+    if(!suspendedTip) return;
+    if(photoViewerOpen()){viewerSeen=true;return;}
+    if(viewerSeen&&Date.now()-suspendedAt>220)setTimeout(resumeTipAfterPhoto,50);
+  });
+  viewerObserver.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
+  setInterval(()=>{removeBackdropIfClosed();if(suspendedTip&&viewerSeen&&!photoViewerOpen())resumeTipAfterPhoto();},900);
   root.ControlEventStableGraphTipFix6={open:openTip,close:closeTip};
 })(window);
