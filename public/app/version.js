@@ -3,8 +3,8 @@ export const VERSION = 'v25_prod';
 export const VERSION_LABEL = 'v25_prod';
 export const VERSION_TEXT = 'ControlEvent v25_prod';
 export const VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260731-V25-PROD-FIX9-1-ACCESO-GRAFICA-SALDO';
-export const ZIP_NAME = 'CE_V25_PROD_FIX9_1_ACCESO_GRAFICA_SALDO.zip';
+export const BUILD_ID = '20260801-V25-PROD-FIX9-1-1-HISTORICO-COMPLETO-SALDO';
+export const ZIP_NAME = 'CE_V25_PROD_FIX9_1_1_HISTORICO_COMPLETO_SALDO.zip';
 
 try {
   window.__ceVersion = VERSION;

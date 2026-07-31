@@ -673,10 +673,11 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       incomeSummary:incomeTrace.summary,
       accounts,
       selectedAccount,
-      // Cronología bancaria completa del periodo para dibujar la evolución real del
-      // saldo. La interfaz destaca sobre esa línea únicamente los movimientos que
-      // pertenecen a la vista actual del evento.
-      balanceTimeline:accountMovements.filter(row=>inPeriod(row,period)).sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id))).map(row=>({
+      // Cronología bancaria histórica completa de la cuenta seleccionada: siempre
+      // desde el movimiento más antiguo hasta el más reciente, sin limitarla por las
+      // fechas del evento. La interfaz destaca sobre esta línea únicamente los
+      // movimientos que pertenecen a la vista actual del evento.
+      balanceTimeline:[...accountMovements].sort((a,b)=>String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id))).map(row=>({
         id:row.id,
         accountId:row.accountId,
         accountLabel:row.accountLabel,
