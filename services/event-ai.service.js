@@ -3407,6 +3407,7 @@ function plannerDatabaseSchemaText() {
 - ce_bank_import_batches(id, source_filename, account_id, account_label, date_from, date_to, parsed_count, inserted_count, duplicate_count, warning_count, imported_by, imported_at)
 - ce_bank_movements(id, account_id, account_label, executed_at, value_date, description, amount, bank_balance, included, source_filename, source_hash, import_batch_id, created_by, created_at, updated_at)
 - ce_bank_ticket_links(id, movement_id, event_id, ticket_code, ticket_amount_snapshot, forced_square, created_by, created_at)
+- ce_bank_income_links(id, movement_id, event_id, income_id, income_amount_snapshot, created_by, created_at)
 - ce_bank_event_settings(event_id, date_from, date_to, updated_by, updated_at)
 - ce_bank_event_movement_state(event_id, movement_id, included, updated_by, created_at, updated_at)
 - ce_users(identificacion, nombre, clave, nivel, created_at, updated_at) [NO consultar clave]
@@ -3424,13 +3425,13 @@ MAPEO_DE_DOMINIO:
 - TICKETS/DOCUMENTOS = ce_ticket_images y ce_compras.ticket_donacion.
 - HITOS = ce_hitos, enlazados al evento por event_id.
 - LG = ce_lg, enlazadas a su Hito por hito_id y al evento por event_id. Son las tareas o Líneas de Gestión.
-- CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_event_settings + ce_bank_event_movement_state. Los lotes CSV están en ce_bank_import_batches.
+- CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_income_links + ce_bank_event_settings + ce_bank_event_movement_state. Los lotes CSV están en ce_bank_import_batches.
 
 SEMANTICA_CONTROL_EVENT:
 - ce_bank_event_settings define el período bancario inclusivo de cada evento.
 - ce_bank_event_movement_state.included es la decisión «En saldo» específica del evento y prevalece sobre ce_bank_movements.included.
 - ce_bank_ticket_links enlaza exclusivamente TKxx del evento con movimientos bancarios. forced_square=true significa cuadre aceptado manualmente y cuenta como justificado igual que un cuadre exacto.
-- ce_bank_movements.amount > 0 es un abono/entrada: si está En saldo se considera «Movimiento positivo conciliado» y no necesita TKxx.
+- ce_bank_movements.amount > 0 es un abono/entrada. Se justifica con registros bancarios de ce_colaboradores; la asociación manual corregida se guarda en ce_bank_income_links y prevalece sobre la asociación automática por importe, nombre y fecha.
 - Para saber si todos los TKxx están conciliados, compara los TKxx contables de ce_compras del evento con ce_bank_ticket_links del mismo event_id.
 - El saldo inicial del evento es saldo_banco del movimiento más antiguo menos su importe; el saldo final calculado aplica cronológicamente solo movimientos En saldo.
 

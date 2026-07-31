@@ -6,6 +6,7 @@ const LINKS_TABLE = 'ce_bank_ticket_links';
 const BATCHES_TABLE = 'ce_bank_import_batches';
 const EVENT_SETTINGS_TABLE = 'ce_bank_event_settings';
 const EVENT_MOVEMENT_STATE_TABLE = 'ce_bank_event_movement_state';
+const INCOME_LINKS_TABLE = 'ce_bank_income_links';
 
 function db(){ return getSupabaseAdmin(); }
 function text(value){ return value == null ? '' : String(value).trim(); }
@@ -34,7 +35,7 @@ function normalizeTicket(value){
 function ticketNumber(code){ return Number(String(code || '').replace(/\D/g, '')) || 0; }
 function friendlyDbError(error){
   const msg = text(error?.message || error);
-  if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|ce_bank_event_settings|ce_bank_event_movement_state|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
+  if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|ce_bank_event_settings|ce_bank_event_movement_state|ce_bank_income_links|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
     const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
     err.status = 503;
     err.code = 'BANK_SCHEMA_MISSING';
@@ -237,6 +238,17 @@ function linkFromDb(row){
     createdBy:row.created_by || '',
     createdAt:row.created_at || '',
     forcedSquare:row.forced_square === true
+  };
+}
+function incomeLinkFromDb(row){
+  return {
+    id:text(row.id),
+    movementId:text(row.movement_id),
+    eventId:text(row.event_id),
+    incomeId:text(row.income_id),
+    incomeAmountSnapshot:cents(row.income_amount_snapshot),
+    createdBy:text(row.created_by),
+    createdAt:text(row.created_at)
   };
 }
 function batchFromDb(row){
@@ -483,15 +495,35 @@ function findIncomeCombination(candidates,target,description,executedAt=''){
   visit(0,[],0,0);
   return best?.chosen||[];
 }
-function attachIncomeTraceability(rows,incomeCatalog){
-  const used=new Set();
+function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
+  const catalogById=new Map(arr(incomeCatalog).map(item=>[text(item.id),item]));
+  const manualByMovement=new Map();
+  const manuallyUsed=new Set();
+  for(const raw of arr(manualLinkRows)){
+    const link=raw?.incomeId!==undefined?raw:incomeLinkFromDb(raw);
+    if(!link.movementId||!link.incomeId) continue;
+    if(!manualByMovement.has(link.movementId)) manualByMovement.set(link.movementId,[]);
+    manualByMovement.get(link.movementId).push(link);
+    manuallyUsed.add(link.incomeId);
+  }
+  const used=new Set(manuallyUsed);
   const prioritized=[...arr(rows)].sort((a,b)=>Number(b.included)-Number(a.included)||String(a.executedAt).localeCompare(String(b.executedAt))||String(a.id).localeCompare(String(b.id)));
   const traced=new Map();
   for(const row of prioritized){
     if(num(row.amount)<=0){ traced.set(row.id,row); continue; }
     const target=cents(Math.max(0,num(row.amount)));
+    const explicit=arr(manualByMovement.get(text(row.id)));
     let matches=[];
-    if(row.included&&!row.linkedToOtherEvent){
+    let associationMode='AUTO';
+    if(explicit.length){
+      associationMode='MANUAL';
+      matches=explicit.map(link=>{
+        const current=catalogById.get(link.incomeId);
+        return current
+          ? {...current,manual:true,linkId:link.id}
+          : {id:link.incomeId,eventId:link.eventId,personId:'',personName:'Ingreso '+link.incomeId,paymentMethod:'',amount:cents(link.incomeAmountSnapshot),imageUrl:'',createdAt:link.createdAt,updatedAt:'',manual:true,linkId:link.id,missing:true};
+      });
+    }else if(row.included&&!row.linkedToOtherEvent){
       const available=incomeCatalog.filter(item=>!used.has(item.id));
       const exact=available.filter(item=>Math.abs(item.amount-target)<=.01).sort((a,b)=>incomeNameScore(row.description,b,row.executedAt)-incomeNameScore(row.description,a,row.executedAt)||String(a.createdAt).localeCompare(String(b.createdAt))||a.id.localeCompare(b.id));
       if(exact.length) matches=[exact[0]];
@@ -501,7 +533,7 @@ function attachIncomeTraceability(rows,incomeCatalog){
     const justified=cents(matches.reduce((sum,item)=>sum+item.amount,0));
     const difference=cents(target-justified);
     const status=!row.included?'FUERA_SALDO':(!matches.length?'SIN_JUSTIFICAR':(Math.abs(difference)<=.01?'CUADRADO':(difference>0?'PENDIENTE':'EXCESO')));
-    traced.set(row.id,{...row,incomeLinks:matches,incomeTargetAmount:target,incomeJustifiedAmount:justified,incomeDifference:difference,incomeJustificationStatus:status});
+    traced.set(row.id,{...row,incomeLinks:matches,incomeTargetAmount:target,incomeJustifiedAmount:justified,incomeDifference:difference,incomeJustificationStatus:status,incomeAssociationMode:associationMode,manualIncomeLinkCount:explicit.length});
   }
   const enriched=arr(rows).map(row=>traced.get(row.id)||row);
   const positive=enriched.filter(row=>num(row.amount)>0&&row.included);
@@ -511,10 +543,11 @@ function attachIncomeTraceability(rows,incomeCatalog){
   const traffic=percentage>80?'GREEN':(percentage>50?'ORANGE':'RED');
   return {movements:enriched,summary:{total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:0,traffic,allReconciled:total>0&&reconciled===total}};
 }
+
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows] = await Promise.all([
+    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {
         columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
         order:'executed_at', ascending:false
@@ -526,7 +559,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       selectPaged('ce_eventos',{columns:'id,titulo,precio,fecha_ini,fecha_fin,situacion',order:'fecha_ini',ascending:true}),
       selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
-      selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+      selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
     ]);
     const activeRawLinkRows=allRawLinkRows.filter(row=>text(row.event_id)===event.id);
     // El catálogo completo de compras solo se construye para el evento activo. Para los
@@ -594,7 +628,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       });
     // Finalizado = fotografía cerrada del evento: únicamente sus movimientos En saldo.
     const incomeCatalog=buildIncomeCatalog(event,collaboratorRows,personRows,incomeImageRows);
-    const incomeTrace=attachIncomeTraceability(scopedAll,incomeCatalog);
+    const incomeTrace=attachIncomeTraceability(scopedAll,incomeCatalog,manualIncomeLinkRows.map(incomeLinkFromDb));
     const tracedById=new Map(incomeTrace.movements.map(row=>[row.id,row]));
     const tracedScoped=scopedAll.map(row=>tracedById.get(row.id)||row);
     const visibleScoped=event.finalized ? tracedScoped.filter(row=>row.included) : tracedScoped;
@@ -748,6 +782,68 @@ export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
   }catch(error){ throw friendlyDbError(error); }
 }
 
+export async function listBankIncomes({movementId='',eventId='',q=''} = {}){
+  try{
+    const selectedEvent=text(eventId);
+    const selectedMovement=text(movementId);
+    if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
+    const event=await loadEvent(selectedEvent);
+    const [collaboratorRows,personRows,imageRows,linkRows]=await Promise.all([
+      selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
+      selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+    ]);
+    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows);
+    const linkedByIncome=new Map(linkRows.map(raw=>{const link=incomeLinkFromDb(raw);return [link.incomeId,link];}));
+    const query=normalizeWords(q);
+    const items=catalog.filter(item=>{
+      if(!query) return true;
+      return normalizeWords([item.personName,item.paymentMethod,item.amount].join(' ')).includes(query);
+    }).map(item=>{
+      const link=linkedByIncome.get(item.id)||null;
+      return {...item,linked:!!link,linkedMovementId:link?.movementId||'',linkedId:link?.id||'',selected:!!link&&link.movementId===selectedMovement,available:!link||link.movementId===selectedMovement};
+    });
+    return {ok:true,eventId:selectedEvent,movementId:selectedMovement,items};
+  }catch(error){ throw friendlyDbError(error); }
+}
+
+export async function setIncomeLinks(movementId,payload={},actor={}){
+  const id=text(movementId);
+  const eventId=text(payload.eventId);
+  const requested=[...new Set(arr(payload.incomeIds).map(text).filter(Boolean))];
+  if(!id||!eventId) fail('Movimiento y evento son obligatorios.');
+  try{
+    const {data:movement,error:movementError}=await db().from(MOVEMENTS_TABLE).select('id,amount').eq('id',id).maybeSingle();
+    if(movementError) throw movementError;
+    if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
+    if(num(movement.amount)<=0) fail('Solo los abonos se pueden justificar con ingresos del evento.',409,'BANK_NEGATIVE_INCOME_LINK');
+    const event=await loadEvent(eventId);
+    const [collaboratorRows,personRows,imageRows,existingRows]=await Promise.all([
+      selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
+      selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+    ]);
+    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows);
+    const byId=new Map(catalog.map(item=>[item.id,item]));
+    for(const incomeId of requested){ if(!byId.has(incomeId)) fail('Uno de los ingresos seleccionados no pertenece al evento activo o no figura como ingreso bancario.',409,'BANK_INCOME_NOT_AVAILABLE'); }
+    const conflicts=existingRows.map(incomeLinkFromDb).filter(link=>requested.includes(link.incomeId)&&link.movementId!==id);
+    if(conflicts.length) fail('Uno de los ingresos seleccionados ya justifica otro movimiento bancario.',409,'BANK_INCOME_ALREADY_LINKED');
+    const {error:deleteError}=await db().from(INCOME_LINKS_TABLE).delete().eq('movement_id',id).eq('event_id',eventId);
+    if(deleteError) throw deleteError;
+    if(requested.length){
+      const rows=requested.map(incomeId=>({movement_id:id,event_id:eventId,income_id:incomeId,income_amount_snapshot:byId.get(incomeId).amount,created_by:text(actor.identificacion||actor.nombre)}));
+      const {error:insertError}=await db().from(INCOME_LINKS_TABLE).insert(rows);
+      if(insertError) throw insertError;
+    }
+    return {ok:true,movementId:id,eventId,incomeIds:requested};
+  }catch(error){
+    if(String(error?.code||'')==='23505') fail('Uno de los ingresos seleccionados ya está vinculado a otro movimiento bancario.',409,'BANK_INCOME_ALREADY_LINKED');
+    throw friendlyDbError(error);
+  }
+}
+
 export async function addTicketLink(movementId, payload = {}, actor = {}){
   const id = text(movementId);
   const eventId = text(payload.eventId);
@@ -824,15 +920,17 @@ export async function exportBankData({accountId='',eventId=''} = {}){
         ok:true,event:reconciliation.event,period:reconciliation.period,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
         movements,links,batches:[],
         eventSettings:[{eventId:selectedEvent,dateFrom:reconciliation.period?.dateFrom||'',dateTo:reconciliation.period?.dateTo||''}],
+        incomeLinks:movements.flatMap(row=>arr(row.incomeLinks).filter(link=>link.manual&&link.linkId).map(link=>({id:link.linkId,movementId:row.id,eventId:selectedEvent,incomeId:link.id,incomeAmountSnapshot:link.amount}))),
         movementStates:movements.map(row=>({eventId:selectedEvent,movementId:row.id,included:true}))
       };
     }
-    const [movementRows,linkRows,batchRows,settingRows,stateRows]=await Promise.all([
+    const [movementRows,linkRows,batchRows,settingRows,stateRows,incomeLinkRows]=await Promise.all([
       selectPaged(MOVEMENTS_TABLE,{columns:'*',order:'executed_at',ascending:true}),
       selectPaged(LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged(BATCHES_TABLE,{columns:'*',order:'imported_at',ascending:true}),
       selectPaged(EVENT_SETTINGS_TABLE,{columns:'*',order:'updated_at',ascending:true}),
-      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{columns:'*',order:'updated_at',ascending:true})
+      selectPaged(EVENT_MOVEMENT_STATE_TABLE,{columns:'*',order:'updated_at',ascending:true}),
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true})
     ]);
     const requestedAccount=text(accountId);
     let movements=movementRows.map(movementFromDb);
@@ -840,6 +938,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
     const movementIds=new Set(movements.map(row=>text(row.id)));
     let links=linkRows.map(linkFromDb).filter(row=>movementIds.has(text(row.movementId)));
     let eventSettings=settingRows.map(eventSettingFromDb);
+    let incomeLinks=incomeLinkRows.map(incomeLinkFromDb).filter(row=>movementIds.has(row.movementId));
     let movementStates=stateRows.map(row=>({
       eventId:text(row.event_id), movementId:text(row.movement_id), included:row.included!==false,
       updatedBy:text(row.updated_by), updatedAt:text(row.updated_at), createdAt:text(row.created_at)
@@ -848,6 +947,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
       links=links.filter(row=>row.eventId===selectedEvent);
       eventSettings=eventSettings.filter(row=>row.eventId===selectedEvent);
       movementStates=movementStates.filter(row=>row.eventId===selectedEvent);
+      incomeLinks=incomeLinks.filter(row=>row.eventId===selectedEvent);
       const linkedIds=new Set(links.map(row=>row.movementId));
       const stateIds=new Set(movementStates.map(row=>row.movementId));
       const period=eventSettings[0]||null;
@@ -861,7 +961,8 @@ export async function exportBankData({accountId='',eventId=''} = {}){
       links,
       batches:batchRows.map(batchFromDb),
       eventSettings,
-      movementStates
+      movementStates,
+      incomeLinks
     };
   }catch(error){ throw friendlyDbError(error); }
 }

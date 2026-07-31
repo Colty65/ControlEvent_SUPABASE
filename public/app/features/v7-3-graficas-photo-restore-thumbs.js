@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX6 · GRAFICAS: panel estable con miniaturas de justificantes. */
+/* ControlEvent v25_prod FIX8 · GRAFICAS: panel estable y miniaturas de justificantes de ingresos. */
 (function(root){
   'use strict';
   const FLAG='__ceV25StableGraphTipFix6';
@@ -54,10 +54,104 @@
       #ceTooltipV21[data-ce-stable-fix6="1"] tr.head td{position:sticky!important;top:0!important;background:#edf3f8!important;font-weight:950!important}
       #ceTooltipV21[data-ce-stable-fix6="1"] .ce-v465-tip-thumb{width:46px!important;height:46px!important;min-width:46px!important;animation:none!important;transform:none!important}
       body.ce-v25-graph-tip-open:before{content:"";position:fixed;inset:0;background:rgba(2,8,23,.34);z-index:2147483643;pointer-events:none}
+      .ce-v25-graph-receipt-viewer{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:16px;background:rgba(2,8,23,.82)}
+      .ce-v25-graph-receipt-viewer>div{position:relative;width:min(900px,96vw);max-height:94vh;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 28px 90px rgba(0,0,0,.45)}
+      .ce-v25-graph-receipt-viewer button{position:absolute;right:10px;top:8px;width:38px;height:38px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font:900 25px/1 system-ui;cursor:pointer}
+      .ce-v25-graph-receipt-viewer header{display:flex;flex-direction:column;padding-right:44px}.ce-v25-graph-receipt-viewer header span{font:900 11px/1.2 system-ui;letter-spacing:.12em;color:#64748b}.ce-v25-graph-receipt-viewer header strong{font:900 20px/1.2 system-ui;color:#0f172a}.ce-v25-graph-receipt-viewer header small{font:800 13px/1.3 system-ui;color:#475569}
+      .ce-v25-graph-receipt-viewer img{max-width:100%;max-height:calc(94vh - 110px);object-fit:contain;border-radius:12px;background:#f8fafc}
       @media(max-width:700px){#ceTooltipV21[data-ce-stable-fix6="1"]{width:calc(100vw - 18px)!important;max-width:calc(100vw - 18px)!important;max-height:82vh!important;padding:44px 10px 12px!important}#ceTooltipV21[data-ce-stable-fix6="1"] td{padding:6px 5px!important;font-size:11px!important}}
     `;
     document.head.appendChild(style);
   }
+
+  const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+  const number=value=>{let raw=String(value??'').replace(/[^0-9,.-]/g,'');if(raw.includes(',')&&raw.includes('.'))raw=raw.replace(/\./g,'').replace(',','.');else if(raw.includes(','))raw=raw.replace(',','.');const n=Number(raw);return Number.isFinite(n)?n:0;};
+  const lexicalState=()=>{try{return Function('return (typeof state!=="undefined"&&state)?state:null')();}catch(_){return null;}};
+  const appState=()=>lexicalState()||root.state||root.ControlEventApp?.state||root.appState||root.__CONTROL_EVENT_STATE__||{};
+  const selectedEventId=()=>String(document.getElementById('selectedEvent')?.value||appState().selectedEventId||'').trim();
+  const list=name=>{const value=appState()?.[name];if(Array.isArray(value))return value;if(value&&typeof value==='object')return Object.values(value);return [];};
+  const imageSrc=value=>typeof value==='string'?value:String(value?.url||value?.public_url||value?.publicUrl||value?.pathname||value?.storage_path||value?.dataUrl||value?.src||'');
+  function personName(personId){const row=list('personas').find(item=>String(item?.id||'')===String(personId||''));return String(row?.nombre||personId||'').trim();}
+  function incomeRows(){
+    const eventId=selectedEventId();
+    const event=list('eventos').find(item=>String(item?.id||'')===eventId)||{};
+    const price=number(event?.precio);
+    return list('colaboradores').filter(row=>String(row?.eventId||row?.event_id||'')===eventId).map(row=>{
+      const pid=row?.personaId||row?.persona_id;
+      const person=list('personas').find(item=>String(item?.id||'')===String(pid||''))||{};
+      const member=normalize(person?.rango)==='SOCIO';
+      const amount=row?.total!=null?number(row.total):((member?number(row?.numero)*price:0)+number(row?.importe??row?.importeVoluntario??row?.voluntario??row?.base));
+      return {id:String(row?.id||row?.colaborador_id||''),name:String(person?.nombre||row?.nombre||personName(pid)||'').trim(),method:String(row?.situacion||row?.formaPago||row?.forma_pago||row?.ingreso||'').trim(),amount};
+    }).filter(row=>row.id&&row.name);
+  }
+  function receiptForIncome(incomeId){
+    const eventId=selectedEventId();
+    const store=appState().ticketImages||{};
+    const patterns=[`${eventId}|INGRESO:${incomeId}`,`${eventId}|INGRESO|${incomeId}`,`INGRESO:${eventId}|${incomeId}`,`INGRESO:${incomeId}`].map(normalize);
+    let best={score:-1,src:''};
+    Object.entries(store).forEach(([key,value])=>{
+      const src=imageSrc(value);if(!src)return;
+      const nk=normalize(key);let score=-1;
+      patterns.forEach((pattern,index)=>{if(nk===pattern)score=Math.max(score,1000-index);});
+      if(score<0&&nk.includes(normalize(`INGRESO ${incomeId}`)))score=700;
+      if(score>best.score)best={score,src};
+    });
+    return best.src;
+  }
+  async function hydrateReceiptStore(){
+    const eventId=selectedEventId();if(!eventId)return;
+    try{
+      const response=await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}&_=${Date.now()}`,{cache:'no-store'});
+      const payload=await response.json().catch(()=>({}));if(!response.ok||!payload?.images)return;
+      const state=appState();state.ticketImages=state.ticketImages||{};
+      Object.entries(payload.images).forEach(([key,value])=>{if(/INGRESO[:|]/i.test(key))state.ticketImages[key]=imageSrc(value)||value;});
+    }catch(_){ }
+  }
+  function directReceiptThumbs(tip){
+    const incomes=incomeRows();
+    tip?.querySelectorAll?.('table.ce-v21-table').forEach(table=>{
+      const rows=Array.from(table.querySelectorAll('tr'));if(!rows.length)return;
+      rows.forEach(row=>Array.from(row.children).filter(cell=>cell.classList?.contains('ce-v25-direct-thumb')).forEach(cell=>cell.remove()));
+      const headerCells=Array.from(rows[0].children);
+      const headers=headerCells.map(cell=>normalize(cell.textContent));
+      const nameIndex=headers.indexOf('NOMBRE');
+      const methodIndex=headers.indexOf('INGRESO');
+      const amountIndex=headers.indexOf('IMPORTE');
+      if(nameIndex<0||methodIndex<0||amountIndex<0)return;
+      const head=document.createElement('td');head.className='ce-v465-thumb-cell ce-v25-direct-thumb';head.textContent='Just.';rows[0].appendChild(head);
+      rows.slice(1).forEach(row=>{
+        const cells=Array.from(row.children);
+        // Algunas tablas incluyen una celda de título solo en la cabecera. En el detalle
+        // se usan las tres primeras columnas: Nombre, Ingreso e Importe.
+        const detailOffset=cells.length===headers.length-1&&nameIndex>0?nameIndex-1:nameIndex;
+        const detailMethod=cells.length===headers.length-1&&methodIndex>0?methodIndex-1:methodIndex;
+        const detailAmount=cells.length===headers.length-1&&amountIndex>0?amountIndex-1:amountIndex;
+        if(cells.length<=Math.max(detailOffset,detailMethod,detailAmount))return;
+        const name=normalize(cells[detailOffset].textContent),method=normalize(cells[detailMethod].textContent),amount=number(cells[detailAmount].textContent);
+        let match=incomes.find(item=>normalize(item.name)===name&&Math.abs(item.amount-amount)<.02&&(!method||normalize(item.method)===method));
+        if(!match)match=incomes.find(item=>normalize(item.name)===name&&Math.abs(item.amount-amount)<.02);
+        if(!match)match=incomes.find(item=>normalize(item.name)===name);
+        const src=match?receiptForIncome(match.id):'';
+        const cell=document.createElement('td');cell.className='ce-v465-thumb-cell ce-v25-direct-thumb';
+        cell.innerHTML=src&&match?`<button type="button" class="ce-v465-tip-thumb" title="Ver justificante de ${esc(match.name)}" data-action="ingreso-receipt-view-v465" data-id="${esc(match.id)}" data-image-src="${esc(src)}" data-person-name="${esc(match.name)}" data-income-method="${esc(match.method)}" data-income-amount="${esc(match.amount)}"><img alt="Justificante de ${esc(match.name)}" src="${esc(src)}"></button>`:'<span class="ce-v465-tip-empty" title="Sin justificante"></span>';
+        row.appendChild(cell);
+      });
+      table.dataset.ceV465Receipts='1';table.dataset.ceV468Receipts='1';
+    });
+  }
+  function closeDirectReceiptViewer(){document.getElementById('ceV25GraphReceiptViewer')?.remove();}
+  function openDirectReceiptViewer(button){
+    const src=String(button?.dataset?.imageSrc||button?.querySelector?.('img')?.src||'').trim();if(!src)return false;
+    closeDirectReceiptViewer();
+    const person=String(button?.dataset?.personName||'Ingreso');
+    const method=String(button?.dataset?.incomeMethod||'Banco');
+    const amount=number(button?.dataset?.incomeAmount);
+    const viewer=document.createElement('div');viewer.id='ceV25GraphReceiptViewer';viewer.className='ce-v25-graph-receipt-viewer';
+    viewer.innerHTML=`<div role="dialog" aria-modal="true" aria-label="Justificante de ingreso"><button type="button" data-ce-v25-close-receipt aria-label="Cerrar">×</button><header><span>JUSTIFICANTE DE INGRESO</span><strong>${esc(person)}</strong><small>${esc(method)} · ${amount.toLocaleString('es-ES',{style:'currency',currency:'EUR'})}</small></header><img src="${esc(src)}" alt="Justificante de ${esc(person)}"></div>`;
+    document.body.appendChild(viewer);return true;
+  }
+
+
   async function refreshReceiptThumbs(tip){
     if(!tip||!tip.isConnected||photoViewerOpen()) return;
     try{
@@ -73,7 +167,9 @@
       if(!tip.isConnected||photoViewerOpen()) return;
       root.ControlEventV469?.enrichOpenTooltips?.();
       root.ControlEventV467?.enrichOpenTooltips?.();
-    }catch(_){ }
+      await hydrateReceiptStore();
+      if(tip.isConnected&&!photoViewerOpen()) directReceiptThumbs(tip);
+    }catch(_){ try{directReceiptThumbs(tip);}catch(__){ } }
   }
   function openTip(owner){
     const raw=owner?.getAttribute?.('data-ce-tip-v21'); if(!raw?.trim()) return;
@@ -99,12 +195,19 @@
   },true);
   // click cubre activación por teclado y anula el clic posterior al pointerdown.
   root.addEventListener('click',event=>{
+    const directClose=event.target?.closest?.('[data-ce-v25-close-receipt]');
+    if(directClose||event.target?.id==='ceV25GraphReceiptViewer'){event.preventDefault();event.stopImmediatePropagation();closeDirectReceiptViewer();return;}
     const close=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix6="1"] .ce-v21-tip-close');
     if(close){event.preventDefault();event.stopImmediatePropagation();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');return;}
     const photo=event.target?.closest?.('#ceTooltipV21[data-ce-stable-fix6="1"] .ce-v465-tip-thumb,#ceTooltipV21[data-ce-stable-fix6="1"] [data-action="ingreso-receipt-view-v465"],#ceTooltipV21[data-ce-stable-fix6="1"] [data-ce-v512-budget-photo]');
     if(photo){
-      // El visor de fotos recibe el clic; el globo se retira después y nunca se reconstruye.
-      setTimeout(()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');},70);
+      // Primero se deja actuar al visor contable ya utilizado en INGRESOS y RESUMEN.
+      // Solo cuando ese visor no aparece se abre el visor local de respaldo.
+      setTimeout(()=>{
+        if(!photoViewerOpen()) openDirectReceiptViewer(photo);
+        closeTip();
+        document.body.classList.remove('ce-v25-graph-tip-open');
+      },140);
       return;
     }
     const owner=graphOwner(event.target);
@@ -123,7 +226,7 @@
   ['resize','scroll','focusout','mouseout'].forEach(type=>root.addEventListener(type,event=>{
     if($('ceTooltipV21')?.dataset?.ceStableFix6==='1') event.stopImmediatePropagation();
   },true));
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('ceTooltipV21')?.dataset?.ceStableFix6==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
+  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(document.getElementById('ceV25GraphReceiptViewer')){event.preventDefault();closeDirectReceiptViewer();return;}if($('ceTooltipV21')?.dataset?.ceStableFix6==='1'){event.preventDefault();closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
   document.addEventListener('change',event=>{if(event.target?.id==='selectedEvent'){closeTip();document.body.classList.remove('ce-v25-graph-tip-open');}},true);
   root.addEventListener('pagehide',()=>{closeTip();document.body.classList.remove('ce-v25-graph-tip-open');});
   setInterval(removeBackdropIfClosed,1500);

@@ -717,6 +717,7 @@ async function buildBackupWorkbook(fullState, scope){
     const bankLinks=Array.isArray(bank?.links)?bank.links:[];
     const bankSettings=Array.isArray(bank?.eventSettings)?bank.eventSettings:[];
     const bankStates=Array.isArray(bank?.movementStates)?bank.movementStates:[];
+    const bankIncomeLinks=Array.isArray(bank?.incomeLinks)?bank.incomeLinks:[];
     addRows('BANCO_IMPORTACIONES', ['ID','SOURCE_FILENAME','ACCOUNT_ID','ACCOUNT_LABEL','DATE_FROM','DATE_TO','PARSED_COUNT','INSERTED_COUNT','DUPLICATE_COUNT','WARNING_COUNT','IMPORTED_BY','IMPORTED_AT'], (Array.isArray(bank?.batches)?bank.batches:[]).map(row=>[
       row.id||'',row.sourceFilename||'',row.accountId||'',row.accountLabel||'',row.dateFrom||'',row.dateTo||'',num(row.parsedCount),num(row.insertedCount),num(row.duplicateCount),num(row.warningCount),row.importedBy||'',row.importedAt||''
     ]));
@@ -726,6 +727,9 @@ async function buildBackupWorkbook(fullState, scope){
     addRows('BANCO_TK_LINKS', ['ID','MOVEMENT_ID','EVENT_ID','TICKET_CODE','TICKET_AMOUNT_SNAPSHOT','FORCED_SQUARE','CREATED_BY','CREATED_AT'], bankLinks.map(row=>[
       row.id||'',row.movementId||'',row.eventId||'',row.ticketCode||'',num(row.ticketAmountSnapshot),row.forcedSquare===true?'SI':'NO',row.createdBy||'',row.createdAt||''
     ]));
+    addRows('BANCO_INGRESOS_LINKS', ['ID','MOVEMENT_ID','EVENT_ID','INCOME_ID','INCOME_AMOUNT_SNAPSHOT','CREATED_BY','CREATED_AT'], bankIncomeLinks.map(row=>[
+      row.id||'',row.movementId||'',row.eventId||'',row.incomeId||'',num(row.incomeAmountSnapshot),row.createdBy||'',row.createdAt||''
+    ]));
     addRows('BANCO_PERIODOS', ['EVENT_ID','DATE_FROM','DATE_TO','UPDATED_BY','UPDATED_AT'], bankSettings.map(row=>[
       row.eventId||'',row.dateFrom||'',row.dateTo||'',row.updatedBy||'',row.updatedAt||''
     ]));
@@ -734,7 +738,7 @@ async function buildBackupWorkbook(fullState, scope){
     ]));
   }catch(bankError){
     console.warn('[ControlEvent v25_prod] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
-    ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
+    ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
@@ -768,6 +772,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     const err=new Error('El BACKUP total no contiene una tabla ACCESOS válida con al menos un usuario GD. Restauración cancelada.');err.status=400;throw err;
   }
   if(all){
+    await deleteRowsByPk('ce_bank_income_links','id');
     await deleteRowsByPk('ce_bank_ticket_links','id');
     await deleteRowsByPk('ce_bank_event_movement_state','movement_id');
     await deleteRowsByPk('ce_bank_event_settings','event_id');
@@ -776,6 +781,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     await deleteRowsByPk('ce_lg','id');
     await deleteRowsByPk('ce_hitos','id');
   }else{
+    await deleteRowsByPk('ce_bank_income_links','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_ticket_links','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_event_movement_state','movement_id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_event_settings','event_id',q=>q.eq('event_id',scope));
@@ -796,6 +802,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
   counts.bankEventSettings=await upsertChunks('ce_bank_event_settings',tables.bankEventSettings,'event_id');
   counts.bankMovementStates=await upsertChunks('ce_bank_event_movement_state',tables.bankMovementStates,'event_id,movement_id');
   counts.bankTicketLinks=await upsertChunks('ce_bank_ticket_links',tables.bankTicketLinks,'id');
+  counts.bankIncomeLinks=await upsertChunks('ce_bank_income_links',tables.bankIncomeLinks,'id');
   counts.hitos=await upsertChunks('ce_hitos',tables.hitos,'id');
   counts.lgs=await upsertChunks('ce_lg',tables.lgs,'id');
   res.json({ok:true,scope,restoredBy:norm(actor?.identificacion||actor?.nombre),counts});

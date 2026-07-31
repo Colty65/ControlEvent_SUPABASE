@@ -8,6 +8,8 @@ import {
   importBankCsv,
   listBankReconciliation,
   listPaidTickets,
+  listBankIncomes,
+  setIncomeLinks,
   setBankEventPeriod,
   setMovementForced,
   setMovementIncluded
@@ -45,6 +47,10 @@ router.get('/bank-reconciliation/paid-tickets', asyncHandler(async (req,res) => 
   requireBankRole(req);
   res.json(await listPaidTickets({movementId:req.query.movementId,eventId:req.query.eventId,q:req.query.q}));
 }));
+router.get('/bank-reconciliation/incomes', asyncHandler(async (req,res) => {
+  requireBankRole(req);
+  res.json(await listBankIncomes({movementId:req.query.movementId,eventId:req.query.eventId,q:req.query.q}));
+}));
 router.get('/bank-reconciliation/export', asyncHandler(async (req,res) => {
   requireBankRole(req);
   res.json(await exportBankData({accountId:req.query.accountId,eventId:req.query.eventId}));
@@ -76,6 +82,12 @@ router.post('/bank-reconciliation/movements/:id/tickets', asyncHandler(async (re
   const actor = requireBankRole(req);
   await assertBankEventWritable(eventIdFrom(req));
   res.json(await addTicketLink(req.params.id, req.body || {}, actor));
+}));
+router.put('/bank-reconciliation/movements/:id/incomes', asyncHandler(async (req,res) => {
+  const actor = requireBankRole(req);
+  const eventId = eventIdFrom(req);
+  await assertBankEventWritable(eventId);
+  res.json(await setIncomeLinks(req.params.id, req.body || {}, actor));
 }));
 router.delete('/bank-reconciliation/ticket-links/:id', asyncHandler(async (req,res) => {
   requireBankRole(req);

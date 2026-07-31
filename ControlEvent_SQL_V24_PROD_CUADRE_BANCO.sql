@@ -1,7 +1,7 @@
 -- ============================================================================
--- ControlEvent v24_prod-04 · CUADRE BANCO POR EVENTO Y PERIODO BANCARIO
+-- ControlEvent v25_prod FIX8 · CUADRE BANCO, TRAZABILIDAD DE COMPRAS E INGRESOS
 -- Ejecutar completo en Supabase > SQL Editor antes de utilizar la nueva ventana.
--- Crea movimientos bancarios, lotes de importación CSV y vínculos con TKxx pagados.
+-- Crea movimientos, lotes CSV, vínculos con TKxx y asociaciones corregibles con ingresos.
 -- ============================================================================
 
 begin;
@@ -57,7 +57,18 @@ create table if not exists public.ce_bank_ticket_links (
 );
 
 
-
+-- FIX8: asociación manual y corregible de abonos con ingresos del evento.
+create table if not exists public.ce_bank_income_links (
+  id uuid primary key default gen_random_uuid(),
+  movement_id uuid not null references public.ce_bank_movements(id) on update cascade on delete cascade,
+  event_id text not null references public.ce_eventos(id) on update cascade on delete cascade,
+  income_id text not null,
+  income_amount_snapshot numeric(14,2) not null default 0,
+  created_by text,
+  created_at timestamptz not null default now(),
+  constraint ce_bank_income_one_use unique (event_id, income_id),
+  constraint ce_bank_income_no_duplicate unique (movement_id, event_id, income_id)
+);
 
 create table if not exists public.ce_bank_event_settings (
   event_id text primary key references public.ce_eventos(id) on update cascade on delete cascade,
@@ -88,6 +99,8 @@ create index if not exists ce_bank_movements_included_idx on public.ce_bank_move
 create index if not exists ce_bank_movements_batch_idx on public.ce_bank_movements(import_batch_id);
 create index if not exists ce_bank_ticket_links_movement_idx on public.ce_bank_ticket_links(movement_id);
 create index if not exists ce_bank_ticket_links_event_idx on public.ce_bank_ticket_links(event_id, ticket_code);
+create index if not exists ce_bank_income_links_movement_idx on public.ce_bank_income_links(movement_id);
+create index if not exists ce_bank_income_links_event_idx on public.ce_bank_income_links(event_id, income_id);
 create index if not exists ce_bank_event_settings_dates_idx on public.ce_bank_event_settings(date_from, date_to);
 create index if not exists ce_bank_event_movement_state_event_idx on public.ce_bank_event_movement_state(event_id, included);
 create index if not exists ce_bank_event_movement_state_movement_idx on public.ce_bank_event_movement_state(movement_id);
@@ -121,6 +134,8 @@ comment on table public.ce_bank_movements is 'Movimientos importados de CSV banc
 comment on column public.ce_bank_movements.included is 'Valor inicial heredado. Desde v24_prod-04 la inclusión efectiva se guarda por evento en ce_bank_event_movement_state.';
 comment on table public.ce_bank_ticket_links is 'Vinculación de movimientos bancarios negativos con TKxx pagados. Un TKxx solo puede justificar un movimiento.';
 comment on column public.ce_bank_ticket_links.forced_square is 'Permite aceptar manualmente diferencias entre el movimiento y la suma de TKxx para un evento.';
+comment on table public.ce_bank_income_links is 'Asociación manual y corregible entre abonos bancarios e ingresos registrados del evento.';
+comment on column public.ce_bank_income_links.income_id is 'Identificador del registro de ce_colaboradores que justifica el abono.';
 comment on table public.ce_bank_event_settings is 'Periodo bancario editable de cada evento. Define qué movimientos se muestran, incluidos los abonos.';
 comment on table public.ce_bank_event_movement_state is 'Inclusión o exclusión de un movimiento en el cálculo del saldo de un evento concreto.';
 comment on column public.ce_bank_event_movement_state.included is 'Si es false, el movimiento se ve pero no altera el saldo inicial/final calculado del evento.';
