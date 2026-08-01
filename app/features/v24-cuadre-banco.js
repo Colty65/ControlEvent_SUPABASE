@@ -619,6 +619,24 @@
     const finalized=selectedEventFinalized();
     return {title,status:finalized?'Finalizado':'En curso',statusClass:finalized?'finalized':'active'};
   }
+  function eventMediaData(eventId='',fallbackTitle=''){
+    const targetId=text(eventId||store.eventId);
+    if(!targetId||targetId===text(store.eventId)){
+      const current=eventDisplayData();
+      return {...current,title:text(fallbackTitle||current.title)};
+    }
+    const currentState=state()||{};
+    const events=arr(currentState.eventos||currentState.events||currentState.eventList);
+    const found=events.find(item=>text(item?.id||item?.ID)===targetId)||{};
+    const title=text(fallbackTitle||found.descripcion||found.titulo||found.nombre||found.title||'Evento');
+    const raw=text(found.situacion||found.estado||found.status||found.SITUACION||found.ESTADO).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    const finalized=raw==='FINALIZADO';
+    return {title,status:finalized?'Finalizado':'En curso',statusClass:finalized?'finalized':'active'};
+  }
+  function eventMediaHeader(info){
+    const data=info||eventDisplayData();
+    return `<div class="ce-bank-photo-event"><b>${esc(data.title||'Evento')}</b><span class="${esc(data.statusClass||'active')}">${esc(data.status||'En curso')}</span></div>`;
+  }
   function chartDomain(values,padding=.08){
     let min=Math.min(...values),max=Math.max(...values);
     if(!Number.isFinite(min)||!Number.isFinite(max)) return {min:0,max:1};
@@ -627,7 +645,7 @@
     return {min:min-span*padding,max:max+span*padding};
   }
   function chartPane(config){
-    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,zoom}=config;
+    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,zoom,showEventPoints=true}=config;
     const left=64,right=20,top=18,bottom=48;
     const plotW=width-left-right,plotH=height-top-bottom;
     const safeMinTime=minTime===maxTime?minTime-43200000:minTime;
@@ -643,10 +661,10 @@
     const highlight=shade&&Number.isFinite(shadeStart)&&Number.isFinite(shadeEnd)
       ?`<rect class="ce-bank-balance-highlight" x="${Math.max(left,x(Math.min(shadeStart,shadeEnd))).toFixed(2)}" y="${top}" width="${Math.max(6,Math.min(left+plotW,x(Math.max(shadeStart,shadeEnd)))-Math.max(left,x(Math.min(shadeStart,shadeEnd)))).toFixed(2)}" height="${plotH.toFixed(2)}"></rect>`:'';
     const movementPoints=series.filter(point=>point.movement);
-    const eventPoints=movementPoints.filter(point=>eventIds.has(String(point.movement.id))).map(point=>{
+    const eventPoints=showEventPoints?movementPoints.filter(point=>eventIds.has(String(point.movement.id))).map(point=>{
       const amount=num(point.movement.amount);
       return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.5" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
-    }).join('');
+    }).join(''):'';
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
     const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     return {html,meta:{id,width,height,left,right,top,bottom,points:movementPoints.map(point=>({cx:x(point.time),cy:y(point.balance),point}))}};
@@ -654,8 +672,8 @@
   function resetBalanceInspector(){
     const inspector=$('ceBankBalanceInspector');
     if(!inspector) return;
-    inspector.className='ce-bank-balance-inspector empty';
-    inspector.innerHTML='<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>Pasa el cursor por cualquiera de las líneas</strong><small>La información aparecerá aquí, sin ocultar la gráfica.</small>';
+    inspector.className='ce-bank-balance-inspector hidden-info';
+    inspector.innerHTML='';
   }
   function updateBalanceInspector(point){
     const inspector=$('ceBankBalanceInspector');
@@ -670,32 +688,49 @@
     const marker=pane?.querySelector('.ce-bank-balance-hover-marker');
     if(!svg||!meta?.points?.length) return;
     const points=meta.points;
-    const nearest=(clientX)=>{
-      const rect=svg.getBoundingClientRect();
-      const target=(clientX-rect.left)*(meta.width/rect.width);
+    const svgPosition=(clientX,clientY)=>{
+      try{
+        const point=svg.createSVGPoint();
+        point.x=clientX; point.y=clientY;
+        return point.matrixTransform(svg.getScreenCTM().inverse());
+      }catch(_){
+        const rect=svg.getBoundingClientRect();
+        return {x:(clientX-rect.left)*(meta.width/rect.width),y:(clientY-rect.top)*(meta.height/rect.height)};
+      }
+    };
+    const locate=(clientX,clientY)=>{
+      const position=svgPosition(clientX,clientY);
+      const target=Math.max(meta.left,Math.min(meta.width-meta.right,position.x));
       let low=0,high=points.length-1;
       while(low<high){const mid=Math.floor((low+high)/2);if(points[mid].cx<target)low=mid+1;else high=mid;}
-      const right=points[low]; const left=points[Math.max(0,low-1)];
-      return !left||Math.abs(right.cx-target)<Math.abs(left.cx-target)?right:left;
+      const right=points[low]; const leftPoint=points[Math.max(0,low-1)];
+      const nearestPoint=!leftPoint||Math.abs(right.cx-target)<Math.abs(leftPoint.cx-target)?right:leftPoint;
+      let curveY=nearestPoint.cy;
+      if(leftPoint&&right&&right.cx!==leftPoint.cx&&target>=leftPoint.cx&&target<=right.cx){
+        const ratio=(target-leftPoint.cx)/(right.cx-leftPoint.cx);
+        curveY=leftPoint.cy+(right.cy-leftPoint.cy)*ratio;
+      }
+      return {item:nearestPoint,cursorX:target,curveY};
     };
-    const show=(item)=>{
-      if(!item) return;
-      updateBalanceInspector(item.point);
+    const show=(selection)=>{
+      if(!selection?.item) return;
+      updateBalanceInspector(selection.item.point);
       if(marker){
         marker.classList.remove('hidden');
         const line=marker.querySelector('line'); const dot=marker.querySelector('circle');
-        line?.setAttribute('x1',item.cx.toFixed(2)); line?.setAttribute('x2',item.cx.toFixed(2));
-        dot?.setAttribute('cx',item.cx.toFixed(2)); dot?.setAttribute('cy',item.cy.toFixed(2));
+        line?.setAttribute('x1',selection.cursorX.toFixed(2)); line?.setAttribute('x2',selection.cursorX.toFixed(2));
+        dot?.setAttribute('cx',selection.cursorX.toFixed(2)); dot?.setAttribute('cy',selection.curveY.toFixed(2));
       }
     };
-    svg.addEventListener('pointermove',event=>show(nearest(event.clientX)));
-    svg.addEventListener('pointerleave',()=>marker?.classList.add('hidden'));
+    svg.addEventListener('pointermove',event=>show(locate(event.clientX,event.clientY)));
+    svg.addEventListener('pointerleave',()=>{marker?.classList.add('hidden');resetBalanceInspector();});
     pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{
       circle.addEventListener('click',event=>openBalanceMovementMedia(circle.dataset.movementId,event));
       circle.addEventListener('focus',()=>{
         const found=points.find(item=>String(item.point.movement?.id)===String(circle.dataset.movementId));
-        show(found);
+        if(found) show({item:found,cursorX:found.cx,curveY:found.cy});
       });
+      circle.addEventListener('blur',()=>{marker?.classList.add('hidden');resetBalanceInspector();});
     });
   }
   function wireBalanceChartClose(overlay){
@@ -729,9 +764,9 @@
     const lastMovement=[...series].reverse().find(point=>point.movement)?.movement;
     const historicalRange=firstMovement&&lastMovement?`${formatDate(firstMovement.executedAt,false)} — ${formatDate(lastMovement.executedAt,false)}`:'Histórico completo';
     const eventData=eventDisplayData();
-    const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom completo del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:1320,height:310,shade:false,zoom:true});
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)} · La franja amarilla identifica el intervalo En saldo del evento`,series,eventIds,minTime,maxTime,width:1320,height:265,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false});
-    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p><small>Arrastra el cursor por las líneas para consultar cada movimiento. Pulsa un punto verde o rojo para abrir sus justificantes.</small></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector empty"><span>INFORMACIÓN DEL MOVIMIENTO</span><strong>Pasa el cursor por cualquiera de las líneas</strong><small>La información aparecerá aquí, sin ocultar la gráfica.</small></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${zoomPane.html}${historyPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Los movimientos ajenos al evento forman la línea, pero no llevan punto.</small></footer></section>`;
+    const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom completo del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:1500,height:310,shade:false,zoom:true,showEventPoints:true});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)} · La franja amarilla identifica el intervalo En saldo del evento`,series,eventIds,minTime,maxTime,width:1500,height:285,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false});
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p><small>Arrastra el cursor por las líneas para consultar cada movimiento. Pulsa un punto verde o rojo para abrir sus justificantes.</small></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Los movimientos ajenos al evento forman la línea, pero no llevan punto.</small></footer></section>`;
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden','false');
     overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='zoom'?zoomPane.meta:historyPane.meta));
@@ -910,10 +945,11 @@
     const src=text(chip?.dataset?.imageSrc);
     const person=text(chip?.dataset?.personName||'Ingreso');
     if(!src) return;
+    const eventInfo=eventMediaData(store.eventId,store.data?.event?.title);
     closeBankTicketPhoto();
     const viewer=document.createElement('div');
     viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
-    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Justificante de ingreso de ${esc(person)}"><div class="ce-bank-photo-head"><div><span>JUSTIFICANTE DE INGRESO</span><strong>${esc(person)}</strong></div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><img class="ce-bank-photo-image" src="${esc(src)}" alt="Justificante de ingreso de ${esc(person)}"></div>`;
+    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Justificante de ingreso de ${esc(person)}"><div class="ce-bank-photo-head"><div><span>JUSTIFICANTE DE INGRESO</span><strong>${esc(person)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><img class="ce-bank-photo-image" src="${esc(src)}" alt="Justificante de ingreso de ${esc(person)}"></div>`;
     $('ceBankOverlay')?.appendChild(viewer);
   }
   async function openBankTicketPhoto(chip,event){
@@ -921,11 +957,12 @@
     const eventId=text(chip?.dataset?.eventId||store.eventId);
     const ticketCode=text(chip?.dataset?.ticketCode);
     const eventTitle=text(chip?.dataset?.eventTitle||store.data?.event?.title);
+    const eventInfo=eventMediaData(eventId,eventTitle);
     if(!eventId||!ticketCode) return;
     closeBankTicketPhoto();
     const viewer=document.createElement('div');
     viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
-    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Foto ${esc(ticketCode)}"><div class="ce-bank-photo-head"><div><span>${esc(eventTitle)}</span><strong>${esc(ticketCode)}</strong></div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando foto del ticket…</b></div></div>`;
+    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Foto ${esc(ticketCode)}"><div class="ce-bank-photo-head"><div><span>FOTO DEL TICKET</span><strong>${esc(ticketCode)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando foto del ticket…</b></div></div>`;
     $('ceBankOverlay')?.appendChild(viewer);
     try{
       const response=await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}`,{cache:'no-store'});
@@ -952,7 +989,7 @@
     store.balanceTicketImages[key]=json.images||{};
     return store.balanceTicketImages[key];
   }
-  function balanceMediaViewer({badge,title,caption='',items=[],loading=false,empty='No hay imágenes disponibles.'}){
+  function balanceMediaViewer({badge,title,caption='',items=[],loading=false,empty='No hay imágenes disponibles.',eventInfo=null}){
     closeBankTicketPhoto();
     const viewer=document.createElement('div');
     viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
@@ -961,7 +998,7 @@
       :items.length
         ?`<div class="ce-bank-photo-gallery count-${items.length}">${items.map(item=>`<figure class="ce-bank-photo-figure ${item.src?'':'without-image'}"><figcaption><strong>${esc(item.title)}</strong><span>${esc(item.subtitle||'')}</span></figcaption>${item.src?`<img class="ce-bank-photo-image" src="${esc(item.src)}" alt="${esc(item.title)}">`:`<div class="ce-bank-photo-empty"><b>Sin imagen adjunta</b><span>${esc(item.empty||'No se ha encontrado la fotografía de este justificante.')}</span></div>`}</figure>`).join('')}</div>`
         :`<div class="ce-bank-photo-empty"><b>${esc(empty)}</b></div>`;
-    viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-gallery" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${caption?`<em>${esc(caption)}</em>`:''}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div>${body}</div>`;
+    viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-gallery" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${caption?`<em>${esc(caption)}</em>`:''}${eventMediaHeader(eventInfo||eventDisplayData())}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div>${body}</div>`;
     $('ceBankOverlay')?.appendChild(viewer);
     return viewer;
   }
@@ -970,16 +1007,17 @@
     const movement=arr(store.data?.movements).find(row=>String(row.id)===String(movementId));
     if(!movement) return;
     const caption=`${formatDate(movement.executedAt)} · ${money(movement.amount)}`;
+    const eventInfo=eventMediaData(store.eventId,store.data?.event?.title);
     if(num(movement.amount)>=0){
       const items=arr(movement.incomeLinks).map(link=>({title:text(link.personName||'Ingreso'),subtitle:money(link.amount),src:text(link.imageUrl),empty:'Este ingreso no tiene fotografía adjunta.'}));
-      balanceMediaViewer({badge:'JUSTIFICANTES DE INGRESO',title:text(movement.description||'Abono bancario'),caption,items,empty:'Este abono no tiene justificantes de ingreso asociados.'});
+      balanceMediaViewer({badge:'JUSTIFICANTES DE INGRESO',title:text(movement.description||'Abono bancario'),caption,items,empty:'Este abono no tiene justificantes de ingreso asociados.',eventInfo});
       return;
     }
     const links=arr(movement.displayLinks||movement.links).slice().sort((a,b)=>(Number(String(a.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b.ticketCode||'').replace(/\D/g,''))||0));
-    balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,loading:true});
+    balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,loading:true,eventInfo});
     if(!links.length){
       $('ceBankTicketPhoto')?.remove();
-      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items:[],empty:'Este cargo no tiene TKxx asociados.'});
+      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items:[],empty:'Este cargo no tiene TKxx asociados.',eventInfo});
       return;
     }
     try{
@@ -992,10 +1030,10 @@
         return {title:code,subtitle:`${text(link.eventTitle||store.data?.event?.title||'Evento')} · ${money(link.ticketAmount)}`,src:ticketImageFromBag(bags[eventId]||{},eventId,code),empty:`No se ha encontrado la fotografía de ${code}.`};
       });
       $('ceBankTicketPhoto')?.remove();
-      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items});
+      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items,eventInfo});
     }catch(error){
       $('ceBankTicketPhoto')?.remove();
-      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items:[],empty:error?.message||'No se pudieron cargar las fotografías.'});
+      balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items:[],empty:error?.message||'No se pudieron cargar las fotografías.',eventInfo});
     }
   }
 
