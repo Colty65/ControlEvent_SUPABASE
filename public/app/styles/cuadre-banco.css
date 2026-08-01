@@ -1159,3 +1159,259 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 }
 #ceBankOverlay .ce-bank-photo-card-gallery .ce-bank-photo-gallery{flex:1 1 auto}
 #ceBankOverlay .ce-bank-photo-card-gallery .ce-bank-photo-gallery.count-1 .ce-bank-photo-figure{min-height:min(72vh,680px)}
+
+/* v25_prod FIX9.1.3 · Zoom superior, histórico inferior e inspector fijo en cabecera */
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout{
+  width:min(1540px,97vw);
+  height:min(900px,96dvh);
+  max-height:96dvh;
+  border-radius:28px;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(360px,.75fr) 48px;
+  align-items:center;
+  gap:20px;
+  padding:15px 20px 13px;
+}
+#ceBankOverlay .ce-bank-balance-title{min-width:0}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header h3{
+  max-width:none;
+  margin:2px 0 0;
+  color:#d8e9f6;
+  font-size:15px;
+  font-weight:900;
+  letter-spacing:.025em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header p{
+  margin:7px 0 0;
+  color:#fff;
+  font-size:16px;
+  font-weight:950;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header small{
+  display:block;
+  margin-top:4px;
+  color:#c9dcea;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.35;
+}
+#ceBankOverlay .ce-bank-balance-inspector{
+  min-width:0;
+  min-height:74px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:0 4px;
+  border:0;
+  border-left:1px solid rgba(255,255,255,.2);
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  color:#fff;
+}
+#ceBankOverlay .ce-bank-balance-inspector>span{
+  display:block;
+  margin:0 0 3px;
+  color:#8ed7ff;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.13em;
+}
+#ceBankOverlay .ce-bank-balance-inspector>strong{
+  display:block;
+  color:#fff;
+  font-size:14px;
+  font-weight:950;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#ceBankOverlay .ce-bank-balance-inspector>div{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:4px;
+}
+#ceBankOverlay .ce-bank-balance-inspector>div b{
+  font-size:16px;
+  font-weight:950;
+}
+#ceBankOverlay .ce-bank-balance-inspector>div b.positive{color:#78e6b2}
+#ceBankOverlay .ce-bank-balance-inspector>div b.negative{color:#ff929b}
+#ceBankOverlay .ce-bank-balance-inspector>div em{
+  color:#d4e3ee;
+  font-size:11px;
+  font-style:normal;
+  font-weight:800;
+}
+#ceBankOverlay .ce-bank-balance-inspector>small{
+  margin-top:4px!important;
+  color:#d5e3ed!important;
+  font-size:10px!important;
+  font-weight:700!important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#ceBankOverlay .ce-bank-balance-inspector.empty>strong{color:#d9e7f1;font-size:12px}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header>button{
+  position:relative;
+  z-index:30;
+  width:46px;
+  height:46px;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  padding:9px 18px 8px;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats>div{
+  padding:8px 12px;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats strong{
+  font-size:17px;
+}
+#ceBankOverlay .ce-bank-balance-stack{
+  display:grid;
+  grid-template-rows:minmax(280px,1.12fr) minmax(235px,.88fr);
+  gap:10px;
+  min-height:0;
+  flex:1 1 auto;
+  padding:0 16px 8px;
+  overflow:hidden;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane{
+  min-width:0;
+  min-height:0;
+  padding:10px 12px 7px;
+  border:1px solid #dce7ef;
+  border-radius:18px;
+  background:linear-gradient(180deg,#fff 0%,#f7fbfd 100%);
+  overflow:hidden;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane.zoom{
+  background:linear-gradient(180deg,#fffdf5 0%,#f8fbfd 100%);
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane-head{
+  margin:0 2px 5px;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane-head strong{
+  font-size:14px;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane-head span{
+  font-size:11px;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{
+  min-height:0;
+  height:100%;
+  overflow:hidden;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{
+  display:block;
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:visible;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-grid text{
+  font-size:9px;
+}
+#ceBankOverlay .ce-bank-chart-range-labels text{
+  fill:#526d82!important;
+  font-size:9px!important;
+  font-weight:950!important;
+}
+#ceBankOverlay .ce-bank-balance-hover-marker{pointer-events:none}
+#ceBankOverlay .ce-bank-balance-hover-marker.hidden{display:none}
+#ceBankOverlay .ce-bank-balance-hover-marker line{
+  stroke:#173a63;
+  stroke-width:1;
+  stroke-dasharray:4 4;
+  opacity:.48;
+  vector-effect:non-scaling-stroke;
+}
+#ceBankOverlay .ce-bank-balance-hover-marker circle{
+  fill:#fff;
+  stroke:#173a63;
+  stroke-width:2;
+  vector-effect:non-scaling-stroke;
+}
+#ceBankOverlay .ce-bank-balance-point-tip{display:none!important}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>footer{
+  min-height:34px;
+  padding:6px 18px 9px;
+  gap:13px;
+}
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>footer small{
+  margin-left:auto;
+  font-size:9px;
+  text-align:right;
+}
+@media (max-width:1180px){
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout{
+    width:100%;
+    height:100dvh;
+    max-height:100dvh;
+    border-radius:0;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+    grid-template-columns:minmax(0,1fr) minmax(280px,.8fr) 46px;
+    gap:12px;
+    padding:12px 14px 10px;
+  }
+  #ceBankOverlay .ce-bank-balance-stack{
+    grid-template-rows:minmax(275px,1.1fr) minmax(230px,.9fr);
+    padding:0 10px 7px;
+  }
+}
+@media (max-width:760px){
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+    grid-template-columns:minmax(0,1fr) 42px;
+    align-items:start;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector{
+    grid-column:1 / -1;
+    grid-row:2;
+    min-height:58px;
+    border-left:0;
+    border-top:1px solid rgba(255,255,255,.2);
+    padding-top:7px;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header>button{
+    grid-column:2;
+    grid-row:1;
+    width:42px;
+    height:42px;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    padding:7px 8px;
+  }
+  #ceBankOverlay .ce-bank-balance-stack{
+    display:block;
+    overflow-y:auto;
+    padding:0 7px 8px;
+  }
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane{
+    min-height:330px;
+    margin-bottom:9px;
+  }
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{
+    overflow-x:auto;
+  }
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{
+    width:900px;
+    height:290px;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>footer{
+    display:none;
+  }
+}

@@ -575,6 +575,10 @@
     const d=new Date(value);
     return Number.isFinite(d.getTime())?d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'—';
   }
+  function chartDateFull(value){
+    const d=new Date(value);
+    return Number.isFinite(d.getTime())?d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+  }
   function chartAmount(value){ return money(value); }
   function monthName(value){
     const date=new Date(value);
@@ -599,14 +603,14 @@
     }
     return unique.length?unique:[{time:minTime,label:monthName(minTime)}];
   }
-  function closeBalanceChart(immediate=false){
+  function closeBalanceChart(){
     const overlay=$('ceBankBalanceChartOverlay');
     if(!overlay) return;
     store.balanceChartOpen=false;
     overlay.classList.remove('visible');
+    overlay.classList.add('hidden');
     overlay.setAttribute('aria-hidden','true');
-    if(immediate) overlay.classList.add('hidden');
-    else setTimeout(()=>{if(!store.balanceChartOpen)overlay.classList.add('hidden');},140);
+    overlay.querySelectorAll('.ce-bank-balance-hover-marker').forEach(node=>node.classList.add('hidden'));
   }
   function eventDisplayData(){
     const snapshot=selectedEventSnapshot();
@@ -623,52 +627,47 @@
     return {min:min-span*padding,max:max+span*padding};
   }
   function chartPane(config){
-    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,compact}=config;
-    const left=compact?52:70,right=18,top=22,bottom=58;
+    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,zoom}=config;
+    const left=64,right=20,top=18,bottom=48;
     const plotW=width-left-right,plotH=height-top-bottom;
     const safeMinTime=minTime===maxTime?minTime-43200000:minTime;
     const safeMaxTime=minTime===maxTime?maxTime+43200000:maxTime;
-    const domain=chartDomain(series.map(point=>point.balance),compact?.12:.08);
+    const domain=chartDomain(series.map(point=>point.balance),zoom?.10:.07);
     const x=time=>left+(time-safeMinTime)/(safeMaxTime-safeMinTime)*plotW;
     const y=value=>top+(domain.max-value)/(domain.max-domain.min)*plotH;
     const path=series.map((point,index)=>`${index?'L':'M'} ${x(point.time).toFixed(2)} ${y(point.balance).toFixed(2)}`).join(' ');
-    const yTicks=Array.from({length:compact?4:5},(_,index)=>domain.max-(domain.max-domain.min)*index/(compact?3:4));
+    const yTicks=Array.from({length:zoom?4:5},(_,index)=>domain.max-(domain.max-domain.min)*index/(zoom?3:4));
     const yGrid=yTicks.map(value=>`<g><line x1="${left}" y1="${y(value).toFixed(2)}" x2="${left+plotW}" y2="${y(value).toFixed(2)}"></line><text x="${left-10}" y="${(y(value)+4).toFixed(2)}" text-anchor="end">${esc(money(value))}</text></g>`).join('');
-    const xGrid=monthlyTicks(safeMinTime,safeMaxTime).map(tick=>`<g class="ce-bank-month-tick"><line x1="${x(tick.time).toFixed(2)}" y1="${top}" x2="${x(tick.time).toFixed(2)}" y2="${top+plotH}"></line><text transform="translate(${x(tick.time).toFixed(2)} ${top+plotH+25}) rotate(-38)" text-anchor="end">${esc(tick.label)}</text></g>`).join('');
+    const xGrid=monthlyTicks(safeMinTime,safeMaxTime).map(tick=>`<g class="ce-bank-month-tick"><line x1="${x(tick.time).toFixed(2)}" y1="${top}" x2="${x(tick.time).toFixed(2)}" y2="${top+plotH}"></line><text x="${x(tick.time).toFixed(2)}" y="${top+plotH+24}" text-anchor="middle">${esc(tick.label)}</text></g>`).join('');
+    const startEnd=`<g class="ce-bank-chart-range-labels"><text x="${left}" y="${top+plotH+42}" text-anchor="start">${esc(chartDateFull(safeMinTime))}</text><text x="${left+plotW}" y="${top+plotH+42}" text-anchor="end">${esc(chartDateFull(safeMaxTime))}</text></g>`;
     const highlight=shade&&Number.isFinite(shadeStart)&&Number.isFinite(shadeEnd)
       ?`<rect class="ce-bank-balance-highlight" x="${Math.max(left,x(Math.min(shadeStart,shadeEnd))).toFixed(2)}" y="${top}" width="${Math.max(6,Math.min(left+plotW,x(Math.max(shadeStart,shadeEnd)))-Math.max(left,x(Math.min(shadeStart,shadeEnd)))).toFixed(2)}" height="${plotH.toFixed(2)}"></rect>`:'';
     const movementPoints=series.filter(point=>point.movement);
     const eventPoints=movementPoints.filter(point=>eventIds.has(String(point.movement.id))).map(point=>{
       const amount=num(point.movement.amount);
-      return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.2" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
+      return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.5" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
-    const html=`<section class="ce-bank-balance-pane ${compact?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g></svg><div class="ce-bank-balance-point-tip hidden"></div></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     return {html,meta:{id,width,height,left,right,top,bottom,points:movementPoints.map(point=>({cx:x(point.time),cy:y(point.balance),point}))}};
   }
-  function tooltipContent(point){
+  function resetBalanceInspector(){
+    const inspector=$('ceBankBalanceInspector');
+    if(!inspector) return;
+    inspector.className='ce-bank-balance-inspector empty';
+    inspector.innerHTML='<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>Pasa el cursor por cualquiera de las líneas</strong><small>La información aparecerá aquí, sin ocultar la gráfica.</small>';
+  }
+  function updateBalanceInspector(point){
+    const inspector=$('ceBankBalanceInspector');
     const movement=point?.movement;
-    if(!movement) return '';
-    const iban=text(movement.accountId||movement.accountLabel||store.accountId)||chartAccountLabel();
+    if(!inspector||!movement) return;
     const amount=num(movement.amount);
-    return `<span>IBAN</span><strong>${esc(iban)}</strong><dl><div><dt>Fecha</dt><dd>${esc(formatDate(movement.executedAt))}</dd></div><div><dt>Importe</dt><dd class="${amount<0?'negative':'positive'}">${chartAmount(amount)}</dd></div><div><dt>Saldo de la cuenta</dt><dd>${chartAmount(movement.bankBalance)}</dd></div><div><dt>Saldo representado</dt><dd>${chartAmount(point.balance)}</dd></div></dl><p>${esc(movement.description||'Movimiento bancario')}</p>`;
+    inspector.className=`ce-bank-balance-inspector ${amount<0?'negative':'positive'}`;
+    inspector.innerHTML=`<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>${esc(formatDate(movement.executedAt))}</strong><div><b class="${amount<0?'negative':'positive'}">${esc(chartAmount(amount))}</b><em>Saldo ${esc(chartAmount(point.balance))}</em></div><small>${esc(movement.description||'Movimiento bancario')}</small>`;
   }
-  function positionBalanceTooltip(pane,clientX,clientY,point){
-    const plot=pane?.querySelector('.ce-bank-balance-plot');
-    const tooltip=pane?.querySelector('.ce-bank-balance-point-tip');
-    if(!plot||!tooltip||!point?.movement) return;
-    tooltip.innerHTML=tooltipContent(point);
-    tooltip.classList.remove('hidden');
-    const rect=plot.getBoundingClientRect();
-    const width=280;
-    const localX=clientX-rect.left;
-    const localY=clientY-rect.top;
-    tooltip.style.left=`${Math.max(10,Math.min(rect.width-width-10,localX+18))}px`;
-    tooltip.style.top=`${Math.max(10,Math.min(rect.height-176,localY>150?localY-150:localY+22))}px`;
-  }
-  function hideBalanceTooltip(pane){ pane?.querySelector('.ce-bank-balance-point-tip')?.classList.add('hidden'); }
   function wireBalancePane(pane,meta){
     const svg=pane?.querySelector('svg');
+    const marker=pane?.querySelector('.ce-bank-balance-hover-marker');
     if(!svg||!meta?.points?.length) return;
     const points=meta.points;
     const nearest=(clientX)=>{
@@ -677,19 +676,34 @@
       let low=0,high=points.length-1;
       while(low<high){const mid=Math.floor((low+high)/2);if(points[mid].cx<target)low=mid+1;else high=mid;}
       const right=points[low]; const left=points[Math.max(0,low-1)];
-      return !left||Math.abs(right.cx-target)<Math.abs(left.cx-target)?right.point:left.point;
+      return !left||Math.abs(right.cx-target)<Math.abs(left.cx-target)?right:left;
     };
-    svg.addEventListener('pointermove',event=>positionBalanceTooltip(pane,event.clientX,event.clientY,nearest(event.clientX)));
-    svg.addEventListener('pointerleave',()=>hideBalanceTooltip(pane));
+    const show=(item)=>{
+      if(!item) return;
+      updateBalanceInspector(item.point);
+      if(marker){
+        marker.classList.remove('hidden');
+        const line=marker.querySelector('line'); const dot=marker.querySelector('circle');
+        line?.setAttribute('x1',item.cx.toFixed(2)); line?.setAttribute('x2',item.cx.toFixed(2));
+        dot?.setAttribute('cx',item.cx.toFixed(2)); dot?.setAttribute('cy',item.cy.toFixed(2));
+      }
+    };
+    svg.addEventListener('pointermove',event=>show(nearest(event.clientX)));
+    svg.addEventListener('pointerleave',()=>marker?.classList.add('hidden'));
     pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{
       circle.addEventListener('click',event=>openBalanceMovementMedia(circle.dataset.movementId,event));
-      circle.addEventListener('focus',event=>{
+      circle.addEventListener('focus',()=>{
         const found=points.find(item=>String(item.point.movement?.id)===String(circle.dataset.movementId));
-        const rect=circle.getBoundingClientRect();
-        if(found) positionBalanceTooltip(pane,rect.left+rect.width/2,rect.top+rect.height/2,found.point);
+        show(found);
       });
-      circle.addEventListener('blur',()=>hideBalanceTooltip(pane));
     });
+  }
+  function wireBalanceChartClose(overlay){
+    const closeButton=overlay?.querySelector('[data-ce-bank-close-balance-chart]');
+    if(!closeButton) return;
+    const closeNow=event=>{stopEvent(event);closeBalanceChart();};
+    closeButton.addEventListener('pointerdown',closeNow,true);
+    closeButton.addEventListener('click',closeNow,true);
   }
   function renderBalanceChart(){
     const overlay=$('ceBankBalanceChartOverlay');
@@ -700,6 +714,7 @@
     const accountLabel=chartAccountLabel();
     if(!series.length){
       overlay.innerHTML=`<section class="ce-bank-balance-chart-card" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header><div><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3></div><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-empty"><strong>No hay movimientos bancarios históricos para esta cuenta.</strong><span>Selecciona otra cuenta que tenga movimientos cargados.</span></div></section>`;
+      wireBalanceChartClose(overlay);
       return;
     }
     const allTimes=series.map(point=>point.time);
@@ -714,12 +729,13 @@
     const lastMovement=[...series].reverse().find(point=>point.movement)?.movement;
     const historicalRange=firstMovement&&lastMovement?`${formatDate(firstMovement.executedAt,false)} — ${formatDate(lastMovement.executedAt,false)}`:'Histórico completo';
     const eventData=eventDisplayData();
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:'La franja amarilla identifica el intervalo de movimientos En saldo del evento',series,eventIds,minTime,maxTime,width:920,height:400,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,compact:false});
-    const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`${formatDate(eventStart,false)} — ${formatDate(eventEnd,false)} · Zoom del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:410,height:400,shade:false,compact:true});
-    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header><div><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p><small>Histórico completo de la cuenta. Pasa el cursor por la línea para consultar cada movimiento y pulsa los puntos del evento para abrir sus justificantes.</small></div><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-split">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Los movimientos ajenos al evento forman la línea, pero no llevan punto.</small></footer></section>`;
+    const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom completo del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:1320,height:310,shade:false,zoom:true});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)} · La franja amarilla identifica el intervalo En saldo del evento`,series,eventIds,minTime,maxTime,width:1320,height:265,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false});
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p><small>Arrastra el cursor por las líneas para consultar cada movimiento. Pulsa un punto verde o rojo para abrir sus justificantes.</small></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector empty"><span>INFORMACIÓN DEL MOVIMIENTO</span><strong>Pasa el cursor por cualquiera de las líneas</strong><small>La información aparecerá aquí, sin ocultar la gráfica.</small></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${zoomPane.html}${historyPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Los movimientos ajenos al evento forman la línea, pero no llevan punto.</small></footer></section>`;
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden','false');
-    overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='history'?historyPane.meta:zoomPane.meta));
+    overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='zoom'?zoomPane.meta:historyPane.meta));
+    wireBalanceChartClose(overlay);
   }
 
   function openBalanceChart(event){

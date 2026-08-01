@@ -3,8 +3,8 @@ export const VERSION = 'v25_prod';
 export const VERSION_LABEL = 'v25_prod';
 export const VERSION_TEXT = 'ControlEvent v25_prod';
 export const VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260801-V25-PROD-FIX9-1-2-GRAFICA-DOBLE-ZOOM';
-export const ZIP_NAME = 'CE_V25_PROD_FIX9_1_2_GRAFICA_DOBLE_ZOOM.zip';
+export const BUILD_ID = '20260801-V25-PROD-FIX9-1-3-ZOOM-SUPERIOR-INSPECTOR-FIJO';
+export const ZIP_NAME = 'CE_V25_PROD_FIX9_1_3_ZOOM_SUPERIOR_INSPECTOR_FIJO.zip';
 
 try {
   window.__ceVersion = VERSION;
