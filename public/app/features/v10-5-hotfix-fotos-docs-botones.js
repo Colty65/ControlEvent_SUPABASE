@@ -95,9 +95,9 @@
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'outline small ce-v105-ticket-save';
-    b.textContent = '💾';
-    b.title = 'Guardar foto del ticket';
-    b.setAttribute('aria-label','Guardar foto del ticket');
+    b.textContent = '⬇';
+    b.title = 'Descargar foto del ticket';
+    b.setAttribute('aria-label','Descargar foto del ticket');
     function go(ev){ stop(ev); return downloadSrc(imgSrc(img), guessTicketName(img,idx)); }
     ['pointerdown','touchstart','touchend','click'].forEach(function(n){ b.addEventListener(n, go, {capture:true, passive:false}); });
     return b;
