@@ -74,6 +74,7 @@
     document.body.appendChild(modal);
   }
   function renderSummaryTiendaTicket(){
+    if(window.__ceDisableLegacySummaryTiendaRenderer || window.__ceSummaryTiendaStableOwner==='v17') return;
     const root=$('summaryTiendaTicket'); if(!root) return;
     const rows=rowsForSummary();
     const sig=JSON.stringify(rows.map(r=>[r.key,Math.round(r.v*100),r.lines.length,r.image]).concat([[st().summaryTiendaSort||'tienda',evId()]]));

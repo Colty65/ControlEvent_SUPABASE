@@ -4,6 +4,8 @@
    FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
 (function(){
   'use strict';
+  if(window.__ceBudgetTipsStableOwnerV25) return;
+  window.__ceBudgetTipsStableOwnerV25 = true;
   const VERSION = 'ControlEvent v25_prod';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
@@ -32,6 +34,10 @@
   let mobileTapStart = null;
   let mobileLastIntent = {row:null, at:0};
   const MOBILE_DOUBLE_TAP_MS = 620;
+  let imageCacheEvent = '';
+  let imageCachePromise = null;
+  const imageCache = {};
+  let openRequestSeq = 0;
   const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   function isBudgetLegacyText(text){
     const t = up(text);
@@ -222,9 +228,15 @@
     }
     return `<td>${esc(cell)}</td>`;
   }
-  function tableHtml(headers, rows){
-    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(tableCellHtml).join('')}</tr>`).join('');
-    return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+  function tableHtml(headers, rows, options={}){
+    const source = rows && rows.length ? rows : [['Sin registros']];
+    const body = source.map(entry => {
+      const row = Array.isArray(entry) ? {cells:entry} : (entry || {cells:['Sin registros']});
+      const cells = Array.isArray(row.cells) ? row.cells : ['Sin registros'];
+      return `<tr${row.className ? ` class="${esc(row.className)}"` : ''}>${cells.map(tableCellHtml).join('')}</tr>`;
+    }).join('');
+    const stableAttrs = options.receipts ? ' data-ce-v465-receipts="1" data-ce-v468-receipts="1"' : '';
+    return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table ce-budget-stable-table" data-ce-budget-owned="1"${stableAttrs}><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
@@ -260,6 +272,69 @@
     }
   }
 
+  function clearImageCache(){
+    Object.keys(imageCache).forEach(key => delete imageCache[key]);
+    imageCacheEvent = '';
+    imageCachePromise = null;
+  }
+  function mergeImageBag(bag){
+    if(!bag || typeof bag !== 'object') return;
+    Object.entries(bag).forEach(([key,value]) => {
+      const src = imageValue(value);
+      if(src) imageCache[key] = src;
+    });
+  }
+  function loadImageCache(force=false){
+    const eventId = selectedEventId();
+    if(!eventId) return Promise.resolve(imageCache);
+    if(!force && imageCacheEvent === eventId) return Promise.resolve(imageCache);
+    if(!force && imageCachePromise) return imageCachePromise;
+    if(force || imageCacheEvent !== eventId) clearImageCache();
+    mergeImageBag(stateRef().ticketImages);
+    mergeImageBag(stateRef().ticketImageRefs);
+    mergeImageBag(window.ControlEventV17CalculosFotos?.serverImages);
+    imageCachePromise = fetch('/api/ticket-images?eventId='+encodeURIComponent(eventId)+'&_='+Date.now(),{cache:'no-store'})
+      .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if(response.ok) mergeImageBag(payload?.images || {});
+        imageCacheEvent = eventId;
+        return imageCache;
+      })
+      .catch(() => { imageCacheEvent = eventId; return imageCache; })
+      .finally(() => { imageCachePromise = null; });
+    return imageCachePromise;
+  }
+  function imageKeyNorm(value){ return up(value).replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim(); }
+  function incomeImageSrc(item){
+    const eventId = selectedEventId();
+    const id = norm(item?.id || item?.colaborador_id || '');
+    if(!id) return '';
+    const exact = [
+      `${eventId}|INGRESO:${id}`,
+      `${eventId}|INGRESO|${id}`,
+      `INGRESO:${eventId}|${id}`,
+      `INGRESO:${id}`
+    ].map(imageKeyNorm);
+    let best={score:-1,src:''};
+    Object.entries(imageCache).forEach(([key,src]) => {
+      const nk=imageKeyNorm(key); let score=-1;
+      exact.forEach((pattern,index) => { if(nk===pattern) score=Math.max(score,1000-index); });
+      if(score<0 && nk.includes(imageKeyNorm(`INGRESO ${id}`))) score=700;
+      if(score>best.score) best={score,src};
+    });
+    return best.src;
+  }
+  function safeDownloadPart(value,fallback){
+    return (norm(value)||fallback||'archivo').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\/:*?"<>|]+/g,' ').replace(/\s+/g,'_').replace(/^_+|_+$/g,'').slice(0,120) || (fallback||'archivo');
+  }
+  function incomeThumbCell(item){
+    const p=incomeParts(item); const src=incomeImageSrc(item);
+    if(!src) return {className:'ce-budget-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
+    const title=`Justificante de ingreso · ${p.nombre}`;
+    const file=`ING-${safeDownloadPart(selectedEventObj().titulo||selectedEventObj().descripcion||'Evento','Evento')}-${safeDownloadPart(p.nombre,'Colaborador')}.jpg`;
+    return {className:'ce-budget-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-person-name="${esc(p.nombre)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
+  }
+
   function incomeTipForRow(row){
     const label = norm(row.querySelector('span')?.textContent || row.textContent || '');
     const sectionText = row.closest('.budget-subrows')?.previousElementSibling?.textContent || '';
@@ -278,11 +353,12 @@
       return true;
     }).sort((a,b) => cmp(incomeParts(a).nombre, incomeParts(b).nombre));
     const total = rows.reduce((sum, item) => sum + incomeParts(item).total, 0);
-    const table = tableHtml(['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total'], rows.map(item => {
+    const tableRows = rows.map(item => {
       const p = incomeParts(item);
-      return [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total)];
-    }));
-    return {title, totalLabel:'TOTAL', totalValue: money(total), table};
+      return [p.nombre, num(p.numero), p.rango || (incomeIsSocio(item) ? 'SOCIO' : 'DONANTE'), money(p.socio), money(p.voluntario), money(p.ingresado), money(p.pendiente), money(p.total), incomeThumbCell(item)];
+    });
+    const table = tableHtml(['Nombre','Nº','Rango','Imp. socio','Imp. voluntario','Ingresado','Pendiente','Total','Just.'], tableRows, {receipts:true});
+    return {title, totalLabel:'TOTAL', totalValue: money(total), table, needsImages:true};
   }
 
   function donationRows(code){
@@ -346,7 +422,7 @@
     }catch(_){ }
     const storeU=up(store); const candidates=[];
     const addBag=bag=>{ if(bag && typeof bag === 'object') candidates.push(...Object.entries(bag)); };
-    addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs);
+    addBag(imageCache); addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs);
     addBag(window.ControlEventV17CalculosFotos?.serverImages);
     let best={score:-1,src:''};
     candidates.forEach(([key,value])=>{
@@ -359,11 +435,12 @@
     });
     return best.src;
   }
-  function ticketThumbCell(store,ticket){
+  function ticketThumbHtml(store,ticket){
     const tk=ticketToken(ticket); const src=ticketImageSrc(store,ticket);
-    if(!tk || !src) return {className:'ce-budget-ticket-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
-    const title=`${tk} · ${store}`; const file=`${tk}-${store}.jpg`.replace(/[^a-zA-Z0-9._-]+/g,'-');
-    return {className:'ce-budget-ticket-thumb-cell',html:`<button type="button" class="ce-budget-ticket-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
+    if(!tk || !src) return '<span class="ce-budget-ticket-thumb-empty">—</span>';
+    const title=`${tk} · ${store}`;
+    const file=`${safeDownloadPart(tk,'TKxx')}-${safeDownloadPart(selectedEventObj().titulo||selectedEventObj().descripcion||'Evento','Evento')}-${safeDownloadPart(store,'Tienda')}.jpg`;
+    return `<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`;
   }
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
@@ -386,14 +463,12 @@
         while(i < sorted.length && storeKey(sorted[i]) === sKey && ticketKey(sorted[i]) === tKey){ group.push(sorted[i]); i += 1; }
         const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
         storeTotal += ticketTotal;
-        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row)), '']));
-        out.push([`Total ${store} ${ticket}`, '', '', '', '', money(ticketTotal), ticketThumbCell(store,ticket)]);
-        out.push(['', '', '', '', '', '', '']);
+        group.forEach(row => out.push({cells:[storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]}));
+        const totalHtml=`<div class="ce-budget-total-media"><strong>${esc(money(ticketTotal))}</strong>${ticketThumbHtml(store,ticket)}</div>`;
+        out.push({className:'ce-budget-ticket-subtotal',cells:[`Total ${store} ${ticket}`, '', '', '', '', {className:'ce-budget-total-with-thumb',html:totalHtml}]});
       }
-      out.push([`Total ${store}`, '', '', '', '', money(storeTotal), '']);
-      out.push(['', '', '', '', '', '', '']);
+      out.push({className:'ce-budget-store-total',cells:[`Total ${store}`, '', '', '', '', money(storeTotal)]});
     }
-    while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
   }
   function operativeTipForRow(row){
@@ -416,8 +491,8 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total','Foto'], expenseTableRows(rows));
-    return {title, totalLabel:'TOTAL', totalValue: money(total), table};
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    return {title, totalLabel:'TOTAL', totalValue: money(total), table, needsImages:true};
   }
   function installLegacyTipAttributeFirewall(){
     try{
@@ -426,7 +501,7 @@
       const wrapped = function(name, value){
         try{
           const attr = String(name || '');
-          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout .budget-panel.socios,#budgetLayout .budget-panel.donantes,#budgetLayout .budget-panel.ce-v306-donantes-lite')){
+          if(LEGACY_TIP_ATTRS.includes(attr) && this?.closest?.('#budgetLayout')){
             return undefined;
           }
         }catch(_){ }
@@ -522,26 +597,30 @@
     const row = findBudgetRow(target);
     if(!row) return false;
     const panel = row.closest('.budget-panel');
-    let tip = null;
-    if(isIncomePanel(panel)) tip = incomeTipForRow(row);
-    if(!tip && isDonationPanel(panel)) tip = donationTipForRow(row);
-    if(!tip && isOperativePanel(panel)) tip = operativeTipForRow(row);
-    if(!tip) return false;
+    const requestId = ++openRequestSeq;
+    const buildTip = () => {
+      let tip = null;
+      if(isIncomePanel(panel)) tip = incomeTipForRow(row);
+      if(!tip && isDonationPanel(panel)) tip = donationTipForRow(row);
+      if(!tip && isOperativePanel(panel)) tip = operativeTipForRow(row);
+      return tip;
+    };
+    const first = buildTip();
+    if(!first) return false;
     row.classList.add('ce-v306-budget-lite-row');
     try{ row.setAttribute('role', 'button'); row.setAttribute('tabindex', '0'); }catch(_){ }
     sanitizeBudgetPanels();
     hideLegacyBudgetTooltips();
-    showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
-    // Las fotos del servidor pueden terminar de cargarse después del primer render.
-    // Al abrir OPERATIVA se rehidrata una sola vez y se conserva el mismo globo.
-    if(isOperativePanel(panel) && typeof window.ControlEventV17CalculosFotos?.loadServerImages === 'function'){
-      const openedTitle=tip.title;
-      Promise.resolve(window.ControlEventV17CalculosFotos.loadServerImages(false)).then(()=>{
-        const box=$(TOOLTIP_ID);
-        if(!box?.classList.contains('open') || box.dataset.ceBudgetLastTitle !== openedTitle || !row.isConnected) return;
-        const refreshed=operativeTipForRow(row);
-        if(refreshed) showTooltip(refreshed.title,refreshed.totalLabel,refreshed.totalValue,refreshed.table);
-      }).catch(()=>{});
+    const show = () => {
+      if(requestId !== openRequestSeq || !row.isConnected) return;
+      const tip = buildTip();
+      if(!tip) return;
+      showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
+    };
+    if(first.needsImages){
+      Promise.resolve(loadImageCache(false)).then(show).catch(show);
+    }else{
+      show();
     }
     return true;
   }
@@ -615,15 +694,32 @@
     if($('ceBudgetFix933Style')) return;
     const style=document.createElement('style'); style.id='ceBudgetFix933Style';
     style.textContent=`
-      #budgetLayout .ce-v306-budget-lite-row{transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;}
-      #budgetLayout .ce-v306-budget-lite-row::before,#budgetLayout .ce-v306-budget-lite-row::after{animation:none!important;transition:none!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-cell{text-align:center!important;vertical-align:middle!important;min-width:58px!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb{width:48px!important;height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-empty{color:#94a3b8!important;font-weight:800!important;}
+      #budgetLayout .ce-v306-budget-lite-row{transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;contain:layout paint!important;}
+      #budgetLayout .ce-v306-budget-lite-row::before,#budgetLayout .ce-v306-budget-lite-row::after{animation:none!important;transition:none!important;transform:none!important;}
+      #ceBudgetLiteTooltipV307,#ceBudgetLiteTooltipV307 *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
+      #ceBudgetLiteTooltipV307{contain:layout paint!important;overflow-anchor:none!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table{table-layout:auto!important;width:100%!important;min-width:760px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table th,#ceBudgetLiteTooltipV307 .ce-budget-lite-table td{vertical-align:middle!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-thumb-cell{width:62px!important;min-width:62px!important;text-align:center!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;vertical-align:middle!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb img{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;object-fit:cover!important;display:block!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-empty{display:inline-flex!important;width:48px!important;height:48px!important;align-items:center!important;justify-content:center!important;color:#94a3b8!important;font-weight:800!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-subtotal td{background:#f8fafc!important;font-weight:900!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-store-total td{background:#eef6ff!important;font-weight:950!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-total-with-thumb{min-width:122px!important;padding-top:4px!important;padding-bottom:4px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-total-media{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;min-height:50px!important;white-space:nowrap!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-total-media>strong{min-width:70px!important;text-align:right!important;}
     `;
     document.head.appendChild(style);
   }
+  function stopBudgetLegacyHover(event){
+    const target=event.target?.nodeType===1?event.target:event.target?.parentElement;
+    if(!target?.closest?.('#budgetLayout,#ceBudgetLiteTooltipV307')) return;
+    hideLegacyBudgetTooltips();
+    try{ event.stopImmediatePropagation(); event.stopPropagation(); }catch(_){ }
+  }
+  ['mouseover','mouseout','mousemove','mouseenter','mouseleave','pointerover','pointerout'].forEach(type=>window.addEventListener(type,stopBudgetLegacyHover,true));
+
   ['mouseover','mouseout'].forEach(type=>document.addEventListener(type,event=>{
     const row=event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row');
     if(!row) return;
@@ -711,12 +807,20 @@
   injectStabilityStyle();
   patchRenderBudget();
   sanitizeBudgetPanels();
+  loadImageCache(false).catch(()=>{});
   [0, 220, 900].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));
   ['controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted','controlevent:event-ready'].forEach(evt => {
     window.addEventListener(evt, () => setTimeout(() => rehydrateBudgetLite(evt), 60));
   });
   document.addEventListener('click', event => {
     if(event.target?.closest?.('#tabResumenBtn,.mobile-menu-action[data-target="tabResumenBtn"]')) setTimeout(() => rehydrateBudgetLite('resumen-tab'), 180);
+  }, true);
+  document.addEventListener('change', event => {
+    if(event.target?.id !== 'selectedEvent') return;
+    ++openRequestSeq;
+    clearImageCache();
+    hideTooltip();
+    setTimeout(() => loadImageCache(true).catch(()=>{}), 80);
   }, true);
   window.ControlEventBudgetLiteTips = {version: VERSION, sanitize: sanitizeBudgetPanels, rehydrate: rehydrateBudgetLite, hide: hideTooltip};
 })();

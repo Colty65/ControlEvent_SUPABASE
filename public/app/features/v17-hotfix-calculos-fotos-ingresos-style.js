@@ -5,6 +5,8 @@
   const INSTALLED='__ceV17CalculosFotosDocMethodFinal';
   if(window[INSTALLED]) return;
   window[INSTALLED]=true;
+  window.__ceDisableLegacySummaryTiendaRenderer=true;
+  window.__ceSummaryTiendaStableOwner='v17';
 
   const STYLE_ID='ceV17CalculosFotosDocMethodFinalStyle';
   const WRITE_SCOPE='ticket-image-v8-5-fix26';
@@ -428,7 +430,7 @@
     drawing=true;
     try{
       root.dataset.ceV17DocPhotoSig=sig;
-      root.classList.add('ce-v17-doc-photo-ready','ce-hf10-ready');
+      root.classList.add('ce-v17-doc-photo-ready','ce-hf10-ready','ce-v17-stable-owner');
       root.innerHTML='';
       const tools=document.createElement('div'); tools.className='hint ce-v17-doc-sortbar ce-hf10-sortbar';
       tools.innerHTML='<span>Ordenar por:</span> <button type="button" class="outline small '+(mode==='tienda'?'active':'')+'" data-ce-v17-sort="tienda">Tienda</button> <button type="button" class="outline small '+(mode==='ticket'?'active':'')+'" data-ce-v17-sort="ticket">Ticket/Donación/Otros gastos</button>';
@@ -462,11 +464,15 @@
         const right=document.createElement('span'); right.className='ce-v17-doc-right'; right.innerHTML='<span class="pill"'+amountStyle+'>'+esc(money(r.v||0))+'</span>';
         if(attachable){
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
-          const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
+          const tk=ticketToken(label); const parts=splitParts(label); const store=parts[0]||'Tienda';
           if(src){
-            const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt='ticket'; img.loading='eager'; img.decoding='async'; img.width=36; img.height=36; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; actions.appendChild(img);
-            const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
-          }else{
+            const thumb=document.createElement('button'); thumb.type='button'; thumb.className='ce-v17-doc-thumb-btn'; thumb.setAttribute('data-ce-g92-photo','1'); thumb.dataset.imageSrc=src; thumb.dataset.photoTitle=`${tk||'TKxx'} · ${store}`; thumb.dataset.downloadName=`${tk||'TKxx'}-${norm(currentEvent().titulo||currentEvent().descripcion||'Evento').replace(/[^a-zA-Z0-9._-]+/g,'-')}-${store.replace(/[^a-zA-Z0-9._-]+/g,'-')}.jpg`; thumb.dataset.ticketCode=tk; thumb.dataset.storeName=store; thumb.setAttribute('aria-label',`Ver ${tk||'ticket'} · ${store}`);
+            const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt=`${tk||'ticket'} · ${store}`; img.loading='eager'; img.decoding='async'; img.width=42; img.height=42; img.src=src; img.dataset.ceHf12Tk=tk; img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; thumb.appendChild(img); actions.appendChild(thumb);
+          }
+          if(canWrite()&&!locked()){
+            const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.setAttribute('aria-label',src?'Cambiar foto':'Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
+            if(src){ const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem); }
+          }else if(!src){
             const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
           }
           right.appendChild(actions);
@@ -612,14 +618,17 @@
     if($(STYLE_ID))return;
     const style=document.createElement('style'); style.id=STYLE_ID;
     style.textContent=`
-      #summaryTiendaTicket .ticket-actions{display:inline-flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;white-space:nowrap!important;min-width:112px!important;}
-      #summaryTiendaTicket .ticket-actions input.ticket-file-input,#summaryTiendaTicket .ticket-actions button:not([data-ce-v17-photo]):not(.ce-v17-doc-photo-btn){display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      #summaryTiendaTicket .ce-v17-doc-photo-btn{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:17px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;}
-      #summaryTiendaTicket .ce-v17-doc-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;cursor:pointer!important;}
+      #summaryTiendaTicket.ce-v17-stable-owner{contain:layout paint!important;overflow-anchor:none!important;}
+      #summaryTiendaTicket,#summaryTiendaTicket *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
+      #summaryTiendaTicket .ticket-actions{display:inline-flex!important;align-items:center!important;gap:6px!important;justify-content:flex-end!important;white-space:nowrap!important;min-width:48px!important;min-height:44px!important;}
+      #summaryTiendaTicket .ticket-actions input.ticket-file-input,#summaryTiendaTicket .ticket-actions button:not([data-ce-v17-photo]):not(.ce-v17-doc-photo-btn):not(.ce-v17-doc-thumb-btn){display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #summaryTiendaTicket .ce-v17-doc-photo-btn{width:31px!important;min-width:31px!important;height:31px!important;min-height:31px!important;padding:1px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:15px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;}
+      #summaryTiendaTicket .ce-v17-doc-thumb-btn{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;max-width:42px!important;max-height:42px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;}
+      #summaryTiendaTicket .ce-v17-doc-thumb{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;max-width:42px!important;max-height:42px!important;object-fit:cover!important;border-radius:8px!important;display:block!important;cursor:pointer!important;}
       #summaryTiendaTicket .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
-      #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;contain:layout paint!important;}
+      #summaryTiendaTicket .ce-v17-doc-row{min-height:54px!important;transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;contain:layout paint!important;}
       #summaryTiendaTicket .ce-v17-doc-row.ce-v15hf6-summary-collapsed>span:first-child::after,#summaryTiendaTicket .ce-v17-doc-row.ce-v15hf7-summary-collapsed>span:first-child::after,#summaryTiendaTicket .ce-v17-doc-row.ce-hf9-collapsed>span:first-child::after{content:none!important;display:none!important;}
-      #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;}
+      #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:10px!important;justify-content:flex-end!important;min-width:150px!important;min-height:44px!important;}
       #summaryTiendaTicket .ce-v17-doc-sortbar button.active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;}
       #summaryTiendaTicket .ce-hf10-label i,#summaryTiendaTicket .ce-v17-doc-row i{display:none!important;visibility:hidden!important;}
       #summaryTiendaTicket .ce-v17-doc-row{cursor:pointer!important;}
@@ -683,6 +692,13 @@
       },true);
     });
   }
+  function stopLegacySummaryHover(ev){
+    const target=ev.target?.nodeType===1?ev.target:ev.target?.parentElement;
+    if(!target?.closest?.('#summaryTiendaTicket')) return;
+    try{ev.stopImmediatePropagation();ev.stopPropagation();}catch(_){ }
+  }
+  ['mouseover','mouseout','mousemove','mouseenter','mouseleave','pointerover','pointerout'].forEach(type=>window.addEventListener(type,stopLegacySummaryHover,true));
+
   ['mouseover','mouseout'].forEach(type=>document.addEventListener(type,ev=>{
     const row=ev.target?.closest?.('#summaryTiendaTicket .ce-v17-doc-row');
     if(!row)return;

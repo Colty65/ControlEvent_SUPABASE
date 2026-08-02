@@ -102,32 +102,9 @@
     ['pointerdown','touchstart','touchend','click'].forEach(function(n){ b.addEventListener(n, go, {capture:true, passive:false}); });
     return b;
   }
-  function patchSummaryTicketDownloads(){
-    var roots = ['tabResumen','summaryTiendaTicket','ceBudgetLiteTooltipV307','ceTooltipV21'].map($).filter(Boolean);
-    roots.forEach(function(root){
-      var imgs = Array.prototype.slice.call(root.querySelectorAll('img'));
-      imgs.forEach(function(img,idx){
-        if(!isTicketImage(img)) return;
-        var host = img.closest('button,a') || img.parentElement || root;
-        var parent = host.parentElement || root;
-        var existing = parent.querySelector(':scope > .ce-v105-ticket-save');
-        if(existing) return;
-        try{ parent.insertBefore(makeTicketSaveButton(img, idx), host.nextSibling); }catch(_){ parent.appendChild(makeTicketSaveButton(img, idx)); }
-      });
-    });
-  }
+  function patchSummaryTicketDownloads(){ return; }
 
-  function patchSummaryActionLabels(){
-    ['tabResumen','summaryTiendaTicket','ceBudgetLiteTooltipV307','ceTooltipV21'].forEach(function(id){
-      var root=$(id); if(!root) return;
-      Array.prototype.slice.call(root.querySelectorAll('button')).forEach(function(b){
-        if(b.classList && b.classList.contains('ce-v105-ticket-save')) return;
-        var lab = fold((b.textContent||'')+' '+(b.title||'')+' '+(b.getAttribute('aria-label')||''));
-        if(/ADJUNTAR|INSERTAR FOTO|SUBIR FOTO|CAMBIAR FOTO/.test(lab) && !/JUSTIFICANTE/.test(lab)){ b.textContent='📎'; b.title='Adjuntar foto'; b.setAttribute('aria-label','Adjuntar foto'); }
-        if(/ELIMINAR FOTO/.test(lab) || (/^\s*ELIMINAR\s*$/.test(fold(b.textContent||'')) && /FOTO|TICKET/.test(lab))){ b.textContent='🗑️'; b.title='Eliminar foto'; b.setAttribute('aria-label','Eliminar foto'); }
-      });
-    });
-  }
+  function patchSummaryActionLabels(){ return; }
 
   function run(){ injectStyle(); patchDocumentModalTitles(); patchSummaryActionLabels(); patchSummaryTicketDownloads(); }
   var timer=0;
