@@ -3,8 +3,8 @@ export const VERSION = 'v25_prod';
 export const VERSION_LABEL = 'v25_prod';
 export const VERSION_TEXT = 'ControlEvent v25_prod';
 export const VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260802-V25-PROD-FIX9-3-PERSONAS-HISTORICAS-MOVIL-SALDO';
-export const ZIP_NAME = 'CE_V25_PROD_FIX9_3_PERSONAS_HISTORICAS_MOVIL_SALDO.zip';
+export const BUILD_ID = '20260802-V25-PROD-FIX9-3-1-PERSONAS-HISTORICAS-CORREGIDAS';
+export const ZIP_NAME = 'CE_V25_PROD_FIX9_3_1_PERSONAS_HISTORICAS_CORREGIDAS.zip';
 
 try {
   window.__ceVersion = VERSION;

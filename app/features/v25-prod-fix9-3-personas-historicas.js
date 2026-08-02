@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX9.3 · PERSONAS históricas por EVENTO. */
+/* ControlEvent v25_prod FIX9.3.1 · PERSONAS históricas corregidas por EVENTO. */
 (function(root){
   'use strict';
   if(root.__ceV25Fix93HistoricalPeople) return;
@@ -74,7 +74,7 @@
   }
   function apply(){hydrateState();patchCollabs();}
 
-  root.ControlEventHistoricalPeople={version:'FIX9.3',snapshotFor,enrich,apply};
+  root.ControlEventHistoricalPeople={version:'FIX9.3.1',snapshotFor,enrich,apply};
   [0,250,900,2200].forEach(ms=>setTimeout(apply,ms));
   root.addEventListener('controlevent:app-ready',apply);
   root.addEventListener('controlevent:state-loaded',apply);
