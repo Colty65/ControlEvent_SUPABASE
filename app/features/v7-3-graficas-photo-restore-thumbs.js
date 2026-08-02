@@ -1,7 +1,7 @@
-/* ControlEvent v25_prod FIX9.2.2 · GRAFICAS: persistencia real, cierre directo y miniatura solo en TOTAL TKxx. */
+/* ControlEvent v25_prod FIX9.3.2 · GRAFICAS aisladas: no eliminar ni ocultar globos de RESUMEN PRESUPUESTARIO. */
 (function(root){
   'use strict';
-  const FLAG='__ceV25GraphSanitationFix922';
+  const FLAG='__ceV25GraphSanitationFix932';
   if(root[FLAG]) return; root[FLAG]=true;
 
   const $=id=>document.getElementById(id);
@@ -22,7 +22,7 @@
   let lastGraphTarget=null;
   let tipWatchdog=0;
   const receiptCache=new Map();
-  const legacyTipIds=['ceTooltipV21','ceTooltipV196','ceTooltipV1952','ceTooltipV190','ceTooltipV181','ceBudgetLiteTooltipV307'];
+  const legacyTipIds=['ceTooltipV21','ceTooltipV196','ceTooltipV1952','ceTooltipV190','ceTooltipV181'];
   const sourceAttrs=['data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','title'];
 
   function state(){
@@ -100,7 +100,7 @@
       #ceV25GraphTip .ce-g92-thumb{width:50px;height:50px;padding:0;border:0;background:transparent;cursor:pointer}
       #ceV25GraphTip .ce-g92-thumb img{display:block;width:100%;height:100%;object-fit:cover;animation:none!important;transition:none!important;transform:none!important}
       body.ce-g92-tip-open:before{content:"";position:fixed;inset:0;z-index:2147483643;background:rgba(2,8,23,.34);pointer-events:none}
-      body.ce-g92-tip-open #ceTooltipV21,body.ce-g92-tip-open #ceTooltipV196,body.ce-g92-tip-open #ceTooltipV1952,body.ce-g92-tip-open #ceTooltipV190,body.ce-g92-tip-open #ceTooltipV181,body.ce-g92-tip-open #ceBudgetLiteTooltipV307{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+      body.ce-g92-tip-open #ceTooltipV21,body.ce-g92-tip-open #ceTooltipV196,body.ce-g92-tip-open #ceTooltipV1952,body.ce-g92-tip-open #ceTooltipV190,body.ce-g92-tip-open #ceTooltipV181{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
       #ceV25GraphMedia{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:16px;background:rgba(2,8,23,.84);backdrop-filter:blur(5px)}
       #ceV25GraphMedia .ce-g92-viewer{position:relative;width:min(1040px,96vw);max-height:95vh;display:flex;flex-direction:column;overflow:hidden;border-radius:20px;background:#fff;box-shadow:0 30px 95px rgba(0,0,0,.5)}
       #ceV25GraphMedia .ce-g92-viewer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:14px 14px 12px 18px;border-bottom:1px solid #dce6ed;background:linear-gradient(110deg,#0d253d,#173a63);color:#fff}
@@ -389,9 +389,11 @@
   function captureLegacyTip(node){
     if(!node||!(node instanceof Element))return;
     setTimeout(()=>{
+      const recentGraphAction=Date.now()-lastGraphPointerAt<1600;
+      if(!activeTip&&!recentGraphAction) return; // Nunca tocar globos creados por RESUMEN u otros módulos.
       if(!node.isConnected&&activeTip)return;
       const raw=rawFromLegacyTip(node);
-      if(!activeTip&&raw&&Date.now()-lastGraphPointerAt<1600)openTipFromRaw(raw,lastGraphTarget?.closest?.('#tabGraficas,#eventChartWrap')||null);
+      if(!activeTip&&raw&&recentGraphAction)openTipFromRaw(raw,lastGraphTarget?.closest?.('#tabGraficas,#eventChartWrap')||null);
       node.remove();
     },20);
   }
@@ -420,7 +422,7 @@
         if(!(node instanceof Element))return;
         const legacyNodes=[];
         if(legacyTipIds.includes(node.id)||node.matches?.('.ce-v211-tooltip,.ce-v196-tooltip,.ce-v1952-tooltip'))legacyNodes.push(node);
-        node.querySelectorAll?.('#ceTooltipV21,#ceTooltipV196,#ceTooltipV1952,#ceTooltipV190,#ceTooltipV181,#ceBudgetLiteTooltipV307,.ce-v211-tooltip,.ce-v196-tooltip,.ce-v1952-tooltip').forEach(item=>legacyNodes.push(item));
+        node.querySelectorAll?.('#ceTooltipV21,#ceTooltipV196,#ceTooltipV1952,#ceTooltipV190,#ceTooltipV181,.ce-v211-tooltip,.ce-v196-tooltip,.ce-v1952-tooltip').forEach(item=>legacyNodes.push(item));
         legacyNodes.forEach(item=>{if(activeTip)item.remove();else captureLegacyTip(item);});
         if(node.matches?.('#tabGraficas,#eventChartWrap')||node.querySelector?.('#tabGraficas,#eventChartWrap'))graphTouched=true;
       });
@@ -430,5 +432,5 @@
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
   setTimeout(warmCache,180);
-  root.ControlEventGraphFix92={version:'FIX9.2.2',open:openTip,close:closeTip,warm:warmCache};
+  root.ControlEventGraphFix92={version:'FIX9.3.2',open:openTip,close:closeTip,warm:warmCache};
 })(window);
