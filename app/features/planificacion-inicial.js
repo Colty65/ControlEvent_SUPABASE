@@ -3495,7 +3495,13 @@
       const savedCollabs = [];
       for(const item of lastIncomeProposal.filter(item => item && item.include !== false)){
         if(!item.personaId) continue;
-        const row = { id: makeId(), eventId:newEventId, personaId:item.personaId, numero:Number(item.numero || 0), situacion:'Pendiente', importe:Number(item.importeVoluntario || 0) };
+        const personSnapshot = (st.personas || []).find(person => String(person?.id || '') === String(item.personaId)) || {};
+        const row = {
+          id: makeId(), eventId:newEventId, personaId:item.personaId,
+          numero:Number(item.numero || 0), situacion:'Pendiente', importe:Number(item.importeVoluntario || 0),
+          personaNombreSnapshot:String(personSnapshot.nombre || item.personaNombre || item.nombre || item.personaId || '').trim(),
+          personaRangoSnapshot:String(personSnapshot.rango || item.rango || 'SOCIO').trim().toUpperCase() || 'SOCIO'
+        };
         await crudUpsert('colaboradores', row);
         savedCollabs.push(row);
       }

@@ -22,7 +22,7 @@ const num = value => {
 };
 const arr = (state, key) => Array.isArray(state?.[key]) ? state[key] : [];
 const cleanFilePart = value => norm(value || 'SIN_TITULO').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'SIN_TITULO';
-const countRows = state => COLLECTIONS.reduce((total, key) => total + arr(state, key).length, 0) + Object.keys(state?.ticketImages || {}).length + arr(state, 'eventDocuments').length;
+const countRows = state => COLLECTIONS.reduce((total, key) => total + arr(state, key).length, 0) + arr(state,'eventPersonSnapshots').length + Object.keys(state?.ticketImages || {}).length + arr(state, 'eventDocuments').length;
 function stamp(date = new Date()){
   const pad = n => String(n).padStart(2, '0');
   return {yyyy:date.getFullYear(), mm:pad(date.getMonth()+1), dd:pad(date.getDate()), hh:pad(date.getHours()), mi:pad(date.getMinutes()), ss:pad(date.getSeconds())};
@@ -55,6 +55,7 @@ function normalizeState(value){
   const state = {};
   for (const key of COLLECTIONS) state[key] = Array.isArray(source[key]) ? source[key].map(plainRow) : [];
   state.eventDocuments = Array.isArray(source.eventDocuments) ? source.eventDocuments.map(plainRow) : [];
+  state.eventPersonSnapshots = Array.isArray(source.eventPersonSnapshots) ? source.eventPersonSnapshots.map(plainRow) : [];
   state.ticketImages = {};
   state.eventCodeMap = source.eventCodeMap && typeof source.eventCodeMap === 'object' ? source.eventCodeMap : {};
   state.entityCodeMaps = source.entityCodeMaps && typeof source.entityCodeMaps === 'object' ? source.entityCodeMaps : {};
@@ -496,11 +497,12 @@ function scopedBackupState(fullState, scope){
   const tiendas = all ? [...dataRows(fullState,'tiendas')] : dataRows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
   const productos = all ? [...dataRows(fullState,'productos')] : dataRows(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const eventDocuments = dataRows(fullState,'eventDocuments').filter(doc => all || eventIds.has(String(doc.eventId)));
+  const eventPersonSnapshots = dataRows(fullState,'eventPersonSnapshots').filter(row => all || eventIds.has(String(row.eventId || row.event_id)));
   const ticketImages = {};
   const liveIndex = buildLiveImageIndex(fullState, eventIds);
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
   Object.entries(fullState.ticketImageRefs || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
-  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, ticketImages};
+  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, eventPersonSnapshots, ticketImages};
 }
 function countsFor(state){
   return {
@@ -622,6 +624,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['REGISTROS_TIENDAS', scopedCounts.tiendas],
     ['REGISTROS_PRODUCTOS', scopedCounts.productos],
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
+    ['REGISTROS_PERSONAS_EVENTO', (scoped.eventPersonSnapshots || []).length],
     ['REGISTROS_COMPRAS', backupCompraCount],
     ['REGISTROS_COMPRAS_CANONICAS_APP', scopedCounts.compras],
     ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
@@ -639,7 +642,10 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
-  addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
+  addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO','PERSONA_NOMBRE_EVENTO','PERSONA_RANGO_EVENTO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario), c.personaNombreSnapshot || c.personaNombre || '', c.personaRangoSnapshot || c.personaRango || c.rango || '']));
+  addRows('PERSONAS_EVENTO', ['EVENT_ID','PERSONA_ID','NOMBRE_SNAPSHOT','RANGO_SNAPSHOT','CAPTURED_AT','UPDATED_AT'], (scoped.eventPersonSnapshots || []).map(row => [
+    row.eventId || row.event_id || '', row.personaId || row.persona_id || '', row.nombreSnapshot || row.nombre_snapshot || '', row.rangoSnapshot || row.rango_snapshot || 'SOCIO', row.capturedAt || row.captured_at || '', row.updatedAt || row.updated_at || ''
+  ]));
   addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], rawCompraRows.map(c => [
     c.id || '', c.event_id || '', c.producto_id || '', c.unidades == null ? '' : c.unidades, c.precio == null ? '' : c.precio, c.ticket_donacion || '', c.tienda_id || '', c.responsable_id || '', c.donor_ref || '', c.created_at || '', c.updated_at || ''
   ]));
@@ -780,6 +786,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     await deleteRowsByPk('ce_bank_import_batches','id');
     await deleteRowsByPk('ce_lg','id');
     await deleteRowsByPk('ce_hitos','id');
+    await deleteRowsByPk('ce_event_person_snapshots','event_id');
   }else{
     await deleteRowsByPk('ce_bank_income_links','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_ticket_links','id',q=>q.eq('event_id',scope));
@@ -787,6 +794,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     await deleteRowsByPk('ce_bank_event_settings','event_id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_lg','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_hitos','id',q=>q.eq('event_id',scope));
+    await deleteRowsByPk('ce_event_person_snapshots','event_id',q=>q.eq('event_id',scope));
   }
   const counts={};
   if(all){
@@ -805,6 +813,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
   counts.bankIncomeLinks=await upsertChunks('ce_bank_income_links',tables.bankIncomeLinks,'id');
   counts.hitos=await upsertChunks('ce_hitos',tables.hitos,'id');
   counts.lgs=await upsertChunks('ce_lg',tables.lgs,'id');
+  counts.eventPersonSnapshots=await upsertChunks('ce_event_person_snapshots',tables.eventPersonSnapshots,'event_id,persona_id');
   res.json({ok:true,scope,restoredBy:norm(actor?.identificacion||actor?.nombre),counts});
 }));
 

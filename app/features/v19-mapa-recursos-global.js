@@ -188,8 +188,10 @@
     const ev = selectedEvent();
     const price = parseAmount(ev?.precio || ev?.EVENTOS_PRECIO || 0);
     return arr('colaboradores').filter(row => same(row?.eventId, eventId)).map(row => {
-      const per = persona(row?.personaId);
-      const rango = norm(per.rango || row.rango || row.personaRango || '');
+      const currentPerson = persona(row?.personaId);
+      const historical = window.ControlEventHistoricalPeople?.snapshotFor?.(eventId,row?.personaId,row) || {};
+      const per = {...currentPerson,nombre:historical.nombre || currentPerson.nombre || row.personaNombreSnapshot || row.personaNombre || '',rango:historical.rango || row.personaRangoSnapshot || row.personaRango || currentPerson.rango || ''};
+      const rango = norm(historical.rango || row.personaRangoSnapshot || row.personaRango || row.rango || per.rango || '');
       const socio = up(rango) === 'SOCIO';
       const numero = Number(row.numero || 0);
       const obligatorio = socio ? numero * price : 0;

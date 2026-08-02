@@ -44,6 +44,14 @@
   };
   const eventPeople = () => {
     const ev = selectedId();
+    const snapshots = arr('eventPersonSnapshots').filter(row => txt(row.eventId || row.event_id) === ev);
+    if(snapshots.length){
+      return snapshots.map(row => {
+        const id=txt(row.personaId || row.persona_id);
+        const current=byId('personas',id)||{};
+        return {...current,id,nombre:txt(row.nombreSnapshot||row.nombre_snapshot||current.nombre||id),rango:txt(row.rangoSnapshot||row.rango_snapshot||current.rango||'SOCIO').toUpperCase(),__historicalSnapshot:true};
+      }).sort((a,b)=>txt(a.nombre).localeCompare(txt(b.nombre),'es'));
+    }
     const scoped = arr('personas').filter(p => !ev || txt(p.eventId || p.event_id) === ev);
     return (scoped.length ? scoped : arr('personas')).slice().sort((a,b)=>txt(a.nombre).localeCompare(txt(b.nombre),'es'));
   };

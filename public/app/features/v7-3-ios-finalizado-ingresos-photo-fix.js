@@ -82,7 +82,13 @@
     if(Array.isArray(enriched)){ const row = enriched.find(r => same(r.id, id)); if(row) return row; }
     return rows('colaboradores').find(r => same(r.id, id)) || {};
   }
-  function personaFor(row){ return row?.persona || rows('personas').find(p => same(p.id, row?.personaId)) || {}; }
+  function personaFor(row){
+    const eventId=norm(row?.eventId||row?.event_id||selectedEventId());
+    const personId=norm(row?.personaId||row?.persona_id);
+    const current=row?.persona || rows('personas').find(p => same(p.id, personId)) || {};
+    const snap=window.ControlEventHistoricalPeople?.snapshotFor?.(eventId,personId,row)||{};
+    return {...current,nombre:snap.nombre||row?.personaNombreSnapshot||row?.personaNombre||current.nombre,rango:snap.rango||row?.personaRangoSnapshot||row?.personaRango||row?.rango||current.rango};
+  }
   function rowTextFor(node){
     const row = node?.closest?.('.summary-item,.budget-row,.itemcard,.rowline,.chart-row,tr,#ceBudgetLiteTooltipV307,#ceTooltipV21,.ce-v21-tooltip,.ce-budget-tooltip,.ce-tooltip');
     const tipOwner = node?.closest?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]') || row?.querySelector?.('[data-ce-tip-v21],[data-tip],[data-ce-tip]');

@@ -168,7 +168,17 @@
   function saveNow(){ try{ if(typeof saveState === 'function') return saveState(); }catch(_){ } try{ return window.saveState?.(); }catch(_){ } }
   function money(v){ try{ return (typeof window.money === 'function') ? window.money(Number(v||0)) : new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v||0)); }catch(_){ return `${Number(v||0).toFixed(2)} €`; } }
   function parseEuro(v){ if(typeof v==='number') return Number.isFinite(v)?v:0; let s=String(v??'').replace(/\s/g,'').replace(/€/g,''); if(s.includes(',')&&s.includes('.')) s=s.replace(/\./g,'').replace(',','.'); else if(s.includes(',')) s=s.replace(',','.'); const n=Number(s); return Number.isFinite(n)?n:0; }
-  function receiptInfo(id){ const row=arr('colaboradores').find(r => same(r.id,id)) || {}; const p=arr('personas').find(x => same(x.id,row.personaId)) || {}; const ev=selectedEv() || {}; const socio=up(p.rango)==='SOCIO'; const precio=parseEuro(ev.precio); const obligatorio=socio ? precio * Number(row.numero || 0) : 0; const voluntario=parseEuro(row.importe); return {nombre:p.nombre||'-',rango:p.rango||'-',situacion:row.situacion||row.ingreso||'Pendiente',numero:Number(row.numero||0),obligatorio,voluntario,total:obligatorio+voluntario}; }
+  function receiptInfo(id){
+    const row=arr('colaboradores').find(r => same(r.id,id)) || {};
+    const current=arr('personas').find(x => same(x.id,row.personaId)) || {};
+    const ev=selectedEv() || {};
+    const snap=window.ControlEventHistoricalPeople?.snapshotFor?.(row.eventId||selectedId(),row.personaId,row)||{};
+    const rango=up(snap.rango||row.personaRangoSnapshot||row.personaRango||row.rango||current.rango);
+    const nombre=snap.nombre||row.personaNombreSnapshot||row.personaNombre||current.nombre||'-';
+    const socio=rango==='SOCIO'; const precio=parseEuro(ev.precio);
+    const obligatorio=socio ? precio * Number(row.numero || 0) : 0; const voluntario=parseEuro(row.importe);
+    return {nombre,rango:rango||'-',situacion:row.situacion||row.ingreso||'Pendiente',numero:Number(row.numero||0),obligatorio,voluntario,total:obligatorio+voluntario};
+  }
   function showReceipt(id,ev){
     const src=receiptSrc(id); if(!src){ alert('Este ingreso no tiene justificante adjunto.'); return stop(ev); }
     const info=receiptInfo(id); let ov=$('ceV504ReceiptModal'); if(ov) ov.remove(); ov=document.createElement('div'); ov.id='ceV504ReceiptModal'; ov.className='ce-v504-modal';

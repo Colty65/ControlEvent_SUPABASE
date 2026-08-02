@@ -24,9 +24,16 @@ function personMaps(state){
   arr(state?.personas).forEach(p=>{ const id=trim(p?.id??p?.ID); if(id) byId.set(id,p); });
   return byId;
 }
+function snapshotMap(state,eventId){
+  const byId=new Map();
+  arr(state?.eventPersonSnapshots).filter(row=>rowEventId(row)===trim(eventId)).forEach(row=>{const id=rowPersonaId(row);if(id)byId.set(id,row);});
+  return byId;
+}
 
-function canonicalSocioCensus(state){
-  const base=arr(state?.personas).map(row=>({
+function canonicalSocioCensus(state,eventId){
+  const snaps=arr(state?.eventPersonSnapshots).filter(row=>rowEventId(row)===trim(eventId));
+  const source=snaps.length?snaps.map(row=>({id:rowPersonaId(row),nombre:row?.nombreSnapshot??row?.nombre_snapshot,rango:row?.rangoSnapshot??row?.rango_snapshot})):arr(state?.personas);
+  const base=source.map(row=>({
     row,
     id:trim(row?.id??row?.ID),
     name:trim(row?.nombre??row?.Nombre??row?.NOMBRE),
@@ -48,15 +55,16 @@ function canonicalSocioCensus(state){
 export function buildCanonicalAttendance(state,eventIds=[]){
   const ids=arr(eventIds).map(trim).filter(Boolean);
   const people=personMaps(state);
-  const census=canonicalSocioCensus(state);
   const events=new Map(arr(state?.eventos).map(e=>[trim(e?.id),trim(e?.titulo??e?.Titulo??e?.nombre??e?.id)]));
   const porEvento=[];
   ids.forEach(eventId=>{
+    const snapshots=snapshotMap(state,eventId);
+    const census=canonicalSocioCensus(state,eventId);
     const incomes=arr(state?.colaboradores).filter(r=>rowEventId(r)===eventId);
     const rows=incomes.map(row=>{
-      const personaId=rowPersonaId(row); const person=people.get(personaId)||{};
-      const name=trim(person?.nombre??person?.Nombre??row?.nombre??row?.Nombre??row?.personaNombre??row?.colaborador??personaId);
-      const rango=norm(person?.rango??person?.Rango??row?.rango??row?.Rango??row?.personaRango??'');
+      const personaId=rowPersonaId(row); const person=people.get(personaId)||{}; const snap=snapshots.get(personaId)||{};
+      const name=trim(row?.personaNombreSnapshot??row?.persona_nombre_snapshot??snap?.nombreSnapshot??snap?.nombre_snapshot??person?.nombre??person?.Nombre??row?.nombre??row?.Nombre??row?.personaNombre??row?.colaborador??personaId);
+      const rango=norm(row?.personaRangoSnapshot??row?.persona_rango_snapshot??snap?.rangoSnapshot??snap?.rango_snapshot??row?.personaRango??row?.rango??person?.rango??person?.Rango??'');
       return {row,personaId,name,key:key(name),rango,number:rawNumber(row),size:rowSize(row,name),confirmed:isAttendanceRow(row)};
     }).filter(x=>x.name&&!excluded(x.name));
     const socioRows=rows.filter(x=>x.rango==='socio'&&x.confirmed);

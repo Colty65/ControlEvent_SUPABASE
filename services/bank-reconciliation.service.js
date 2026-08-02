@@ -449,16 +449,18 @@ function confirmedCashIncome(value){
   const state=normalizeWords(value);
   return state==='EFECTIVO'||state==='PAGADO EFECTIVO'||state==='INGRESADO EFECTIVO';
 }
-function collaboratorIncomeAmount(event,row,person={}){
-  const isMember=normalizeWords(person.rango)==='SOCIO';
+function collaboratorIncomeAmount(event,row,person={},snapshot={}){
+  const historicalRange=text(snapshot.rango_snapshot||snapshot.rangoSnapshot||row.persona_rango_snapshot||row.personaRangoSnapshot||'');
+  const isMember=normalizeWords(historicalRange||person.rango)==='SOCIO';
   const mandatory=isMember?cents(num(row.numero)*num(event.price)):0;
   return cents(mandatory+num(row.importe));
 }
-function cashIncomeTotal(event,collaborators,persons){
+function cashIncomeTotal(event,collaborators,persons,snapshots=[]){
   const people=new Map(arr(persons).map(row=>[text(row.id),row]));
+  const history=new Map(arr(snapshots).map(row=>[`${text(row.event_id)}|${text(row.persona_id)}`,row]));
   return cents(arr(collaborators)
     .filter(row=>text(row.event_id)===event.id&&confirmedCashIncome(row.situacion))
-    .reduce((sum,row)=>sum+collaboratorIncomeAmount(event,row,people.get(text(row.persona_id))||{}),0));
+    .reduce((sum,row)=>sum+collaboratorIncomeAmount(event,row,people.get(text(row.persona_id))||{},history.get(`${event.id}|${text(row.persona_id)}`)||{}),0));
 }
 function incomeImageUrl(images,eventId,incomeId){
   const expected=[`${eventId}|INGRESO:${incomeId}`,`${eventId}|INGRESO|${incomeId}`,`INGRESO:${eventId}|${incomeId}`,`INGRESO:${incomeId}`].map(normalizeWords);
@@ -475,13 +477,15 @@ function incomeImageUrl(images,eventId,incomeId){
   }
   return best.url;
 }
-function buildIncomeCatalog(event,collaborators,persons,images){
+function buildIncomeCatalog(event,collaborators,persons,images,snapshots=[]){
   const people=new Map(arr(persons).map(row=>[text(row.id),row]));
+  const history=new Map(arr(snapshots).map(row=>[`${text(row.event_id)}|${text(row.persona_id)}`,row]));
   return arr(collaborators).filter(row=>text(row.event_id)===event.id&&confirmedBankIncome(row.situacion)).map(row=>{
     const person=people.get(text(row.persona_id))||{};
-    const amount=collaboratorIncomeAmount(event,row,person);
+    const snapshot=history.get(`${event.id}|${text(row.persona_id)}`)||{};
+    const amount=collaboratorIncomeAmount(event,row,person,snapshot);
     return {
-      id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName:text(person.nombre)||text(row.persona_id)||'Ingreso',
+      id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName:text(snapshot.nombre_snapshot||snapshot.nombreSnapshot||person.nombre)||text(row.persona_id)||'Ingreso',
       paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at)
     };
   }).filter(row=>row.id&&row.amount>0).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||a.personName.localeCompare(b.personName,'es')||a.id.localeCompare(b.id));
@@ -571,7 +575,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows] = await Promise.all([
+    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows, eventPersonSnapshotRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {
         columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
         order:'executed_at', ascending:false
@@ -584,7 +588,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[])
     ]);
     const activeRawLinkRows=allRawLinkRows.filter(row=>text(row.event_id)===event.id);
     // El catálogo completo de compras solo se construye para el evento activo. Para los
@@ -651,7 +656,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         };
       });
     // Finalizado = fotografía cerrada del evento: únicamente sus movimientos En saldo.
-    const incomeCatalog=buildIncomeCatalog(event,collaboratorRows,personRows,incomeImageRows);
+    const incomeCatalog=buildIncomeCatalog(event,collaboratorRows,personRows,incomeImageRows,eventPersonSnapshotRows);
     const incomeTrace=attachIncomeTraceability(scopedAll,incomeCatalog,manualIncomeLinkRows.map(incomeLinkFromDb));
     const tracedById=new Map(incomeTrace.movements.map(row=>[row.id,row]));
     const tracedScoped=scopedAll.map(row=>tracedById.get(row.id)||row);
@@ -661,7 +666,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id);
-    const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows);
+    const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows,eventPersonSnapshotRows);
     const eventIncome=cents(ledger.summary.income+cashIncome);
     const economicVariation=cents(eventIncome-ledger.summary.expense);
     return {
@@ -829,13 +834,14 @@ export async function listBankIncomes({movementId='',eventId='',q=''} = {}){
     const selectedMovement=text(movementId);
     if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
     const event=await loadEvent(selectedEvent);
-    const [collaboratorRows,personRows,imageRows,linkRows]=await Promise.all([
+    const [collaboratorRows,personRows,imageRows,linkRows,eventPersonSnapshotRows]=await Promise.all([
       selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[])
     ]);
-    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows);
+    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows,eventPersonSnapshotRows);
     const linkedByIncome=new Map(linkRows.map(raw=>{const link=incomeLinkFromDb(raw);return [link.incomeId,link];}));
     const query=normalizeWords(q);
     const items=catalog.filter(item=>{
@@ -860,13 +866,14 @@ export async function setIncomeLinks(movementId,payload={},actor={}){
     if(!movement) fail('Movimiento bancario no encontrado.',404,'BANK_MOVEMENT_NOT_FOUND');
     if(num(movement.amount)<=0) fail('Solo los abonos se pueden justificar con ingresos del evento.',409,'BANK_NEGATIVE_INCOME_LINK');
     const event=await loadEvent(eventId);
-    const [collaboratorRows,personRows,imageRows,existingRows]=await Promise.all([
+    const [collaboratorRows,personRows,imageRows,existingRows,eventPersonSnapshotRows]=await Promise.all([
       selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)})
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[])
     ]);
-    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows);
+    const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows,eventPersonSnapshotRows);
     const byId=new Map(catalog.map(item=>[item.id,item]));
     for(const incomeId of requested){ if(!byId.has(incomeId)) fail('Uno de los ingresos seleccionados no pertenece al evento activo o no figura como ingreso bancario.',409,'BANK_INCOME_NOT_AVAILABLE'); }
     const conflicts=existingRows.map(incomeLinkFromDb).filter(link=>requested.includes(link.incomeId)&&link.movementId!==id);

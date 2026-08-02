@@ -186,10 +186,14 @@
   function incomeRows(){
     const id=selectedEventId();const ev=currentEvent();const price=number(ev.precio||ev.price);
     return list('colaboradores').filter(row=>text(row.eventId||row.event_id||row.eventoId)===id).map(row=>{
-      const personId=row.personaId||row.persona_id;const person=list('personas').find(item=>text(item.id)===text(personId))||{};
-      const member=normalize(person.rango)==='SOCIO';
+      const personId=row.personaId||row.persona_id;
+      const current=list('personas').find(item=>text(item.id)===text(personId))||{};
+      const historical=window.ControlEventHistoricalPeople?.snapshotFor?.(id,personId,row)||{};
+      const range=normalize(row.personaRangoSnapshot||row.persona_rango_snapshot||historical.rango||row.personaRango||row.rango||current.rango);
+      const name=text(row.personaNombreSnapshot||row.persona_nombre_snapshot||historical.nombre||row.personaNombre||current.nombre||row.nombre||personName(personId));
+      const member=range==='SOCIO';
       const amount=row.total!=null?number(row.total):((member?number(row.numero)*price:0)+number(row.importe??row.importeVoluntario??row.voluntario??row.base));
-      return {id:text(row.id||row.colaborador_id),name:text(person.nombre||row.nombre||personName(personId)),method:text(row.situacion||row.formaPago||row.forma_pago||row.ingreso||''),amount};
+      return {id:text(row.id||row.colaborador_id),name,range,method:text(row.situacion||row.formaPago||row.forma_pago||row.ingreso||''),amount};
     }).filter(row=>row.id&&row.name);
   }
   function cacheForEvent(){

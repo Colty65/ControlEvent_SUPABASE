@@ -125,8 +125,19 @@ function compactState(state, selectedEventId = '') {
   const products = byId(state?.productos);
   const compras = arr(state?.compras);
   const colaboradores = arr(state?.colaboradores);
+  const eventPeople = new Map(arr(state?.eventPersonSnapshots).map(row => [`${trim(row?.eventId || row?.event_id)}|${trim(row?.personaId || row?.persona_id)}`, row]));
   const selectedEvent = events.find(e => trim(e.id) === trim(selectedEventId)) || null;
 
+  function historicalPerson(row){
+    const eventId=trim(row?.eventId || row?.event_id);
+    const personId=trim(row?.personaId || row?.persona_id);
+    const snap=eventPeople.get(`${eventId}|${personId}`)||{};
+    const current=people.get(personId)||{};
+    return {
+      nombre:trim(row?.personaNombreSnapshot || row?.persona_nombre_snapshot || snap?.nombreSnapshot || snap?.nombre_snapshot || current.nombre || personId || 'Sin colaborador'),
+      rango:trim(row?.personaRangoSnapshot || row?.persona_rango_snapshot || snap?.rangoSnapshot || snap?.rango_snapshot || current.rango || row?.rango || row?.personaRango || '')
+    };
+  }
   function productName(id) { return trim(products.get(trim(id))?.nombre || id || 'Sin producto'); }
   function storeName(id) { return trim(stores.get(trim(id))?.nombre || id || 'Sin tienda'); }
   function personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); }
@@ -139,14 +150,13 @@ function compactState(state, selectedEventId = '') {
     return fallback;
   }
   function incomeRango(row) {
-    const persona = people.get(trim(row?.personaId || row?.persona_id));
-    return norm(persona?.rango || row?.rango || row?.personaRango || row?.tipoPersona || '');
+    const historical=historicalPerson(row);
+    return norm(historical.rango || row?.rango || row?.personaRango || row?.tipoPersona || '');
   }
   function isSocioIncome(row) { return incomeRango(row) === 'socio'; }
   function incomePayment(row) { return trim(row?.situacion || row?.formaPago || row?.ingreso || 'Pendiente') || 'Pendiente'; }
   function incomePersonName(row) {
-    const id = trim(row?.personaId || row?.persona_id);
-    return trim(people.get(id)?.nombre || row?.nombre || id || 'Sin colaborador');
+    return historicalPerson(row).nombre;
   }
   function incomeParts(row, ev) {
     const numero = num(row?.numero);
@@ -157,7 +167,7 @@ function compactState(state, selectedEventId = '') {
     const importeTotal = round(importeObligatorio + importeVoluntario, 2);
     return {
       socio,
-      rango: socio ? 'SOCIO' : (trim(people.get(trim(row?.personaId || row?.persona_id))?.rango || row?.rango || row?.personaRango || '') || 'NO SOCIO / OTRO'),
+      rango: socio ? 'SOCIO' : (historicalPerson(row).rango || 'NO SOCIO / OTRO'),
       numero: round(numero, 3),
       formaPago: incomePayment(row),
       importeObligatorio,
@@ -3397,6 +3407,7 @@ function plannerDatabaseSchemaText() {
   return `TABLAS_REALES_SUPABASE_Y_CAMPOS:
 - ce_eventos(id, titulo, precio, fecha_ini, fecha_fin, situacion, descripcion, created_at, updated_at)
 - ce_colaboradores(id, event_id, persona_id, numero, situacion, importe, created_at, updated_at)
+- ce_event_person_snapshots(event_id, persona_id, nombre_snapshot, rango_snapshot, captured_at, updated_at)
 - ce_personas(id, nombre, rango, created_at, updated_at)
 - ce_compras(id, event_id, producto_id, unidades, precio, ticket_donacion, donor_ref, responsable_id, tienda_id, created_at, updated_at)
 - ce_productos(id, nombre, segmento, destino, default_precio, default_tienda_id, created_at, updated_at)
@@ -3414,7 +3425,7 @@ function plannerDatabaseSchemaText() {
 
 MAPEO_DE_DOMINIO:
 - EVENTOS = ce_eventos.
-- INGRESOS = ce_colaboradores JOIN ce_personas ON ce_colaboradores.persona_id = ce_personas.id JOIN ce_eventos ON ce_colaboradores.event_id = ce_eventos.id.
+- INGRESOS = ce_colaboradores JOIN ce_event_person_snapshots por event_id + persona_id para recuperar nombre/rango históricos; ce_personas se usa solo como catálogo actual. JOIN ce_eventos ON ce_colaboradores.event_id = ce_eventos.id.
 - COMPRAS = ce_compras con ticket_donacion que NO empieza por DONADO. Incluye compras realizadas y compras pendientes.
 - COMPRAS realizadas = ce_compras donde ticket_donacion NO sea DONADO ... y NO sea Pte. Compra/PENDIENTE.
 - COMPRAS pendientes / previstas = ce_compras donde ticket_donacion contenga Pte. Compra o PENDIENTE.
@@ -6371,15 +6382,17 @@ function planIncomeRowsForEvent(state, eventId) {
   const ev = planEventById(state, eventId) || {};
   const precio = num(ev.precio);
   return arr(state?.colaboradores).filter(c => trim(c?.eventId || c?.event_id) === trim(eventId)).map((c, index) => {
-    const p = maps.people.get(trim(c?.personaId || c?.persona_id)) || {};
-    const rango = trim(p.rango || c?.rango || '').toUpperCase() || 'SIN RANGO';
+    const personId = trim(c?.personaId || c?.persona_id);
+    const p = maps.people.get(personId) || {};
+    const snap = arr(state?.eventPersonSnapshots).find(row=>trim(row?.eventId||row?.event_id)===trim(eventId)&&trim(row?.personaId||row?.persona_id)===personId) || {};
+    const rango = trim(c?.personaRangoSnapshot || c?.persona_rango_snapshot || snap?.rangoSnapshot || snap?.rango_snapshot || p.rango || c?.rango || '').toUpperCase() || 'SIN RANGO';
     const numero = num(c.numero);
     const voluntario = num(c.importeVoluntario ?? c.importe ?? 0);
     return {
       key: `ingreso:${trim(c.id) || index}`,
       sourceId: trim(c.id),
       personaId: trim(c?.personaId || c?.persona_id),
-      personaName: trim(p.nombre || c?.nombre || 'Persona sin nombre'),
+      personaName: trim(c?.personaNombreSnapshot || c?.persona_nombre_snapshot || snap?.nombreSnapshot || snap?.nombre_snapshot || p.nombre || c?.nombre || 'Persona sin nombre'),
       rango,
       numero,
       situacion: trim(c.situacion || c.ingreso || 'Pendiente'),

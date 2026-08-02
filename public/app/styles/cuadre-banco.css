@@ -1549,3 +1549,89 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane-head span{font-size:12px!important}
   #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-grid text{font-size:10px!important}
 }
+
+
+/* FIX9.3 · Evolución temporal operativa en teléfonos */
+@media (max-width:760px){
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 44px!important;
+    grid-template-rows:auto auto!important;
+    align-items:start!important;
+    gap:7px 10px!important;
+    min-height:0!important;
+    padding:10px 11px 9px!important;
+  }
+  #ceBankOverlay .ce-bank-balance-title{
+    grid-column:1!important;
+    grid-row:1!important;
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+  }
+  #ceBankOverlay .ce-bank-balance-title>span{
+    margin:0 0 3px!important;
+    font-size:9px!important;
+    line-height:1.15!important;
+    letter-spacing:.11em!important;
+    white-space:normal!important;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header h3{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    font-size:12px!important;
+    line-height:1.25!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header p{
+    margin:5px 0 0!important;
+    font-size:14px!important;
+    line-height:1.2!important;
+    white-space:normal!important;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>header>button{
+    grid-column:2!important;
+    grid-row:1!important;
+    width:42px!important;
+    height:42px!important;
+    align-self:start!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector{
+    grid-column:1 / -1!important;
+    grid-row:2!important;
+    min-height:48px!important;
+    padding:6px 0 0!important;
+    border-left:0!important;
+    border-top:1px solid rgba(255,255,255,.18)!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector.hidden-info{
+    display:none!important;
+    min-height:0!important;
+    height:0!important;
+    padding:0!important;
+    border:0!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector>strong{font-size:12px!important}
+  #ceBankOverlay .ce-bank-balance-inspector>div b{font-size:14px!important}
+  #ceBankOverlay .ce-bank-balance-inspector>div em,
+  #ceBankOverlay .ce-bank-balance-inspector>small{font-size:10px!important}
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    padding:8px!important;
+  }
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats>div{padding:9px 10px!important}
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats span{font-size:8px!important;line-height:1.25!important}
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout .ce-bank-balance-chart-stats strong{font-size:17px!important}
+  #ceBankOverlay .ce-bank-balance-stack{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    padding:0 6px 8px!important;
+  }
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane{min-height:315px!important;margin-bottom:8px!important}
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{overflow-x:auto!important;overscroll-behavior-x:contain!important}
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{width:720px!important;height:265px!important;min-height:265px!important}
+}

@@ -26,8 +26,11 @@
   const rowSize=(row,name)=>{ const n=rawNumber(row); if(n!==null&&n>0) return n; return isPair(name)?Math.max(2,parts(name).length||2):1; };
 
   function peopleMap(state){ const m=new Map(); arr(state?.personas).forEach(p=>{ const id=trim(p?.id??p?.ID); if(id)m.set(id,p); }); return m; }
-  function census(state){
-    const base=arr(state?.personas).map(row=>({row,id:trim(row?.id??row?.ID),name:trim(row?.nombre??row?.Nombre??row?.NOMBRE),rango:norm(row?.rango??row?.Rango??row?.RANGO)})).filter(x=>x.rango==='socio'&&!excluded(x.name));
+  function snapshotMap(state,eventId){ const m=new Map(); arr(state?.eventPersonSnapshots).filter(row=>eventIdOf(row)===trim(eventId)).forEach(row=>{const id=personIdOf(row);if(id)m.set(id,row);}); return m; }
+  function census(state,eventId){
+    const snaps=arr(state?.eventPersonSnapshots).filter(row=>eventIdOf(row)===trim(eventId));
+    const source=snaps.length?snaps.map(row=>({id:personIdOf(row),nombre:row?.nombreSnapshot??row?.nombre_snapshot,rango:row?.rangoSnapshot??row?.rango_snapshot})):arr(state?.personas);
+    const base=source.map(row=>({row,id:trim(row?.id??row?.ID),name:trim(row?.nombre??row?.Nombre??row?.NOMBRE),rango:norm(row?.rango??row?.Rango??row?.RANGO)})).filter(x=>x.rango==='socio'&&!excluded(x.name));
     const pairs=base.filter(x=>isPair(x.name)).map(x=>({kind:'pair',id:x.id,name:x.name,key:key(x.name),parts:parts(x.name),size:Math.max(2,parts(x.name).length||2)}));
     const out=[],seen=new Set();
     pairs.forEach(p=>{ if(!seen.has(p.key)){seen.add(p.key);out.push(p);} });
@@ -35,9 +38,9 @@
     return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
   }
   function calculate(state,eventId){
-    const id=trim(eventId); const people=peopleMap(state); const socioCensus=census(state);
+    const id=trim(eventId); const people=peopleMap(state); const snapshots=snapshotMap(state,id); const socioCensus=census(state,id);
     const incomes=arr(state?.colaboradores).filter(row=>eventIdOf(row)===id);
-    const rows=incomes.map(row=>{ const personaId=personIdOf(row),person=people.get(personaId)||{}; const name=trim(person?.nombre??person?.Nombre??row?.nombre??row?.Nombre??row?.personaNombre??row?.colaborador??personaId); const rango=norm(person?.rango??person?.Rango??row?.rango??row?.Rango??row?.personaRango??''); return {row,personaId,name,key:key(name),rango,number:rawNumber(row),size:rowSize(row,name),confirmed:confirmed(row)}; }).filter(x=>x.name&&!excluded(x.name));
+    const rows=incomes.map(row=>{ const personaId=personIdOf(row),person=people.get(personaId)||{},snap=snapshots.get(personaId)||{}; const name=trim(row?.personaNombreSnapshot??row?.persona_nombre_snapshot??snap?.nombreSnapshot??snap?.nombre_snapshot??person?.nombre??person?.Nombre??row?.nombre??row?.Nombre??row?.personaNombre??row?.colaborador??personaId); const rango=norm(row?.personaRangoSnapshot??row?.persona_rango_snapshot??snap?.rangoSnapshot??snap?.rango_snapshot??row?.personaRango??row?.rango??person?.rango??person?.Rango??''); return {row,personaId,name,key:key(name),rango,number:rawNumber(row),size:rowSize(row,name),confirmed:confirmed(row)}; }).filter(x=>x.name&&!excluded(x.name));
     const socioRows=rows.filter(x=>x.rango==='socio'&&x.confirmed);
     const matches=(item,row)=>(row.personaId&&item.id&&row.personaId===item.id)||row.key===item.key;
     const directPair=item=>socioRows.some(row=>matches(item,row)&&((row.number===0&&row.confirmed)||row.size>=item.size));

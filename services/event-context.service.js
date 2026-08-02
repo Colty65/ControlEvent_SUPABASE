@@ -149,8 +149,10 @@ function makeHelpers(state) {
   const people = byId(state?.personas);
   const stores = byId(state?.tiendas);
   const products = byId(state?.productos);
-  function personName(id) { return trim(people.get(trim(id))?.nombre || id || 'Sin responsable'); }
-  function personRange(id) { return trim(people.get(trim(id))?.rango || ''); }
+  const eventPeople = new Map(arr(state?.eventPersonSnapshots).map(row => [`${trim(row?.eventId || row?.event_id)}|${trim(row?.personaId || row?.persona_id)}`, row]));
+  function personSnapshot(eventId,id) { return eventPeople.get(`${trim(eventId)}|${trim(id)}`) || {}; }
+  function personName(id, eventId = '', row = {}) { const snap=personSnapshot(eventId,id); return trim(row?.personaNombreSnapshot || row?.persona_nombre_snapshot || snap?.nombreSnapshot || snap?.nombre_snapshot || people.get(trim(id))?.nombre || id || 'Sin responsable'); }
+  function personRange(id, eventId = '', row = {}) { const snap=personSnapshot(eventId,id); return trim(row?.personaRangoSnapshot || row?.persona_rango_snapshot || snap?.rangoSnapshot || snap?.rango_snapshot || people.get(trim(id))?.rango || ''); }
   function storeName(id) { return trim(stores.get(trim(id))?.nombre || id || 'Sin tienda'); }
   function productName(id) { return trim(products.get(trim(id))?.nombre || id || 'Sin producto'); }
   function productSegment(id) { return trim(products.get(trim(id))?.segmento || ''); }
@@ -163,12 +165,12 @@ function makeHelpers(state) {
     if (products.has(v)) return productName(v);
     return v;
   }
-  return { people, stores, products, personName, personRange, storeName, productName, productSegment, productDestino, entityName };
+  return { people, stores, products, eventPeople, personSnapshot, personName, personRange, storeName, productName, productSegment, productDestino, entityName };
 }
 
 function incomeParts(row, ev, helpers, ticketImages) {
   const personaId = rowPersonaId(row);
-  const rangoRaw = trim(helpers.personRange(personaId) || row?.rango || row?.personaRango || row?.tipoPersona || '');
+  const rangoRaw = trim(helpers.personRange(personaId, row?.eventId || ev?.id, row) || row?.personaRangoSnapshot || row?.persona_rango_snapshot || row?.rango || row?.personaRango || row?.tipoPersona || '');
   const socio = norm(rangoRaw) === 'socio';
   const numero = num(row?.numero);
   const precioEntrada = num(ev?.precio);
@@ -176,7 +178,7 @@ function incomeParts(row, ev, helpers, ticketImages) {
   const importeVoluntario = firstNumber(row, ['importeVoluntario','voluntario','donation','importe','importeDonacion','aportacionVoluntaria'], 0);
   const total = round(importeObligatorioSocios + importeVoluntario, 2);
   return {
-    colaborador: helpers.personName(personaId),
+    colaborador: helpers.personName(personaId, row?.eventId || ev?.id, row),
     tipoPersona: socio ? 'SOCIO' : (rangoRaw || 'NO SOCIO / OTRO'),
     esSocio: socio,
     numero: round(numero, 3),
@@ -817,7 +819,7 @@ function zuzuHasCue(prompt, cues) {
   return arr(cues).some(c => new RegExp('\\b' + zuzuEscapeRegExp(c) + '\\b', 'i').test(p));
 }
 function zuzuRangoPersona(id, row, helpers) {
-  const r = trim(helpers.people.get(trim(id))?.rango || row?.rango || row?.personaRango || row?.tipoPersona || '');
+  const r = trim(helpers.personRange(id, rowEventId(row), row) || row?.personaRangoSnapshot || row?.persona_rango_snapshot || row?.rango || row?.personaRango || row?.tipoPersona || '');
   if (/^socio$/i.test(r)) return 'SOCIO';
   if (/donante/i.test(r)) return 'DONANTE';
   if (/no\s*socio/i.test(r)) return 'NO SOCIO';
@@ -1382,7 +1384,7 @@ function zuzuModuleIngresos(state, eventIds, filters, helpers, ticketImages) {
     const amounts = zuzuIncomeAmounts(row, ev, helpers);
     rows.push({
       Evento: trim(ev?.titulo) || 'Sin evento',
-      Nombre: zuzuHumanPerson(personaId, helpers, 'Sin nombre'),
+      Nombre: helpers.personName(personaId, evId, row) || zuzuHumanPerson(personaId, helpers, 'Sin nombre'),
       Numero: amounts.numero,
       'Importe obligatorio': amounts.obligatorio,
       'Importe voluntario': amounts.voluntario,

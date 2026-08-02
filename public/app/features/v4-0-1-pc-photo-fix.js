@@ -163,7 +163,9 @@
   function ingresoInfo(trigger){
     const id = idFrom(trigger);
     const row = arr('colaboradores').find(c => String(c.id || '') === String(id || '')) || {};
-    const persona = row.persona || arr('personas').find(p => String(p.id || '') === String(row.personaId || '')) || {};
+    const currentPersona = row.persona || arr('personas').find(p => String(p.id || '') === String(row.personaId || '')) || {};
+    const snap = window.ControlEventHistoricalPeople?.snapshotFor?.(row.eventId || selectedEventId(), row.personaId, row) || {};
+    const persona = {...currentPersona,nombre:snap.nombre||row.personaNombreSnapshot||row.personaNombre||currentPersona.nombre,rango:snap.rango||row.personaRangoSnapshot||row.personaRango||row.rango||currentPersona.rango};
     const ev = selectedEventObj();
     const numero = Number(row.numero || 0) || 0;
     const precio = Number(ev.precio || 0) || 0;

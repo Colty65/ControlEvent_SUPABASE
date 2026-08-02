@@ -48,7 +48,7 @@
   }
   function eventPrice(){ return num(selectedEventObj().precio ?? selectedEventObj().price ?? 0); }
   function incomePersona(row){ return row?.persona || byId('personas', row?.personaId) || byId('personas', row?.persona_id) || {}; }
-  function isSocio(row){ return up(incomePersona(row)?.rango || row?.rango || row?.personaRango || '') === 'SOCIO'; }
+  function isSocio(row){ return up(row?.personaRangoSnapshot || row?.persona_rango_snapshot || row?.personaRango || row?.rango || incomePersona(row)?.rango || '') === 'SOCIO'; }
   function incomeSitu(row){
     const raw = text(row?.situacion || row?.ingreso || row?.tipoIngreso || row?.formaPago || '');
     return raw || 'Pendiente';

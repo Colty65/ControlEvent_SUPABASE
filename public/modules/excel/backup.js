@@ -23,7 +23,7 @@ const num = value => {
 };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const rows = (state, key) => Array.isArray(state?.[key]) ? state[key] : [];
-const countRows = state => COLLECTIONS.reduce((total, key) => total + rows(state, key).length, 0) + Object.keys(state?.ticketImages || {}).length + rows(state, 'eventDocuments').length;
+const countRows = state => COLLECTIONS.reduce((total, key) => total + rows(state, key).length, 0) + rows(state,'eventPersonSnapshots').length + Object.keys(state?.ticketImages || {}).length + rows(state, 'eventDocuments').length;
 const cleanFilePart = value => norm(value || 'SIN_TITULO').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'SIN_TITULO';
 function stamp(date = new Date()){
   const pad = n => String(n).padStart(2, '0');
@@ -106,6 +106,7 @@ function normalizeState(value){
   const state = cloneState(value);
   for(const key of COLLECTIONS) if(!Array.isArray(state[key])) state[key] = [];
   state.eventDocuments = Array.isArray(state.eventDocuments) ? state.eventDocuments : [];
+  state.eventPersonSnapshots = Array.isArray(state.eventPersonSnapshots) ? state.eventPersonSnapshots : [];
   state.ticketImages = state.ticketImages && typeof state.ticketImages === 'object' ? state.ticketImages : {};
   const refs = state.ticketImageRefs && typeof state.ticketImageRefs === 'object' ? state.ticketImageRefs : {};
   Object.entries(refs).forEach(([key, ref]) => {
@@ -435,11 +436,12 @@ function scopedBackupState(fullState, scope){
   const tiendas = all ? [...dataRows(fullState,'tiendas')] : dataRows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
   const productos = all ? [...dataRows(fullState,'productos')] : dataRows(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const eventDocuments = dataRows(fullState,'eventDocuments').filter(doc => all || eventIds.has(String(doc.eventId)));
+  const eventPersonSnapshots = dataRows(fullState,'eventPersonSnapshots').filter(row => all || eventIds.has(String(row.eventId || row.event_id)));
   const ticketImages = {};
   const liveIndex = buildLiveImageIndex(fullState, eventIds);
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
   Object.entries(fullState.ticketImageRefs || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
-  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, ticketImages};
+  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, eventPersonSnapshots, ticketImages};
 }
 function splitLongText(value, size = 30000){
   const text = String(value || '');
@@ -586,6 +588,7 @@ export async function run(options = {}){
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
     ['REGISTROS_COMPRAS', scopedCounts.compras],
     ['REGISTROS_DOCUMENTOS', scopedCounts.eventDocuments || 0],
+    ['REGISTROS_PERSONAS_EVENTO', (scoped.eventPersonSnapshots || []).length],
     ['REGISTROS_TICKETS', scopedCounts.ticketImages],
     ['TOTAL_ORIGEN_EVENTOS', totalCounts.eventos],
     ['TOTAL_ORIGEN_PERSONAS', totalCounts.personas],
@@ -598,7 +601,10 @@ export async function run(options = {}){
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
-  addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario)]));
+  addRows('INGRESOS', ['EVENTO_CODIGO','INGRESO_ID','PERSONA_CODIGO','NUMERO','INGRESO','IMPORTE_VOLUNTARIO','PERSONA_NOMBRE_EVENTO','PERSONA_RANGO_EVENTO'], scoped.colaboradores.map(c => [eventCode[c.eventId] || '', c.id || '', personCode[c.personaId] || '', num(c.numero), c.situacion || c.ingreso || 'Pendiente', num(c.importe ?? c.importeVoluntario), c.personaNombreSnapshot || c.personaNombre || '', c.personaRangoSnapshot || c.personaRango || c.rango || '']));
+  addRows('PERSONAS_EVENTO', ['EVENT_ID','PERSONA_ID','NOMBRE_SNAPSHOT','RANGO_SNAPSHOT','CAPTURED_AT','UPDATED_AT'], (scoped.eventPersonSnapshots || []).map(row => [
+    row.eventId || row.event_id || '', row.personaId || row.persona_id || '', row.nombreSnapshot || row.nombre_snapshot || '', row.rangoSnapshot || row.rango_snapshot || 'SOCIO', row.capturedAt || row.captured_at || '', row.updatedAt || row.updated_at || ''
+  ]));
   addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], scoped.compras.map(c=>[c.id||'',c.eventId||'',c.productoId||'',num(c.unidades),num(c.precio),ticket(c),c.tiendaId||'',c.responsableId||'',c.donorRef||'',c.createdAt||'',c.updatedAt||'']));
   addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
   addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], scoped.compras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || '', c.id || '', productCode[c.productoId] || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || '') : (kind === 'T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || '']; }));

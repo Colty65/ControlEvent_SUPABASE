@@ -55,8 +55,15 @@
   function rowNumero(row){ const n=rowNumeroRaw(row); if(n>0) return n; const name=rowName(row); return isGrupoYName(name)?Math.max(2,splitGrupoYRaw(name).length||2):1; }
   function personOfId(id){ return id?arr('personas').find(p=>String(p?.id||p?.ID||'')===String(id)):null; }
   function personName(p){ return txt(p?.nombre||p?.Nombre||p?.NOMBRE||''); }
-  function rowPersona(row){ return row?.persona || personOfId(rowPersonaId(row)) || {}; }
-  function rowRango(row){ const p=rowPersona(row); return up(p?.rango||p?.Rango||p?.RANGO||row?.rango||row?.Rango||row?.personaRango||''); }
+  function historicalSnapshot(eventId,personaId,row){
+    const directName=txt(row?.personaNombreSnapshot||row?.persona_nombre_snapshot||row?.personaNombre);
+    const directRange=up(row?.personaRangoSnapshot||row?.persona_rango_snapshot||row?.personaRango||row?.rango);
+    const snap=arr('eventPersonSnapshots').find(x=>String(x?.eventId||x?.event_id||'')===String(eventId||'')&&String(x?.personaId||x?.persona_id||'')===String(personaId||''))||{};
+    const current=personOfId(personaId)||{};
+    return {id:personaId,nombre:directName||txt(snap.nombreSnapshot||snap.nombre_snapshot)||personName(current),rango:directRange||up(snap.rangoSnapshot||snap.rango_snapshot)||up(current.rango||current.Rango||'SOCIO')};
+  }
+  function rowPersona(row){ return historicalSnapshot(rowEventId(row)||evId(),rowPersonaId(row),row); }
+  function rowRango(row){ const p=rowPersona(row); return up(row?.personaRangoSnapshot||row?.persona_rango_snapshot||p?.rango||row?.rango||row?.Rango||row?.personaRango||''); }
   function rowName(row){
     const p=rowPersona(row);
     return txt(p?.nombre||row?.nombre||row?.personaNombre||row?.personaNombreCompleto||row?.persona||row?.colaborador||row?.donante||row?.responsable||'');
@@ -97,7 +104,8 @@
     return group.partsRaw.some(part=>sameNorm(singleName,part));
   }
   function sociosCanonicos(){
-    const base=arr('personas').filter(socioBasePermitido);
+    const eventSnapshots=arr('eventPersonSnapshots').filter(x=>String(x?.eventId||x?.event_id||'')===String(evId())).map(x=>({id:x.personaId||x.persona_id,nombre:x.nombreSnapshot||x.nombre_snapshot,rango:x.rangoSnapshot||x.rango_snapshot}));
+    const base=(eventSnapshots.length?eventSnapshots:arr('personas')).filter(socioBasePermitido);
     const grupos=base.filter(p=>isGrupoYName(personName(p))).map(p=>{
       const name=personName(p); const partsRaw=splitGrupoYRaw(name);
       return {kind:'group',id:String(p.id||p.ID||name),name,partsRaw,size:Math.max(2,partsRaw.length||2),person:p};
