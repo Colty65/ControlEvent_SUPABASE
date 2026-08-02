@@ -1,7 +1,7 @@
-/* ControlEvent v25_prod FIX9.2 · GRAFICAS: sistema único de globos, miniaturas estables y visor restaurable. */
+/* ControlEvent v25_prod FIX9.2.1 · GRAFICAS: globos persistentes y justificantes TKxx solo en TOTAL. */
 (function(root){
   'use strict';
-  const FLAG='__ceV25GraphSanitationFix92';
+  const FLAG='__ceV25GraphSanitationFix921';
   if(root[FLAG]) return; root[FLAG]=true;
 
   const $=id=>document.getElementById(id);
@@ -79,6 +79,7 @@
       #ceV25GraphTip tr.ce-g92-subtotal td{background:#f8fafc;color:#173a63;font-weight:950}
       #ceV25GraphTip .ce-g92-total{margin-top:14px;padding:11px 12px;border:1px solid #cbd9e4;border-left:5px solid #173a63;border-radius:10px;background:#f3f7fa;color:#0f172a;font:950 16px/1.3 system-ui,sans-serif}
       #ceV25GraphTip .ce-g92-thumb-head,#ceV25GraphTip .ce-g92-thumb-cell{width:68px;min-width:68px;text-align:center}
+      #ceV25GraphTip .ce-g92-thumb-cell-empty{width:68px;min-width:68px;padding:0!important;background:transparent!important}
       #ceV25GraphTip .ce-g92-thumb-slot{width:50px;height:50px;display:inline-grid;place-items:center;border:1px solid #d5e1ea;border-radius:9px;background:#f2f6f9;overflow:hidden}
       #ceV25GraphTip .ce-g92-thumb-slot.loading:after{content:"";width:17px;height:17px;border:2px solid #b7c7d4;border-top-color:#173a63;border-radius:50%;animation:ceG92Spin .7s linear infinite}
       #ceV25GraphTip .ce-g92-thumb-slot.empty:after{content:"—";color:#9aabb8;font-weight:900}
@@ -167,6 +168,10 @@
     let cell=row.querySelector('.ce-g92-thumb-cell');if(!cell){cell=document.createElement('td');cell.className='ce-g92-thumb-cell';cell.innerHTML='<span class="ce-g92-thumb-slot loading"></span>';row.appendChild(cell);}
     cell.dataset.ceG92Kind=meta.kind;cell.dataset.ceG92Id=meta.id||'';cell.dataset.ceG92Name=meta.name||'';cell.dataset.ceG92Code=meta.code||'';cell.dataset.ceG92Store=meta.store||'';cell.dataset.ceG92Amount=String(meta.amount||0);cell.dataset.ceG92Method=meta.method||'';
   }
+  function addEmptyThumbCell(row){
+    if(row.querySelector('.ce-g92-thumb-cell,.ce-g92-thumb-cell-empty'))return;
+    const cell=document.createElement('td');cell.className='ce-g92-thumb-cell-empty';cell.setAttribute('aria-hidden','true');row.appendChild(cell);
+  }
   function prepareThumbSlots(tip){
     const incomes=incomeRows();
     tip.querySelectorAll('table').forEach(table=>{
@@ -190,7 +195,16 @@
       const rows=Array.from(table.querySelectorAll('tbody tr'));const hasTicket=ticketIndex>=0||rows.some(row=>/\bTK\s*0*\d+\b/i.test(row.textContent||''));
       if(hasTicket){
         addThumbHeader(table);
-        rows.forEach(row=>{const raw=text(row.textContent);const ticketText=text((ticketIndex>=0?row.children[ticketIndex]:null)?.textContent||raw);const match=ticketText.match(/\bTK\s*0*\d+\b/i);const code=match?match[0].toUpperCase().replace(/\s+/g,''):'';const store=text((storeIndex>=0?row.children[storeIndex]:null)?.textContent||'Tienda');addThumbSlot(row,{kind:'ticket',code,store,name:raw});});
+        const totalRows=rows.filter(row=>row.classList.contains('ce-g92-subtotal')||/^\s*(TOTAL|SUBTOTAL)\b/i.test(text(row.children[0]?.textContent)));
+        rows.forEach(row=>{
+          if(!totalRows.includes(row)){addEmptyThumbCell(row);return;}
+          const raw=text(row.textContent);
+          const ticketText=text((ticketIndex>=0?row.children[ticketIndex]:null)?.textContent||raw);
+          const match=ticketText.match(/\bTK\s*0*\d+\b/i)||raw.match(/\bTK\s*0*\d+\b/i);
+          const code=match?match[0].toUpperCase().replace(/\s+/g,''):'';
+          const store=text((storeIndex>=0?row.children[storeIndex]:null)?.textContent||'Tienda');
+          if(code)addThumbSlot(row,{kind:'ticket',code,store,name:raw});else addEmptyThumbCell(row);
+        });
       }
     });
   }
@@ -216,18 +230,15 @@
     if(activeTip?.isConnected)activeTip.remove();
     activeTip=null;activeOwner=null;suspended=null;document.body.classList.remove('ce-g92-tip-open');
   }
-  function scheduleClose(delay=220){clearTimeout(closeTimer);closeTimer=setTimeout(()=>{if(!activeTip||suspended||$('ceV25GraphMedia'))return;if(activeTip.matches(':hover')||activeTip.contains(document.activeElement))return;closeTip();},delay);}
+  function scheduleClose(){clearTimeout(closeTimer);}
   function openTip(owner,restore={}){
     const raw=adoptOwner(owner);if(!raw)return;
     closeTip();scrubLegacyTips();addStyle();activeOwner=owner;
-    const tip=document.createElement('section');tip.id='ceV25GraphTip';tip.tabIndex=-1;tip.setAttribute('role','dialog');tip.setAttribute('aria-modal','false');tip.setAttribute('aria-label','Información de gráficas');
+    const tip=document.createElement('section');tip.id='ceV25GraphTip';tip.tabIndex=-1;tip.setAttribute('role','dialog');tip.setAttribute('aria-modal','false');tip.setAttribute('aria-label','Información de gráficas');tip.setAttribute('data-ce-preserve-tooltip','1');tip.setAttribute('data-ce-g92-stable','1');
     tip.innerHTML=`<header class="ce-g92-head"><div><span class="ce-g92-kicker">GRÁFICAS DEL EVENTO</span><strong class="ce-g92-event">${esc(eventTitle())}</strong><span class="ce-g92-status ${statusClass()}">${esc(eventStatus())}</span></div><button type="button" class="ce-g92-close" data-ce-g92-close-tip aria-label="Cerrar información">×</button></header><div class="ce-g92-content">${renderStructured(raw)}</div>`;
-    tip.addEventListener('pointerenter',()=>clearTimeout(closeTimer));
-    tip.addEventListener('pointerleave',()=>scheduleClose(300));
-    tip.addEventListener('focusout',event=>{if(!tip.contains(event.relatedTarget)&&!$('ceV25GraphMedia'))scheduleClose(120);});
     document.body.appendChild(tip);activeTip=tip;document.body.classList.add('ce-g92-tip-open');
     prepareThumbSlots(tip);hydrateThumbs(tip);
-    requestAnimationFrame(()=>{const content=tip.querySelector('.ce-g92-content');if(content){content.scrollTop=restore.scrollTop||0;content.scrollLeft=restore.scrollLeft||0;}tip.focus({preventScroll:true});});
+    requestAnimationFrame(()=>{const content=tip.querySelector('.ce-g92-content');if(content){content.scrollTop=restore.scrollTop||0;content.scrollLeft=restore.scrollLeft||0;}});
   }
   function suspendTip(){
     if(!activeTip||suspended)return;
@@ -237,7 +248,7 @@
   }
   function restoreTip(){
     if(!suspended)return;const saved=suspended;suspended=null;
-    if(saved.tip?.isConnected){saved.tip.hidden=false;activeTip=saved.tip;activeOwner=saved.owner;const content=saved.tip.querySelector('.ce-g92-content');if(content){content.scrollTop=saved.scrollTop;content.scrollLeft=saved.scrollLeft;}document.body.classList.add('ce-g92-tip-open');saved.tip.focus({preventScroll:true});}
+    if(saved.tip?.isConnected){saved.tip.hidden=false;activeTip=saved.tip;activeOwner=saved.owner;const content=saved.tip.querySelector('.ce-g92-content');if(content){content.scrollTop=saved.scrollTop;content.scrollLeft=saved.scrollLeft;}document.body.classList.add('ce-g92-tip-open');}
     else if(saved.owner?.isConnected)openTip(saved.owner,{scrollTop:saved.scrollTop,scrollLeft:saved.scrollLeft});
   }
 
@@ -304,10 +315,16 @@
       if((activeTip||Date.now()<suppressLegacyUntil)&&(legacyTipIds.includes(node.id)||node.matches?.('.ce-v211-tooltip,.ce-v196-tooltip,.ce-v1952-tooltip')))node.remove();
       if(node.matches?.('#tabGraficas,#eventChartWrap')||node.querySelector?.('#tabGraficas,#eventChartWrap'))graphTouched=true;
     }));
-    if(activeTip)scrubLegacyTips();
+    if(activeTip){
+      scrubLegacyTips();
+      if(!suspended){
+        if(!activeTip.isConnected){document.body.appendChild(activeTip);document.body.classList.add('ce-g92-tip-open');}
+        activeTip.hidden=false;
+      }
+    }
     if(graphTouched)setTimeout(warmCache,60);
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
   setTimeout(warmCache,180);
-  root.ControlEventGraphFix92={open:openTip,close:closeTip,warm:warmCache};
+  root.ControlEventGraphFix92={version:'FIX9.2.1',open:openTip,close:closeTip,warm:warmCache};
 })(window);
