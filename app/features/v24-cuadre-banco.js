@@ -586,7 +586,7 @@
     const names=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
     return `${names[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
   }
-  function monthlyTicks(minTime,maxTime){
+  function monthlyTicks(minTime,maxTime,maxLabels=14){
     const start=new Date(minTime); const end=new Date(maxTime);
     if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())) return [];
     const cursor=new Date(start.getFullYear(),start.getMonth(),1,0,0,0,0);
@@ -601,7 +601,11 @@
     for(const tick of ticks){
       if(!unique.some(item=>Math.abs(item.time-tick.time)<1000)) unique.push(tick);
     }
-    return unique.length?unique:[{time:minTime,label:monthName(minTime)}];
+    if(!unique.length) return [{time:minTime,label:monthName(minTime)}];
+    const limit=Math.max(2,Number(maxLabels||14));
+    const step=Math.max(1,Math.ceil(unique.length/limit));
+    const sparse=unique.filter((tick,index)=>index===0||index===unique.length-1||index%step===0);
+    return sparse;
   }
   function closeBalanceChart(){
     const overlay=$('ceBankBalanceChartOverlay');
@@ -656,7 +660,7 @@
     const path=series.map((point,index)=>`${index?'L':'M'} ${x(point.time).toFixed(2)} ${y(point.balance).toFixed(2)}`).join(' ');
     const yTicks=Array.from({length:zoom?4:5},(_,index)=>domain.max-(domain.max-domain.min)*index/(zoom?3:4));
     const yGrid=yTicks.map(value=>`<g><line x1="${left}" y1="${y(value).toFixed(2)}" x2="${left+plotW}" y2="${y(value).toFixed(2)}"></line><text x="${left-10}" y="${(y(value)+4).toFixed(2)}" text-anchor="end">${esc(money(value))}</text></g>`).join('');
-    const xGrid=monthlyTicks(safeMinTime,safeMaxTime).map(tick=>`<g class="ce-bank-month-tick"><line x1="${x(tick.time).toFixed(2)}" y1="${top}" x2="${x(tick.time).toFixed(2)}" y2="${top+plotH}"></line><text x="${x(tick.time).toFixed(2)}" y="${top+plotH+24}" text-anchor="middle">${esc(tick.label)}</text></g>`).join('');
+    const xGrid=monthlyTicks(safeMinTime,safeMaxTime,zoom?12:15).map(tick=>`<g class="ce-bank-month-tick"><line x1="${x(tick.time).toFixed(2)}" y1="${top}" x2="${x(tick.time).toFixed(2)}" y2="${top+plotH}"></line><text x="${x(tick.time).toFixed(2)}" y="${top+plotH+24}" text-anchor="middle">${esc(tick.label)}</text></g>`).join('');
     const startEnd=`<g class="ce-bank-chart-range-labels"><text x="${left}" y="${top+plotH+42}" text-anchor="start">${esc(chartDateFull(safeMinTime))}</text><text x="${left+plotW}" y="${top+plotH+42}" text-anchor="end">${esc(chartDateFull(safeMaxTime))}</text></g>`;
     const highlight=shade&&Number.isFinite(shadeStart)&&Number.isFinite(shadeEnd)
       ?`<rect class="ce-bank-balance-highlight" x="${Math.max(left,x(Math.min(shadeStart,shadeEnd))).toFixed(2)}" y="${top}" width="${Math.max(6,Math.min(left+plotW,x(Math.max(shadeStart,shadeEnd)))-Math.max(left,x(Math.min(shadeStart,shadeEnd)))).toFixed(2)}" height="${plotH.toFixed(2)}"></rect>`:'';

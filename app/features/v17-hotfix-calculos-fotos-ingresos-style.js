@@ -464,7 +464,7 @@
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
           const attach=document.createElement('button'); attach.type='button'; attach.className='outline small ce-v17-doc-photo-btn'; attach.dataset.ceV17Photo='attach'; attach.dataset.ceV17Label=label; attach.title='Adjuntar foto'; attach.setAttribute('aria-label','Adjuntar foto'); attach.textContent='📎'; attach.disabled=busy.has(canonicalKey(label)); actions.appendChild(attach);
           if(src){
-            const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt='ticket'; img.loading='lazy'; img.decoding='async'; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; actions.appendChild(img);
+            const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt='ticket'; img.loading='eager'; img.decoding='async'; img.width=36; img.height=36; img.src=src; img.dataset.ceHf12Tk=ticketToken(label); img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; actions.appendChild(img);
             const rem=document.createElement('button'); rem.type='button'; rem.className='outline small ce-v17-doc-photo-btn'; rem.dataset.ceV17Photo='remove'; rem.dataset.ceV17Label=label; rem.title='Eliminar foto'; rem.setAttribute('aria-label','Eliminar foto'); rem.textContent='🗑️'; rem.disabled=busy.has(canonicalKey(label)); actions.appendChild(rem);
           }else{
             const no=document.createElement('span'); no.className='hint ce-v17-noimage'; no.textContent='Sin imagen'; actions.appendChild(no);
@@ -693,5 +693,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,serverImages,version:'v24_prod_doc_method_fix12_visor_detalle_miniaturas'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v25_prod_fix934_resumen_estable_miniaturas'};
 })();

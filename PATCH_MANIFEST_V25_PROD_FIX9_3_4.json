@@ -1,0 +1,25 @@
+{
+  "version": "v25_prod",
+  "buildId": "20260802-V25-PROD-FIX9-3-4-RESUMEN-ESTABLE-FECHAS-LEGIBLES",
+  "zipName": "CE_V25_PROD_FIX9_3_4_RESUMEN_ESTABLE_FECHAS_LEGIBLES.zip",
+  "base": "CE_V25_PROD_FIX9_3_3_RETEMBLORES_MINIATURAS_NO_ASISTENTES.zip",
+  "changes": [
+    "Resumen Presupuestario: bloqueo temprano de hover legacy y DOM estable",
+    "Cálculos por tienda/ticket: miniaturas fijas y visor de Gráficas",
+    "Gastos realizados: resolución directa de imágenes V17",
+    "Cuadre bancario: densidad adaptativa de fechas del eje X"
+  ],
+  "modifiedFiles": [
+    "public/index.html",
+    "app/version.js",
+    "MANIFEST_VERSION.txt",
+    "public/app/features/v24-cuadre-banco.js",
+    "app/features/v24-cuadre-banco.js",
+    "public/app/features/budget-tooltips-lite.js",
+    "budget-tooltips-lite.js",
+    "public/app/features/v17-hotfix-calculos-fotos-ingresos-style.js",
+    "app/features/v17-hotfix-calculos-fotos-ingresos-style.js",
+    "public/app/features/v25-prod-fix9-3-4-resumen-estable.js",
+    "app/features/v25-prod-fix9-3-4-resumen-estable.js"
+  ]
+}

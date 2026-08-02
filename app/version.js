@@ -3,8 +3,8 @@ export const VERSION = 'v25_prod';
 export const VERSION_LABEL = 'v25_prod';
 export const VERSION_TEXT = 'ControlEvent v25_prod';
 export const VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260802-V25-PROD-FIX9-3-2-RESUMEN-GLOBOS-AISLADOS';
-export const ZIP_NAME = 'CE_V25_PROD_FIX9_3_2_RESUMEN_GLOBOS_AISLADOS.zip';
+export const BUILD_ID = '20260802-V25-PROD-FIX9-3-4-RESUMEN-ESTABLE-FECHAS-LEGIBLES';
+export const ZIP_NAME = 'CE_V25_PROD_FIX9_3_4_RESUMEN_ESTABLE_FECHAS_LEGIBLES.zip';
 
 try {
   window.__ceVersion = VERSION;

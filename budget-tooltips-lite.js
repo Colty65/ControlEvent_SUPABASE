@@ -338,6 +338,12 @@
   function normalizeImageKey(value){ return up(value).replace(/\s*\|\s*/g,' | '); }
   function ticketImageSrc(store, ticket){
     const eventId=selectedEventId(); const tk=ticketToken(ticket); if(!tk) return '';
+    try{
+      const direct=window.ControlEventV17CalculosFotos?.imageFor?.(`${store} | ${tk}`)
+        || window.ControlEventV17CalculosFotos?.imageFor?.(`${store}|${tk}`)
+        || window.ControlEventV17CalculosFotos?.imageFor?.(tk);
+      if(direct) return imageValue(direct);
+    }catch(_){ }
     const storeU=up(store); const candidates=[];
     const addBag=bag=>{ if(bag && typeof bag === 'object') candidates.push(...Object.entries(bag)); };
     addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs);
@@ -357,7 +363,7 @@
     const tk=ticketToken(ticket); const src=ticketImageSrc(store,ticket);
     if(!tk || !src) return {className:'ce-budget-ticket-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
     const title=`${tk} · ${store}`; const file=`${tk}-${store}.jpg`.replace(/[^a-zA-Z0-9._-]+/g,'-');
-    return {className:'ce-budget-ticket-thumb-cell',html:`<button type="button" class="ce-budget-ticket-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="lazy" decoding="async"></button>`};
+    return {className:'ce-budget-ticket-thumb-cell',html:`<button type="button" class="ce-budget-ticket-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
   }
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
