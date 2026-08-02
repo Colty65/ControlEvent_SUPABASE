@@ -412,28 +412,36 @@
   }
   function ticketToken(value){ const m=norm(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i); return m ? m[0].replace(/\s+/g,'').toUpperCase() : ''; }
   function normalizeImageKey(value){ return up(value).replace(/\s*\|\s*/g,' | '); }
+  function decodedImageText(value){ let out=norm(value); try{out=decodeURIComponent(out);}catch(_){ } return out; }
+  function ticketIdentity(value){ const m=decodedImageText(value).match(/\bTK\s*0*(\d+)\b/i); return m?'TK'+String(Number(m[1])):''; }
   function ticketImageSrc(store, ticket){
-    const eventId=selectedEventId(); const tk=ticketToken(ticket); if(!tk) return '';
+    const eventId=selectedEventId(); const tk=ticketToken(ticket); const wanted=ticketIdentity(tk||ticket); if(!wanted) return '';
     try{
       const direct=window.ControlEventV17CalculosFotos?.imageFor?.(`${store} | ${tk}`)
         || window.ControlEventV17CalculosFotos?.imageFor?.(`${store}|${tk}`)
         || window.ControlEventV17CalculosFotos?.imageFor?.(tk);
       if(direct) return imageValue(direct);
     }catch(_){ }
-    const storeU=up(store); const candidates=[];
-    const addBag=bag=>{ if(bag && typeof bag === 'object') candidates.push(...Object.entries(bag)); };
-    addBag(imageCache); addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs);
-    addBag(window.ControlEventV17CalculosFotos?.serverImages);
+    const storeU=up(store); const candidates=[]; const seen=new Set();
+    const addBag=bag=>{ if(!bag||typeof bag!=='object')return; for(const entry of Object.entries(bag)){const sig=entry[0]+'\n'+imageValue(entry[1]);if(!seen.has(sig)){seen.add(sig);candidates.push(entry);}} };
+    addBag(imageCache); addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs); addBag(window.ControlEventV17CalculosFotos?.serverImages);
+    const eventIds=new Set(arr('eventos').map(e=>norm(e?.id)).filter(Boolean));
     let best={score:-1,src:''};
     candidates.forEach(([key,value])=>{
       const src=imageValue(value); if(!src) return;
-      const keyU=normalizeImageKey(key); let score=-1;
-      if(keyU.includes(tk)) score=300;
-      if(score>=0 && storeU && keyU.includes(storeU)) score+=200;
-      if(score>=0 && eventId && keyU.includes(up(eventId))) score+=100;
-      if(score>best.score) best={score,src};
+      const rawKey=decodedImageText(key); const rawSrc=decodedImageText(src); const keyTicket=ticketIdentity(rawKey); const srcTicket=ticketIdentity(rawSrc);
+      if(keyTicket!==wanted&&srcTicket!==wanted)return;
+      const first=norm(rawKey.split('|')[0]); if(first&&eventIds.has(first)&&eventId&&first!==eventId)return;
+      const keyU=normalizeImageKey(rawKey); const srcU=up(rawSrc); let score=0;
+      if(keyTicket===wanted)score+=800;
+      if(srcTicket===wanted)score+=500;
+      if(eventId&&rawKey.startsWith(eventId+'|'))score+=350;
+      if(eventId&&keyU.includes(up(eventId)))score+=100;
+      if(storeU&&keyU.includes(storeU))score+=260;
+      else if(storeU&&srcU.includes(storeU))score+=80;
+      if(score>best.score)best={score,src};
     });
-    return best.src;
+    return best.score>=0?best.src:'';
   }
   function ticketThumbHtml(store,ticket){
     const tk=ticketToken(ticket); const src=ticketImageSrc(store,ticket);

@@ -16505,6 +16505,7 @@ window.addCellNote = addCellNote;
     return `${title}\n${row.k || row.label || ''}\n${totalLabel}: ${money(row.v)}\n\n${header}\n${lines.length ? lines.join('\n') : 'Sin productos'}`;
   }
   function renderTiendaTicketV240(targetId, rows){
+    if(window.__ceDisableLegacySummaryTiendaRenderer || window.__ceSummaryTiendaStableOwner==='v17') return;
     const wrap = $(targetId);
     if(!wrap) return;
     rows = Array.isArray(rows) ? rows : summaryByTiendaTicketV240();
@@ -16795,15 +16796,21 @@ window.addCellNote = addCellNote;
     window.renderColabs = wrapped;
   }
   function installSummaryOverrides(){
-    try{ summaryByTiendaTicket = summaryByTiendaTicketV240; }catch(_){ }
-    window.summaryByTiendaTicket = summaryByTiendaTicketV240;
+    const stableTicketSummary = window.__ceDisableLegacySummaryTiendaRenderer || window.__ceSummaryTiendaStableOwner==='v17';
+    if(!stableTicketSummary){
+      try{ summaryByTiendaTicket = summaryByTiendaTicketV240; }catch(_){ }
+      window.summaryByTiendaTicket = summaryByTiendaTicketV240;
+    }
     try{ summaryBySegmento = function(){ return groupRowsV240('segmento'); }; window.summaryBySegmento = summaryBySegmento; }catch(_){ window.summaryBySegmento = function(){ return groupRowsV240('segmento'); }; }
     try{ summaryByDestino = function(){ return groupRowsV240('destino'); }; window.summaryByDestino = summaryByDestino; }catch(_){ window.summaryByDestino = function(){ return groupRowsV240('destino'); }; }
     const prev = (typeof renderSummaryList === 'function') ? renderSummaryList : window.renderSummaryList;
     if(prev && !prev.__v240Wrapped){
       const wrapped = function(targetId, rows){
         if(targetId === 'summarySegmento' || targetId === 'summaryDestino') return renderGroupingBarsV240(targetId, rows || []);
-        if(targetId === 'summaryTiendaTicket') return renderTiendaTicketV240(targetId, rows || summaryByTiendaTicketV240());
+        if(targetId === 'summaryTiendaTicket'){
+          if(window.__ceDisableLegacySummaryTiendaRenderer || window.__ceSummaryTiendaStableOwner==='v17') return prev.apply(this, arguments);
+          return renderTiendaTicketV240(targetId, rows || summaryByTiendaTicketV240());
+        }
         return prev.apply(this, arguments);
       };
       wrapped.__v240Wrapped = true;

@@ -153,35 +153,64 @@
     }
     return up(rest)===up(clean);
   }
+  function mergeImageBagIntoServer(bag){
+    if(!bag||typeof bag!=='object')return;
+    for(const [k,v] of Object.entries(bag)){
+      const raw=imageValue(v); if(!raw)continue;
+      const seed=norm(v?.storage_path||v?.pathname||v?.url||v?.public_url||k);
+      serverImages[k]=cacheBust(raw,seed);
+    }
+  }
   function normalizeApiImages(images){
     Object.keys(serverImages).forEach(k=>delete serverImages[k]);
-    for(const [k,v] of Object.entries(images||{})){
-      const src=cacheBust(imageValue(v), norm(v?.storage_path||v?.pathname||v?.url||k));
-      if(src)serverImages[k]=src;
+    for(const s of stateObjects()){
+      mergeImageBagIntoServer(s?.ticketImages);
+      mergeImageBagIntoServer(s?.ticketImageRefs);
+      mergeImageBagIntoServer(s?.ticketImagesByKey);
     }
+    mergeImageBagIntoServer(images||{});
   }
   async function loadServerImages(force=false){
     const ev=eventId(); if(!ev)return {};
+    if(force||loadedEvent!==ev)normalizeApiImages({});
     if(!force&&loadedEvent===ev)return Promise.resolve(serverImages);
     if(!force&&fetchingEvent===ev&&fetchPromise)return fetchPromise;
     fetchingEvent=ev;
-    fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev),{cache:'no-store'})
+    fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev)+'&_='+Date.now(),{cache:'no-store'})
       .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); normalizeApiImages(json.images||{}); loadedEvent=ev; return serverImages;})
-      .catch(err=>{console.warn('[ControlEvent v25_prod] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
+      .catch(err=>{loadedEvent=ev;console.warn('[ControlEvent v25_prod] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
       .finally(()=>{fetchPromise=null;});
     return fetchPromise;
   }
+  function decoded(value){
+    let out=norm(value); try{out=decodeURIComponent(out);}catch(_){ }
+    return out;
+  }
+  function ticketIdentity(value){
+    const m=decoded(value).match(/\bTK\s*0*(\d+)\b/i);
+    return m?'TK'+String(Number(m[1])):'';
+  }
   function imageFor(label){
-    const clean=cleanLabel(label); const tk=ticketToken(clean); const p=splitParts(clean); const storeU=up(p[0]||'');
-    if(tombstones.has(canonicalKey(clean))||tombstones.has(tk))return '';
+    const clean=cleanLabel(label); const tk=ticketToken(clean); const wantedTicket=ticketIdentity(tk||clean); const p=splitParts(clean); const storeU=up(p[0]||''); const ev=eventId();
+    if(!wantedTicket||tombstones.has(canonicalKey(clean))||tombstones.has(tk))return '';
+    const eventIds=new Set();
+    for(const s of stateObjects()) for(const e of (Array.isArray(s?.eventos)?s.eventos:[])) if(norm(e?.id))eventIds.add(norm(e.id));
     let best={score:-1,src:''};
-    for(const [key,src] of Object.entries(serverImages)){
-      if(!sameEventImageKey(key,src))continue;
-      const rest=imageRest(key); const restU=up(rest); let score=-1;
-      if(key===canonicalKey(clean))score=1000;
-      else if(up(rest)===up(clean))score=800;
-      else if(tk&&restU.includes(tk)&&(!storeU||restU.includes(storeU)||restU===tk))score=500;
-      else if(matchesLabel(clean,key,src))score=300;
+    for(const [key,value] of Object.entries(serverImages)){
+      const src=imageValue(value); if(!src)continue;
+      const rawKey=decoded(key); const rawSrc=decoded(src); const keyTicket=ticketIdentity(rawKey); const srcTicket=ticketIdentity(rawSrc);
+      if(keyTicket!==wantedTicket&&srcTicket!==wantedTicket)continue;
+      const first=norm(rawKey.split('|')[0]);
+      if(first&&eventIds.has(first)&&ev&&first!==ev)continue;
+      const keyU=up(rawKey); const srcU=up(rawSrc); let score=0;
+      if(rawKey===canonicalKey(clean))score+=1400;
+      if(up(imageRest(rawKey))===up(clean))score+=1100;
+      if(keyTicket===wantedTicket)score+=800;
+      if(srcTicket===wantedTicket)score+=500;
+      if(ev&&rawKey.startsWith(ev+'|'))score+=350;
+      if(ev&&keyU.includes(up(ev)))score+=120;
+      if(storeU&&keyU.includes(storeU))score+=260;
+      else if(storeU&&srcU.includes(storeU))score+=80;
       if(score>best.score)best={score,src};
     }
     return best.score>=0?best.src:'';
@@ -386,7 +415,9 @@
       const txt=tipForRow(r,clean)||'Sin detalle';
       body='<pre class="ce-v17-rowdetail-pre">'+esc(txt)+'</pre>';
     }
-    modal.innerHTML='<div class="ce-v17-rowdetail-card" role="dialog" aria-modal="true"><div class="ce-v17-rowdetail-head"><div><h3>'+esc(title)+'</h3><p>'+esc(clean)+'</p></div><button type="button" class="ce-v17-rowdetail-close" aria-label="Cerrar">×</button></div><div class="ce-v17-rowdetail-total"><span>'+esc(r?.donated?'TOTAL ESTIMADO':'TOTAL')+'</span><strong>'+esc(money(r?.v||0))+'</strong></div>'+body+'</div>';
+    const detailTk=ticketToken(clean); const detailStore=splitParts(clean)[0]||'Tienda'; const detailSrc=detailTk?imageFor(clean):'';
+    const detailThumb=detailSrc?'<button type="button" class="ce-v17-rowdetail-thumb ce-budget-stable-thumb" data-ce-g92-photo="1" data-image-src="'+esc(detailSrc)+'" data-photo-title="'+esc(`${detailTk} · ${detailStore}`)+'" data-download-name="'+esc(`${detailTk}-${norm(currentEvent().titulo||currentEvent().descripcion||'Evento').replace(/[^a-zA-Z0-9._-]+/g,'-')}-${detailStore.replace(/[^a-zA-Z0-9._-]+/g,'-')}.jpg`)+'" aria-label="Ver '+esc(detailTk)+'"><img src="'+esc(detailSrc)+'" alt="'+esc(`${detailTk} · ${detailStore}`)+'" width="48" height="48"></button>':'';
+    modal.innerHTML='<div class="ce-v17-rowdetail-card" role="dialog" aria-modal="true"><div class="ce-v17-rowdetail-head"><div><h3>'+esc(title)+'</h3><p>'+esc(clean)+'</p></div><button type="button" class="ce-v17-rowdetail-close" aria-label="Cerrar">×</button></div><div class="ce-v17-rowdetail-total"><span>'+esc(r?.donated?'TOTAL ESTIMADO':'TOTAL')+'</span><span class="ce-v17-rowdetail-total-right"><strong>'+esc(money(r?.v||0))+'</strong>'+detailThumb+'</span></div>'+body+'</div>';
     modal.addEventListener('click',e=>{
       if(e.target===modal||e.target.closest('.ce-v17-rowdetail-close')){
         stop(e); modal.remove();
@@ -639,6 +670,9 @@
       .ce-v17-rowdetail-head p{margin:4px 0 0!important;font-weight:850!important;color:#334155!important;}
       .ce-v17-rowdetail-close{border:0!important;background:#0f172a!important;color:#fff!important;border-radius:999px!important;width:46px!important;height:46px!important;font-size:30px!important;font-weight:950!important;line-height:1!important;cursor:pointer!important;}
       .ce-v17-rowdetail-total{display:flex!important;justify-content:space-between!important;gap:12px!important;align-items:center!important;background:#e0f2fe!important;border-radius:12px!important;padding:8px 10px!important;margin-bottom:8px!important;font-weight:950!important;}
+      .ce-v17-rowdetail-total-right{display:inline-flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;min-height:50px!important;}
+      .ce-v17-rowdetail-thumb{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;}
+      .ce-v17-rowdetail-thumb img{width:48px!important;height:48px!important;object-fit:cover!important;display:block!important;}
       .ce-v17-rowdetail-table-wrap{overflow:auto!important;border:1px solid #dbe4ee!important;border-radius:12px!important;}
       .ce-v17-rowdetail-table{border-collapse:separate!important;border-spacing:0!important;width:100%!important;min-width:680px!important;font-size:13px!important;}
       .ce-v17-rowdetail-table th,.ce-v17-rowdetail-table td{padding:7px 9px!important;border-bottom:1px solid #e2e8f0!important;border-right:1px solid #eef2f7!important;text-align:left!important;white-space:nowrap!important;}
@@ -709,5 +743,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v25_prod_fix934_resumen_estable_miniaturas'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v25_prod_fix936_ticket_thumbs_single_owner'};
 })();
