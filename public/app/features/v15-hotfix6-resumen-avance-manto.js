@@ -162,7 +162,7 @@
       box.className = 'ce-v15hf6-avance-box';
       panel.appendChild(box);
     }
-    box.innerHTML = `
+    const html = `
       <div class="ce-v15hf6-avance-title">AVANCE del evento</div>
       ${progressRowHtml('1 · INGRESOS', p.ingresosPct, '#2563eb', p.ingresosText, '')}
       ${progressRowHtml('2 · Foto justificante de ingresos adjuntas', p.ingresosReceiptPct, '#16a34a', p.ingresosReceiptText, '')}
@@ -171,11 +171,26 @@
       ${progressRowHtml('5 · DOCUMENTOS DEL EVENTO', p.docsPct, p.docsPct >= 100 ? '#16a34a' : '#f59e0b', p.docsText, p.docsWarn)}
       ${progressRowHtml('6 · Foto de tickets adjuntos a factura contable', p.ticketPhotoPct, '#8b5cf6', p.ticketPhotoText, p.ticketPhotoWarn)}
     `;
+    // No reconstruir el DOM si el cálculo no ha cambiado. La reconstrucción
+    // continua era el origen del retemblor y de la flecha heredada intermitente.
+    if(box.dataset.ceV15Hf6Sig !== html){
+      box.dataset.ceV15Hf6Sig = html;
+      box.innerHTML = html;
+    }
   }
 
   function normalizeSummaryRows(){
     const root = $('summaryTiendaTicket');
     if(!root) return;
+    // V17 es el renderizador final de "Por tienda y ticket". No volver a
+    // truncar, etiquetar ni reconstruir sus filas desde este hotfix antiguo.
+    if(root.classList.contains('ce-v17-doc-photo-ready') || root.querySelector('.ce-v17-doc-row')){
+      root.querySelectorAll('.ce-v17-doc-row,.ce-v17-doc-row *').forEach(node=>{
+        ['data-ce-tip-v21','data-tip-bg-v21','data-ce-tip-layout-v21','data-ce-tip','data-tip-bg','data-ce-tip-layout','title'].forEach(attr=>node.removeAttribute?.(attr));
+        node.classList?.remove('ce-v15hf6-summary-collapsed','ce-v15hf7-summary-collapsed','ce-hf9-collapsed');
+      });
+      return;
+    }
     const rows = Array.from(root.querySelectorAll(':scope > .summary-item'));
     rows.forEach(row => {
       const amount = row.querySelector('.pill');
@@ -330,7 +345,15 @@
   function installObserver(){
     if(mo) return;
     try{
-      mo = new MutationObserver(() => {
+      mo = new MutationObserver(records => {
+        const relevant = records.some(record => {
+          const target = record.target?.nodeType === 1 ? record.target : record.target?.parentElement;
+          if(!target) return false;
+          if(target.closest?.('.ce-v15hf6-avance-box,#summaryTiendaTicket.ce-v17-doc-photo-ready')) return false;
+          if(target.closest?.('#budgetLayout,#maintenanceWrapper')) return true;
+          return Array.from(record.addedNodes || []).some(node => node?.nodeType === 1 && (node.matches?.('#budgetLayout,#maintenanceWrapper') || node.querySelector?.('#budgetLayout,#maintenanceWrapper')));
+        });
+        if(!relevant) return;
         if(installObserver._t) clearTimeout(installObserver._t);
         installObserver._t = setTimeout(applyAll, 80);
       });
@@ -358,6 +381,6 @@
 
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 40)));
   [0,120,500,1400,2600].forEach(ms => setTimeout(install, ms));
-  setInterval(applyAll, 2500);
+  // Sin sondeo periódico: los renderizados y eventos ya disparan applyAll.
   window.ControlEventV15Hotfix6 = {version: VERSION, versionFile: VERSION_FILE, applyAll, computeProgress};
 })();

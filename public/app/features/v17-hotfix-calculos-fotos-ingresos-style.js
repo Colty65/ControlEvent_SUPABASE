@@ -455,6 +455,8 @@
         const gastosCorrientes=up(label).includes('GASTOS CORRIENTES');
         div.className='summary-item ce-hf10-row ce-v17-doc-row'+(pending?' red-row ce-v17-pending':'')+(donated?' ce-hf10-donation':'')+(gastosCorrientes?' ce-v17-gastos-corrientes':'');
         div.dataset.ceV17Label=label; div.dataset.ceTicketLabel=label; div.dataset.ceV17Detail=JSON.stringify(detailPayload); div.setAttribute('role','button'); div.setAttribute('tabindex','0'); div.setAttribute('aria-label','Ver detalle');
+        ['data-ce-tip-v21','data-tip-bg-v21','data-ce-tip-layout-v21','data-ce-tip','data-tip-bg','data-ce-tip-layout','title'].forEach(attr=>div.removeAttribute(attr));
+        div.classList.remove('ce-v15hf6-summary-collapsed','ce-v15hf7-summary-collapsed','ce-hf9-collapsed');
         const amountStyle=pending?' style="background:#fef2f2;color:#b91c1c"':(donated?' style="text-decoration:line-through"':'');
         const left=document.createElement('span'); left.className='ce-hf10-label'; left.innerHTML=esc(label);
         const right=document.createElement('span'); right.className='ce-v17-doc-right'; right.innerHTML='<span class="pill"'+amountStyle+'>'+esc(money(r.v||0))+'</span>';
@@ -615,7 +617,8 @@
       #summaryTiendaTicket .ce-v17-doc-photo-btn{width:34px!important;min-width:34px!important;height:30px!important;min-height:30px!important;padding:2px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:17px!important;line-height:1!important;border-radius:8px!important;white-space:nowrap!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;}
       #summaryTiendaTicket .ce-v17-doc-thumb{width:36px!important;height:36px!important;object-fit:cover!important;border-radius:8px!important;display:inline-block!important;cursor:pointer!important;}
       #summaryTiendaTicket .ce-v17-noimage{font-size:12px!important;color:#64748b!important;white-space:nowrap!important;}
-      #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;}
+      #summaryTiendaTicket .ce-v17-doc-row{min-height:44px!important;transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;contain:layout paint!important;}
+      #summaryTiendaTicket .ce-v17-doc-row.ce-v15hf6-summary-collapsed>span:first-child::after,#summaryTiendaTicket .ce-v17-doc-row.ce-v15hf7-summary-collapsed>span:first-child::after,#summaryTiendaTicket .ce-v17-doc-row.ce-hf9-collapsed>span:first-child::after{content:none!important;display:none!important;}
       #summaryTiendaTicket .ce-v17-doc-right{display:flex!important;align-items:center!important;gap:8px!important;justify-content:flex-end!important;}
       #summaryTiendaTicket .ce-v17-doc-sortbar button.active{background:#0f172a!important;color:#fff!important;border-color:#0f172a!important;}
       #summaryTiendaTicket .ce-hf10-label i,#summaryTiendaTicket .ce-v17-doc-row i{display:none!important;visibility:hidden!important;}
@@ -680,6 +683,11 @@
       },true);
     });
   }
+  ['mouseover','mouseout'].forEach(type=>document.addEventListener(type,ev=>{
+    const row=ev.target?.closest?.('#summaryTiendaTicket .ce-v17-doc-row');
+    if(!row)return;
+    try{ev.stopImmediatePropagation();}catch(_){ }
+  },true));
   function install(){injectStyle();wrapGlobals();wrapRenderers();patchRefreshForPhotos();loadServerImages(false).then(redraw);redraw();}
   ['click','pointerup','touchend'].forEach(type=>{window.addEventListener(type,handleActivation,{capture:true,passive:false});document.addEventListener(type,handleActivation,{capture:true,passive:false});});
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);

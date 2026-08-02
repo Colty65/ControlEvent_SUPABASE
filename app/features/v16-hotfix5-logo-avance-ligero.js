@@ -104,8 +104,17 @@
     return group.partsRaw.some(part=>sameNorm(singleName,part));
   }
   function sociosCanonicos(){
-    const eventSnapshots=arr('eventPersonSnapshots').filter(x=>String(x?.eventId||x?.event_id||'')===String(evId())).map(x=>({id:x.personaId||x.persona_id,nombre:x.nombreSnapshot||x.nombre_snapshot,rango:x.rangoSnapshot||x.rango_snapshot}));
-    const base=(eventSnapshots.length?eventSnapshots:arr('personas')).filter(socioBasePermitido);
+    // El snapshot del evento no es un censo completo: solo contiene personas con
+    // relación real. Se conserva PERSONAS para poder obtener los NO ASISTENTES y
+    // el snapshot sobrescribe el nombre/rango histórico cuando existe.
+    const byId=new Map(); const withoutId=[];
+    arr('personas').forEach(p=>{ const id=String(p?.id||p?.ID||''); if(id)byId.set(id,p); else withoutId.push(p); });
+    arr('eventPersonSnapshots').filter(x=>String(x?.eventId||x?.event_id||'')===String(evId())).forEach(x=>{
+      const id=String(x?.personaId||x?.persona_id||''); const current=byId.get(id)||{};
+      const merged={...current,id:id||current.id||current.ID||'',nombre:x?.nombreSnapshot||x?.nombre_snapshot||current.nombre||current.Nombre||'',rango:x?.rangoSnapshot||x?.rango_snapshot||current.rango||current.Rango||''};
+      if(id)byId.set(id,merged); else withoutId.push(merged);
+    });
+    const base=[...byId.values(),...withoutId].filter(socioBasePermitido);
     const grupos=base.filter(p=>isGrupoYName(personName(p))).map(p=>{
       const name=personName(p); const partsRaw=splitGrupoYRaw(name);
       return {kind:'group',id:String(p.id||p.ID||name),name,partsRaw,size:Math.max(2,partsRaw.length||2),person:p};

@@ -216,14 +216,20 @@
     return ref || storeName(row) || 'Sin donante';
   }
 
+  function tableCellHtml(cell){
+    if(cell && typeof cell === 'object' && typeof cell.html === 'string'){
+      return `<td${cell.className ? ` class="${esc(cell.className)}"` : ''}>${cell.html}</td>`;
+    }
+    return `<td>${esc(cell)}</td>`;
+  }
   function tableHtml(headers, rows){
-    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
+    const body = (rows && rows.length ? rows : [['Sin registros']]).map(row => `<tr>${row.map(tableCellHtml).join('')}</tr>`).join('');
     return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
   function showTooltip(title, totalLabel, totalValue, table){
     const box = ensureTooltip();
     hideLegacyBudgetTooltips();
-    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div><div class="ce-budget-lite-total"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>${table}`;
+    box.innerHTML = `<button type="button" class="ce-budget-lite-close" aria-label="Cerrar">×</button><div class="ce-budget-lite-title">${esc(title)}</div>${table}<div class="ce-budget-lite-total ce-budget-lite-total-final"><span>${esc(totalLabel)}</span><strong>${esc(totalValue)}</strong></div>`;
     box.dataset.ceBudgetOpenedAt = String(Date.now());
     box.dataset.ceBudgetLastTitle = String(title || '');
     box.classList.add('open');
@@ -322,6 +328,37 @@
   }
 
   function expenseTicket(row){ return norm(row.ticketDonacion || row.ticket || '') || 'Pte.Compra'; }
+  function imageValue(value){
+    if(!value) return '';
+    if(typeof value === 'string') return norm(value);
+    if(typeof value === 'object') return norm(value.url || value.public_url || value.publicUrl || value.pathname || value.path || value.storage_path || value.dataUrl || value.src || value.base64 || '');
+    return '';
+  }
+  function ticketToken(value){ const m=norm(value).match(/\bTK\s*\d+[A-Z0-9_-]*\b/i); return m ? m[0].replace(/\s+/g,'').toUpperCase() : ''; }
+  function normalizeImageKey(value){ return up(value).replace(/\s*\|\s*/g,' | '); }
+  function ticketImageSrc(store, ticket){
+    const eventId=selectedEventId(); const tk=ticketToken(ticket); if(!tk) return '';
+    const storeU=up(store); const candidates=[];
+    const addBag=bag=>{ if(bag && typeof bag === 'object') candidates.push(...Object.entries(bag)); };
+    addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs);
+    addBag(window.ControlEventV17CalculosFotos?.serverImages);
+    let best={score:-1,src:''};
+    candidates.forEach(([key,value])=>{
+      const src=imageValue(value); if(!src) return;
+      const keyU=normalizeImageKey(key); let score=-1;
+      if(keyU.includes(tk)) score=300;
+      if(score>=0 && storeU && keyU.includes(storeU)) score+=200;
+      if(score>=0 && eventId && keyU.includes(up(eventId))) score+=100;
+      if(score>best.score) best={score,src};
+    });
+    return best.src;
+  }
+  function ticketThumbCell(store,ticket){
+    const tk=ticketToken(ticket); const src=ticketImageSrc(store,ticket);
+    if(!tk || !src) return {className:'ce-budget-ticket-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
+    const title=`${tk} · ${store}`; const file=`${tk}-${store}.jpg`.replace(/[^a-zA-Z0-9._-]+/g,'-');
+    return {className:'ce-budget-ticket-thumb-cell',html:`<button type="button" class="ce-budget-ticket-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="lazy" decoding="async"></button>`};
+  }
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
   function realisedExpenseRows(){ return allExpenseRows().filter(row => norm(row.ticketDonacion || row.ticket || '') !== ''); }
@@ -343,12 +380,12 @@
         while(i < sorted.length && storeKey(sorted[i]) === sKey && ticketKey(sorted[i]) === tKey){ group.push(sorted[i]); i += 1; }
         const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
         storeTotal += ticketTotal;
-        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]));
-        out.push([`Total ${store}, ${ticket}`, '', '', '', '', money(ticketTotal)]);
-        out.push(['', '', '', '', '', '']);
+        group.forEach(row => out.push([storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row)), '']));
+        out.push([`Total ${store} ${ticket}`, '', '', '', '', money(ticketTotal), ticketThumbCell(store,ticket)]);
+        out.push(['', '', '', '', '', '', '']);
       }
-      out.push([`Total ${store}`, '', '', '', '', money(storeTotal)]);
-      out.push(['', '', '', '', '', '']);
+      out.push([`Total ${store}`, '', '', '', '', money(storeTotal), '']);
+      out.push(['', '', '', '', '', '', '']);
     }
     while(out.length && out[out.length - 1].every(cell => !String(cell || '').trim())) out.pop();
     return out;
@@ -373,7 +410,7 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total','Foto'], expenseTableRows(rows));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table};
   }
   function installLegacyTipAttributeFirewall(){
@@ -489,6 +526,17 @@
     sanitizeBudgetPanels();
     hideLegacyBudgetTooltips();
     showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
+    // Las fotos del servidor pueden terminar de cargarse después del primer render.
+    // Al abrir OPERATIVA se rehidrata una sola vez y se conserva el mismo globo.
+    if(isOperativePanel(panel) && typeof window.ControlEventV17CalculosFotos?.loadServerImages === 'function'){
+      const openedTitle=tip.title;
+      Promise.resolve(window.ControlEventV17CalculosFotos.loadServerImages(false)).then(()=>{
+        const box=$(TOOLTIP_ID);
+        if(!box?.classList.contains('open') || box.dataset.ceBudgetLastTitle !== openedTitle || !row.isConnected) return;
+        const refreshed=operativeTipForRow(row);
+        if(refreshed) showTooltip(refreshed.title,refreshed.totalLabel,refreshed.totalValue,refreshed.table);
+      }).catch(()=>{});
+    }
     return true;
   }
 
@@ -557,6 +605,26 @@
     }
     return false;
   }
+  function injectStabilityStyle(){
+    if($('ceBudgetFix933Style')) return;
+    const style=document.createElement('style'); style.id='ceBudgetFix933Style';
+    style.textContent=`
+      #budgetLayout .ce-v306-budget-lite-row{transition:none!important;animation:none!important;transform:none!important;will-change:auto!important;}
+      #budgetLayout .ce-v306-budget-lite-row::before,#budgetLayout .ce-v306-budget-lite-row::after{animation:none!important;transition:none!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-cell{text-align:center!important;vertical-align:middle!important;min-width:58px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb{width:48px!important;height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-empty{color:#94a3b8!important;font-weight:800!important;}
+    `;
+    document.head.appendChild(style);
+  }
+  ['mouseover','mouseout'].forEach(type=>document.addEventListener(type,event=>{
+    const row=event.target?.closest?.('#budgetLayout .ce-v306-budget-lite-row');
+    if(!row) return;
+    hideLegacyBudgetTooltips();
+    try{ event.stopImmediatePropagation(); }catch(_){ }
+  },true));
+
   document.addEventListener('pointerdown', event => {
     try{ rememberMobileBudgetTapStart(event); }catch(_){ }
   }, true);
@@ -634,6 +702,7 @@
   }
   try{ document.body.classList.add('ce-budget-tips-lite-active-v307'); }catch(_){ }
   installLegacyTipAttributeFirewall();
+  injectStabilityStyle();
   patchRenderBudget();
   sanitizeBudgetPanels();
   [0, 220, 900].forEach(ms => setTimeout(() => rehydrateBudgetLite('startup'), ms));

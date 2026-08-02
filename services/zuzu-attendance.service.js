@@ -31,8 +31,23 @@ function snapshotMap(state,eventId){
 }
 
 function canonicalSocioCensus(state,eventId){
-  const snaps=arr(state?.eventPersonSnapshots).filter(row=>rowEventId(row)===trim(eventId));
-  const source=snaps.length?snaps.map(row=>({id:rowPersonaId(row),nombre:row?.nombreSnapshot??row?.nombre_snapshot,rango:row?.rangoSnapshot??row?.rango_snapshot})):arr(state?.personas);
+  // Los snapshots FIX9.3 recogen relaciones reales del evento, no todo el censo.
+  // PERSONAS aporta los posibles no asistentes y el snapshot sobrescribe el dato
+  // histórico de quienes sí estaban vinculados al evento.
+  const byId=new Map(); const withoutId=[];
+  arr(state?.personas).forEach(row=>{
+    const id=trim(row?.id??row?.ID);
+    const item={id,nombre:row?.nombre??row?.Nombre??row?.NOMBRE,rango:row?.rango??row?.Rango??row?.RANGO};
+    if(id) byId.set(id,item); else withoutId.push(item);
+  });
+  arr(state?.eventPersonSnapshots).filter(row=>rowEventId(row)===trim(eventId)).forEach(row=>{
+    const id=rowPersonaId(row); const current=byId.get(id)||{};
+    const nombre=trim(row?.nombreSnapshot??row?.nombre_snapshot)||current.nombre||'';
+    const rango=trim(row?.rangoSnapshot??row?.rango_snapshot)||current.rango||'';
+    const item={...current,id:id||current.id||'',nombre,rango};
+    if(id) byId.set(id,item); else withoutId.push(item);
+  });
+  const source=[...byId.values(),...withoutId];
   const base=source.map(row=>({
     row,
     id:trim(row?.id??row?.ID),

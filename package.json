@@ -1,6 +1,6 @@
 {
   "name": "controlevent-v25-prod",
-  "version": "25.0.10",
+  "version": "25.0.11",
   "private": true,
   "type": "module",
   "scripts": {

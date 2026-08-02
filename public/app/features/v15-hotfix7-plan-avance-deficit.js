@@ -63,6 +63,8 @@
   function collapseTiendaTicketRows(){
     const root=$('summaryTiendaTicket');
     if(!root) return;
+    // El renderizador V17 mantiene filas, detalle y miniaturas estables.
+    if(root.classList.contains('ce-v17-doc-photo-ready') || root.querySelector('.ce-v17-doc-row')) return;
     Array.from(root.querySelectorAll(':scope > .summary-item')).forEach(row=>{
       const amount=row.querySelector('.pill');
       const label=row.querySelector(':scope > span:first-child') || row.querySelector('span');
@@ -84,5 +86,5 @@
   function apply(){ injectStyle(); applyProgressFallback(); collapseSummaryRows(); collapseTiendaTicketRows(); }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-changed'].forEach(e=>window.addEventListener(e,()=>setTimeout(apply,60),true));
   [0,200,700,1500,3000].forEach(ms=>setTimeout(apply,ms));
-  setInterval(apply,2500);
+  // Sin sondeo periódico: evita repintados y retemblores sobre las filas.
 })();
