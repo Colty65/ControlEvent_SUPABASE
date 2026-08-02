@@ -235,7 +235,10 @@
       const cells = Array.isArray(row.cells) ? row.cells : ['Sin registros'];
       return `<tr${row.className ? ` class="${esc(row.className)}"` : ''}>${cells.map(tableCellHtml).join('')}</tr>`;
     }).join('');
-    const stableAttrs = options.receipts ? ' data-ce-v465-receipts="1" data-ce-v468-receipts="1"' : '';
+    const stableAttrs = [
+      options.receipts ? ' data-ce-v465-receipts="1" data-ce-v468-receipts="1"' : '',
+      options.tickets ? ' data-ce-budget-ticket-table="1"' : ''
+    ].join('');
     return `<div class="ce-budget-lite-table-wrap"><table class="ce-budget-lite-table ce-budget-stable-table" data-ce-budget-owned="1"${stableAttrs}><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
   function showTooltip(title, totalLabel, totalValue, table){
@@ -511,8 +514,8 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total','Ticket'], expenseTableRows(rows));
-    return {title, totalLabel:'TOTAL', totalValue: money(total), table, needsImages:true};
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total','Ticket'], expenseTableRows(rows), {tickets:true});
+    return {title, totalLabel:'TOTAL', totalValue: money(total), table, needsImages:true, needsTicketImages:true};
   }
   function installLegacyTipAttributeFirewall(){
     try{
@@ -638,7 +641,9 @@
       showTooltip(tip.title, tip.totalLabel, tip.totalValue, tip.table);
     };
     if(first.needsImages){
-      Promise.resolve(loadImageCache(false)).then(show).catch(show);
+      // Los eventos con muchas fotos pueden tener una caché parcial (p. ej. justificantes de ingresos)
+      // antes de que se hayan cargado las fotos de TKxx. Para Gastos se fuerza una lectura completa.
+      Promise.resolve(loadImageCache(first.needsTicketImages === true)).then(show).catch(show);
     }else{
       show();
     }
@@ -720,6 +725,19 @@
       #ceBudgetLiteTooltipV307{contain:layout paint!important;overflow-anchor:none!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-lite-table{table-layout:auto!important;width:100%!important;min-width:760px!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-lite-table th,#ceBudgetLiteTooltipV307 .ce-budget-lite-table td{vertical-align:middle!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"]{table-layout:fixed!important;width:100%!important;min-width:820px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(1){width:165px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(2){width:76px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(4){width:58px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(5){width:84px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(6){width:92px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:nth-child(7){width:68px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] td:nth-child(3){white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.18!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:last-child,
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] td:last-child{position:sticky!important;right:0!important;z-index:3!important;background:#fff!important;box-shadow:-8px 0 12px -12px rgba(15,23,42,.55)!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] th:last-child{z-index:5!important;background:#f1f5f9!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] .ce-budget-ticket-subtotal td:last-child{background:#f8fafc!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-lite-table[data-ce-budget-ticket-table="1"] .ce-budget-store-total td:last-child{background:#eef6ff!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-thumb-cell{width:62px!important;min-width:62px!important;text-align:center!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;vertical-align:middle!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb img{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;object-fit:cover!important;display:block!important;}
