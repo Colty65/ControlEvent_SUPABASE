@@ -89,8 +89,14 @@
   function canWrite(){const r=role();return r==='GD'||r==='RW';}
   function locked(){
     const val=safe(()=>typeof isLocked==='function'?isLocked():undefined,undefined);
-    if(val!==undefined)return !!val;
-    return /FINALIZADO/i.test(norm(currentEvent().situacion||currentEvent().estado||''));
+    const ev=currentEvent()||{};
+    const select=$('selectedEvent');
+    const selectedText=norm(select?.selectedOptions?.[0]?.textContent||'');
+    const statusText=norm($('eventStatus')?.textContent||'');
+    const body=document.body;
+    const uiFinalized=!!(body?.classList?.contains('ce-v235-finalizado')||body?.classList?.contains('ce-event-finalized')||body?.classList?.contains('ce-v233-final-consulta')||body?.classList?.contains('ce-finalizado-consulta'));
+    const text=[ev.situacion,ev.estado,ev.status,selectedText,statusText].map(norm).join(' ');
+    return val===true||uiFinalized||/FINALIZAD[OA]/i.test(text);
   }
   function money(v){
     const n=Number(v||0);
@@ -161,8 +167,7 @@
       serverImages[k]=cacheBust(raw,seed);
     }
   }
-  function normalizeApiImages(images){
-    Object.keys(serverImages).forEach(k=>delete serverImages[k]);
+  function mergeKnownImages(images){
     for(const s of stateObjects()){
       mergeImageBagIntoServer(s?.ticketImages);
       mergeImageBagIntoServer(s?.ticketImageRefs);
@@ -170,16 +175,18 @@
     }
     mergeImageBagIntoServer(images||{});
   }
+  function clearServerImages(){Object.keys(serverImages).forEach(k=>delete serverImages[k]);}
   async function loadServerImages(force=false){
     const ev=eventId(); if(!ev)return {};
-    if(force||loadedEvent!==ev)normalizeApiImages({});
+    if(loadedEvent&&loadedEvent!==ev){clearServerImages();loadedEvent='';}
+    mergeKnownImages({});
     if(!force&&loadedEvent===ev)return Promise.resolve(serverImages);
-    if(!force&&fetchingEvent===ev&&fetchPromise)return fetchPromise;
+    if(fetchingEvent===ev&&fetchPromise)return fetchPromise;
     fetchingEvent=ev;
     fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev)+'&_='+Date.now(),{cache:'no-store'})
-      .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); normalizeApiImages(json.images||{}); loadedEvent=ev; return serverImages;})
-      .catch(err=>{loadedEvent=ev;console.warn('[ControlEvent v25_prod] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
-      .finally(()=>{fetchPromise=null;});
+      .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); mergeKnownImages(json.images||{}); loadedEvent=ev; return serverImages;})
+      .catch(err=>{loadedEvent=ev;mergeKnownImages({});console.warn('[ControlEvent v25_prod] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
+      .finally(()=>{fetchPromise=null;fetchingEvent='';});
     return fetchPromise;
   }
   function decoded(value){
@@ -497,7 +504,7 @@
           const actions=document.createElement('span'); actions.className='ticket-actions ce-v17-doc-actions'; actions.dataset.ceV17Label=label;
           const tk=ticketToken(label); const parts=splitParts(label); const store=parts[0]||'Tienda';
           if(src){
-            const thumb=document.createElement('button'); thumb.type='button'; thumb.className='ce-v17-doc-thumb-btn'; thumb.setAttribute('data-ce-g92-photo','1'); thumb.dataset.imageSrc=src; thumb.dataset.photoTitle=`${tk||'TKxx'} · ${store}`; thumb.dataset.downloadName=`${tk||'TKxx'}-${norm(currentEvent().titulo||currentEvent().descripcion||'Evento').replace(/[^a-zA-Z0-9._-]+/g,'-')}-${store.replace(/[^a-zA-Z0-9._-]+/g,'-')}.jpg`; thumb.dataset.ticketCode=tk; thumb.dataset.storeName=store; thumb.setAttribute('aria-label',`Ver ${tk||'ticket'} · ${store}`);
+            const thumb=document.createElement('button'); thumb.type='button'; thumb.className='ce-v17-doc-thumb-btn'; thumb.setAttribute('data-ce-g92-photo','1'); thumb.setAttribute('data-ce-view-ticket-image','1'); thumb.dataset.imageSrc=src; thumb.dataset.photoTitle=`${tk||'TKxx'} · ${store}`; thumb.dataset.downloadName=`${tk||'TKxx'}-${norm(currentEvent().titulo||currentEvent().descripcion||'Evento').replace(/[^a-zA-Z0-9._-]+/g,'-')}-${store.replace(/[^a-zA-Z0-9._-]+/g,'-')}.jpg`; thumb.dataset.ticketCode=tk; thumb.dataset.storeName=store; thumb.setAttribute('aria-label',`Ver ${tk||'ticket'} · ${store}`); thumb.disabled=false; thumb.style.setProperty('display','inline-flex','important'); thumb.style.setProperty('visibility','visible','important'); thumb.style.setProperty('pointer-events','auto','important'); thumb.style.setProperty('opacity','1','important');
             const img=document.createElement('img'); img.className='ce-v17-doc-thumb'; img.alt=`${tk||'ticket'} · ${store}`; img.loading='eager'; img.decoding='async'; img.width=42; img.height=42; img.src=src; img.dataset.ceHf12Tk=tk; img.dataset.ceV17Src=src; img.dataset.ceV17Detail=div.dataset.ceV17Detail||''; thumb.appendChild(img); actions.appendChild(thumb);
           }
           if(canWrite()&&!locked()){
@@ -743,5 +750,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v25_prod_fix936_ticket_thumbs_single_owner'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v25_prod_fix937_finalized_view_thumbs_stable'};
 })();

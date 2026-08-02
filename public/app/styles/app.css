@@ -677,7 +677,7 @@ body.ce-role-ro #btnExportSeed{display:none !important;}
 body.ce-role-rw #btnOpenImport,
 body.ce-role-rw #btnExportSeed,
 body.ce-role-rw #mtAccesoBtn{display:none !important;}
-body.ce-role-ro #summaryTiendaTicket .ticket-actions button,
+body.ce-role-ro #summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),
 body.ce-role-ro #summaryTiendaTicket .ticket-actions input,
 body.ce-role-ro #summaryTiendaTicket .ce-photo-btn-v202,
 body.ce-role-ro #summaryTiendaTicket [data-ce-delete-img],
@@ -773,11 +773,13 @@ body.ce-v235-gd #btnExportSeed,body.ce-v235-gd #btnOpenImport{display:flex!impor
 body.ce-v235-rw #mtAccesoBtn,body.ce-v235-ro #mtAccesoBtn{display:none!important;}
 body.ce-v235-rw #btnExportSeed,body.ce-v235-rw #btnOpenImport,
 body.ce-v235-ro #btnExportSeed,body.ce-v235-ro #btnOpenImport{display:none!important;}
-body.ce-v235-finalizado #summaryTiendaTicket .ticket-actions button,
+body.ce-v235-finalizado #summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),
 body.ce-v235-finalizado #summaryTiendaTicket .ticket-actions input[type="file"],
 body.ce-v235-finalizado #summaryTiendaTicket .ce-photo-btn-v202,
 body.ce-v235-finalizado #summaryTiendaTicket [data-ce-delete-img="1"]{display:none!important;pointer-events:none!important;}
 body.ce-v235-finalizado img.ticket-thumb, body.ce-v235-ro img.ticket-thumb{display:inline-block!important;visibility:visible!important;pointer-events:auto!important;opacity:1!important;cursor:zoom-in!important;}
+body.ce-v235-finalizado #summaryTiendaTicket .ce-v17-doc-thumb-btn,body.ce-v235-ro #summaryTiendaTicket .ce-v17-doc-thumb-btn,body.ce-role-ro #summaryTiendaTicket .ce-v17-doc-thumb-btn{display:inline-flex!important;visibility:visible!important;pointer-events:auto!important;opacity:1!important;cursor:zoom-in!important;}
+body.ce-v235-finalizado #summaryTiendaTicket .ce-v17-doc-thumb,body.ce-v235-ro #summaryTiendaTicket .ce-v17-doc-thumb,body.ce-role-ro #summaryTiendaTicket .ce-v17-doc-thumb{display:block!important;visibility:visible!important;pointer-events:auto!important;opacity:1!important;}
 body.ce-v235-finalizado .locked, body.ce-v235-finalizado .app-lockable.locked{opacity:1!important;filter:none!important;pointer-events:auto!important;user-select:auto!important;}
 body.ce-v235-rw #mtEventos input, body.ce-v235-rw #mtEventos select, body.ce-v235-rw #mtEventos textarea, body.ce-v235-rw #mtEventos button,
 body.ce-v235-gd #mtEventos input, body.ce-v235-gd #mtEventos select, body.ce-v235-gd #mtEventos textarea, body.ce-v235-gd #mtEventos button{pointer-events:auto!important;opacity:1!important;}

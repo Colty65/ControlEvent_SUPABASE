@@ -14975,7 +14975,7 @@ window.addCellNote = addCellNote;
     hideMobileTarget('btnExportSeed',gd);
     // RO: resumen/graficas solo consulta. Oculta botones de foto, aunque por si aparecen hay bloqueo por captura.
     if(ro){
-      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img]').forEach(el=>{el.style.setProperty('display','none','important');});
+      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img]').forEach(el=>{el.style.setProperty('display','none','important');});
     }
     ensureRoInfo();
     switchToAllowedForRO();
@@ -14992,7 +14992,7 @@ window.addCellNote = addCellNote;
       if(deniedTab) return block('Usuario RO: solo consulta de Resumen, Cálculos por agrupación, Gráficas y Excel INFOEVENTO si el evento está finalizado.',evnt);
       const excel=t.closest('#btnExportExcel,.mobile-menu-action[data-target="btnExportExcel"]');
       if(excel && !isFinalized()) return block('Usuario RO: solo puede descargar INFOEVENTO cuando el evento está Finalizado.',evnt);
-      const photo=t.closest('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img],button[onclick*="uploadTicketImage"],button[onclick*="removeTicketImage"]');
+      const photo=t.closest('#summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img],button[onclick*="uploadTicketImage"],button[onclick*="removeTicketImage"]');
       if(photo) return block('Usuario RO: modo consulta. No puede añadir ni eliminar fotos.',evnt);
     }
   },true);
@@ -15528,13 +15528,13 @@ window.addCellNote = addCellNote;
     // Evento finalizado: navegar/visualizar sí, cambios de fotos no.
     if(isFinalized()){
       document.querySelectorAll('.locked,.app-lockable.locked').forEach(el=>{el.classList.remove('locked');el.style.pointerEvents='auto';el.style.opacity='1';el.style.filter='none';});
-      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
-      document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb').forEach(img=>{img.style.display='inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';});
+      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
+      document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket [data-ce-view-ticket-image="1"]').forEach(img=>{img.style.display=img.matches?.('.ce-v17-doc-thumb-btn,[data-ce-view-ticket-image="1"]')?'inline-flex':'inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';img.disabled=false;});
     }
     if(isRO()){
       // RO en curso: no modificar fotos, pero sí ver miniaturas y abrirlas.
-      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
-      document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb').forEach(img=>{img.style.display='inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';});
+      document.querySelectorAll('#summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),#summaryTiendaTicket .ticket-actions input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"]').forEach(el=>{el.style.display='none';el.disabled=true;el.style.pointerEvents='none';});
+      document.querySelectorAll('#summaryTiendaTicket img.ticket-thumb,img.ticket-thumb,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket [data-ce-view-ticket-image="1"]').forEach(img=>{img.style.display=img.matches?.('.ce-v17-doc-thumb-btn,[data-ce-view-ticket-image="1"]')?'inline-flex':'inline-block';img.style.visibility='visible';img.style.pointerEvents='auto';img.style.opacity='1';img.disabled=false;});
     }
   }
 
@@ -15587,7 +15587,7 @@ window.addCellNote = addCellNote;
       // En GD no bloqueamos por evento finalizado: dejamos que la rutina original de backup se ejecute.
       return true;
     }
-    const photo=t.closest?.('#summaryTiendaTicket .ticket-actions button,#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"],button[onclick*="uploadTicketImage"],button[onclick*="removeTicketImage"],input.ticket-file-input');
+    const photo=t.closest?.('#summaryTiendaTicket .ticket-actions button:not(.ce-v17-doc-thumb-btn):not([data-ce-g92-photo]):not([data-ce-view-ticket-image]),#summaryTiendaTicket input[type="file"],#summaryTiendaTicket .ce-photo-btn-v202,#summaryTiendaTicket [data-ce-delete-img="1"],button[onclick*="uploadTicketImage"],button[onclick*="removeTicketImage"],input.ticket-file-input');
     if(photo && (isFinalized()||isRO())){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();alert(isFinalized()?'Evento finalizado: solo se permite visualizar fotos.':'Usuario RO: solo puede visualizar fotos.');return false;}
   },true);
   document.addEventListener('change',function(ev){const t=ev.target;if(t&&t.matches?.('#summaryTiendaTicket input[type="file"],input.ticket-file-input')&&(isFinalized()||isRO())){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();t.value='';return false;}},true);

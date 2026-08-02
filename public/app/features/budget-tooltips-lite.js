@@ -287,20 +287,32 @@
   function loadImageCache(force=false){
     const eventId = selectedEventId();
     if(!eventId) return Promise.resolve(imageCache);
-    if(!force && imageCacheEvent === eventId) return Promise.resolve(imageCache);
-    if(!force && imageCachePromise) return imageCachePromise;
-    if(force || imageCacheEvent !== eventId) clearImageCache();
+    if(imageCacheEvent && imageCacheEvent !== eventId) clearImageCache();
     mergeImageBag(stateRef().ticketImages);
     mergeImageBag(stateRef().ticketImageRefs);
+    mergeImageBag(stateRef().ticketImagesByKey);
     mergeImageBag(window.ControlEventV17CalculosFotos?.serverImages);
-    imageCachePromise = fetch('/api/ticket-images?eventId='+encodeURIComponent(eventId)+'&_='+Date.now(),{cache:'no-store'})
+    if(!force && imageCacheEvent === eventId && Object.keys(imageCache).length) return Promise.resolve(imageCache);
+    if(imageCachePromise) return imageCachePromise;
+    const v17Load = typeof window.ControlEventV17CalculosFotos?.loadServerImages === 'function'
+      ? Promise.resolve(window.ControlEventV17CalculosFotos.loadServerImages(force)).catch(() => ({}))
+      : Promise.resolve({});
+    const apiLoad = fetch('/api/ticket-images?eventId='+encodeURIComponent(eventId)+'&_='+Date.now(),{cache:'no-store'})
       .then(async response => {
         const payload = await response.json().catch(() => ({}));
         if(response.ok) mergeImageBag(payload?.images || {});
+        return imageCache;
+      }).catch(() => imageCache);
+    imageCachePromise = Promise.all([v17Load,apiLoad])
+      .then(([v17Images]) => {
+        mergeImageBag(v17Images);
+        mergeImageBag(window.ControlEventV17CalculosFotos?.serverImages);
+        mergeImageBag(stateRef().ticketImages);
+        mergeImageBag(stateRef().ticketImageRefs);
+        mergeImageBag(stateRef().ticketImagesByKey);
         imageCacheEvent = eventId;
         return imageCache;
       })
-      .catch(() => { imageCacheEvent = eventId; return imageCache; })
       .finally(() => { imageCachePromise = null; });
     return imageCachePromise;
   }
@@ -422,33 +434,34 @@
         || window.ControlEventV17CalculosFotos?.imageFor?.(tk);
       if(direct) return imageValue(direct);
     }catch(_){ }
-    const storeU=up(store); const candidates=[]; const seen=new Set();
+    const storeU=up(store); const eventU=up(eventId); const candidates=[]; const seen=new Set();
     const addBag=bag=>{ if(!bag||typeof bag!=='object')return; for(const entry of Object.entries(bag)){const sig=entry[0]+'\n'+imageValue(entry[1]);if(!seen.has(sig)){seen.add(sig);candidates.push(entry);}} };
-    addBag(imageCache); addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs); addBag(window.ControlEventV17CalculosFotos?.serverImages);
-    const eventIds=new Set(arr('eventos').map(e=>norm(e?.id)).filter(Boolean));
+    addBag(imageCache); addBag(window.ControlEventV17CalculosFotos?.serverImages); addBag(stateRef().ticketImages); addBag(stateRef().ticketImageRefs); addBag(stateRef().ticketImagesByKey);
+    const eventIds=new Set(arr('eventos').map(e=>up(e?.id)).filter(Boolean));
     let best={score:-1,src:''};
     candidates.forEach(([key,value])=>{
       const src=imageValue(value); if(!src) return;
-      const rawKey=decodedImageText(key); const rawSrc=decodedImageText(src); const keyTicket=ticketIdentity(rawKey); const srcTicket=ticketIdentity(rawSrc);
-      if(keyTicket!==wanted&&srcTicket!==wanted)return;
-      const first=norm(rawKey.split('|')[0]); if(first&&eventIds.has(first)&&eventId&&first!==eventId)return;
-      const keyU=normalizeImageKey(rawKey); const srcU=up(rawSrc); let score=0;
-      if(keyTicket===wanted)score+=800;
-      if(srcTicket===wanted)score+=500;
-      if(eventId&&rawKey.startsWith(eventId+'|'))score+=350;
-      if(eventId&&keyU.includes(up(eventId)))score+=100;
-      if(storeU&&keyU.includes(storeU))score+=260;
-      else if(storeU&&srcU.includes(storeU))score+=80;
-      if(score>best.score)best={score,src};
+      const rawKey=decodedImageText(key); const rawSrc=decodedImageText(src);
+      const valueText=value&&typeof value==='object'?decodedImageText([value.key,value.label,value.url,value.public_url,value.pathname,value.storage_path].filter(Boolean).join(' | ')):'';
+      const allText=[rawKey,rawSrc,valueText].join(' | '); const allU=up(allText);
+      const found=ticketIdentity(allText); if(found!==wanted) return;
+      const firstU=up(rawKey.split('|')[0]);
+      if(firstU&&eventIds.has(firstU)&&eventU&&firstU!==eventU) return;
+      let score=500;
+      if(ticketIdentity(rawKey)===wanted) score+=500;
+      if(eventU&&allU.includes(eventU)) score+=300;
+      if(storeU&&allU.includes(storeU)) score+=260;
+      if(normalizeImageKey(rawKey)===normalizeImageKey(`${eventId}|${store} | ${tk}`)) score+=1000;
+      if(score>best.score) best={score,src};
     });
     return best.score>=0?best.src:'';
   }
-  function ticketThumbHtml(store,ticket){
+  function ticketThumbCell(store,ticket){
     const tk=ticketToken(ticket); const src=ticketImageSrc(store,ticket);
-    if(!tk || !src) return '<span class="ce-budget-ticket-thumb-empty">—</span>';
+    if(!tk || !src) return {className:'ce-budget-ticket-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
     const title=`${tk} · ${store}`;
     const file=`${safeDownloadPart(tk,'TKxx')}-${safeDownloadPart(selectedEventObj().titulo||selectedEventObj().descripcion||'Evento','Evento')}-${safeDownloadPart(store,'Tienda')}.jpg`;
-    return `<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`;
+    return {className:'ce-budget-ticket-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-ce-view-ticket-image="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-ticket-code="${esc(tk)}" data-store-name="${esc(store)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
   }
   function isExpenseRow(row){ return !isDonationTicket(row.ticketDonacion || row.ticket || ''); }
   function allExpenseRows(){ return compras().filter(isExpenseRow); }
@@ -471,11 +484,10 @@
         while(i < sorted.length && storeKey(sorted[i]) === sKey && ticketKey(sorted[i]) === tKey){ group.push(sorted[i]); i += 1; }
         const ticketTotal = group.reduce((sum, row) => sum + productValue(row), 0);
         storeTotal += ticketTotal;
-        group.forEach(row => out.push({cells:[storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row))]}));
-        const totalHtml=`<div class="ce-budget-total-media"><strong>${esc(money(ticketTotal))}</strong>${ticketThumbHtml(store,ticket)}</div>`;
-        out.push({className:'ce-budget-ticket-subtotal',cells:[`Total ${store} ${ticket}`, '', '', '', '', {className:'ce-budget-total-with-thumb',html:totalHtml}]});
+        group.forEach(row => out.push({cells:[storeName(row), expenseTicket(row), productName(row), num(productUnits(row)), money(productPrice(row)), money(productValue(row)), '']}));
+        out.push({className:'ce-budget-ticket-subtotal',cells:[`Total ${store} ${ticket}`, '', '', '', '', money(ticketTotal), ticketThumbCell(store,ticket)]});
       }
-      out.push({className:'ce-budget-store-total',cells:[`Total ${store}`, '', '', '', '', money(storeTotal)]});
+      out.push({className:'ce-budget-store-total',cells:[`Total ${store}`, '', '', '', '', money(storeTotal), '']});
     }
     return out;
   }
@@ -499,7 +511,7 @@
       return null;
     }
     const total = rows.reduce((sum, item) => sum + productValue(item), 0);
-    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total'], expenseTableRows(rows));
+    const table = tableHtml(['Tienda','Ticket','Producto','Uds','Precio','Total','Ticket'], expenseTableRows(rows));
     return {title, totalLabel:'TOTAL', totalValue: money(total), table, needsImages:true};
   }
   function installLegacyTipAttributeFirewall(){
@@ -714,9 +726,8 @@
       #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-empty{display:inline-flex!important;width:48px!important;height:48px!important;align-items:center!important;justify-content:center!important;color:#94a3b8!important;font-weight:800!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-ticket-subtotal td{background:#f8fafc!important;font-weight:900!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-store-total td{background:#eef6ff!important;font-weight:950!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-total-with-thumb{min-width:122px!important;padding-top:4px!important;padding-bottom:4px!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-total-media{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;min-height:50px!important;white-space:nowrap!important;}
-      #ceBudgetLiteTooltipV307 .ce-budget-total-media>strong{min-width:70px!important;text-align:right!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-cell{width:64px!important;min-width:64px!important;max-width:64px!important;text-align:center!important;padding-left:8px!important;padding-right:8px!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-ticket-subtotal .ce-budget-ticket-thumb-cell{height:58px!important;}
     `;
     document.head.appendChild(style);
   }
