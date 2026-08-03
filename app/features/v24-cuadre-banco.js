@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX9.1.2 · Cuadre Banco: histórico completo, franja del evento, zoom y visor de justificantes. */
+/* ControlEvent v25_prod FIX9.3.9 · Cuadre Banco: selector TKxx protegido frente a manejadores heredados. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -294,6 +294,14 @@
     root.addEventListener('pointerdown',event=>{
       const target=event.target;
       if(!$('ceBankOverlay')||$('ceBankOverlay').classList.contains('hidden')) return;
+      const ticketAction=target?.closest?.('[data-ce-bank-add-ticket]');
+      if(ticketAction){
+        // Evita que manejadores heredados de la fila interpreten la pulsación
+        // como un cambio de «En saldo». No se cancela el gesto: el click
+        // posterior abrirá el selector múltiple de TKxx.
+        try{event.stopPropagation();event.stopImmediatePropagation();}catch(_){ }
+        return;
+      }
       if(target?.id==='ceBankSearch'){
         try{target.focus({preventScroll:true});}catch(_){try{target.focus();}catch(__){}}
         return;
@@ -310,8 +318,20 @@
       if(event.target?.id==='ceBankSearch') applyCommandValue(event.target);
     },true);
     root.addEventListener('click',event=>{
+      const overlay=$('ceBankOverlay');
+      if(!overlay||overlay.classList.contains('hidden')) return;
+      const ticketAction=event.target?.closest?.('[data-ce-bank-add-ticket]');
+      if(ticketAction){
+        // Captura prioritaria en window: el botón solo abre el selector de TKxx
+        // y nunca puede activar/desactivar el movimiento bancario.
+        stopEvent(event);
+        if(ticketAction.disabled||ticketAction.getAttribute('aria-disabled')==='true') return;
+        const movementId=text(ticketAction.dataset.ceBankAddTicket);
+        if(movementId&&actionAllowed(`ticket-picker:${movementId}`,500)) openTicketPicker(movementId);
+        return;
+      }
       const refresh=event.target?.closest?.('#ceBankRefresh');
-      if(!refresh||!$('ceBankOverlay')||$('ceBankOverlay').classList.contains('hidden')) return;
+      if(!refresh) return;
       stopEvent(event);
       refreshBankData();
     },true);
@@ -1262,12 +1282,18 @@
     if(chartTrigger){openBalanceChart(event);return;}
     const chartClose=event.target?.closest?.('[data-ce-bank-close-balance-chart]');
     if(chartClose||event.target?.id==='ceBankBalanceChartOverlay'){stopEvent(event);closeBalanceChart();return;}
-    const included=event.target?.closest?.('[data-ce-bank-included]');
-    if(included){toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;}
-    const forced=event.target?.closest?.('[data-ce-bank-forced]');
-    if(forced){toggleForced(forced.dataset.ceBankForced,forced.checked,forced);return;}
     const add=event.target?.closest?.('[data-ce-bank-add-ticket]');
-    if(add){openTicketPicker(add.dataset.ceBankAddTicket);return;}
+    if(add){
+      stopEvent(event);
+      if(add.disabled||add.getAttribute('aria-disabled')==='true') return;
+      const movementId=text(add.dataset.ceBankAddTicket);
+      if(movementId&&actionAllowed(`ticket-picker:${movementId}`,500)) openTicketPicker(movementId);
+      return;
+    }
+    const included=event.target?.closest?.('[data-ce-bank-included]');
+    if(included){stopEvent(event);toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;}
+    const forced=event.target?.closest?.('[data-ce-bank-forced]');
+    if(forced){stopEvent(event);toggleForced(forced.dataset.ceBankForced,forced.checked,forced);return;}
     const editIncome=event.target?.closest?.('[data-ce-bank-edit-income]');
     if(editIncome){openIncomePicker(editIncome.dataset.ceBankEditIncome);return;}
     const remove=event.target?.closest?.('[data-ce-bank-remove-link]');
@@ -1327,6 +1353,10 @@
     installDom(); applyRole();
   }):null;
   if(observer) observer.observe(document.documentElement,{childList:true,subtree:true});
+  // Se instala ahora, antes de que carguen los bundles heredados situados después
+  // de este módulo en index.html. Así ningún capturador global previo puede convertir
+  // «Revisar / modificar TKxx» en un cambio de «En saldo».
+  installCommandCapture();
   document.addEventListener('DOMContentLoaded',()=>{installDom();installCommandCapture();},{once:true});
   [0,100,500,1400].forEach(ms=>setTimeout(installDom,ms));
   root.ControlEventBankReconciliation={version:VERSION,open,close,load,refresh:refreshBankData,openBalanceChart,closeBalanceChart,exportData,parseMoney:num,state:store};

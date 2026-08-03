@@ -1635,3 +1635,13 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{overflow-x:auto!important;overscroll-behavior-x:contain!important}
   #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{width:720px!important;height:265px!important;min-height:265px!important}
 }
+
+
+/* v25_prod FIX9.3.9 · el botón TKxx queda por encima de cualquier capa heredada.
+   La acción se limita a abrir el selector; «En saldo» solo responde a su propio conmutador. */
+#ceBankOverlay .ce-bank-movement-main{position:relative!important;z-index:1!important}
+#ceBankOverlay .ce-bank-justification{position:relative!important;z-index:4!important}
+#ceBankOverlay .ce-bank-justify-right,
+#ceBankOverlay .ce-bank-justify-actions{position:relative!important;z-index:10!important;isolation:isolate!important}
+#ceBankOverlay .ce-bank-add-ticket[data-ce-bank-add-ticket]{position:relative!important;z-index:12!important;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important}
+#ceBankOverlay .ce-bank-add-ticket[data-ce-bank-add-ticket]>*{pointer-events:none!important}
