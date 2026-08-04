@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX9.3.9 · Cuadre Banco: selector TKxx protegido frente a manejadores heredados. */
+/* ControlEvent v25_prod FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -875,9 +875,9 @@
       );
       const links=orderedLinks.map(link=>{
         const removable=link.isActiveEvent!==false&&!store.readOnly;
-        return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}" role="button" tabindex="0" data-ce-bank-view-ticket="1" data-event-id="${esc(link.eventId||store.eventId)}" data-ticket-code="${esc(link.ticketCode)}" data-event-title="${esc(link.eventTitle)}" title="Ver foto de ${esc(link.ticketCode)} · ${esc(link.eventTitle)} · ${money(link.ticketAmount)}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><em aria-hidden="true">📷</em>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
+        return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}" role="button" tabindex="0" data-ce-bank-view-ticket="1" data-event-id="${esc(link.eventId||store.eventId)}" data-ticket-code="${esc(link.ticketCode)}" data-event-title="${esc(link.eventTitle)}" data-ticket-amount="${esc(link.ticketAmount)}" data-movement-id="${esc(row.id)}" title="Ver foto de ${esc(link.ticketCode)} · ${esc(link.eventTitle)} · ${money(link.ticketAmount)}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><em aria-hidden="true">📷</em>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
       }).join('');
-      const incomeChips=incomeLinks.map(link=>`<span class="ce-bank-income-chip ${link.imageUrl?'has-photo':''} ${link.manual?'manual':''}" ${link.imageUrl?`role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id)}" data-person-name="${esc(link.personName)}" title="Ver justificante de ingreso de ${esc(link.personName)}"`:''}><i>ING</i><b>${esc(link.personName)}</b><strong>${money(link.amount)}</strong>${link.imageUrl?`<img src="${esc(link.imageUrl)}" alt="Justificante de ${esc(link.personName)}">`:'<em aria-hidden="true">📷</em>'}</span>`).join('');
+      const incomeChips=incomeLinks.map(link=>`<span class="ce-bank-income-chip ${link.imageUrl?'has-photo':''} ${link.manual?'manual':''}" ${link.imageUrl?`role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id)}" data-person-name="${esc(link.personName)}" data-income-amount="${esc(link.amount)}" data-payment-method="${esc(link.paymentMethod)}" data-movement-id="${esc(row.id)}" title="Ver justificante de ingreso de ${esc(link.personName)}"`:''}><i>ING</i><b>${esc(link.personName)}</b><strong>${money(link.amount)}</strong>${link.imageUrl?`<img src="${esc(link.imageUrl)}" alt="Justificante de ${esc(link.personName)}">`:'<em aria-hidden="true">📷</em>'}</span>`).join('');
       const forceControl=row.amount<0&&!row.linkedToOtherEvent&&activeLinks.length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)
         ?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${actionDisabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
       const includeLabel=row.inclusionLocked?'Otro evento':(row.included?'En saldo':'Inactivo');
@@ -963,43 +963,91 @@
     });
     return best.src;
   }
+  function normalizeTicketUi(value){
+    const match=text(value).toUpperCase().match(/\bTK\s*0*(\d+)[A-Z0-9_-]*\b/);
+    return match?`TK${String(Number(match[1])).padStart(2,'0')}`:text(value).toUpperCase();
+  }
+  function movementForMedia(node){
+    const movementId=text(node?.dataset?.movementId||node?.closest?.('[data-movement-id]')?.dataset?.movementId);
+    return arr(store.data?.movements).find(row=>String(row.id)===String(movementId))||null;
+  }
+  function ticketLinkForMedia(movement,eventId,ticketCode){
+    const code=normalizeTicketUi(ticketCode);
+    return arr(movement?.displayLinks||movement?.links).find(link=>text(link.eventId||store.eventId)===text(eventId)&&normalizeTicketUi(link.ticketCode)===code)
+      ||arr(movement?.displayLinks||movement?.links).find(link=>normalizeTicketUi(link.ticketCode)===code)
+      ||null;
+  }
+  function unitsText(value){
+    const n=num(value);
+    return n.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:3});
+  }
+  function accountingMovementHtml(movement){
+    if(!movement) return '<div class="ce-bank-accounting-movement empty"><b>Movimiento bancario</b><span>No se ha podido recuperar el movimiento de origen.</span></div>';
+    const target=num(movement.amount)>=0?num(movement.incomeTargetAmount||movement.amount):num(movement.targetAmount||Math.abs(num(movement.amount)));
+    const justified=num(movement.amount)>=0?num(movement.incomeJustifiedAmount):(movement.linkedToOtherEvent?num(movement.foreignJustifiedAmount):num(movement.justifiedAmount));
+    return `<div class="ce-bank-accounting-movement"><div><span>Movimiento bancario</span><strong>${esc(formatDate(movement.executedAt))}</strong></div><p>${esc(movement.description||'Sin concepto')}</p><dl><div><dt>Importe banco</dt><dd>${money(movement.amount)}</dd></div><div><dt>Total justificado</dt><dd>${money(justified)} de ${money(target)}</dd></div></dl></div>`;
+  }
+  function ticketAccountingHtml(detail,movement,link,eventInfo,ticketCode,error=''){
+    const rows=arr(detail?.lines);
+    const stores=arr(detail?.stores).length?arr(detail.stores):arr(link?.stores);
+    const responsibles=arr(detail?.responsibles).length?arr(detail.responsibles):arr(link?.responsibles);
+    const total=detail?.total!=null?num(detail.total):num(link?.ticketAmount||link?.ticketAmountSnapshot||0);
+    const body=rows.length?rows.map(row=>`<tr><td>${esc(row.product||'Producto')}</td><td>${esc(unitsText(row.units))}</td><td>${money(row.unitPrice)}</td><td>${money(row.amount)}</td></tr>`).join(''):`<tr><td colspan="4">${esc(error||'No hay líneas contables disponibles para este ticket.')}</td></tr>`;
+    return `<section class="ce-bank-accounting-panel" aria-label="Información contable"><div class="ce-bank-accounting-section-title">Información contable</div><div class="ce-bank-accounting-ticket-head"><div><span>${esc(eventInfo?.title||'Evento')}</span><strong>${esc(ticketCode)}</strong></div><div class="ce-bank-accounting-total"><span>Total contabilizado</span><strong>${money(total)}</strong></div></div><div class="ce-bank-accounting-meta"><div><span>Tienda</span><b>${esc(stores.join(', ')||'Sin tienda')}</b></div><div><span>Responsable</span><b>${esc(responsibles.join(', ')||'Sin responsable')}</b></div><div><span>Líneas</span><b>${esc(detail?.lineCount??rows.length??0)}</b></div></div>${accountingMovementHtml(movement)}<div class="ce-bank-accounting-table-wrap"><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  }
+  function incomeAccountingHtml(link,movement,eventInfo){
+    const target=num(movement?.incomeTargetAmount||movement?.amount||link?.amount);
+    const justified=num(movement?.incomeJustifiedAmount||link?.amount);
+    const manual=link?.manual===true||text(movement?.incomeAssociationMode).toUpperCase()==='MANUAL';
+    return `<section class="ce-bank-accounting-panel" aria-label="Información contable"><div class="ce-bank-accounting-section-title">Información contable</div><div class="ce-bank-accounting-ticket-head"><div><span>${esc(eventInfo?.title||'Evento')}</span><strong>${esc(link?.personName||'Ingreso')}</strong></div><div class="ce-bank-accounting-total"><span>Importe contabilizado</span><strong>${money(link?.amount)}</strong></div></div><div class="ce-bank-accounting-meta"><div><span>Forma de pago</span><b>${esc(link?.paymentMethod||'Banco')}</b></div><div><span>Asociación</span><b>${manual?'Manual':'Automática'}</b></div><div><span>Conciliación</span><b>${money(justified)} de ${money(target)}</b></div></div>${accountingMovementHtml(movement)}<div class="ce-bank-income-accounting-note"><b>Comprobación visual</b><span>Contrasta el nombre y el importe contabilizado con el justificante mostrado a la derecha.</span></div></section>`;
+  }
+  function accountingViewer({badge,title,eventInfo,leftHtml='',imageSrc='',imageAlt='',loadingLeft=false,loadingImage=false}){
+    closeBankTicketPhoto();
+    const viewer=document.createElement('div');
+    viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
+    const left=loadingLeft?'<section class="ce-bank-accounting-panel ce-bank-accounting-loading"><span class="ce-bank-loader"></span><b>Cargando información contable…</b></section>':leftHtml;
+    const right=loadingImage?'<div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando justificante…</b></div>':(imageSrc?`<div class="ce-bank-accounting-image-stage"><img class="ce-bank-photo-image ce-bank-photo-accounting-image" src="${esc(imageSrc)}" alt="${esc(imageAlt||title)}"></div>`:'<div class="ce-bank-photo-empty"><b>No hay imagen adjunta.</b></div>');
+    viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-accounting" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div><div class="ce-bank-photo-accounting-grid"><div data-ce-bank-accounting-left>${left}</div><section class="ce-bank-accounting-image-panel" aria-label="Justificante"><div class="ce-bank-accounting-section-title">Justificante</div><div data-ce-bank-accounting-right>${right}</div></section></div></div>`;
+    $('ceBankOverlay')?.appendChild(viewer);
+    return viewer;
+  }
   function closeBankTicketPhoto(){ $('ceBankTicketPhoto')?.remove(); }
   function openBankIncomePhoto(chip,event){
     stopEvent(event);
     const src=text(chip?.dataset?.imageSrc);
-    const person=text(chip?.dataset?.personName||'Ingreso');
     if(!src) return;
+    const movement=movementForMedia(chip);
+    const incomeId=text(chip?.dataset?.incomeId);
+    const found=arr(movement?.incomeLinks).find(item=>text(item.id)===incomeId)||{};
+    const link={...found,id:incomeId,personName:text(found.personName||chip?.dataset?.personName||'Ingreso'),amount:num(found.amount||chip?.dataset?.incomeAmount),paymentMethod:text(found.paymentMethod||chip?.dataset?.paymentMethod||'Banco'),manual:found.manual===true};
     const eventInfo=eventMediaData(store.eventId,store.data?.event?.title);
-    closeBankTicketPhoto();
-    const viewer=document.createElement('div');
-    viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
-    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Justificante de ingreso de ${esc(person)}"><div class="ce-bank-photo-head"><div><span>JUSTIFICANTE DE INGRESO</span><strong>${esc(person)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><img class="ce-bank-photo-image" src="${esc(src)}" alt="Justificante de ingreso de ${esc(person)}"></div>`;
-    $('ceBankOverlay')?.appendChild(viewer);
+    accountingViewer({badge:'JUSTIFICANTE DE INGRESO',title:link.personName,eventInfo,leftHtml:incomeAccountingHtml(link,movement,eventInfo),imageSrc:src,imageAlt:`Justificante de ingreso de ${link.personName}`});
   }
   async function openBankTicketPhoto(chip,event){
     stopEvent(event);
     const eventId=text(chip?.dataset?.eventId||store.eventId);
-    const ticketCode=text(chip?.dataset?.ticketCode);
+    const ticketCode=normalizeTicketUi(chip?.dataset?.ticketCode);
     const eventTitle=text(chip?.dataset?.eventTitle||store.data?.event?.title);
     const eventInfo=eventMediaData(eventId,eventTitle);
+    const movement=movementForMedia(chip);
+    const link=ticketLinkForMedia(movement,eventId,ticketCode)||{ticketCode,eventId,eventTitle,ticketAmount:num(chip?.dataset?.ticketAmount)};
     if(!eventId||!ticketCode) return;
-    closeBankTicketPhoto();
-    const viewer=document.createElement('div');
-    viewer.id='ceBankTicketPhoto'; viewer.className='ce-bank-photo-overlay';
-    viewer.innerHTML=`<div class="ce-bank-photo-card" role="dialog" aria-modal="true" aria-label="Foto ${esc(ticketCode)}"><div class="ce-bank-photo-head"><div><span>FOTO DEL TICKET</span><strong>${esc(ticketCode)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar foto">×</button></div><div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando foto del ticket…</b></div></div>`;
-    $('ceBankOverlay')?.appendChild(viewer);
-    try{
-      const response=await fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}`,{cache:'no-store'});
-      const json=await response.json().catch(()=>({}));
-      if(!response.ok) throw new Error(json.error||`HTTP ${response.status}`);
-      const src=ticketImageFromBag(json.images||{},eventId,ticketCode);
-      const card=viewer.querySelector('.ce-bank-photo-card');
-      if(!card||!viewer.isConnected) return;
-      card.querySelector('.ce-bank-photo-loading')?.remove();
-      card.insertAdjacentHTML('beforeend',src?`<img class="ce-bank-photo-image" src="${esc(src)}" alt="Foto ${esc(ticketCode)}">`:`<div class="ce-bank-photo-empty"><b>No hay foto adjunta para ${esc(ticketCode)}.</b><span>El ticket está conciliado, pero no se ha encontrado una imagen en este evento.</span></div>`);
-    }catch(error){
-      const loading=viewer.querySelector('.ce-bank-photo-loading');
-      if(loading) loading.innerHTML=`<b>No se pudo cargar la foto.</b><span>${esc(error?.message||error)}</span>`;
+    const viewer=accountingViewer({badge:'COMPROBACIÓN DE TICKET',title:ticketCode,eventInfo,loadingLeft:true,loadingImage:true});
+    const leftSlot=viewer.querySelector('[data-ce-bank-accounting-left]');
+    const rightSlot=viewer.querySelector('[data-ce-bank-accounting-right]');
+    const detailPromise=api(`/api/bank-reconciliation/ticket-detail?eventId=${encodeURIComponent(eventId)}&ticketCode=${encodeURIComponent(ticketCode)}`);
+    const imagePromise=fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}`,{cache:'no-store'}).then(async response=>{const json=await response.json().catch(()=>({}));if(!response.ok) throw new Error(json.error||`HTTP ${response.status}`);return ticketImageFromBag(json.images||{},eventId,ticketCode);});
+    const [detailResult,imageResult]=await Promise.allSettled([detailPromise,imagePromise]);
+    if(!viewer.isConnected) return;
+    if(leftSlot){
+      const detail=detailResult.status==='fulfilled'?detailResult.value:null;
+      const error=detailResult.status==='rejected'?text(detailResult.reason?.message||detailResult.reason):'';
+      leftSlot.innerHTML=ticketAccountingHtml(detail,movement,link,eventInfo,ticketCode,error);
+    }
+    if(rightSlot){
+      const src=imageResult.status==='fulfilled'?text(imageResult.value):'';
+      const error=imageResult.status==='rejected'?text(imageResult.reason?.message||imageResult.reason):'';
+      rightSlot.innerHTML=src?`<div class="ce-bank-accounting-image-stage"><img class="ce-bank-photo-image ce-bank-photo-accounting-image" src="${esc(src)}" alt="Foto ${esc(ticketCode)}"></div>`:`<div class="ce-bank-photo-empty"><b>No hay foto adjunta para ${esc(ticketCode)}.</b><span>${esc(error||'El ticket está conciliado, pero no se ha encontrado una imagen en este evento.')}</span></div>`;
     }
   }
 
@@ -1013,6 +1061,11 @@
     store.balanceTicketImages[key]=json.images||{};
     return store.balanceTicketImages[key];
   }
+  function balanceMediaItemAttrs(item){
+    if(item?.kind==='ticket') return ` role="button" tabindex="0" data-ce-bank-view-ticket="1" data-event-id="${esc(item.eventId||store.eventId)}" data-ticket-code="${esc(item.ticketCode||item.title)}" data-event-title="${esc(item.eventTitle||'')}" data-ticket-amount="${esc(item.ticketAmount||0)}" data-movement-id="${esc(item.movementId||'')}"` ;
+    if(item?.kind==='income'&&item.src) return ` role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(item.src)}" data-income-id="${esc(item.incomeId||'')}" data-person-name="${esc(item.personName||item.title||'Ingreso')}" data-income-amount="${esc(item.amount||0)}" data-payment-method="${esc(item.paymentMethod||'Banco')}" data-movement-id="${esc(item.movementId||'')}"` ;
+    return '';
+  }
   function balanceMediaViewer({badge,title,caption='',items=[],loading=false,empty='No hay imágenes disponibles.',eventInfo=null}){
     closeBankTicketPhoto();
     const viewer=document.createElement('div');
@@ -1020,7 +1073,7 @@
     const body=loading
       ?`<div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando justificantes…</b></div>`
       :items.length
-        ?`<div class="ce-bank-photo-gallery count-${items.length}">${items.map(item=>`<figure class="ce-bank-photo-figure ${item.src?'':'without-image'}"><figcaption><strong>${esc(item.title)}</strong><span>${esc(item.subtitle||'')}</span></figcaption>${item.src?`<img class="ce-bank-photo-image" src="${esc(item.src)}" alt="${esc(item.title)}">`:`<div class="ce-bank-photo-empty"><b>Sin imagen adjunta</b><span>${esc(item.empty||'No se ha encontrado la fotografía de este justificante.')}</span></div>`}</figure>`).join('')}</div>`
+        ?`<div class="ce-bank-photo-gallery count-${items.length}">${items.map(item=>`<figure class="ce-bank-photo-figure ${item.src?'':'without-image'}"${balanceMediaItemAttrs(item)}><figcaption><strong>${esc(item.title)}</strong><span>${esc(item.subtitle||'')}</span></figcaption>${item.src?`<img class="ce-bank-photo-image" src="${esc(item.src)}" alt="${esc(item.title)}">`:`<div class="ce-bank-photo-empty"><b>Sin imagen adjunta</b><span>${esc(item.empty||'No se ha encontrado la fotografía de este justificante.')}</span></div>`}</figure>`).join('')}</div>`
         :`<div class="ce-bank-photo-empty"><b>${esc(empty)}</b></div>`;
     viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-gallery" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${caption?`<em>${esc(caption)}</em>`:''}${eventMediaHeader(eventInfo||eventDisplayData())}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div>${body}</div>`;
     $('ceBankOverlay')?.appendChild(viewer);
@@ -1033,7 +1086,7 @@
     const caption=`${formatDate(movement.executedAt)} · ${money(movement.amount)}`;
     const eventInfo=eventMediaData(store.eventId,store.data?.event?.title);
     if(num(movement.amount)>=0){
-      const items=arr(movement.incomeLinks).map(link=>({title:text(link.personName||'Ingreso'),subtitle:money(link.amount),src:text(link.imageUrl),empty:'Este ingreso no tiene fotografía adjunta.'}));
+      const items=arr(movement.incomeLinks).map(link=>({kind:'income',movementId:movement.id,incomeId:link.id,personName:text(link.personName||'Ingreso'),paymentMethod:text(link.paymentMethod||'Banco'),amount:num(link.amount),title:text(link.personName||'Ingreso'),subtitle:money(link.amount),src:text(link.imageUrl),empty:'Este ingreso no tiene fotografía adjunta.'}));
       balanceMediaViewer({badge:'JUSTIFICANTES DE INGRESO',title:text(movement.description||'Abono bancario'),caption,items,empty:'Este abono no tiene justificantes de ingreso asociados.',eventInfo});
       return;
     }
@@ -1051,7 +1104,7 @@
       const items=links.map(link=>{
         const eventId=text(link.eventId||store.eventId);
         const code=text(link.ticketCode||'TKxx');
-        return {title:code,subtitle:`${text(link.eventTitle||store.data?.event?.title||'Evento')} · ${money(link.ticketAmount)}`,src:ticketImageFromBag(bags[eventId]||{},eventId,code),empty:`No se ha encontrado la fotografía de ${code}.`};
+        return {kind:'ticket',movementId:movement.id,eventId,ticketCode:code,eventTitle:text(link.eventTitle||store.data?.event?.title||'Evento'),ticketAmount:num(link.ticketAmount),title:code,subtitle:`${text(link.eventTitle||store.data?.event?.title||'Evento')} · ${money(link.ticketAmount)}`,src:ticketImageFromBag(bags[eventId]||{},eventId,code),empty:`No se ha encontrado la fotografía de ${code}.`};
       });
       $('ceBankTicketPhoto')?.remove();
       balanceMediaViewer({badge:'TICKETS JUSTIFICANTES',title:text(movement.description||'Cargo bancario'),caption,items,eventInfo});

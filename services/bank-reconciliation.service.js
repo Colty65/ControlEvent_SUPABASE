@@ -811,6 +811,60 @@ export async function setMovementForced(movementId,eventId,forced){
   }catch(error){ throw friendlyDbError(error); }
 }
 
+
+export async function getBankTicketDetail({eventId='',ticketCode=''} = {}){
+  const selectedEvent=text(eventId);
+  const code=normalizeTicket(ticketCode);
+  if(!selectedEvent) fail('Falta el evento del ticket.',409,'BANK_EVENT_REQUIRED');
+  if(!code) fail('El código TKxx no es válido.',409,'BANK_TICKET_REQUIRED');
+  try{
+    const event=await loadEvent(selectedEvent);
+    const [purchaseRows,storeRows,personRows,productRows]=await Promise.all([
+      selectPaged('ce_compras',{order:'created_at',ascending:true,apply:query=>query.eq('event_id',selectedEvent)}),
+      selectPaged('ce_tiendas',{order:'nombre',ascending:true}),
+      selectPaged('ce_personas',{order:'nombre',ascending:true}),
+      selectPaged('ce_productos',{order:'nombre',ascending:true})
+    ]);
+    const stores=new Map(storeRows.map(row=>[text(row.id),text(row.nombre||row.descripcion)||text(row.id)]));
+    const persons=new Map(personRows.map(row=>[text(row.id),text(row.nombre||row.descripcion)||text(row.id)]));
+    const products=new Map(productRows.map(row=>[text(row.id),text(row.nombre||row.descripcion)||text(row.id)]));
+    const rows=purchaseRows.filter(row=>normalizeTicket(row.ticket_donacion)===code);
+    const lines=rows.map((row,index)=>{
+      const productId=text(row.producto_id||row.productoId||row.product_id||row.productId);
+      const storeId=text(row.tienda_id||row.tiendaId||row.store_id||row.storeId);
+      const responsibleId=text(row.responsable_id||row.responsableId||row.persona_id||row.personaId);
+      const units=num(row.unidades||row.cantidad||row.units);
+      const unitPrice=cents(row.precio||row.precio_unitario||row.unit_price||row.unitPrice);
+      const amount=cents(units*unitPrice);
+      return {
+        id:text(row.id)||`${code}-${index+1}`,
+        productId,
+        product:text(row.producto_nombre||row.productoNombre||row.nombre_producto||row.nombreProducto)||products.get(productId)||productId||'Producto',
+        units,
+        unitPrice,
+        amount,
+        storeId,
+        store:stores.get(storeId)||storeId||'',
+        responsibleId,
+        responsible:persons.get(responsibleId)||responsibleId||'',
+        createdAt:text(row.created_at||row.fecha||row.fecha_compra)
+      };
+    });
+    const uniqueStores=[...new Set(lines.map(row=>row.store).filter(Boolean))];
+    const uniqueResponsibles=[...new Set(lines.map(row=>row.responsible).filter(Boolean))];
+    return {
+      ok:true,
+      event:{id:event.id,title:event.title,status:event.status,finalized:event.finalized},
+      ticketCode:code,
+      total:cents(lines.reduce((sum,row)=>sum+row.amount,0)),
+      lineCount:lines.length,
+      stores:uniqueStores,
+      responsibles:uniqueResponsibles,
+      lines
+    };
+  }catch(error){ throw friendlyDbError(error); }
+}
+
 export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
   try{
     const selectedEvent=text(eventId);

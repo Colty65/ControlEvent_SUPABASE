@@ -10,6 +10,7 @@ import {
   listBankReconciliation,
   listPaidTickets,
   listBankIncomes,
+  getBankTicketDetail,
   setIncomeLinks,
   setBankEventPeriod,
   setMovementForced,
@@ -51,6 +52,10 @@ function eventIdFrom(req){
 router.get('/bank-reconciliation', asyncHandler(async (req,res) => {
   await requireBankReadRole(req);
   res.json(await listBankReconciliation({accountId:req.query.accountId,eventId:req.query.eventId}));
+}));
+router.get('/bank-reconciliation/ticket-detail', asyncHandler(async (req,res) => {
+  await requireBankReadRole(req);
+  res.json(await getBankTicketDetail({eventId:req.query.eventId,ticketCode:req.query.ticketCode}));
 }));
 router.get('/bank-reconciliation/paid-tickets', asyncHandler(async (req,res) => {
   requireBankRole(req);
