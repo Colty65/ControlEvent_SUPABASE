@@ -102,9 +102,10 @@
     }
     const n=Number(s); return Number.isFinite(n)?n:0;
   }
-  function parseDomDetail(img){
-    const row=img?.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
-    const raw=img?.dataset?.ceV17Detail || row?.dataset?.ceV17Detail || '';
+  function parseDomDetail(target){
+    const img=target?.matches?.('img')?target:target?.querySelector?.('img');
+    const row=target?.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row')||img?.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
+    const raw=target?.dataset?.ceV17Detail || img?.dataset?.ceV17Detail || row?.dataset?.ceV17Detail || '';
     if(!raw) return null;
     try{
       const d=JSON.parse(raw);
@@ -168,15 +169,20 @@
     document.querySelectorAll(modalRoots()).forEach(m=>{try{m.remove();}catch(_){try{m.classList.remove('visible');}catch(__){}}});
     return false;
   }
-  function openTicketViewerFromThumb(img,ev){
-    if(!img) return false;
-    const src=norm(img.currentSrc||img.src||img.dataset.ceV17Src||'');
-    const row=img.closest('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
-    const label=cleanLabel(img.dataset.ceV17Label||row?.dataset?.ceV17Label||row?.dataset?.ceTicketLabel||row?.innerText||'');
-    const domDetail=parseDomDetail(img);
-    const tk=ticketToken(label)||norm(domDetail?.ticket||img.dataset.ceHf12Tk||img.dataset.ceHf10Tk||'').toUpperCase();
+  function openTicketViewerFromThumb(target,ev){
+    if(!target) return false;
+    const img=target.matches?.('img')?target:target.querySelector?.('img');
+    const src=norm(target.dataset?.imageSrc||target.dataset?.ceV17Src||img?.currentSrc||img?.src||img?.dataset?.ceV17Src||'');
+    const row=target.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row')||img?.closest?.('#summaryTiendaTicket .summary-item,.ce-v17-doc-row');
+    const domDetail=parseDomDetail(target);
+    const dataTicket=norm(target.dataset?.ticketCode||img?.dataset?.ceHf12Tk||img?.dataset?.ceHf10Tk||'').toUpperCase();
+    const dataStore=norm(target.dataset?.storeName||'');
+    const dataTitle=norm(target.dataset?.photoTitle||target.getAttribute?.('aria-label')||img?.alt||'');
+    const fallbackLabel=[dataStore,dataTicket].filter(Boolean).join(' | ')||dataTitle;
+    const label=cleanLabel(target.dataset?.ceV17Label||img?.dataset?.ceV17Label||row?.dataset?.ceV17Label||row?.dataset?.ceTicketLabel||fallbackLabel||row?.innerText||'');
+    const tk=ticketToken(label)||norm(domDetail?.ticket||dataTicket).toUpperCase();
     if(!src||!tk) return false;
-    lastThumbForViewer=img; lastThumbAt=Date.now();
+    lastThumbForViewer=img||target; lastThumbAt=Date.now();
     stop(ev);
     closeTicketViewers();
     const rows=rowsForTicketLabel(label||tk);
@@ -184,7 +190,7 @@
     const rowsTotal=rows.length?rows.reduce((a,c)=>a+valueLine(c),0):0;
     const detailTotal=domDetail&&Number.isFinite(domDetail.total)?Number(domDetail.total||0):0;
     const total=detailTotal||rowsTotal||rowPillTotal||0;
-    const store=domDetail?.store||splitParts(label)[0]||rows[0]&&storeName(rows[0])||'';
+    const store=domDetail?.store||dataStore||splitParts(label)[0]||rows[0]&&storeName(rows[0])||'';
     let tableHtml='';
     if(domDetail){
       tableHtml=tableFromDomDetail(domDetail);
@@ -201,16 +207,21 @@
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.innerHTML='<div class="ce-v17-ticket-card">'
-      +'<h2>'+esc(titleEvent())+'</h2>'
+      +'<div class="ce-v17-ticket-head"><div><span>COMPROBACIÓN DE TICKET</span><h2>'+esc(titleEvent())+'</h2></div><button type="button" class="outline small ce-v17-ticket-close-top" data-ce-v17-ticket-close aria-label="Cerrar">×</button></div>'
       +'<div class="ce-v17-ticket-grid">'
-        +'<div class="ce-v17-ticket-lines">'
-          +'<div class="ce-v17-ticket-meta"><strong>'+esc(store)+'</strong><strong>'+esc(tk)+'</strong></div>'
-          +'<div class="ce-v17-ticket-total">'+esc(money(total))+'</div>'
+        +'<section class="ce-v17-ticket-lines" aria-label="Información contable">'
+          +'<div class="ce-v17-ticket-section-title">Información contable</div>'
+          +'<div class="ce-v17-ticket-meta"><strong>'+esc(store||'Sin tienda')+'</strong><strong>'+esc(tk)+'</strong></div>'
+          +'<div class="ce-v17-ticket-total"><span>Total contabilizado</span><strong>'+esc(money(total))+'</strong></div>'
           +'<div class="ce-v17-ticket-table-wrap">'+tableHtml+'</div>'
-        +'</div>'
-        +'<div class="ce-v17-ticket-image"><img alt="Foto '+esc(tk)+'" src="'+esc(src)+'"><button type="button" class="outline small" data-ce-v17-ticket-close>✕ Cerrar</button></div>'
+        +'</section>'
+        +'<section class="ce-v17-ticket-image" aria-label="Ticket de compra">'
+          +'<div class="ce-v17-ticket-section-title">Ticket de compra</div>'
+          +'<div class="ce-v17-ticket-image-stage"><img alt="Foto '+esc(tk)+'" src="'+esc(src)+'"></div>'
+        +'</section>'
       +'</div>'
     +'</div>';
+    modal.addEventListener('click',event=>{if(event.target===modal)closeTicketViewers(event);},true);
     document.body.appendChild(modal);
     try{modal.querySelector('[data-ce-v17-ticket-close]')?.focus({preventScroll:true});}catch(_){ }
     return false;
@@ -276,23 +287,30 @@
       #summaryTiendaTicket .ce-v17-doc-actions img:nth-of-type(n+2){display:none!important;}
       .ce-v17-rowdetail-close{pointer-events:auto!important;cursor:pointer!important;z-index:10000050!important;}
       #ceV17TicketViewerFinal{position:fixed!important;inset:0!important;z-index:10000090!important;background:rgba(15,23,42,.72)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:10px!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-card{background:#fff!important;border-radius:14px!important;width:96vw!important;max-width:1420px!important;height:94vh!important;max-height:94vh!important;overflow:auto!important;padding:14px!important;border:2px solid #fb923c!important;display:flex!important;flex-direction:column!important;gap:14px!important;}
-      #ceV17TicketViewerFinal h2{margin:0!important;text-align:center!important;font-size:24px!important;font-weight:950!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-card{background:#fff!important;border-radius:14px!important;width:98vw!important;max-width:none!important;height:96vh!important;max-height:96vh!important;overflow:hidden!important;padding:12px!important;border:2px solid #fb923c!important;display:flex!important;flex-direction:column!important;gap:10px!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;min-height:48px!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-head>div{min-width:0!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-head span{display:block!important;font-size:11px!important;letter-spacing:.12em!important;font-weight:950!important;color:#64748b!important;}
+      #ceV17TicketViewerFinal h2{margin:1px 0 0!important;text-align:left!important;font-size:21px!important;line-height:1.1!important;font-weight:950!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
       #ceV17TicketViewerFinal.ce-v17-event-curso h2{color:#166534!important;}
       #ceV17TicketViewerFinal.ce-v17-event-finalizado h2{color:#991b1b!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-grid{display:grid!important;grid-template-columns:minmax(320px,38%) 1fr!important;gap:14px!important;min-height:0!important;flex:1 1 auto!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-lines{border:1px solid #dbe4ee!important;border-radius:12px!important;overflow:auto!important;background:#fff!important;align-self:start!important;max-height:calc(94vh - 86px)!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-meta{display:flex!important;justify-content:space-between!important;gap:10px!important;align-items:center!important;background:#f8fafc!important;border-bottom:1px solid #e2e8f0!important;padding:10px!important;font-weight:950!important;color:#334155!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-total{padding:10px!important;font-weight:950!important;color:#0f172a!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-table-wrap{overflow:auto!important;}
-      #ceV17TicketViewerFinal table{width:100%!important;border-collapse:collapse!important;font-size:13px!important;}
-      #ceV17TicketViewerFinal th,#ceV17TicketViewerFinal td{border-top:1px solid #e2e8f0!important;padding:7px!important;text-align:left!important;}
-      #ceV17TicketViewerFinal th{background:#f8fafc!important;font-weight:950!important;position:sticky!important;top:0!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-close-top{flex:0 0 auto!important;width:44px!important;height:42px!important;min-width:44px!important;min-height:42px!important;padding:0!important;font-size:28px!important;line-height:1!important;font-weight:950!important;background:#fff!important;color:#0f172a!important;border:1px solid #94a3b8!important;border-radius:10px!important;cursor:pointer!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-grid{display:grid!important;grid-template-columns:minmax(320px,32%) minmax(0,68%)!important;gap:12px!important;min-height:0!important;flex:1 1 auto!important;overflow:hidden!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-section-title{padding:9px 11px!important;background:#173a63!important;color:#fff!important;font-size:14px!important;font-weight:950!important;letter-spacing:.02em!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-lines{border:1px solid #cbd5e1!important;border-radius:12px!important;overflow:hidden!important;background:#fff!important;display:flex!important;flex-direction:column!important;min-height:0!important;height:100%!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-meta{display:flex!important;justify-content:space-between!important;gap:10px!important;align-items:center!important;background:#f8fafc!important;border-bottom:1px solid #e2e8f0!important;padding:10px 11px!important;font-weight:950!important;color:#334155!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-total{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;padding:10px 11px!important;font-weight:850!important;color:#334155!important;background:#fff7ed!important;border-bottom:1px solid #fed7aa!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-total strong{font-size:20px!important;color:#9a3412!important;white-space:nowrap!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-table-wrap{overflow:auto!important;min-height:0!important;flex:1 1 auto!important;}
+      #ceV17TicketViewerFinal table{width:100%!important;border-collapse:collapse!important;font-size:12.5px!important;}
+      #ceV17TicketViewerFinal th,#ceV17TicketViewerFinal td{border-top:1px solid #e2e8f0!important;padding:7px!important;text-align:left!important;vertical-align:top!important;}
+      #ceV17TicketViewerFinal th{background:#f8fafc!important;font-weight:950!important;position:sticky!important;top:0!important;z-index:2!important;}
       #ceV17TicketViewerFinal td:nth-child(n+2),#ceV17TicketViewerFinal th:nth-child(n+2){text-align:right!important;white-space:nowrap!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-image{position:relative!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;overflow:auto!important;min-height:0!important;padding-bottom:8px!important;}
-      #ceV17TicketViewerFinal .ce-v17-ticket-image img{max-width:100%!important;max-height:calc(94vh - 112px)!important;object-fit:contain!important;border-radius:10px!important;background:#fff!important;}
-      #ceV17TicketViewerFinal [data-ce-v17-ticket-close]{position:sticky!important;bottom:10px!important;align-self:flex-start!important;margin:8px auto 0 10px!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;font-size:15px!important;background:#fff!important;z-index:8!important;box-shadow:0 8px 24px rgba(15,23,42,.20)!important;}
-      @media(max-width:760px){#ceV17TicketViewerFinal .ce-v17-ticket-grid{grid-template-columns:1fr!important;}#ceV17TicketViewerFinal .ce-v17-ticket-lines{max-height:34vh!important;}#ceV17TicketViewerFinal .ce-v17-ticket-image img{max-height:45vh!important;}}
+      #ceV17TicketViewerFinal .ce-v17-ticket-image{border:1px solid #cbd5e1!important;border-radius:12px!important;overflow:hidden!important;background:#eef2f7!important;display:flex!important;flex-direction:column!important;min-height:0!important;height:100%!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-image-stage{min-height:0!important;flex:1 1 auto!important;overflow:auto!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;padding:8px!important;background:#dbe3ea!important;}
+      #ceV17TicketViewerFinal .ce-v17-ticket-image img{display:block!important;width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;border-radius:8px!important;background:#fff!important;box-shadow:0 8px 28px rgba(15,23,42,.18)!important;}
+      @media(max-width:900px){#ceV17TicketViewerFinal .ce-v17-ticket-card{width:99vw!important;height:98vh!important;padding:8px!important;}#ceV17TicketViewerFinal .ce-v17-ticket-grid{grid-template-columns:minmax(280px,38%) minmax(0,62%)!important;gap:8px!important;}}
+      @media(max-width:700px){#ceV17TicketViewerFinal .ce-v17-ticket-card{overflow:auto!important;}#ceV17TicketViewerFinal .ce-v17-ticket-grid{grid-template-columns:1fr!important;overflow:visible!important;}#ceV17TicketViewerFinal .ce-v17-ticket-lines{height:auto!important;max-height:39vh!important;}#ceV17TicketViewerFinal .ce-v17-ticket-image{height:50vh!important;}#ceV17TicketViewerFinal h2{font-size:17px!important;}}
       #ceV104TicketDetail [data-ce-v104-close],#ceV103TicketDetail [data-ce-v103-close],#ceV102TicketDetail [data-ce-v102-close],#ceV101TicketDetail [data-ce-v101-close],#ceV100TicketDetail [data-ce-v100-close],#ceV96TicketDetail [data-ce-v96-close],#ceV40TicketPhotoModal .ce-v40-modal-close{position:fixed!important;left:calc(2vw + 24px)!important;right:auto!important;bottom:calc(3vh + 16px)!important;top:auto!important;z-index:10000095!important;min-width:112px!important;min-height:40px!important;font-weight:950!important;background:#fff!important;}
     `;
     document.head.appendChild(st);
@@ -301,8 +319,8 @@
   function handleClick(ev){
     if(ev.target?.closest?.('.ce-v17-rowdetail-close,.ce-v17-rowdetail-head button,[aria-label="Cerrar"]')) return closeRowDetail(ev);
     if(ev.target?.closest?.('[data-ce-v17-ticket-close],[data-ce-v104-close],[data-ce-v103-close],[data-ce-v102-close],[data-ce-v101-close],[data-ce-v100-close],[data-ce-v96-close],.ce-v40-modal-close')) return closeTicketViewers(ev);
-    const img=ev.target?.closest?.('#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*="ticket-images"],#summaryTiendaTicket img[src^="data:image/"]');
-    if(img) return openTicketViewerFromThumb(img,ev);
+    const ticketTarget=ev.target?.closest?.('#summaryTiendaTicket [data-ce-view-ticket-image="1"],#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*="ticket-images"],#summaryTiendaTicket img[src^="data:image/"],#ceBudgetLiteTooltipV307 [data-ce-g92-photo="1"]');
+    if(ticketTarget) return openTicketViewerFromThumb(ticketTarget,ev);
   }
   function handleKey(ev){
     if(ev.key==='Escape'){
@@ -336,5 +354,5 @@
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(_){ }
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,900,1800].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v24_prod_fix13_titulo_evento_color_estado'};
+  window.ControlEventV17Fix10={install,sanitizeSummaryThumbs,openTicketViewerFromThumb,closeTicketViewers,version:'v25_prod_fix9_3_11_contabilidad_y_ticket'};
 })();

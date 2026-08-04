@@ -119,7 +119,9 @@
 
   var lastOpenTap=0;
   function openFromButton(ev){
-    if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+    if(ev){
+      try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
+    }
     var now=Date.now(); if(now-lastOpenTap<650) return; lastOpenTap=now;
     openModal();
   }
@@ -209,7 +211,15 @@
       window.addEventListener(type, block, {capture:true, passive:false});
     });
   }
+  function closeGraphInfoBubble(){
+    try{
+      if(window.ControlEventGraphFix92 && typeof window.ControlEventGraphFix92.close==='function') window.ControlEventGraphFix92.close();
+      var tip=$('ceV25GraphTip'); if(tip) tip.remove();
+      document.body.classList.remove('ce-g92-tip-open');
+    }catch(_){ }
+  }
   function openModal(){
+    closeGraphInfoBubble();
     injectStyle();
     installPromptEventShield();
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();

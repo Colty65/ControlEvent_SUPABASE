@@ -41,7 +41,9 @@
   function ticketFilename(code,storeName){return `${safeFilePart(code||'TKxx','TKxx')}-${safeFilePart(eventTitle(),'Evento')}-${safeFilePart(storeName||'Tienda','Tienda')}.jpg`;}
 
   function insideGraph(node){ return !!node?.closest?.('#tabGraficas,#eventChartWrap'); }
+  function insideZuzu(node){ return !!node?.closest?.('#ceGeminiLibreBtn,#ceGeminiLibreOverlay'); }
   function graphOwner(target,event){
+    if(insideZuzu(target)) return null;
     const candidates=[];
     if(event?.composedPath){
       for(const node of event.composedPath()){ if(node instanceof Element)candidates.push(node); }
@@ -49,6 +51,7 @@
     let node=target instanceof Element?target:null;
     while(node){ candidates.push(node); if(node.id==='tabGraficas'||node.id==='eventChartWrap')break; node=node.parentElement; }
     for(const item of candidates){
+      if(insideZuzu(item))return null;
       if(!insideGraph(item))continue;
       if(tipSource(item))return item;
     }
@@ -365,6 +368,7 @@
     return false;
   }
   function onGraphPointerDown(event){
+    if(insideZuzu(event.target))return;
     if(directAction(event))return;
     if(activeTip&&activeTip.contains(event.target))return;
     const graphRoot=event.target?.closest?.('#tabGraficas,#eventChartWrap');
@@ -373,9 +377,11 @@
     suppressClickUntil=Date.now()+850;outsideCloseAllowedAt=Date.now()+1000;consume(event);openTip(owner);
   }
   function onGraphPointerUp(event){
+    if(insideZuzu(event.target))return;
     if(activeTip&&!activeTip.contains(event.target)&&Date.now()<suppressClickUntil)consume(event);
   }
   function onGraphClick(event){
+    if(insideZuzu(event.target))return;
     if(directAction(event))return;
     const legacyPhoto=event.target?.closest?.('#ceV25GraphTip .ce-v465-tip-thumb,#ceV25GraphTip [data-action="ingreso-receipt-view-v465"],#ceV25GraphTip [data-ce-v512-budget-photo],#ceV25GraphTip button:has(img)');
     if(legacyPhoto){const meta=genericPhotoMeta(legacyPhoto);if(meta){legacyPhoto.dataset.imageSrc=meta.src;legacyPhoto.dataset.photoTitle=meta.title;legacyPhoto.dataset.downloadName=meta.filename;consume(event);openViewer(legacyPhoto);}return;}
@@ -432,5 +438,5 @@
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
   setTimeout(warmCache,180);
-  root.ControlEventGraphFix92={version:'FIX9.3.2',open:openTip,close:closeTip,warm:warmCache};
+  root.ControlEventGraphFix92={version:'FIX9.3.10',open:openTip,close:closeTip,warm:warmCache};
 })(window);
