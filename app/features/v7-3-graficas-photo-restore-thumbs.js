@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX9.3.2 · GRAFICAS aisladas: no eliminar ni ocultar globos de RESUMEN PRESUPUESTARIO. */
+/* ControlEvent v25_prod FIX9.3.13 · GRAFICAS con comprobación contable de TKxx: no eliminar ni ocultar globos de RESUMEN PRESUPUESTARIO. */
 (function(root){
   'use strict';
   const FLAG='__ceV25GraphSanitationFix932';
@@ -297,7 +297,8 @@
       }
       slot.classList.remove('loading');
       if(!src){slot.classList.add('empty');return;}
-      slot.classList.remove('empty');slot.innerHTML=`<button type="button" class="ce-g92-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(filename)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}"></button>`;
+      const ticketAttrs=kind==='ticket'?` data-ce-view-ticket-image="1" data-ticket-code="${esc(cell.dataset.ceG92Code)}" data-store-name="${esc(cell.dataset.ceG92Store)}" data-ce-v17-label="${esc(`${cell.dataset.ceG92Store||'Tienda'} | ${cell.dataset.ceG92Code||'TKxx'}`)}"`:'';
+      slot.classList.remove('empty');slot.innerHTML=`<button type="button" class="ce-g92-thumb" data-ce-g92-photo="1"${ticketAttrs} data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(filename)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}"></button>`;
     });
   }
 
@@ -364,7 +365,21 @@
     const close=target?.closest?.('[data-ce-g92-close-tip]');if(close){consume(event);closeTip();return true;}
     const viewerClose=target?.closest?.('[data-ce-g92-close-viewer]');if(viewerClose||target?.id==='ceV25GraphMedia'){consume(event);closeViewer(true);return true;}
     const download=target?.closest?.('[data-ce-g92-download]');if(download){consume(event);downloadImage(download.dataset.imageSrc,download.dataset.downloadName);return true;}
-    const thumb=target?.closest?.('[data-ce-g92-photo="1"]');if(thumb){consume(event);openViewer(thumb);return true;}
+    const thumb=target?.closest?.('[data-ce-g92-photo="1"]');if(thumb){
+      const accountingTicket=thumb.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307');
+      const graphTicket=thumb.closest?.('#ceV25GraphTip')&&text(thumb.dataset.ticketCode);
+      if(accountingTicket||graphTicket){
+        const opener=root.ControlEventV17Fix10?.openTicketViewerFromThumb;
+        if(typeof opener==='function'){
+          consume(event);
+          opener(thumb,event);
+          if(graphTicket)closeTip();
+          return true;
+        }
+        return false;
+      }
+      consume(event);openViewer(thumb);return true;
+    }
     return false;
   }
   function onGraphPointerDown(event){
