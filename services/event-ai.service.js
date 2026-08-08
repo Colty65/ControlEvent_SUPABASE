@@ -3244,15 +3244,29 @@ function plannerSection(textValue, labels) {
   return m ? trim(m[1]) : '';
 }
 
-function promptNeedsGeminiSqlFirst(prompt) {
+function promptNeedsSemanticAgent(prompt, state = {}) {
   const p = norm(prompt);
   if (!p) return false;
-  const dataNouns = /\b(evento|eventos|compra|compras|gasto|gastos|ingreso|ingresos|donacion|donaciones|producto|productos|tienda|tiendas|responsable|responsables|socio|socios|persona|personas|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|hito|hitos|\blg\b|tarea|tareas|banco|conciliacion|cuadre|saldo|asistencia|asistentes)\b/;
-  const dataAsk = /\b(dame|dime|busca|buscar|saca|sacar|muestra|mostrar|lista|listado|informe|resumen|total|totaliza|totalizado|sumatorio|suma|sumar|cuanto|cuantos|cuanta|cuantas|cual|cuales|quien|quienes|compara|comparar|ranking|top|importe|valor|cantidad|unidades|realizadas|realizados|pendientes|registradas|registrados|hay|hubo|evolucion)\b/;
   const metaOnly = /\b(que\s+puedes\s+hacer|quien\s+eres|presentate|ayuda\s+de\s+zuzu)\b/;
-  const weatherOnly = /\b(meteo|meteorolog|metereolog|clima|lluvia|temperatura|viento|prevision|pronostico)\b/.test(p)
-    && !/\b(compra|ingreso|donacion|producto|tienda|banco|saldo|ticket|hito|tarea|socio|persona)\b/.test(p);
-  return !metaOnly.test(p) && !weatherOnly && dataNouns.test(p) && dataAsk.test(p);
+  if (metaOnly.test(p)) return false;
+  // La meteorología conserva su flujo especializado porque necesita una fuente externa.
+  if (/\b(meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|prevision|pronostico)\b/.test(p)) return false;
+  const dataNouns = /\b(evento|eventos|compra|compras|gasto|gastos|ingreso|ingresos|donacion|donaciones|producto|productos|tienda|tiendas|responsable|responsables|socio|socios|persona|personas|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|hito|hitos|\blg\b|tarea|tareas|banco|conciliacion|cuadre|saldo|asistencia|asistentes)\b/;
+  const dataAsk = /\b(dame|dime|busca|buscar|saca|sacar|muestra|mostrar|lista|listado|informe|resumen|total|totaliza|totalizado|sumatorio|suma|sumar|cuanto|cuantos|cuanta|cuantas|cual|cuales|quien|quienes|compara|comparar|ranking|top|importe|valor|cantidad|unidades|realizadas|realizados|pendientes|registradas|registrados|hay|hubo|evolucion|hablame|cuentame|informacion|analiza|analizar|explica|explicame|detalle|detallado|grafico|grafica)\b/;
+  if (!dataAsk.test(p)) return false;
+  if (dataNouns.test(p)) return true;
+  const names = [];
+  arr(state?.personas).forEach(x => names.push(trim(x?.nombre)));
+  arr(state?.tiendas).forEach(x => names.push(trim(x?.nombre)));
+  arr(state?.productos).forEach(x => names.push(trim(x?.nombre)));
+  arr(state?.eventos).forEach(x => names.push(trim(x?.titulo)));
+  return names.some(name => {
+    const n = norm(name);
+    if (!n) return false;
+    if (p.includes(n)) return true;
+    const first = n.split(/\s+/)[0];
+    return first.length >= 5 && new RegExp(`\\b${escapeRegexText(first)}\\b`, 'i').test(p);
+  });
 }
 
 function strictScopeRequested(prompt) {
@@ -4620,37 +4634,133 @@ function zuzuLoggedUserDisplayName(context = {}) {
   return name || 'Amigo';
 }
 
-// FIX9.3.14 · ZUZU SQL-FIRST
-// Separación estricta de responsabilidades para consultas sobre datos:
-//   1) Gemini interpreta la petición y propone SELECT de solo lectura.
-//   2) ControlEvent valida y ejecuta literalmente esas SELECT.
-//   3) Gemini recibe únicamente la pregunta original + los resultados ejecutados.
-//   4) ControlEvent presenta la respuesta y la tabla principal.
-// No se mezclan en este flujo informes heurísticos ni métricas locales cocinadas por CE.
-function sqlFirstPlanSchema() {
+// FIX9.3.15 · ZUZU AGENTE SEMÁNTICO
+// Arquitectura estricta:
+//   1) Gemini interpreta la intención y devuelve un PLAN SEMÁNTICO (nunca SQL).
+//   2) ControlEvent resuelve entidades humanas y traduce el plan a SELECTs cerradas/eficientes.
+//   3) ControlEvent ejecuta las SELECTs y devuelve resultados a Gemini.
+//   4) Gemini puede pedir una segunda/tercera ronda de datos, también en lenguaje semántico.
+//   5) Gemini redacta y decide qué gráficas convienen; CE valida cifras y dibuja con datos reales.
+// Gemini piensa. ControlEvent conoce la BBDD, consulta y presenta.
+const ZUZU_SEMANTIC_DOMAINS = ['EVENTS','PEOPLE','PARTICIPATION','INCOMES','PURCHASES','DONATIONS','PRODUCTS','STORES','TICKETS','DOCUMENTS','HITOS','LG','BANK'];
+const ZUZU_SEMANTIC_DIMENSIONS = ['event','event_state','event_start','event_end','person','range','payment_status','store','product','responsible','ticket','segment','destination','donation_type','hito','task','task_status','movement_type','bank_description','description'];
+const ZUZU_SEMANTIC_METRICS = ['count','count_records','participants','amount','mandatory_amount','voluntary_amount','units','line_count','ticket_count','completed_count','pending_count','credits','debits'];
+
+function semanticQuerySchema() {
   return {
     type: 'OBJECT',
     properties: {
-      scope: { type: 'STRING' },
-      principal_select: { type: 'STRING' },
-      validation_selects: { type: 'ARRAY', items: { type: 'STRING' } },
-      rationale: { type: 'STRING' }
+      id: { type: 'STRING' },
+      title: { type: 'STRING' },
+      domain: { type: 'STRING' },
+      scope: { type: 'STRING', description: 'active_event, all_events, named_events o year' },
+      event_names: { type: 'ARRAY', items: { type: 'STRING' } },
+      year: { type: 'INTEGER' },
+      status: { type: 'STRING', description: 'realized, pending, all, completed o open según dominio' },
+      filters: {
+        type: 'ARRAY', items: {
+          type: 'OBJECT', properties: {
+            field: { type: 'STRING' }, value: { type: 'STRING' }, operator: { type: 'STRING' }
+          }, required: ['field','value','operator']
+        }
+      },
+      group_by: { type: 'ARRAY', items: { type: 'STRING' } },
+      metrics: { type: 'ARRAY', items: { type: 'STRING' } },
+      detail_fields: { type: 'ARRAY', items: { type: 'STRING' } },
+      include_total: { type: 'BOOLEAN' },
+      include_empty: { type: 'BOOLEAN' },
+      sort: { type: 'STRING' },
+      limit: { type: 'INTEGER' },
+      show_table: { type: 'BOOLEAN' }
     },
-    required: ['scope', 'principal_select', 'validation_selects', 'rationale']
+    required: ['id','title','domain','scope','event_names','year','status','filters','group_by','metrics','detail_fields','include_total','include_empty','sort','limit','show_table']
   };
 }
-function sqlFirstAnswerSchema() {
+function semanticPlanSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      action: { type: 'STRING', description: 'query o clarify' },
+      clarification: { type: 'STRING' },
+      intent: { type: 'STRING' },
+      scope_summary: { type: 'STRING' },
+      queries: { type: 'ARRAY', items: semanticQuerySchema() },
+      wants_charts: { type: 'BOOLEAN' },
+      rationale: { type: 'STRING' }
+    },
+    required: ['action','clarification','intent','scope_summary','queries','wants_charts','rationale']
+  };
+}
+function semanticReviewSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      status: { type: 'STRING', description: 'enough, more o clarify' },
+      reason: { type: 'STRING' },
+      clarification: { type: 'STRING' },
+      additional_queries: { type: 'ARRAY', items: semanticQuerySchema() }
+    },
+    required: ['status','reason','clarification','additional_queries']
+  };
+}
+function semanticFinalSchema() {
   return {
     type: 'OBJECT',
     properties: {
       title: { type: 'STRING' },
       answer: { type: 'STRING' },
-      warnings: { type: 'ARRAY', items: { type: 'STRING' } }
+      warnings: { type: 'ARRAY', items: { type: 'STRING' } },
+      charts: {
+        type: 'ARRAY', items: {
+          type: 'OBJECT', properties: {
+            title: { type: 'STRING' },
+            type: { type: 'STRING', description: 'bar, horizontalBar, pie, donut o line' },
+            query_id: { type: 'STRING' },
+            label_field: { type: 'STRING' },
+            value_field: { type: 'STRING' },
+            unit: { type: 'STRING' }
+          }, required: ['title','type','query_id','label_field','value_field','unit']
+        }
+      }
     },
-    required: ['title', 'answer', 'warnings']
+    required: ['title','answer','warnings','charts']
   };
 }
-function sqlFirstPlannerPrompt(userPrompt, state, selectedEventId = '') {
+function semanticOntologyText() {
+  return `VOCABULARIO SEMANTICO DE CONTROLEVENT (NO ES SQL):
+DOMINIOS:
+- EVENTS: ficha/lista de eventos (título, fechas, estado, precio, descripción).
+- PEOPLE: catálogo maestro actual de personas y su rango actual.
+- PARTICIPATION: presencia de una persona en eventos a través de sus registros de colaboración/ingreso.
+- INCOMES: ingresos/aportaciones por persona y evento. Importe total = obligatorio de SOCIO (numero * precio evento) + aportación voluntaria. Para NO SOCIO el obligatorio es 0.
+- PURCHASES: compras/gastos. Importe = unidades * precio. Por defecto excluye DONADO. status=realized excluye Pte. Compra/PENDIENTE; status=pending incluye solo pendientes; status=all incluye realizadas+pendientes pero nunca donaciones.
+- DONATIONS: líneas DONADO SOCIO / DONADO TIENDA / DONADO OTROS. Son valor de producto, no dinero de caja.
+- PRODUCTS: catálogo de productos, segmento, destino y precio de referencia.
+- STORES: catálogo de tiendas.
+- TICKETS: evidencias/fotos de TKxx.
+- DOCUMENTS: documentos/evidencias DOCxx.
+- HITOS y LG: objetivos y tareas del evento; LG tiene responsable, fechas, cumplimiento y dependencias.
+- BANK: movimientos bancarios del evento cuando se pide expresamente conciliación/banco.
+
+DIMENSIONES PERMITIDAS: ${ZUZU_SEMANTIC_DIMENSIONS.join(', ')}.
+METRICAS PERMITIDAS: ${ZUZU_SEMANTIC_METRICS.join(', ')}.
+
+CONCEPTOS IMPORTANTES:
+- "este evento" = evento activo en pantalla.
+- "todos los eventos" = no limitar al evento activo.
+- asistencia/participación no equivale a número de filas administrativas. Si se pide en qué eventos «participó/asistió» una persona, usa PARTICIPATION con status=realized salvo que el usuario pida también pendientes/registros administrativos.
+- "socio canónico" NO es un concepto definido de ControlEvent. No conviertas esa ambigüedad en cero filas. Si el usuario lo pide, pregunta si se refiere a (a) socios actuales del maestro PEOPLE/rango SOCIO, o (b) socios históricos de un evento según snapshot.
+- Los nombres humanos no son claves. "ALMACEN", "almacén", "El Almacén" pueden referirse a la misma tienda. Devuelve filtro field=store,value=<texto humano>; CE resolverá el id real.
+- Igual para personas, productos, responsables y eventos: tú expresas el concepto; CE resuelve la entidad.
+- Si una entidad parece ambigua, action=clarify antes de afirmar que no existe.
+- Para una pregunta abierta sobre una persona (ej. «Háblame de Ernesto»), no te limites a una tabla: planifica PARTICIPATION y, si procede, PURCHASES como responsable, DONATIONS como donante/responsable y LG como responsable. Después podrás decidir si necesitas más.
+- Para «informe detallado/gráfico de este evento», NO pidas una consulta gigante. Divide en consultas pequeñas: EVENTS; INCOMES; PURCHASES; DONATIONS; PARTICIPATION; agrupación de PURCHASES por tienda/destino; TICKETS/DOCUMENTS; HITOS/LG si existen. BANK solo si el usuario lo pide o es esencial para el informe solicitado.
+- Para un sumatorio por tienda y evento, usa PURCHASES status=realized, filtro store, group_by=[event], metrics=[amount,line_count], include_total=true. Si dice «todos los eventos registrados», include_empty=true.
+- Si el usuario solo quiere una lista, evita métricas irrelevantes y marca show_table=true.
+- La palabra «informe» no autoriza a añadir módulos no relacionados con el objeto concreto pedido.
+- Prefiere de 1 a 8 consultas pequeñas. Nunca una consulta que intente unir varias tablas de hechos a la vez.`;
+}
+function semanticPlannerPrompt(userPrompt, state, selectedEventId = '') {
   const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
   const active = catalog?.eventoActivo;
   const eventList = arr(catalog?.eventos).map(e => `${trim(e.titulo)} | id=${trim(e.id)} | ${trim(e.fechaInicio)}-${trim(e.fechaFin)} | ${trim(e.situacion)}`).join('\n');
@@ -4658,254 +4768,605 @@ function sqlFirstPlannerPrompt(userPrompt, state, selectedEventId = '') {
   const tiendas = arr(candidates.tiendas).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNA';
   const productos = arr(candidates.productos).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNO';
   const personas = arr(candidates.personas).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNA';
-  return `Eres Gemini actuando EXCLUSIVAMENTE como cerebro de consulta de ControlEvent. NO redactes todavía la respuesta al usuario y NO inventes datos.
-Tu única misión en esta fase es decidir qué SELECT de solo lectura necesita ControlEvent para contestar EXACTAMENTE a la pregunta.
-
-PREGUNTA ORIGINAL DEL USUARIO:
-${trim(userPrompt)}
-
-EVENTO ACTIVO EN PANTALLA:
-${active?.id ? `${trim(active.titulo)} | id=${trim(active.id)}` : 'NINGUNO'}
-
-EVENTOS REGISTRADOS DISPONIBLES:
-${eventList}
-
-COINCIDENCIAS DEL CATALOGO CON PALABRAS DEL USUARIO:
-TIENDAS: ${tiendas}
-PRODUCTOS: ${productos}
-PERSONAS: ${personas}
-
-${plannerDatabaseSchemaText()}
-
-REGLAS DE ESTA FASE:
-- Gemini decide la semántica. ControlEvent NO completará ni reinterpretará después tu consulta.
-- Devuelve una principal_select que produzca directamente los datos necesarios para contestar, con alias humanos claros.
-- Puedes devolver validation_selects breves para verificar entidades nombradas (tienda, producto, persona) o el conjunto base.
-- Solo SELECT. Prohibido cualquier INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/COPY/EXEC/CALL.
-- NO consultes ce_users.clave ni secretos.
-- Si el usuario pide datos de todos los eventos, no limites la SELECT al evento activo.
-- Si pide «todos los eventos registrados» y tiene sentido mostrar ceros, usa ce_eventos como tabla base y LEFT JOIN/CASE de modo que no desaparezcan eventos sin coincidencias.
-- Si pide compras realizadas, el importe de línea es unidades * precio y deben quedar fuera DONADO... y Pte. Compra/PENDIENTE. No confundas compras totales del evento con compras de la tienda pedida.
-- Los nombres del usuario son conceptos humanos. ALMACEN, almacén y El Almacén son potencialmente la misma tienda. Normaliza mayúsculas/acentos y artículos; usa los candidatos del catálogo y evita igualdad literal frágil.
-- Para normalizar texto puedes usar UPPER(TRANSLATE(TRIM(COALESCE(campo,'')), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN')).
-- Si se pide total por evento, principal_select debe devolver una fila por evento con esa métrica. Si además se pide sumatorio/global, incluye total_general en la MISMA SELECT (por ejemplo con función de ventana) para que nadie tenga que recalcular ni adivinar después.
-- Una validation_select recomendable al filtrar una tienda es listar los nombres reales de ce_tiendas que semánticamente coinciden con el texto solicitado.
-- No amplíes por la palabra «informe»: si se pide tienda + compras + eventos, consulta solo eso.
-
-Devuelve JSON estricto con: scope, principal_select, validation_selects, rationale.`;
-}
-function sqlFirstSafePlan(parsed) {
-  const principalCheck = isSafePlannerSelect(parsed?.principal_select || '');
-  if (!principalCheck.ok) throw new Error(`Gemini no devolvió una SELECT principal válida: ${principalCheck.reason || 'inválida'}`);
-  const entries = [{ role: 'principal', sql: principalCheck.sql }];
-  const seen = new Set([sqlDedupeKey(principalCheck.sql)]);
-  arr(parsed?.validation_selects).slice(0, 4).forEach(sql => {
-    const safe = isSafePlannerSelect(sql);
-    if (!safe.ok) return;
-    const key = sqlDedupeKey(safe.sql);
-    if (seen.has(key)) return;
-    seen.add(key);
-    entries.push({ role: 'validacion', sql: safe.sql });
-  });
-  return { scope: trim(parsed?.scope), rationale: trim(parsed?.rationale), entries };
-}
-async function callGeminiSqlFirstPlanner(userPrompt, state, selectedEventId, flowTrace = []) {
-  const apiKey = geminiKey();
-  if (!apiKey) throw new Error('Falta GEMINI_API_KEY para que Gemini decida la consulta.');
-  const plannerText = sqlFirstPlannerPrompt(userPrompt, state, selectedEventId);
-  let lastError = null;
-  for (const model of configuredGeminiModelsForTask('zuzu-planner', { prompt: userPrompt })) {
-    try {
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'RUN', `Modelo ${model}. Se envían pregunta, esquema y catálogo mínimo; no se envían cálculos locales.`);
-      sizeTrace(flowTrace, 'Paso 1 · Gemini decide la consulta', 'Contexto de planificación SQL', plannerText);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-      const body = {
-        contents: [{ role: 'user', parts: [{ text: plannerText }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: sqlFirstPlanSchema(), temperature: 0.0, maxOutputTokens: 2600, thinkingConfig: { thinkingBudget: 0 } }
-      };
-      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 22000));
-      logGeminiUsage('PASO 1 SQL-first', model, payload);
-      if (!res.ok) { const e = new Error(payload?.error?.message || `Gemini planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
-      const out = trim(geminiOutText(payload));
-      const parsed = JSON.parse(out);
-      const plan = sqlFirstSafePlan(parsed);
-      plan.model = model;
-      plan.usage = usageSmall(payload, model);
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'OK', `SELECT principal válida + ${plan.entries.length - 1} validación(es). Alcance=${plan.scope || 'deducido por Gemini'}.`, { model, usage: plan.usage });
-      return plan;
-    } catch (error) {
-      lastError = error;
-      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'KO', cleanGeminiError(error), { model });
-      if (isQuotaError(error) || !isRetryable(error)) break;
-    }
-  }
-  throw lastError || new Error('Gemini no pudo decidir una SELECT fiable.');
-}
-function sqlFirstCollectHumanLookups(rawExecutions = []) {
-  return collectSqlHumanLookups(rawExecutions);
-}
-async function executeSqlFirstPlan(plan, flowTrace = []) {
-  let client;
-  try { client = getSupabaseAdmin(); }
-  catch (error) { throw new Error(`ControlEvent no puede ejecutar la consulta porque falta conexión Supabase: ${trim(error?.message || error)}`); }
-  const raw = [];
-  zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', 'RUN', `CE valida y ejecuta ${arr(plan?.entries).length} SELECT(s) de solo lectura mediante ce_zuzu_select.`);
-  for (let i = 0; i < arr(plan?.entries).length; i += 1) {
-    const entry = plan.entries[i];
-    try {
-      const { data, error } = await client.rpc('ce_zuzu_select', { p_sql: entry.sql, p_max_rows: 300 });
-      if (error) throw error;
-      const payload = data && typeof data === 'object' ? data : { ok: true, rows: data };
-      const rows = arr(payload.rows || payload.data || payload.resultados);
-      const suspect = payload.ok !== false && (sqlResultHasNullMetric(rows) || sqlSelectLooksUnsafeFactJoin(entry.sql));
-      const suspectReason = sqlSelectLooksUnsafeFactJoin(entry.sql)
-        ? 'La consulta agrega varias tablas de hechos mediante un JOIN con riesgo de multiplicar importes.'
-        : (sqlResultHasNullMetric(rows) ? 'La consulta devuelve una métrica nula/vacía en filas etiquetadas.' : '');
-      raw.push({ index: i + 1, role: entry.role, sql: entry.sql, ok: payload.ok !== false, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, suspect, suspectReason, error: trim(payload.error || '') });
-      zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', payload.ok === false ? 'KO' : (suspect ? 'KO' : 'OK'), `${entry.role}: ${rows.length} fila(s)${suspect ? ` · descartada: ${suspectReason}` : ''}.`);
-    } catch (error) {
-      raw.push({ index: i + 1, role: entry.role, sql: entry.sql, ok: false, rows: [], rowCount: 0, truncated: false, suspect: false, suspectReason: '', error: trim(error?.message || error) });
-      zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', 'KO', `${entry.role}: ${trim(error?.message || error)}`);
-    }
-  }
-  const lookups = sqlFirstCollectHumanLookups(raw);
-  const executed = raw.map(item => ({
-    ...item,
-    rows: arr(item.rows).map(row => humanizeSqlRowForDisplay(row, lookups, '')).filter(row => Object.keys(row).length)
-  }));
-  const principal = executed.find(x => x.role === 'principal');
-  if (!principal?.ok) throw new Error(`La SELECT principal no pudo ejecutarse: ${principal?.error || 'error desconocido'}`);
-  if (principal?.suspect) throw new Error(`La SELECT principal fue descartada por ControlEvent: ${principal.suspectReason}`);
-  return executed;
-}
-function sqlFirstNumbers(executed = []) {
-  const out = [];
-  arr(executed).filter(x => x?.ok && !x?.suspect).forEach(item => arr(item.rows).forEach(row => {
-    Object.values(row || {}).forEach(v => {
-      if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
-      else if (typeof v === 'string' && /^\s*-?[0-9][0-9.,\s]*\s*$/.test(v)) {
-        const raw = v.replace(/\s/g, '');
-        let n;
-        if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) n = Number(raw.replace(/\./g, '').replace(',', '.'));
-        else n = Number(raw.replace(',', '.'));
-        if (Number.isFinite(n)) out.push(n);
-      }
-    });
-  }));
-  return out;
-}
-function sqlFirstUnsupportedEuro(answer, executed = []) {
-  const facts = sqlFirstNumbers(executed);
-  if (!facts.length) return false;
-  const money = [...text(answer).matchAll(/(-?\d[\d.\s]*(?:,\d+)?|-?\d+(?:\.\d+)?)\s*€/g)];
-  return money.some(m => {
-    const raw = trim(m[1]).replace(/\s/g, '');
-    let n;
-    if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) n = Number(raw.replace(/\./g, '').replace(',', '.'));
-    else n = Number(raw.replace(',', '.'));
-    return Number.isFinite(n) && !facts.some(v => Math.abs(v - n) < 0.005);
-  });
-}
-function sqlFirstFinalPrompt(userPrompt, executed, correction = '') {
-  const payload = arr(executed).filter(x => x?.ok && !x?.suspect).map(x => ({ role: x.role, rowCount: x.rowCount, truncated: x.truncated === true, rows: x.rows }));
-  return `Eres Gemini en la FASE FINAL de Zuzu. ControlEvent ya ha ejecutado las consultas que tú decidiste.
+  return `Eres Gemini, cerebro SEMANTICO de Zuzu. NO escribas SQL. NO calcules cifras. NO redactes todavía la respuesta final.
+Tu trabajo es entender exactamente qué quiere el usuario y pedir a ControlEvent los conjuntos de datos necesarios mediante un PLAN SEMANTICO.
 
 PREGUNTA ORIGINAL:
 ${trim(userPrompt)}
 
-RESULTADOS REALES DEVUELTOS POR CONTROLEVENT:
-${JSON.stringify(payload)}
+EVENTO ACTIVO:
+${active?.id ? `${trim(active.titulo)} | id=${trim(active.id)}` : 'NINGUNO'}
 
-REGLAS OBLIGATORIAS:
-- Estos resultados son la ÚNICA fuente de verdad para la respuesta. No uses memoria, conocimiento previo, cálculos locales de CE ni datos de otros módulos.
-- Contesta exactamente a la pregunta original. No conviertas una consulta concreta en un informe financiero general.
-- La fila/filas role=principal son la respuesta factual principal. role=validacion sirve solo para comprobar nombres y alcance.
-- No inventes ninguna cifra, evento, tienda, compra ni conclusión. No sustituyas cifras por estimaciones.
-- Si la principal tiene filas, está prohibido afirmar que no hay datos.
-- Si la principal tiene 0 filas, dilo; si validacion muestra variantes de nombre, explícalas sin inventar compras.
-- Si existe una columna total_general, úsala como sumatorio; NO vuelvas a calcularla por tu cuenta.
-- No menciones SQL, SELECT, RPC, prompts, tokens ni el flujo interno salvo petición técnica expresa.
-- Sé claro y conciso. ControlEvent mostrará debajo la tabla exacta de resultados, así que no repitas todas las filas en prosa salvo que sean muy pocas.
-${correction ? `\nCORRECCION OBLIGATORIA DE CONTROLEVENT:\n${correction}\n` : ''}
-Devuelve JSON con title, answer y warnings.`;
+EVENTOS REGISTRADOS:
+${eventList}
+
+CANDIDATOS DE ENTIDADES DETECTADOS EN EL TEXTO:
+TIENDAS: ${tiendas}
+PRODUCTOS: ${productos}
+PERSONAS: ${personas}
+
+${semanticOntologyText()}
+
+REGLAS DE PLANIFICACION:
+- action=query si entiendes la intención; action=clarify si un término esencial es ambiguo y no puede resolverse sin preguntar.
+- En queries usa SOLO dominios, dimensiones y métricas del vocabulario. ControlEvent rechazará cualquier otra cosa.
+- scope: active_event, all_events, named_events o year. Si scope=named_events rellena event_names. Si scope=year rellena year.
+- filters usa field semántico: store, product, person, responsible, donor, range, payment_status, ticket, segment, destination, event_state, donation_type, task_status.
+- operator normalmente exact o contains. Para entidades humanas CE resolverá por catálogo; no intentes fabricar ids.
+- status para PURCHASES: realized/pending/all. Para INCOMES: realized/pending/all. Para LG: completed/open/all.
+- group_by y detail_fields usan dimensiones permitidas.
+- metrics usa métricas permitidas.
+- include_total=true cuando el usuario pida sumatorio/global además de agrupación.
+- include_empty=true si el usuario dice explícitamente «todos los eventos registrados» y quiere que también aparezcan eventos sin coincidencias con valor 0.
+- show_table=true solo para datos que merece la pena mostrar al usuario; consultas de apoyo pueden ir false.
+- wants_charts=true solo si el usuario pide gráfico o un informe donde un gráfico mejora claramente la lectura.
+- Si la petición es amplia, divide el trabajo. Si es concreta, no la infles.
+
+Devuelve JSON estricto con action, clarification, intent, scope_summary, queries, wants_charts y rationale.`;
 }
-async function callGeminiSqlFirstAnswer(userPrompt, executed, flowTrace = []) {
+function semanticCleanToken(value) {
+  return norm(value).replace(/\b(el|la|los|las|un|una|unos|unas|tienda|establecimiento)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function semanticCatalogRows(state, type) {
+  if (type === 'event') return arr(state?.eventos).map(x => ({ id: trim(x?.id), nombre: trim(x?.titulo) })).filter(x => x.id && x.nombre);
+  if (type === 'store') return arr(state?.tiendas).map(x => ({ id: trim(x?.id), nombre: trim(x?.nombre) })).filter(x => x.id && x.nombre);
+  if (type === 'product') return arr(state?.productos).map(x => ({ id: trim(x?.id), nombre: trim(x?.nombre) })).filter(x => x.id && x.nombre);
+  if (type === 'person' || type === 'responsible' || type === 'donor') return arr(state?.personas).map(x => ({ id: trim(x?.id), nombre: trim(x?.nombre) })).filter(x => x.id && x.nombre);
+  return [];
+}
+function semanticEntityScore(needle, candidate) {
+  const a = semanticCleanToken(needle), b = semanticCleanToken(candidate);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (b.endsWith(` ${a}`) || b.startsWith(`${a} `) || b.includes(` ${a} `)) return 0.94;
+  if (a.includes(b) || b.includes(a)) return Math.min(0.92, 0.72 + Math.min(a.length,b.length) / Math.max(a.length,b.length) * 0.18);
+  const at = a.split(' ').filter(Boolean), bt = new Set(b.split(' ').filter(Boolean));
+  const overlap = at.filter(t => bt.has(t)).length;
+  if (overlap && overlap === at.length) return 0.82 + Math.min(0.08, overlap * 0.02);
+  return 0;
+}
+function semanticResolveEntity(state, type, value) {
+  const rows = semanticCatalogRows(state, type);
+  const scored = rows.map(row => ({ ...row, score: semanticEntityScore(value, row.nombre) })).filter(x => x.score >= 0.72).sort((a,b) => b.score - a.score || a.nombre.localeCompare(b.nombre,'es'));
+  if (!scored.length) return { ok: false, ambiguous: false, value: trim(value), type, candidates: [] };
+  const top = scored[0];
+  const near = scored.filter(x => top.score - x.score <= 0.035);
+  if (near.length > 1 && top.score < 0.995) return { ok: false, ambiguous: true, value: trim(value), type, candidates: near.slice(0,5) };
+  return { ok: true, id: top.id, nombre: top.nombre, score: top.score, type, candidates: scored.slice(0,5) };
+}
+function semanticSqlLiteral(value) { return `'${text(value).replace(/'/g,"''")}'`; }
+function semanticNormExpr(expr) { return `UPPER(TRANSLATE(TRIM(COALESCE(${expr},'')), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN'))`; }
+function semanticSqlLike(expr, value) { return `${semanticNormExpr(expr)} LIKE ${semanticSqlLiteral(`%${semanticCleanToken(value).toUpperCase().replace(/\s+/g,'%')}%`)}`; }
+function semanticUnique(list) { const out=[]; arr(list).forEach(x=>{ const v=trim(x); if(v && !out.includes(v)) out.push(v); }); return out; }
+function semanticNormalizeQuery(raw, index = 0) {
+  const domain = trim(raw?.domain).toUpperCase();
+  if (!ZUZU_SEMANTIC_DOMAINS.includes(domain)) throw new Error(`Dominio semántico no permitido: ${domain || 'vacío'}`);
+  const groupBy = semanticUnique(raw?.group_by).filter(x => ZUZU_SEMANTIC_DIMENSIONS.includes(x));
+  const detailFields = semanticUnique(raw?.detail_fields).filter(x => ZUZU_SEMANTIC_DIMENSIONS.includes(x));
+  const metrics = semanticUnique(raw?.metrics).filter(x => ZUZU_SEMANTIC_METRICS.includes(x));
+  const scopeRaw = trim(raw?.scope).toLowerCase();
+  const scope = ['active_event','all_events','named_events','year'].includes(scopeRaw) ? scopeRaw : 'active_event';
+  return {
+    id: trim(raw?.id) || `q${index+1}`,
+    title: trim(raw?.title) || `Consulta ${index+1}`,
+    domain,
+    scope,
+    event_names: semanticUnique(raw?.event_names).slice(0,20),
+    year: Math.max(0, Number(raw?.year)||0),
+    status: trim(raw?.status || 'all').toLowerCase(),
+    filters: arr(raw?.filters).slice(0,12).map(f=>({ field:trim(f?.field).toLowerCase(), value:trim(f?.value), operator:trim(f?.operator||'exact').toLowerCase() })).filter(f=>f.field && f.value),
+    group_by: groupBy,
+    metrics,
+    detail_fields: detailFields,
+    include_total: raw?.include_total === true,
+    include_empty: raw?.include_empty === true,
+    sort: trim(raw?.sort || '').toLowerCase(),
+    limit: Math.max(1, Math.min(300, Number(raw?.limit)||80)),
+    show_table: raw?.show_table !== false
+  };
+}
+function semanticSafePlan(parsed) {
+  const action = trim(parsed?.action).toLowerCase();
+  const queries = arr(parsed?.queries).slice(0,10).map((q,i)=>semanticNormalizeQuery(q,i));
+  if (action === 'clarify') return { action:'clarify', clarification:trim(parsed?.clarification) || 'Necesito concretar un término antes de consultar los datos.', queries:[], intent:trim(parsed?.intent), scopeSummary:trim(parsed?.scope_summary), wantsCharts:false, rationale:trim(parsed?.rationale) };
+  if (!queries.length) throw new Error('Gemini no ha pedido ningún conjunto de datos semántico.');
+  return { action:'query', clarification:'', queries, intent:trim(parsed?.intent), scopeSummary:trim(parsed?.scope_summary), wantsCharts:parsed?.wants_charts===true, rationale:trim(parsed?.rationale) };
+}
+async function callGeminiSemanticPlanner(userPrompt, state, selectedEventId, flowTrace = []) {
   const apiKey = geminiKey();
-  if (!apiKey) throw new Error('Falta GEMINI_API_KEY para redactar la respuesta final.');
+  if (!apiKey) throw new Error('Falta GEMINI_API_KEY para que Gemini interprete la petición.');
+  const promptText = semanticPlannerPrompt(userPrompt, state, selectedEventId);
   let lastError = null;
-  let correction = '';
-  const principal = arr(executed).find(x => x.role === 'principal');
-  for (const model of configuredGeminiModelsForTask('zuzu-narrative', { prompt: userPrompt })) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const promptText = sqlFirstFinalPrompt(userPrompt, executed, correction);
-        zuzuTracePush(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'RUN', `Modelo ${model}. Solo recibe pregunta original + filas ejecutadas.`);
-        sizeTrace(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'Contexto final SQL-first', promptText);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-        const body = { contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: sqlFirstAnswerSchema(), temperature: 0.05, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 } } };
-        const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || 22000));
-        logGeminiUsage('PASO 3 SQL-first', model, payload);
-        if (!res.ok) { const e = new Error(payload?.error?.message || `Gemini final HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
-        const parsed = JSON.parse(trim(geminiOutText(payload)));
-        const answer = trim(parsed?.answer);
-        const unsupportedMoney = sqlFirstUnsupportedEuro(answer, executed);
-        const falseNoData = arr(principal?.rows).length > 0 && /\b(no\s+hay|ninguna\s+compra|sin\s+compras|no\s+se\s+han\s+registrado)\b/i.test(answer);
-        if (unsupportedMoney || falseNoData) {
-          correction = `${unsupportedMoney ? 'Has usado un importe en euros que no aparece en los resultados. ' : ''}${falseNoData ? 'La consulta principal contiene filas; no puedes afirmar que no hay datos. ' : ''}Reescribe usando exclusivamente los valores recibidos.`;
-          zuzuTracePush(flowTrace, 'Paso 3b · Control de veracidad CE', 'KO', correction, { model });
-          continue;
-        }
-        zuzuTracePush(flowTrace, 'Paso 3b · Control de veracidad CE', 'OK', 'La redacción no introduce importes ajenos ni contradice la existencia de resultados.', { model });
-        return { title: trim(parsed?.title) || 'Resultado de Zuzu', answer, warnings: arr(parsed?.warnings), model, usage: usageSmall(payload, model) };
-      } catch (error) {
-        lastError = error;
-        zuzuTracePush(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'KO', cleanGeminiError(error), { model });
-        break;
+  for (const model of configuredGeminiModelsForTask('zuzu-planner', { prompt:userPrompt })) {
+    try {
+      zuzuTracePush(flowTrace,'Paso 1 · Gemini interpreta','RUN',`Modelo ${model}. Gemini devuelve intención y plan semántico; no SQL.`);
+      sizeTrace(flowTrace,'Paso 1 · Gemini interpreta','Contexto semántico enviado',promptText);
+      const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const body={contents:[{role:'user',parts:[{text:promptText}]}],generationConfig:{responseMimeType:'application/json',responseSchema:semanticPlanSchema(),temperature:0.05,maxOutputTokens:3000,thinkingConfig:{thinkingBudget:0}}};
+      const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS||22000));
+      logGeminiUsage('PASO 1 AGENTE SEMANTICO',model,payload);
+      if(!res.ok){const e=new Error(payload?.error?.message||`Gemini planner HTTP ${res.status}`);e.status=Number(res.status||502);e.details=payload;throw e;}
+      const parsed=JSON.parse(trim(geminiOutText(payload)));
+      const plan=semanticSafePlan(parsed); plan.model=model; plan.usage=usageSmall(payload,model);
+      zuzuTracePush(flowTrace,'Paso 1 · Gemini interpreta','OK',plan.action==='clarify'?`Gemini pide aclaración: ${plan.clarification}`:`Plan semántico: ${plan.queries.length} consulta(s) · ${plan.queries.map(q=>q.domain).join(', ')}`,{model,usage:plan.usage});
+      return plan;
+    } catch(error){ lastError=error; zuzuTracePush(flowTrace,'Paso 1 · Gemini interpreta','KO',cleanGeminiError(error),{model}); if(isQuotaError(error)||!isRetryable(error)) break; }
+  }
+  throw lastError||new Error('Gemini no pudo construir un plan semántico.');
+}
+function semanticScopeConditions(query, state, selectedEventId, alias='e') {
+  const cond=[]; const resolved=[];
+  if(query.scope==='active_event'){
+    const id=trim(selectedEventId||state?.selectedEventId||'');
+    if(!id) return {error:'No hay evento activo y la petición depende de «este evento».',conditions:[],resolved:[]};
+    cond.push(`${alias}.id=${semanticSqlLiteral(id)}`); resolved.push({type:'event',id,nombre:trim(arr(state?.eventos).find(x=>trim(x?.id)===id)?.titulo||id)});
+  } else if(query.scope==='named_events'){
+    const ids=[];
+    for(const name of query.event_names){ const r=semanticResolveEntity(state,'event',name); if(!r.ok) return {error:r.ambiguous?`El evento «${name}» es ambiguo: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`No encuentro con seguridad el evento «${name}».`,conditions:[],resolved}; ids.push(r.id); resolved.push(r); }
+    if(!ids.length) return {error:'El plan pide eventos concretos pero no ha indicado ninguno.',conditions:[],resolved};
+    cond.push(`${alias}.id IN (${ids.map(semanticSqlLiteral).join(',')})`);
+  } else if(query.scope==='year'){
+    const y=Math.trunc(query.year); if(!y||y<2000||y>2100) return {error:'El año solicitado no es válido.',conditions:[],resolved};
+    cond.push(`(EXTRACT(YEAR FROM ${alias}.fecha_ini)=${y} OR EXTRACT(YEAR FROM ${alias}.fecha_fin)=${y})`);
+  }
+  return {conditions:cond,resolved};
+}
+function semanticFilterConditions(query,state,ctx={}){
+  const cond=[]; const resolved=[];
+  for(const f of arr(query.filters)){
+    const field=f.field, value=f.value;
+    if(['store','product','person','responsible'].includes(field)){
+      const type=field==='store'?'store':field==='product'?'product':field==='person'?'person':'responsible';
+      const r=semanticResolveEntity(state,type,value);
+      if(!r.ok) return {error:r.ambiguous?`«${value}» puede referirse a varias ${type==='person'||type==='responsible'?'personas':'entidades'}: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`No encuentro con seguridad ${field==='store'?'la tienda':field==='product'?'el producto':'la persona'} «${value}».`,conditions:[],resolved};
+      resolved.push({...r,field});
+      if(field==='store'){
+        if(['PURCHASES','DONATIONS','TICKETS'].includes(query.domain)) cond.push(`c.tienda_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='STORES') cond.push(`t.id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='PRODUCTS') cond.push(`pr.default_tienda_id=${semanticSqlLiteral(r.id)}`);
+      } else if(field==='product'){
+        if(['PURCHASES','DONATIONS','TICKETS'].includes(query.domain)) cond.push(`c.producto_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='PRODUCTS') cond.push(`pr.id=${semanticSqlLiteral(r.id)}`);
+      } else if(field==='responsible'){
+        if(['PURCHASES','DONATIONS','TICKETS'].includes(query.domain)) cond.push(`c.responsable_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='LG') cond.push(`l.responsable_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='HITOS') cond.push(`h.responsable_id=${semanticSqlLiteral(r.id)}`);
+      } else if(field==='person'){
+        if(query.domain==='PEOPLE') cond.push(`p.id=${semanticSqlLiteral(r.id)}`);
+        else if(['PARTICIPATION','INCOMES'].includes(query.domain)) cond.push(`c.persona_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='LG') cond.push(`l.responsable_id=${semanticSqlLiteral(r.id)}`);
+        else if(query.domain==='HITOS') cond.push(`h.responsable_id=${semanticSqlLiteral(r.id)}`);
+      }
+    } else if(field==='donor'){
+      if(!['DONATIONS','PURCHASES'].includes(query.domain)) continue;
+      const pr=semanticResolveEntity(state,'person',value), st=semanticResolveEntity(state,'store',value);
+      const terms=[];
+      if(pr.ok){terms.push(`c.donor_ref=${semanticSqlLiteral(`P:${pr.id}`)}`);resolved.push({...pr,field});}
+      if(st.ok){terms.push(`c.donor_ref=${semanticSqlLiteral(`T:${st.id}`)}`);resolved.push({...st,field});}
+      if(!terms.length) terms.push(semanticSqlLike('c.donor_ref',value));
+      cond.push(`(${terms.join(' OR ')})`);
+    } else if(field==='range'){
+      if(query.domain==='PEOPLE') cond.push(`${semanticNormExpr('p.rango')}=${semanticSqlLiteral(semanticCleanToken(value).toUpperCase())}`);
+      else if(['PARTICIPATION','INCOMES'].includes(query.domain)) cond.push(`${semanticNormExpr("COALESCE(s.rango_snapshot,p.rango,'')")}=${semanticSqlLiteral(semanticCleanToken(value).toUpperCase())}`);
+    } else if(field==='payment_status' && ['PARTICIPATION','INCOMES'].includes(query.domain)) cond.push(`${semanticNormExpr('c.situacion')} LIKE ${semanticSqlLiteral(`%${semanticCleanToken(value).toUpperCase()}%`)}`);
+    else if(field==='ticket' && ['PURCHASES','DONATIONS','TICKETS'].includes(query.domain)) cond.push(semanticSqlLike('c.ticket_donacion',value));
+    else if(field==='segment' && ['PURCHASES','DONATIONS','PRODUCTS','TICKETS'].includes(query.domain)) cond.push(semanticSqlLike('pr.segmento',value));
+    else if(field==='destination' && ['PURCHASES','DONATIONS','PRODUCTS','TICKETS'].includes(query.domain)) cond.push(semanticSqlLike('pr.destino',value));
+    else if(field==='event_state' && !['PEOPLE','PRODUCTS','STORES'].includes(query.domain)) cond.push(semanticSqlLike('e.situacion',value));
+    else if(field==='donation_type' && ['PURCHASES','DONATIONS'].includes(query.domain)) cond.push(semanticSqlLike('c.ticket_donacion',value));
+    else if(field==='task_status' && query.domain==='LG'){
+      const nv=semanticCleanToken(value); if(/cumpl|complet|hech/.test(nv)) cond.push('l.cumplida=TRUE'); else if(/pend|abiert|no/.test(nv)) cond.push('(l.cumplida IS DISTINCT FROM TRUE)');
+    }
+  }
+  return {conditions:cond,resolved};
+}
+function semanticPurchaseClassCondition(domain,status){
+  const t=`${semanticNormExpr('c.ticket_donacion')}`;
+  if(domain==='DONATIONS') return `${t} LIKE 'DONADO%'`;
+  const notDonation=`${t} NOT LIKE 'DONADO%'`;
+  if(status==='pending') return `${notDonation} AND (${t} LIKE '%PTE%COMPRA%' OR ${t} LIKE '%PENDIENTE%')`;
+  if(status==='realized') return `${notDonation} AND NOT (${t} LIKE '%PTE%COMPRA%' OR ${t} LIKE '%PENDIENTE%')`;
+  return notDonation;
+}
+function semanticIncomeStatusCondition(status){
+  const st=semanticNormExpr('c.situacion');
+  if(status==='pending') return `${st}='PENDIENTE'`;
+  if(status==='realized') return `${st} IN ('BANCO','EFECTIVO','BIZUM','EXENTO','INVITADO','CONFIRMADO','ASISTE','SI','PAGADO')`;
+  return 'TRUE';
+}
+function semanticDimensionExpr(domain,dim){
+  const domainsWithEvent=['EVENTS','INCOMES','PARTICIPATION','PURCHASES','DONATIONS','LG','HITOS','TICKETS','DOCUMENTS','BANK'];
+  if(domainsWithEvent.includes(domain) && dim==='event') return {expr:'e.titulo',alias:'Evento'};
+  if(domainsWithEvent.includes(domain) && dim==='event_state') return {expr:'e.situacion',alias:'Estado'};
+  if(domain==='EVENTS' && dim==='description') return {expr:`COALESCE(e.descripcion,'')`,alias:'Descripción'};
+  if(['EVENTS','INCOMES','PARTICIPATION','PURCHASES','DONATIONS','TICKETS'].includes(domain) && dim==='event_start') return {expr:'e.fecha_ini',alias:'Fecha inicio'};
+  if(['EVENTS','INCOMES','PARTICIPATION','PURCHASES','DONATIONS','TICKETS'].includes(domain) && dim==='event_end') return {expr:'e.fecha_fin',alias:'Fecha fin'};
+  if(['INCOMES','PARTICIPATION'].includes(domain)){
+    const m={person:`COALESCE(s.nombre_snapshot,p.nombre,c.persona_id)`,range:`COALESCE(s.rango_snapshot,p.rango,'')`,payment_status:`c.situacion`};
+    if(m[dim]) return {expr:m[dim],alias:{person:'Persona',range:'Rango',payment_status:'Estado ingreso'}[dim]};
+  }
+  if(['PURCHASES','DONATIONS'].includes(domain)){
+    const donor=`CASE WHEN c.donor_ref LIKE 'P:%' THEN COALESCE(dp.nombre,c.donor_ref) WHEN c.donor_ref LIKE 'T:%' THEN COALESCE(dt.nombre,c.donor_ref) ELSE COALESCE(c.donor_ref,'') END`;
+    const m={store:`COALESCE(t.nombre,'Sin tienda')`,product:`COALESCE(pr.nombre,'Sin producto')`,responsible:`COALESCE(r.nombre,'Sin responsable')`,ticket:`COALESCE(c.ticket_donacion,'')`,segment:`COALESCE(pr.segmento,'Sin segmento')`,destination:`COALESCE(pr.destino,'Sin destino')`,donation_type:`COALESCE(c.ticket_donacion,'')`,person:donor};
+    if(m[dim]) return {expr:m[dim],alias:{store:'Tienda',product:'Producto',responsible:'Responsable',ticket:'TKxx',segment:'Segmento',destination:'Destino',donation_type:'Tipo donación',person:'Donante'}[dim]};
+  }
+  if(domain==='PEOPLE'){
+    const m={person:'p.nombre',range:'p.rango'}; if(m[dim]) return {expr:m[dim],alias:dim==='person'?'Persona':'Rango'};
+  }
+  if(domain==='PRODUCTS'){
+    const m={product:'pr.nombre',segment:'pr.segmento',destination:'pr.destino',store:`COALESCE(t.nombre,'')`}; if(m[dim]) return {expr:m[dim],alias:{product:'Producto',segment:'Segmento',destination:'Destino',store:'Tienda referencia'}[dim]};
+  }
+  if(domain==='STORES' && dim==='store') return {expr:'t.nombre',alias:'Tienda'};
+  if(domain==='LG'){
+    const m={event:'e.titulo',hito:`COALESCE(h.nombre_hito,'')`,task:'l.descripcion',responsible:`COALESCE(l.responsable_nombre,p.nombre,'')`,task_status:`CASE WHEN l.cumplida=TRUE THEN 'Cumplida' ELSE 'Pendiente' END`,event_start:'l.fecha_minima',event_end:'l.fecha_maxima'};
+    if(m[dim]) return {expr:m[dim],alias:{event:'Evento',hito:'Hito',task:'LG',responsible:'Responsable',task_status:'Estado tarea',event_start:'Fecha mínima',event_end:'Fecha máxima'}[dim]};
+  }
+  if(domain==='HITOS'){
+    const m={event:'e.titulo',hito:'h.nombre_hito',responsible:`COALESCE(h.responsable_nombre,p.nombre,'')`,event_start:'h.fecha_minima',event_end:'h.fecha_maxima'};
+    if(m[dim]) return {expr:m[dim],alias:{event:'Evento',hito:'Hito',responsible:'Responsable',event_start:'Fecha mínima',event_end:'Fecha máxima'}[dim]};
+  }
+  if(domain==='TICKETS'){
+    const m={ticket:`COALESCE(c.ticket_donacion,'')`,store:`COALESCE(t.nombre,'Sin tienda')`,product:`COALESCE(pr.nombre,'Sin producto')`,responsible:`COALESCE(r.nombre,'Sin responsable')`,segment:`COALESCE(pr.segmento,'Sin segmento')`,destination:`COALESCE(pr.destino,'Sin destino')`};
+    if(m[dim]) return {expr:m[dim],alias:{ticket:'TKxx',store:'Tienda',product:'Producto',responsible:'Responsable',segment:'Segmento',destination:'Destino'}[dim]};
+  }
+  if(domain==='DOCUMENTS'){
+    const m={ticket:`COALESCE(d->>'codigo',d->>'imageKey',d->>'id','DOC')`,event_start:`COALESCE(d->>'fecha','')`,description:`COALESCE(d->>'descripcion',d->>'description','')`};
+    if(m[dim]) return {expr:m[dim],alias:{ticket:'Documento',event_start:'Fecha',description:'Descripción'}[dim]};
+  }
+  if(domain==='BANK'){
+    const m={event:'e.titulo',movement_type:`CASE WHEN m.amount>=0 THEN 'Abono' ELSE 'Cargo' END`,bank_description:'m.description',event_start:'m.executed_at'}; if(m[dim]) return {expr:m[dim],alias:{event:'Evento',movement_type:'Tipo movimiento',bank_description:'Concepto',event_start:'Fecha'}[dim]};
+  }
+  return null;
+}
+function semanticMetricExpr(domain,metric){
+  if(domain==='EVENTS' && metric==='count') return {expr:'COUNT(*)',alias:'Eventos'};
+  if(domain==='PEOPLE' && ['count','count_records'].includes(metric)) return {expr:'COUNT(*)',alias:'Personas'};
+  if(['INCOMES','PARTICIPATION'].includes(domain)){
+    const rango=`${semanticNormExpr("COALESCE(s.rango_snapshot,p.rango,'')")}`;
+    const total=`(CASE WHEN ${rango}='SOCIO' THEN COALESCE(c.numero,0)*COALESCE(e.precio,0) ELSE 0 END + COALESCE(c.importe,0))`;
+    const m={count:'COUNT(*)',count_records:'COUNT(*)',participants:`COALESCE(SUM(CASE WHEN COALESCE(c.numero,0)>0 THEN c.numero WHEN ${semanticNormExpr('c.situacion')} IN ('BANCO','EFECTIVO','BIZUM','EXENTO','INVITADO','CONFIRMADO','ASISTE','SI','PAGADO') THEN CASE WHEN ${semanticNormExpr("COALESCE(s.nombre_snapshot,p.nombre,'')")} LIKE '% Y %' THEN 2 ELSE 1 END ELSE 0 END),0)`,amount:`COALESCE(SUM(${total}),0)`,mandatory_amount:`COALESCE(SUM(CASE WHEN ${rango}='SOCIO' THEN COALESCE(c.numero,0)*COALESCE(e.precio,0) ELSE 0 END),0)`,voluntary_amount:'COALESCE(SUM(COALESCE(c.importe,0)),0)'};
+    if(m[metric]) return {expr:m[metric],alias:{count:'Registros',count_records:'Registros',participants:'Participantes',amount:'Importe',mandatory_amount:'Importe obligatorio',voluntary_amount:'Importe voluntario'}[metric]};
+  }
+  if(['PURCHASES','DONATIONS'].includes(domain)){
+    const m={count:'COUNT(*)',line_count:'COUNT(*)',count_records:'COUNT(*)',units:'COALESCE(SUM(COALESCE(c.unidades,0)),0)',amount:'COALESCE(SUM(COALESCE(c.unidades,0)*COALESCE(c.precio,0)),0)',ticket_count:`COUNT(DISTINCT NULLIF(TRIM(COALESCE(c.ticket_donacion,'')),''))`};
+    if(m[metric]) return {expr:m[metric],alias:{count:'Líneas',line_count:'Líneas',count_records:'Líneas',units:'Unidades',amount:'Importe',ticket_count:'Tickets'}[metric]};
+  }
+  if(domain==='PRODUCTS' && ['count','count_records'].includes(metric)) return {expr:'COUNT(*)',alias:'Productos'};
+  if(domain==='STORES' && ['count','count_records'].includes(metric)) return {expr:'COUNT(*)',alias:'Tiendas'};
+  if(domain==='LG'){
+    const m={count:'COUNT(*)',count_records:'COUNT(*)',completed_count:'COALESCE(SUM(CASE WHEN l.cumplida=TRUE THEN 1 ELSE 0 END),0)',pending_count:'COALESCE(SUM(CASE WHEN l.cumplida=TRUE THEN 0 ELSE 1 END),0)'};
+    if(m[metric]) return {expr:m[metric],alias:{count:'LG',count_records:'LG',completed_count:'Cumplidas',pending_count:'Pendientes'}[metric]};
+  }
+  if(domain==='HITOS' && ['count','count_records'].includes(metric)) return {expr:'COUNT(*)',alias:'Hitos'};
+  if(domain==='TICKETS'){
+    const m={count:`COUNT(DISTINCT NULLIF(TRIM(COALESCE(c.ticket_donacion,'')),''))`,count_records:'COUNT(*)',ticket_count:`COUNT(DISTINCT NULLIF(TRIM(COALESCE(c.ticket_donacion,'')),''))`,line_count:'COUNT(*)',amount:'COALESCE(SUM(COALESCE(c.unidades,0)*COALESCE(c.precio,0)),0)'};
+    if(m[metric]) return {expr:m[metric],alias:{count:'Tickets',count_records:'Líneas',ticket_count:'Tickets',line_count:'Líneas',amount:'Importe'}[metric]};
+  }
+  if(domain==='DOCUMENTS' && ['count','count_records'].includes(metric)) return {expr:'COUNT(*)',alias:'Documentos'};
+  if(domain==='BANK'){
+    const m={count:'COUNT(*)',count_records:'COUNT(*)',amount:'COALESCE(SUM(m.amount),0)',credits:'COALESCE(SUM(CASE WHEN m.amount>0 THEN m.amount ELSE 0 END),0)',debits:'COALESCE(SUM(CASE WHEN m.amount<0 THEN -m.amount ELSE 0 END),0)'};
+    if(m[metric]) return {expr:m[metric],alias:{count:'Movimientos',count_records:'Movimientos',amount:'Variación',credits:'Abonos',debits:'Cargos'}[metric]};
+  }
+  return null;
+}
+function semanticBaseForDomain(domain){
+  if(domain==='EVENTS') return {from:'ce_eventos e',eventAlias:'e'};
+  if(['INCOMES','PARTICIPATION'].includes(domain)) return {from:'ce_colaboradores c JOIN ce_eventos e ON e.id=c.event_id LEFT JOIN ce_event_person_snapshots s ON s.event_id=c.event_id AND s.persona_id=c.persona_id LEFT JOIN ce_personas p ON p.id=c.persona_id',eventAlias:'e'};
+  if(['PURCHASES','DONATIONS'].includes(domain)) return {from:"ce_compras c JOIN ce_eventos e ON e.id=c.event_id LEFT JOIN ce_productos pr ON pr.id=c.producto_id LEFT JOIN ce_tiendas t ON t.id=c.tienda_id LEFT JOIN ce_personas r ON r.id=c.responsable_id LEFT JOIN ce_personas dp ON c.donor_ref=('P:'||dp.id) LEFT JOIN ce_tiendas dt ON c.donor_ref=('T:'||dt.id)",eventAlias:'e'};
+  if(domain==='PEOPLE') return {from:'ce_personas p',eventAlias:''};
+  if(domain==='PRODUCTS') return {from:'ce_productos pr LEFT JOIN ce_tiendas t ON t.id=pr.default_tienda_id',eventAlias:''};
+  if(domain==='STORES') return {from:'ce_tiendas t',eventAlias:''};
+  if(domain==='LG') return {from:'ce_lg l JOIN ce_eventos e ON e.id=l.event_id LEFT JOIN ce_hitos h ON h.id=l.hito_id LEFT JOIN ce_personas p ON p.id=l.responsable_id',eventAlias:'e'};
+  if(domain==='HITOS') return {from:'ce_hitos h JOIN ce_eventos e ON e.id=h.event_id LEFT JOIN ce_personas p ON p.id=h.responsable_id',eventAlias:'e'};
+  if(domain==='TICKETS') return {from:"ce_compras c JOIN ce_eventos e ON e.id=c.event_id LEFT JOIN ce_productos pr ON pr.id=c.producto_id LEFT JOIN ce_tiendas t ON t.id=c.tienda_id LEFT JOIN ce_personas r ON r.id=c.responsable_id",eventAlias:'e',baseCondition:`${semanticPurchaseClassCondition('PURCHASES','realized')} AND ${semanticNormExpr("c.ticket_donacion")} LIKE 'TK%'`};
+  if(domain==='DOCUMENTS') return {from:"ce_meta m CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(m.value)='array' THEN m.value ELSE '[]'::jsonb END) d JOIN ce_eventos e ON e.id=COALESCE(d->>'eventId',d->>'event_id')",eventAlias:'e',baseCondition:"m.key='eventDocuments'"};
+  if(domain==='BANK') return {from:'ce_bank_event_movement_state bs JOIN ce_eventos e ON e.id=bs.event_id JOIN ce_bank_movements m ON m.id=bs.movement_id',eventAlias:'e',baseCondition:'bs.included=TRUE'};
+  throw new Error(`Dominio no implementado: ${domain}`);
+}
+function semanticDefaultDetails(domain){
+  const map={EVENTS:['event','event_start','event_end','event_state'],PEOPLE:['person','range'],PARTICIPATION:['event','person','range','payment_status'],INCOMES:['event','person','range','payment_status'],PURCHASES:['event','store','ticket','product','responsible'],DONATIONS:['event','donation_type','person','product','responsible'],PRODUCTS:['product','segment','destination'],STORES:['store'],TICKETS:['event','ticket','store','responsible'],DOCUMENTS:['event','ticket','event_start','description'],HITOS:['event','hito','responsible','event_start','event_end'],LG:['event','hito','task','responsible','task_status'],BANK:['event','event_start','movement_type','bank_description']};
+  return map[domain]||[];
+}
+function semanticBuildEventZeroFillSql(query,state,selectedEventId){
+  if(!query.include_empty || !['PURCHASES','DONATIONS'].includes(query.domain)) return null;
+  if(query.group_by.length!==1 || query.group_by[0]!=='event' || !query.metrics.length) return null;
+  const unsupportedFilters=arr(query.filters).filter(f=>!['store','product','responsible','donor','ticket','segment','destination','donation_type','event_state'].includes(f.field));
+  if(unsupportedFilters.length) return null;
+  const scope=semanticScopeConditions(query,state,selectedEventId,'e');
+  if(scope.error) return {error:scope.error};
+  const eventFilters=[];
+  for(const f of arr(query.filters).filter(x=>x.field==='event_state')) eventFilters.push(semanticSqlLike('e.situacion',f.value));
+  const factQuery={...query,filters:arr(query.filters).filter(x=>x.field!=='event_state')};
+  const fc=semanticFilterConditions(factQuery,state,{});
+  if(fc.error) return {error:fc.error};
+  const factConditions=[semanticPurchaseClassCondition(query.domain,query.status),...fc.conditions];
+  const metricParts=[]; const aliases=[];
+  for(const m of query.metrics){const x=semanticMetricExpr(query.domain,m);if(x){metricParts.push(`${x.expr} AS "${x.alias}"`);aliases.push(x.alias);}}
+  if(!metricParts.length) return null;
+  const factFrom="ce_compras c LEFT JOIN ce_productos pr ON pr.id=c.producto_id LEFT JOIN ce_tiendas t ON t.id=c.tienda_id LEFT JOIN ce_personas r ON r.id=c.responsable_id LEFT JOIN ce_personas dp ON c.donor_ref=('P:'||dp.id) LEFT JOIN ce_tiendas dt ON c.donor_ref=('T:'||dt.id)";
+  const fact=`SELECT c.event_id, ${metricParts.join(', ')} FROM ${factFrom} WHERE ${factConditions.map(x=>`(${x})`).join(' AND ')} GROUP BY c.event_id`;
+  const outerConditions=[...scope.conditions,...eventFilters];
+  const select=['e.titulo AS "Evento"'];
+  aliases.forEach(a=>select.push(`COALESCE(f."${a}",0) AS "${a}"`));
+  const totalAlias=aliases.find(a=>a==='Importe')||aliases[0];
+  if(query.include_total && totalAlias) select.push(`SUM(COALESCE(f."${totalAlias}",0)) OVER () AS "Total general"`);
+  let order='';
+  if(query.sort==='event_date') order=' ORDER BY e.fecha_ini DESC';
+  else if(query.sort==='amount_desc' && aliases.includes('Importe')) order=' ORDER BY "Importe" DESC, e.fecha_ini DESC';
+  else if(query.sort==='name') order=' ORDER BY e.titulo';
+  else if(totalAlias) order=` ORDER BY "${totalAlias}" DESC, e.fecha_ini DESC`;
+  const where=outerConditions.length?` WHERE ${outerConditions.map(x=>`(${x})`).join(' AND ')}`:'';
+  const limit=` LIMIT ${Math.max(1,Math.min(300,query.limit||80))}`;
+  return {sql:`SELECT ${select.join(', ')} FROM ce_eventos e LEFT JOIN (${fact}) f ON f.event_id=e.id${where}${order}${limit}`,resolved:[...scope.resolved,...fc.resolved],columnsHint:['Evento',...aliases,...(query.include_total?['Total general']:[])]};
+}
+function semanticBuildSql(query,state,selectedEventId){
+  const zeroFill=semanticBuildEventZeroFillSql(query,state,selectedEventId);
+  if(zeroFill) return zeroFill;
+  const base=semanticBaseForDomain(query.domain); const conditions=[]; const resolved=[];
+  if(base.baseCondition) conditions.push(base.baseCondition);
+  if(base.eventAlias){ const sc=semanticScopeConditions(query,state,selectedEventId,base.eventAlias); if(sc.error) return {error:sc.error}; conditions.push(...sc.conditions); resolved.push(...sc.resolved); }
+  else if(query.scope==='named_events'||query.scope==='active_event'||query.scope==='year'){
+    // Dominios maestros no dependen de evento. El planner debe pedirlos con all_events.
+  }
+  if(query.domain==='PURCHASES') conditions.push(semanticPurchaseClassCondition('PURCHASES',query.status));
+  if(query.domain==='DONATIONS') conditions.push(semanticPurchaseClassCondition('DONATIONS','all'));
+  if(['INCOMES','PARTICIPATION'].includes(query.domain)) conditions.push(semanticIncomeStatusCondition(query.status));
+  if(query.domain==='LG'){
+    if(query.status==='completed') conditions.push('l.cumplida=TRUE');
+    else if(query.status==='open') conditions.push('(l.cumplida IS DISTINCT FROM TRUE)');
+  }
+  const fc=semanticFilterConditions(query,state,{base}); if(fc.error) return {error:fc.error}; conditions.push(...fc.conditions); resolved.push(...fc.resolved);
+
+  const dims=semanticUnique(query.group_by.length?query.group_by:(query.metrics.length?[]:(query.detail_fields.length?query.detail_fields:semanticDefaultDetails(query.domain))));
+  const metrics=semanticUnique(query.metrics);
+  const select=[]; const group=[];
+  for(const d of dims){ const x=semanticDimensionExpr(query.domain,d); if(x){select.push(`${x.expr} AS "${x.alias}"`);group.push(x.expr);} }
+  const metricAliases=[];
+  for(const m of metrics){const x=semanticMetricExpr(query.domain,m);if(x){select.push(`${x.expr} AS "${x.alias}"`);metricAliases.push(x.alias);} }
+  if(!select.length){
+    for(const d of semanticDefaultDetails(query.domain)){const x=semanticDimensionExpr(query.domain,d);if(x)select.push(`${x.expr} AS "${x.alias}"`);}
+  }
+  if(query.domain==='EVENTS' && !metrics.length){
+    if(!select.some(x=>/"Precio"/.test(x))) select.push('e.precio AS "Precio"');
+    if(!select.some(x=>/"Descripción"/.test(x))) select.push("COALESCE(e.descripcion,'') AS \"Descripción\"");
+  }
+  if(['INCOMES','PARTICIPATION'].includes(query.domain) && !metrics.length){
+    select.push('COALESCE(c.numero,0) AS "Número"');
+    if(query.domain==='INCOMES'){
+      const rango=semanticNormExpr("COALESCE(s.rango_snapshot,p.rango,'')");
+      select.push(`CASE WHEN ${rango}='SOCIO' THEN COALESCE(c.numero,0)*COALESCE(e.precio,0) ELSE 0 END AS "Importe obligatorio"`);
+      select.push('COALESCE(c.importe,0) AS "Importe voluntario"');
+    }
+  }
+  if(['PURCHASES','DONATIONS'].includes(query.domain) && !metrics.length){
+    select.push('COALESCE(c.unidades,0) AS "Unidades"','COALESCE(c.precio,0) AS "Precio"','COALESCE(c.unidades,0)*COALESCE(c.precio,0) AS "Importe"');
+  }
+  if(domainNeedsDateExtra(query.domain) && query.domain==='BANK' && !metrics.length) select.push('m.amount AS "Importe"');
+  const where=conditions.length?` WHERE ${conditions.map(x=>`(${x})`).join(' AND ')}`:'';
+  const groupClause=metrics.length&&group.length?` GROUP BY ${group.join(', ')}`:'';
+  let order='';
+  const metricOrder=metricAliases[0];
+  if(query.sort==='amount_desc' && metricAliases.includes('Importe')) order=' ORDER BY "Importe" DESC';
+  else if(query.sort==='count_desc' && metricOrder) order=` ORDER BY "${metricOrder}" DESC`;
+  else if(query.sort==='name' && select.length) order=' ORDER BY 1';
+  else if(query.sort==='event_date' && query.domain==='EVENTS') order=' ORDER BY e.fecha_ini DESC';
+  else if(query.sort==='event_date' && group.length && query.group_by.includes('event')) order=' ORDER BY MIN(e.fecha_ini) DESC';
+  else if(query.sort==='event_date' && base.eventAlias && !metrics.length) order=' ORDER BY e.fecha_ini DESC';
+  else if(metrics.length && metricOrder) order=` ORDER BY "${metricOrder}" DESC`;
+  else if(query.domain==='EVENTS') order=' ORDER BY e.fecha_ini DESC';
+  const limit=` LIMIT ${Math.max(1,Math.min(300,query.limit||80))}`;
+  let sql=`SELECT ${select.join(', ')} FROM ${base.from}${where}${groupClause}${order}${limit}`;
+  if(query.include_total && metrics.length && group.length){
+    const amountAlias=metricAliases.find(a=>a==='Importe')||metricAliases[0];
+    if(amountAlias) sql=`SELECT ce_sem.*, SUM(COALESCE(ce_sem."${amountAlias}",0)) OVER () AS "Total general" FROM (${sql.replace(/ LIMIT \d+$/,'')}) ce_sem${order.replace(/e\.[a-z_]+/gi,'1')}${limit}`;
+  }
+  return {sql,resolved,columnsHint:select.map(x=>(x.match(/AS\s+"([^"]+)"/i)||[])[1]).filter(Boolean)};
+}
+function domainNeedsDateExtra(domain){return domain==='BANK';}
+function semanticPlanWithResolvedQueries(plan,state,selectedEventId){
+  const built=[]; const resolved=[];
+  for(const q of arr(plan.queries)){
+    const b=semanticBuildSql(q,state,selectedEventId);
+    if(b.error) return {error:b.error,query:q,built,resolved};
+    built.push({...q,sql:b.sql,columnsHint:b.columnsHint}); resolved.push(...arr(b.resolved));
+  }
+  return {built,resolved};
+}
+async function semanticExecuteQueries(queries,flowTrace=[]){
+  let client; try{client=getSupabaseAdmin();}catch(error){throw new Error(`ControlEvent no puede consultar Supabase: ${trim(error?.message||error)}`);}
+  const out=[];
+  for(const q of arr(queries)){
+    zuzuTracePush(flowTrace,'Paso 2 · ControlEvent consulta','RUN',`${q.id} · ${q.domain} · ${q.title}. SELECT construida por CE, no por Gemini.`);
+    try{
+      const {data,error}=await client.rpc('ce_zuzu_select',{p_sql:q.sql,p_max_rows:Math.max(50,Math.min(300,q.limit||80))});
+      if(error) throw error;
+      const payload=data&&typeof data==='object'?data:{ok:true,rows:data};
+      const rows=arr(payload.rows||payload.data||payload.resultados);
+      const suspect=payload.ok!==false&&(sqlResultHasNullMetric(rows)||sqlSelectLooksUnsafeFactJoin(q.sql));
+      const human=rows.map(row=>humanizeSqlRowForDisplay(row,collectSqlHumanLookups([{ok:true,rows}]),'')).filter(row=>Object.keys(row).length);
+      out.push({id:q.id,title:q.title,domain:q.domain,showTable:q.show_table,ok:payload.ok!==false&&!suspect,rows:human,rowCount:Number(payload.row_count??payload.rowCount??human.length)||human.length,truncated:payload.truncated===true,error:suspect?'ControlEvent detectó una consulta agregada insegura.':trim(payload.error||''),columnsHint:q.columnsHint});
+      zuzuTracePush(flowTrace,'Paso 2 · ControlEvent consulta',payload.ok===false||suspect?'KO':'OK',`${q.id}: ${human.length} fila(s)${payload.truncated?' · truncado':''}.`);
+    }catch(error){
+      const msg=trim(error?.message||error); out.push({id:q.id,title:q.title,domain:q.domain,showTable:q.show_table,ok:false,rows:[],rowCount:0,truncated:false,error:msg,columnsHint:q.columnsHint});
+      zuzuTracePush(flowTrace,'Paso 2 · ControlEvent consulta','KO',`${q.id}: ${msg}`);
+    }
+  }
+  return out;
+}
+function semanticResultsForGemini(results){
+  return arr(results).map(r=>({id:r.id,title:r.title,domain:r.domain,ok:r.ok,rowCount:r.rowCount,truncated:r.truncated,error:r.error||'',columns:r.rows[0]?Object.keys(r.rows[0]):arr(r.columnsHint),rows:arr(r.rows).slice(0,80)}));
+}
+function semanticReviewerPrompt(userPrompt,plan,results,round){
+  return `Eres Gemini revisando si ControlEvent ya ha obtenido información suficiente para responder bien.
+NO escribas SQL. Si faltan datos, pide SOLO consultas semánticas adicionales con el mismo contrato de la fase 1.
+
+PREGUNTA ORIGINAL:
+${trim(userPrompt)}
+
+INTENCION INTERPRETADA:
+${trim(plan.intent)}
+
+RONDA DE DATOS: ${round}
+RESULTADOS DE CONTROLEVENT:
+${compactJson(semanticResultsForGemini(results),22000)}
+
+${semanticOntologyText()}
+
+DECISION:
+- status=enough si los resultados permiten contestar la pregunta con rigor.
+- status=more si falta una faceta necesaria o una consulta falló y puede sustituirse por otra consulta semántica más simple. Devuelve additional_queries (máximo 6).
+- status=clarify si el resultado revela una ambigüedad que solo el usuario puede resolver.
+- Un resultado 0 NO demuestra por sí solo inexistencia si la entidad/concepto estaba dudoso.
+- Ante timeout/error, NO abandones automáticamente: pide una consulta más pequeña/agrupada que cubra la misma necesidad.
+- En informes amplios, comprueba que haya cobertura de los bloques realmente solicitados, pero no añadas módulos por rutina.
+Devuelve JSON estricto con status, reason, clarification, additional_queries.`;
+}
+async function callGeminiSemanticReviewer(userPrompt,plan,results,round,flowTrace=[]){
+  const apiKey=geminiKey(); if(!apiKey) return {status:'enough',reason:'Sin Gemini para revisión adicional.',clarification:'',additionalQueries:[]};
+  const promptText=semanticReviewerPrompt(userPrompt,plan,results,round); let lastError=null;
+  for(const model of configuredGeminiModelsForTask('zuzu-planner',{prompt:userPrompt})){
+    try{
+      zuzuTracePush(flowTrace,`Paso 3.${round} · Gemini revisa datos`,'RUN',`Modelo ${model}. Decide si necesita otra ronda; no SQL.`);
+      const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const body={contents:[{role:'user',parts:[{text:promptText}]}],generationConfig:{responseMimeType:'application/json',responseSchema:semanticReviewSchema(),temperature:0.05,maxOutputTokens:2200,thinkingConfig:{thinkingBudget:0}}};
+      const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS||22000));
+      logGeminiUsage(`PASO 3.${round} REVISION SEMANTICA`,model,payload);
+      if(!res.ok){const e=new Error(payload?.error?.message||`Gemini reviewer HTTP ${res.status}`);e.status=Number(res.status||502);throw e;}
+      const p=JSON.parse(trim(geminiOutText(payload))); const status=trim(p?.status).toLowerCase();
+      const additional=arr(p?.additional_queries).slice(0,6).map((q,i)=>{const nq=semanticNormalizeQuery(q,i+100*round);nq.id=`r${round}_${i+1}_${nq.id}`;return nq;});
+      const out={status:['enough','more','clarify'].includes(status)?status:'enough',reason:trim(p?.reason),clarification:trim(p?.clarification),additionalQueries:additional,model};
+      zuzuTracePush(flowTrace,`Paso 3.${round} · Gemini revisa datos`,'OK',`${out.status}${out.additionalQueries.length?` · ${out.additionalQueries.length} consulta(s) adicional(es)`:''}. ${out.reason}`);
+      return out;
+    }catch(error){lastError=error;zuzuTracePush(flowTrace,`Paso 3.${round} · Gemini revisa datos`,'KO',cleanGeminiError(error),{model});if(isQuotaError(error)||!isRetryable(error))break;}
+  }
+  return {status:'enough',reason:`No se pudo completar la revisión adaptativa: ${cleanGeminiError(lastError)}`,clarification:'',additionalQueries:[]};
+}
+function semanticNumbers(results=[]){
+  const nums=[];
+  for(const result of arr(results).filter(r=>r?.ok)){
+    for(const row of arr(result.rows)){
+      for(const v of Object.values(row||{})){
+        if(typeof v==='number' && Number.isFinite(v)) { nums.push(v); continue; }
+        if(typeof v!=='string' || !/^\s*-?[0-9][0-9.,\s]*\s*$/.test(v)) continue;
+        const raw=v.replace(/\s/g,'');
+        let n;
+        if(/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) n=Number(raw.replace(/\./g,'').replace(',','.'));
+        else n=Number(raw.replace(',','.'));
+        if(Number.isFinite(n)) nums.push(n);
       }
     }
-    if (lastError && (isQuotaError(lastError) || !isRetryable(lastError))) break;
   }
-  throw lastError || new Error('Gemini no pudo redactar una respuesta fiel a los resultados.');
+  return nums;
 }
-function sqlFirstPresentation(executed) {
-  const principal = arr(executed).find(x => x.role === 'principal');
-  const { columns, rows } = rowsToTableRows(principal?.rows || [], 300);
-  const tables = columns.length ? [{ title: 'Resultado de la consulta', columns, rows }] : [];
-  const files = columns.length ? [{ filename: fileSafe('Zuzu_resultado_consulta_v25_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, arr(principal?.rows).map(r => Object.fromEntries(columns.map(c => [c, r?.[c]])))) }] : [];
-  return { tables, files };
+function semanticUnsupportedEuro(answer,results=[]){
+  const facts=semanticNumbers(results); if(!facts.length)return false;
+  return [...text(answer).matchAll(/(-?\d[\d.\s]*(?:,\d+)?|-?\d+(?:\.\d+)?)\s*€/g)].some(m=>{const raw=trim(m[1]).replace(/\s/g,'');let n;if(/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw))n=Number(raw.replace(/\./g,'').replace(',','.'));else n=Number(raw.replace(',','.'));return Number.isFinite(n)&&!facts.some(v=>Math.abs(v-n)<0.005);});
 }
-async function runZuzuSqlFirst({ userPrompt, state, selectedEventId, flowTrace = [] }) {
+function semanticFinalPrompt(userPrompt,plan,results,correction=''){
+  const resultPayload=semanticResultsForGemini(results);
+  return `Eres Gemini en la fase FINAL de Zuzu. Tú interpretaste la intención; ControlEvent resolvió entidades y ejecutó consultas cerradas. Ahora redacta SOLO con estos resultados.
+
+PREGUNTA ORIGINAL:
+${trim(userPrompt)}
+
+INTENCION:
+${trim(plan.intent)}
+
+RESULTADOS REALES:
+${compactJson(resultPayload,26000)}
+
+REGLAS:
+- Los resultados anteriores son la única fuente de verdad factual.
+- Responde exactamente a la pregunta. No agregues un informe financiero genérico por ver la palabra «informe».
+- Si una consulta falló pero otras cubren la petición, responde con lo disponible e indica únicamente la limitación pertinente.
+- No digas «no hay datos» si existe alguna fila relevante.
+- No inventes cifras. Si necesitas un total, solo usa una columna/fila que ya lo contenga.
+- No menciones SQL, SELECT, RPC, tablas físicas, prompts ni tokens.
+- Para pregunta abierta sobre persona, sintetiza las facetas que realmente aparezcan en los resultados; no prometas haber revisado facetas que no están presentes.
+- Si el usuario pidió gráfico o plan.wants_charts=true, propone hasta 4 gráficas usando SOLO columnas existentes: query_id, label_field y value_field deben coincidir literalmente con los nombres de columnas recibidos.
+- Si una gráfica no mejora la comprensión, no la propongas.
+- Sé natural, preciso y útil. Evita frases de relleno.
+${correction?`\nCORRECCION OBLIGATORIA DE CE:\n${correction}\n`:''}
+Devuelve JSON estricto con title, answer, warnings y charts.`;
+}
+async function callGeminiSemanticFinal(userPrompt,plan,results,flowTrace=[]){
+  const apiKey=geminiKey(); if(!apiKey)throw new Error('Falta GEMINI_API_KEY para redactar la respuesta final.');
+  let lastError=null,correction='';
+  for(const model of configuredGeminiModelsForTask('zuzu-narrative',{prompt:userPrompt})){
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const promptText=semanticFinalPrompt(userPrompt,plan,results,correction);
+        zuzuTracePush(flowTrace,'Paso 4 · Gemini sintetiza','RUN',`Modelo ${model}. Recibe pregunta + resultados reales; decide narración y gráficas, no consultas.`);
+        const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+        const body={contents:[{role:'user',parts:[{text:promptText}]}],generationConfig:{responseMimeType:'application/json',responseSchema:semanticFinalSchema(),temperature:0.08,maxOutputTokens:2600,thinkingConfig:{thinkingBudget:0}}};
+        const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS||24000));
+        logGeminiUsage('PASO 4 SINTESIS SEMANTICA',model,payload);
+        if(!res.ok){const e=new Error(payload?.error?.message||`Gemini final HTTP ${res.status}`);e.status=Number(res.status||502);throw e;}
+        const p=JSON.parse(trim(geminiOutText(payload))); const answer=trim(p?.answer);
+        const unsupported=semanticUnsupportedEuro(answer,results);
+        const anyRows=arr(results).some(r=>r.ok&&arr(r.rows).length);
+        const falseNoData=anyRows&&/\b(no\s+hay\s+datos|no\s+se\s+encontraron\s+datos|no\s+se\s+encontraron\s+registros|sin\s+datos\s+registrados)\b/i.test(answer);
+        if(unsupported||falseNoData){correction=`${unsupported?'Has citado un importe en euros que no aparece en ningún resultado. ':''}${falseNoData?'Hay filas relevantes; no puedes afirmar que no hay datos. ':''}Reescribe usando solo hechos recibidos.`;zuzuTracePush(flowTrace,'Paso 4b · Control de verdad CE','KO',correction,{model});continue;}
+        zuzuTracePush(flowTrace,'Paso 4b · Control de verdad CE','OK','Narración coherente con las filas obtenidas.',{model});
+        return {title:trim(p?.title)||'Resultado de Zuzu',answer,warnings:arr(p?.warnings),chartSpecs:arr(p?.charts).slice(0,4),model};
+      }catch(error){lastError=error;zuzuTracePush(flowTrace,'Paso 4 · Gemini sintetiza','KO',cleanGeminiError(error),{model});break;}
+    }
+    if(lastError&&(isQuotaError(lastError)||!isRetryable(lastError)))break;
+  }
+  throw lastError||new Error('Gemini no pudo sintetizar una respuesta fiable.');
+}
+function semanticBuildCharts(specs,results=[]){
+  const charts=[]; const byId=new Map(arr(results).map(r=>[trim(r.id),r]));
+  for(const s of arr(specs).slice(0,4)){
+    const r=byId.get(trim(s?.query_id)); if(!r?.ok||!arr(r.rows).length)continue;
+    const label=trim(s?.label_field), value=trim(s?.value_field); if(!label||!value)continue;
+    const labels=[],values=[];
+    for(const row of arr(r.rows).slice(0,30)){ if(!(label in row)||!(value in row))continue; const n=num(row[value]); labels.push(trim(row[label])||'Sin etiqueta'); values.push(n); }
+    if(!labels.length)continue;
+    let type=trim(s?.type); if(!['bar','horizontalBar','pie','donut','line'].includes(type))type=labels.length>8?'horizontalBar':'bar';
+    charts.push({title:trim(s?.title)||r.title,type,labels,values,unit:trim(s?.unit)});
+  }
+  return charts;
+}
+function semanticPresentation(results=[]){
+  const tables=[]; const files=[];
+  for(const r of arr(results).filter(x=>x.ok&&x.showTable&&arr(x.rows).length).slice(0,10)){
+    const {columns,rows}=rowsToTableRows(r.rows,200); if(!columns.length)continue;
+    tables.push({title:r.title,columns,rows});
+    if(files.length<4)files.push({filename:fileSafe(`${r.id}_${r.title}_v25_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(columns,r.rows.map(row=>Object.fromEntries(columns.map(c=>[c,row?.[c]]))))});
+  }
+  return {tables,files};
+}
+function semanticFallbackAnswer(results=[]){
+  const ok=arr(results).filter(r=>r.ok); const failed=arr(results).filter(r=>!r.ok);
+  const rows=ok.reduce((a,r)=>a+arr(r.rows).length,0);
+  return {title:'Datos verificados de ControlEvent',answer:`ControlEvent ha obtenido ${rows} fila(s) verificadas en ${ok.length} conjunto(s) de datos.${failed.length?` ${failed.length} consulta(s) no pudieron completarse y se indican como limitación.`:''} Muestro las tablas obtenidas sin añadir conclusiones no verificadas.`,warnings:failed.map(r=>`${r.title}: ${r.error}`)};
+}
+async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){
   let plan;
-  try {
-    plan = await callGeminiSqlFirstPlanner(userPrompt, state, selectedEventId, flowTrace);
-  } catch (error) {
-    return { ok: true, rejected: true, title: 'No puedo consultar los datos con fiabilidad', answer: `Gemini no ha podido decidir una consulta válida. ControlEvent no la sustituirá por cálculos locales ni por una estimación. ${friendlyZuzuErrorMessage(error)}`, warnings: [cleanGeminiError(error)], charts: [], tables: [], files: [], provider: 'zuzu-sql-first-corte-planificador', model: '', debugTrace: flowTrace, showDebugTrace: true };
+  try{plan=await callGeminiSemanticPlanner(userPrompt,state,selectedEventId,flowTrace);}catch(error){return{ok:true,rejected:true,title:'No puedo interpretar la consulta con garantías',answer:`Gemini no ha podido construir un plan semántico fiable. ${friendlyZuzuErrorMessage(error)}`,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+  if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-clarification',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
+  const allResults=[]; const allQueries=[]; let currentQueries=plan.queries; let roundsExecuted=0;
+  for(let round=1;round<=3;round++){
+    const prep=semanticPlanWithResolvedQueries({queries:currentQueries},state,selectedEventId);
+    if(prep.error){zuzuTracePush(flowTrace,`Paso 2.${round} · Resolución de entidades`,'KO',prep.error);return{ok:true,rejected:false,title:'Necesito concretar una entidad',answer:`${prep.error} Prefiero preguntarlo antes que devolverte un cero falso.`,warnings:[],charts:[],tables:semanticPresentation(allResults).tables,files:semanticPresentation(allResults).files,provider:'zuzu-semantic-agent-entity-clarification',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};}
+    zuzuTracePush(flowTrace,`Paso 2.${round} · Resolución de entidades`,'OK',prep.resolved.length?`Resueltas: ${prep.resolved.map(x=>`${x.field||x.type}:${x.nombre}`).join(' · ')}`:'No había entidades humanas que resolver.');
+    const ids=new Set(allQueries.map(q=>q.id)); const built=prep.built.filter(q=>!ids.has(q.id)); if(!built.length)break;
+    roundsExecuted=round; allQueries.push(...built); const batch=await semanticExecuteQueries(built,flowTrace); allResults.push(...batch);
+    if(round>=3)break;
+    const review=await callGeminiSemanticReviewer(userPrompt,plan,allResults,round,flowTrace);
+    if(review.status==='clarify')return{ok:true,rejected:false,title:'Necesito una aclaración',answer:review.clarification||review.reason,warnings:[],charts:[],tables:semanticPresentation(allResults).tables,files:semanticPresentation(allResults).files,provider:'zuzu-semantic-agent-review-clarification',model:review.model||plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
+    if(review.status!=='more'||!review.additionalQueries.length)break;
+    currentQueries=review.additionalQueries;
   }
-  let executed;
-  try {
-    executed = await executeSqlFirstPlan(plan, flowTrace);
-  } catch (error) {
-    return { ok: true, rejected: true, title: 'No puedo obtener datos fiables', answer: `Gemini ha decidido la consulta, pero ControlEvent no ha podido ejecutarla con garantías. No se usará un cálculo alternativo. ${trim(error?.message || error)}`, warnings: [cleanGeminiError(error)], charts: [], tables: [], files: [], provider: 'zuzu-sql-first-corte-ejecucion', model: plan.model || '', debugTrace: flowTrace, showDebugTrace: true };
-  }
-  const presentation = sqlFirstPresentation(executed);
+  const presentation=semanticPresentation(allResults);
   let final;
-  try {
-    final = await callGeminiSqlFirstAnswer(userPrompt, executed, flowTrace);
-  } catch (error) {
-    const principal = executed.find(x => x.role === 'principal');
-    const count = Number(principal?.rowCount) || arr(principal?.rows).length;
-    return { ok: true, rejected: false, title: 'Resultado verificado de ControlEvent', answer: `ControlEvent ha obtenido ${count} fila(s) de datos, pero la redacción de Gemini no ha superado el control de veracidad. Para no falsear la respuesta, muestro únicamente la tabla exacta obtenida.`, warnings: [friendlyZuzuErrorMessage(error)], charts: [], tables: presentation.tables, files: presentation.files, provider: 'zuzu-sql-first-tabla-verificada', model: '', meta: { generatedAt: new Date().toISOString(), version: 'v25_prod', architecture: 'Gemini SELECT -> CE ejecuta -> Gemini redacta -> CE presenta', filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, {})).slice(0, 70), debugTrace: arr(flowTrace).slice(0, 80) }, debugTrace: arr(flowTrace).slice(0, 80), showDebugTrace: true };
-  }
-  const displayName = zuzuLoggedUserDisplayName({ usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null });
-  const answer = `${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
-  zuzuTracePush(flowTrace, 'Paso 4 · ControlEvent presenta', 'OK', `CE presenta solo la tabla principal (${presentation.tables.length ? 'con datos' : 'sin filas'}) y la redacción validada de Gemini.`);
-  return {
-    ok: true, rejected: false, title: final.title, answer,
-    warnings: arr(final.warnings), charts: [], tables: presentation.tables, files: presentation.files,
-    provider: 'gemini-sql-first-control-event', model: final.model || '',
-    meta: { generatedAt: new Date().toISOString(), version: 'v25_prod', architecture: 'Prompt -> Gemini decide SELECT -> CE valida/ejecuta -> Gemini recibe prompt+resultados -> CE presenta', plannerModel: plan.model || '', plannerScope: plan.scope || '', plannerRationale: plan.rationale || '', geminiUsageEstimate: summarizeGeminiUsageFromTrace(flowTrace), filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, {})).slice(0, 70), debugTrace: arr(flowTrace).slice(0, 80) },
-    debugTrace: arr(flowTrace).slice(0, 80), showDebugTrace: true
-  };
+  try{final=await callGeminiSemanticFinal(userPrompt,plan,allResults,flowTrace);}catch(error){final={...semanticFallbackAnswer(allResults),chartSpecs:[],model:'',warnings:semanticFallbackAnswer(allResults).warnings.concat(friendlyZuzuErrorMessage(error))};}
+  const charts=semanticBuildCharts(final.chartSpecs,allResults);
+  const displayName=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||null});
+  const answer=`${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
+  zuzuTracePush(flowTrace,'Paso 5 · ControlEvent presenta','OK',`Tablas=${presentation.tables.length}; gráficas=${charts.length}; conjuntos de datos=${allResults.length}.`);
+  return{ok:true,rejected:false,title:final.title,answer,warnings:arr(final.warnings),charts,tables:presentation.tables,files:presentation.files,provider:'gemini-semantic-agent-control-event',model:final.model||plan.model||'',meta:{generatedAt:new Date().toISOString(),version:'v25_prod',architecture:'Prompt -> Gemini plan semántico -> CE resuelve entidades/crea SELECT -> CE ejecuta -> Gemini revisa/pide más -> Gemini sintetiza -> CE valida/presenta',plannerModel:plan.model||'',plannerIntent:plan.intent||'',plannerScope:plan.scopeSummary||'',plannerRationale:plan.rationale||'',dataRounds:roundsExecuted,geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),filenameSubject:fileSafe(dominantSubjectFromPrompt(userPrompt,{})).slice(0,70),debugTrace:arr(flowTrace).slice(0,100)},debugTrace:arr(flowTrace).slice(0,100),showDebugTrace:true};
 }
 
 
@@ -4973,11 +5434,11 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
   }
 
-  const sqlFirstMode = promptNeedsGeminiSqlFirst(userPrompt);
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
-  if (sqlFirstMode) {
-    zuzuTracePush(flowTrace, 'Paso 0 · Modo SQL-first', 'OK', `Petición factual detectada. CE carga catálogo mínimo: eventos=${arr(state?.eventos).length}, tiendas=${arr(state?.tiendas).length}, productos=${arr(state?.productos).length}, personas=${arr(state?.personas).length}. No cocina una respuesta local.`);
-    return runZuzuSqlFirst({ userPrompt, state, selectedEventId, flowTrace });
+  const semanticAgentMode = promptNeedsSemanticAgent(userPrompt, state);
+  if (semanticAgentMode) {
+    zuzuTracePush(flowTrace, 'Paso 0 · Agente semántico', 'OK', `Petición de datos detectada. Gemini interpretará la intención; CE resolverá entidades y construirá SELECTs cerradas. Catálogo: eventos=${arr(state?.eventos).length}, tiendas=${arr(state?.tiendas).length}, productos=${arr(state?.productos).length}, personas=${arr(state?.personas).length}.`);
+    return runZuzuSemanticAgent({ userPrompt, state, selectedEventId, flowTrace });
   }
   state = await attachHitosState(state, flowTrace);
   state = await attachBankState(state, userPrompt, flowTrace);
