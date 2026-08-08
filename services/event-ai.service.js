@@ -3244,6 +3244,17 @@ function plannerSection(textValue, labels) {
   return m ? trim(m[1]) : '';
 }
 
+function promptNeedsGeminiSqlFirst(prompt) {
+  const p = norm(prompt);
+  if (!p) return false;
+  const dataNouns = /\b(evento|eventos|compra|compras|gasto|gastos|ingreso|ingresos|donacion|donaciones|producto|productos|tienda|tiendas|responsable|responsables|socio|socios|persona|personas|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|hito|hitos|\blg\b|tarea|tareas|banco|conciliacion|cuadre|saldo|asistencia|asistentes)\b/;
+  const dataAsk = /\b(dame|dime|busca|buscar|saca|sacar|muestra|mostrar|lista|listado|informe|resumen|total|totaliza|totalizado|sumatorio|suma|sumar|cuanto|cuantos|cuanta|cuantas|cual|cuales|quien|quienes|compara|comparar|ranking|top|importe|valor|cantidad|unidades|realizadas|realizados|pendientes|registradas|registrados|hay|hubo|evolucion)\b/;
+  const metaOnly = /\b(que\s+puedes\s+hacer|quien\s+eres|presentate|ayuda\s+de\s+zuzu)\b/;
+  const weatherOnly = /\b(meteo|meteorolog|metereolog|clima|lluvia|temperatura|viento|prevision|pronostico)\b/.test(p)
+    && !/\b(compra|ingreso|donacion|producto|tienda|banco|saldo|ticket|hito|tarea|socio|persona)\b/.test(p);
+  return !metaOnly.test(p) && !weatherOnly && dataNouns.test(p) && dataAsk.test(p);
+}
+
 function strictScopeRequested(prompt) {
   const p = norm(prompt);
   return /\b(solo|exactos?|estricto|restringid|no\s+hagas\s+consulta\s+global|no\s+consulta\s+global|no\s+analices\s+ning[uú]n\s+otro|no\s+incluyas\s+eventos\s+parecidos|todos\s+los\s+dem[aá]s\s+eventos\s+quedan\s+prohibidos)\b/.test(p);
@@ -3413,6 +3424,7 @@ function plannerDatabaseSchemaText() {
 - ce_productos(id, nombre, segmento, destino, default_precio, default_tienda_id, created_at, updated_at)
 - ce_tiendas(id, nombre, created_at, updated_at)
 - ce_ticket_images(image_key, event_id, label, storage_path, public_url, pathname, content_type, size_bytes, created_at, updated_at)
+- ce_meta(key, value, updated_at) [metadatos JSONB de estructuras sin tabla propia, entre ellas documentos del evento]
 - ce_hitos(id, event_id, nombre_hito, descripcion, fecha_minima, fecha_maxima, responsable_id, responsable_nombre, orden, created_at, updated_at)
 - ce_lg(id, event_id, hito_id, descripcion, fecha_minima, fecha_maxima, notas, dependencia_tipo, dependencias_previas, dependencias_posteriores, responsable_id, responsable_nombre, cumplida, cumplida_at, orden, created_at, updated_at)
 - ce_bank_import_batches(id, source_filename, account_id, account_label, date_from, date_to, parsed_count, inserted_count, duplicate_count, warning_count, imported_by, imported_at)
@@ -3433,7 +3445,8 @@ MAPEO_DE_DOMINIO:
 - PERSONAS = ce_personas.
 - PRODUCTOS = ce_productos.
 - TIENDAS = ce_tiendas.
-- TICKETS/DOCUMENTOS = ce_ticket_images y ce_compras.ticket_donacion.
+- TICKETS = ce_ticket_images y ce_compras.ticket_donacion.
+- DOCUMENTOS = metadatos en ce_meta (eventDocuments/eventDocumentMeta) + imagen/evidencia en ce_ticket_images.
 - HITOS = ce_hitos, enlazados al evento por event_id.
 - LG = ce_lg, enlazadas a su Hito por hito_id y al evento por event_id. Son las tareas o Líneas de Gestión.
 - CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_income_links + ce_bank_event_settings + ce_bank_event_movement_state. Los lotes CSV están en ce_bank_import_batches.
@@ -3458,6 +3471,7 @@ SEMANTICA_CONTROL_EVENT:
 - Numero=0 NO confirma asistencia por sí solo. Solo cuenta como asistente si situacion confirma BANCO/EFECTIVO/BIZUM/EXENTO/INVITADO/CONFIRMADO/ASISTE/SI/PAGADO. PENDIENTE o vacío no cuenta.
 - Pendiente = situacion PENDIENTE. No lo mezcles con pagado.
 - En SQL, normaliza SIEMPRE textos de estado con UPPER(TRIM(campo)). Ejemplo: UPPER(TRIM(c.situacion)) IN ('BANCO','EFECTIVO','BIZUM'). Los datos reales pueden venir como Banco/Pendiente y una comparación literal en mayúsculas puede devolver NULL/0 por error.
+- Para nombres humanos (tienda, producto, persona), no uses igualdad literal frágil. Normaliza con UPPER(TRANSLATE(TRIM(COALESCE(campo,'')), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN')). Por ejemplo ALMACEN, almacén y El Almacén deben poder resolverse por el mismo concepto mediante LIKE '%ALMACEN%' o usando el nombre candidato real del catálogo.
 - En agregados SUM/COUNT, usa COALESCE para evitar filas vacías: COALESCE(SUM(...),0) AS importe_total. Si una métrica puede salir NULL, no es válida para un informe ejecutivo.
 - En ce_compras, el valor económico de línea es unidades * precio, salvo que preguntes solo precio unitario.
 - ticket_donacion = 'Pte. Compra' o similar significa compra prevista/provisional, no ausencia de compra.
@@ -4606,6 +4620,295 @@ function zuzuLoggedUserDisplayName(context = {}) {
   return name || 'Amigo';
 }
 
+// FIX9.3.14 · ZUZU SQL-FIRST
+// Separación estricta de responsabilidades para consultas sobre datos:
+//   1) Gemini interpreta la petición y propone SELECT de solo lectura.
+//   2) ControlEvent valida y ejecuta literalmente esas SELECT.
+//   3) Gemini recibe únicamente la pregunta original + los resultados ejecutados.
+//   4) ControlEvent presenta la respuesta y la tabla principal.
+// No se mezclan en este flujo informes heurísticos ni métricas locales cocinadas por CE.
+function sqlFirstPlanSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      scope: { type: 'STRING' },
+      principal_select: { type: 'STRING' },
+      validation_selects: { type: 'ARRAY', items: { type: 'STRING' } },
+      rationale: { type: 'STRING' }
+    },
+    required: ['scope', 'principal_select', 'validation_selects', 'rationale']
+  };
+}
+function sqlFirstAnswerSchema() {
+  return {
+    type: 'OBJECT',
+    properties: {
+      title: { type: 'STRING' },
+      answer: { type: 'STRING' },
+      warnings: { type: 'ARRAY', items: { type: 'STRING' } }
+    },
+    required: ['title', 'answer', 'warnings']
+  };
+}
+function sqlFirstPlannerPrompt(userPrompt, state, selectedEventId = '') {
+  const catalog = buildZuzuPlanningCatalog(state, selectedEventId, userPrompt);
+  const active = catalog?.eventoActivo;
+  const eventList = arr(catalog?.eventos).map(e => `${trim(e.titulo)} | id=${trim(e.id)} | ${trim(e.fechaInicio)}-${trim(e.fechaFin)} | ${trim(e.situacion)}`).join('\n');
+  const candidates = catalog?.candidatosPorPrompt || {};
+  const tiendas = arr(candidates.tiendas).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNA';
+  const productos = arr(candidates.productos).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNO';
+  const personas = arr(candidates.personas).map(x => trim(x?.nombre)).filter(Boolean).join(' | ') || 'NINGUNA';
+  return `Eres Gemini actuando EXCLUSIVAMENTE como cerebro de consulta de ControlEvent. NO redactes todavía la respuesta al usuario y NO inventes datos.
+Tu única misión en esta fase es decidir qué SELECT de solo lectura necesita ControlEvent para contestar EXACTAMENTE a la pregunta.
+
+PREGUNTA ORIGINAL DEL USUARIO:
+${trim(userPrompt)}
+
+EVENTO ACTIVO EN PANTALLA:
+${active?.id ? `${trim(active.titulo)} | id=${trim(active.id)}` : 'NINGUNO'}
+
+EVENTOS REGISTRADOS DISPONIBLES:
+${eventList}
+
+COINCIDENCIAS DEL CATALOGO CON PALABRAS DEL USUARIO:
+TIENDAS: ${tiendas}
+PRODUCTOS: ${productos}
+PERSONAS: ${personas}
+
+${plannerDatabaseSchemaText()}
+
+REGLAS DE ESTA FASE:
+- Gemini decide la semántica. ControlEvent NO completará ni reinterpretará después tu consulta.
+- Devuelve una principal_select que produzca directamente los datos necesarios para contestar, con alias humanos claros.
+- Puedes devolver validation_selects breves para verificar entidades nombradas (tienda, producto, persona) o el conjunto base.
+- Solo SELECT. Prohibido cualquier INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/COPY/EXEC/CALL.
+- NO consultes ce_users.clave ni secretos.
+- Si el usuario pide datos de todos los eventos, no limites la SELECT al evento activo.
+- Si pide «todos los eventos registrados» y tiene sentido mostrar ceros, usa ce_eventos como tabla base y LEFT JOIN/CASE de modo que no desaparezcan eventos sin coincidencias.
+- Si pide compras realizadas, el importe de línea es unidades * precio y deben quedar fuera DONADO... y Pte. Compra/PENDIENTE. No confundas compras totales del evento con compras de la tienda pedida.
+- Los nombres del usuario son conceptos humanos. ALMACEN, almacén y El Almacén son potencialmente la misma tienda. Normaliza mayúsculas/acentos y artículos; usa los candidatos del catálogo y evita igualdad literal frágil.
+- Para normalizar texto puedes usar UPPER(TRANSLATE(TRIM(COALESCE(campo,'')), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN')).
+- Si se pide total por evento, principal_select debe devolver una fila por evento con esa métrica. Si además se pide sumatorio/global, incluye total_general en la MISMA SELECT (por ejemplo con función de ventana) para que nadie tenga que recalcular ni adivinar después.
+- Una validation_select recomendable al filtrar una tienda es listar los nombres reales de ce_tiendas que semánticamente coinciden con el texto solicitado.
+- No amplíes por la palabra «informe»: si se pide tienda + compras + eventos, consulta solo eso.
+
+Devuelve JSON estricto con: scope, principal_select, validation_selects, rationale.`;
+}
+function sqlFirstSafePlan(parsed) {
+  const principalCheck = isSafePlannerSelect(parsed?.principal_select || '');
+  if (!principalCheck.ok) throw new Error(`Gemini no devolvió una SELECT principal válida: ${principalCheck.reason || 'inválida'}`);
+  const entries = [{ role: 'principal', sql: principalCheck.sql }];
+  const seen = new Set([sqlDedupeKey(principalCheck.sql)]);
+  arr(parsed?.validation_selects).slice(0, 4).forEach(sql => {
+    const safe = isSafePlannerSelect(sql);
+    if (!safe.ok) return;
+    const key = sqlDedupeKey(safe.sql);
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({ role: 'validacion', sql: safe.sql });
+  });
+  return { scope: trim(parsed?.scope), rationale: trim(parsed?.rationale), entries };
+}
+async function callGeminiSqlFirstPlanner(userPrompt, state, selectedEventId, flowTrace = []) {
+  const apiKey = geminiKey();
+  if (!apiKey) throw new Error('Falta GEMINI_API_KEY para que Gemini decida la consulta.');
+  const plannerText = sqlFirstPlannerPrompt(userPrompt, state, selectedEventId);
+  let lastError = null;
+  for (const model of configuredGeminiModelsForTask('zuzu-planner', { prompt: userPrompt })) {
+    try {
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'RUN', `Modelo ${model}. Se envían pregunta, esquema y catálogo mínimo; no se envían cálculos locales.`);
+      sizeTrace(flowTrace, 'Paso 1 · Gemini decide la consulta', 'Contexto de planificación SQL', plannerText);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: plannerText }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: sqlFirstPlanSchema(), temperature: 0.0, maxOutputTokens: 2600, thinkingConfig: { thinkingBudget: 0 } }
+      };
+      const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS || 22000));
+      logGeminiUsage('PASO 1 SQL-first', model, payload);
+      if (!res.ok) { const e = new Error(payload?.error?.message || `Gemini planner HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+      const out = trim(geminiOutText(payload));
+      const parsed = JSON.parse(out);
+      const plan = sqlFirstSafePlan(parsed);
+      plan.model = model;
+      plan.usage = usageSmall(payload, model);
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'OK', `SELECT principal válida + ${plan.entries.length - 1} validación(es). Alcance=${plan.scope || 'deducido por Gemini'}.`, { model, usage: plan.usage });
+      return plan;
+    } catch (error) {
+      lastError = error;
+      zuzuTracePush(flowTrace, 'Paso 1 · Gemini decide la consulta', 'KO', cleanGeminiError(error), { model });
+      if (isQuotaError(error) || !isRetryable(error)) break;
+    }
+  }
+  throw lastError || new Error('Gemini no pudo decidir una SELECT fiable.');
+}
+function sqlFirstCollectHumanLookups(rawExecutions = []) {
+  return collectSqlHumanLookups(rawExecutions);
+}
+async function executeSqlFirstPlan(plan, flowTrace = []) {
+  let client;
+  try { client = getSupabaseAdmin(); }
+  catch (error) { throw new Error(`ControlEvent no puede ejecutar la consulta porque falta conexión Supabase: ${trim(error?.message || error)}`); }
+  const raw = [];
+  zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', 'RUN', `CE valida y ejecuta ${arr(plan?.entries).length} SELECT(s) de solo lectura mediante ce_zuzu_select.`);
+  for (let i = 0; i < arr(plan?.entries).length; i += 1) {
+    const entry = plan.entries[i];
+    try {
+      const { data, error } = await client.rpc('ce_zuzu_select', { p_sql: entry.sql, p_max_rows: 300 });
+      if (error) throw error;
+      const payload = data && typeof data === 'object' ? data : { ok: true, rows: data };
+      const rows = arr(payload.rows || payload.data || payload.resultados);
+      const suspect = payload.ok !== false && (sqlResultHasNullMetric(rows) || sqlSelectLooksUnsafeFactJoin(entry.sql));
+      const suspectReason = sqlSelectLooksUnsafeFactJoin(entry.sql)
+        ? 'La consulta agrega varias tablas de hechos mediante un JOIN con riesgo de multiplicar importes.'
+        : (sqlResultHasNullMetric(rows) ? 'La consulta devuelve una métrica nula/vacía en filas etiquetadas.' : '');
+      raw.push({ index: i + 1, role: entry.role, sql: entry.sql, ok: payload.ok !== false, rows, rowCount: Number(payload.row_count ?? payload.rowCount ?? rows.length) || rows.length, truncated: payload.truncated === true, suspect, suspectReason, error: trim(payload.error || '') });
+      zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', payload.ok === false ? 'KO' : (suspect ? 'KO' : 'OK'), `${entry.role}: ${rows.length} fila(s)${suspect ? ` · descartada: ${suspectReason}` : ''}.`);
+    } catch (error) {
+      raw.push({ index: i + 1, role: entry.role, sql: entry.sql, ok: false, rows: [], rowCount: 0, truncated: false, suspect: false, suspectReason: '', error: trim(error?.message || error) });
+      zuzuTracePush(flowTrace, 'Paso 2 · ControlEvent ejecuta SELECT', 'KO', `${entry.role}: ${trim(error?.message || error)}`);
+    }
+  }
+  const lookups = sqlFirstCollectHumanLookups(raw);
+  const executed = raw.map(item => ({
+    ...item,
+    rows: arr(item.rows).map(row => humanizeSqlRowForDisplay(row, lookups, '')).filter(row => Object.keys(row).length)
+  }));
+  const principal = executed.find(x => x.role === 'principal');
+  if (!principal?.ok) throw new Error(`La SELECT principal no pudo ejecutarse: ${principal?.error || 'error desconocido'}`);
+  if (principal?.suspect) throw new Error(`La SELECT principal fue descartada por ControlEvent: ${principal.suspectReason}`);
+  return executed;
+}
+function sqlFirstNumbers(executed = []) {
+  const out = [];
+  arr(executed).filter(x => x?.ok && !x?.suspect).forEach(item => arr(item.rows).forEach(row => {
+    Object.values(row || {}).forEach(v => {
+      if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
+      else if (typeof v === 'string' && /^\s*-?[0-9][0-9.,\s]*\s*$/.test(v)) {
+        const raw = v.replace(/\s/g, '');
+        let n;
+        if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) n = Number(raw.replace(/\./g, '').replace(',', '.'));
+        else n = Number(raw.replace(',', '.'));
+        if (Number.isFinite(n)) out.push(n);
+      }
+    });
+  }));
+  return out;
+}
+function sqlFirstUnsupportedEuro(answer, executed = []) {
+  const facts = sqlFirstNumbers(executed);
+  if (!facts.length) return false;
+  const money = [...text(answer).matchAll(/(-?\d[\d.\s]*(?:,\d+)?|-?\d+(?:\.\d+)?)\s*€/g)];
+  return money.some(m => {
+    const raw = trim(m[1]).replace(/\s/g, '');
+    let n;
+    if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) n = Number(raw.replace(/\./g, '').replace(',', '.'));
+    else n = Number(raw.replace(',', '.'));
+    return Number.isFinite(n) && !facts.some(v => Math.abs(v - n) < 0.005);
+  });
+}
+function sqlFirstFinalPrompt(userPrompt, executed, correction = '') {
+  const payload = arr(executed).filter(x => x?.ok && !x?.suspect).map(x => ({ role: x.role, rowCount: x.rowCount, truncated: x.truncated === true, rows: x.rows }));
+  return `Eres Gemini en la FASE FINAL de Zuzu. ControlEvent ya ha ejecutado las consultas que tú decidiste.
+
+PREGUNTA ORIGINAL:
+${trim(userPrompt)}
+
+RESULTADOS REALES DEVUELTOS POR CONTROLEVENT:
+${JSON.stringify(payload)}
+
+REGLAS OBLIGATORIAS:
+- Estos resultados son la ÚNICA fuente de verdad para la respuesta. No uses memoria, conocimiento previo, cálculos locales de CE ni datos de otros módulos.
+- Contesta exactamente a la pregunta original. No conviertas una consulta concreta en un informe financiero general.
+- La fila/filas role=principal son la respuesta factual principal. role=validacion sirve solo para comprobar nombres y alcance.
+- No inventes ninguna cifra, evento, tienda, compra ni conclusión. No sustituyas cifras por estimaciones.
+- Si la principal tiene filas, está prohibido afirmar que no hay datos.
+- Si la principal tiene 0 filas, dilo; si validacion muestra variantes de nombre, explícalas sin inventar compras.
+- Si existe una columna total_general, úsala como sumatorio; NO vuelvas a calcularla por tu cuenta.
+- No menciones SQL, SELECT, RPC, prompts, tokens ni el flujo interno salvo petición técnica expresa.
+- Sé claro y conciso. ControlEvent mostrará debajo la tabla exacta de resultados, así que no repitas todas las filas en prosa salvo que sean muy pocas.
+${correction ? `\nCORRECCION OBLIGATORIA DE CONTROLEVENT:\n${correction}\n` : ''}
+Devuelve JSON con title, answer y warnings.`;
+}
+async function callGeminiSqlFirstAnswer(userPrompt, executed, flowTrace = []) {
+  const apiKey = geminiKey();
+  if (!apiKey) throw new Error('Falta GEMINI_API_KEY para redactar la respuesta final.');
+  let lastError = null;
+  let correction = '';
+  const principal = arr(executed).find(x => x.role === 'principal');
+  for (const model of configuredGeminiModelsForTask('zuzu-narrative', { prompt: userPrompt })) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const promptText = sqlFirstFinalPrompt(userPrompt, executed, correction);
+        zuzuTracePush(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'RUN', `Modelo ${model}. Solo recibe pregunta original + filas ejecutadas.`);
+        sizeTrace(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'Contexto final SQL-first', promptText);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+        const body = { contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: sqlFirstAnswerSchema(), temperature: 0.05, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 } } };
+        const { res, payload } = await geminiFetchJsonWithTimeout(url, body, apiKey, Number(process.env.CONTROLEVENT_ZUZU_NARRATIVE_TIMEOUT_MS || 22000));
+        logGeminiUsage('PASO 3 SQL-first', model, payload);
+        if (!res.ok) { const e = new Error(payload?.error?.message || `Gemini final HTTP ${res.status}`); e.status = Number(res.status || 502); e.details = payload; throw e; }
+        const parsed = JSON.parse(trim(geminiOutText(payload)));
+        const answer = trim(parsed?.answer);
+        const unsupportedMoney = sqlFirstUnsupportedEuro(answer, executed);
+        const falseNoData = arr(principal?.rows).length > 0 && /\b(no\s+hay|ninguna\s+compra|sin\s+compras|no\s+se\s+han\s+registrado)\b/i.test(answer);
+        if (unsupportedMoney || falseNoData) {
+          correction = `${unsupportedMoney ? 'Has usado un importe en euros que no aparece en los resultados. ' : ''}${falseNoData ? 'La consulta principal contiene filas; no puedes afirmar que no hay datos. ' : ''}Reescribe usando exclusivamente los valores recibidos.`;
+          zuzuTracePush(flowTrace, 'Paso 3b · Control de veracidad CE', 'KO', correction, { model });
+          continue;
+        }
+        zuzuTracePush(flowTrace, 'Paso 3b · Control de veracidad CE', 'OK', 'La redacción no introduce importes ajenos ni contradice la existencia de resultados.', { model });
+        return { title: trim(parsed?.title) || 'Resultado de Zuzu', answer, warnings: arr(parsed?.warnings), model, usage: usageSmall(payload, model) };
+      } catch (error) {
+        lastError = error;
+        zuzuTracePush(flowTrace, 'Paso 3 · Gemini redacta con resultados', 'KO', cleanGeminiError(error), { model });
+        break;
+      }
+    }
+    if (lastError && (isQuotaError(lastError) || !isRetryable(lastError))) break;
+  }
+  throw lastError || new Error('Gemini no pudo redactar una respuesta fiel a los resultados.');
+}
+function sqlFirstPresentation(executed) {
+  const principal = arr(executed).find(x => x.role === 'principal');
+  const { columns, rows } = rowsToTableRows(principal?.rows || [], 300);
+  const tables = columns.length ? [{ title: 'Resultado de la consulta', columns, rows }] : [];
+  const files = columns.length ? [{ filename: fileSafe('Zuzu_resultado_consulta_v25_prod.csv'), mime: 'text/csv;charset=utf-8', content: csvFromRows(columns, arr(principal?.rows).map(r => Object.fromEntries(columns.map(c => [c, r?.[c]])))) }] : [];
+  return { tables, files };
+}
+async function runZuzuSqlFirst({ userPrompt, state, selectedEventId, flowTrace = [] }) {
+  let plan;
+  try {
+    plan = await callGeminiSqlFirstPlanner(userPrompt, state, selectedEventId, flowTrace);
+  } catch (error) {
+    return { ok: true, rejected: true, title: 'No puedo consultar los datos con fiabilidad', answer: `Gemini no ha podido decidir una consulta válida. ControlEvent no la sustituirá por cálculos locales ni por una estimación. ${friendlyZuzuErrorMessage(error)}`, warnings: [cleanGeminiError(error)], charts: [], tables: [], files: [], provider: 'zuzu-sql-first-corte-planificador', model: '', debugTrace: flowTrace, showDebugTrace: true };
+  }
+  let executed;
+  try {
+    executed = await executeSqlFirstPlan(plan, flowTrace);
+  } catch (error) {
+    return { ok: true, rejected: true, title: 'No puedo obtener datos fiables', answer: `Gemini ha decidido la consulta, pero ControlEvent no ha podido ejecutarla con garantías. No se usará un cálculo alternativo. ${trim(error?.message || error)}`, warnings: [cleanGeminiError(error)], charts: [], tables: [], files: [], provider: 'zuzu-sql-first-corte-ejecucion', model: plan.model || '', debugTrace: flowTrace, showDebugTrace: true };
+  }
+  const presentation = sqlFirstPresentation(executed);
+  let final;
+  try {
+    final = await callGeminiSqlFirstAnswer(userPrompt, executed, flowTrace);
+  } catch (error) {
+    const principal = executed.find(x => x.role === 'principal');
+    const count = Number(principal?.rowCount) || arr(principal?.rows).length;
+    return { ok: true, rejected: false, title: 'Resultado verificado de ControlEvent', answer: `ControlEvent ha obtenido ${count} fila(s) de datos, pero la redacción de Gemini no ha superado el control de veracidad. Para no falsear la respuesta, muestro únicamente la tabla exacta obtenida.`, warnings: [friendlyZuzuErrorMessage(error)], charts: [], tables: presentation.tables, files: presentation.files, provider: 'zuzu-sql-first-tabla-verificada', model: '', meta: { generatedAt: new Date().toISOString(), version: 'v25_prod', architecture: 'Gemini SELECT -> CE ejecuta -> Gemini redacta -> CE presenta', filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, {})).slice(0, 70), debugTrace: arr(flowTrace).slice(0, 80) }, debugTrace: arr(flowTrace).slice(0, 80), showDebugTrace: true };
+  }
+  const displayName = zuzuLoggedUserDisplayName({ usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null });
+  const answer = `${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
+  zuzuTracePush(flowTrace, 'Paso 4 · ControlEvent presenta', 'OK', `CE presenta solo la tabla principal (${presentation.tables.length ? 'con datos' : 'sin filas'}) y la redacción validada de Gemini.`);
+  return {
+    ok: true, rejected: false, title: final.title, answer,
+    warnings: arr(final.warnings), charts: [], tables: presentation.tables, files: presentation.files,
+    provider: 'gemini-sql-first-control-event', model: final.model || '',
+    meta: { generatedAt: new Date().toISOString(), version: 'v25_prod', architecture: 'Prompt -> Gemini decide SELECT -> CE valida/ejecuta -> Gemini recibe prompt+resultados -> CE presenta', plannerModel: plan.model || '', plannerScope: plan.scope || '', plannerRationale: plan.rationale || '', geminiUsageEstimate: summarizeGeminiUsageFromTrace(flowTrace), filenameSubject: fileSafe(dominantSubjectFromPrompt(userPrompt, {})).slice(0, 70), debugTrace: arr(flowTrace).slice(0, 80) },
+    debugTrace: arr(flowTrace).slice(0, 80), showDebugTrace: true
+  };
+}
+
+
 function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
   const withWeather = attachWeatherVisualsIfNeeded(result || {}, context, userPrompt);
   const structured = sanitizeResultStructure(withWeather, context, userPrompt);
@@ -4670,7 +4973,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return { ok: true, rejected: true, title: 'Petición rechazada', answer: 'La petición no parece relacionada con la gestión de eventos de ControlEvent.', warnings: [], charts: [], tables: [], files: [], provider: 'local-guard', model: '', debugTrace: flowTrace, showDebugTrace: true };
   }
 
+  const sqlFirstMode = promptNeedsGeminiSqlFirst(userPrompt);
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
+  if (sqlFirstMode) {
+    zuzuTracePush(flowTrace, 'Paso 0 · Modo SQL-first', 'OK', `Petición factual detectada. CE carga catálogo mínimo: eventos=${arr(state?.eventos).length}, tiendas=${arr(state?.tiendas).length}, productos=${arr(state?.productos).length}, personas=${arr(state?.personas).length}. No cocina una respuesta local.`);
+    return runZuzuSqlFirst({ userPrompt, state, selectedEventId, flowTrace });
+  }
   state = await attachHitosState(state, flowTrace);
   state = await attachBankState(state, userPrompt, flowTrace);
   zuzuTracePush(flowTrace, 'Paso 0 · Estado CE', 'OK', `Estado cargado: eventos=${arr(state?.eventos).length}, compras=${arr(state?.compras).length}, ingresos=${arr(state?.colaboradores).length}, personas=${arr(state?.personas).length}, productos=${arr(state?.productos).length}, hitos=${arr(state?.hitos).length}, LG=${arr(state?.lgs).length}, banco=${arr(state?.bankMovements).length}, vínculosBanco=${arr(state?.bankTicketLinks).length}.`);
