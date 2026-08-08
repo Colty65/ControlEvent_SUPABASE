@@ -1,7 +1,7 @@
-CONTROLEVENT v25_prod · FIX2 CUADRE BANCO
+CONTROLEVENT v26_prod · FIX2 CUADRE BANCO
 
 1. Sustituye en GitHub/Vercel el contenido completo por el de este ZIP.
-2. No es necesario ejecutar SQL nuevo si v25_prod FIX1 ya estaba instalado.
+2. No es necesario ejecutar SQL nuevo si v26_prod FIX1 ya estaba instalado.
 3. Tras el despliegue, usa Ctrl+F5 en PC. En móvil, cierra y vuelve a abrir la pestaña.
 
 Correcciones principales:

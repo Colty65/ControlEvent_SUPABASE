@@ -29,7 +29,7 @@
 
 Ejecutar completo en **Supabase > SQL Editor**:
 
-`ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`
+`ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`
 
 El script es compatible con una instalación previa de v24_prod-02 y añade de forma segura la columna:
 
@@ -43,7 +43,7 @@ El script es compatible con una instalación previa de v24_prod-02 y añade de f
 - `public/app/styles/cuadre-banco.css`
 - `services/bank-reconciliation.service.js`
 - `routes/bank-reconciliation.routes.js`
-- `ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`
+- `ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`
 - `index.html`
 - `public/index.html`
 - `package.json`

@@ -1,5 +1,5 @@
 -- ============================================================================
--- ControlEvent v25_prod FIX8 · CUADRE BANCO, TRAZABILIDAD DE COMPRAS E INGRESOS
+-- ControlEvent v26_prod FIX8 · CUADRE BANCO, TRAZABILIDAD DE COMPRAS E INGRESOS
 -- Ejecutar completo en Supabase > SQL Editor antes de utilizar la nueva ventana.
 -- Crea movimientos, lotes CSV, vínculos con TKxx y asociaciones corregibles con ingresos.
 -- ============================================================================
@@ -90,7 +90,7 @@ create table if not exists public.ce_bank_event_movement_state (
   primary key (event_id, movement_id)
 );
 
--- Actualización segura para instalaciones que ya tenían la versión v24_prod-02.
+-- Actualización segura para instalaciones que ya tenían la versión v26_prod-02.
 alter table public.ce_bank_ticket_links
   add column if not exists forced_square boolean not null default false;
 
@@ -131,7 +131,7 @@ before update on public.ce_bank_event_movement_state
 for each row execute function public.ce_bank_set_updated_at();
 
 comment on table public.ce_bank_movements is 'Movimientos importados de CSV bancario para el Cuadre Banco de ControlEvent.';
-comment on column public.ce_bank_movements.included is 'Valor inicial heredado. Desde v24_prod-04 la inclusión efectiva se guarda por evento en ce_bank_event_movement_state.';
+comment on column public.ce_bank_movements.included is 'Valor inicial heredado. Desde v26_prod-04 la inclusión efectiva se guarda por evento en ce_bank_event_movement_state.';
 comment on table public.ce_bank_ticket_links is 'Vinculación de movimientos bancarios negativos con TKxx pagados. Un TKxx solo puede justificar un movimiento.';
 comment on column public.ce_bank_ticket_links.forced_square is 'Permite aceptar manualmente diferencias entre el movimiento y la suma de TKxx para un evento.';
 comment on table public.ce_bank_income_links is 'Asociación manual y corregible entre abonos bancarios e ingresos registrados del evento.';

@@ -15,4 +15,4 @@ CONTROLEVENT v24_prod-05 · CUADRE BANCO FLUIDO Y CSV AMPLIO
 
 SUPABASE:
 - Si ya instalaste v24_prod-04, NO hay que ejecutar SQL nuevo.
-- Si vienes de una versión anterior, ejecuta ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql.
+- Si vienes de una versión anterior, ejecuta ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql.

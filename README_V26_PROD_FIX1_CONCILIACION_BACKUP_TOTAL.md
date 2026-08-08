@@ -1,6 +1,6 @@
-# ControlEvent v25_prod · FIX1 Conciliación y BACKUP total
+# ControlEvent v26_prod · FIX1 Conciliación y BACKUP total
 
-Esta revisión mantiene la versión visible `v25_prod` y aplica las correcciones solicitadas el 29/07/2026.
+Esta revisión mantiene la versión visible `v26_prod` y aplica las correcciones solicitadas el 29/07/2026.
 
 ## Avance del evento
 

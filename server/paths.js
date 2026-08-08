@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v25_prod';
+export const APP_VERSION = 'ControlEvent v26_prod';
 
-export const APP_VERSION_LABEL = 'v25_prod';
-export const APP_VERSION_FILE = 'ControlEvent_v25_prod';
-export const BUILD_ID = '20260729-V25-PROD-COMPACT-BANK';
-export const ZIP_NAME = 'CE_V25_PROD.zip';
+export const APP_VERSION_LABEL = 'v26_prod';
+export const APP_VERSION_FILE = 'ControlEvent_v26_prod';
+export const BUILD_ID = '20260808-V26-PROD-ZUZU-TOOLS';
+export const ZIP_NAME = 'CE_V26_PROD_ZUZU_TOOLS.zip';

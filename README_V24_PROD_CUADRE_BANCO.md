@@ -3,7 +3,7 @@
 ## Antes del primer uso
 Ejecutar en **Supabase > SQL Editor** el fichero:
 
-`ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`
+`ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`
 
 ## Funcionalidad
 

@@ -81,7 +81,7 @@ assert.match(exportRoute,/\/export\/restore-extended/);
 const ai=read('services/event-ai.service.js');
 for(const table of ['ce_bank_import_batches','ce_bank_movements','ce_bank_ticket_links','ce_bank_event_settings','ce_bank_event_movement_state','ce_hitos','ce_lg']) assert.ok(ai.includes(table),`Zuzu no conoce ${table}`);
 assert.match(ai,/asksBroadEvent/);
-const ui=read('public/app/features/v25-prod-fix1-conciliacion-backup.js');
+const ui=read('public/app/features/v26-prod-fix1-conciliacion-backup.js');
 assert.match(ui,/ceV25PinnedGraphTip/);
 assert.match(ui,/closeBankNow/);
 assert.match(ui,/CE_COMPRAS_BBDD/);
@@ -93,6 +93,6 @@ assert.match(ui,/BACKUP con alcance TODOS/);
 const backupClient=read('public/modules/excel/backup.js');
 for(const sheet of ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO','HITOS','LG']) assert.ok(backupClient.includes(sheet),`Fallback sin ${sheet}`);
 const index=read('public/index.html');
-assert.match(index,/v25-prod-fix1-conciliacion-backup\.js/);
+assert.match(index,/v26-prod-fix1-conciliacion-backup\.js/);
 
-console.log('OK v25_prod FIX1: avance, INFOEVENTO, cierre, globos, Zuzu, BACKUP integral y Finalizado En saldo.');
+console.log('OK v26_prod FIX1: avance, INFOEVENTO, cierre, globos, Zuzu, BACKUP integral y Finalizado En saldo.');

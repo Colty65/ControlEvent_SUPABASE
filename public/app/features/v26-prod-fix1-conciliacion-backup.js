@@ -1,7 +1,7 @@
-/* ControlEvent v25_prod - FIX4: restauración integral y estilos del globo canónico. */
+/* ControlEvent v26_prod - FIX4: restauración integral y estilos del globo canónico. */
 (function(){
   'use strict';
-  if(window.__ceV25ProdFix1) return; window.__ceV25ProdFix1=true;
+  if(window.__ceV26ProdFix1) return; window.__ceV26ProdFix1=true;
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -14,12 +14,12 @@
 
   // FIX3: un único globo canónico. Se elimina el globo oscuro duplicado de FIX2 y
   // se deja la persistencia al gestor ceTooltipV21 del bundle legacy.
-  try{ document.getElementById('ceV25PinnedGraphTip')?.remove(); }catch(_){ }
-  if(!document.getElementById('ce-v25-fix3-tooltip-style')){
+  try{ document.getElementById('ceV26PinnedGraphTip')?.remove(); }catch(_){ }
+  if(!document.getElementById('ce-v26-fix3-tooltip-style')){
     const style=document.createElement('style');
-    style.id='ce-v25-fix3-tooltip-style';
+    style.id='ce-v26-fix3-tooltip-style';
     style.textContent=`
-      #ceV25PinnedGraphTip{display:none!important}
+      #ceV26PinnedGraphTip{display:none!important}
       #ceTooltipV21[data-ce-pinned="1"]{
         pointer-events:auto!important;
         position:fixed!important;
@@ -45,7 +45,7 @@
     document.head.appendChild(style);
   }
 
-  // Restauración integral de los BACKUP v25_prod: núcleo + banco + hitos/LG.
+  // Restauración integral de los BACKUP v26_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){
     if(window.XLSX) return window.XLSX;
     if(typeof window.ensureSheetJS==='function') await window.ensureSheetJS();
@@ -62,7 +62,7 @@
   function parseJson(v){if(v&&typeof v==='object')return v;try{return JSON.parse(norm(v)||'[]');}catch(_){return [];}}
   function parseJsonValue(v){if(v&&typeof v==='object')return v;const raw=norm(v);if(!raw)return null;try{return JSON.parse(raw);}catch(_){return raw;}}
   function backupScope(wb){const rows=sheetRows(wb,'METADATOS');const map=Object.fromEntries(rows.map(r=>[up(pick(r,'CAMPO')),pick(r,'VALOR')]));const id=norm(map.EVENTO_ID);return !id||up(id)==='TODOS'?'TODOS':id;}
-  function isV25Backup(wb){return (wb.SheetNames||[]).some(n=>up(n)==='METADATOS')&&(wb.SheetNames||[]).some(n=>up(n)==='CE_COMPRAS_BBDD');}
+  function isV26Backup(wb){return (wb.SheetNames||[]).some(n=>up(n)==='METADATOS')&&(wb.SheetNames||[]).some(n=>up(n)==='CE_COMPRAS_BBDD');}
   function coreState(wb){
     const eventRows=sheetRows(wb,'EVENTOS');
     const eventos=eventRows.map(r=>({id:norm(pick(r,'EVENTO_ID')),titulo:norm(pick(r,'EVENTO_TITULO')),precio:number(pick(r,'EVENTO_PRECIO')),fechaIni:norm(pick(r,'EVENTO_FECHAINI')),fechaFin:norm(pick(r,'EVENTO_FECHAFIN')),situacion:norm(pick(r,'EVENTO_SITUACION'))||'En curso',descripcion:norm(pick(r,'EVENTO_DESCRIPCION'))})).filter(r=>r.id);
@@ -96,7 +96,7 @@
     };
   }
   async function restoreBackup(file){
-    const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV25Backup(wb))return false;
+    const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV26Backup(wb))return false;
     const scope=backupScope(wb);
     if(scope!=='TODOS') throw new Error('La restauración integral requiere un BACKUP con alcance TODOS para no sustituir accidentalmente otros eventos.');
     const role=up((window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{}).nivel);if(role!=='GD')throw new Error('Solo un usuario GD puede restaurar un BACKUP.');
@@ -113,7 +113,7 @@
     const btn=ev.target?.closest?.('#btnStartImport');if(!btn)return;
     const file=$('importWorkbookFile')?.files?.[0];if(!file)return;
     try{
-      const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV25Backup(wb))return;
+      const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV26Backup(wb))return;
       ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();
       await restoreBackup(file);
     }catch(error){const status=$('importStatus');if(status){status.textContent='Error al restaurar BACKUP: '+(error?.message||error);status.className='bad';}else alert(error?.message||error);}

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const root=new URL('../',import.meta.url);
 const read=relative=>fs.readFileSync(new URL(relative,root),'utf8');
 
-const fix=read('public/app/features/v25-prod-fix1-conciliacion-backup.js');
+const fix=read('public/app/features/v26-prod-fix1-conciliacion-backup.js');
 assert.doesNotMatch(fix,/new\s+MutationObserver/, 'El parche posterior no debe reintroducir el observador que bloqueaba la botonera');
 assert.doesNotMatch(fix,/setInterval\s*\(\s*keepCsvAvailable/, 'CSV no debe sincronizarse mediante intervalos');
 assert.doesNotMatch(fix,/keepCsvAvailableInCurrentEvent/, 'El parche posterior no debe gobernar el estado de CSV');
@@ -31,11 +31,11 @@ assert.match(info,/CUADRADO_FORZADO/);
 assert.match(info,/Movimiento positivo conciliado/);
 
 const css=read('public/app/styles/cuadre-banco.css');
-assert.match(css,/ControlEvent v25_prod FIX4|body\.ce-bank-open > :not\(#ceBankOverlay\)/, 'Debe existir el aislamiento real de la ventana bancaria');
+assert.match(css,/ControlEvent v26_prod FIX4|body\.ce-bank-open > :not\(#ceBankOverlay\)/, 'Debe existir el aislamiento real de la ventana bancaria');
 assert.match(css,/grid-template-columns:minmax\(560px,1\.03fr\) minmax\(500px,\.97fr\)/, 'En PC: movimiento izquierda y conciliación derecha');
 assert.match(css,/\.ce-bank-ticket-chip\.foreign>span\{display:inline-flex!important/);
 assert.match(css,/@media \(max-width:700px\)/, 'Debe existir diseño específico para teléfono');
 
 const index=read('public/index.html');
-assert.match(index,/20260730-V25-PROD-FIX4-REAL/);
-console.log('OK v25_prod FIX4: controles nativos, En saldo exacto, fichas PC/móvil y globo canónico.');
+assert.match(index,/20260730-V26-PROD-FIX4-REAL/);
+console.log('OK v26_prod FIX4: controles nativos, En saldo exacto, fichas PC/móvil y globo canónico.');

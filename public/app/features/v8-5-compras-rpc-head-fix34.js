@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod FIX34 - COMPRAS RPC desde HEAD
+/* ControlEvent v26_prod FIX34 - COMPRAS RPC desde HEAD
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras

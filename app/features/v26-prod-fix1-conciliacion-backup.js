@@ -1,7 +1,7 @@
-/* ControlEvent v25_prod - FIX3 controles bancarios, globos canónicos y restauración integral. */
+/* ControlEvent v26_prod - FIX4: restauración integral y estilos del globo canónico. */
 (function(){
   'use strict';
-  if(window.__ceV25ProdFix1) return; window.__ceV25ProdFix1=true;
+  if(window.__ceV26ProdFix1) return; window.__ceV26ProdFix1=true;
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const up=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -9,42 +9,17 @@
   const number=v=>{if(typeof v==='number')return Number.isFinite(v)?v:0;let s=norm(v).replace(/[^0-9,.-]/g,'');if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');const n=Number(s);return Number.isFinite(n)?n:0;};
   const actorHeader=()=>{const u=window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{};return encodeURIComponent(JSON.stringify({nivel:up(u.nivel||u.Nivel),identificacion:norm(u.identificacion||u.Identificacion),nombre:norm(u.nombre||u.Nombre)}));};
 
-  // Cierre robusto: el aspa funciona aunque una capa heredada capture el click.
-  function closeBankNow(ev){
-    const btn=ev?.target?.closest?.('#ceBankClose'); if(!btn) return;
-    try{ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();}catch(_){ }
-    try{window.ControlEventBankReconciliation?.close?.(true);}catch(_){ }
-    try{window.ceCloseCuadreBanco?.();}catch(_){ }
-    const overlay=$('ceBankOverlay'); if(overlay){overlay.classList.remove('visible');overlay.classList.add('hidden');overlay.style.removeProperty('display');}
-    try{document.body.classList.remove('ce-bank-open');document.body.style.overflow='';}catch(_){ }
-  }
-  ['pointerdown','pointerup','touchend','click'].forEach(type=>document.addEventListener(type,closeBankNow,{capture:true,passive:false}));
-  // La versión FIX1 observaba todos los atributos del cuadro y volvía a escribir
-  // disabled/aria-disabled en cada mutación. Eso generaba un bucle de microtareas que
-  // terminaba bloqueando CSV, búsqueda y desplegables. La disponibilidad se sincroniza
-  // ahora solo cuando cambia realmente el estado.
-  function keepCsvAvailableInCurrentEvent(){
-    const overlay=$('ceBankOverlay');const button=$('ceBankImport');const headline=$('ceBankEventHeadline');
-    if(!overlay||!button||!headline||overlay.classList.contains('hidden'))return;
-    const inProgress=headline.classList.contains('in-progress')&&!/FINALIZADO/i.test(headline.textContent||'');
-    const shouldDisable=!inProgress||button.classList.contains('busy');
-    if(button.disabled!==shouldDisable) button.disabled=shouldDisable;
-    const aria=shouldDisable?'true':'false';
-    if(button.getAttribute('aria-disabled')!==aria) button.setAttribute('aria-disabled',aria);
-  }
-  document.addEventListener('DOMContentLoaded',()=>{
-    keepCsvAvailableInCurrentEvent();
-    document.addEventListener('controlevent:event-loaded',()=>setTimeout(keepCsvAvailableInCurrentEvent,0));
-  },{once:true});
+  // Cuadre Banco gestiona sus controles y su cierre en su propio módulo.
+  // No se instalan capturas globales ni se reescribe el estado de CSV desde aquí.
 
   // FIX3: un único globo canónico. Se elimina el globo oscuro duplicado de FIX2 y
   // se deja la persistencia al gestor ceTooltipV21 del bundle legacy.
-  try{ document.getElementById('ceV25PinnedGraphTip')?.remove(); }catch(_){ }
-  if(!document.getElementById('ce-v25-fix3-tooltip-style')){
+  try{ document.getElementById('ceV26PinnedGraphTip')?.remove(); }catch(_){ }
+  if(!document.getElementById('ce-v26-fix3-tooltip-style')){
     const style=document.createElement('style');
-    style.id='ce-v25-fix3-tooltip-style';
+    style.id='ce-v26-fix3-tooltip-style';
     style.textContent=`
-      #ceV25PinnedGraphTip{display:none!important}
+      #ceV26PinnedGraphTip{display:none!important}
       #ceTooltipV21[data-ce-pinned="1"]{
         pointer-events:auto!important;
         position:fixed!important;
@@ -70,7 +45,7 @@
     document.head.appendChild(style);
   }
 
-  // Restauración integral de los BACKUP v25_prod: núcleo + banco + hitos/LG.
+  // Restauración integral de los BACKUP v26_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){
     if(window.XLSX) return window.XLSX;
     if(typeof window.ensureSheetJS==='function') await window.ensureSheetJS();
@@ -87,7 +62,7 @@
   function parseJson(v){if(v&&typeof v==='object')return v;try{return JSON.parse(norm(v)||'[]');}catch(_){return [];}}
   function parseJsonValue(v){if(v&&typeof v==='object')return v;const raw=norm(v);if(!raw)return null;try{return JSON.parse(raw);}catch(_){return raw;}}
   function backupScope(wb){const rows=sheetRows(wb,'METADATOS');const map=Object.fromEntries(rows.map(r=>[up(pick(r,'CAMPO')),pick(r,'VALOR')]));const id=norm(map.EVENTO_ID);return !id||up(id)==='TODOS'?'TODOS':id;}
-  function isV25Backup(wb){return (wb.SheetNames||[]).some(n=>up(n)==='METADATOS')&&(wb.SheetNames||[]).some(n=>up(n)==='CE_COMPRAS_BBDD');}
+  function isV26Backup(wb){return (wb.SheetNames||[]).some(n=>up(n)==='METADATOS')&&(wb.SheetNames||[]).some(n=>up(n)==='CE_COMPRAS_BBDD');}
   function coreState(wb){
     const eventRows=sheetRows(wb,'EVENTOS');
     const eventos=eventRows.map(r=>({id:norm(pick(r,'EVENTO_ID')),titulo:norm(pick(r,'EVENTO_TITULO')),precio:number(pick(r,'EVENTO_PRECIO')),fechaIni:norm(pick(r,'EVENTO_FECHAINI')),fechaFin:norm(pick(r,'EVENTO_FECHAFIN')),situacion:norm(pick(r,'EVENTO_SITUACION'))||'En curso',descripcion:norm(pick(r,'EVENTO_DESCRIPCION'))})).filter(r=>r.id);
@@ -98,7 +73,7 @@
     const personCodeToId=new Map(personaRows.map(r=>[norm(pick(r,'PERSONA_CODIGO')),norm(pick(r,'PERSONA_ID'))]).filter(([code,id])=>code&&id));
     const tiendas=sheetRows(wb,'TIENDAS').map(r=>({id:norm(pick(r,'TIENDA_ID')),nombre:norm(pick(r,'TIENDA_NOMBRE'))})).filter(r=>r.id);
     const productos=sheetRows(wb,'PRODUCTOS').map(r=>({id:norm(pick(r,'PRODUCTO_ID')),nombre:norm(pick(r,'PRODUCTO_NOMBRE')),segmento:norm(pick(r,'PRODUCTO_SEGMENTO')),destino:norm(pick(r,'PRODUCTO_DESTINO')),defaultPrecio:number(pick(r,'PRODUCTO_PRECIO_REFERENCIA')),precio:number(pick(r,'PRODUCTO_PRECIO_REFERENCIA'))})).filter(r=>r.id);
-    const colaboradores=sheetRows(wb,'INGRESOS').map(r=>{const code=norm(pick(r,'PERSONA_CODIGO'));return {id:norm(pick(r,'INGRESO_ID')),eventId:resolveEventId(pick(r,'EVENTO_CODIGO')),personaId:personCodeToId.get(code)||code,numero:number(pick(r,'NUMERO')),situacion:norm(pick(r,'INGRESO')),importe:number(pick(r,'IMPORTE_VOLUNTARIO'))};}).filter(r=>r.id&&r.eventId&&r.personaId);
+    const colaboradores=sheetRows(wb,'INGRESOS').map(r=>{const code=norm(pick(r,'PERSONA_CODIGO'));return {id:norm(pick(r,'INGRESO_ID')),eventId:resolveEventId(pick(r,'EVENTO_CODIGO')),personaId:personCodeToId.get(code)||code,numero:number(pick(r,'NUMERO')),situacion:norm(pick(r,'INGRESO')),importe:number(pick(r,'IMPORTE_VOLUNTARIO')),personaNombreSnapshot:norm(pick(r,'PERSONA_NOMBRE_EVENTO')),personaRangoSnapshot:up(pick(r,'PERSONA_RANGO_EVENTO'))};}).filter(r=>r.id&&r.eventId&&r.personaId);
     const compras=sheetRows(wb,'CE_COMPRAS_BBDD').map(r=>({id:norm(pick(r,'COMPRA_ID')),eventId:norm(pick(r,'EVENT_ID')),productoId:norm(pick(r,'PRODUCTO_ID')),unidades:number(pick(r,'UNIDADES')),precio:number(pick(r,'PRECIO')),ticketDonacion:norm(pick(r,'TICKET_DONACION')),tiendaId:norm(pick(r,'TIENDA_ID')),responsableId:norm(pick(r,'RESPONSABLE_ID')),donorRef:norm(pick(r,'DONOR_REF')),createdAt:norm(pick(r,'CREATED_AT')),updatedAt:norm(pick(r,'UPDATED_AT'))})).filter(r=>r.id);
     const eventDocuments=sheetRows(wb,'DOCUMENTOS').map(r=>({eventId:resolveEventId(pick(r,'EVENTO_CODIGO')),id:norm(pick(r,'DOC_ID')),codigo:norm(pick(r,'DOC_CODIGO')),fecha:norm(pick(r,'FECHA')),descripcion:norm(pick(r,'DESCRIPCION')),imageKey:norm(pick(r,'CLAVE_IMAGEN')),imageUrl:norm(pick(r,'FOTO_URL'))})).filter(r=>r.eventId&&(r.id||r.codigo));
     const ticketImages={};sheetRows(wb,'CE_TICKET_IMAGES_BBDD').forEach(r=>{const key=norm(pick(r,'IMAGE_KEY'));const value=norm(pick(r,'PUBLIC_URL'))||norm(pick(r,'PATHNAME'))||norm(pick(r,'STORAGE_PATH'));if(key&&value)ticketImages[key]=value;});
@@ -111,6 +86,8 @@
       ticketImageRows:sheetRows(wb,'CE_TICKET_IMAGES_BBDD').map(r=>({image_key:norm(pick(r,'IMAGE_KEY')),event_id:norm(pick(r,'EVENT_ID')),label:norm(pick(r,'LABEL')),public_url:norm(pick(r,'PUBLIC_URL'))||null,pathname:norm(pick(r,'PATHNAME'))||null,storage_path:norm(pick(r,'STORAGE_PATH'))||null,content_type:norm(pick(r,'CONTENT_TYPE'))||null,size_bytes:number(pick(r,'SIZE_BYTES'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.image_key),
       bankImportBatches:sheetRows(wb,'BANCO_IMPORTACIONES').map(r=>({id:norm(pick(r,'ID')),source_filename:norm(pick(r,'SOURCE_FILENAME')),account_id:norm(pick(r,'ACCOUNT_ID')),account_label:norm(pick(r,'ACCOUNT_LABEL')),date_from:norm(pick(r,'DATE_FROM'))||null,date_to:norm(pick(r,'DATE_TO'))||null,parsed_count:number(pick(r,'PARSED_COUNT')),inserted_count:number(pick(r,'INSERTED_COUNT')),duplicate_count:number(pick(r,'DUPLICATE_COUNT')),warning_count:number(pick(r,'WARNING_COUNT')),imported_by:norm(pick(r,'IMPORTED_BY'))||null,imported_at:norm(pick(r,'IMPORTED_AT'))||undefined})).filter(r=>r.id),
       bankMovements:sheetRows(wb,'BANCO_MVTOS').map(r=>({id:norm(pick(r,'ID')),account_id:norm(pick(r,'ACCOUNT_ID')),account_label:norm(pick(r,'ACCOUNT_LABEL')),executed_at:norm(pick(r,'EXECUTED_AT')),value_date:norm(pick(r,'VALUE_DATE')),description:norm(pick(r,'DESCRIPTION')),amount:number(pick(r,'AMOUNT')),bank_balance:number(pick(r,'BANK_BALANCE')),included:bool(pick(r,'INCLUDED')),source_filename:norm(pick(r,'SOURCE_FILENAME')),source_hash:norm(pick(r,'SOURCE_HASH')),import_batch_id:norm(pick(r,'IMPORT_BATCH_ID'))||null,created_by:norm(pick(r,'CREATED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.id),
+      bankIncomeLinks:sheetRows(wb,'BANCO_INGRESOS_LINKS').map(r=>({id:norm(pick(r,'ID')),movement_id:norm(pick(r,'MOVEMENT_ID')),event_id:norm(pick(r,'EVENT_ID')),income_id:norm(pick(r,'INCOME_ID')),income_amount_snapshot:number(pick(r,'INCOME_AMOUNT_SNAPSHOT')),created_by:norm(pick(r,'CREATED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined})).filter(r=>r.id),
+      eventPersonSnapshots:sheetRows(wb,'PERSONAS_EVENTO').map(r=>({event_id:norm(pick(r,'EVENT_ID')),persona_id:norm(pick(r,'PERSONA_ID')),nombre_snapshot:norm(pick(r,'NOMBRE_SNAPSHOT')),rango_snapshot:up(pick(r,'RANGO_SNAPSHOT'))||'SOCIO',captured_at:norm(pick(r,'CAPTURED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.event_id&&r.persona_id),
       bankTicketLinks:sheetRows(wb,'BANCO_TK_LINKS').map(r=>({id:norm(pick(r,'ID')),movement_id:norm(pick(r,'MOVEMENT_ID')),event_id:norm(pick(r,'EVENT_ID')),ticket_code:norm(pick(r,'TICKET_CODE')),ticket_amount_snapshot:number(pick(r,'TICKET_AMOUNT_SNAPSHOT')),forced_square:bool(pick(r,'FORCED_SQUARE')),created_by:norm(pick(r,'CREATED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined})).filter(r=>r.id),
       bankEventSettings:sheetRows(wb,'BANCO_PERIODOS').map(r=>({event_id:norm(pick(r,'EVENT_ID')),date_from:norm(pick(r,'DATE_FROM')),date_to:norm(pick(r,'DATE_TO')),updated_by:norm(pick(r,'UPDATED_BY'))||null,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.event_id),
       bankMovementStates:sheetRows(wb,'BANCO_ESTADO_MVTO').map(r=>({event_id:norm(pick(r,'EVENT_ID')),movement_id:norm(pick(r,'MOVEMENT_ID')),included:bool(pick(r,'INCLUDED')),updated_by:norm(pick(r,'UPDATED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.event_id&&r.movement_id),
@@ -119,7 +96,7 @@
     };
   }
   async function restoreBackup(file){
-    const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV25Backup(wb))return false;
+    const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV26Backup(wb))return false;
     const scope=backupScope(wb);
     if(scope!=='TODOS') throw new Error('La restauración integral requiere un BACKUP con alcance TODOS para no sustituir accidentalmente otros eventos.');
     const role=up((window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||{}).nivel);if(role!=='GD')throw new Error('Solo un usuario GD puede restaurar un BACKUP.');
@@ -136,7 +113,7 @@
     const btn=ev.target?.closest?.('#btnStartImport');if(!btn)return;
     const file=$('importWorkbookFile')?.files?.[0];if(!file)return;
     try{
-      const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV25Backup(wb))return;
+      const XLSX=await ensureXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});if(!isV26Backup(wb))return;
       ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();
       await restoreBackup(file);
     }catch(error){const status=$('importStatus');if(status){status.textContent='Error al restaurar BACKUP: '+(error?.message||error);status.className='bad';}else alert(error?.message||error);}

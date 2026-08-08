@@ -1,10 +1,10 @@
-/* ControlEvent v25_prod FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
+/* ControlEvent v26_prod FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v25_prod';
+  const VERSION = 'v26_prod';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -457,7 +457,7 @@
         if(body) body.innerHTML=`<div class="ce-bank-empty error"><strong>No se pudo abrir Cuadre Banco.</strong><span>${esc(error.message)}</span></div>`;
       }
       notice(error.message,'error',true);
-      if(error.code==='BANK_SCHEMA_MISSING') notice('Ejecuta en Supabase el fichero ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql actualizado.','warning',true);
+      if(error.code==='BANK_SCHEMA_MISSING') notice('Ejecuta en Supabase el fichero ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql actualizado.','warning',true);
     }finally{
       if(seq===store.loadSeq){
         store.loading=false;

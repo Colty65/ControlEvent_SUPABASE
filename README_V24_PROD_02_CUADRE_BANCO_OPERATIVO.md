@@ -20,4 +20,4 @@ Esta revisión:
 3. La importación añade únicamente los movimientos que todavía no existan.
 4. Cada movimiento puede incluirse o excluirse del saldo y las salidas pueden justificarse con uno o varios TKxx pagados.
 
-La estructura SQL continúa siendo la definida en `ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`.
+La estructura SQL continúa siendo la definida en `ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`.

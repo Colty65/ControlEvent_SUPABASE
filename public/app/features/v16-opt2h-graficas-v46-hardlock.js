@@ -1,4 +1,4 @@
-/* ControlEvent v25_prod OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
+/* ControlEvent v26_prod OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
    Objetivo: que nunca se vea la gráfica antigua de 4 quesos / 2 columnas.
    Estrategia:
    - Se carga muy pronto y también al final para reengancharse.
@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v24_prod_opt_2j';
+  const VERSION = 'v26_prod_opt_2j';
   const now = () => Date.now();
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
@@ -245,8 +245,8 @@
       return;
     }
     metrics.finalRuns++;
-    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v24_prod_opt_2h_' + (reason || 'final')}); }
-    catch(err){ console.warn('[v24_prod_opt_2h] render V46', err); }
+    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v26_prod_opt_2h_' + (reason || 'final')}); }
+    catch(err){ console.warn('[v26_prod_opt_2h] render V46', err); }
     const html = rawGet(w) || '';
     if(!commitIfStrict(html, reason || 'final')){
       if(isWrongChartHtml(html) || isBlankChartHtml(html)){
@@ -299,7 +299,7 @@
         }
       });
       w.__ceOpt2HHardLocked = true;
-    }catch(err){ console.warn('[v24_prod_opt_2h] patch wrap', err); }
+    }catch(err){ console.warn('[v26_prod_opt_2h] patch wrap', err); }
   }
 
   function makeWrapper(){

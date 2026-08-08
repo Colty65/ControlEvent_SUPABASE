@@ -1,4 +1,4 @@
-# ControlEvent v25_prod
+# ControlEvent v26_prod
 
 Base de trabajo: `CE_V24_PROD_05_CUADRE_BANCO_FLUIDEZ_CSV.zip`.
 
@@ -15,11 +15,11 @@ Base de trabajo: `CE_V24_PROD_05_CUADRE_BANCO_FLUIDEZ_CSV.zip`.
 
 La versión de producto pasa a:
 
-- Visible: `v25_prod`
-- Texto completo: `ControlEvent v25_prod`
-- Nombre para ficheros: `ControlEvent_v25_prod`
-- Paquete: `CE_V25_PROD.zip`
-- Build: `20260729-V25-PROD-COMPACT-BANK`
+- Visible: `v26_prod`
+- Texto completo: `ControlEvent v26_prod`
+- Nombre para ficheros: `ControlEvent_v26_prod`
+- Paquete: `CE_V26_PROD.zip`
+- Build: `20260729-V26-PROD-COMPACT-BANK`
 
 Se han actualizado la cabecera principal, fichas ColtyLAB, ventana de Cuadre Banco, trazas activas, API de versión, service worker, INFOEVENTO, BACKUP cliente y servidor, nombres de descarga, metadatos de Excel y copias `app/public`.
 

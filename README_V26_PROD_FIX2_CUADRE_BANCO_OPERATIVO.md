@@ -1,4 +1,4 @@
-# ControlEvent v25_prod · FIX2 Cuadre Banco operativo
+# ControlEvent v26_prod · FIX2 Cuadre Banco operativo
 
 - Eliminado el bucle de MutationObserver que bloqueaba CSV, búsqueda y desplegables.
 - INFOEVENTO usa el estado `En saldo` propio del evento y calcula cuadre normal/forzado.

@@ -36,7 +36,7 @@ La importación y la visualización son operaciones distintas: los movimientos s
 
 ## Supabase
 
-Si ya se ejecutó el SQL incluido con `v24_prod-04`, **no hay cambios de base de datos ni es necesario volver a ejecutarlo**. Para una instalación anterior a v24_prod-04, debe ejecutarse `ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`.
+Si ya se ejecutó el SQL incluido con `v24_prod-04`, **no hay cambios de base de datos ni es necesario volver a ejecutarlo**. Para una instalación anterior a v24_prod-04, debe ejecutarse `ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`.
 
 ## Archivos principales modificados
 

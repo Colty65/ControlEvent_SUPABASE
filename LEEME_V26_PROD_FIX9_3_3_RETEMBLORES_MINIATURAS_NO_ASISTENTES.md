@@ -1,6 +1,6 @@
-# ControlEvent V25_PROD-FIX9-3-3
+# ControlEvent V26_PROD-FIX9-3-3
 
-Base: `CE_V25_PROD_FIX9_3_2_RESUMEN_GLOBOS_AISLADOS(1).zip`
+Base: `CE_V26_PROD_FIX9_3_2_RESUMEN_GLOBOS_AISLADOS(1).zip`
 
 ## Cambios incluidos
 
@@ -29,7 +29,7 @@ Base: `CE_V25_PROD_FIX9_3_2_RESUMEN_GLOBOS_AISLADOS(1).zip`
 - Abrir GASTOS REALIZADOS y comprobar miniatura en `Total tienda TKxx`.
 - Abrir ColtyLAB en un evento con socios sin registro de ingreso y verificar la lista roja de no asistentes.
 
-Cache-buster: `20260802-V25-PROD-FIX9-3-3-RETEMBLORES-MINIATURAS-NO-ASISTENTES`
+Cache-buster: `20260802-V26-PROD-FIX9-3-3-RETEMBLORES-MINIATURAS-NO-ASISTENTES`
 
 ## Validaciones realizadas
 

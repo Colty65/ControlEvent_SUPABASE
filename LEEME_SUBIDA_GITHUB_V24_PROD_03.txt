@@ -1,7 +1,7 @@
 CONTROLEVENT v24_prod-03 · CUADRE BANCO POR EVENTO
 
 1. Ejecutar primero en Supabase SQL Editor:
-   ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql
+   ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql
 
 2. Subir a GitHub/Vercel el contenido completo de este ZIP, conservando carpetas.
 

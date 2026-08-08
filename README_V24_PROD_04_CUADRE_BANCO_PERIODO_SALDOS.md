@@ -44,7 +44,7 @@ La ventana continúa disponible en modo de consulta. En eventos Finalizados se p
 
 Ejecutar completo en **Supabase > SQL Editor**:
 
-`ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`
+`ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`
 
 Además de conservar las tablas anteriores, crea:
 
@@ -61,7 +61,7 @@ El script es seguro para instalaciones que ya tengan v24_prod-02 o v24_prod-03.
 - `public/app/styles/cuadre-banco.css`
 - `services/bank-reconciliation.service.js`
 - `routes/bank-reconciliation.routes.js`
-- `ControlEvent_SQL_V24_PROD_CUADRE_BANCO.sql`
+- `ControlEvent_SQL_V26_PROD_CUADRE_BANCO.sql`
 - `scripts/test-bank-reconciliation-v24-4.js`
 - `index.html`
 - `public/index.html`
