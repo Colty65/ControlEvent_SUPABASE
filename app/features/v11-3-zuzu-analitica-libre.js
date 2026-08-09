@@ -1,9 +1,9 @@
-/* ControlEvent v26_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v26_prod_1.0 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v26_prod';
+  var VERSION='v26_prod_1.0';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -75,7 +75,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || userFacingTitle(data,prompt) || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v26_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v26_prod_1.0-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -113,7 +113,7 @@
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
       '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
       '@media(pointer:coarse){#ceGeminiLibreOverlay .ce-ai-thinking-orb,#ceGeminiLibreOverlay .ce-ai-thinking-orb:before,#ceGeminiLibreOverlay .ce-ai-thinking-orb:after,#ceGeminiLibreOverlay .ce-ai-spinner{animation:none!important}}\n';
-    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}';
+    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}';
     document.head.appendChild(css);
   }
 
@@ -141,7 +141,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod_1.0</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -152,7 +152,7 @@
 
   function zuzuPrintableCss(){
     return '<style>'+
-      '@page{size:A4;margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#fff;margin:0}.ce-print-wrap{padding:0}.ce-print-head{border:2px solid #f59e0b;border-radius:18px;padding:12px 16px;margin:0 0 14px;background:linear-gradient(90deg,#fff7ed,#fff)}.ce-print-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.ce-print-head h1{font-size:22px;margin:0 0 8px;color:#7c2d12}.ce-print-datetime{font-size:13px;font-weight:950;color:#0f172a;white-space:nowrap;text-align:right}.ce-print-meta{font-size:13px;font-weight:800;color:#475569}.ce-print-prompt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px}.ce-ai-card{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:12px;margin:0 0 12px;box-shadow:none}.ce-ai-card h3{margin:0 0 10px;color:#075985}.ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:400}.ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}.ce-ai-trace-item{display:block;border-top:1px dashed #bae6fd;padding:4px 0;font-size:11px}.ce-ai-table-wrap{overflow:visible}.ce-ai-table{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}.ce-ai-table th,.ce-ai-table td{border:1px solid #dbeafe;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.ce-ai-table.ce-ai-table-wide{font-size:9px}.ce-ai-table th{background:#eff6ff;color:#075985}.ce-ai-bars{display:grid;gap:7px}.ce-ai-bar-row{display:grid;grid-template-columns:190px 1fr 82px;align-items:center;gap:8px}.ce-ai-bar-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-bar-track{height:17px;background:#e2e8f0;border-radius:999px;overflow:hidden}.ce-ai-bar-fill{height:100%;border-radius:999px}.ce-ai-bar-value{font-weight:650;color:#075985;text-align:right}.ce-ai-vbars{height:260px;display:flex;align-items:flex-end;gap:10px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:30px 10px 48px;overflow:visible}.ce-ai-vbar{height:100%;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;flex:1}.ce-ai-vbar-col{width:26px;border-radius:10px 10px 0 0}.ce-ai-vbar-value{position:absolute;bottom:calc(100% + 6px);font-size:9px;font-weight:650;color:#075985;white-space:nowrap;transform:none;transform-origin:center}.ce-ai-vbar-label{position:absolute;bottom:-42px;max-width:95px;text-align:center;font-size:9px;font-weight:650;color:#334155;line-height:1.1;overflow-wrap:anywhere}.ce-ai-pie-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.ce-ai-pie{width:190px;height:190px;border-radius:50%;box-shadow:inset 0 0 0 36px rgba(255,255,255,.82),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie.donut{box-shadow:inset 0 0 0 56px rgba(255,255,255,.88),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie-list{display:grid;gap:7px;min-width:220px}.ce-ai-pie-legend{font-weight:850}.ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}.ce-ai-line-svg{width:100%;height:260px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}.ce-ai-stacked-wrap{display:grid;gap:10px}.ce-ai-stack-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}.ce-ai-stack-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-stack-track{height:22px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}.ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.16)}.ce-ai-stack-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-weight:650;color:#334155}.ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}.ce-ai-files,.ce-ai-file-btn,.ce-ai-preview,.ce-ai-trace,.ce-ai-files-card{display:none!important}@media print{button{display:none!important}.ce-ai-card{box-shadow:none!important}}'+
+      '@page{size:A4;margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#fff;margin:0}.ce-print-wrap{padding:0}.ce-print-head{border:2px solid #f59e0b;border-radius:18px;padding:12px 16px;margin:0 0 14px;background:linear-gradient(90deg,#fff7ed,#fff)}.ce-print-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.ce-print-head h1{font-size:22px;margin:0 0 8px;color:#7c2d12}.ce-print-datetime{font-size:13px;font-weight:950;color:#0f172a;white-space:nowrap;text-align:right}.ce-print-meta{font-size:13px;font-weight:800;color:#475569}.ce-print-prompt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px}.ce-ai-card{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:12px;margin:0 0 12px;box-shadow:none}.ce-ai-card h3{margin:0 0 10px;color:#075985}.ce-ai-answer-card{break-inside:auto!important;page-break-inside:auto!important}.ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:400}.ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}.ce-ai-trace-item{display:block;border-top:1px dashed #bae6fd;padding:4px 0;font-size:11px}.ce-ai-table-wrap{overflow:visible}.ce-ai-table{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}.ce-ai-table th,.ce-ai-table td{border:1px solid #dbeafe;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.ce-ai-table.ce-ai-table-wide{font-size:9px}.ce-ai-table th{background:#eff6ff;color:#075985}.ce-ai-bars{display:grid;gap:7px}.ce-ai-bar-row{display:grid;grid-template-columns:190px 1fr 82px;align-items:center;gap:8px}.ce-ai-bar-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-bar-track{height:17px;background:#e2e8f0;border-radius:999px;overflow:hidden}.ce-ai-bar-fill{height:100%;border-radius:999px}.ce-ai-bar-value{font-weight:650;color:#075985;text-align:right}.ce-ai-vbars{height:260px;display:flex;align-items:flex-end;gap:10px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:30px 10px 48px;overflow:visible}.ce-ai-vbar{height:100%;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;flex:1}.ce-ai-vbar-col{width:26px;border-radius:10px 10px 0 0}.ce-ai-vbar-value{position:absolute;bottom:calc(100% + 6px);font-size:9px;font-weight:650;color:#075985;white-space:nowrap;transform:none;transform-origin:center}.ce-ai-vbar-label{position:absolute;bottom:-42px;max-width:95px;text-align:center;font-size:9px;font-weight:650;color:#334155;line-height:1.1;overflow-wrap:anywhere}.ce-ai-pie-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.ce-ai-pie{width:190px;height:190px;border-radius:50%;box-shadow:inset 0 0 0 36px rgba(255,255,255,.82),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie.donut{box-shadow:inset 0 0 0 56px rgba(255,255,255,.88),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie-list{display:grid;gap:7px;min-width:220px}.ce-ai-pie-legend{font-weight:850}.ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}.ce-ai-line-svg{width:100%;height:260px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}.ce-ai-stacked-wrap{display:grid;gap:10px}.ce-ai-stack-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}.ce-ai-stack-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-stack-track{height:22px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}.ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.16)}.ce-ai-stack-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-weight:650;color:#334155}.ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}.ce-ai-files,.ce-ai-file-btn,.ce-ai-preview,.ce-ai-trace,.ce-ai-files-card{display:none!important}.ce-print-onepage{font-size:10px}.ce-print-onepage .ce-print-head{padding:6px 9px;margin-bottom:7px;border-radius:12px}.ce-print-onepage .ce-print-head h1{font-size:16px;margin-bottom:2px}.ce-print-onepage .ce-print-datetime,.ce-print-onepage .ce-print-meta{font-size:9px}.ce-print-onepage .ce-print-prompt{display:none!important}.ce-print-onepage .ce-ai-card{padding:6px 8px;margin-bottom:6px;border-radius:9px;break-inside:auto;page-break-inside:auto}.ce-print-onepage .ce-ai-card h3{font-size:14px;margin-bottom:4px}.ce-print-onepage .ce-ai-answer{font-size:10px;line-height:1.18}.ce-print-onepage .ce-ai-table{font-size:8.6px}.ce-print-onepage .ce-ai-table th,.ce-print-onepage .ce-ai-table td{padding:3px 4px;line-height:1.12}@media print{button{display:none!important}.ce-ai-card{box-shadow:none!important}body.ce-print-onepage{zoom:.92}}'+
       '</style>';
   }
   function printZuzuPdf(){
@@ -163,6 +163,7 @@
     }
     var data=window.__ceLastZuzuResult || {};
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
+    var compactOnePage=!!(data.compactOnePage || (data.meta&&data.meta.compactOnePage));
     var now=new Date();
     var title=responsePdfTitle(data, prompt);
     var win=null;
@@ -183,7 +184,7 @@
       });
     }
     win.document.open();
-    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Soy Zuzu, respuesta completa</h1>'+metaHtml+'</div>'+dateHtml+'</div>'+(prompt?'<div class="ce-print-prompt"><strong>Pregunta:</strong> '+esc(prompt)+'</div>':'')+'</header>'+printable.innerHTML+'</main><script>window.onload=function(){setTimeout(function(){try{document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)}<\/script></body></html>');
+    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body class="'+(compactOnePage?'ce-print-onepage':'')+'"><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Soy Zuzu, respuesta completa</h1>'+metaHtml+'</div>'+dateHtml+'</div>'+(prompt?'<div class="ce-print-prompt"><strong>Pregunta:</strong> '+esc(prompt)+'</div>':'')+'</header>'+printable.innerHTML+'</main><script>window.onload=function(){setTimeout(function(){try{document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)}<\/script></body></html>');
     win.document.close();
     setStatus('Abierta impresión: elige Guardar como PDF. Nombre sugerido: '+title, 'ok');
   }
@@ -192,6 +193,10 @@
   function clearZuzu(ev){
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
+    window.__ceZuzuConversationV26=[];
+    window.__ceZuzuConversationContextV26=null;
+    saveZuzuInteractionId('');
+    try{ sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_context'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_interaction_id'); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -309,18 +314,43 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
+  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_conversation'; }
+  function loadZuzuConversation(){
+    if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
+    try{ var raw=sessionStorage.getItem(zuzuConversationKey()); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
+    return window.__ceZuzuConversationV26;
+  }
+  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
+  function zuzuContextKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_context'; }
+  function loadZuzuConversationContext(){
+    if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
+    try{ var raw=sessionStorage.getItem(zuzuContextKey()); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; }catch(_){ window.__ceZuzuConversationContextV26=null; }
+    return window.__ceZuzuConversationContextV26;
+  }
+  function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
+  function zuzuInteractionKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_interaction_id'; }
+  function loadZuzuInteractionId(){
+    if(typeof window.__ceZuzuInteractionIdV261==='string' && window.__ceZuzuInteractionIdV261) return window.__ceZuzuInteractionIdV261;
+    try{ window.__ceZuzuInteractionIdV261=String(sessionStorage.getItem(zuzuInteractionKey())||'').trim(); }catch(_){ window.__ceZuzuInteractionIdV261=''; }
+    return window.__ceZuzuInteractionIdV261||'';
+  }
+  function saveZuzuInteractionId(value){
+    window.__ceZuzuInteractionIdV261=String(value||'').trim();
+    try{ if(window.__ceZuzuInteractionIdV261) sessionStorage.setItem(zuzuInteractionKey(),window.__ceZuzuInteractionIdV261); else sessionStorage.removeItem(zuzuInteractionKey()); }catch(_){ }
+  }
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    var ev=currentEvent();
-    var globalAsk=/\b(todos\s+los\s+eventos|eventos\s+registrados|consulta\s+global|cualquier\s+evento|en\s+todos\s+los\s+eventos)\b/i.test(prompt);
-    var eventMention=/\b(evento|eventos|jornada|jornadas|celebraci[oó]n|celebraciones|peña|arrastre)\b|[\"“”'‘’][^\"“”'‘’]{3,90}[\"“”'‘’]/i.test(prompt);
-    if(!ev && !globalAsk && !eventMention){ setStatus('Selecciona un evento o menciona claramente el evento/consulta global.', 'err'); return; }
-    setStatus('Zuzu está preparando el plan...', 'ok');
+    // v26_prod_1.0: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // No se bloquean preguntas globales o personales por no haber evento activo.
+    loadZuzuInteractionId();
+    setStatus('Zuzu está pensando...', 'ok');
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload()})});
+      var history=loadZuzuConversation().slice(-6);
+      var previousInteractionId=loadZuzuInteractionId();
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -335,6 +365,14 @@
         }
       }
       data.__prompt = prompt;
+      var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
+      if(returnedInteractionId) saveZuzuInteractionId(returnedInteractionId);
+      var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||null;
+      if(returnedContext&&typeof returnedContext==='object'){ window.__ceZuzuConversationContextV26=returnedContext; saveZuzuConversationContext(); }
+      if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
+      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext});
+      if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
+      saveZuzuConversation();
       await finishZuzuThinkingFast();
       stopZuzuThinking();
       renderResult(data);
@@ -345,10 +383,19 @@
       setStatus('Error', 'err');
     }
   }
+  function usageHtml(data){
+    var usage=(data&&data.meta&&data.meta.geminiUsageEstimate)||data&&data.geminiUsageEstimate||null;
+    if(!usage || !(Number(usage.calls||0)>0)) return '';
+    var tokens=formatNumber(usage.totalTokens||0);
+    var cost=formatCost(usage.costEurApprox||0);
+    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
+  }
   function traceHtml(data){
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
     if(!Array.isArray(trace) || !trace.length) return '';
     var ok=trace.filter(function(x){return String(x.status||'').toUpperCase()==='OK';}).length;
+    var retry=trace.filter(function(x){return String(x.status||'').toUpperCase()==='RETRY';}).length;
+    var warn=trace.filter(function(x){return String(x.status||'').toUpperCase()==='WARN';}).length;
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
     var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
     var usageLine='';
@@ -368,7 +415,8 @@
       }
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
     }).join('');
-    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad</h3><details><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO'+esc(usageLine)+'</summary>'+items+'</details></div>';
+    var statusBits=[ok+' OK']; if(retry)statusBits.push(retry+' reintento'+(retry===1?'':'s')); if(warn)statusBits.push(warn+' aviso'+(warn===1?'':'s')); statusBits.push(ko+' KO');
+    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad</h3><details><summary>Ver recorrido técnico: '+statusBits.join(' / ')+esc(usageLine)+'</summary>'+items+'</details></div>';
   }
   function renderResult(data){
     data = data || {};
@@ -379,9 +427,10 @@
     var cls=data.rejected?' ce-ai-rejected':'';
     var promptText=trim(data.__prompt||(($('ceAiPrompt')||{}).value)||'');
     var allowTechnical=explicitTechnicalView(promptText);
-    html+='<div class="ce-ai-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
+    html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && visibleWarnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
+    html+=usageHtml(data);
     html+=traceHtml(data);
     (data.charts||[]).forEach(function(ch){ if(allowTechnical || !isTechnicalHeading(ch&&ch.title)) html+=chartHtml(ch); });
     (data.tables||[]).forEach(function(tb){ if(allowTechnical || !isTechnicalHeading(tb&&tb.title)) html+=tableHtml(tb); });
@@ -429,10 +478,10 @@
     if(type==='line') return labels.length<2 ? singleMetricChartHtml(ch, labels, values) : lineChartHtml(ch, labels, values);
     if(type==='stackedbar' || (Array.isArray(ch.series) && ch.series.length)) return stackedChartHtml(ch);
     if(type==='bar' || type==='verticalbar') return verticalChartHtml(ch, labels, values);
-    var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.8, Math.min(100, raw)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
+    var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.8, Math.min(100, raw)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
-  function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+  function formatNumber(v,unit){ var n=Number(v||0),isMoney=/^(?:€|EUR)$/i.test(String(unit||'').trim()); if(isMoney){var neg=n<0?'-':'',p=Math.abs(n).toFixed(2).split('.');return neg+p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+p[1];} return n.toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function formatCost(v){ return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:5, maximumFractionDigits:6}); }
   function chartColor(i){ return ['#38bdf8','#fb923c','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
   function chartItemColor(ch,i){
@@ -471,13 +520,13 @@
   }
   function singleMetricChartHtml(ch, labels, values){
     var l=labels[0]||''; var v=Number(values[0]||0);
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Dato')+'</h3><div style="border:1px solid #dbeafe;border-radius:16px;background:linear-gradient(180deg,#ffffff,#f8fafc);padding:18px;text-align:center"><div style="font-weight:850;color:#475569;margin-bottom:8px">'+esc(l)+'</div><div style="font-size:34px;font-weight:950;color:#075985">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Dato')+'</h3><div style="border:1px solid #dbeafe;border-radius:16px;background:linear-gradient(180deg,#ffffff,#f8fafc);padding:18px;text-align:center"><div style="font-weight:850;color:#475569;margin-bottom:8px">'+esc(l)+'</div><div style="font-size:34px;font-weight:950;color:#075985">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div></div></div>';
   }
 
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
     var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartItemColor(ch,i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
-    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
+    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i],ch.unit))+' '+esc(ch.unit||'')+'</div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
   function lineChartHtml(ch, labels, values){
@@ -494,7 +543,7 @@
     for(var g=0;g<=4;g++){
       var val=max-(max-min)*g/4,y=top+plotH*g/4;
       grid+='<line x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(w-right)+'" y2="'+y.toFixed(1)+'" stroke="#e2e8f0" stroke-width="1"/>';
-      grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val))+'</text>';
+      grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val,ch.unit))+'</text>';
     }
     var xLabels=labels.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
     var paths='',dots='',legend='';
@@ -503,7 +552,7 @@
       var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
       var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
       paths+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>';
-      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v))+'</text>';}).join('');
+      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v,ch.unit))+'</text>';}).join('');
       legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-weight:850"><i style="display:inline-block;width:22px;height:4px;border-radius:4px;background:'+color+'"></i>'+esc(sr.name||('Serie '+(si+1)))+'</span>';
     });
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
@@ -512,13 +561,13 @@
     var labels=(ch.labels||[]).map(String); var series=(ch.series||[]);
     if(!series.length) return chartHtml({title:ch.title,type:'horizontalBar',labels:labels,values:(ch.values||[]),unit:ch.unit});
     var totals=labels.map(function(_,i){return series.reduce(function(a,s){return a+(Number((s.values||[])[i])||0);},0);}); var max=Math.max.apply(null, totals.concat([1]));
-    var rows=labels.map(function(l,i){ var valuesLine=[]; var parts=series.map(function(s,si){ var v=Number((s.values||[])[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.0, raw); var show=v && pct>=9.5; if(v){ valuesLine.push('<span><b>'+esc(s.name||('Serie '+(si+1)))+':</b> '+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</span>'); } return '<div class="ce-ai-stack-part" title="'+esc((s.name||'Serie')+': '+formatNumber(v)+' '+(ch.unit||''))+'" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(si)+'">'+(show?esc(formatNumber(v)):'')+'</div>'; }).join(''); return '<div class="ce-ai-stack-row"><div class="ce-ai-stack-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-stack-body"><div class="ce-ai-stack-track">'+parts+'</div><div class="ce-ai-stack-values">'+valuesLine.join('')+'</div></div></div>'; }).join('');
+    var rows=labels.map(function(l,i){ var valuesLine=[]; var parts=series.map(function(s,si){ var v=Number((s.values||[])[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.0, raw); var show=v && pct>=9.5; if(v){ valuesLine.push('<span><b>'+esc(s.name||('Serie '+(si+1)))+':</b> '+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</span>'); } return '<div class="ce-ai-stack-part" title="'+esc((s.name||'Serie')+': '+formatNumber(v,ch.unit)+' '+(ch.unit||''))+'" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(si)+'">'+(show?esc(formatNumber(v,ch.unit)):'')+'</div>'; }).join(''); return '<div class="ce-ai-stack-row"><div class="ce-ai-stack-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-stack-body"><div class="ce-ai-stack-track">'+parts+'</div><div class="ce-ai-stack-values">'+valuesLine.join('')+'</div></div></div>'; }).join('');
     var leg=series.map(function(s,i){return '<span><i style="background:'+chartColor(i)+'"></i>'+esc(s.name||('Serie '+(i+1)))+'</span>';}).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-stacked-wrap">'+rows+'</div><div class="ce-ai-stack-legend">'+leg+'</div></div>';
   }
   function verticalChartHtml(ch, labels, values){
     var max=Math.max.apply(null, values.concat([1]));
-    var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(v?7:4.5, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
+    var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(v?7:4.5, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
   }
   function tableHtml(tb){

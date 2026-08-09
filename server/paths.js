@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v26_prod';
+export const APP_VERSION = 'ControlEvent v26_prod_1.0';
 
-export const APP_VERSION_LABEL = 'v26_prod';
-export const APP_VERSION_FILE = 'ControlEvent_v26_prod';
-export const BUILD_ID = '20260808-V26-PROD-ZUZU-TOOLS';
-export const ZIP_NAME = 'CE_V26_PROD_ZUZU_TOOLS.zip';
+export const APP_VERSION_LABEL = 'v26_prod_1.0';
+export const APP_VERSION_FILE = 'ControlEvent_v26_prod_1.0';
+export const BUILD_ID = '20260809-V26-PROD-1-0-GEMINI-INTERACTIONS';
+export const ZIP_NAME = 'CE_V26_PROD_1_0_ZUZU_GEMINI_INTERACTIONS.zip';

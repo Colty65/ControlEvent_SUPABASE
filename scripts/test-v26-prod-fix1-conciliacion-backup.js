@@ -95,4 +95,4 @@ for(const sheet of ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_
 const index=read('public/index.html');
 assert.match(index,/v26-prod-fix1-conciliacion-backup\.js/);
 
-console.log('OK v26_prod FIX1: avance, INFOEVENTO, cierre, globos, Zuzu, BACKUP integral y Finalizado En saldo.');
+console.log('OK v26_prod_1.0 FIX1: avance, INFOEVENTO, cierre, globos, Zuzu, BACKUP integral y Finalizado En saldo.');

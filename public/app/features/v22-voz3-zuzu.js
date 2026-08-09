@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod · VOZ4 MOVIL ESTABLE
+/* ControlEvent v26_prod_1.0 · VOZ4 MOVIL ESTABLE
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -12,7 +12,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu = true;
 
-  var BUILD = 'v26_prod';
+  var BUILD = 'v26_prod_1.0';
   var STYLE_ID = 'ceV22Voz3Style';
   var PANEL_ID = 'ceV22Voz3Panel';
   var STORAGE = {
@@ -351,6 +351,11 @@
     var s=String(value==null?'':value);
     s=s.replace(/\u00a0/g,' ').replace(/[•▪◦]/g,'. ').replace(/[|]+/g,', ');
     s=s.replace(/\bPte\.?\s*Compra\b/gi,'pendiente de compra');
+    // v26_prod_1.0 · Voz: el TTS de algunos navegadores pronuncia mal «línea/líneas».
+    // Solo cambiamos el texto enviado a voz; no alteramos los datos ni lo que se muestra en pantalla.
+    s=s.replace(/\bl[ií]neas?\s+de\s+compra\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'registro de compra':'registros de compra';});
+    s=s.replace(/\bl[ií]neas?\s+de\s+gesti[oó]n\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'tarea de gestión':'tareas de gestión';});
+    s=s.replace(/\bl[ií]nea\b/gi,'registro').replace(/\bl[ií]neas\b/gi,'registros');
     s=s.replace(/\bGASTOS\s+CORRIENTES\b/gi,'gastos corrientes');
     s=s.replace(/\bTK\s*0*(\d+)\b/gi,function(_,n){return 'ticket '+integerWords(Number(n),false);});
     s=s.replace(/\bTKxx\b/gi,'tickets realizados');
@@ -368,6 +373,9 @@
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:cl|centilitros?)\b/gi,function(_,n){return genericNumberWords(n)+' centilitros';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:ml|mililitros?)\b/gi,function(_,n){return genericNumberWords(n)+' mililitros';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:l|litros?)\b/gi,function(_,n){return genericNumberWords(n)+' litros';});
+    // Concordancia antes de convertir los números restantes a palabras.
+    s=s.replace(/\b1\s+(registro(?: de compra)?|evento|ticket|hito|producto|documento|ingreso)\b/gi,'un $1');
+    s=s.replace(/\b1\s+(tarea(?: LG| de gestión)?|persona|compra|donación|llamada)\b/gi,'una $1');
     s=s.replace(/\b-?\d+(?:[.,]\d+)?\b/g,function(n){return genericNumberWords(n);});
     s=s.replace(/\s+\/\s+/g,', ').replace(/\s*·\s*/g,'. ');
     s=s.replace(/\bPDF\b/g,'pe de efe').replace(/\bIA\b/g,'inteligencia artificial').replace(/\bBIZUM\b/g,'bízum');

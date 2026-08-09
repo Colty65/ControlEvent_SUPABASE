@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
+/* ControlEvent v26_prod_1.0 - persistencia real de justificantes de INGRESOS, retorno al globo y negrita PRODUCTOS.
    - Los justificantes de ingresos se suben tambien a /api/ticket-images (Supabase) como los tickets.
    - Se mantiene una copia local de seguridad para no perder fotos en cambios de version/cache.
    - Al cerrar una foto se restaura el globo de origen si el navegador lo habia cerrado por perdida de foco.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v26_prod';
-  const VERSION_FILE = 'ControlEvent_v26_prod';
+  const VERSION = 'ControlEvent v26_prod_1.0';
+  const VERSION_FILE = 'ControlEvent_v26_prod_1.0';
   const INSTALLED = '__ceV468FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

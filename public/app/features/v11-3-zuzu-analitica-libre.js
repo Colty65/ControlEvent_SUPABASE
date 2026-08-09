@@ -1,9 +1,9 @@
-/* ControlEvent v26_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v26_prod_1.0 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v26_prod';
+  var VERSION='v26_prod_1.0';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -75,7 +75,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || userFacingTitle(data,prompt) || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v26_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v26_prod_1.0-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -141,7 +141,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod_1.0</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -195,7 +195,8 @@
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
-    try{ sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_context'); }catch(_){ }
+    saveZuzuInteractionId('');
+    try{ sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_context'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_interaction_id'); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -313,36 +314,43 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_zuzu_conversation'; }
+  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_conversation'; }
   function loadZuzuConversation(){
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
     try{ var raw=sessionStorage.getItem(zuzuConversationKey()); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
   function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
-  function zuzuContextKey(){ return 'ControlEvent_v26_prod_zuzu_context'; }
+  function zuzuContextKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_context'; }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
     try{ var raw=sessionStorage.getItem(zuzuContextKey()); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; }catch(_){ window.__ceZuzuConversationContextV26=null; }
     return window.__ceZuzuConversationContextV26;
   }
   function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
+  function zuzuInteractionKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_interaction_id'; }
+  function loadZuzuInteractionId(){
+    if(typeof window.__ceZuzuInteractionIdV261==='string' && window.__ceZuzuInteractionIdV261) return window.__ceZuzuInteractionIdV261;
+    try{ window.__ceZuzuInteractionIdV261=String(sessionStorage.getItem(zuzuInteractionKey())||'').trim(); }catch(_){ window.__ceZuzuInteractionIdV261=''; }
+    return window.__ceZuzuInteractionIdV261||'';
+  }
+  function saveZuzuInteractionId(value){
+    window.__ceZuzuInteractionIdV261=String(value||'').trim();
+    try{ if(window.__ceZuzuInteractionIdV261) sessionStorage.setItem(zuzuInteractionKey(),window.__ceZuzuInteractionIdV261); else sessionStorage.removeItem(zuzuInteractionKey()); }catch(_){ }
+  }
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    var ev=currentEvent();
-    var globalAsk=/\b(todos\s+los\s+eventos|eventos\s+registrados|consulta\s+global|cualquier\s+evento|en\s+todos\s+los\s+eventos)\b/i.test(prompt);
-    var eventMention=/\b(evento|eventos|jornada|jornadas|celebraci[oó]n|celebraciones|peña|arrastre)\b|[\"“”'‘’][^\"“”'‘’]{3,90}[\"“”'‘’]/i.test(prompt);
-    var priorContext=loadZuzuConversationContext();
-    var hasConversation=loadZuzuConversation().length>0 || !!(priorContext&&priorContext.topic);
-    if(!ev && !globalAsk && !eventMention && !hasConversation){ setStatus('Selecciona un evento, menciona el ámbito o continúa una conversación de Zuzu.', 'err'); return; }
-    setStatus('Zuzu está preparando el plan...', 'ok');
+    // v26_prod_1.0: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // No se bloquean preguntas globales o personales por no haber evento activo.
+    loadZuzuInteractionId();
+    setStatus('Zuzu está pensando...', 'ok');
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
       var history=loadZuzuConversation().slice(-6);
-      var conversationContext=loadZuzuConversationContext();
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationHistory:history,conversationContext:conversationContext})});
+      var previousInteractionId=loadZuzuInteractionId();
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -357,7 +365,9 @@
         }
       }
       data.__prompt = prompt;
-      var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||conversationContext||null;
+      var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
+      if(returnedInteractionId) saveZuzuInteractionId(returnedInteractionId);
+      var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||null;
       if(returnedContext&&typeof returnedContext==='object'){ window.__ceZuzuConversationContextV26=returnedContext; saveZuzuConversationContext(); }
       if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
       window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext});

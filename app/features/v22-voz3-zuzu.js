@@ -1,17 +1,18 @@
-/* ControlEvent v26_prod · VOZ3 GRATIS
+/* ControlEvent v26_prod_1.0 · VOZ4 MOVIL ESTABLE
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
    - No usa Azure, OpenAI ni ningún servicio TTS de pago; no necesita claves ni variables nuevas.
    - Permite perfil femenino/masculino, elección de voz concreta, prueba, pausa y lectura por bloques.
    - Prepara importes, porcentajes, fechas, horas, tickets, temperaturas y unidades para una lectura humana.
+   - Los importes en formato español (1.234,56 €) se convierten a palabras antes de llegar al motor TTS.
    - No modifica la inteligencia, consultas, cálculos, tablas ni PDF de Zuzu. */
 (function(){
   'use strict';
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu = true;
 
-  var BUILD = 'v26_prod';
+  var BUILD = 'v26_prod_1.0';
   var STYLE_ID = 'ceV22Voz3Style';
   var PANEL_ID = 'ceV22Voz3Panel';
   var STORAGE = {
@@ -42,7 +43,10 @@
     voicesLoaded: false,
     voiceRetryTimer: null,
     voiceRetryCount: 0,
-    selectedVoiceLabel: ''
+    selectedVoiceLabel: '',
+    finalSegments: [],
+    recognitionEndWaiters: [],
+    submitBypass: false
   };
 
   function $(id){ return document.getElementById(id); }
@@ -51,6 +55,41 @@
   function clean(v){ return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); }
   function joinText(){
     return Array.prototype.slice.call(arguments).map(clean).filter(Boolean).join(' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+  }
+  function normalizedTranscript(value){
+    return clean(value).toLocaleLowerCase('es-ES').replace(/[.,;:!?¿¡]+/g,'').trim();
+  }
+  function appendFinalTranscript(text){
+    text=clean(text); if(!text) return;
+    var key=normalizedTranscript(text);
+    if(!key) return;
+    var segments=state.finalSegments;
+    if(segments.some(function(item){ return item.key===key; })) return;
+    var last=segments.length?segments[segments.length-1]:null;
+    if(last && (last.key.indexOf(key)>=0 || key.indexOf(last.key)>=0)){
+      if(key.length>last.key.length) segments[segments.length-1]={key:key,text:text};
+    }else{
+      segments.push({key:key,text:text});
+    }
+    state.finalText=segments.map(function(item){return item.text;}).join(' ');
+  }
+  function resolveRecognitionEnd(){
+    var waiters=state.recognitionEndWaiters.splice(0);
+    waiters.forEach(function(resolve){try{resolve();}catch(_){}});
+  }
+  function stopListeningAndWait(maxWait){
+    maxWait=Number(maxWait)||750;
+    state.wantListening=false;
+    state.recognitionStarting=false;
+    setMicUi(false);
+    return new Promise(function(resolve){
+      var done=false;
+      function finish(){if(done)return;done=true;resolve();}
+      state.recognitionEndWaiters.push(finish);
+      try{ if(state.recognition) state.recognition.stop(); else finish(); }
+      catch(_){ try{state.recognition&&state.recognition.abort();}catch(__){} setTimeout(finish,30); }
+      setTimeout(finish,maxWait);
+    });
   }
   function safeGet(key, fallback){
     try{ var value = localStorage.getItem(key); return value == null ? fallback : value; }catch(_){ return fallback; }
@@ -86,7 +125,8 @@
       '.ce-voz3-help-card{width:min(620px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:20px;color:#0f172a}\n'+
       '.ce-voz3-help-card h3{margin:0 0 10px;font-size:20px}.ce-voz3-help-card p{line-height:1.5;margin:8px 0}.ce-voz3-help-card ol{padding-left:22px;line-height:1.55}.ce-voz3-help-card button{margin-top:12px;border:0;border-radius:10px;padding:9px 14px;background:#0f172a;color:#fff;font-weight:850;cursor:pointer}\n'+
       '@keyframes ceVoz3Pulse{0%,100%{box-shadow:0 0 0 4px rgba(220,38,38,.12)}50%{box-shadow:0 0 0 9px rgba(220,38,38,.04)}}\n'+
-      '@media(max-width:760px){#'+PANEL_ID+'{padding:9px}#'+PANEL_ID+' .ce-voz3-row{align-items:stretch}#'+PANEL_ID+' .ce-voz3-btn{flex:1 1 auto}#'+PANEL_ID+' .ce-voz3-status{flex-basis:100%}#'+PANEL_ID+' select{max-width:100%;flex:1 1 170px}}\n';
+      '#ceGeminiLibreOverlay #ceAiResult{flex:1 1 240px;min-height:170px;overflow:auto;-webkit-overflow-scrolling:touch}\n'+
+      '@media(max-width:760px){#'+PANEL_ID+'{padding:9px;max-height:36vh;overflow:auto;-webkit-overflow-scrolling:touch;flex:0 1 auto}#ceGeminiLibreOverlay .ce-ai-modal{overflow:hidden}#ceGeminiLibreOverlay .ce-ai-prompt{flex:0 0 auto}#ceGeminiLibreOverlay #ceAiResult{flex:1 1 210px;min-height:180px}#'+PANEL_ID+' .ce-voz3-row{align-items:stretch}#'+PANEL_ID+' .ce-voz3-btn{flex:1 1 auto}#'+PANEL_ID+' .ce-voz3-status{flex-basis:100%}#'+PANEL_ID+' select{max-width:100%;flex:1 1 170px}}\n';
     document.head.appendChild(st);
   }
 
@@ -144,7 +184,7 @@
       for(var i=ev.resultIndex; i<ev.results.length; i++){
         var text = clean(ev.results[i] && ev.results[i][0] && ev.results[i][0].transcript);
         if(!text) continue;
-        if(ev.results[i].isFinal) state.finalText = joinText(state.finalText, text);
+        if(ev.results[i].isFinal) appendFinalTranscript(text);
         else interim = joinText(interim, text);
       }
       updatePrompt(interim);
@@ -161,6 +201,7 @@
     };
     rec.onend = function(){
       state.recognitionStarting = false;
+      resolveRecognitionEnd();
       if(state.wantListening && document.getElementById('ceGeminiLibreOverlay')){
         setMicUi(true);
         setVoiceStatus('Micrófono abierto. Reanudando la escucha…', 'ok');
@@ -195,6 +236,7 @@
     var p = promptEl();
     state.baseText = clean(p && p.value);
     state.finalText = '';
+    state.finalSegments = [];
     state.wantListening = true;
     setMicUi(true);
     setVoiceStatus('Solicitando acceso al micrófono…', '');
@@ -243,13 +285,21 @@
     return String(n);
   }
   function parseLocalizedNumber(raw){
-    var s=String(raw||'').replace(/\s/g,'').trim();
+    var s=String(raw||'').replace(/\u00a0/g,' ').replace(/\s/g,'').trim();
     var negative=false;
     if(s.charAt(0)==='-'){ negative=true; s=s.slice(1); }
+    else if(s.charAt(0)==='+'){ s=s.slice(1); }
+    s=s.replace(/(?:€|euros?)$/i,'');
     var comma=s.lastIndexOf(','), dot=s.lastIndexOf('.'), decimal='';
-    if(comma>=0 && dot>=0) decimal=comma>dot?',':'.';
-    else if(comma>=0){ var cd=s.length-comma-1; decimal=(cd>0 && cd<=3)?',':''; }
-    else if(dot>=0){ var dd=s.length-dot-1; decimal=(dd>0 && dd<=2)?'.':''; }
+    if(comma>=0 && dot>=0){
+      decimal=comma>dot?',':'.';
+    }else if(comma>=0){
+      var cd=s.length-comma-1;
+      decimal=(cd>0 && cd<=2)?',':'';
+    }else if(dot>=0){
+      var dd=s.length-dot-1;
+      decimal=(dd>0 && dd<=2)?'.':'';
+    }
     var normalized;
     if(decimal){
       var idx=s.lastIndexOf(decimal);
@@ -301,6 +351,11 @@
     var s=String(value==null?'':value);
     s=s.replace(/\u00a0/g,' ').replace(/[•▪◦]/g,'. ').replace(/[|]+/g,', ');
     s=s.replace(/\bPte\.?\s*Compra\b/gi,'pendiente de compra');
+    // v26_prod_1.0 · Voz: el TTS de algunos navegadores pronuncia mal «línea/líneas».
+    // Solo cambiamos el texto enviado a voz; no alteramos los datos ni lo que se muestra en pantalla.
+    s=s.replace(/\bl[ií]neas?\s+de\s+compra\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'registro de compra':'registros de compra';});
+    s=s.replace(/\bl[ií]neas?\s+de\s+gesti[oó]n\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'tarea de gestión':'tareas de gestión';});
+    s=s.replace(/\bl[ií]nea\b/gi,'registro').replace(/\bl[ií]neas\b/gi,'registros');
     s=s.replace(/\bGASTOS\s+CORRIENTES\b/gi,'gastos corrientes');
     s=s.replace(/\bTK\s*0*(\d+)\b/gi,function(_,n){return 'ticket '+integerWords(Number(n),false);});
     s=s.replace(/\bTKxx\b/gi,'tickets realizados');
@@ -310,7 +365,7 @@
       return integerWords(Number(d),false)+' de '+(months[Number(m)]||integerWords(Number(m),false))+' de '+integerWords(Number(y),false);
     });
     s=s.replace(/\b(\d{1,2}):(\d{2})\b/g,function(_,h,m){var hw=integerWords(Number(h),false).replace(/veintiuno$/,'veintiuna').replace(/ y uno$/,' y una').replace(/uno$/,'una'); return hw+' horas'+(Number(m)?' y '+integerWords(Number(m),false)+' minutos':'');});
-    s=s.replace(/(-?\d[\d.\s]*(?:,\d{1,2})?|-?\d+(?:\.\d{1,2})?)\s*€/g,function(_,n){return moneyWords(n);});
+    s=s.replace(/(-?(?:\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?))\s*(?:€|euros?)/gi,function(_,n){return moneyWords(n);});
     s=s.replace(/(-?\d[\d.\s]*(?:,\d{1,2})?|-?\d+(?:\.\d{1,2})?)\s*%/g,function(_,n){return percentWords(n);});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:°\s*C|º\s*C)\b/gi,function(_,n){return genericNumberWords(n)+' grados centígrados';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*km\s*\/\s*h\b/gi,function(_,n){return genericNumberWords(n)+' kilómetros por hora';});
@@ -318,6 +373,9 @@
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:cl|centilitros?)\b/gi,function(_,n){return genericNumberWords(n)+' centilitros';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:ml|mililitros?)\b/gi,function(_,n){return genericNumberWords(n)+' mililitros';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:l|litros?)\b/gi,function(_,n){return genericNumberWords(n)+' litros';});
+    // Concordancia antes de convertir los números restantes a palabras.
+    s=s.replace(/\b1\s+(registro(?: de compra)?|evento|ticket|hito|producto|documento|ingreso)\b/gi,'un $1');
+    s=s.replace(/\b1\s+(tarea(?: LG| de gestión)?|persona|compra|donación|llamada)\b/gi,'una $1');
     s=s.replace(/\b-?\d+(?:[.,]\d+)?\b/g,function(n){return genericNumberWords(n);});
     s=s.replace(/\s+\/\s+/g,', ').replace(/\s*·\s*/g,'. ');
     s=s.replace(/\bPDF\b/g,'pe de efe').replace(/\bIA\b/g,'inteligencia artificial').replace(/\bBIZUM\b/g,'bízum');
@@ -696,8 +754,23 @@
 
   document.addEventListener('click',function(ev){
     var target=ev&&ev.target;
-    if(target&&target.closest&&target.closest('#ceAiRun')){
-      stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+    var runButton=target&&target.closest&&target.closest('#ceAiRun');
+    if(runButton){
+      if(state.submitBypass){
+        state.submitBypass=false;
+        stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+      }else if(state.wantListening || state.recognitionStarting){
+        ev.preventDefault(); ev.stopPropagation();
+        try{ev.stopImmediatePropagation();}catch(_){}
+        setVoiceStatus('Cerrando el micrófono antes de enviar…','');
+        stopListeningAndWait(850).then(function(){
+          state.submitBypass=true;
+          setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+          runButton.click();
+        });
+      }else{
+        stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+      }
     }
     if(target&&target.closest&&target.closest('#ceAiClear')){
       stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Campo limpio. Puedes volver a hablar.','');
@@ -722,7 +795,7 @@
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
 
-  window.ControlEventV22Voz3={
+  window.ControlEventV22Voz4={
     version:BUILD,
     startListening:startListening,
     stopListening:stopListening,
@@ -735,4 +808,5 @@
     refreshVoices:loadLocalVoices,
     selectedDeviceVoice:selectedDeviceVoice
   };
+  window.ControlEventV22Voz3=window.ControlEventV22Voz4;
 })();

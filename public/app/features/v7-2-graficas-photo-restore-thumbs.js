@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod FIX5 · GRAFICAS: un único panel estable, sin restauraciones ni retemblores. */
+/* ControlEvent v26_prod_1.0 FIX5 · GRAFICAS: un único panel estable, sin restauraciones ni retemblores. */
 (function(root){
   'use strict';
   const FLAG='__ceV25StableGraphTipFix5';

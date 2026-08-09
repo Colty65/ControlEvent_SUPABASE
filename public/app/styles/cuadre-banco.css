@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod FIX4 · Cuadre Banco / interfaz orbital operativa */
+/* ControlEvent v26_prod_1.0 FIX4 · Cuadre Banco / interfaz orbital operativa */
 :root{--ce-bank-ink:#07111f;--ce-bank-night:#081527;--ce-bank-cyan:#34d7c3;--ce-bank-blue:#5d8cff;--ce-bank-gold:#f7c75f;--ce-bank-red:#ff6b7a;--ce-bank-green:#54e1a3;--ce-bank-paper:#f4f8fc}
 body.ce-bank-open{overscroll-behavior:none}
 .ce-bank-overlay{position:fixed;inset:0;z-index:2147480000!important;background:radial-gradient(circle at 15% 20%,rgba(55,189,181,.18),transparent 34%),radial-gradient(circle at 88% 82%,rgba(91,108,255,.20),transparent 36%),rgba(2,8,20,.82);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(14px) saturate(1.15);opacity:0;transition:opacity .18s ease}.ce-bank-overlay.visible{opacity:1}.ce-bank-overlay.hidden,.ce-bank-ticket-overlay.hidden{display:none!important}
@@ -30,7 +30,7 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
 @media(max-width:520px){.ce-bank-header p{display:none}.ce-bank-title-block{flex:1}.ce-bank-command-fields{grid-template-columns:1fr}.ce-bank-search{grid-column:auto}.ce-bank-summary{grid-template-columns:1fr}.ce-bank-kpi-bank{display:none}.ce-bank-kpi-hero{min-height:82px}.ce-bank-movement-main{grid-template-columns:83px 1fr 106px}.ce-bank-date small{display:none}.ce-bank-description strong{font-size:11px}.ce-bank-description small{font-size:8px}.ce-bank-include b{font-size:8px}.ce-bank-justify-head>div:first-child>div{display:block}.ce-bank-status{display:inline-block;margin-top:3px}.ce-bank-justify-numbers{display:block;text-align:right}.ce-bank-ticket-choice>span{display:block}.ce-bank-ticket-choice>span b,.ce-bank-ticket-choice>span strong,.ce-bank-ticket-choice>span small{display:block}.ce-bank-ticket-choice>span b{font-size:11px}.ce-bank-ticket-choice>span strong{font-size:10px}.ce-bank-ticket-choice>span small{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.ce-bank-overlay,.ce-bank-window,.ce-bank-brand-orbit:before,.ce-bank-brand-orbit:after,.ce-bank-eyebrow>b i,.ce-bank-signal i,.ce-bank-loader{animation:none!important;transition:none!important}}
 
-/* v26_prod-03 · alcance por evento, semáforo, solo lectura y cuadre forzado */
+/* v26_prod_1.0-03 · alcance por evento, semáforo, solo lectura y cuadre forzado */
 .ce-bank-title-block{flex:1;min-width:260px}.ce-bank-event-headline{display:flex;align-items:center;gap:10px;min-width:0;margin-top:1px}.ce-bank-event-headline strong{display:block;max-width:620px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:25px;line-height:1.05;font-weight:950;letter-spacing:-.025em}.ce-bank-event-headline span{flex:0 0 auto;padding:4px 9px;border-radius:999px;font-size:8px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}.ce-bank-event-headline.in-progress strong{color:#66ebb2}.ce-bank-event-headline.in-progress span{background:rgba(45,205,135,.18);border:1px solid rgba(102,235,178,.35);color:#85f2c4}.ce-bank-event-headline.finalized strong{color:#ff7886}.ce-bank-event-headline.finalized span{background:rgba(255,107,122,.16);border:1px solid rgba(255,120,134,.38);color:#ff9aa5}.ce-bank-title-block>p#ceBankEventPeriod{margin-top:4px;max-width:760px;color:#a9bfd0;font-size:9px}
 .ce-bank-traffic{position:relative;z-index:2;display:flex;align-items:center;gap:10px;min-width:210px;padding:10px 12px;border-radius:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.055);box-shadow:0 8px 28px rgba(0,0,0,.15)}.ce-bank-traffic-light{display:grid;grid-template-columns:repeat(3,12px);gap:5px;padding:6px;border-radius:999px;background:#030a12;box-shadow:0 0 0 1px rgba(255,255,255,.12) inset}.ce-bank-traffic-light i{width:12px;height:12px;border-radius:50%;background:#273442;box-shadow:0 0 0 1px rgba(255,255,255,.05) inset}.ce-bank-traffic.green .ce-bank-traffic-light i:nth-child(3){background:#42e194;box-shadow:0 0 13px #42e194}.ce-bank-traffic.orange .ce-bank-traffic-light i:nth-child(2){background:#f7b44c;box-shadow:0 0 13px #f7b44c}.ce-bank-traffic.red .ce-bank-traffic-light i:nth-child(1){background:#ff6373;box-shadow:0 0 13px #ff6373}.ce-bank-traffic div{display:flex;flex-direction:column;min-width:0}.ce-bank-traffic b{color:#fff;font-size:12px}.ce-bank-traffic small{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9db5c7;font-size:8px;font-weight:800}
 .ce-bank-readonly{display:flex;align-items:center;justify-content:center;gap:12px;padding:7px 16px;background:#fff1f2;border-bottom:1px solid #fecdd3;color:#9f1239}.ce-bank-readonly.hidden{display:none!important}.ce-bank-readonly b{font-size:9px;letter-spacing:.12em}.ce-bank-readonly span{font-size:10px;font-weight:750}
@@ -46,7 +46,7 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
 .ce-bank-version{position:relative;z-index:2;align-self:flex-start;margin-top:2px;padding:4px 7px;border-radius:8px;background:rgba(255,255,255,.08);color:#9db5c7;font-size:7px;font-weight:900;letter-spacing:.06em;white-space:nowrap}
 @media(max-width:850px){.ce-bank-version{display:none}}
 
-/* v26_prod-04 · periodo bancario editable, cargos/abonos y saldo propio del evento */
+/* v26_prod_1.0-04 · periodo bancario editable, cargos/abonos y saldo propio del evento */
 .ce-bank-command-fields{grid-template-columns:minmax(170px,.85fr) minmax(190px,1fr) minmax(190px,.95fr) minmax(250px,1.35fr)}
 .ce-bank-period-deck{position:relative;z-index:2;display:grid;grid-template-columns:minmax(330px,1fr) 175px 175px 150px;align-items:end;gap:10px;padding:9px 18px 10px;border-bottom:1px solid #d7e2ed;background:linear-gradient(90deg,#eef9f7,#f4f7ff 68%,#fff9ec)}
 .ce-bank-period-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.ce-bank-period-copy>span{color:#168676;font-size:8px;font-weight:950;letter-spacing:.15em}.ce-bank-period-copy>b{color:#203d52;font-size:11px}.ce-bank-period-copy>small{color:#71889a;font-size:8px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -60,13 +60,13 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
 
 .ce-bank-movement.excluded{opacity:.74}
 
-/* v26_prod · interfaz fluida para periodos bancarios largos */
+/* v26_prod_1.0 · interfaz fluida para periodos bancarios largos */
 #ceBankOverlay .ce-bank-file-native{pointer-events:none!important}
 .ce-bank-resultbar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;margin:0 18px 7px;padding:4px 8px 4px 14px;border:1px solid #d6e2ec;border-radius:12px;background:rgba(255,255,255,.82);box-shadow:0 5px 14px rgba(28,62,88,.05);color:#5e7588;font-size:9px;font-weight:850}.ce-bank-resultbar>div{display:flex;align-items:center;gap:7px}.ce-bank-resultbar button{width:30px;height:26px;display:grid;place-items:center;border:1px solid #c8d7e3;border-radius:8px;background:#f4f8fb;color:#24465e;font-size:20px;line-height:1;box-shadow:none}.ce-bank-resultbar button:hover:not(:disabled){background:#e6f2f8;border-color:#8eb6c9}.ce-bank-resultbar button:disabled{cursor:not-allowed!important;opacity:.36}.ce-bank-resultbar b{min-width:92px;text-align:center;color:#2d4a60;font-size:9px}
 .ce-bank-import-btn.busy{cursor:progress!important;filter:saturate(.72)}.ce-bank-import-btn.busy>span{font-size:0}.ce-bank-import-btn.busy>span:after{content:"";width:17px;height:17px;border:2px solid rgba(7,32,24,.2);border-top-color:#0b594c;border-radius:50%;animation:ceBankSpin .75s linear infinite}.ce-bank-overlay.ce-bank-loading-data .ce-bank-refresh-btn>span{animation:ceBankSpin .9s linear infinite}.ce-bank-overlay.ce-bank-loading-data .ce-bank-resultbar:after{content:"Actualizando datos…";margin-left:auto;color:#178575;font-size:8px;font-weight:900;letter-spacing:.06em}
 @media(max-width:850px){.ce-bank-resultbar{margin:0 8px 6px;min-height:31px;padding:3px 5px 3px 9px}.ce-bank-resultbar>span{max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ce-bank-resultbar b{min-width:74px;font-size:8px}.ce-bank-resultbar button{width:27px;height:24px}.ce-bank-overlay.ce-bank-loading-data .ce-bank-resultbar:after{display:none}}
 
-/* v26_prod · máxima densidad visual en Cuadre Banco (escritorio) */
+/* v26_prod_1.0 · máxima densidad visual en Cuadre Banco (escritorio) */
 @media (min-width:851px){
   .ce-bank-overlay{padding:7px}
   .ce-bank-window{width:min(1600px,99vw);height:min(980px,98.5vh);border-radius:24px}
@@ -115,7 +115,7 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
 }
 
 
-/* v26_prod FIX2 · operativa desbloqueada, fichas izquierda/derecha y móvil práctico */
+/* v26_prod_1.0 FIX2 · operativa desbloqueada, fichas izquierda/derecha y móvil práctico */
 #ceBankOverlay .ce-bank-command-deck{z-index:40!important;isolation:isolate!important;pointer-events:auto!important}
 #ceBankOverlay .ce-bank-command-deck:before,#ceBankOverlay .ce-bank-command-deck:after{pointer-events:none!important}
 #ceBankOverlay .ce-bank-command-primary,#ceBankOverlay .ce-bank-command-fields,#ceBankOverlay .ce-bank-command-fields label,#ceBankOverlay .ce-bank-command-fields select,#ceBankOverlay .ce-bank-command-fields input{pointer-events:auto!important;position:relative!important;z-index:42!important}
@@ -187,7 +187,7 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
   .ce-bank-justify-head strong{font-size:10px!important}.ce-bank-status,.ce-bank-ticket-chip,.ce-bank-positive-note{font-size:8px!important}
 }
 
-/* v26_prod FIX3 · controles nativos, columnas sin solapes y vínculos de otros eventos */
+/* v26_prod_1.0 FIX3 · controles nativos, columnas sin solapes y vínculos de otros eventos */
 #ceBankOverlay .ce-bank-command-deck,
 #ceBankOverlay .ce-bank-command-primary,
 #ceBankOverlay .ce-bank-command-fields,
@@ -317,7 +317,7 @@ body.ce-bank-open #ceMapaFloatingHomeButton,body.ce-bank-open .mapa-floating-hom
 }
 
 
-/* v26_prod FIX4 · el Cuadre Banco es el único plano interactivo mientras está abierto.
+/* v26_prod_1.0 FIX4 · el Cuadre Banco es el único plano interactivo mientras está abierto.
    Evita que mantos, tooltips o botones flotantes heredados capturen los clics de CSV,
    desplegables y búsqueda. */
 body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
@@ -334,7 +334,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay #ceBankImport{position:relative!important;overflow:hidden!important;cursor:pointer!important}
 
 
-/* v26_prod FIX5 · cierre definitivo de Cuadre Banco: lectura, controles y legibilidad. */
+/* v26_prod_1.0 FIX5 · cierre definitivo de Cuadre Banco: lectura, controles y legibilidad. */
 #ceBankOverlay .ce-bank-command-fields label>span,
 #ceBankOverlay .ce-bank-period-deck label>span{font-size:10px!important;line-height:1.2!important;letter-spacing:.08em!important}
 #ceBankOverlay .ce-bank-command-fields select,
@@ -411,7 +411,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay.ce-bank-readonly-mode .ce-bank-ticket-list{flex-wrap:wrap!important;overflow:visible!important}
 }
 
-/* v26_prod FIX5.1 · legibilidad final solicitada */
+/* v26_prod_1.0 FIX5.1 · legibilidad final solicitada */
 #ceBankOverlay .ce-bank-command-fields label>span,
 #ceBankOverlay .ce-bank-period-fields label>span{font-size:11px!important;line-height:1.15!important;letter-spacing:.045em!important}
 #ceBankOverlay #ceBankAccount,
@@ -441,7 +441,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-ticket-chip{font-size:11px!important}
 }
 
-/* v26_prod FIX6 · cabecera compacta, KPIs junto a fechas y área útil responsive. */
+/* v26_prod_1.0 FIX6 · cabecera compacta, KPIs junto a fechas y área útil responsive. */
 #ceBankOverlay .ce-bank-window{height:min(960px,97dvh)!important}
 #ceBankOverlay .ce-bank-header{
   min-height:86px!important;
@@ -623,7 +623,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 }
 
 
-/* v26_prod FIX7 · trazabilidad visual de ingresos y doble semáforo. */
+/* v26_prod_1.0 FIX7 · trazabilidad visual de ingresos y doble semáforo. */
 #ceBankOverlay .ce-bank-traffic-group{position:relative;z-index:3;display:flex;align-items:stretch;justify-content:flex-end;gap:7px;min-width:0}
 #ceBankOverlay .ce-bank-traffic-group .ce-bank-traffic{display:flex!important;min-width:184px!important;padding:8px 9px!important;gap:8px!important}
 #ceBankOverlay .ce-bank-income-traffic .ce-bank-traffic-light{border-color:rgba(93,140,255,.28)!important}
@@ -664,7 +664,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-income-chip>img{width:38px;height:30px}
 }
 
-/* v26_prod FIX8 · compras e ingresos con la misma composición y asociación editable. */
+/* v26_prod_1.0 FIX8 · compras e ingresos con la misma composición y asociación editable. */
 #ceBankOverlay .ce-bank-justification{
   display:grid!important;
   grid-template-columns:minmax(255px,.72fr) minmax(430px,1.28fr)!important;
@@ -724,7 +724,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-income-modal-footer button{flex:1 1 150px!important}
 }
 
-/* v26_prod FIX8 final · misma retícula para la trazabilidad de COMPRA e INGRESO. */
+/* v26_prod_1.0 FIX8 final · misma retícula para la trazabilidad de COMPRA e INGRESO. */
 #ceBankOverlay .ce-bank-justify-right{
   display:grid!important;
   grid-template-columns:minmax(0,1fr)!important;
@@ -762,7 +762,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 }
 
 
-/* v26_prod FIX9 · efectivo visible y asociaciones de compra completas/modificables. */
+/* v26_prod_1.0 FIX9 · efectivo visible y asociaciones de compra completas/modificables. */
 #ceBankOverlay .ce-bank-kpi-flow .ce-bank-flow-row{grid-template-columns:76px minmax(34px,1fr) auto!important;gap:5px!important}
 #ceBankOverlay .ce-bank-flow-row.cash>i u{background:linear-gradient(90deg,#a8d94b,#d4ea78)!important}
 #ceBankOverlay .ce-bank-flow-row.cash>strong{color:#54771c!important}
@@ -803,7 +803,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 }
 
 
-/* v26_prod FIX9.1 · gráfica temporal del saldo y acceso de consulta RO en Finalizado. */
+/* v26_prod_1.0 FIX9.1 · gráfica temporal del saldo y acceso de consulta RO en Finalizado. */
 #ceBankOverlay .ce-bank-kpi-chart-trigger{position:relative!important;cursor:pointer!important;outline:none!important;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease!important}
 #ceBankOverlay .ce-bank-kpi-chart-trigger:hover,#ceBankOverlay .ce-bank-kpi-chart-trigger:focus-visible{transform:translateY(-2px)!important;border-color:rgba(23,58,99,.42)!important;box-shadow:0 12px 24px rgba(18,49,79,.14)!important}
 #ceBankOverlay .ce-bank-chart-hint{position:absolute;right:8px;bottom:4px;color:#173a63;font-size:7px;font-style:normal;font-weight:950;letter-spacing:.04em;text-transform:uppercase;opacity:.78}
@@ -878,7 +878,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-balance-point-tip{position:fixed;left:50%!important;top:auto!important;bottom:18px;width:min(300px,calc(100vw - 24px))}
 }
 
-/* v26_prod FIX9.1.2 · Evolución temporal: histórico + zoom del evento */
+/* v26_prod_1.0 FIX9.1.2 · Evolución temporal: histórico + zoom del evento */
 #ceBankOverlay .ce-bank-balance-chart-card.refined{
   width:min(1500px,97vw);
   height:min(860px,94dvh);
@@ -1160,7 +1160,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-photo-card-gallery .ce-bank-photo-gallery{flex:1 1 auto}
 #ceBankOverlay .ce-bank-photo-card-gallery .ce-bank-photo-gallery.count-1 .ce-bank-photo-figure{min-height:min(72vh,680px)}
 
-/* v26_prod FIX9.1.3 · Zoom superior, histórico inferior e inspector fijo en cabecera */
+/* v26_prod_1.0 FIX9.1.3 · Zoom superior, histórico inferior e inspector fijo en cabecera */
 #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout{
   width:min(1540px,97vw);
   height:min(900px,96dvh);
@@ -1416,7 +1416,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   }
 }
 
-/* v26_prod FIX9.1.4 · gráficos a todo el ancho, histórico superior y cursor exacto */
+/* v26_prod_1.0 FIX9.1.4 · gráficos a todo el ancho, histórico superior y cursor exacto */
 #ceBankOverlay .ce-bank-balance-chart-overlay{
   padding:8px!important;
 }
@@ -1637,7 +1637,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 }
 
 
-/* v26_prod FIX9.3.9 · el botón TKxx queda por encima de cualquier capa heredada.
+/* v26_prod_1.0 FIX9.3.9 · el botón TKxx queda por encima de cualquier capa heredada.
    La acción se limita a abrir el selector; «En saldo» solo responde a su propio conmutador. */
 #ceBankOverlay .ce-bank-movement-main{position:relative!important;z-index:1!important}
 #ceBankOverlay .ce-bank-justification{position:relative!important;z-index:4!important}
@@ -1646,7 +1646,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-add-ticket[data-ce-bank-add-ticket]{position:relative!important;z-index:12!important;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important}
 #ceBankOverlay .ce-bank-add-ticket[data-ce-bank-add-ticket]>*{pointer-events:none!important}
 
-/* v26_prod FIX9.3.12 · visor contable universal dentro de Cuadre Banco. */
+/* v26_prod_1.0 FIX9.3.12 · visor contable universal dentro de Cuadre Banco. */
 #ceBankOverlay .ce-bank-photo-card-accounting{
   width:min(1540px,98vw)!important;
   height:min(900px,95dvh)!important;

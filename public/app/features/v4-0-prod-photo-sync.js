@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod - sincronizacion y visor de fotos de INGRESOS/TICKETS.
+/* ControlEvent v26_prod_1.0 - sincronizacion y visor de fotos de INGRESOS/TICKETS.
    Parche acotado sobre v4.0_prod:
    - No toca login.
    - No toca INFOEVENTO/BACKUP salvo textos de version globales.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v26_prod';
-  const VERSION_FILE = 'ControlEvent_v26_prod';
+  const VERSION = 'ControlEvent v26_prod_1.0';
+  const VERSION_FILE = 'ControlEvent_v26_prod_1.0';
   const INSTALLED = '__ceV40ProdPhotoSync';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -353,7 +353,7 @@
       const payload = await res.json().catch(() => ({}));
       const images = payload && payload.images ? payload.images : {};
       Object.entries(images).forEach(([rawKey, value]) => { if(addImageVariants(rawKey, value)) changed = true; });
-    }catch(error){ console.warn('[ControlEvent v26_prod] No se pudieron hidratar fotos.', error); }
+    }catch(error){ console.warn('[ControlEvent v26_prod_1.0] No se pudieron hidratar fotos.', error); }
     finally{ hydrateBusy = false; }
     return changed;
   }

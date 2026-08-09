@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod FIX9.3.1 · PERSONAS históricas corregidas por EVENTO. */
+/* ControlEvent v26_prod_1.0 FIX9.3.1 · PERSONAS históricas corregidas por EVENTO. */
 (function(root){
   'use strict';
   if(root.__ceV25Fix93HistoricalPeople) return;
