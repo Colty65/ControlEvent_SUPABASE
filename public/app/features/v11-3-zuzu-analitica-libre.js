@@ -430,10 +430,10 @@
     if(type==='line') return labels.length<2 ? singleMetricChartHtml(ch, labels, values) : lineChartHtml(ch, labels, values);
     if(type==='stackedbar' || (Array.isArray(ch.series) && ch.series.length)) return stackedChartHtml(ch);
     if(type==='bar' || type==='verticalbar') return verticalChartHtml(ch, labels, values);
-    var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.8, Math.min(100, raw)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
+    var rows=labels.map(function(l,i){ var v=Number(values[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.8, Math.min(100, raw)); return '<div class="ce-ai-bar-row"><div class="ce-ai-bar-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-bar-track"><div class="ce-ai-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(i)+'"></div></div><div class="ce-ai-bar-value">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div></div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-bars">'+rows+'</div></div>';
   }
-  function formatNumber(v){ return Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+  function formatNumber(v,unit){ var n=Number(v||0),isMoney=/^(?:€|EUR)$/i.test(String(unit||'').trim()); if(isMoney){var neg=n<0?'-':'',p=Math.abs(n).toFixed(2).split('.');return neg+p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+p[1];} return n.toLocaleString('es-ES',{maximumFractionDigits:2}); }
   function formatCost(v){ return Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:5, maximumFractionDigits:6}); }
   function chartColor(i){ return ['#38bdf8','#fb923c','#22c55e','#e11d48','#8b5cf6','#14b8a6','#facc15','#64748b'][i%8]; }
   function chartItemColor(ch,i){
@@ -472,13 +472,13 @@
   }
   function singleMetricChartHtml(ch, labels, values){
     var l=labels[0]||''; var v=Number(values[0]||0);
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Dato')+'</h3><div style="border:1px solid #dbeafe;border-radius:16px;background:linear-gradient(180deg,#ffffff,#f8fafc);padding:18px;text-align:center"><div style="font-weight:850;color:#475569;margin-bottom:8px">'+esc(l)+'</div><div style="font-size:34px;font-weight:950;color:#075985">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div></div></div>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Dato')+'</h3><div style="border:1px solid #dbeafe;border-radius:16px;background:linear-gradient(180deg,#ffffff,#f8fafc);padding:18px;text-align:center"><div style="font-weight:850;color:#475569;margin-bottom:8px">'+esc(l)+'</div><div style="font-size:34px;font-weight:950;color:#075985">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div></div></div>';
   }
 
   function pieChartHtml(ch, labels, values, donut){
     var total=values.reduce(function(a,b){return a+Number(b||0);},0)||1; var acc=0;
     var stops=values.map(function(v,i){ var start=acc; acc += (Number(v||0)/total)*100; return chartItemColor(ch,i)+' '+start.toFixed(2)+'% '+acc.toFixed(2)+'%'; }).join(',');
-    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i]))+' '+esc(ch.unit||'')+'</div>'; }).join('');
+    var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i],ch.unit))+' '+esc(ch.unit||'')+'</div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
   function lineChartHtml(ch, labels, values){
@@ -495,7 +495,7 @@
     for(var g=0;g<=4;g++){
       var val=max-(max-min)*g/4,y=top+plotH*g/4;
       grid+='<line x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(w-right)+'" y2="'+y.toFixed(1)+'" stroke="#e2e8f0" stroke-width="1"/>';
-      grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val))+'</text>';
+      grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val,ch.unit))+'</text>';
     }
     var xLabels=labels.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
     var paths='',dots='',legend='';
@@ -504,7 +504,7 @@
       var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
       var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
       paths+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>';
-      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v))+'</text>';}).join('');
+      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v,ch.unit))+'</text>';}).join('');
       legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-weight:850"><i style="display:inline-block;width:22px;height:4px;border-radius:4px;background:'+color+'"></i>'+esc(sr.name||('Serie '+(si+1)))+'</span>';
     });
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
@@ -513,13 +513,13 @@
     var labels=(ch.labels||[]).map(String); var series=(ch.series||[]);
     if(!series.length) return chartHtml({title:ch.title,type:'horizontalBar',labels:labels,values:(ch.values||[]),unit:ch.unit});
     var totals=labels.map(function(_,i){return series.reduce(function(a,s){return a+(Number((s.values||[])[i])||0);},0);}); var max=Math.max.apply(null, totals.concat([1]));
-    var rows=labels.map(function(l,i){ var valuesLine=[]; var parts=series.map(function(s,si){ var v=Number((s.values||[])[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.0, raw); var show=v && pct>=9.5; if(v){ valuesLine.push('<span><b>'+esc(s.name||('Serie '+(si+1)))+':</b> '+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</span>'); } return '<div class="ce-ai-stack-part" title="'+esc((s.name||'Serie')+': '+formatNumber(v)+' '+(ch.unit||''))+'" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(si)+'">'+(show?esc(formatNumber(v)):'')+'</div>'; }).join(''); return '<div class="ce-ai-stack-row"><div class="ce-ai-stack-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-stack-body"><div class="ce-ai-stack-track">'+parts+'</div><div class="ce-ai-stack-values">'+valuesLine.join('')+'</div></div></div>'; }).join('');
+    var rows=labels.map(function(l,i){ var valuesLine=[]; var parts=series.map(function(s,si){ var v=Number((s.values||[])[i]||0); var raw=(v/max)*100; var pct=Math.max(v?4.5:2.0, raw); var show=v && pct>=9.5; if(v){ valuesLine.push('<span><b>'+esc(s.name||('Serie '+(si+1)))+':</b> '+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</span>'); } return '<div class="ce-ai-stack-part" title="'+esc((s.name||'Serie')+': '+formatNumber(v,ch.unit)+' '+(ch.unit||''))+'" style="width:'+pct.toFixed(1)+'%;background:'+chartColor(si)+'">'+(show?esc(formatNumber(v,ch.unit)):'')+'</div>'; }).join(''); return '<div class="ce-ai-stack-row"><div class="ce-ai-stack-label" title="'+esc(l)+'">'+esc(l)+'</div><div class="ce-ai-stack-body"><div class="ce-ai-stack-track">'+parts+'</div><div class="ce-ai-stack-values">'+valuesLine.join('')+'</div></div></div>'; }).join('');
     var leg=series.map(function(s,i){return '<span><i style="background:'+chartColor(i)+'"></i>'+esc(s.name||('Serie '+(i+1)))+'</span>';}).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-stacked-wrap">'+rows+'</div><div class="ce-ai-stack-legend">'+leg+'</div></div>';
   }
   function verticalChartHtml(ch, labels, values){
     var max=Math.max.apply(null, values.concat([1]));
-    var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(v?7:4.5, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
+    var bars=labels.map(function(l,i){ var v=Number(values[i]||0); var h=Math.max(v?7:4.5, Math.min(100,(v/max)*100)); return '<div class="ce-ai-vbar"><div class="ce-ai-vbar-value">'+esc(formatNumber(v,ch.unit))+' '+esc(ch.unit||'')+'</div><div class="ce-ai-vbar-col" style="height:'+h.toFixed(1)+'%;background:'+chartColor(i)+'"></div><div class="ce-ai-vbar-label" title="'+esc(l)+'">'+esc(l)+'</div></div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
   }
   function tableHtml(tb){

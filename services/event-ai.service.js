@@ -5854,18 +5854,94 @@ async function v26ExecuteTools(tools,state,selectedEventId,flowTrace=[]){
 function v26CompactToolPayload(results){
   return arr(results).map(r=>({id:r.id,name:r.name,ok:r.ok,title:r.title,error:r.error||'',facts:r.facts||{},tables:arr(r.tables).map(t=>({key:t.key,title:t.title,schema:t.schema||{},rows:arr(t.rows).slice(0,120)}))}));
 }
+function v26ParseLocalizedDisplayNumber(value){
+  const raw=trim(value).replace(/\u00a0/g,' ').replace(/\s+/g,'');
+  if(!raw)return NaN;
+  let sign=1,s=raw;
+  if(s.startsWith('-')){sign=-1;s=s.slice(1);}else if(s.startsWith('+'))s=s.slice(1);
+  s=s.replace(/(?:€|euros?)$/i,'');
+  const comma=s.lastIndexOf(','),dot=s.lastIndexOf('.');
+  let dec='';
+  if(comma>=0&&dot>=0) dec=comma>dot?',':'.';
+  else if(comma>=0){const digits=s.length-comma-1;dec=(digits>0&&digits<=2)?',':'';}
+  else if(dot>=0){const digits=s.length-dot-1;dec=(digits>0&&digits<=2)?'.':'';}
+  let normalized;
+  if(dec){const i=s.lastIndexOf(dec);normalized=s.slice(0,i).replace(/[.,]/g,'')+'.'+s.slice(i+1).replace(/[.,]/g,'');}
+  else normalized=s.replace(/[.,]/g,'');
+  const n=Number(normalized);return Number.isFinite(n)?sign*n:NaN;
+}
+function v26FormatEuro(value){
+  const n=typeof value==='number'?value:v26ParseLocalizedDisplayNumber(value);
+  if(!Number.isFinite(n))return trim(value);
+  const negative=n<0?'-':'';const fixed=Math.abs(n).toFixed(2);const parts=fixed.split('.');const entero=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  return `${negative}${entero},${parts[1]} €`;
+}
+function v26FormatPercent(value){
+  const n=typeof value==='number'?value:v26ParseLocalizedDisplayNumber(value);
+  if(!Number.isFinite(n))return trim(value);
+  return new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' %';
+}
+function v26FormatPlainNumber(value,maxDigits=3){
+  const n=typeof value==='number'?value:v26ParseLocalizedDisplayNumber(value);
+  if(!Number.isFinite(n))return trim(value);
+  return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:maxDigits}).format(n);
+}
+function v26MoneyIndicator(label){return /precio|ingres|compra|donaci|saldo|valoraci|importe|coste|aportaci/i.test(trim(label));}
+function v26EffectiveCellMeta(table,column,row){
+  const direct=v26TableFieldMeta(table,column);if(direct&&direct.kind!=='text')return direct;
+  const key=trim(table?.key);
+  if(key==='kpis'&&column==='Valor'){
+    const indicator=trim(row?.Indicador);if(v26MoneyIndicator(indicator))return v26MoneySchema(indicator);
+    if(/asistent|participante|persona/i.test(indicator))return v26CountSchema('personas',indicator);
+    if(/fecha/i.test(indicator))return v26DateSchema(indicator);
+    return direct||v26TextSchema(indicator);
+  }
+  if(key==='differences'&&column!=='Indicador'){
+    const indicator=trim(row?.Indicador);
+    if(column==='Variación %')return v26SchemaField('percent','%',indicator);
+    if(/asistent/i.test(indicator))return v26CountSchema('personas',indicator);
+    return v26MoneySchema(indicator||column);
+  }
+  return direct||null;
+}
+function v26FormatPresentationCell(value,meta){
+  if(!meta)return text(value);
+  if(meta.kind==='money')return v26FormatEuro(value);
+  if(meta.kind==='percent')return v26FormatPercent(value);
+  if(meta.kind==='count')return v26FormatPlainNumber(value,3)+(trim(meta.unit)&&trim(meta.unit)!=='registros'?' '+trim(meta.unit):'');
+  if(meta.kind==='quantity'||meta.kind==='number')return v26FormatPlainNumber(value,3)+(trim(meta.unit)?' '+trim(meta.unit):'');
+  return text(value);
+}
+function v26MoneyContext(textValue,start,end){
+  const t=text(textValue),before=t.slice(Math.max(0,start-64),start),after=t.slice(end,Math.min(t.length,end+64));
+  return /(€|euros?|importe|ingres|gasto|compra|donaci|saldo|valoraci|precio|aportaci|coste|costoso|proveedor)/i.test(before+' '+after);
+}
+function v26FormatNarrativeMoney(answer,results){
+  const known=v26KnownMoneyValues(results);const src=text(answer);if(!src)return'';
+  const re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)(?:\s*(?:€|euros?))?/gi;
+  let out='',last=0,m;
+  while((m=re.exec(src))){out+=src.slice(last,m.index);const token=m[0],n=v26ParseLocalizedDisplayNumber(token);const explicit=/(€|euros?)/i.test(token);const knownMatch=Number.isFinite(n)&&known.some(v=>Math.abs(v-round(n,2))<0.011);const monetary=explicit||(knownMatch&&v26MoneyContext(src,m.index,re.lastIndex));
+    out+=monetary&&Number.isFinite(n)?v26FormatEuro(n):token;last=re.lastIndex;
+  }
+  out+=src.slice(last);
+  return trim(out.replace(/\s+([,.;:!?])/g,'$1').replace(/([.!?])(?=[A-ZÁÉÍÓÚÑ])/g,'$1 '));
+}
 function v26KnownMoneyValues(results){
-  const vals=[]; const moneyKey=/amount|importe|income|purchase|donation|saldo|balance|valuation|valor|price|precio|total/i;
+  const vals=[];
+  const moneyKey=/amount|importe|income|purchase|donation|saldo|balance|valuation|valor|price|precio|total/i;
+  const nonMoneyKey=/people|person|count|units|unit|event_count|lines|records|attendee|members_attending|nonmembers|asistentes|participantes/i;
   function push(v){const n=Number(v);if(Number.isFinite(n))vals.push(round(n,2));}
   for(const r of arr(results)){
-    for(const [k,v] of Object.entries(r?.facts||{})) if(moneyKey.test(k)&&typeof v==='number')push(v);
-    for(const t of arr(r?.tables)) for(const row of arr(t?.rows)) for(const [k,v] of Object.entries(row||{})) if(moneyKey.test(k)&&typeof v==='number')push(v);
+    for(const [k,v] of Object.entries(r?.facts||{})) if(moneyKey.test(k)&&!nonMoneyKey.test(k)&&typeof v==='number')push(v);
+    for(const t of arr(r?.tables)) for(const row of arr(t?.rows)) for(const [k,v] of Object.entries(row||{})){
+      const meta=v26EffectiveCellMeta(t,k,row);if(meta?.kind==='money'&&typeof v==='number')push(v);
+    }
   }
-  return vals;
+  return [...new Set(vals)];
 }
 function v26UnsupportedMoney(answer,results){
-  const known=v26KnownMoneyValues(results); if(!known.length)return[]; const out=[]; const txt=text(answer); const re=/-?\d+(?:[.,]\d+)?/g; let m;
-  while((m=re.exec(txt))){const around=txt.slice(Math.max(0,m.index-42),Math.min(txt.length,re.lastIndex+42));if(!/(€|euros?|importe|ingres|gasto|compra|donaci|saldo|valoraci|precio|aportaci)/i.test(around))continue;const n=round(Number(m[0].replace(',','.')),2);if(!Number.isFinite(n))continue;if(!known.some(v=>Math.abs(v-n)<0.011))out.push(n);}
+  const known=v26KnownMoneyValues(results); if(!known.length)return[]; const out=[]; const txt=text(answer); const re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)(?:\s*(?:€|euros?))?/gi; let m;
+  while((m=re.exec(txt))){if(!v26MoneyContext(txt,m.index,re.lastIndex))continue;const n=round(v26ParseLocalizedDisplayNumber(m[0]),2);if(!Number.isFinite(n))continue;if(!known.some(v=>Math.abs(v-n)<0.011))out.push(n);}
   return [...new Set(out)];
 }
 function v26FinalPrompt(userPrompt,plan,results,repair=''){
@@ -5881,6 +5957,9 @@ REGLAS DE RESPUESTA:
 - Responde a lo que se preguntó, no a todo lo que sabes.
 - En preguntas abiertas («háblame de X», «dime cositas») haz una síntesis inteligente: qué destaca, cifras clave, anomalías y contexto. No digas «CE obtuvo N filas».
 - Si una cifra ya viene en facts (por ejemplo income_total), cópiala; no la vuelvas a sumar mentalmente.
+- FORMATO MONETARIO OBLIGATORIO EN EL TEXTO: usa siempre formato español con dos decimales y símbolo, por ejemplo 1.234,56 €. Nunca 1234.56, 1234.5, 1234€ ni importes sin €.
+- «Finalizado» describe el estado del evento; no lo conviertas automáticamente en «finalizado con éxito» salvo que exista un hecho que permita valorar el éxito.
+- Evita felicitaciones, entusiasmo gratuito o juicios como «¡es genial!». Sé cercano pero analítico.
 - Si hay un ajuste extraño (por ejemplo importe voluntario negativo), explícalo como dato a revisar, sin inventar su causa.
 - No afirmes «no hay datos» de un ámbito salvo que la herramienta correspondiente lo haya comprobado.
 - show_tables: elige solo tablas que ayuden. No muestres tablas redundantes ni columnas administrativas sin valor.
@@ -5916,7 +5995,9 @@ async function callGeminiV26Final(userPrompt,plan,results,flowTrace=[]){
 function v26BuildPresentation(final,results,userPrompt){
   const byId=new Map(arr(results).map(r=>[trim(r.id),r])); const tables=[],charts=[]; const seenT=new Set();
   for(const ref of arr(final?.showTables).slice(0,6)){
-    const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; const sig=`${r.id}:${t.key}`;if(seenT.has(sig))continue;seenT.add(sig);const {columns,rows}=rowsToTableRows(t.rows,160);if(columns.length)tables.push({title:t.title,columns,rows});
+    const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; const sig=`${r.id}:${t.key}`;if(seenT.has(sig))continue;seenT.add(sig);
+    const srcRows=arr(t.rows).slice(0,160);const columns=[];srcRows.forEach(row=>{if(row&&typeof row==='object'&&!Array.isArray(row))Object.keys(row).forEach(k=>{if(!columns.includes(k))columns.push(k);});});const cols=columns.slice(0,24);
+    const rows=srcRows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v26EffectiveCellMeta(t,c,row))));if(cols.length)tables.push({title:t.title,columns:cols,rows});
   }
   const wantsCharts=semanticPromptExplicitlyRequestsCharts(userPrompt);
   if(wantsCharts){
@@ -5931,7 +6012,7 @@ function v26BuildPresentation(final,results,userPrompt){
 }
 function v26SemanticAudit(final,results,userPrompt){
   const out={...final,showTables:arr(final?.showTables).slice(),chartSpecs:arr(final?.chartSpecs).slice(),warnings:arr(final?.warnings).slice()};const p=norm(userPrompt),comparison=/\b(compara|comparar|comparativa|comparativo|frente\s+a|versus|\bvs\b)\b/.test(p);const cmp=arr(results).find(r=>r.ok&&r.name==='compare_events');
-  if(comparison&&cmp){const names=arr(cmp?.facts?.event_names);const missing=names.filter(n=>!norm(out.answer).includes(norm(n)));if(missing.length){const dif=arr(cmp?.facts?.differences);const money=dif.filter(x=>x.Indicador!=='Asistentes canónicos').slice(0,4);const parts=money.map(x=>`${x.Indicador}: ${names[0]} ${x[names[0]]} €, ${names[1]} ${x[names[1]]} €; diferencia ${x.Diferencia>0?'+':''}${x.Diferencia} €${x['Variación %']===null?'':` (${x['Variación %']>0?'+':''}${x['Variación %']} %)`}`).join('. ');out.title=`Comparativa · ${names.join(' vs ')}`;out.answer=`He comparado los ${names.length} eventos con la misma base canónica de ControlEvent. ${parts}.`;}
+  if(comparison&&cmp){const names=arr(cmp?.facts?.event_names);const missing=names.filter(n=>!norm(out.answer).includes(norm(n)));if(missing.length){const dif=arr(cmp?.facts?.differences);const money=dif.filter(x=>x.Indicador!=='Asistentes canónicos').slice(0,4);const parts=money.map(x=>`${x.Indicador}: ${names[0]} ${v26FormatEuro(x[names[0]])}, ${names[1]} ${v26FormatEuro(x[names[1]])}; diferencia ${x.Diferencia>0?'+':''}${v26FormatEuro(x.Diferencia)}${x['Variación %']===null?'':` (${x['Variación %']>0?'+':''}${v26FormatPercent(x['Variación %'])})`}`).join('. ');out.title=`Comparativa · ${names.join(' vs ')}`;out.answer=`He comparado los ${names.length} eventos con la misma base canónica de ControlEvent. ${parts}.`;}
     if(!out.showTables.some(x=>trim(x.tool_id)===trim(cmp.id)&&trim(x.table_key)==='comparison'))out.showTables.unshift({tool_id:cmp.id,table_key:'comparison'});
     out.chartSpecs=out.chartSpecs.filter(x=>trim(x.tool_id)===trim(cmp.id));
   }
@@ -5940,9 +6021,9 @@ function v26SemanticAudit(final,results,userPrompt){
 }
 function v26FallbackFromTools(results,userPrompt){
   const ok=arr(results).filter(r=>r.ok); if(!ok.length)return{title:'Zuzu no ha podido recuperar datos',answer:'No he podido obtener hechos fiables de ControlEvent para responder a esta petición.',showTables:[],chartSpecs:[],warnings:arr(results).map(r=>r.error).filter(Boolean)};
-  const person=ok.find(r=>r.name==='person_dossier');if(person){const f=person.facts||{};const money=f.composite_expansion?`Los registros individuales enlazados suman ${f.income_direct_total} € y los registros bajo entidad compuesta/pareja suman ${f.income_composite_total} €.`:`Sus ingresos enlazados suman ${f.income_linked_total} €.`;return{title:`Información sobre ${f.person||'la persona'}`,answer:`${f.person} aparece en ${f.event_count} evento(s). ${money}`,showTables:[{tool_id:person.id,table_key:'participation'},{tool_id:person.id,table_key:'incomes'}],chartSpecs:[],warnings:[]};}
-  const store=ok.find(r=>r.name==='store_purchases');if(store){const f=store.facts||{};return{title:`Compras en ${f.store}`,answer:`Las compras ${f.status==='realized'?'realizadas ':''}en ${f.store} suman ${f.total_amount} € en ${f.event_count} evento(s).`,showTables:[{tool_id:store.id,table_key:'by_event'}],chartSpecs:[],warnings:[]};}
-  const event=ok.find(r=>r.name==='event_dossier');if(event){const f=event.facts||{};return{title:`Resumen de ${f.event}`,answer:`${f.event} registró ${f.income_total} € de ingresos, ${f.purchases_realized} € de compras realizadas y ${f.donations_value} € en donaciones valoradas. El saldo operativo es ${f.operating_balance} €.`,showTables:[{tool_id:event.id,table_key:'kpis'}],chartSpecs:[],warnings:[]};}
+  const person=ok.find(r=>r.name==='person_dossier');if(person){const f=person.facts||{};const money=f.composite_expansion?`Los registros individuales enlazados suman ${v26FormatEuro(f.income_direct_total)} y los registros bajo entidad compuesta/pareja suman ${v26FormatEuro(f.income_composite_total)}.`:`Sus ingresos enlazados suman ${v26FormatEuro(f.income_linked_total)}.`;return{title:`Información sobre ${f.person||'la persona'}`,answer:`${f.person} aparece en ${f.event_count} evento(s). ${money}`,showTables:[{tool_id:person.id,table_key:'participation'},{tool_id:person.id,table_key:'incomes'}],chartSpecs:[],warnings:[]};}
+  const store=ok.find(r=>r.name==='store_purchases');if(store){const f=store.facts||{};return{title:`Compras en ${f.store}`,answer:`Las compras ${f.status==='realized'?'realizadas ':''}en ${f.store} suman ${v26FormatEuro(f.total_amount)} en ${f.event_count} evento(s).`,showTables:[{tool_id:store.id,table_key:'by_event'}],chartSpecs:[],warnings:[]};}
+  const event=ok.find(r=>r.name==='event_dossier');if(event){const f=event.facts||{};return{title:`Resumen de ${f.event}`,answer:`${f.event} registró ${v26FormatEuro(f.income_total)} de ingresos, ${v26FormatEuro(f.purchases_realized)} de compras realizadas y ${v26FormatEuro(f.donations_value)} en donaciones valoradas. El saldo operativo es ${v26FormatEuro(f.operating_balance)}.`,showTables:[{tool_id:event.id,table_key:'kpis'}],chartSpecs:[],warnings:[]};}
   const part=ok.find(r=>r.name==='participation_events');if(part)return{title:part.title,answer:`He encontrado ${part.facts?.event_count||0} evento(s) para ${part.facts?.person||'la persona indicada'}.`,showTables:[{tool_id:part.id,table_key:'events'}],chartSpecs:[],warnings:[]};
   return{title:'Respuesta de Zuzu',answer:'He recuperado los datos solicitados de ControlEvent.',showTables:ok.slice(0,2).flatMap(r=>arr(r.tables).slice(0,1).map(t=>({tool_id:r.id,table_key:t.key}))),chartSpecs:[],warnings:[]};
 }
@@ -5953,6 +6034,7 @@ async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[]}){
   const results=await v26ExecuteTools(plan.tools,state,selectedEventId,flowTrace); const good=results.filter(r=>r.ok); if(!good.length){return{ok:true,rejected:true,title:'No puedo obtener datos fiables',answer:results.map(r=>r.error).filter(Boolean).join(' · ')||'Las herramientas de ControlEvent no han podido recuperar datos.',warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-data-error',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};}
   let final; try{final=await callGeminiV26Final(userPrompt,plan,results,flowTrace);}catch(error){final=v26FallbackFromTools(results,userPrompt);final.model='';final.warnings=arr(final.warnings).concat(friendlyZuzuErrorMessage(error));}
   final=v26SemanticAudit(final,results,userPrompt);
+  final={...final,answer:v26FormatNarrativeMoney(final.answer,results)};
   const presentation=v26BuildPresentation(final,results,userPrompt); const files=[];
   for(const t of presentation.tables.slice(0,4)){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v26_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
   const displayName=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||null}); const answer=`${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
@@ -9331,5 +9413,8 @@ export const __zuzuStructuralTesting = Object.freeze({
   v26FallbackFromTools,
   v26ResolvePersonFamily,
   v26ComparisonEventNamesFromPrompt,
-  v26SemanticAudit
+  v26SemanticAudit,
+  v26FormatNarrativeMoney,
+  v26FormatEuro,
+  v26BuildPresentation
 });

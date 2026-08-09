@@ -5,6 +5,7 @@
    - No usa Azure, OpenAI ni ningún servicio TTS de pago; no necesita claves ni variables nuevas.
    - Permite perfil femenino/masculino, elección de voz concreta, prueba, pausa y lectura por bloques.
    - Prepara importes, porcentajes, fechas, horas, tickets, temperaturas y unidades para una lectura humana.
+   - Los importes en formato español (1.234,56 €) se convierten a palabras antes de llegar al motor TTS.
    - No modifica la inteligencia, consultas, cálculos, tablas ni PDF de Zuzu. */
 (function(){
   'use strict';
@@ -284,13 +285,21 @@
     return String(n);
   }
   function parseLocalizedNumber(raw){
-    var s=String(raw||'').replace(/\s/g,'').trim();
+    var s=String(raw||'').replace(/\u00a0/g,' ').replace(/\s/g,'').trim();
     var negative=false;
     if(s.charAt(0)==='-'){ negative=true; s=s.slice(1); }
+    else if(s.charAt(0)==='+'){ s=s.slice(1); }
+    s=s.replace(/(?:€|euros?)$/i,'');
     var comma=s.lastIndexOf(','), dot=s.lastIndexOf('.'), decimal='';
-    if(comma>=0 && dot>=0) decimal=comma>dot?',':'.';
-    else if(comma>=0){ var cd=s.length-comma-1; decimal=(cd>0 && cd<=3)?',':''; }
-    else if(dot>=0){ var dd=s.length-dot-1; decimal=(dd>0 && dd<=2)?'.':''; }
+    if(comma>=0 && dot>=0){
+      decimal=comma>dot?',':'.';
+    }else if(comma>=0){
+      var cd=s.length-comma-1;
+      decimal=(cd>0 && cd<=2)?',':'';
+    }else if(dot>=0){
+      var dd=s.length-dot-1;
+      decimal=(dd>0 && dd<=2)?'.':'';
+    }
     var normalized;
     if(decimal){
       var idx=s.lastIndexOf(decimal);
@@ -351,7 +360,7 @@
       return integerWords(Number(d),false)+' de '+(months[Number(m)]||integerWords(Number(m),false))+' de '+integerWords(Number(y),false);
     });
     s=s.replace(/\b(\d{1,2}):(\d{2})\b/g,function(_,h,m){var hw=integerWords(Number(h),false).replace(/veintiuno$/,'veintiuna').replace(/ y uno$/,' y una').replace(/uno$/,'una'); return hw+' horas'+(Number(m)?' y '+integerWords(Number(m),false)+' minutos':'');});
-    s=s.replace(/(-?\d[\d.\s]*(?:,\d{1,2})?|-?\d+(?:\.\d{1,2})?)\s*€/g,function(_,n){return moneyWords(n);});
+    s=s.replace(/(-?(?:\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?))\s*(?:€|euros?)/gi,function(_,n){return moneyWords(n);});
     s=s.replace(/(-?\d[\d.\s]*(?:,\d{1,2})?|-?\d+(?:\.\d{1,2})?)\s*%/g,function(_,n){return percentWords(n);});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:°\s*C|º\s*C)\b/gi,function(_,n){return genericNumberWords(n)+' grados centígrados';});
     s=s.replace(/(-?\d+(?:[.,]\d+)?)\s*km\s*\/\s*h\b/gi,function(_,n){return genericNumberWords(n)+' kilómetros por hora';});
