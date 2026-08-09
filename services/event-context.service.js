@@ -340,7 +340,7 @@ function buildEventDetail(ev, state, helpers, ticketImages) {
   const ingresos = summarizeIngresos(evIngresos, ev, helpers, ticketImages);
   const compras = summarizeCompras(evCompras, ev, helpers, ticketImages);
   const documentos = summarizeDocs(state?.eventDocuments, ev, ticketImages);
-  const valoracion = round(ingresos.ingresosTotal + compras.totalDonacionesProducto - compras.totalComprasReales, 2);
+  const valoracion = round(compras.totalComprasReales + compras.totalComprasPendientes + compras.totalDonacionesProducto, 2);
   const avisos = [];
   if (compras.totalComprasPendientes > 0) avisos.push(`Hay compras pendientes por ${round(compras.totalComprasPendientes, 2)} €.`);
   if (compras.ticketsSinFoto > 0) avisos.push(`Hay ${compras.ticketsSinFoto} ticket(s) sin foto asociada.`);
@@ -364,7 +364,7 @@ function buildEventDetail(ev, state, helpers, ticketImages) {
       donacionesProducto: compras.totalDonacionesProducto,
       comprasPendientes: compras.totalComprasPendientes,
       valoracionEvento: valoracion,
-      formulaValoracion: 'valoracionEvento = ingresosTotal + donacionesProducto - comprasReales'
+      formulaValoracion: 'valoracionEvento = comprasReales + comprasPendientes + donacionesProducto'
     },
     ingresos,
     compras,
@@ -754,7 +754,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
     instruccionesCalculo: {
       ingresos: 'Para socios, obligatorio = numero * precioEntrada. Total ingreso = obligatorio + voluntario/no socio. No usar solo importe bruto.',
       compras: 'COMPRA_REAL son tickets TKxx u otros gastos no pendientes ni donados. PTE_COMPRA son previsiones. DONADO TIENDA/SOCIO/OTROS son donaciones de producto valoradas.',
-      valoracion: 'valoracionEvento = ingresosTotal + donacionesProducto - comprasReales.',
+      valoracion: 'valoracionEvento = comprasReales + comprasPendientes + donacionesProducto.',
       tickets: 'Los tickets agrupan líneas de compra por TKxx, tienda y responsable; tieneFoto solo indica disponibilidad de imagen, no se envía la imagen.',
       personas: 'Todos los datos están humanizados: se exponen nombres de producto, tienda, responsable y donante, no claves internas.'
     },

@@ -356,7 +356,7 @@
     if(!usage || !(Number(usage.calls||0)>0)) return '';
     var tokens=formatNumber(usage.totalTokens||0);
     var cost=formatCost(usage.costEurApprox||0);
-    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' llamada(s) · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
+    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
@@ -365,7 +365,7 @@
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
     var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
     var usageLine='';
-    if(usage && usage.calls){ usageLine=' · '+usage.calls+' llamada(s) · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
+    if(usage && usage.calls){ usageLine=' · '+usage.calls+' '+(Number(usage.calls)===1?'llamada':'llamadas')+' · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
     var items=trace.map(function(x){
       var st=String(x.status||'INFO').toUpperCase();
       var extra='';

@@ -352,7 +352,7 @@
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
     var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
     var usageLine='';
-    if(usage && usage.calls){ usageLine=' · '+usage.calls+' llamada(s) · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
+    if(usage && usage.calls){ usageLine=' · '+usage.calls+' '+(Number(usage.calls)===1?'llamada':'llamadas')+' · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
     var items=trace.map(function(x){
       var st=String(x.status||'INFO').toUpperCase();
       var extra='';
