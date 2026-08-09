@@ -3265,6 +3265,9 @@ function promptNeedsSemanticAgent(prompt, state = {}, conversationHistory = []) 
   // La meteorología conserva su flujo especializado porque necesita una fuente externa.
   if (/\b(meteo|meteorolog|metereolog|clima|tiempo|lluvia|temperatura|viento|prevision|pronostico)\b/.test(p)) return false;
   if (v26LooksLikeConversationFollowUp(prompt, conversationHistory)) return true;
+  // Intenciones operativas que no siempre llevan un verbo del diccionario clásico
+  // («¿está todo justificado documentalmente?», «¿y en responsabilidades?»).
+  if (/\b(justificad|documental|responsabilidades?|implicad|participad|faltan|pendientes?\s+de\s+justificar)\b/.test(p)) return true;
   const dataNouns = /\b(evento|eventos|sysa|jornada|jornadas|peña|actividad|actividades|implicacion|implicación|compra|compras|gasto|gastos|ingreso|ingresos|donacion|donaciones|producto|productos|tienda|tiendas|responsable|responsables|socio|socios|persona|personas|colaborador|colaboradores|ticket|tickets|tk\s*\d+|documento|documentos|documentacion|documentación|justificante|justificantes|hito|hitos|\blg\b|tarea|tareas|banco|conciliacion|cuadre|saldo|asistencia|asistentes|valoracion|valoración)\b/;
   const dataAsk = /\b(dame|dime|dirias|dirías|ves|busca|buscar|saca|sacar|muestra|mostrar|lista|listado|informe|resumen|total|totaliza|totalizado|sumatorio|suma|sumar|cuanto|cuantos|cuanta|cuantas|cual|cuales|quien|quienes|compara|comparas|comparar|comparativa|ranking|top|importe|valor|cantidad|unidades|realizadas|realizados|pendientes|registradas|registrados|hay|hubo|ha habido|evolucion|hablame|cuentame|informacion|analiza|analizar|explica|explicame|detalle|detallado|grafico|grafica|que tal|qué tal|como fue|cómo fue|como salio|cómo salió|como estuvo|cómo estuvo|que paso|qué pasó|que ocurrio|qué ocurrió|en que|en qué|donde|dónde|se fue|se gasto|se gastó|coste|costo|raro|anomalia|anomalía|refieres)\b/;
   if (!dataAsk.test(p)) return false;
@@ -5650,39 +5653,122 @@ function v26PersonHintsFromPrompt(prompt,state){
   }
   return out.slice(0,8);
 }
-function v26HistorySubjects(state,history=[]){
+function v26NormalizeConversationContext(value={}){
+  const src=value&&typeof value==='object'?value:{};
+  const allowedTopics=new Set(['','person','person_comparison','event_analysis','event_comparison','event_documentation','global_events','people_activity']);
+  const topic=allowedTopics.has(trim(src.topic))?trim(src.topic):'';
+  const people=semanticUnique(arr(src.people).map(trim).filter(Boolean)).slice(0,6);
+  const events=semanticUnique(arr(src.events).map(trim).filter(Boolean)).slice(0,6);
+  return {
+    version:1,
+    topic,
+    people,
+    events,
+    focus:trim(src.focus).slice(0,80),
+    lastIntent:trim(src.lastIntent||src.intent).slice(0,120),
+    selectedEventId:trim(src.selectedEventId).slice(0,100),
+    turn:Math.max(0,Math.trunc(num(src.turn)))
+  };
+}
+function v26FrameFromHistory(history=[]){
+  for(const h of [...arr(history)].reverse()){
+    const frame=v26NormalizeConversationContext(h?.conversationContext||h?.context||{});
+    if(frame.topic||frame.people.length||frame.events.length)return frame;
+  }
+  return v26NormalizeConversationContext({});
+}
+function v26HistorySubjects(state,history=[],conversationContext={}){
   const people=[],events=[],seenP=new Set(),seenE=new Set();
   const addP=v=>{const k=canonicalNameKey(v);if(v&&k&&!seenP.has(k)){seenP.add(k);people.push(trim(v));}};
   const addE=v=>{const k=norm(v);if(v&&k&&!seenE.has(k)){seenE.add(k);events.push(trim(v));}};
-  for(const h of arr(history).slice(-4)){
-    const blob=[h?.user,h?.title,h?.assistant].map(trim).filter(Boolean).join(' ');
-    v26PersonHintsFromPrompt(blob,state).forEach(addP);
-    exactEventTitlesFromPrompt(blob,arr(state?.eventos)).forEach(x=>addE(trim(x?.titulo)));
+  const frame0=v26NormalizeConversationContext(conversationContext);
+  const frame=(frame0.topic||frame0.people.length||frame0.events.length)?frame0:v26FrameFromHistory(history);
+  frame.people.forEach(addP);frame.events.forEach(addE);
+  // Compatibilidad con sesiones antiguas: solo se inspecciona lo que escribió el usuario.
+  // No extraemos entidades del texto libre generado por Zuzu, porque puede contener nombres
+  // incidentales de tablas, productos o personas que contaminarían el hilo.
+  if(!people.length&&!events.length){
+    for(const h of arr(history).slice(-4)){
+      const blob=trim(h?.user);
+      v26PersonHintsFromPrompt(blob,state).forEach(addP);
+      exactEventTitlesFromPrompt(blob,arr(state?.eventos)).forEach(x=>addE(trim(x?.titulo)));
+    }
   }
-  return{people:people.slice(-6),events:events.slice(-6)};
+  return{people:people.slice(-6),events:events.slice(-6),frame};
 }
-function v26LooksLikeConversationFollowUp(prompt,history=[]){
-  if(!arr(history).length)return false;
-  const p=norm(prompt),words=p.split(/\s+/).filter(Boolean);
+function v26LooksLikeConversationFollowUp(prompt,history=[],conversationContext={}){
+  if(!arr(history).length&&!v26NormalizeConversationContext(conversationContext).topic)return false;
+  const p=norm(prompt).replace(/^[¿¡!?.:,;\"'“”‘’()\s]+/,'').trim(),words=p.split(/\s+/).filter(Boolean);
   if(words.length<=16&&/^(y\b|pero\b|entonces\b|tambien\b|también\b|ahora\b|si\b|sí\b|vale\b|ok\b|pues\b|bueno\b)/.test(p))return true;
-  if(words.length<=18&&/\b(eso|esa|ese|estos|estas|ellos|ellas|ambos|los dos|las dos|lo comparas|lo compares|a que te refieres|a qué te refieres|exactamente|y si|y comparado|y comparada)\b/.test(p))return true;
-  if(words.length<=12&&/\b(comparas|compáralo|comparalo|dime mas|dime más|amplia|amplía|detalla|profundiza)\b/.test(p))return true;
+  if(words.length<=18&&/\b(eso|esa|ese|estos|estas|ellos|ellas|ambos|los dos|las dos|lo comparas|lo compares|a que te refieres|a qué te refieres|exactamente|y si|y comparado|y comparada|los que faltan|las que faltan)\b/.test(p))return true;
+  if(words.length<=14&&/\b(comparas|compáralo|comparalo|dime mas|dime más|amplia|amplía|detalla|profundiza|responsabilidades?|participado|participación|implicado|implicada|faltan|pendientes)\b/.test(p))return true;
   return false;
 }
-function v26ResolveConversationFollowUp(prompt,state,selectedEventId='',history=[]){
-  const hs=arr(history).slice(-6);if(!hs.length)return{isFollowUp:false,effectivePrompt:prompt,people:[],events:[]};
+function v26FollowupFocusFromPrompt(prompt,previous=''){
+  const p=norm(prompt);
+  if(/\b(responsab\w*|compras?\s+gestion\w*|hitos?|lg|tareas?)\b/.test(p))return'responsibilities';
+  if(/\b(particip\w*|asist\w*|eventos?\s+ha|eventos?\s+han)\b/.test(p))return'participation';
+  if(/\b(implicad\w*|activ[oa]s?|presentes?)\b/.test(p))return'implication';
+  if(/\b(cuales?\s+son\s+los?\s+que\s+faltan|cuáles?\s+son\s+los?\s+que\s+faltan|faltan|pendientes)\b/.test(p))return'documentation_missing';
+  if(/\b(document\w*|justific\w*|tickets?|facturas?)\b/.test(p))return'documentation';
+  if(/\b(ingres\w*|dinero|importes?|aportaci\w*)\b/.test(p))return'income';
+  if(/\b(rar[oa]s?|anomali\w*|no\s+cuadra|llamativ\w*)\b/.test(p))return'anomaly';
+  if(/\b(a que te refieres|a qué te refieres|exactamente|detalla|profundiza)\b/.test(p))return trim(previous)||'detail';
+  return trim(previous)||'followup';
+}
+function v26ResolveConversationFollowUp(prompt,state,selectedEventId='',history=[],conversationContext={}){
+  const hs=arr(history).slice(-6);
   const currentPeople=v26PersonHintsFromPrompt(prompt,state),currentEvents=exactEventTitlesFromPrompt(prompt,arr(state?.eventos)).map(x=>trim(x?.titulo)).filter(Boolean);
-  const prior=v26HistorySubjects(state,hs),isFollowUp=v26LooksLikeConversationFollowUp(prompt,hs);
-  if(!isFollowUp)return{isFollowUp:false,effectivePrompt:prompt,people:currentPeople,events:currentEvents};
-  const last=hs[hs.length-1]||{},lastAssistant=trim(last?.assistant).slice(0,650),lastTitle=trim(last?.title).slice(0,140),lastUser=trim(last?.user).slice(0,300);
-  const cmp=/\b(compara(?:s|mos|n|do|da|das|dos)?|comparar|comparad|frente\s+a|versus|\bvs\b)\b/.test(norm(prompt));
-  if(cmp&&currentPeople.length&&prior.people.length){
-    const priorPerson=[...prior.people].reverse().find(x=>!currentPeople.some(y=>canonicalNameKey(y)===canonicalNameKey(x)));
-    if(priorPerson)return{isFollowUp:true,effectivePrompt:`Compara a ${priorPerson} con ${currentPeople[0]}. Es una continuación de la conversación anterior; conserva el criterio y el contexto previos. Petición literal actual: ${prompt}`,people:[priorPerson,currentPeople[0]],events:currentEvents,reason:'comparación de personas resuelta desde el turno anterior'};
+  const prior=v26HistorySubjects(state,hs,conversationContext),frame=prior.frame||v26NormalizeConversationContext({});
+  const isFollowUp=v26LooksLikeConversationFollowUp(prompt,hs,frame);
+  if(!isFollowUp)return{isFollowUp:false,effectivePrompt:prompt,people:currentPeople,events:currentEvents,frame};
+  const last=hs[hs.length-1]||{},lastAssistant=trim(last?.assistant).slice(0,450),lastTitle=trim(last?.title).slice(0,140),lastUser=trim(last?.user).slice(0,260);
+  const p=norm(prompt),cmp=/\b(compara(?:s|mos|n|do|da|das|dos)?|comparar|comparad|frente\s+a|versus|\bvs\b)\b/.test(p);
+  const focus=v26FollowupFocusFromPrompt(prompt,frame.focus);
+
+  // Marco fuerte: una comparación entre dos personas debe conservar exactamente esas dos
+  // entidades durante los turnos elípticos («los dos», «y en responsabilidades», etc.).
+  if(frame.topic==='person_comparison'&&frame.people.length>=2){
+    const people=frame.people.slice(0,2);
+    let instruction='Compara';
+    if(focus==='participation')instruction='Compara la participación y di quién ha participado en más eventos';
+    else if(focus==='responsibilities')instruction='Compara las responsabilidades, compras gestionadas, Hitos y tareas LG';
+    else if(focus==='implication')instruction='Valora cuál de los dos ha estado más implicado usando participación y responsabilidades, explicando el criterio';
+    else if(focus==='income')instruction='Compara los ingresos vinculados';
+    return{isFollowUp:true,effectivePrompt:`CONTINUACIÓN CONFIRMADA DE COMPARACIÓN PERSONAL. ${instruction} entre ${people[0]} y ${people[1]}. No cambies los sujetos y no uses el evento de pantalla para sustituirlos. Petición literal actual: ${prompt}`,people,events:[],focus,frame:{...frame,focus},reason:'marco persistente de comparación entre personas'};
   }
+
+  // Si veníamos de documentación, «cuáles faltan» solo puede referirse a evidencias/adjuntos
+  // pendientes de ese mismo evento, nunca a colaboradores pendientes de pago.
+  if(frame.topic==='event_documentation'&&frame.events.length){
+    const ev=frame.events[0];
+    const detail=focus==='documentation_missing'
+      ?'Enumera exactamente qué justificantes, fototickets o documentos faltan; si no falta ninguno, dilo expresamente.'
+      :'Continúa explicando la justificación documental y los adjuntos del mismo evento.';
+    return{isFollowUp:true,effectivePrompt:`CONTINUACIÓN CONFIRMADA DE DOCUMENTACIÓN. Evento: ${ev}. ${detail} Petición literal actual: ${prompt}`,people:frame.people,events:[ev],focus,frame:{...frame,focus},reason:'marco persistente de justificación documental'};
+  }
+
+  // Paso natural de un análisis de evento a documentación u otro detalle del mismo evento.
+  if(frame.events.length&&['event_analysis','event_comparison'].includes(frame.topic)){
+    const ev=frame.events[0];
+    if(focus==='documentation'||focus==='documentation_missing'){
+      return{isFollowUp:true,effectivePrompt:`CONTINUACIÓN DEL EVENTO ${ev}. Revisa la justificación documental de ese mismo evento. ${focus==='documentation_missing'?'Indica exactamente qué elementos faltan.':''} Petición literal actual: ${prompt}`,people:frame.people,events:[ev],focus,frame:{...frame,topic:'event_documentation',events:[ev],focus},reason:'continuación de evento hacia documentación'};
+    }
+  }
+
+  // «Háblame de Colty» -> «¿y si lo comparas con Curvas?».
+  if(cmp&&currentPeople.length&&(frame.people.length||prior.people.length)){
+    const basePeople=frame.people.length?frame.people:prior.people;
+    const priorPerson=[...basePeople].reverse().find(x=>!currentPeople.some(y=>canonicalNameKey(y)===canonicalNameKey(x)));
+    if(priorPerson){
+      const people=[priorPerson,currentPeople[0]];
+      return{isFollowUp:true,effectivePrompt:`Compara a ${people[0]} con ${people[1]}. Es una continuación de la conversación anterior; conserva el criterio y el contexto previos. Petición literal actual: ${prompt}`,people,events:[],focus,frame:{version:1,topic:'person_comparison',people,events:[],focus,lastIntent:'compare_people',selectedEventId:trim(selectedEventId),turn:frame.turn},reason:'comparación de personas resuelta desde el turno anterior'};
+    }
+  }
+
   const subject=[];if(prior.people.length)subject.push(`personas previas: ${prior.people.slice(-3).join(', ')}`);if(prior.events.length)subject.push(`eventos previos: ${prior.events.slice(-3).join(', ')}`);if(lastTitle)subject.push(`tema previo: ${lastTitle}`);
   const context=`Turno anterior del usuario: ${lastUser||'(sin texto)'}. Respuesta anterior de Zuzu: ${lastAssistant||'(sin texto)'}.`;
-  return{isFollowUp:true,effectivePrompt:`CONTINUACIÓN DE CONVERSACIÓN. ${subject.join(' · ')}. ${context} Responde a esta continuación sin reiniciar en el evento de pantalla salvo que el usuario lo pida expresamente: ${prompt}`,people:semanticUnique(prior.people.concat(currentPeople)).slice(-6),events:semanticUnique(prior.events.concat(currentEvents)).slice(-6),reason:'pronombre/continuación corta resuelta con historial'};
+  return{isFollowUp:true,effectivePrompt:`CONTINUACIÓN DE CONVERSACIÓN. ${subject.join(' · ')}. ${context} Responde a esta continuación sin reiniciar en el evento de pantalla salvo que el usuario lo pida expresamente: ${prompt}`,people:semanticUnique(prior.people.concat(currentPeople)).slice(-6),events:semanticUnique(prior.events.concat(currentEvents)).slice(-6),focus,frame:{...frame,focus},reason:'continuación corta resuelta con marco estructurado'};
 }
 function v26EventHintFromPrompt(prompt,state,selectedEventId=''){
   const exact=exactEventTitlesFromPrompt(prompt,arr(state?.eventos));
@@ -5739,7 +5825,9 @@ Devuelve JSON estructurado.`;
 async function callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[]){
   const apiKey=geminiKey(); if(!apiKey) throw new Error('Falta GEMINI_API_KEY para Zuzu Tools.');
   const promptText=v26PlannerPrompt(userPrompt,state,selectedEventId,conversationHistory); let lastError=null;
-  for(const model of v26ModelList('planner')){
+  const models=v26ModelList('planner');
+  for(let mi=0;mi<models.length;mi++){
+    const model=models[mi];
     try{
       zuzuTracePush(flowTrace,'V26 · Gemini interpreta','RUN',`Modelo ${model}. Selecciona herramientas CE; no SQL.`);
       const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
@@ -5757,11 +5845,15 @@ async function callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace=[
       let out={action:trim(raw?.action)==='clarify'?'clarify':'tools',clarification:trim(raw?.clarification),intent:trim(raw?.intent),wantsCharts:raw?.wants_charts===true,tools,model};
       out=v26ApplyPlannerGuardrails(out,userPrompt,state,selectedEventId);
       if(out.action==='tools'&&!out.tools.length) throw new Error('Gemini no seleccionó ninguna herramienta válida.');
-      const usage = apiUsage;
       zuzuTracePush(flowTrace,'V26 · Gemini interpreta','OK',out.action==='clarify'?`Aclaración: ${out.clarification}`:`Herramientas: ${out.tools.map(t=>t.name).join(', ')}`,{model});
-      out.usage = usage;
+      out.usage = apiUsage;
       return out;
-    }catch(error){lastError=error;zuzuTracePush(flowTrace,'V26 · Gemini interpreta','KO',cleanGeminiError(error),{model});if(isQuotaError(error)||!isRetryable(error))break;}
+    }catch(error){
+      lastError=error;
+      const canRetry=mi<models.length-1&&isRetryable(error)&&!isQuotaError(error);
+      zuzuTracePush(flowTrace,'V26 · Gemini interpreta',canRetry?'RETRY':'KO',cleanGeminiError(error),{model});
+      if(!canRetry)break;
+    }
   }
   throw lastError||new Error('Gemini no pudo seleccionar herramientas.');
 }
@@ -5862,6 +5954,115 @@ function v26ApplyPlannerGuardrails(plan,userPrompt,state,selectedEventId){
   const seen=new Set(); tools=tools.filter(t=>{const sig=[t.name,trim(t.event),trim(t.person),trim(t.store),arr(t.events).join('|')].join('::');if(seen.has(sig))return false;seen.add(sig);return true;}).slice(0,4);
   return {...plan,tools};
 }
+
+function v26DeterministicPlan(userPrompt,state,selectedEventId='',conversationResolution={},conversationContext={}){
+  const intent=v26ImplicitIntent(userPrompt),p=norm(userPrompt),frame=v26NormalizeConversationContext(conversationResolution?.frame||conversationContext||{});
+  const wantsCharts=semanticPromptExplicitlyRequestsCharts(userPrompt);
+  const tools=[];
+  const add=t=>{const sig=[t.name,trim(t.event),trim(t.person),trim(t.store),arr(t.events).join('|')].join('::');if(!tools.some(x=>[x.name,trim(x.event),trim(x.person),trim(x.store),arr(x.events).join('|')].join('::')===sig))tools.push(t);};
+  const currentPeople=v26PersonHintsFromPrompt(userPrompt,state);
+  const currentEvents=v26ComparisonEventNamesFromPrompt(userPrompt,state);
+  const frameEvent=trim(frame.events?.[0]);
+  const explicitEvent=v26EventHintFromPrompt(userPrompt,state,selectedEventId);
+  const eventRef=frameEvent||explicitEvent||'';
+  const eventScope=eventRef?'named_event':'active_event';
+  const follow=conversationResolution?.isFollowUp===true;
+  const focus=trim(conversationResolution?.focus||frame.focus||v26FollowupFocusFromPrompt(userPrompt,''));
+
+  if(follow&&frame.topic==='person_comparison'&&frame.people.length>=2){
+    frame.people.slice(0,2).forEach((person,i)=>add(v26ToolStub('person_dossier',`person_compare_${i+1}`,{person,scope:'all_events',status:'all'})));
+    return{action:'tools',clarification:'',intent:`continuación comparación personas · ${focus||'general'}`,wantsCharts:false,tools:tools.slice(0,4),model:'control-event-local-plan',localPlan:true,conversationFrame:{...frame,focus}};
+  }
+  if(follow&&frame.topic==='event_documentation'&&frameEvent){
+    add(v26ToolStub('event_documentation','event_documentation',{event:frameEvent,scope:'named_event',status:'all'}));
+    return{action:'tools',clarification:'',intent:`continuación documentación · ${focus||'detalle'}`,wantsCharts:false,tools,model:'control-event-local-plan',localPlan:true,conversationFrame:{...frame,focus}};
+  }
+  if(follow&&frame.events.length&&(focus==='documentation'||focus==='documentation_missing')){
+    add(v26ToolStub('event_documentation','event_documentation',{event:frameEvent,scope:'named_event',status:'all'}));
+    return{action:'tools',clarification:'',intent:`documentación del evento en conversación · ${focus}`,wantsCharts:false,tools,model:'control-event-local-plan',localPlan:true,conversationFrame:{...frame,topic:'event_documentation',focus}};
+  }
+
+  if(intent.comparison){
+    if(currentPeople.length>=2&&currentEvents.length<2){
+      currentPeople.slice(0,2).forEach((person,i)=>add(v26ToolStub('person_dossier',`person_compare_${i+1}`,{person,scope:'all_events',status:'all'})));
+      return{action:'tools',clarification:'',intent:'comparación de personas',wantsCharts:false,tools,model:'control-event-local-plan',localPlan:true};
+    }
+    if(currentEvents.length>=2){
+      add(v26ToolStub('compare_events','compare_events',{events:currentEvents.slice(0,6),scope:'named_event',status:'all'}));
+      return{action:'tools',clarification:'',intent:'comparación canónica de eventos',wantsCharts,tools,model:'control-event-local-plan',localPlan:true};
+    }
+  }
+
+  const hintedPerson=currentPeople[0]||v26PersonHintFromPrompt(userPrompt,state);
+  if((intent.broadPerson||(hintedPerson&&intent.conversational))&&hintedPerson){
+    add(v26ToolStub('person_dossier','person_dossier',{person:hintedPerson,scope:'all_events',status:'all'}));
+    return{action:'tools',clarification:'',intent:'dossier personal 360',wantsCharts:false,tools,model:'control-event-local-plan',localPlan:true};
+  }
+
+  if(intent.documentation){
+    add(v26ToolStub('event_documentation','event_documentation',{event:eventRef,scope:eventScope,status:'all'}));
+    return{action:'tools',clarification:'',intent:'justificación documental del evento',wantsCharts:false,tools,model:'control-event-local-plan',localPlan:true};
+  }
+  if(intent.peopleActivity){
+    add(v26ToolStub('people_activity','people_activity',{scope:'all_events',status:'all'}));
+    return{action:'tools',clarification:'',intent:'implicación transversal de personas',wantsCharts,tools,model:'control-event-local-plan',localPlan:true};
+  }
+  if(intent.globalAcrossEvents&&!intent.comparison){
+    add(v26ToolStub('events_overview','events_overview',{scope:'all_events',status:'all'}));
+    return{action:'tools',clarification:'',intent:'análisis transversal de eventos',wantsCharts,tools,model:'control-event-local-plan',localPlan:true};
+  }
+  if(intent.anomaly){
+    add(v26ToolStub('event_dossier','event_dossier',{event:eventRef,scope:eventScope,status:'all'}));
+    add(v26ToolStub('event_breakdowns','event_breakdowns',{event:eventRef,scope:eventScope,status:'all'}));
+    add(v26ToolStub('event_people','event_people',{event:eventRef,scope:eventScope,status:'all'}));
+    add(v26ToolStub('event_documentation','event_documentation',{event:eventRef,scope:eventScope,status:'all'}));
+    return{action:'tools',clarification:'',intent:'auditoría de anomalías del evento',wantsCharts,tools:tools.slice(0,4),model:'control-event-local-plan',localPlan:true};
+  }
+  if(intent.spendAnalysis){
+    add(v26ToolStub('event_dossier','event_dossier',{event:eventRef,scope:eventScope,status:'all'}));
+    add(v26ToolStub('event_breakdowns','event_breakdowns',{event:eventRef,scope:eventScope,status:'all'}));
+    return{action:'tools',clarification:'',intent:'análisis de gasto real',wantsCharts,tools,model:'control-event-local-plan',localPlan:true};
+  }
+  if(intent.broadEvent||(explicitEvent&&intent.conversational)){
+    add(v26ToolStub('event_dossier','event_dossier',{event:eventRef,scope:eventScope,status:'all'}));
+    add(v26ToolStub('event_breakdowns','event_breakdowns',{event:eventRef,scope:eventScope,status:'all'}));
+    return{action:'tools',clarification:'',intent:'análisis abierto del evento',wantsCharts,tools,model:'control-event-local-plan',localPlan:true};
+  }
+  return null;
+}
+
+function v26ConversationContextFromRun(userPrompt,plan,results,previousContext={},conversationResolution={},selectedEventId=''){
+  const prev=v26NormalizeConversationContext(previousContext),p=norm(userPrompt),turn=(prev.turn||0)+1;
+  const personResults=arr(results).filter(r=>r?.ok&&r?.name==='person_dossier');
+  const doc=arr(results).find(r=>r?.ok&&r?.name==='event_documentation');
+  const cmp=arr(results).find(r=>r?.ok&&r?.name==='compare_events');
+  const overview=arr(results).find(r=>r?.ok&&r?.name==='events_overview');
+  const activity=arr(results).find(r=>r?.ok&&r?.name==='people_activity');
+  const event=arr(results).find(r=>r?.ok&&r?.name==='event_dossier');
+  const focus=v26FollowupFocusFromPrompt(userPrompt,conversationResolution?.focus||prev.focus);
+  if(personResults.length>=2){
+    const planned=arr(plan?.tools).filter(t=>t?.name==='person_dossier').map(t=>trim(t?.person)).filter(Boolean);
+    const people=semanticUnique(planned.length>=2?planned:personResults.map(r=>trim(r?.facts?.query||r?.facts?.person))).slice(0,2);
+    return{version:1,topic:'person_comparison',people,events:[],focus,lastIntent:trim(plan?.intent)||'compare_people',selectedEventId:trim(selectedEventId),turn};
+  }
+  if(personResults.length===1){
+    const r=personResults[0],name=trim(arr(plan?.tools).find(t=>t?.name==='person_dossier')?.person||r?.facts?.query||r?.facts?.person);
+    return{version:1,topic:'person',people:name?[name]:[],events:[],focus,lastIntent:trim(plan?.intent)||'person',selectedEventId:trim(selectedEventId),turn};
+  }
+  if(doc){
+    return{version:1,topic:'event_documentation',people:prev.people,events:[trim(doc?.facts?.event)].filter(Boolean),focus:focus==='documentation_missing'?'documentation_missing':'documentation',lastIntent:trim(plan?.intent)||'documentation',selectedEventId:trim(selectedEventId),turn};
+  }
+  if(cmp){
+    return{version:1,topic:'event_comparison',people:[],events:arr(cmp?.facts?.event_names).map(trim).filter(Boolean).slice(0,6),focus:'comparison',lastIntent:trim(plan?.intent)||'compare_events',selectedEventId:trim(selectedEventId),turn};
+  }
+  if(event){
+    return{version:1,topic:'event_analysis',people:[],events:[trim(event?.facts?.event)].filter(Boolean),focus:focus||'analysis',lastIntent:trim(plan?.intent)||'event',selectedEventId:trim(selectedEventId),turn};
+  }
+  if(overview)return{version:1,topic:'global_events',people:[],events:[],focus:'overview',lastIntent:trim(plan?.intent)||'overview',selectedEventId:trim(selectedEventId),turn};
+  if(activity)return{version:1,topic:'people_activity',people:[],events:[],focus:'implication',lastIntent:trim(plan?.intent)||'people_activity',selectedEventId:trim(selectedEventId),turn};
+  return{...prev,focus:focus||prev.focus,lastIntent:trim(plan?.intent)||prev.lastIntent,selectedEventId:trim(selectedEventId)||prev.selectedEventId,turn};
+}
+
 function v26PairParts(name){return trim(name).split(/\s+y\s+/i).map(trim).filter(Boolean);}
 function v26ResolvePersonFamily(state,value){
   const primary=semanticResolveEntity(state,'person',value);if(!primary.ok)return primary;
@@ -6050,12 +6251,29 @@ async function v26ToolEventsOverview(tool,state){
 }
 async function v26ToolEventDocumentation(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool.event,tool.scope);if(!rr.ok)throw new Error(rr.error);const eid=rr.id;
-  const incomes=arr(state?.colaboradores).filter(x=>trim(x?.eventId||x?.event_id)===eid);const incomeRows=incomes.map(x=>({Registro:trim(x?.id),Persona:trim(byId(state?.personas).get(trim(x?.personaId||x?.persona_id))?.nombre),'Forma/estado':trim(x?.situacion||x?.formaPago||x?.ingreso),Justificante:v26HasImage(state,eid,`INGRESO:${trim(x?.id)}`)?'Sí':'No'}));
-  const purchaseMap=new Map();for(const c of arr(state?.compras).filter(x=>trim(x?.eventId||x?.event_id)===eid&&!isDonationTicket(ticketText(x))&&!isPendingTicket(ticketText(x)))){const tk=v26TicketToken(ticketText(c));if(!tk)continue;if(!purchaseMap.has(tk))purchaseMap.set(tk,{TKxx:tk,Ticket:v26HasImage(state,eid,tk)?'Sí':'No',Líneas:0,Importe:0});const g=purchaseMap.get(tk);g.Líneas+=1;g.Importe+=valueOfLine(c);}const tickets=[...purchaseMap.values()].map(x=>({...x,Importe:v26Money(x.Importe)}));
+  const people=byId(state?.personas);
+  const incomes=arr(state?.colaboradores).filter(x=>trim(x?.eventId||x?.event_id)===eid);
+  const incomeRows=incomes.map(x=>({Registro:trim(x?.id),Persona:trim(people.get(trim(x?.personaId||x?.persona_id))?.nombre),'Forma/estado':trim(x?.situacion||x?.formaPago||x?.ingreso),Justificante:v26HasImage(state,eid,`INGRESO:${trim(x?.id)}`)?'Sí':'No'}));
+  const purchaseMap=new Map();
+  for(const c of arr(state?.compras).filter(x=>trim(x?.eventId||x?.event_id)===eid&&!isDonationTicket(ticketText(x))&&!isPendingTicket(ticketText(x)))){
+    const tk=v26TicketToken(ticketText(c));if(!tk)continue;
+    if(!purchaseMap.has(tk))purchaseMap.set(tk,{TKxx:tk,Ticket:v26HasImage(state,eid,tk)?'Sí':'No',Líneas:0,Importe:0});
+    const g=purchaseMap.get(tk);g.Líneas+=1;g.Importe+=valueOfLine(c);
+  }
+  const tickets=[...purchaseMap.values()].map(x=>({...x,Importe:v26Money(x.Importe)}));
   const docs=arr(state?.eventDocuments).filter(d=>trim(d?.eventId||d?.event_id)===eid).map(d=>{const code=trim(d?.codigo||d?.imageKey||d?.id||'DOC');return{Documento:code,Fecha:trim(d?.fecha),Descripción:trim(d?.descripcion||d?.texto),Adjunto:(v26HasImage(state,eid,code)||!!trim(d?.imageUrl))?'Sí':'No'};});
+  const missing=[];
+  incomeRows.filter(x=>x.Justificante!=='Sí').forEach(x=>missing.push({Tipo:'Ingreso',Referencia:x.Registro||x.Persona||'Ingreso',Detalle:[x.Persona,x['Forma/estado']].filter(Boolean).join(' · '),Falta:'Justificante adjunto'}));
+  tickets.filter(x=>x.Ticket!=='Sí').forEach(x=>missing.push({Tipo:'Compra',Referencia:x.TKxx||'Ticket',Detalle:`${v26CountPhrase(x.Líneas||0,'línea','líneas')} · ${v26FormatEuro(x.Importe||0)}`,Falta:'Fototicket / justificante de compra'}));
+  docs.filter(x=>x.Adjunto!=='Sí').forEach(x=>missing.push({Tipo:'Documento',Referencia:x.Documento||'DOC',Detalle:[x.Fecha,x.Descripción].filter(Boolean).join(' · '),Falta:'Adjunto del documento'}));
   const incomeJust=incomeRows.filter(x=>x.Justificante==='Sí').length,ticketJust=tickets.filter(x=>x.Ticket==='Sí').length,docJust=docs.filter(x=>x.Adjunto==='Sí').length;
-  const facts={event:rr.nombre,income_records:incomeRows.length,income_with_receipt:incomeJust,income_without_receipt:incomeRows.length-incomeJust,purchase_tickets:tickets.length,purchase_tickets_with_image:ticketJust,purchase_tickets_without_image:tickets.length-ticketJust,documents:docs.length,documents_with_attachment:docJust,documents_without_attachment:docs.length-docJust,note:'Este bloque mide evidencias/adjuntos disponibles en ControlEvent. No debe equiparar automáticamente ausencia de foto con falta de conciliación bancaria.'};
-  return{id:tool.id,name:tool.name,ok:true,title:`Justificación documental · ${rr.nombre}`,facts,tables:[v26Table('income_receipts','Justificantes de ingresos',incomeRows,{Registro:v26TextSchema(),Persona:v26TextSchema(),'Forma/estado':v26TextSchema(),Justificante:v26StatusSchema()}),v26Table('purchase_tickets','Tickets/fototickets de compra',tickets,{TKxx:v26TextSchema(),Ticket:v26StatusSchema(),Líneas:v26CountSchema('líneas'),Importe:v26MoneySchema()}),v26Table('documents','Documentos del evento',docs,{Documento:v26TextSchema(),Fecha:v26DateSchema(),Descripción:v26TextSchema(),Adjunto:v26StatusSchema()})].filter(t=>t.rows.length)};
+  const facts={event:rr.nombre,income_records:incomeRows.length,income_with_receipt:incomeJust,income_without_receipt:incomeRows.length-incomeJust,purchase_tickets:tickets.length,purchase_tickets_with_image:ticketJust,purchase_tickets_without_image:tickets.length-ticketJust,documents:docs.length,documents_with_attachment:docJust,documents_without_attachment:docs.length-docJust,missing_evidence_count:missing.length,missing_evidence:missing.slice(0,80),note:'Este bloque mide evidencias/adjuntos disponibles en ControlEvent. No debe equiparar automáticamente ausencia de foto con falta de conciliación bancaria.'};
+  return{id:tool.id,name:tool.name,ok:true,title:`Justificación documental · ${rr.nombre}`,facts,tables:[
+    v26Table('missing_evidence','Elementos sin evidencia documental',missing,{Tipo:v26TextSchema('Tipo de elemento'),Referencia:v26TextSchema('Identificador o persona'),Detalle:v26TextSchema('Contexto'),Falta:v26StatusSchema('Evidencia que falta')}),
+    v26Table('income_receipts','Justificantes de ingresos',incomeRows,{Registro:v26TextSchema(),Persona:v26TextSchema(),'Forma/estado':v26TextSchema(),Justificante:v26StatusSchema()}),
+    v26Table('purchase_tickets','Tickets/fototickets de compra',tickets,{TKxx:v26TextSchema(),Ticket:v26StatusSchema(),Líneas:v26CountSchema('líneas'),Importe:v26MoneySchema()}),
+    v26Table('documents','Documentos del evento',docs,{Documento:v26TextSchema(),Fecha:v26DateSchema(),Descripción:v26TextSchema(),Adjunto:v26StatusSchema()})
+  ].filter(t=>t.rows.length)};
 }
 async function v26ToolCompareEvents(tool,state,selectedEventId=''){
   const requested=semanticUnique(arr(tool?.events).concat(trim(tool?.event)?[trim(tool.event)]:[])).slice(0,6);if(requested.length<2)throw new Error('La comparación necesita al menos dos eventos.');
@@ -6087,8 +6305,21 @@ async function v26ExecuteTool(tool,state,selectedEventId){
 }
 async function v26ExecuteTools(tools,state,selectedEventId,flowTrace=[]){
   const started=Date.now();
-  const results=await Promise.all(arr(tools).map(async tool=>{try{const r=await v26ExecuteTool(tool,state,selectedEventId);zuzuTracePush(flowTrace,`V26 · Herramienta ${tool.name}`,'OK',`${r.tables?.reduce((a,t)=>a+arr(t.rows).length,0)||0} fila(s) estructuradas.`);return r;}catch(error){zuzuTracePush(flowTrace,`V26 · Herramienta ${tool.name}`,'KO',cleanGeminiError(error));return{id:tool.id,name:tool.name,ok:false,title:tool.name,error:cleanGeminiError(error),facts:{},tables:[]};}}));
-  zuzuTracePush(flowTrace,'V26 · ControlEvent obtiene hechos','OK',`${results.filter(x=>x.ok).length}/${results.length} herramientas OK en ${Date.now()-started} ms.`); return results;
+  const results=await Promise.all(arr(tools).map(async tool=>{
+    try{
+      const r=await v26ExecuteTool(tool,state,selectedEventId);
+      zuzuTracePush(flowTrace,`V26 · Herramienta ${tool.name}`,'OK',`${r.tables?.reduce((a,t)=>a+arr(t.rows).length,0)||0} fila(s) estructuradas.`);
+      return r;
+    }catch(error){
+      // Una herramienta parcial que falla no convierte toda la consulta en KO si las demás
+      // pueden responder. Se conserva como WARN y solo se marca KO si no queda ningún hecho fiable.
+      zuzuTracePush(flowTrace,`V26 · Herramienta ${tool.name}`,'WARN',cleanGeminiError(error));
+      return{id:tool.id,name:tool.name,ok:false,title:tool.name,error:cleanGeminiError(error),facts:{},tables:[]};
+    }
+  }));
+  const good=results.filter(x=>x.ok).length;
+  zuzuTracePush(flowTrace,'V26 · ControlEvent obtiene hechos',good?'OK':'KO',`${good}/${results.length} herramientas OK en ${Date.now()-started} ms.`);
+  return results;
 }
 function v26CompactToolPayload(results){
   return arr(results).map(r=>({id:r.id,name:r.name,ok:r.ok,title:r.title,error:r.error||'',facts:r.facts||{},tables:arr(r.tables).map(t=>({key:t.key,title:t.title,schema:t.schema||{},rows:arr(t.rows).slice(0,120)}))}));
@@ -6213,12 +6444,11 @@ function v26UnsupportedMoney(answer,results){
   while((m=re.exec(txt))){const n=round(v26ParseLocalizedDisplayNumber(m[0]),2);if(!Number.isFinite(n))continue;if(!known.some(v=>Math.abs(v-n)<0.011))out.push(n);}
   return [...new Set(out)];
 }
-function v26FinalPrompt(userPrompt,plan,results,repair='',conversationHistory=[]){
+function v26FinalPrompt(userPrompt,plan,results,repair='',conversationHistory=[],conversationContext={}){
   return `Eres Zuzu, ANALISTA de ControlEvent v26_prod. ControlEvent ya ha ejecutado las herramientas y te entrega HECHOS CANÓNICOS. Tu valor añadido es interpretarlos bien, detectar lo relevante y responder como un analista humano. NO inventes datos y NO recalcules totales: usa exactamente los hechos numéricos ya calculados por CE.
 
 PREGUNTA ORIGINAL:\n${userPrompt}
-CONTEXTO CONVERSACIONAL RECIENTE:\n${JSON.stringify(arr(conversationHistory).slice(-6))}
-INTENCIÓN INTERPRETADA:\n${plan.intent}
+CONTEXTO CONVERSACIONAL RECIENTE:\n${JSON.stringify(arr(conversationHistory).slice(-6))}\nMARCO CONVERSACIONAL RESUELTO POR CONTROLEVENT:\n${JSON.stringify(v26NormalizeConversationContext(conversationContext))}\nINTENCIÓN INTERPRETADA:\n${plan.intent}
 ¿EL USUARIO PIDIÓ GRÁFICAS?: ${plan.wantsCharts?'SÍ':'NO'}
 
 RESULTADOS DE HERRAMIENTAS:\n${JSON.stringify(v26CompactToolPayload(results))}
@@ -6280,107 +6510,112 @@ function v26NarrativeStyleIssues(answer){
   return issues;
 }
 
-function v26ResponseQualityIssues(raw,results,userPrompt){
-  const issues=[],intent=v26ImplicitIntent(userPrompt),p=norm(userPrompt),answer=trim(raw?.answer),refs=arr(raw?.show_tables);
-  const hasTable=(toolId,key)=>refs.some(x=>trim(x?.tool_id)===trim(toolId)&&trim(x?.table_key)===trim(key));
-  const person=arr(results).find(r=>r.ok&&r.name==='person_dossier');
+function v26ResponseQualityIssues(raw,results,userPrompt,conversationContext={}){
+  const issues=[],intent=v26ImplicitIntent(userPrompt),answer=trim(raw?.answer);
   const event=arr(results).find(r=>r.ok&&r.name==='event_dossier');
-  const breakdown=arr(results).find(r=>r.ok&&r.name==='event_breakdowns');
-  const cmp=arr(results).find(r=>r.ok&&r.name==='compare_events');
+  const documentation=arr(results).find(r=>r.ok&&r.name==='event_documentation');
 
-  if((intent.explicitNoTables||(intent.conversational&&!intent.explicitList&&!intent.comparison))&&refs.length){
-    issues.push('La petición es conversacional y no necesita volcar tablas; deja show_tables vacío salvo necesidad excepcional.');
-  }
-  if(person&&intent.broadPerson){
-    const f=person.facts||{};
-    if(f.composite_expansion&&arr(f.matched_entities).length>1&&!arr(f.matched_entities).some(n=>norm(answer).includes(norm(n)))) issues.push('Explica que la persona aparece también dentro de una pareja/entidad compuesta.');
-    const hasResp=num(f.purchase_responsibility_lines)>0||num(f.hitos_count)>0||num(f.lg_count)>0||num(f.donation_lines)>0;
-    if(hasResp&&!/responsab|compras?|hitos?|tareas?|\blg\b|donaci/i.test(answer)) issues.push('Resume las responsabilidades/compras/donaciones/Hitos-LG encontradas en el dossier, aunque el usuario no las haya enumerado.');
-    if(new RegExp('\\b'+String(Math.trunc(num(f.event_count)))+'(?:[.,]00)?\\s*€\\s*(?:evento|eventos)','i').test(answer)) issues.push('El número de eventos es un conteo, no dinero.');
-  }
-  if(event&&(intent.broadEvent||intent.spendAnalysis)){
+  // Este auditor solo fuerza reintento por errores de VERDAD/SEMÁNTICA.
+  // Presentación, tablas, estilo, conclusiones o brevedad se corrigen después de forma
+  // determinista por ControlEvent y no deben provocar cuatro llamadas Gemini.
+  if(event&&(intent.broadEvent||intent.spendAnalysis||intent.anomaly)){
     const f=event.facts||{};
-    if(intent.broadEvent&&answer.length<180) issues.push('La respuesta abierta sobre el evento es demasiado superficial: aporta 2-4 hallazgos y una lectura útil, no solo cuatro KPIs.');
-    if(intent.broadEvent&&!/saldo|donaci|compra|ingres|asisten|pendiente|concentr|destino|segmento|tienda|anomali|llamativ/i.test(answer)) issues.push('Añade una lectura analítica del evento, no solo su identificación.');
     const claims=[
-      ['ingresos totales','(?:ingresos(?:\s+totales|\s+confirmados)?\s*(?:sumaron|ascendieron\s+a|fueron|de|:))',num(f.income_total)],
-      ['compras realizadas','(?:compras\s+realizadas\s*(?:sumaron|ascendieron\s+a|fueron|por\s+valor\s+de|de|:)|total\s+de\s+compras\s*(?:realizadas)?\s*(?:de|:))',num(f.purchases_realized)],
-      ['donaciones valoradas','(?:donaciones(?:\s+valoradas)?\s*(?:sumaron|ascendieron\s+a|fueron|por\s+valor\s+de|de|:))',num(f.donations_value)],
-      ['saldo operativo','(?:saldo(?:\s+operativo|\s+final|\s+actual)?\s*(?:es|fue|queda|quedó|de|:))',num(f.operating_balance)],
-      ['valoración del evento','(?:valoraci[oó]n(?:\s+del\s+evento|\s+con\s+donaciones)?\s*(?:es|fue|asciende\s+a|de|:))',num(f.event_valuation)]
+      ['ingresos totales','(?:ingresos(?:\\s+totales|\\s+confirmados)?\\s*(?:sumaron|ascendieron\\s+a|fueron|de|:))',num(f.income_total)],
+      ['compras realizadas','(?:compras\\s+realizadas\\s*(?:sumaron|ascendieron\\s+a|fueron|por\\s+valor\\s+de|de|:)|total\\s+de\\s+compras\\s*(?:realizadas)?\\s*(?:de|:))',num(f.purchases_realized)],
+      ['donaciones valoradas','(?:donaciones(?:\\s+valoradas)?\\s*(?:sumaron|ascendieron\\s+a|fueron|por\\s+valor\\s+de|de|:))',num(f.donations_value)],
+      ['saldo operativo','(?:saldo(?:\\s+operativo|\\s+final|\\s+actual)?\\s*(?:es|fue|queda|quedó|de|:))',num(f.operating_balance)],
+      ['valoración del evento','(?:valoraci[oó]n(?:\\s+del\\s+evento|\\s+con\\s+donaciones)?\\s*(?:es|fue|asciende\\s+a|de|:))',num(f.event_valuation)]
     ];
     for(const [label,reSrc,expected] of claims){
       const got=v26NarrativeEuroAfterLabel(answer,reSrc);
-      if(got!==null&&!v26MoneyMatches(got,expected))issues.push(`La cifra citada para ${label} no corresponde a su hecho canónico: debe ser ${v26FormatEuro(expected)}.`);
+      if(got!==null&&!v26MoneyMatches(got,expected))issues.push(`La cifra citada para ${label} debe ser ${v26FormatEuro(expected)}.`);
     }
-    if(/gracias\s+a\s+(?:las\s+)?donaciones[^.!?]{0,120}\bsaldo\b|\bdonaciones\b[^.!?]{0,100}\b(?:mejoraron|aumentaron|elevaron|hicieron\s+positivo)\b[^.!?]{0,60}\bsaldo\b/i.test(answer)) issues.push('No atribuyas el saldo a las donaciones: las donaciones no entran en la caja ni en el saldo operativo.');
+    if(/gracias\s+a\s+(?:las\s+)?donaciones[^.!?]{0,120}\bsaldo\b|\bdonaciones\b[^.!?]{0,100}\b(?:mejoraron|aumentaron|elevaron|hicieron\s+positivo)\b[^.!?]{0,60}\bsaldo\b/i.test(answer))issues.push('Las donaciones no pueden presentarse como causa del saldo operativo.');
     if(intent.spendAnalysis){
-      if(!/compras\s+realizadas|gasto\s+real|gast[oó]|tienda|destino|segmento|producto/i.test(answer))issues.push('La pregunta es «en qué se fue el dinero»: responde desde compras realizadas/gasto real y su distribución.');
       const valuation=num(f.event_valuation),purchases=num(f.purchases_realized);
-      const claimedPurchases=v26NarrativeEuroAfterLabel(answer,'(?:compras\s+realizadas\s*(?:sumaron|ascendieron\s+a|fueron|por\s+valor\s+de|de|:)|total\s+de\s+compras\s*(?:realizadas)?\s*(?:de|:))');
-      if(claimedPurchases!==null&&v26MoneyMatches(claimedPurchases,valuation)&&!v26MoneyMatches(valuation,purchases))issues.push('Se ha usado la valoración del evento como si fueran compras realizadas. Para «dinero gastado» usa únicamente purchases_realized.');
+      const claimedPurchases=v26NarrativeEuroAfterLabel(answer,'(?:compras\\s+realizadas\\s*(?:sumaron|ascendieron\\s+a|fueron|por\\s+valor\\s+de|de|:)|total\\s+de\\s+compras\\s*(?:realizadas)?\\s*(?:de|:))');
+      if(claimedPurchases!==null&&v26MoneyMatches(claimedPurchases,valuation)&&!v26MoneyMatches(valuation,purchases))issues.push('Se ha usado la valoración como si fueran compras realizadas.');
     }
     const desc=norm(f.description||'');
-    if(/\bobjetiv[oa]\s+(?:era|fue|consist[ií]a)\b/i.test(answer)&&!/\bobjetiv/.test(desc))issues.push('No inventes el objetivo/finalidad del evento si no consta en la descripción o en los hechos.');
-    const managementSupported=num(f.lg_count)>0&&num(f.lg_pending)===0;
-    if(/éxito\s+organizativo|exito\s+organizativo|todo\s+estuvo\s+bien\s+atado|organizaci[oó]n\s+(?:fue|era|result[oó])\s+(?:un\s+)?punto\s+fuerte/i.test(answer)&&!managementSupported)issues.push('No declares éxito organizativo sin hechos de gestión suficientes que lo respalden.');
+    if(/\bobjetiv[oa]\s+(?:era|fue|consist[ií]a)\b/i.test(answer)&&!/\bobjetiv/.test(desc))issues.push('Se ha inventado el objetivo/finalidad del evento.');
   }
-  if(breakdown){
-    if(/\bdestino\b/.test(p)&&!hasTable(breakdown.id,'destinations')) issues.push('El usuario pidió desglose por destino: incluye la tabla destinations.');
-    if(/\bsegmento\b/.test(p)&&!hasTable(breakdown.id,'segments')) issues.push('El usuario pidió desglose por segmento: incluye la tabla segments.');
-    if(/\b(comprado|donado|pendiente(?: de compra)?)\b/.test(p)){
-      for(const term of ['comprado','donado','pendiente']) if(p.includes(term)&&!answer.toLowerCase().includes(term)) issues.push(`La respuesta debe distinguir explícitamente ${term}.`);
+
+  if(documentation){
+    const f=documentation.facts||{};
+    if(/\b(todo|todos|ninguno|ninguna)\b[^.!?]{0,70}\b(?:justific|document|adjunt|ticket)/i.test(answer)){
+      const missing=num(f.missing_evidence_count);
+      if(missing>0&&/\b(todo|todos|ninguno|ninguna)\b/i.test(answer))issues.push(`Existen ${missing} elementos sin evidencia documental; no puede afirmarse que está todo completo.`);
     }
+    if(/\bconciliad[oa]s?\b/i.test(answer)&&!/conciliaci[oó]n/.test(norm(f.note||'')))issues.push('La herramienta documental acredita adjuntos, no conciliación bancaria.');
   }
-  if(cmp){
-    const names=arr(cmp?.facts?.event_names);
-    const missing=names.filter(n=>!norm(answer).includes(norm(n)));
-    if(missing.length) issues.push(`La comparativa debe nombrar todos los eventos: falta ${missing.join(', ')}.`);
-    if(intent.asksConclusion&&!/(?:sal[ií]o|fue|result[oó]|queda|qued[oó])\s+(?:claramente\s+)?mejor|mejor\s+resultado|peor\s+resultado|en\s+conclusi[oó]n|por\s+tanto|en\s+conjunto|econ[oó]micamente\s+(?:mejor|peor)|m[aá]s\s+eficiente/i.test(answer)) issues.push('El usuario espera una conclusión comparativa explícita que diga cuál salió mejor/peor y por qué, no solo una enumeración de diferencias.');
-    if(/participantes?|asistentes?/.test(p)&&!/participantes?|asistentes?/.test(answer.toLowerCase())) issues.push('Incluye la comparación de asistentes/participantes porque forma parte de la intención.');
-  }
-  if(/\b\d+(?:[.,]\d+)?\s*€\s*(?:eventos?|personas?|líneas?|lineas?|días?|dias?|unidades?)/i.test(answer)) issues.push('Hay un conteo presentado erróneamente como euros; respeta el tipo semántico.');
-  if(/\b1\s+personas\b/i.test(answer)) issues.push('Corrige la concordancia: 1 persona; plural solo desde 2.');
-  issues.push(...v26NarrativeStyleIssues(answer));
-  // Si Gemini menciona un hecho monetario conocido dentro de un contexto monetario, debe marcarlo
-  // explícitamente como euros. CE no vuelve a "adivinar" dinero con regex: lo devuelve a Gemini para
-  // que respete el tipo semántico y luego solo normaliza tokens que ya llevan € / euro(s).
+
+  if(/\b\d+(?:[.,]\d+)?\s*€\s*(?:eventos?|personas?|líneas?|lineas?|días?|dias?|unidades?)/i.test(answer))issues.push('Un conteo se ha presentado erróneamente como euros.');
+
   const knownMoney=v26KnownMoneyValues(results);
   const rawNumber=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)/g;
   let nm;
   while((nm=rawNumber.exec(answer))){
     const before=answer[nm.index-1]||'',after=answer[rawNumber.lastIndex]||'';
-    if(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(before)||/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ/]/.test(after)) continue; // DIC25, TK05, fechas, etc.
-    if(/^\s*(?:€|euros?)/i.test(answer.slice(rawNumber.lastIndex,rawNumber.lastIndex+10))) continue;
-    if(!v26MoneyContext(answer,nm.index,rawNumber.lastIndex)) continue;
+    if(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(before)||/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ/]/.test(after))continue;
+    if(/^\s*(?:€|euros?)/i.test(answer.slice(rawNumber.lastIndex,rawNumber.lastIndex+10)))continue;
+    if(!v26MoneyContext(answer,nm.index,rawNumber.lastIndex))continue;
     const n=round(v26ParseLocalizedDisplayNumber(nm[0]),2);
-    if(Number.isFinite(n)&&knownMoney.some(v=>Math.abs(v-n)<0.011)){ issues.push(`El importe ${nm[0]} se ha escrito sin unidad monetaria; exprésalo en formato español con dos decimales y €.`); break; }
+    if(Number.isFinite(n)&&knownMoney.some(v=>Math.abs(v-n)<0.011)){issues.push(`El importe ${nm[0]} está sin unidad monetaria.`);break;}
   }
   return semanticUnique(issues);
 }
 
-async function callGeminiV26Final(userPrompt,plan,results,flowTrace=[],conversationHistory=[]){
-  const apiKey=geminiKey(); if(!apiKey)throw new Error('Falta GEMINI_API_KEY para redactar la respuesta.'); let repair='',lastError=null;
+async function callGeminiV26Final(userPrompt,plan,results,flowTrace=[],conversationHistory=[],conversationContext={}){
+  const apiKey=geminiKey(); if(!apiKey)throw new Error('Falta GEMINI_API_KEY para redactar la respuesta.');
+  let repair='',lastError=null;
+  const models=v26ModelList('final');
+  let preferredModel=models[0]||'gemini-2.5-flash';
+
   for(let attempt=1;attempt<=2;attempt++){
-    for(const model of v26ModelList('final')){
+    let qualityRetry=false, completedTransport=false;
+    for(let mi=0;mi<models.length;mi++){
+      const model=mi===0?preferredModel:models[mi];
+      if(mi>0&&model===preferredModel)continue;
       try{
-        const promptText=v26FinalPrompt(userPrompt,plan,results,repair,conversationHistory);zuzuTracePush(flowTrace,'V26 · Gemini analiza y redacta','RUN',`Modelo ${model}${attempt>1?' · corrección de cifras':''}.`);
+        const promptText=v26FinalPrompt(userPrompt,plan,results,repair,conversationHistory,conversationContext);
+        zuzuTracePush(flowTrace,'V26 · Gemini analiza y redacta','RUN',`Modelo ${model}${attempt>1?' · reintento de calidad':''}.`);
         const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         const body={contents:[{role:'user',parts:[{text:promptText}]}],generationConfig:{responseMimeType:'application/json',responseSchema:v26FinalSchema(),temperature:0.22,maxOutputTokens:4200}};
-        const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_TOOLS_FINAL_TIMEOUT_MS||26000)); logGeminiUsage('V26 TOOLS FINAL',model,payload);
+        const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_TOOLS_FINAL_TIMEOUT_MS||26000));
+        logGeminiUsage('V26 TOOLS FINAL',model,payload);
         if(!res.ok){const e=new Error(payload?.error?.message||`Gemini final HTTP ${res.status}`);e.status=Number(res.status||502);throw e;}
+        completedTransport=true;preferredModel=model;
         const apiUsage=usageSmall(payload,model);
         zuzuTracePush(flowTrace,'V26 · Gemini API · análisis/redacción','OK',`Llamada facturable completada con ${model}${attempt>1?' (reintento de calidad)':''}.`,{model,usage:apiUsage});
-        const raw=JSON.parse(trim(geminiOutText(payload))||'{}'); const bad=v26UnsupportedMoney(raw?.answer,results);
-        if(bad.length){repair=`Has citado importes no presentes entre los hechos canónicos: ${bad.join(', ')}. Reescribe usando exclusivamente cifras entregadas por CE.`;lastError=new Error(repair);continue;}
-        const qualityIssues=v26ResponseQualityIssues(raw,results,userPrompt);
-        if(qualityIssues.length){repair=`La respuesta no cumple todavía la intención implícita del usuario: ${qualityIssues.join(' | ')}`;lastError=new Error(repair);zuzuTracePush(flowTrace,'V26 · Auditor de intención','KO',repair,{model});continue;}
-        zuzuTracePush(flowTrace,'V26 · Auditor de intención','OK','Respuesta coherente con intención, unidades y presentación esperada.',{model});
+        const raw=JSON.parse(trim(geminiOutText(payload))||'{}');
+        const bad=v26UnsupportedMoney(raw?.answer,results);
+        if(bad.length){
+          repair=`Has citado importes no presentes entre los hechos canónicos: ${bad.join(', ')}. Reescribe usando exclusivamente cifras entregadas por CE.`;
+          lastError=new Error(repair);qualityRetry=true;
+          zuzuTracePush(flowTrace,'V26 · Auditor de verdad','RETRY',repair,{model});
+          break;
+        }
+        const qualityIssues=v26ResponseQualityIssues(raw,results,userPrompt,conversationContext);
+        if(qualityIssues.length){
+          repair=`Corrige únicamente estos problemas objetivos: ${qualityIssues.join(' | ')}`;
+          lastError=new Error(repair);qualityRetry=true;
+          zuzuTracePush(flowTrace,'V26 · Auditor de verdad','RETRY',repair,{model});
+          break;
+        }
+        zuzuTracePush(flowTrace,'V26 · Auditor de verdad','OK','Cifras y conceptos canónicos coherentes.',{model});
         zuzuTracePush(flowTrace,'V26 · Gemini analiza y redacta','OK',`Respuesta final estructurada (${trim(raw?.answer).length} caracteres).`,{model});
         return{title:trim(raw?.title)||'Respuesta de Zuzu',answer:trim(raw?.answer),warnings:arr(raw?.warnings).map(trim).filter(Boolean),showTables:arr(raw?.show_tables),chartSpecs:arr(raw?.charts),model,usage:apiUsage};
-      }catch(error){lastError=error;zuzuTracePush(flowTrace,'V26 · Gemini analiza y redacta','KO',cleanGeminiError(error),{model});if(isQuotaError(error)||!isRetryable(error))break;}
+      }catch(error){
+        lastError=error;
+        const canRetryTransport=mi<models.length-1&&isRetryable(error)&&!isQuotaError(error);
+        zuzuTracePush(flowTrace,'V26 · Gemini analiza y redacta',canRetryTransport?'RETRY':'KO',cleanGeminiError(error),{model});
+        if(!canRetryTransport)break;
+      }
     }
-    if(!repair)break;
+    if(qualityRetry&&attempt<2)continue;
+    if(qualityRetry)break;
+    if(!completedTransport)break;
   }
   throw lastError||new Error('Gemini no pudo redactar una respuesta fiable.');
 }
@@ -6398,23 +6633,29 @@ function v26BuildPresentation(final,results,userPrompt){
       const requestedSeries=arr(spec?.series_fields).map(trim).filter(Boolean);if(requestedSeries.length){const metas=requestedSeries.map(f=>v26TableFieldMeta(t,f));if(metas.some(m=>!v26IsChartNumericMeta(m)))continue;const units=[...new Set(metas.map(m=>trim(m?.unit)).filter(Boolean))];if(units.length>1)continue;const labels=[],series=requestedSeries.map(f=>({name:f,values:[]}));for(const row of arr(t.rows).slice(0,20)){if(!(lf in row))continue;labels.push(trim(row[lf])||'Sin etiqueta');requestedSeries.forEach((f,i)=>series[i].values.push(num(row[f])));}if(labels.length<2)continue;charts.push({title:trim(spec?.title)||t.title,type:'stackedBar',labels,values:[],series,unit:units[0]||trim(spec?.unit)});continue;}
       if(!v26IsChartNumericMeta(valueMeta))continue;const labels=[],values=[];for(const row of arr(t.rows).slice(0,30)){if(!(lf in row)||!(vf in row))continue;const n=Number(row[vf]);if(!Number.isFinite(n))continue;labels.push(trim(row[lf])||'Sin etiqueta');values.push(n);}if(labels.length<2)continue;const uniq=new Set(values.map(v=>round(v,6)));if(uniq.size<=1)continue;let type=trim(spec?.type);if(!['bar','horizontalBar','pie','donut','line'].includes(type))type=labels.length>8?'horizontalBar':'bar';if((type==='pie'||type==='donut')&&labels.length<2)continue;charts.push({title:trim(spec?.title)||t.title,type,labels,values,unit:trim(valueMeta?.unit)||trim(spec?.unit)});
     }
-    const compare=arr(results).find(r=>r.ok&&r.name==='compare_events');if(compare&&!charts.length){const t=arr(compare.tables).find(x=>x.key==='comparison');if(t&&arr(t.rows).length>=2){for(const field of ['Ingresos','Compras realizadas','Donaciones valoradas','Saldo operativo']){const meta=v26TableFieldMeta(t,field);const values=arr(t.rows).map(x=>num(x[field]));if(new Set(values.map(v=>round(v,6))).size<=1)continue;charts.push({title:`Comparativa · ${field}`,type:'bar',labels:arr(t.rows).map(x=>trim(x.Evento)),values,unit:trim(meta?.unit)});if(charts.length>=4)break;}}}
+    const compare=arr(results).find(r=>r.ok&&r.name==='compare_events');if(compare&&!charts.length){const t=arr(compare.tables).find(x=>x.key==='comparison');if(t&&arr(t.rows).length>=2){for(const field of ['Ingresos','Compras realizadas','Donaciones valoradas','Saldo operativo','Valoración del evento']){const meta=v26TableFieldMeta(t,field);const values=arr(t.rows).map(x=>num(x[field]));if(new Set(values.map(v=>round(v,6))).size<=1)continue;charts.push({title:`Comparativa · ${field}`,type:'bar',labels:arr(t.rows).map(x=>trim(x.Evento)),values,unit:trim(meta?.unit)});if(charts.length>=5)break;}}}
   }
   return{tables,charts};
 }
-function v26SemanticAudit(final,results,userPrompt){
+function v26SemanticAudit(final,results,userPrompt,conversationContext={}){
   const out={...final,showTables:arr(final?.showTables).slice(),chartSpecs:arr(final?.chartSpecs).slice(),warnings:arr(final?.warnings).slice()};
-  const p=norm(userPrompt),intent=v26ImplicitIntent(userPrompt),cmp=arr(results).find(r=>r.ok&&r.name==='compare_events');
+  const p=norm(userPrompt),intent=v26ImplicitIntent(userPrompt),frame=v26NormalizeConversationContext(conversationContext);
+  const cmp=arr(results).find(r=>r.ok&&r.name==='compare_events');
 
   if(intent.comparison&&cmp){
     const names=arr(cmp?.facts?.event_names);
     const missing=names.filter(n=>!norm(out.answer).includes(norm(n)));
-    if(missing.length){
-      const dif=arr(cmp?.facts?.differences);
-      const money=dif.filter(x=>x.Indicador!=='Asistentes canónicos').slice(0,6);
-      const parts=money.map(x=>`${x.Indicador}: ${names[0]} ${v26FormatEuro(x[names[0]])}, ${names[1]} ${v26FormatEuro(x[names[1]])}; diferencia ${x.Diferencia>0?'+':''}${v26FormatEuro(x.Diferencia)}${x['Variación %']===null?'':` (${x['Variación %']>0?'+':''}${v26FormatPercent(x['Variación %'])})`}`).join('. ');
-      out.title=`Comparativa · ${names.join(' vs ')}`;
-      out.answer=`He comparado los ${names.length} eventos con la misma base canónica de ControlEvent. ${parts}.`;
+    const tooGeneric=trim(out.answer).length<90||/he recuperado los datos solicitados/i.test(out.answer);
+    if(missing.length||tooGeneric){
+      const table=arr(cmp.tables).find(x=>x.key==='comparison'),rows=arr(table?.rows);
+      if(rows.length){
+        const incomeWinner=rows.slice().sort((a,b)=>num(b.Ingresos)-num(a.Ingresos))[0];
+        const valuationWinner=rows.slice().sort((a,b)=>num(b['Valoración del evento'])-num(a['Valoración del evento']))[0];
+        const balanceWinner=rows.slice().sort((a,b)=>num(b['Saldo operativo'])-num(a['Saldo operativo']))[0];
+        const donationWinner=rows.slice().sort((a,b)=>num(b['Donaciones valoradas'])-num(a['Donaciones valoradas']))[0];
+        out.title=`Comparativa · ${names.join(' vs ')}`;
+        out.answer=`La comparación usa la misma base canónica para ${names.length} eventos. ${incomeWinner.Evento} registra los mayores ingresos (${v26FormatEuro(incomeWinner.Ingresos)}); ${balanceWinner.Evento}, el mayor saldo operativo (${v26FormatEuro(balanceWinner['Saldo operativo'])}); ${donationWinner.Evento}, el mayor valor de producto donado (${v26FormatEuro(donationWinner['Donaciones valoradas'])}); y ${valuationWinner.Evento}, la mayor valoración total (${v26FormatEuro(valuationWinner['Valoración del evento'])}).`;
+      }
     }
     if(intent.asksConclusion&&!/(?:sal[ií]o|fue|result[oó]|queda|qued[oó])\s+(?:claramente\s+)?mejor|mejor\s+resultado|peor\s+resultado|en\s+conclusi[oó]n|por\s+tanto|en\s+conjunto|econ[oó]micamente\s+(?:mejor|peor)|m[aá]s\s+eficiente/i.test(out.answer)){
       const t=arr(cmp.tables).find(x=>x.key==='comparison'),rows=arr(t?.rows);
@@ -6422,16 +6663,49 @@ function v26SemanticAudit(final,results,userPrompt){
         const a=rows[0],b=rows[1],aVal=num(a['Valoración del evento']),bVal=num(b['Valoración del evento']),aSaldo=num(a['Saldo operativo']),bSaldo=num(b['Saldo operativo']);
         const winner=bVal>aVal?b:a,other=winner===a?b:a;
         const saldoWinner=winner===a?aSaldo:bSaldo,saldoOther=winner===a?bSaldo:aSaldo;
-        out.answer+=` En conjunto, ${winner.Evento} presenta el mejor resultado según la valoración económica de ControlEvent: ${v26FormatEuro(winner['Valoración del evento'])} frente a ${v26FormatEuro(other['Valoración del evento'])}. Su saldo operativo es ${v26FormatEuro(saldoWinner)}, frente a ${v26FormatEuro(saldoOther)} del otro evento.`;
+        out.answer+=` En conjunto, ${winner.Evento} aporta más valor según la valoración económica de ControlEvent: ${v26FormatEuro(winner['Valoración del evento'])} frente a ${v26FormatEuro(other['Valoración del evento'])}. Su saldo operativo es ${v26FormatEuro(saldoWinner)}, frente a ${v26FormatEuro(saldoOther)} del otro evento.`;
       }
     }
-    if(!out.showTables.some(x=>trim(x.tool_id)===trim(cmp.id)&&trim(x.table_key)==='comparison'))out.showTables.unshift({tool_id:cmp.id,table_key:'comparison'});
+    if(!out.showTables.some(x=>trim(x.tool_id)===trim(cmp.id)&&trim(x.table_key)==='comparison')&&intent.explicitList)out.showTables.unshift({tool_id:cmp.id,table_key:'comparison'});
     out.chartSpecs=out.chartSpecs.filter(x=>trim(x.tool_id)===trim(cmp.id));
   }
 
-  const person=arr(results).find(r=>r.ok&&r.name==='person_dossier');
-  if(person){
-    const f=person.facts||{};
+  const persons=arr(results).filter(r=>r.ok&&r.name==='person_dossier');
+  if(persons.length>=2){
+    const a=persons[0].facts||{},b=persons[1].facts||{};
+    const an=trim(arr(results).find(r=>r===persons[0])?.facts?.query||a.person||'Primera persona');
+    const bn=trim(arr(results).find(r=>r===persons[1])?.facts?.query||b.person||'Segunda persona');
+    const focus=v26FollowupFocusFromPrompt(userPrompt,frame.focus);
+    out.title=`Comparativa · ${an} vs ${bn}`;
+
+    if(focus==='participation'||/\bparticip/.test(p)){
+      const ac=num(a.event_count),bc=num(b.event_count);
+      const winner=ac===bc?'Empate':ac>bc?an:bn;
+      out.answer=`${an} aparece vinculado a ${v26CountPhrase(ac,'evento','eventos')} y ${bn} a ${v26CountPhrase(bc,'evento','eventos')}. ${winner==='Empate'?'Los dos tienen la misma participación por número de eventos.':`Por participación en eventos, ${winner} ha participado más.`}`;
+    }else if(focus==='responsibilities'||/\bresponsab/.test(p)){
+      const aTasks=num(a.hitos_count)+num(a.lg_count),bTasks=num(b.hitos_count)+num(b.lg_count);
+      out.answer=`En responsabilidades, ${an} tiene ${v26CountPhrase(a.purchase_responsibility_lines,'línea','líneas')} de compra vinculadas por ${v26FormatEuro(a.purchase_responsibility_total)}, además de ${v26CountPhrase(a.hitos_count,'hito','hitos')} y ${v26CountPhrase(a.lg_count,'tarea LG','tareas LG')}. ${bn} tiene ${v26CountPhrase(b.purchase_responsibility_lines,'línea','líneas')} de compra por ${v26FormatEuro(b.purchase_responsibility_total)}, ${v26CountPhrase(b.hitos_count,'hito','hitos')} y ${v26CountPhrase(b.lg_count,'tarea LG','tareas LG')}.`;
+      if(num(a.purchase_responsibility_lines)!==num(b.purchase_responsibility_lines)||aTasks!==bTasks){
+        const aw=(num(a.purchase_responsibility_lines)>num(b.purchase_responsibility_lines)?1:0)+(aTasks>bTasks?1:0);
+        const bw=(num(b.purchase_responsibility_lines)>num(a.purchase_responsibility_lines)?1:0)+(bTasks>aTasks?1:0);
+        if(aw!==bw)out.answer+=` En estas dimensiones, ${aw>bw?an:bn} acumula más responsabilidad operativa registrada.`;
+      }
+    }else if(focus==='implication'||/\bimplicad/.test(p)){
+      const dims=[
+        ['participación',num(a.event_count),num(b.event_count)],
+        ['líneas de compra bajo responsabilidad',num(a.purchase_responsibility_lines),num(b.purchase_responsibility_lines)],
+        ['gestión Hitos/LG',num(a.hitos_count)+num(a.lg_count),num(b.hitos_count)+num(b.lg_count)],
+        ['donaciones como donante',num(a.donation_lines),num(b.donation_lines)]
+      ];
+      let aw=0,bw=0;dims.forEach(([,av,bv])=>{if(av>bv)aw++;else if(bv>av)bw++;});
+      const winner=aw===bw?'ninguno de forma clara':aw>bw?an:bn;
+      out.answer=`Para valorar la implicación no uso un índice opaco: comparo participación, responsabilidades de compra, gestión Hitos/LG y donaciones. ${an} aparece en ${v26CountPhrase(a.event_count,'evento','eventos')} y registra ${v26CountPhrase(a.purchase_responsibility_lines,'línea','líneas')} de compra bajo responsabilidad, ${v26CountPhrase(a.hitos_count+a.lg_count,'responsabilidad de gestión','responsabilidades de gestión')}; ${bn} aparece en ${v26CountPhrase(b.event_count,'evento','eventos')} y registra ${v26CountPhrase(b.purchase_responsibility_lines,'línea','líneas')} de compra y ${v26CountPhrase(b.hitos_count+b.lg_count,'responsabilidad de gestión','responsabilidades de gestión')}. ${winner==='ninguno de forma clara'?'Las dimensiones quedan repartidas y no hay un ganador claro.':`Con ese criterio, ${winner} muestra una implicación registrada mayor.`}`;
+    }else{
+      out.answer=`${an} aparece en ${v26CountPhrase(a.event_count,'evento','eventos')} y ${bn} en ${v26CountPhrase(b.event_count,'evento','eventos')}. En ingresos vinculados constan ${v26FormatEuro(a.income_linked_total)} frente a ${v26FormatEuro(b.income_linked_total)}; en compras bajo responsabilidad, ${v26FormatEuro(a.purchase_responsibility_total)} frente a ${v26FormatEuro(b.purchase_responsibility_total)}.`;
+    }
+    if(!intent.explicitList)out.showTables=[];
+  }else if(persons.length===1){
+    const person=persons[0],f=person.facts||{};
     if(f.composite_expansion){
       const names=arr(f.matched_entities);
       if(names.length>1&&!names.some(n=>norm(out.answer).includes(norm(n))))out.answer=`He tenido en cuenta que «${f.query}» aparece en ControlEvent bajo varias entidades relacionadas: ${names.join(' y ')}. ${out.answer}`;
@@ -6445,6 +6719,50 @@ function v26SemanticAudit(final,results,userPrompt){
     }
   }
 
+  const documentation=arr(results).find(r=>r.ok&&r.name==='event_documentation');
+  if(documentation){
+    const f=documentation.facts||{},missing=arr(f.missing_evidence);
+    const asksMissing=frame.focus==='documentation_missing'||/\b(faltan|pendientes|cuales son|cuáles son)\b/.test(p);
+    if(asksMissing){
+      out.title=`Justificación documental · ${f.event}`;
+      if(!missing.length){
+        out.answer=`No falta ningún justificante o adjunto de los que ControlEvent controla documentalmente en ${f.event}: los ${v26CountPhrase(f.income_records,'registro de ingreso','registros de ingreso')} tienen justificante, los ${v26CountPhrase(f.purchase_tickets,'ticket de compra','tickets de compra')} tienen fototicket y los ${v26CountPhrase(f.documents,'documento','documentos')} registrados tienen adjunto. Esto acredita documentación disponible; no equivale por sí solo a conciliación bancaria.`;
+        out.showTables=[];
+      }else{
+        out.answer=`Faltan ${v26CountPhrase(missing.length,'elemento documental','elementos documentales')} en ${f.event}. Te indico exactamente cuáles en la tabla de pendientes.`;
+        out.showTables=[{tool_id:documentation.id,table_key:'missing_evidence'}];
+      }
+    }else if(trim(out.answer).length<100||/he recuperado los datos solicitados/i.test(out.answer)){
+      out.title=`Justificación documental · ${f.event}`;
+      out.answer=`En ${f.event}, ${v26CountPhrase(f.income_with_receipt,'registro de ingreso tiene','registros de ingreso tienen')} justificante de ${v26CountPhrase(f.income_records,'registro','registros')}; ${v26CountPhrase(f.purchase_tickets_with_image,'ticket de compra tiene','tickets de compra tienen')} fototicket de ${v26CountPhrase(f.purchase_tickets,'ticket','tickets')}; y ${v26CountPhrase(f.documents_with_attachment,'documento tiene','documentos tienen')} adjunto de ${v26CountPhrase(f.documents,'documento','documentos')}. ${num(f.missing_evidence_count)>0?`Quedan ${v26CountPhrase(f.missing_evidence_count,'elemento','elementos')} sin evidencia documental.`:'No detecto adjuntos documentales pendientes en estos tres bloques.'}`;
+    }
+  }
+
+  const event=arr(results).find(r=>r.ok&&r.name==='event_dossier');
+  if(event&&intent.anomaly){
+    const f=event.facts||{},people=arr(results).find(r=>r.ok&&r.name==='event_people'),breakdown=arr(results).find(r=>r.ok&&r.name==='event_breakdowns');
+    const docs=documentation,findings=[];
+    const peopleTable=arr(people?.tables).find(t=>t.key==='people');
+    const negative=arr(peopleTable?.rows).filter(r=>num(r['Importe voluntario'])<0);
+    if(negative.length)findings.push(`${v26CountPhrase(negative.length,'ajuste voluntario negativo','ajustes voluntarios negativos')} en ingresos (${negative.slice(0,3).map(r=>`${r.Persona}: ${v26FormatEuro(r['Importe voluntario'])}`).join(', ')})`);
+    if(num(f.purchases_pending)>0)findings.push(`quedan ${v26FormatEuro(f.purchases_pending)} en compras pendientes`);
+    if(num(f.operating_balance)<0)findings.push(`el saldo operativo es negativo (${v26FormatEuro(f.operating_balance)})`);
+    if(docs&&num(docs?.facts?.missing_evidence_count)>0)findings.push(`hay ${v26CountPhrase(docs.facts.missing_evidence_count,'elemento documental','elementos documentales')} sin adjunto`);
+    if(breakdown){
+      const bf=breakdown.facts||{};
+      if(Math.abs(num(bf.purchases_realized)-num(f.purchases_realized))>.02)findings.push(`el desglose de compras (${v26FormatEuro(bf.purchases_realized)}) no coincide con el total canónico (${v26FormatEuro(f.purchases_realized)})`);
+      if(Math.abs(num(bf.donations_value)-num(f.donations_value))>.02)findings.push(`el desglose de donaciones (${v26FormatEuro(bf.donations_value)}) no coincide con el total canónico (${v26FormatEuro(f.donations_value)})`);
+    }
+    out.title=`Revisión de anomalías · ${f.event}`;
+    if(findings.length){
+      out.answer=`He revisado ingresos, compras, donaciones, saldo, participación y documentación. Sí hay aspectos que merecen revisión: ${findings.join('; ')}. No les atribuyo una causa sin datos adicionales.`;
+    }else{
+      const ratio=num(f.purchases_realized)?round(num(f.donations_value)/num(f.purchases_realized)*100,1):0;
+      out.answer=`He revisado los principales cruces de ${f.event} y no veo un descuadre contable evidente: ingresos ${v26FormatEuro(f.income_total)}, compras ${v26FormatEuro(f.purchases_realized)}, saldo ${v26FormatEuro(f.operating_balance)} y valoración ${v26FormatEuro(f.event_valuation)} son coherentes entre sí. Como dato llamativo, el producto donado vale ${v26FormatEuro(f.donations_value)}${ratio?`, aproximadamente un ${v26FormatPlainNumber(ratio,1)} % del valor de las compras realizadas`:''}. Eso es relevante, pero no es por sí mismo una anomalía.`;
+    }
+    out.showTables=[];
+  }
+
   const breakdown=arr(results).find(r=>r.ok&&r.name==='event_breakdowns');
   if(breakdown){
     const force=(key)=>{if(!out.showTables.some(x=>trim(x.tool_id)===trim(breakdown.id)&&trim(x.table_key)===key))out.showTables.push({tool_id:breakdown.id,table_key:key});};
@@ -6454,7 +6772,6 @@ function v26SemanticAudit(final,results,userPrompt){
     if(/\btienda|tiendas\b/.test(p))force('stores');
   }
 
-  // Política de presentación implícita: conversación primero; tablas solo cuando la pregunta las necesita.
   if(intent.explicitNoTables||(intent.conversational&&!intent.explicitList&&!intent.comparison)){
     out.showTables=[];
   }
@@ -6487,19 +6804,57 @@ function v26FallbackFromTools(results,userPrompt){
   const part=ok.find(r=>r.name==='participation_events');if(part)return{title:part.title,answer:`He encontrado ${v26CountPhrase(part.facts?.event_count||0,'evento','eventos')} para ${part.facts?.person||'la persona indicada'}.`,showTables:[{tool_id:part.id,table_key:'events'}],chartSpecs:[],warnings:[]};
   return{title:'Respuesta de Zuzu',answer:'He recuperado los datos solicitados de ControlEvent.',showTables:ok.slice(0,2).flatMap(r=>arr(r.tables).slice(0,1).map(t=>({tool_id:r.id,table_key:t.key}))),chartSpecs:[],warnings:[]};
 }
-async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[]}){
-  let plan;
-  try{plan=await callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace,conversationHistory);}catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationContext={},conversationResolution={}}){
+  let plan=v26DeterministicPlan(userPrompt,state,selectedEventId,conversationResolution,conversationContext);
+  if(plan){
+    zuzuTracePush(flowTrace,'V26 · Plan ControlEvent','OK',`Plan local determinista: ${plan.tools.map(t=>t.name).join(', ')}. Se evita una llamada Gemini de planificación porque la intención ya es inequívoca.`);
+  }else{
+    try{plan=await callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace,conversationHistory);}
+    catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+  }
   if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-clarify',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
-  const results=await v26ExecuteTools(plan.tools,state,selectedEventId,flowTrace); const good=results.filter(r=>r.ok); if(!good.length){return{ok:true,rejected:true,title:'No puedo obtener datos fiables',answer:results.map(r=>r.error).filter(Boolean).join(' · ')||'Las herramientas de ControlEvent no han podido recuperar datos.',warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-data-error',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};}
-  let final; try{final=await callGeminiV26Final(userPrompt,plan,results,flowTrace,conversationHistory);}catch(error){final=v26FallbackFromTools(results,userPrompt);final.model='';final.warnings=arr(final.warnings).concat(friendlyZuzuErrorMessage(error));}
-  final=v26SemanticAudit(final,results,userPrompt);
+
+  const results=await v26ExecuteTools(plan.tools,state,selectedEventId,flowTrace);
+  const good=results.filter(r=>r.ok);
+  if(!good.length){
+    return{ok:true,rejected:true,title:'No puedo obtener datos fiables',answer:results.map(r=>r.error).filter(Boolean).join(' · ')||'Las herramientas de ControlEvent no han podido recuperar datos.',warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-data-error',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
+  }
+
+  const nextContext=v26ConversationContextFromRun(userPrompt,plan,results,conversationContext,conversationResolution,selectedEventId);
+  let final;
+  try{
+    final=await callGeminiV26Final(userPrompt,plan,results,flowTrace,conversationHistory,nextContext);
+  }catch(error){
+    // El fallback no es un KO funcional: CE ya tiene los hechos canónicos y construye
+    // una respuesta determinista. Se deja WARN para diagnóstico sin contaminar la traza con
+    // un fallo rojo si la consulta sí ha quedado respondida correctamente.
+    zuzuTracePush(flowTrace,'V26 · Redacción de respaldo','WARN',`Se usa redacción determinista de ControlEvent: ${cleanGeminiError(error)}`);
+    final=v26FallbackFromTools(results,userPrompt);final.model='';final.warnings=arr(final.warnings);
+  }
+  final=v26SemanticAudit(final,results,userPrompt,nextContext);
   final={...final,answer:v26PolishNarrative(v26FormatNarrativeMoney(final.answer,results))};
   const presentation=v26BuildPresentation(final,results,userPrompt); const files=[];
-  for(const t of presentation.tables.slice(0,4)){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v26_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
-  const displayName=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||null}); const answer=`${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
-  zuzuTracePush(flowTrace,'V26 · ControlEvent presenta','OK',`Tools=${results.length}; tablas=${presentation.tables.length}; gráficas=${presentation.charts.length}.`);
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-v26-tools',model:final.model||plan.model||'',meta:{generatedAt:new Date().toISOString(),version:'v26_prod',architecture:'Prompt -> Gemini selecciona herramientas -> CE calcula hechos canónicos en memoria -> Gemini analiza/redacta -> CE audita cifras y presenta',plannerModel:plan.model||'',intent:plan.intent||'',tools:plan.tools.map(t=>t.name),geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,100)},debugTrace:arr(flowTrace).slice(0,100),showDebugTrace:true};
+  for(const t of presentation.tables.slice(0,4)){
+    const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));
+    files.push({filename:fileSafe(`${t.title}_v26_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});
+  }
+  const displayName=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||null});
+  const answer=`${trim(final.answer)}\n\n${displayName}, soy tu amigo Zuzu, pregúntame lo que quieras.`;
+  zuzuTracePush(flowTrace,'V26 · ControlEvent presenta','OK',`Tools=${results.length}; tablas=${presentation.tables.length}; gráficas=${presentation.charts.length}. Contexto=${nextContext.topic||'sin marco'}${nextContext.focus?`/${nextContext.focus}`:''}.`);
+  return{
+    ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,
+    provider:'gemini-v26-tools',model:final.model||plan.model||'',
+    meta:{
+      generatedAt:new Date().toISOString(),version:'v26_prod',
+      architecture:'Prompt -> CE resuelve conversación -> CE planifica si la intención es inequívoca / Gemini planifica si es ambigua -> CE calcula hechos canónicos -> Gemini analiza -> CE audita y presenta',
+      plannerModel:plan.model||'',intent:plan.intent||'',tools:plan.tools.map(t=>t.name),
+      conversationContext:nextContext,
+      geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),
+      debugTrace:arr(flowTrace).slice(0,100)
+    },
+    conversationContext:nextContext,
+    debugTrace:arr(flowTrace).slice(0,100),showDebugTrace:true
+  };
 }
 
 async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){
@@ -6595,7 +6950,7 @@ function v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acc
   return{ok:true,rejected:false,title:'Qué puedes preguntarle a Zuzu',answer,warnings:[],charts:[],tables:[],files:[],provider:'control-event-local-capabilities',model:'',meta:{generatedAt:new Date().toISOString(),version:'v26_prod',architecture:'Ayuda local de capacidades; no requiere llamada a Gemini',geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:[{step:'V26 · Capacidades de Zuzu',status:'OK',detail:'Respuesta local basada en las capacidades reales de ControlEvent; sin consumo Gemini.'}]},debugTrace:[{step:'V26 · Capacidades de Zuzu',status:'OK',detail:'Respuesta local basada en las capacidades reales de ControlEvent; sin consumo Gemini.'}],showDebugTrace:true};
 }
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, conversationHistory } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, conversationHistory, conversationContext } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
   zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
@@ -6623,14 +6978,26 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
-  const safeHistory=arr(conversationHistory).slice(-6).map(x=>({user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),intent:trim(x?.intent).slice(0,120),tools:arr(x?.tools).map(trim).filter(Boolean).slice(0,6),selectedEventId:trim(x?.selectedEventId).slice(0,100)}));
-  const conv=v26ResolveConversationFollowUp(userPrompt,state,selectedEventId,safeHistory);const processingPrompt=trim(conv?.effectivePrompt)||userPrompt;
-  if(conv?.isFollowUp)zuzuTracePush(flowTrace,'V26 · Contexto conversacional','OK',`${conv.reason||'Continuación detectada'}. Personas=${arr(conv.people).join(' / ')||'—'}; eventos=${arr(conv.events).join(' / ')||'—'}. El evento de pantalla queda como contexto secundario.`);
-  const semanticAgentMode = promptNeedsSemanticAgent(processingPrompt, state, safeHistory);
+  const safeContext=v26NormalizeConversationContext(conversationContext||{});
+  const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
+    user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,900),title:trim(x?.title).slice(0,160),
+    provider:trim(x?.provider).slice(0,80),intent:trim(x?.intent).slice(0,120),
+    tools:arr(x?.tools).map(trim).filter(Boolean).slice(0,6),selectedEventId:trim(x?.selectedEventId).slice(0,100),
+    conversationContext:v26NormalizeConversationContext(x?.conversationContext||x?.context||{})
+  }));
+  const conv=v26ResolveConversationFollowUp(userPrompt,state,selectedEventId,safeHistory,safeContext);
+  const processingPrompt=trim(conv?.effectivePrompt)||userPrompt;
+  if(conv?.isFollowUp)zuzuTracePush(flowTrace,'V26 · Contexto conversacional','OK',`${conv.reason||'Continuación detectada'}. Personas=${arr(conv.people).join(' / ')||'—'}; eventos=${arr(conv.events).join(' / ')||'—'}; foco=${trim(conv.focus)||'—'}. El evento de pantalla queda como contexto secundario.`);
+  // IMPORTANTE: una continuación ya resuelta SIEMPRE entra en Zuzu Tools. Antes se volvía
+  // a evaluar solo el prompt reescrito; frases como «¿y en responsabilidades?» podían perder
+  // el marcador de continuación y caer en la rama antigua.
+  const weatherSpecial=wantsWeatherInfo(userPrompt)||/\b(meteo|meteorolog|metereolog|clima|lluvia|temperatura|viento|previsi[oó]n|pron[oó]stico)\b/i.test(userPrompt);
+  const semanticAgentMode = !weatherSpecial && (conv?.isFollowUp || promptNeedsSemanticAgent(userPrompt, state, safeHistory) || promptNeedsSemanticAgent(processingPrompt, state, safeHistory) || eventish.test(userPrompt));
   if (semanticAgentMode) {
-    const intent=v26ImplicitIntent(processingPrompt);if(intent.documentation)state=await attachBankState(state,processingPrompt,flowTrace);
-    zuzuTracePush(flowTrace, 'V26 · Zuzu Tools', 'OK', `Petición de datos detectada${conv?.isFollowUp?' como continuación conversacional':''}. Gemini seleccionará herramientas de dominio; ControlEvent devolverá hechos canónicos sin SQL generado por IA. Catálogo: eventos=${arr(state?.eventos).length}, tiendas=${arr(state?.tiendas).length}, productos=${arr(state?.productos).length}, personas=${arr(state?.personas).length}.`);
-    return runZuzuV26Tools({ userPrompt:processingPrompt, state, selectedEventId, flowTrace, conversationHistory:safeHistory });
+    const intent=v26ImplicitIntent(processingPrompt);
+    if(intent.documentation||conv?.focus==='documentation'||conv?.focus==='documentation_missing')state=await attachBankState(state,processingPrompt,flowTrace);
+    zuzuTracePush(flowTrace, 'V26 · Zuzu Tools', 'OK', `Petición de datos detectada${conv?.isFollowUp?' como continuación conversacional':''}. ControlEvent intentará resolver localmente el plan inequívoco; Gemini solo planificará si queda ambigüedad. Catálogo: eventos=${arr(state?.eventos).length}, tiendas=${arr(state?.tiendas).length}, productos=${arr(state?.productos).length}, personas=${arr(state?.personas).length}.`);
+    return runZuzuV26Tools({ userPrompt:processingPrompt, state, selectedEventId, flowTrace, conversationHistory:safeHistory, conversationContext:safeContext, conversationResolution:conv });
   }
   state = await attachHitosState(state, flowTrace);
   state = await attachBankState(state, processingPrompt, flowTrace);

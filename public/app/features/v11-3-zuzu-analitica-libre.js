@@ -113,7 +113,7 @@
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
       '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
       '@media(pointer:coarse){#ceGeminiLibreOverlay .ce-ai-thinking-orb,#ceGeminiLibreOverlay .ce-ai-thinking-orb:before,#ceGeminiLibreOverlay .ce-ai-thinking-orb:after,#ceGeminiLibreOverlay .ce-ai-spinner{animation:none!important}}\n';
-    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}';
+    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}';
     document.head.appendChild(css);
   }
 
@@ -194,7 +194,8 @@
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
     window.__ceZuzuConversationV26=[];
-    try{ sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_conversation'); }catch(_){ }
+    window.__ceZuzuConversationContextV26=null;
+    try{ sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_context'); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -319,19 +320,29 @@
     return window.__ceZuzuConversationV26;
   }
   function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
+  function zuzuContextKey(){ return 'ControlEvent_v26_prod_zuzu_context'; }
+  function loadZuzuConversationContext(){
+    if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
+    try{ var raw=sessionStorage.getItem(zuzuContextKey()); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; }catch(_){ window.__ceZuzuConversationContextV26=null; }
+    return window.__ceZuzuConversationContextV26;
+  }
+  function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
     var ev=currentEvent();
     var globalAsk=/\b(todos\s+los\s+eventos|eventos\s+registrados|consulta\s+global|cualquier\s+evento|en\s+todos\s+los\s+eventos)\b/i.test(prompt);
     var eventMention=/\b(evento|eventos|jornada|jornadas|celebraci[oó]n|celebraciones|peña|arrastre)\b|[\"“”'‘’][^\"“”'‘’]{3,90}[\"“”'‘’]/i.test(prompt);
-    if(!ev && !globalAsk && !eventMention){ setStatus('Selecciona un evento o menciona claramente el evento/consulta global.', 'err'); return; }
+    var priorContext=loadZuzuConversationContext();
+    var hasConversation=loadZuzuConversation().length>0 || !!(priorContext&&priorContext.topic);
+    if(!ev && !globalAsk && !eventMention && !hasConversation){ setStatus('Selecciona un evento, menciona el ámbito o continúa una conversación de Zuzu.', 'err'); return; }
     setStatus('Zuzu está preparando el plan...', 'ok');
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
       var history=loadZuzuConversation().slice(-6);
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationHistory:history})});
+      var conversationContext=loadZuzuConversationContext();
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationHistory:history,conversationContext:conversationContext})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -346,8 +357,10 @@
         }
       }
       data.__prompt = prompt;
+      var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||conversationContext||null;
+      if(returnedContext&&typeof returnedContext==='object'){ window.__ceZuzuConversationContextV26=returnedContext; saveZuzuConversationContext(); }
       if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
-      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId()});
+      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext});
       if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
       saveZuzuConversation();
       await finishZuzuThinkingFast();
@@ -371,6 +384,8 @@
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
     if(!Array.isArray(trace) || !trace.length) return '';
     var ok=trace.filter(function(x){return String(x.status||'').toUpperCase()==='OK';}).length;
+    var retry=trace.filter(function(x){return String(x.status||'').toUpperCase()==='RETRY';}).length;
+    var warn=trace.filter(function(x){return String(x.status||'').toUpperCase()==='WARN';}).length;
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
     var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
     var usageLine='';
@@ -390,7 +405,8 @@
       }
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
     }).join('');
-    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad</h3><details><summary>Ver recorrido técnico: '+ok+' OK / '+ko+' KO'+esc(usageLine)+'</summary>'+items+'</details></div>';
+    var statusBits=[ok+' OK']; if(retry)statusBits.push(retry+' reintento'+(retry===1?'':'s')); if(warn)statusBits.push(warn+' aviso'+(warn===1?'':'s')); statusBits.push(ko+' KO');
+    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad</h3><details><summary>Ver recorrido técnico: '+statusBits.join(' / ')+esc(usageLine)+'</summary>'+items+'</details></div>';
   }
   function renderResult(data){
     data = data || {};
