@@ -1,7 +1,7 @@
 {
   "version": "15.0.0-prod",
   "notes": "v23_prod FIX8: ColtyLAB contextual, versión de ficha centralizada y comparativas con familia exacta/sin anexos no pedidos.",
-  "versionLabel": "ControlEvent v26_prod_1.0",
+  "versionLabel": "ControlEvent v26_prod_1.1",
   "generatedAt": "2026-07-17T22:10:00+02:00",
   "build": "v23_prod_r1",
   "versionFile": "ControlEvent_v23_prod_r1",

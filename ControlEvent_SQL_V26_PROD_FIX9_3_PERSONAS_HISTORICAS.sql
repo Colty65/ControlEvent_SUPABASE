@@ -1,4 +1,4 @@
--- ControlEvent v26_prod_1.0 · FIX9.3.1
+-- ControlEvent v26_prod_1.1 · FIX9.3.1
 -- Fotografías históricas corregidas de PERSONAS por EVENTO.
 --
 -- Ejecutar en Supabase > SQL Editor tanto en una instalación nueva como si ya se ejecutó la FIX9.3 original.

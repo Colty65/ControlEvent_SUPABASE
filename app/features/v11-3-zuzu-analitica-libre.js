@@ -1,9 +1,9 @@
-/* ControlEvent v26_prod_1.0 - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v26_prod_1.1 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v26_prod_1.0';
+  var VERSION='v26_prod_1.1';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -75,7 +75,7 @@
     data=data||{}; var m=data.meta||{};
     var subject=cleanSubject(m.filenameSubject || userFacingTitle(data,prompt) || prompt || 'respuesta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v26_prod_1.0-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v26_prod_1.1-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -141,7 +141,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod_1.0</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v26_prod_1.1</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -196,7 +196,7 @@
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
     saveZuzuInteractionId('');
-    try{ sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_context'); sessionStorage.removeItem('ControlEvent_v26_prod_1.0_zuzu_interaction_id'); }catch(_){ }
+    try{ sessionStorage.removeItem('ControlEvent_v26_prod_1.1_zuzu_conversation'); sessionStorage.removeItem('ControlEvent_v26_prod_1.1_zuzu_context'); sessionStorage.removeItem('ControlEvent_v26_prod_1.1_zuzu_interaction_id'); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -314,24 +314,24 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_conversation'; }
+  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_1.1_zuzu_conversation'; }
   function loadZuzuConversation(){
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
-    try{ var raw=sessionStorage.getItem(zuzuConversationKey()); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
+    try{ var raw=sessionStorage.getItem(zuzuConversationKey())||sessionStorage.getItem('ControlEvent_v26_prod_1.0_zuzu_conversation'); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; if(raw&&!sessionStorage.getItem(zuzuConversationKey()))sessionStorage.setItem(zuzuConversationKey(),JSON.stringify(window.__ceZuzuConversationV26)); }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
   function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
-  function zuzuContextKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_context'; }
+  function zuzuContextKey(){ return 'ControlEvent_v26_prod_1.1_zuzu_context'; }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
-    try{ var raw=sessionStorage.getItem(zuzuContextKey()); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; }catch(_){ window.__ceZuzuConversationContextV26=null; }
+    try{ var raw=sessionStorage.getItem(zuzuContextKey())||sessionStorage.getItem('ControlEvent_v26_prod_1.0_zuzu_context'); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; if(raw&&!sessionStorage.getItem(zuzuContextKey()))sessionStorage.setItem(zuzuContextKey(),raw); }catch(_){ window.__ceZuzuConversationContextV26=null; }
     return window.__ceZuzuConversationContextV26;
   }
   function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
-  function zuzuInteractionKey(){ return 'ControlEvent_v26_prod_1.0_zuzu_interaction_id'; }
+  function zuzuInteractionKey(){ return 'ControlEvent_v26_prod_1.1_zuzu_interaction_id'; }
   function loadZuzuInteractionId(){
     if(typeof window.__ceZuzuInteractionIdV261==='string' && window.__ceZuzuInteractionIdV261) return window.__ceZuzuInteractionIdV261;
-    try{ window.__ceZuzuInteractionIdV261=String(sessionStorage.getItem(zuzuInteractionKey())||'').trim(); }catch(_){ window.__ceZuzuInteractionIdV261=''; }
+    try{ window.__ceZuzuInteractionIdV261=String(sessionStorage.getItem(zuzuInteractionKey())||sessionStorage.getItem('ControlEvent_v26_prod_1.0_zuzu_interaction_id')||'').trim(); if(window.__ceZuzuInteractionIdV261&&!sessionStorage.getItem(zuzuInteractionKey()))sessionStorage.setItem(zuzuInteractionKey(),window.__ceZuzuInteractionIdV261); }catch(_){ window.__ceZuzuInteractionIdV261=''; }
     return window.__ceZuzuInteractionIdV261||'';
   }
   function saveZuzuInteractionId(value){
@@ -341,7 +341,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v26_prod_1.0: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v26_prod_1.1: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
     loadZuzuInteractionId();
     setStatus('Zuzu está pensando...', 'ok');
@@ -350,7 +350,7 @@
     try{
       var history=loadZuzuConversation().slice(-6);
       var previousInteractionId=loadZuzuInteractionId();
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history})});
+      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }

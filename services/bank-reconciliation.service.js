@@ -36,7 +36,7 @@ function ticketNumber(code){ return Number(String(code || '').replace(/\D/g, '')
 function friendlyDbError(error){
   const msg = text(error?.message || error);
   if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|ce_bank_event_settings|ce_bank_event_movement_state|ce_bank_income_links|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
-    const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V26_PROD_1_0_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
+    const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V26_PROD_1_1_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
     err.status = 503;
     err.code = 'BANK_SCHEMA_MISSING';
     return err;

@@ -1,12 +1,12 @@
-/* ControlEvent v26_prod_1.0 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v26_prod_1.1 - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v26_prod_1.0';
-  var VERSION_TEXT = 'ControlEvent v26_prod_1.0';
-  var VERSION_FILE = 'ControlEvent_v26_prod_1.0';
-  var BUILD_ID = '20260809-V26-PROD-1-0-GEMINI-INTERACTIONS';
+  var VERSION_LABEL = 'v26_prod_1.1';
+  var VERSION_TEXT = 'ControlEvent v26_prod_1.1';
+  var VERSION_FILE = 'ControlEvent_v26_prod_1.1';
+  var BUILD_ID = '20260809-V26-PROD-1-1-GEMINI-INTERACTIONS-AFINADO';
   var ZIP_NAME = 'CE_V26_PROD_1_0_ZUZU_GEMINI_INTERACTIONS.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;

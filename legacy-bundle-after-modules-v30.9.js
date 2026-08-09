@@ -1,8 +1,8 @@
-/* ControlEvent v26_prod_1.0 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
+/* ControlEvent v26_prod_1.1 - Refuerzo de ordenacion en Resumen / Por tienda y Ticket.
    Evita depender del onclick inline, que en algunas capas antiguas no se ejecutaba. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v26_prod_1.0';
+  const VERSION = 'ControlEvent v26_prod_1.1';
   const ROOT_ID = 'summaryTiendaTicket';
 
   function $(id){ return document.getElementById(id); }
