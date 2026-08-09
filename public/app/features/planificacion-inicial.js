@@ -4407,12 +4407,24 @@
   }
 
 
+  function cePlanFormatGeminiCost(value){
+    const n = Number(value || 0);
+    return (Number.isFinite(n) ? n : 0).toLocaleString('es-ES',{minimumFractionDigits:5,maximumFractionDigits:6});
+  }
+  function renderPlanGeminiCost(debug){
+    const c = debug?.costEstimate;
+    if(!c || !Number(c.calls || 0)) return '';
+    const calls = Number(c.calls || 0);
+    const tokens = Number(c.totalTokens || 0);
+    return `<section class="planificacion-note compact-note" style="border:1px solid #a7f3d0;background:#ecfdf5;color:#065f46"><strong>💶 Consumo Gemini:</strong> ${calls} llamada${calls===1?'':'s'} · ${tokens.toLocaleString('es-ES')} tokens · <strong>coste estimado ${cePlanFormatGeminiCost(c.costEurApprox)} €</strong><br><small>Estimación de ControlEvent según tokens facturables y tarifas contractuales configuradas.</small></section>`;
+  }
+
   function renderPlanDebugTrace(debug){
     if(!debug) return '';
     const ctx = debug.contextResumen || {};
     const attempts = Array.isArray(debug.attempts) ? debug.attempts : [];
     const final = debug.finalCounts || {};
-    const rowsAttempts = attempts.map(a => `<tr><td>${esc(a.model || '')}</td><td>${a.ok ? 'OK' : 'ERROR'}</td><td>${esc(a.elapsedMs || 0)} ms</td><td>${esc(a.rowsGemini ?? '')}</td><td>${esc(a.comprasGemini ?? '')}</td><td>${esc(a.donacionesGemini ?? '')}</td><td>${esc(a.error || '')}</td></tr>`).join('');
+    const rowsAttempts = attempts.map(a => { const u=a.usage||{}; const ce=a.costEstimate||{}; const tokens=Number(u.totalTokens||ce.totalTokens||0); const eur=Number(u.costEurApprox||ce.costEurApprox||0); return `<tr><td>${esc(a.model || '')}</td><td>${a.ok ? 'OK' : 'ERROR'}</td><td>${esc(a.elapsedMs || 0)} ms</td><td>${tokens ? esc(tokens.toLocaleString('es-ES')) : '—'}</td><td>${eur ? esc(cePlanFormatGeminiCost(eur))+' €' : '—'}</td><td>${esc(a.rowsGemini ?? '')}</td><td>${esc(a.comprasGemini ?? '')}</td><td>${esc(a.donacionesGemini ?? '')}</td><td>${esc(a.error || '')}</td></tr>`; }).join('');
     const traceShort = {
       version: debug.version,
       selectedModel: debug.selectedModel,
@@ -4426,6 +4438,7 @@
       providerFinal: debug.providerFinal,
       modelFinal: debug.modelFinal,
       attempts: debug.attempts,
+      costEstimate: debug.costEstimate,
       notesFinal: debug.notesFinal,
       briefEvento: debug.briefEvento,
       briefEventoTexto: debug.briefEventoTexto,
@@ -4437,11 +4450,11 @@
     return `<section class="ce-hf27-diagnostic ce-fix32-trace" style="border-color:#0f172a;background:#f8fafc">
       <div class="ce-hf27-head" style="background:#e0f2fe">
         <div><h3>Trazabilidad FIX47: consumo abierto, fases y opciones</h3><p>Sirve para ver dónde se pierde la propuesta: extracción del prompt, JSON enviado, respuesta bruta de Zuzu, filas interpretadas y filas finales.</p></div>
-        <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span></div>
+        <div class="ce-hf27-kpis"><span>Tiempo <b>${esc(debug.elapsedMs || '—')} ms</b></span><span>Días <b>${esc(ctx.diasOperativos || '—')}</b></span><span>Momentos <b>${esc(ctx.momentos || '—')}</b></span><span>Donaciones <b>${esc(ctx.donacionesDetectadas ?? '—')}</b></span><span>Compras finales <b>${esc(final.compras ?? '—')}</b></span><span>Tokens Gemini <b>${esc(Number(debug.costEstimate?.totalTokens||0).toLocaleString('es-ES'))}</b></span><span>Coste estimado <b>${esc(cePlanFormatGeminiCost(debug.costEstimate?.costEurApprox))} €</b></span></div>
       </div>
       <div class="ce-hf27-actions"><button type="button" id="btnCePlanCopyTrace">Copiar traza completa</button></div>
       ${phaseHtml}
-      <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Filas Zuzu</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="7">No hay intento Zuzu registrado.</td></tr>'}</tbody></table></div>
+      <div class="ce-hf27-tablewrap"><table><thead><tr><th>Modelo</th><th>Estado</th><th>Tiempo</th><th>Tokens</th><th>Coste estimado</th><th>Filas Zuzu</th><th>Compras</th><th>Donaciones</th><th>Error</th></tr></thead><tbody>${rowsAttempts || '<tr><td colspan="9">No hay intento Zuzu registrado.</td></tr>'}</tbody></table></div>
       <details style="padding:12px 16px"><summary><b>Ver brief / request / respuesta bruta</b></summary><pre style="white-space:pre-wrap;max-height:460px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px">${esc(JSON.stringify(traceShort, null, 2)).slice(0, 180000)}</pre></details>
     </section>`;
   }
@@ -4533,8 +4546,9 @@
       const menuSummary = renderZuzuMenuSummary(data.menuResumen);
       const note = data.notes && data.notes.length ? '<div class="planificacion-note compact-note"><strong>Notas de Zuzu:</strong> '+data.notes.map(esc).join(' · ')+'</div>' : '';
       window.__cePlanLastDebug = data.debugPlanificacion || null;
+      const geminiCostInfo = renderPlanGeminiCost(data.debugPlanificacion);
       const tracePanel = renderPlanDebugTrace(data.debugPlanificacion);
-      const topInfo = menuSummary + note + tracePanel;
+      const topInfo = menuSummary + note + geminiCostInfo + tracePanel;
       if(topInfo){ document.getElementById('planificacionResultado')?.insertAdjacentHTML('afterbegin', topInfo); }
       bindPlanDebugTraceCopy(data.debugPlanificacion);
       document.getElementById('planificacionResultado')?.scrollIntoView({behavior:'smooth', block:'start'});

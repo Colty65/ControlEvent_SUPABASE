@@ -265,8 +265,15 @@ function estimateGeminiCost(model, usage = {}) {
   const totalTokens = Number(usage.totalTokenCount || usage.totalTokens || 0) || 0;
   const billableOutputTokens = Math.max(0, candidateTokens, totalTokens ? totalTokens - promptTokens : 0);
   const hiddenOutputTokens = Math.max(0, billableOutputTokens - candidateTokens);
-  let inputUsdPerM = 0.30, outputUsdPerM = 2.50, family = 'gemini-2.5-flash';
-  if (/flash-lite/i.test(m)) { inputUsdPerM = 0.10; outputUsdPerM = 0.40; family = 'gemini-2.5-flash-lite'; }
+  // Mismo cálculo contractual por tokens que usa Zuzu/Planificación en ControlEvent.
+  let inputUsdPerM = Number(process.env.CONTROLEVENT_GEMINI_FLASH_INPUT_USD_PER_M || '0.30') || 0.30;
+  let outputUsdPerM = Number(process.env.CONTROLEVENT_GEMINI_FLASH_OUTPUT_USD_PER_M || '2.50') || 2.50;
+  let family = 'gemini-2.5-flash';
+  if (/flash-lite/i.test(m)) {
+    inputUsdPerM = Number(process.env.CONTROLEVENT_GEMINI_FLASH_LITE_INPUT_USD_PER_M || '0.10') || 0.10;
+    outputUsdPerM = Number(process.env.CONTROLEVENT_GEMINI_FLASH_LITE_OUTPUT_USD_PER_M || '0.40') || 0.40;
+    family = 'gemini-2.5-flash-lite';
+  }
   const usd = (promptTokens * inputUsdPerM + billableOutputTokens * outputUsdPerM) / 1000000;
   const eurRate = Number(process.env.CONTROLEVENT_USD_EUR || '0.92') || 0.92;
   return { family, promptTokens, candidateTokens, visibleOutputTokens:candidateTokens, hiddenOutputTokens, outputTokens: billableOutputTokens, billableOutputTokens, totalTokens: totalTokens || promptTokens + billableOutputTokens, costUsd: Number(usd.toFixed(8)), costEurApprox: Number((usd * eurRate).toFixed(8)) };

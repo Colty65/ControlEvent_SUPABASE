@@ -193,6 +193,7 @@
   function clearZuzu(ev){
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
+    window.__ceZuzuConversationV26=[];
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -321,7 +322,8 @@
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload()})});
+      var history=Array.isArray(window.__ceZuzuConversationV26)?window.__ceZuzuConversationV26.slice(-6):[];
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationHistory:history})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -336,6 +338,9 @@
         }
       }
       data.__prompt = prompt;
+      if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
+      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160)});
+      if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
       await finishZuzuThinkingFast();
       stopZuzuThinking();
       renderResult(data);
@@ -345,6 +350,13 @@
       resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
     }
+  }
+  function usageHtml(data){
+    var usage=(data&&data.meta&&data.meta.geminiUsageEstimate)||data&&data.geminiUsageEstimate||null;
+    if(!usage || !(Number(usage.calls||0)>0)) return '';
+    var tokens=formatNumber(usage.totalTokens||0);
+    var cost=formatCost(usage.costEurApprox||0);
+    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' llamada(s) · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
@@ -383,6 +395,7 @@
     html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && visibleWarnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
+    html+=usageHtml(data);
     html+=traceHtml(data);
     (data.charts||[]).forEach(function(ch){ if(allowTechnical || !isTechnicalHeading(ch&&ch.title)) html+=chartHtml(ch); });
     (data.tables||[]).forEach(function(tb){ if(allowTechnical || !isTechnicalHeading(tb&&tb.title)) html+=tableHtml(tb); });

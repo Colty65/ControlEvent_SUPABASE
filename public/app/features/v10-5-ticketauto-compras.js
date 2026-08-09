@@ -114,6 +114,7 @@
 
     st.textContent += '\n@media (max-width:767px){.ce-ai-overlay{align-items:flex-start!important;padding:4px!important}.ce-ai-modal{width:99vw!important;max-height:98vh!important;padding:8px!important;border-radius:12px!important;overflow:auto!important;overflow-x:hidden!important}.ce-ai-head{position:sticky!important;top:0!important;background:#fff!important;z-index:8!important;padding-bottom:4px!important;display:grid!important;grid-template-columns:1fr auto!important;gap:6px!important;align-items:start!important}.ce-ai-title{font-size:15px!important;min-width:0!important;white-space:normal!important}.ce-ai-head>button,.ce-ai-head #ceAiClose{position:static!important;display:inline-flex!important;max-width:86px!important;min-width:68px!important;justify-content:center!important;font-size:13px!important;padding:7px 8px!important}.ce-ai-work{display:flex!important;flex-direction:column!important;gap:6px!important;overflow:visible!important}.ce-ai-left,.ce-ai-right{width:100%!important;min-width:0!important;overflow:visible!important;padding:6px!important;box-sizing:border-box!important}.ce-ai-photo-title{display:none!important}.ce-ai-photo-tools{justify-content:center!important;gap:6px!important}.ce-ai-photo-tools input{max-width:100%!important;font-size:12px!important;padding:5px!important}.ce-ai-photo-tools input#ceAiFile{display:block!important;width:100%!important;min-height:40px!important;opacity:1!important;visibility:visible!important;position:relative!important;z-index:3!important}.ce-ai-photo-tools #ceAiZoomBtn{font-size:12px!important;padding:5px 7px!important}.ce-ai-preview{height:160px!important;min-height:120px!important;max-height:210px!important}.ce-ai-grid{grid-template-columns:1fr!important;gap:5px!important;margin-bottom:4px!important}.ce-ai-field label{font-size:11px!important;margin-bottom:1px!important}.ce-ai-field select{padding:5px!important;font-size:12px!important}.ce-ai-hintbox textarea{height:32px!important;min-height:32px!important;font-size:11px!important}.ce-ai-totalbar{grid-template-columns:1fr 1fr 1fr!important;gap:4px!important}.ce-ai-totalbox{padding:4px!important}.ce-ai-totalbox strong{font-size:9px!important}.ce-ai-totalbox span{font-size:12px!important}.ce-ai-table-wrap{max-height:220px!important;min-height:190px!important;overflow:auto!important;scrollbar-width:auto!important}.ce-ai-table{font-size:10px!important;min-width:720px!important}.ce-ai-pending-box{min-height:220px!important}.ce-ai-pending-list{scrollbar-width:auto!important}.ce-ai-pending-title{font-size:12px!important;align-items:flex-start!important}.ce-ai-pending-row{grid-template-columns:25px 1fr 74px 72px 70px!important;font-size:10px!important}.ce-ai-actions-bottom{padding-bottom:4px!important}.ce-ai-download-btn{display:none!important}}\n#ceAiDownloadPhoto{display:none!important}\nbody.ce-ai-panel-open #ceMapaFloatingHomeButton,body.ce-ai-panel-open .ce-global-floating-home-v412,body.ce-ai-panel-open .ce-maint-floating-top-v40,body.ce-ai-panel-open .mapa-floating-home{display:none!important;visibility:hidden!important;pointer-events:none!important}\n';
     st.textContent += '\n.ce-ai-status.err{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;font-weight:950!important}.ce-ai-status.warn{background:#fef3c7!important;color:#92400e!important;border-color:#fde68a!important;font-weight:900!important}.ce-ai-status.ok{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;font-weight:900!important}';
+    st.textContent += '\n.ce-ai-gemini-trace{margin:4px 0 6px 0;padding:6px 9px;border:1px solid #a7f3d0;border-radius:10px;background:#ecfdf5;color:#065f46;font-size:11px;line-height:1.3}.ce-ai-gemini-trace summary{cursor:pointer;font-weight:950}.ce-ai-gemini-trace .ce-ai-cost-main{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.ce-ai-gemini-trace b{color:#064e3b}.ce-ai-gemini-trace small{display:block;margin-top:4px;color:#475569}@media(max-width:767px){.ce-ai-gemini-trace{font-size:10px;padding:5px 7px}}';
     document.head.appendChild(st);
   }
   function sortedByName(list){
@@ -220,6 +221,7 @@
             '</div>'+ 
             '<div class="ce-ai-hintbox"><textarea id="ceAiGeminiHint" placeholder="Ej.: responsable Juan Pérez; añade PROPINAS 1 ud 73,05 €; aplica IVA general a las líneas si procede."></textarea></div>'+
             '<div class="ce-ai-actions ce-ai-actions-top"><button type="button" id="ceAiAnalyze" class="ce-ai-primary ce-ai-icon-btn" aria-label="Analizar foto con IA"><span aria-hidden="true">🤖</span></button><button type="button" id="ceAiAddRow" class="ce-ai-secondary ce-ai-icon-btn" aria-label="Añadir fila manual"><span aria-hidden="true">🤚＋</span></button><button type="button" id="ceAiClear" class="ce-ai-danger ce-ai-icon-btn" aria-label="Limpiar"><span aria-hidden="true">🧹</span></button></div>'+ 
+            '<div id="ceAiGeminiTrace" class="ce-ai-gemini-trace" style="display:none"></div>'+
             '<datalist id="ceAiProducts"></datalist><datalist id="ceAiSegmentos"></datalist><datalist id="ceAiDestinos"></datalist>'+ 
             '<div class="ce-ai-totalbar"><div class="ce-ai-totalbox"><strong>Total factura líneas OK</strong><span id="ceAiTotalLines">0,00 €</span></div><div class="ce-ai-totalbox"><strong>Total leído en foto por IA</strong><span id="ceAiTotalPhoto">—</span></div><div id="ceAiDiffBox" class="ce-ai-totalbox"><strong>Diferencia</strong><span id="ceAiTotalDiff">—</span></div></div>'+ 
             '<div class="ce-ai-table-wrap"><table class="ce-ai-table"><thead><tr><th class="col-ok">OK</th><th class="col-prod">Producto</th><th class="col-attr">Segmento</th><th class="col-attr">Destino</th><th class="col-num">Unid.</th><th class="col-num">Precio</th><th class="col-num">Importe</th><th class="col-conf">Conf.</th><th class="col-del"></th></tr></thead><tbody id="ceAiRows"><tr><td colspan="9">Sin líneas todavía.</td></tr></tbody></table></div>'+ 
@@ -251,6 +253,23 @@
   }
   function refreshRole(){ var show=canWriteCompras()?'':'none'; var btn=$('btnReceiptAiCompras'); if(btn) btn.style.display=show; var hbtn=$('btnReceiptAiComprasHeader'); if(hbtn && hbtn.parentNode) hbtn.parentNode.removeChild(hbtn); }
   function setStatus(msg,type){ var el=$('ceAiStatus'); if(el){ el.className='ce-ai-status '+(type||'info'); el.textContent=msg||''; el.title=msg||''; } }
+  function formatGeminiCost(value){
+    var n=Number(value||0);
+    if(!Number.isFinite(n)) n=0;
+    return n.toLocaleString('es-ES',{minimumFractionDigits:5,maximumFractionDigits:6});
+  }
+  function renderGeminiTrace(data){
+    var box=$('ceAiGeminiTrace'); if(!box) return;
+    var u=data && data.usoGemini;
+    if(!u){ box.innerHTML=''; box.style.display='none'; return; }
+    var prompt=Number(u.promptTokens||0), output=Number(u.outputTokens||u.billableOutputTokens||0), total=Number(u.totalTokens||0);
+    var eur=Number(u.costEurApprox||0), usd=Number(u.costUsd||0);
+    var model=htmlEscape(data.modelo||u.model||'Gemini');
+    box.style.display='';
+    box.innerHTML='<details><summary>💶 Traza Gemini · coste estimado '+formatGeminiCost(eur)+' €</summary>'+
+      '<div class="ce-ai-cost-main"><span>Modelo <b>'+model+'</b></span><span>Entrada <b>'+prompt.toLocaleString('es-ES')+'</b> tokens</span><span>Salida facturable <b>'+output.toLocaleString('es-ES')+'</b> tokens</span><span>Total <b>'+total.toLocaleString('es-ES')+'</b> tokens</span><span>Coste estimado <b>'+formatGeminiCost(eur)+' €</b></span></div>'+
+      '<small>Cálculo de ControlEvent a partir de los tokens devueltos por Gemini y las tarifas contractuales configuradas. Equivalente estimado: $'+usd.toFixed(6)+'.</small></details>';
+  }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
     var oldT=tienda ? trim(tienda.value) : ''; var oldR=resp ? trim(resp.value) : '';
@@ -293,6 +312,7 @@
     if($('ceAiResponsable')) $('ceAiResponsable').value='';
     if($('ceAiPendingSort')) $('ceAiPendingSort').value='tienda';
     if($('ceAiPendingList')) $('ceAiPendingList').innerHTML='';
+    renderGeminiTrace(null);
     renderRows(); updateTotals(); markTicketSelect();
     setStatus(silent ? '' : 'Limpio.','ok');
   }
@@ -769,6 +789,7 @@
       var img=$('ceAiPreview'); if(img){ img.src=src; img.style.display=''; }
       return apiJson('/api/receipt-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:src, instrucciones:trim(($('ceAiGeminiHint')||{}).value), responsables:arr('personas').filter(isSocioPersona).map(function(p){return p.nombre||'';}).filter(Boolean), tiendas:arr('tiendas').map(function(t){return t.nombre||'';}).filter(Boolean)})});
     }).then(function(data){
+      renderGeminiTrace(data);
       var rows=Array.isArray(data.productos)?data.productos:[];
       window.__ceAiDetectedTotal=money(data.total||0);
       window.__ceAiTicketLines=sortLinesLikeTk(rows.map(function(r){ return enrichRowDefaults(Object.assign({ok:true},r)); }));
@@ -784,6 +805,7 @@
       if(respMsg) msg+=' '+respMsg;
       if(data.total) msg+=' Total leído: '+euro(data.total)+'.';
       if(data.proveedorIa || data.modelo) msg+=' IA: '+(data.proveedorIa||'')+(data.modelo?' '+data.modelo:'')+'.';
+      if(data.usoGemini) msg+=' Coste estimado: '+formatGeminiCost(data.usoGemini.costEurApprox)+' € ('+Number(data.usoGemini.totalTokens||0).toLocaleString('es-ES')+' tokens).';
       if(data.advertencias && data.advertencias.length) msg+=' Revisa advertencias.';
       setStatus(msg, rows.length?'ok':'warn');
     }).catch(function(err){
