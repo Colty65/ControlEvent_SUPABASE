@@ -1,12 +1,12 @@
-/* ControlEvent v26_prod_1.1 - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v26_prod_1.2 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v26_prod_1.1';
-  var VERSION_TEXT='ControlEvent v26_prod_1.1';
-  var VERSION_FILE='ControlEvent_v26_prod_1.1';
-  var BUILD_ID='20260809-V26-PROD-1-1-GEMINI-INTERACTIONS-AFINADO';
-  var ZIP_NAME='CE_V26_PROD_1_0_ZUZU_GEMINI_INTERACTIONS.zip';
+  var VERSION_LABEL='v26_prod_1.2';
+  var VERSION_TEXT='ControlEvent v26_prod_1.2';
+  var VERSION_FILE='ControlEvent_v26_prod_1.2';
+  var BUILD_ID='20260809-V26-PROD-1-2-GEMINI-INTERACTIONS-AFINADO';
+  var ZIP_NAME='CE_V26_PROD_1_2_ZUZU_IDENTIDAD_SEMANTICA.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -14,7 +14,7 @@
     return String(value||'')
       .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
       .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
-      .replace(/\bv26_prod_1.1\b/ig,VERSION_LABEL);
+      .replace(/\bv26_prod_1.2\b/ig,VERSION_LABEL);
   }
   function patchDownloadNames(){
     safe(function(){

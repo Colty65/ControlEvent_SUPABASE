@@ -31,11 +31,11 @@ assert.match(info,/CUADRADO_FORZADO/);
 assert.match(info,/Movimiento positivo conciliado/);
 
 const css=read('public/app/styles/cuadre-banco.css');
-assert.match(css,/ControlEvent v26_prod_1.1 FIX4|body\.ce-bank-open > :not\(#ceBankOverlay\)/, 'Debe existir el aislamiento real de la ventana bancaria');
+assert.match(css,/ControlEvent v26_prod_1.2 FIX4|body\.ce-bank-open > :not\(#ceBankOverlay\)/, 'Debe existir el aislamiento real de la ventana bancaria');
 assert.match(css,/grid-template-columns:minmax\(560px,1\.03fr\) minmax\(500px,\.97fr\)/, 'En PC: movimiento izquierda y conciliación derecha');
 assert.match(css,/\.ce-bank-ticket-chip\.foreign>span\{display:inline-flex!important/);
 assert.match(css,/@media \(max-width:700px\)/, 'Debe existir diseño específico para teléfono');
 
 const index=read('public/index.html');
 assert.match(index,/20260730-V26-PROD-FIX4-REAL/);
-console.log('OK v26_prod_1.1 FIX4: controles nativos, En saldo exacto, fichas PC/móvil y globo canónico.');
+console.log('OK v26_prod_1.2 FIX4: controles nativos, En saldo exacto, fichas PC/móvil y globo canónico.');

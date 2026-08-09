@@ -100,7 +100,7 @@ async function loadAndListDuplicates(options = {}){
 function installLegacyMap(){
   const api = {
     version: LEGACY_MAP_VERSION,
-    mapVersion: 'ControlEvent v26_prod_1.1',
+    mapVersion: 'ControlEvent v26_prod_1.2',
     mapUrl: LEGACY_MAP_URL,
     get raw(){ return rawMap; },
     load,

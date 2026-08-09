@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod_1.1 FIX41
+/* ControlEvent v26_prod_1.2 FIX41
    - Traduce en pantalla P-id... y T-id... a nombres humanos en Compras/Donaciones.
    - Solo visual: no toca datos ni BD. */
 (function(){

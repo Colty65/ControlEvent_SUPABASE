@@ -1,8 +1,8 @@
-/* ControlEvent v26_prod_1.1 - ajustes generales: cabecera, búsquedas finalizados, resumen, mapa TK, compartir y gráficas táctiles. */
+/* ControlEvent v26_prod_1.2 - ajustes generales: cabecera, búsquedas finalizados, resumen, mapa TK, compartir y gráficas táctiles. */
 (function(){
   'use strict';
   if(window.__ceV101AppFixes) return; window.__ceV101AppFixes=true;
-  var VERSION='v26_prod_1.1';
+  var VERSION='v26_prod_1.2';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

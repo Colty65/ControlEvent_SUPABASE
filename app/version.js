@@ -1,20 +1,20 @@
-/* ControlEvent v26_prod_1.1 - versión centralizada */
-export const VERSION = 'v26_prod_1.1';
-export const VERSION_LABEL = 'v26_prod_1.1';
-export const VERSION_TEXT = 'ControlEvent v26_prod_1.1';
-export const VERSION_FILE = 'ControlEvent_v26_prod_1.1';
-export const BUILD_ID = '20260809-V26-PROD-1-1-GEMINI-INTERACTIONS-AFINADO';
-export const ZIP_NAME = 'CE_V26_PROD_1_0_ZUZU_GEMINI_INTERACTIONS.zip';
+/* ControlEvent v26_prod_1.2 - versión centralizada */
+export const VERSION = 'v26_prod_1.2';
+export const VERSION_LABEL = 'v26_prod_1.2';
+export const VERSION_TEXT = 'ControlEvent v26_prod_1.2';
+export const VERSION_FILE = 'ControlEvent_v26_prod_1.2';
+export const BUILD_ID = '20260810-V26-PROD-1-2-IDENTIDAD-SEMANTICA';
+export const ZIP_NAME = 'CE_V26_PROD_1_2_ZUZU_IDENTIDAD_SEMANTICA.zip';
 
 try {
-  // v26_prod_1.1: migración única de claves internas heredadas sin perder sesión/preferencias.
+  // v26_prod_1.2: migración única de claves internas heredadas sin perder sesión/preferencias.
   for (const store of [window.localStorage, window.sessionStorage]) {
     try {
       const copies = [];
       for (let i = 0; i < store.length; i += 1) {
         const oldKey = store.key(i);
         if (!oldKey || !oldKey.startsWith('ControlEvent_v24_prod')) continue;
-        const newKey = oldKey.replace(/^ControlEvent_v24_prod/, 'ControlEvent_v26_prod_1.1');
+        const newKey = oldKey.replace(/^ControlEvent_v24_prod/, 'ControlEvent_v26_prod_1.2');
         if (store.getItem(newKey) == null) copies.push([newKey, store.getItem(oldKey)]);
       }
       copies.forEach(([key, value]) => store.setItem(key, value));
