@@ -194,6 +194,7 @@
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); }catch(_){ } }
     var p=$('ceAiPrompt'); if(p){ p.value=''; p.textContent=''; }
     window.__ceZuzuConversationV26=[];
+    try{ sessionStorage.removeItem('ControlEvent_v26_prod_zuzu_conversation'); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -311,6 +312,13 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
+  function zuzuConversationKey(){ return 'ControlEvent_v26_prod_zuzu_conversation'; }
+  function loadZuzuConversation(){
+    if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
+    try{ var raw=sessionStorage.getItem(zuzuConversationKey()); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
+    return window.__ceZuzuConversationV26;
+  }
+  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
@@ -322,7 +330,7 @@
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
-      var history=Array.isArray(window.__ceZuzuConversationV26)?window.__ceZuzuConversationV26.slice(-6):[];
+      var history=loadZuzuConversation().slice(-6);
       var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationHistory:history})});
       var raw=await res.text();
       var data={};
@@ -339,8 +347,9 @@
       }
       data.__prompt = prompt;
       if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
-      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160)});
+      window.__ceZuzuConversationV26.push({user:prompt,assistant:String(data.answer||'').slice(0,1200),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId()});
       if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
+      saveZuzuConversation();
       await finishZuzuThinkingFast();
       stopZuzuThinking();
       renderResult(data);
