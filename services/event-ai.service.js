@@ -6689,7 +6689,7 @@ REGLAS DE RESPUESTA:
 - La descripción larga del evento se interpreta/narra: no la conviertas en una enorme celda de tabla.
 - Cada tabla incluye schema con kind, unit y concept. RESPETA esa semántica literalmente: una fecha nunca es €, un conteo de personas nunca es €, y «Valor disponible» no es «Compras».
 - Comprado = compras realizadas. Donado = donaciones de producto. Pte.Compra = compras pendientes. Valor disponible = Comprado + Donado. No mezcles ni renombres estos conceptos.
-- FÓRMULAS CANÓNICAS CE: Saldo operativo = Ingresos - Compras realizadas - Compras pendientes. Las donaciones NO entran en el saldo de caja. Valoración del evento = Compras realizadas + Compras pendientes + Valor del producto donado. NUNCA calcules la valoración como saldo + donaciones ni como ingresos + donaciones - compras.
+- FÓRMULAS CANÓNICAS CE: Saldo operativo = Ingresos - Compras realizadas - Compras pendientes. Las donaciones NO entran en el saldo de caja. Valoración del evento = Compras realizadas + Valor del producto donado. NUNCA calcules la valoración como saldo + donaciones ni como ingresos + donaciones - compras.
 - Si preguntas «en qué se fue el dinero», «qué se gastó» o equivalente, habla de COMPRAS REALIZADAS y de su distribución. No llames compras a Comprado+Donado ni a la valoración del evento.
 - No atribuyas causalidad falsa: nunca digas «gracias a las donaciones el saldo fue positivo» porque las donaciones no son dinero de caja.
 - En person_dossier, matched_entities puede incluir una persona individual y una pareja/entidad compuesta. Si composite_expansion=true, explica la relación y NO atribuyas income_linked_total como dinero exclusivo de una sola persona; distingue income_direct_total e income_composite_total.
@@ -7401,7 +7401,10 @@ async function v274ToolMasterCatalog(tool,state,selectedEventId=''){
 }
 async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
-  const sr=v274ResolveOptionalStore(state,tool?.store),status=trim(tool?.status)||'realized';const rows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:trim(tool?.detail)||'standard'});
+  const sr=v274ResolveOptionalStore(state,tool?.store),status=trim(tool?.status)||'realized';
+  const ticketFilter=norm(tool?.ticket);
+  const allRows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:trim(tool?.detail)||'standard'});
+  const rows=ticketFilter?allRows.filter(r=>norm(r?.['Ticket u otros gastos'])===ticketFilter):allRows;
   const groups=new Map(),segDestGroups=new Map(),segDestTotals=new Map();
   for(const r of rows){
     const key=norm(r.Producto),g=groups.get(key)||{Producto:r.Producto,Unidades:0,Importe:0,'Nº registros':0,Precios:new Set(),Tiendas:new Set()};
@@ -7418,7 +7421,7 @@ async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const totalsBySegmentDestination=[...segDestTotals.values()].map(g=>({Segmento:g.Segmento,Destino:g.Destino,'Productos distintos':g.Productos.size,'Unidades':round(g.Unidades,3),'Nº registros':g.Registros,Importe:v26Money(g.Importe)}))
     .sort((a,b)=>trim(a.Segmento).localeCompare(trim(b.Segmento),'es',{sensitivity:'base'})||trim(a.Destino).localeCompare(trim(b.Destino),'es',{sensitivity:'base'}));
   const total=v26Money(rows.reduce((a,r)=>a+num(r.Importe),0));
-  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,status,store:sr.nombre||'',purchase_line_count:rows.length,product_count:summary.length,total_amount:total,detail_semantics:'purchase_lines conserva cada registro real producto a producto. by_product agrega por producto. by_segment_destination agrega producto dentro de Segmento/Destino y totals_by_segment_destination totaliza cada grupo sin depender de redacción generativa.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
+  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,status,store:sr.nombre||'',ticket:trim(tool?.ticket)||'',purchase_line_count:rows.length,product_count:summary.length,total_amount:total,detail_semantics:'purchase_lines conserva cada registro real producto a producto. by_product agrega por producto. by_segment_destination agrega producto dentro de Segmento/Destino y totals_by_segment_destination totaliza cada grupo sin depender de redacción generativa.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
     v26Table('purchase_lines',`Compras producto a producto · ${rr.nombre}`,rows,{Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario registrado'),Importe:v26MoneySchema('Importe del registro'),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26StatusSchema(),'ID compra':v26TextSchema(),'ID producto':v26TextSchema(),'ID tienda':v26TextSchema(),'ID responsable':v26TextSchema(),Creado:v26DateSchema(),Actualizado:v26DateSchema()}),
     v26Table('by_product',`Compras agrupadas por producto · ${rr.nombre}`,summary,{Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema()}),
     v26Table('by_segment_destination',`Compras por Segmento/Destino · ${rr.nombre}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema()}),
@@ -7451,7 +7454,7 @@ function v261AgentTools(){
     {type:'function',name:'event_dossier',description:'Obtiene el panorama canónico agregado de un evento: fechas, estado, ingresos, compras realizadas y pendientes, producto donado, saldo, valoración, asistencia y conteos de gestión. Es un buen punto de partida, pero no sustituye el detalle cuando necesites investigar anomalías, causas o matices.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_breakdowns',description:'Desglosa un evento por tienda, destino, segmento, producto y forma de pago. Separa comprado, donado y pendiente. Úsala para explicar en qué se gastó el dinero o qué recursos hubo.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'master_catalog',description:'Lee catálogos generales NO restringidos de ControlEvent: products, stores, people o events. Para products puede superponer, sin eliminar productos del catálogo, las compras de un evento y/o tienda. Nunca expone ACCESO/usuarios/credenciales.',parameters:{type:'object',properties:{entity:{type:'string',enum:['products','stores','people','events']},query:{type:'string',description:'Filtro textual opcional sobre el catálogo.'},event:eventArg,scope:{type:'string',enum:['active_event','named_event']},store:{type:'string',description:'Filtro opcional de tienda solo para superponer compras sobre products.'},purchase_status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['entity']}},
-    {type:'function',name:'event_purchase_lines',description:'Detalle exhaustivo de compras de un evento producto a producto. Devuelve cada registro con unidades, precio, importe, ticket/otros gastos, tienda, responsable, segmento/destino y una tabla agrupada por producto. Úsala cuando el usuario pida todos los productos comprados o detalle por producto; store_purchases es solo agregado y NO sustituye esta herramienta.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
+    {type:'function',name:'event_purchase_lines',description:'Detalle exhaustivo de compras de un evento producto a producto. Devuelve cada registro con unidades, precio, importe, ticket/otros gastos, tienda, responsable, segmento/destino y una tabla agrupada por producto. Puede filtrar un TKxx concreto ANTES de compactar datos, para no perder líneas del ticket. Úsala cuando el usuario pida todos los productos comprados o detalle por producto; store_purchases es solo agregado y NO sustituye esta herramienta.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},ticket:{type:'string',description:'TKxx u otro identificador exacto de ticket/gasto opcional. Si se informa, el filtrado se aplica antes de entregar las filas.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
     {type:'function',name:'event_people',description:'Obtiene participantes/colaboradores e ingresos de un evento con criterio de asistencia canónica. Incluye número, forma/estado, importe obligatorio, voluntario y total por registro; úsala cuando necesites inspeccionar matices, ajustes o posibles anomalías de ingresos.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_documentation',description:'Comprueba evidencias documentales de un evento: justificantes de ingresos, fototickets de compra y documentos/adjuntos. No equivale a conciliación bancaria.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_management',description:'Obtiene Hitos y tareas LG de un evento, responsables, fechas, estado y notas. Úsala para responsabilidades y gestión.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
@@ -7486,7 +7489,7 @@ function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUse
   const localNow=trim(clientLocalDateTime).slice(0,120)||fallbackNow;
   const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid';
   const utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  return `Eres Zuzu, el asistente conversacional y analista de ControlEvent v28.0_prod. Hablas en español natural con ${display}.\n\nPRINCIPIO DE ARQUITECTURA:\n- TÚ mantienes la conversación, resuelves pronombres y elipsis a partir del historial de esta Interaction, interpretas la intención, decides qué herramientas necesitas, analizas sus resultados y redactas la respuesta.\n- ControlEvent NO interpreta por ti la conversación: solo ejecuta las herramientas que solicites y te devuelve hechos canónicos.\n- Las herramientas pueden incluir facts_schema y schema de tablas: son la definición semántica de cada cifra. No uses dos magnitudes como si significaran lo mismo solo porque su aritmética encaje.\n- El evento actualmente visible es SOLO contexto ambiental: ${activeText}. No cambies el tema hacia él si el hilo actual trata de otra persona, comparación, documento o evento.\n\nENRUTADO INTERNO DE ESTE TURNO:\n- ${v273RoutingInstruction(userPrompt,conversationHistory)||'No hay una prioridad adicional; aplica las reglas generales.'}\n\nCONTEXTO TEMPORAL FIABLE:\n- Fecha y hora local del usuario al iniciar este turno: ${localNow}. Zona horaria informada: ${tz}. Referencia UTC: ${utcNow}.\n- Si preparas un informe con fecha de emisión, usa esta fecha/hora actual. No confundas la fecha de emisión con las fechas del evento y no inventes fechas.\n\nREGLAS DE INTELIGENCIA:\n- Responde exactamente a lo que el usuario intenta saber, no a una plantilla. Integra los turnos anteriores: si antes comparaste participación y luego responsabilidades, una pregunta sobre «implicación» debe considerar lo ya aprendido y pedir más datos si los necesitas.\n- Ante preguntas abiertas, evaluativas, de anomalías, conclusiones, riesgos, matices o informes ejecutivos, INVESTIGA antes de concluir. Un resumen agregado puede servir para orientarte, pero no basta para afirmar que «todo está bien» si existen herramientas con detalle relevante. Decide tú qué herramientas consultar y encadena más de una ronda si la evidencia inicial no es suficiente.\n- PROACTIVIDAD: cuando analices un evento por primera vez, revisa las income_attention_signals que ya aporta event_dossier. Si hay señales materiales, menciónalas en ESA PRIMERA RESPUESTA con su explicación respaldada y, si hace falta detalle, consulta event_people en la misma interacción. No esperes a que el usuario te diga «mira más», «husmea» o «¿no ves nada raro?». Si aparece una casuística nueva no contemplada, investígala con las herramientas disponibles y explica qué hecho te llama la atención y qué falta para cerrarla.\n- En informes para Dirección, revisiones de riesgos o cuando el usuario pregunte qué exige actuación, no declares «sin incidencias», «impecable», «éxito operativo» o equivalente solo por tener saldo positivo o tareas cerradas. Si puede cambiar la conclusión, consulta documentación, gestión y conciliación bancaria además del dossier económico antes de cerrar el juicio.\n- En seguimientos y comparaciones, no repitas listados extensos que ya aparecieron en el turno anterior salvo que el usuario los pida: sintetiza la diferencia nueva y reutiliza el contexto de la Interaction.\n- Si una herramienta devuelve datos truncados y la conclusión depende del conjunto completo, solicita más detalle o una herramienta más adecuada antes de concluir.\n- SALIDAS MASIVAS: si el usuario pide una lista, catálogo, tabla exhaustiva, ordenación o agrupación de muchas filas, NO redactes todas las filas en prosa. Resume en una o dos frases y referencia la tabla canónica en show_tables. La tabla/CSV de ControlEvent conserva el conjunto completo aunque el contexto compacto de Gemini solo muestre una muestra.\n- FOLLOW-UPS ESTRUCTURADOS: «al lado», «ordénalo», «agrúpalo», «totaliza», «dame simplemente la tabla» y expresiones equivalentes transforman la tabla/dataset del turno anterior; conserva su ámbito y no sustituyas el conjunto por un subconjunto distinto salvo que el usuario lo pida.\n- No repitas herramientas si el historial de la Interaction ya contiene hechos suficientes y siguen siendo aplicables al hilo actual.\n- IDENTIDAD PERSONAL CANÓNICA: si el usuario nombra una o varias personas concretas, usa person_dossier para cada una. Esa herramienta integra automáticamente sus registros individuales y las parejas donde aparece. people_activity es para exploración global cuando todavía no hay sujetos concretos; no la uses para sustituir un dossier nominal.\n- Si dos herramientas personales muestran representaciones distintas, prevalece la identidad canónica y sus canonical_representations; no presentes la pareja y el individuo como identidades incompatibles ni cambies cifras entre turnos sin volver a consultar la fuente canónica.\n- Pregunta para aclarar solo cuando exista una ambigüedad real que no puedas resolver razonablemente con el historial o las herramientas.\n- Puedes opinar, destacar, comparar, detectar anomalías y recomendar basándote en datos. Una opinión debe explicar brevemente qué hechos la sustentan.\n- No inventes causas, éxitos, objetivos, conciliaciones ni relaciones no aportadas por ControlEvent.\n- No muestres SQL, nombres internos de columnas ni detalles de implementación.
+  return `Eres Zuzu, el asistente conversacional y analista de ControlEvent v28.0_prod. Hablas en español natural con ${display}.\n\nPRINCIPIO DE ARQUITECTURA:\n- TÚ mantienes la conversación, resuelves pronombres y elipsis a partir del historial de esta Interaction, interpretas la intención, decides qué herramientas necesitas, analizas sus resultados y redactas la respuesta.\n- ControlEvent NO interpreta por ti la conversación: solo ejecuta las herramientas que solicites y te devuelve hechos canónicos.\n- Las herramientas pueden incluir facts_schema y schema de tablas: son la definición semántica de cada cifra. No uses dos magnitudes como si significaran lo mismo solo porque su aritmética encaje.\n- El evento actualmente visible es SOLO contexto ambiental: ${activeText}. No cambies el tema hacia él si el hilo actual trata de otra persona, comparación, documento o evento.\n\nENRUTADO INTERNO DE ESTE TURNO:\n- ${v273RoutingInstruction(userPrompt,conversationHistory)||'No hay una prioridad adicional; aplica las reglas generales.'}\n\nCONTEXTO TEMPORAL FIABLE:\n- Fecha y hora local del usuario al iniciar este turno: ${localNow}. Zona horaria informada: ${tz}. Referencia UTC: ${utcNow}.\n- Si preparas un informe con fecha de emisión, usa esta fecha/hora actual. No confundas la fecha de emisión con las fechas del evento y no inventes fechas.\n\nREGLAS DE INTELIGENCIA:\n- Responde exactamente a lo que el usuario intenta saber, no a una plantilla. Integra los turnos anteriores: si antes comparaste participación y luego responsabilidades, una pregunta sobre «implicación» debe considerar lo ya aprendido y pedir más datos si los necesitas.\n- Ante preguntas abiertas, evaluativas, de anomalías, conclusiones, riesgos, matices o informes ejecutivos, INVESTIGA antes de concluir. Un resumen agregado puede servir para orientarte, pero no basta para afirmar que «todo está bien» si existen herramientas con detalle relevante. Decide tú qué herramientas consultar y encadena más de una ronda si la evidencia inicial no es suficiente.\n- PROACTIVIDAD: cuando analices un evento por primera vez, revisa las income_attention_signals que ya aporta event_dossier. Si hay señales materiales, menciónalas en ESA PRIMERA RESPUESTA con su explicación respaldada y, si hace falta detalle, consulta event_people en la misma interacción. No esperes a que el usuario te diga «mira más», «husmea» o «¿no ves nada raro?». Si aparece una casuística nueva no contemplada, investígala con las herramientas disponibles y explica qué hecho te llama la atención y qué falta para cerrarla.\n- En informes para Dirección, revisiones de riesgos o cuando el usuario pregunte qué exige actuación, no declares «sin incidencias», «impecable», «éxito operativo» o equivalente solo por tener saldo positivo o tareas cerradas. Si puede cambiar la conclusión, consulta documentación, gestión y conciliación bancaria además del dossier económico antes de cerrar el juicio.\n- En seguimientos y comparaciones, no repitas listados extensos que ya aparecieron en el turno anterior salvo que el usuario los pida: sintetiza la diferencia nueva y reutiliza el contexto de la Interaction.\n- Si una herramienta devuelve datos truncados y la conclusión depende del conjunto completo, solicita más detalle o una herramienta más adecuada antes de concluir.\n- SALIDAS MASIVAS: si el usuario pide una lista, catálogo, tabla exhaustiva, ordenación o agrupación de muchas filas, NO redactes todas las filas en prosa. Resume en una o dos frases y referencia la tabla canónica en show_tables. La tabla/CSV de ControlEvent conserva el conjunto completo aunque el contexto compacto de Gemini solo muestre una muestra.\n- FOLLOW-UPS ESTRUCTURADOS: «al lado», «ordénalo», «agrúpalo», «totaliza», «dame simplemente la tabla» y expresiones equivalentes transforman la tabla/dataset del turno anterior; conserva su ámbito y no sustituyas el conjunto por un subconjunto distinto salvo que el usuario lo pida.\n- No repitas herramientas si el historial de la Interaction ya contiene hechos suficientes y siguen siendo aplicables al hilo actual.\n- EFICIENCIA: cuando necesites varias fuentes independientes, solicítalas en la MISMA ronda siempre que sea posible. No encadenes exploraciones una a una si pueden resolverse en paralelo; una pregunta normal no debe gastar llamadas extra para volver a obtener hechos que ya están disponibles.\n- IDENTIDAD PERSONAL CANÓNICA: si el usuario nombra una o varias personas concretas, usa person_dossier para cada una. Esa herramienta integra automáticamente sus registros individuales y las parejas donde aparece. people_activity es para exploración global cuando todavía no hay sujetos concretos; no la uses para sustituir un dossier nominal.\n- Si dos herramientas personales muestran representaciones distintas, prevalece la identidad canónica y sus canonical_representations; no presentes la pareja y el individuo como identidades incompatibles ni cambies cifras entre turnos sin volver a consultar la fuente canónica.\n- Pregunta para aclarar solo cuando exista una ambigüedad real que no puedas resolver razonablemente con el historial o las herramientas.\n- Puedes opinar, destacar, comparar, detectar anomalías y recomendar basándote en datos. Una opinión debe explicar brevemente qué hechos la sustentan.\n- No inventes causas, éxitos, objetivos, conciliaciones ni relaciones no aportadas por ControlEvent.\n- No muestres SQL, nombres internos de columnas ni detalles de implementación.
 - DATOS GENERALES NO RESTRINGIDOS: los catálogos maestros de PRODUCTOS, TIENDAS, PERSONAS y EVENTOS son información consultable de ControlEvent. Si el usuario pide una lista/catálogo/tabla general o cualquier dato almacenado de esos ámbitos, usa master_catalog y entrégalo; no afirmes que no existe una herramienta para consultarlo. ACCESO/usuarios/credenciales queda expresamente fuera y nunca debe exponerse como catálogo.
 - DETALLE DE COMPRAS: event_breakdowns resume y agrega; store_purchases agrega por tienda. Si el usuario pide productos comprados uno a uno, unidades, precio, importe, ticket, tienda o responsable, usa event_purchase_lines. Nunca uses la limitación de store_purchases para concluir que ControlEvent no tiene detalle producto a producto.
 - CATÁLOGO + EVENTO: si pide todos los productos del catálogo y, al lado, qué se compró en un evento, usa master_catalog(entity=products, event/scope correspondiente). Esa herramienta conserva TODOS los productos maestros y superpone unidades/precios/importes de compra cuando existan. Si además pide exactitud registro a registro, añade event_purchase_lines.
@@ -7508,19 +7511,35 @@ function v261OutputText(payload){
   return arr(payload?.steps).filter(s=>s?.type==='model_output').flatMap(s=>arr(s?.content)).filter(c=>c?.type==='text').map(c=>text(c?.text)).join('\n').trim();
 }
 function v261FunctionCalls(payload){return arr(payload?.steps).filter(s=>s?.type==='function_call'&&trim(s?.name)&&trim(s?.id));}
+function v281StripInternalPresentationLeak(raw){
+  const src=trim(raw);if(!src)return'';
+  const m=src.match(/(?:^|\n)\s*(?:charts|show_tables|showTables|chart_specs|chartSpecs)\s*:/i);
+  if(!m)return src;
+  const clean=trim(src.slice(0,m.index));
+  return clean||'Aquí tienes el resultado solicitado con los datos disponibles en ControlEvent.';
+}
 function v261ParseFinal(payload){
   const raw=v261OutputText(payload);if(!raw)return{title:'Respuesta de Zuzu',answer:'',warnings:[],showTables:[],chartSpecs:[]};
   try{
     const parsed=parsePlanJsonLenientHf37(raw).parsed||{};
-    return{title:trim(parsed?.title)||'Respuesta de Zuzu',answer:trim(parsed?.answer),warnings:arr(parsed?.warnings).map(trim).filter(Boolean).slice(0,8),showTables:arr(parsed?.show_tables||parsed?.showTables).slice(0,8),chartSpecs:arr(parsed?.charts||parsed?.chart_specs||parsed?.chartSpecs).slice(0,8)};
-  }catch(_){return{title:'Respuesta de Zuzu',answer:raw,warnings:[],showTables:[],chartSpecs:[]};}
+    return{title:trim(parsed?.title)||'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(trim(parsed?.answer)),warnings:arr(parsed?.warnings).map(trim).filter(Boolean).slice(0,8),showTables:arr(parsed?.show_tables||parsed?.showTables).slice(0,8),chartSpecs:arr(parsed?.charts||parsed?.chart_specs||parsed?.chartSpecs).slice(0,8)};
+  }catch(_){return{title:'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(raw),warnings:[],showTables:[],chartSpecs:[]};}
 }
 
 function v261CompactToolResult(result,detail='standard'){
-  const largeStructured=['master_catalog','event_purchase_lines'].includes(trim(result?.name));
-  const limit=largeStructured?(detail==='full'?72:detail==='brief'?14:32):(detail==='full'?160:detail==='brief'?18:60);
-  const tables=arr(result?.tables).map(t=>({key:t.key,title:t.title,schema:t.schema,rows:arr(t.rows).slice(0,limit),row_count:arr(t.rows).length,truncated:arr(t.rows).length>limit}));
-  return{id:trim(result?.id),name:trim(result?.name),ok:result?.ok!==false,title:trim(result?.title),provenance:trim(result?.provenance)||'ControlEvent · datos estructurados',facts:result?.facts||{},facts_schema:result?.facts_schema||{},tables};
+  const name=trim(result?.name),largeStructured=['master_catalog','event_purchase_lines'].includes(name);
+  const genericLimit=largeStructured?(detail==='full'?28:detail==='brief'?8:12):(detail==='full'?64:detail==='brief'?10:24);
+  const tableLimit=t=>{
+    if(name==='event_bank'){
+      const key=trim(t?.key);
+      if(key==='event_window_timeline')return detail==='full'?32:16;
+      if(key==='reconciliation_timeline')return detail==='full'?24:10;
+      if(key==='movements'||key==='ticket_links')return detail==='full'?24:10;
+    }
+    return genericLimit;
+  };
+  const tables=arr(result?.tables).map(t=>{const limit=tableLimit(t);return{key:t.key,title:t.title,schema:t.schema,rows:arr(t.rows).slice(0,limit),row_count:arr(t.rows).length,truncated:arr(t.rows).length>limit};});
+  return{id:trim(result?.id),name,ok:result?.ok!==false,title:trim(result?.title),provenance:trim(result?.provenance)||'ControlEvent · datos estructurados',facts:result?.facts||{},facts_schema:result?.facts_schema||{},tables};
 }
 
 async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
@@ -7541,7 +7560,8 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
 
 async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto'}){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
-  const body={model,input,system_instruction:systemInstruction,tools,response_format:{type:'text',mime_type:'application/json',schema:v261FinalSchema()},generation_config:{thinking_level:'medium',thinking_summaries:'none',max_output_tokens:6000,tool_choice:toolChoice},store:true};
+  const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const maxOutput=Math.max(1200,Math.min(6000,Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||3200));
+  const body={model,input,system_instruction:systemInstruction,tools,response_format:{type:'text',mime_type:'application/json',schema:v261FinalSchema()},generation_config:{thinking_level:thinkingLevel,thinking_summaries:'none',max_output_tokens:maxOutput,tool_choice:toolChoice},store:true};
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
   let res,payload;
@@ -7598,16 +7618,18 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const model=v261InteractionModel(),tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory});
   let currentId=trim(previousInteractionId),payload;
   const cache=new Map(),allResults=[];
-  const initialInput=userPrompt;
-  try{payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'V27.1.5 · Gemini conversación'});}
+  const prefetch=await v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+  if(prefetch)allResults.push(...prefetch.results);
+  const initialInput=v281PrefetchInput(userPrompt,prefetch),initialToolChoice=(prefetch||v281PreviousAnswerAuditRequest(userPrompt))?'none':'auto';
+  try{payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'V28 · Gemini conversación',toolChoice:initialToolChoice});}
   catch(error){
     if(currentId&&v261PreviousIdFailure(error)){
-      zuzuTracePush(flowTrace,'V27.1.5 · Recuperación de conversación','WARN','El previous_interaction_id ya no es válido. Gemini reconstruirá el hilo con los últimos turnos guardados por el navegador.');
-      currentId='';payload=await v261CallInteraction({input:v261EmergencyConversationInput(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'V27.1.5 · Gemini conversación recuperada'});
+      zuzuTracePush(flowTrace,'V28 · Recuperación de conversación','WARN','El previous_interaction_id ya no es válido. Gemini reconstruirá el hilo con los últimos turnos guardados por el navegador.');
+      currentId='';payload=await v261CallInteraction({input:v261EmergencyConversationInput(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'V28 · Gemini conversación recuperada',toolChoice:initialToolChoice});
     }else throw error;
   }
   currentId=trim(payload?.id)||currentId;
-  if((chartIntent||dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&!v261FunctionCalls(payload).length){
+  if(!prefetch&&(chartIntent||dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&!v261FunctionCalls(payload).length){
     let forcedToolHint='';
     if(dataAccessReq.catalogEntity){
       forcedToolHint=`INSTRUCCIÓN INTERNA DE EJECUCIÓN: el usuario está pidiendo información de un catálogo general no restringido (${dataAccessReq.catalogEntity}). Debes llamar ahora a master_catalog con entity=${dataAccessReq.catalogEntity}. Si además pide datos de compras de un evento, incluye event/scope en master_catalog y usa event_purchase_lines cuando requiera detalle producto a producto. No respondas aún al usuario.`;
@@ -7624,7 +7646,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     payload=await v261CallInteraction({input:forcedToolHint,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'V27.1.5 · Gemini solicita fuente obligatoria'});
     currentId=trim(payload?.id)||currentId;
   }
-  for(let cycle=1;cycle<=8;cycle++){
+  for(let cycle=1;cycle<=4;cycle++){
     let calls=v261FunctionCalls(payload);
     const haveRequiredMaster=!dataAccessReq.catalogEntity||allResults.some(r=>r?.ok&&r?.name==='master_catalog'&&trim(r?.facts?.entity)===dataAccessReq.catalogEntity);
     const haveRequiredPurchase=!dataAccessReq.purchaseDetail||allResults.some(r=>r?.ok&&r?.name==='event_purchase_lines');
@@ -7707,6 +7729,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     else zuzuTracePush(flowTrace,'V27.1.5 · Auditor factual','OK','Gemini corrigió los hechos señalados; ControlEvent no redactó una respuesta alternativa.');
   }else zuzuTracePush(flowTrace,'V27.1.5 · Auditor factual','OK','No se detectan importes no respaldados ni una fórmula de valoración incorrecta.');
   final={...final,answer:v26PolishNarrative(v26FormatNarrativeMoney(final.answer,allResults))};
+  final=v281ApplyPrefetchChartPolicy(final,prefetch);
   // v28.0_prod: si el usuario pidió datos maestros o detalle de compras y CE ya los obtuvo,
   // la tabla correspondiente se muestra aunque Gemini olvide referenciarla en showTables.
   // Esto no inventa datos ni rutas de negocio: solo materializa la fuente canónica ya ejecutada.
@@ -7849,6 +7872,192 @@ function v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acc
   return{ok:true,rejected:false,title:'Qué puedes preguntarle a Zuzu',answer,warnings:[],charts:[],tables:[],files:[],provider:'control-event-local-capabilities',model:'',meta:{generatedAt:new Date().toISOString(),version:'v28.0_prod',architecture:'Ayuda local de capacidades; no requiere llamada a Gemini',geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:[{step:'V27 · Capacidades de Zuzu',status:'OK',detail:'Respuesta local basada en las capacidades reales de ControlEvent; sin consumo Gemini.'}]},debugTrace:[{step:'V27 · Capacidades de Zuzu',status:'OK',detail:'Respuesta local basada en las capacidades reales de ControlEvent; sin consumo Gemini.'}],showDebugTrace:true};
 }
 
+// ============================================================================
+// v28.0_prod · RUTAS DETERMINISTAS DE BAJO COSTE
+// Las consultas estructuradas inequívocas no necesitan que Gemini vuelva a leer
+// cientos de filas para decidir lo que ControlEvent ya sabe calcular/presentar.
+// No hay datos de negocio hardcodeados: se resuelven evento, catálogo y TK desde el estado.
+// ============================================================================
+function v281EventNameInText(state,value){
+  const blob=norm(value);if(!blob)return'';
+  const matches=arr(state?.eventos).map(e=>({name:trim(e?.titulo),key:norm(e?.titulo)})).filter(x=>x.name&&x.key&&blob.includes(x.key)).sort((a,b)=>b.key.length-a.key.length);
+  return matches[0]?.name||'';
+}
+function v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory=[],allowHistory=true){
+  const direct=v281EventNameInText(state,userPrompt);if(direct)return direct;
+  if(allowHistory){
+    for(const turn of arr(conversationHistory).slice(-5).reverse()){
+      const found=v281EventNameInText(state,`${trim(turn?.user)} ${trim(turn?.assistant)} ${trim(turn?.title)}`);if(found)return found;
+    }
+  }
+  return trim(v26EventById(state,selectedEventId)?.titulo);
+}
+function v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory=[],allowHistory=true){
+  const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,allowHistory);
+  return event?{event,scope:'named_event'}:{scope:'active_event'};
+}
+function v281TicketToken(value){
+  const m=text(value).match(/\bTK\s*[-_ ]?0*(\d{1,8})\b/i);if(!m)return'';return`TK${String(Number(m[1]))}`;
+}
+function v281TicketEqual(a,b){
+  const parse=v=>{const m=norm(v).match(/^TK\s*0*(\d+)$/);return m?Number(m[1]):NaN;};
+  const x=parse(a),y=parse(b);return Number.isFinite(x)&&Number.isFinite(y)?x===y:norm(a)===norm(b);
+}
+function v281ResolveTicketCode(state,eventId,raw){
+  const wanted=trim(raw);if(!wanted)return'';
+  for(const row of arr(state?.compras)){
+    if(eventId&&trim(row?.eventId||row?.event_id)!==trim(eventId))continue;
+    const actual=ticketText(row);if(v281TicketEqual(actual,wanted))return actual;
+  }
+  return wanted;
+}
+function v281ExactTicketRequest(userPrompt){
+  const p=norm(userPrompt);return !!v281TicketToken(userPrompt)&&/\b(detalle|complet|linea|línea|producto|suma|sumar|coincid|total|ticket)\b/.test(p);
+}
+function v281EventWindowChartContext(userPrompt,conversationHistory=[]){
+  if(v280BankEventWindowRequest(userPrompt))return true;
+  if(!v273ChartRefinementFollowUp(userPrompt))return false;
+  const prior=arr(conversationHistory).slice(-4).map(x=>`${trim(x?.user)} ${trim(x?.assistant)} ${trim(x?.title)}`).join(' ');
+  return v280BankEventWindowRequest(prior)||/event_window_timeline|movimientos bancarios entre fechas del evento|exclusivamente entre (?:la )?fecha/i.test(prior);
+}
+function v281PreviousAnswerAuditRequest(userPrompt){
+  const p=norm(userPrompt);return /\b(revisa|audita|comprueba)\b/.test(p)&&/\b(respuesta anterior|lo anterior|conclusiones? anteriores?)\b/.test(p)&&/\b(inferencia|hecho|directamente registrado|respaldad|sustentad)\b/.test(p);
+}
+function v281DateMs(value){const d=v272DateOnly(value);const ms=d?Date.parse(`${d}T00:00:00Z`):NaN;return Number.isFinite(ms)?ms:NaN;}
+function v281BroadBankKey(bankResult){
+  const f=bankResult?.facts||{},eventRows=arr(bankResult?.tables).find(t=>t?.key==='event_window_timeline')?.rows||[];
+  if(eventRows.length>=2)return'event_window_timeline';
+  const ps=v281DateMs(f.period_start),pe=v281DateMs(f.period_end),es=v281DateMs(f.event_start),ee=v281DateMs(f.event_end);
+  if(![ps,pe,es,ee].every(Number.isFinite))return'';
+  const day=86400000,eventDays=Math.max(1,Math.round((ee-es)/day)+1),periodDays=Math.max(1,Math.round((pe-ps)/day)+1);
+  if(periodDays<=Math.max(45,eventDays*4+14)){
+    const full=arr(bankResult?.tables).find(t=>t?.key==='reconciliation_timeline')?.rows||[];if(full.length>=2)return'reconciliation_timeline';
+  }
+  return'';
+}
+function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],results=[],showTables=[],chartSpecs=[],flowTrace=[],previousInteractionId=''}){
+  const final={title,answer,warnings,showTables,chartSpecs};
+  const presentation=v26BuildPresentation(final,results,'',{wantsCharts:false,bankContext:false,staticPointLabels:false});
+  const files=[];
+  for(const t of presentation.tables.slice(0,8)){
+    const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));
+    files.push({filename:fileSafe(`${t.title}_v28.0_prod.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});
+  }
+  zuzuTracePush(flowTrace,'v28 · Ruta directa','OK',`Gemini no es necesario para esta petición inequívoca. Herramientas CE=${results.map(r=>trim(r?.name)).filter(Boolean).join(', ')||'ninguna'}; tablas=${presentation.tables.length}; gráficas=${presentation.charts.length}.`);
+  return{ok:true,rejected:false,title,answer,warnings:arr(warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'control-event-v28-direct',model:'calculo-local-oficial',interactionId:trim(previousInteractionId),meta:{generatedAt:new Date().toISOString(),version:'v28.0_prod',architecture:'Ruta determinista para consultas estructuradas inequívocas; Gemini reservado para razonamiento abierto',interactionId:trim(previousInteractionId),tools:[...new Set(results.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+function v281AnalysisPrefetchKind(userPrompt){
+  const p=norm(userPrompt);
+  if(/\b(informe\s+(?:ejecutivo|grafico|gráfico)|direcci[oó]n|semafor|cuadro\s+de\s+mando)\b/.test(p))return'executive';
+  if(/\b(curios\w*|rar\w*|anomal\w*|riesg\w*|hallazg\w*|cosas?\s+relevantes?|algo\s+importante[^.]{0,60}(?:olvid\w*|falt\w*)|que\s+tal\s+(?:salio|salió)|analiza\s+(?:a\s+fondo|en\s+profundidad))\b/.test(p))return'analysis';
+  return'';
+}
+async function v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
+  const kind=v281AnalysisPrefetchKind(userPrompt);if(!kind)return null;
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)return null;
+  const defs=[
+    {id:'v28_prefetch_dossier',name:'event_dossier',...ea,detail:'brief'},
+    {id:'v28_prefetch_breakdowns',name:'event_breakdowns',...ea,detail:'brief'},
+    {id:'v28_prefetch_documentation',name:'event_documentation',...ea,detail:'brief'}
+  ];
+  if(kind==='analysis')defs.push({id:'v28_prefetch_people',name:'event_people',...ea,detail:'brief'});
+  if(kind==='executive'||/\b(banco|bancari|concili|cuadre|tesorer|liquidez|flujo\s+de\s+caja|olvid|falta)\b/.test(norm(userPrompt)))defs.push({id:'v28_prefetch_bank',name:'event_bank',...ea,detail:'brief'});
+  const results=(await Promise.all(defs.map(async d=>{try{return await v261ExecuteAgentTool(d,state,selectedEventId,flowTrace);}catch(error){zuzuTracePush(flowTrace,'v28 · Prefetch analítico','WARN',`${d.name}: ${cleanGeminiError(error)}`);return null;}}))).filter(Boolean);
+  if(!results.length)return null;
+  zuzuTracePush(flowTrace,'v28 · Prefetch analítico','OK',`${kind}: ${results.map(r=>r.name).join(', ')}. Las fuentes se obtienen en paralelo antes de una única redacción de Gemini.`);
+  return{kind,event:rr.nombre,results};
+}
+function v281PrefetchInput(userPrompt,prefetch){
+  if(!prefetch)return userPrompt;
+  const compact=prefetch.results.map(r=>v261CompactToolResult(r,'brief'));
+  return `${userPrompt}\n\nINSTRUCCIÓN INTERNA DE EFICIENCIA: ControlEvent ya ha preconsultado en paralelo las fuentes canónicas necesarias. Analízalas y responde en UNA sola redacción; no solicites herramientas adicionales salvo que exista una carencia objetiva imposible de resolver con estas fuentes. No menciones este prefetch ni IDs internos.\nFUENTES CANÓNICAS PRECONSULTADAS:\n${JSON.stringify(compact)}`;
+}
+function v281ApplyPrefetchChartPolicy(final,prefetch){
+  if(!prefetch||prefetch.kind!=='executive')return final;
+  const bank=prefetch.results.find(r=>r?.name==='event_bank');if(!bank)return final;
+  const chosen=v281BroadBankKey(bank),bankKeys=new Set(['event_window_timeline','reconciliation_timeline','balance_timeline']);
+  let specs=arr(final?.chartSpecs).filter(s=>!bankKeys.has(trim(s?.table_key)));
+  if(chosen){
+    const t=arr(bank?.tables).find(x=>x?.key===chosen),exists=specs.some(s=>trim(s?.tool_id)===trim(bank.id)&&trim(s?.table_key)===chosen);
+    if(!exists)specs.unshift({title:trim(t?.title)||`Evolución bancaria · ${bank?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:chosen,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:[],unit:'€'});
+  }
+  return{...final,chartSpecs:specs.slice(0,8)};
+}
+
+async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const p=norm(userPrompt),dataReq=v274DataAccessRequirement(userPrompt,conversationHistory);
+  if(dataReq.accessRestricted&&/\b(catalogo|catálogo|lista|tabla|todos|todas)\b/.test(p)){
+    return v281LocalResponse({title:'Información restringida',answer:'Los catálogos de negocio no restringidos sí son consultables, pero ACCESO, usuarios de acceso, credenciales, contraseñas y tokens quedan fuera de las herramientas de Zuzu.',flowTrace,previousInteractionId});
+  }
+
+  // TKxx concreto: filtrar ANTES de compactar y comparar contra un total independiente si existe.
+  if(v281ExactTicketRequest(userPrompt)){
+    const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)return null;
+    const rawTicket=v281TicketToken(userPrompt),ticket=v281ResolveTicketCode(state,rr.id,rawTicket);
+    const purchase=await v274ToolEventPurchaseLines({id:'v28_direct_ticket',name:'event_purchase_lines',...ea,ticket,status:'realized',detail:'standard'},state,selectedEventId);
+    const rows=arr(purchase?.tables).find(t=>t?.key==='purchase_lines')?.rows||[],sum=v26Money(purchase?.facts?.total_amount);
+    let comparison='',warnings=[],results=[purchase];
+    if(/\b(comprueba|coincid|total\s+del\s+ticket|suma)\b/.test(p)){
+      try{
+        const bank=await v261EventBankTool({id:'v28_direct_ticket_bank',name:'event_bank',...ea,detail:'brief'},state,selectedEventId);results.push(bank);
+        const link=arr(bank?.tables).find(t=>t?.key==='ticket_links')?.rows?.find(r=>v281TicketEqual(r?.TKxx,ticket));
+        if(link){const official=v26Money(link?.Importe),diff=v26Money(sum-official);if(Math.abs(diff)<=0.01)comparison=` Coincide con el total independiente vinculado al ticket: ${v26FormatEuro(official)}.`;else{comparison=` No coincide con el total independiente vinculado al ticket: líneas ${v26FormatEuro(sum)} frente a ${v26FormatEuro(official)}; diferencia ${v26FormatEuro(diff)}.`;warnings.push(`Diferencia detectada en ${ticket}: suma de registros ${v26FormatEuro(sum)} frente a total vinculado ${v26FormatEuro(official)}.`);}}
+        else comparison=' La suma de los registros está calculada, pero no hay un total independiente de ese ticket en el Cuadre Banco con el que verificarla; no se afirma una coincidencia que no esté demostrada.';
+      }catch(_){comparison=' La suma de los registros está calculada, pero no se ha obtenido un total independiente con el que verificarla; no se afirma una coincidencia no demostrada.';}
+    }
+    return v281LocalResponse({title:`Detalle de ${ticket} · ${rr.nombre}`,answer:rows.length?`${ticket} contiene ${v26CountPhrase(rows.length,'registro de compra','registros de compra')} y la suma de esos registros es ${v26FormatEuro(sum)}.${comparison}`:`No hay registros de compra para ${ticket} en ${rr.nombre}.`,warnings,results,showTables:rows.length?[{tool_id:purchase.id,table_key:'purchase_lines'}]:[],flowTrace,previousInteractionId});
+  }
+
+  // Catálogos maestros y cruce catálogo + evento: CE ya posee la tabla final; no se paga a Gemini para volver a describirla.
+  if(dataReq.catalogEntity){
+    const detail=/\b(toda|todo|complet|disponible|campos?)\b/.test(p)?'full':'standard';
+    const tool={id:'v28_direct_catalog',name:'master_catalog',entity:dataReq.catalogEntity,detail};
+    if(dataReq.catalogWithEvent){const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);Object.assign(tool,ea,{purchase_status:'realized'});}
+    const res=await v274ToolMasterCatalog(tool,state,selectedEventId);
+    let key='catalog';if(dataReq.catalogWithEvent)key=dataReq.groupSegmentDestination?'catalog_with_event_purchases_by_segment_destination':'catalog_with_event_purchases';
+    const show=[{tool_id:res.id,table_key:key}];if(dataReq.catalogWithEvent&&dataReq.groupSegmentDestination)show.push({tool_id:res.id,table_key:'catalog_purchase_totals_by_segment_destination'});
+    const entityLabel={products:'productos',stores:'tiendas',people:'personas',events:'eventos'}[dataReq.catalogEntity]||'registros';
+    const extra=dataReq.catalogWithEvent?` La misma tabla conserva todo el catálogo y añade las compras del evento cuando existen; constan ${v26CountPhrase(res?.facts?.purchase_line_count||0,'registro de compra','registros de compra')} asociados.`:'';
+    return v281LocalResponse({title:res.title,answer:`Hay ${v26CountPhrase(res?.facts?.record_count||0,entityLabel.slice(0,-1)||'registro',entityLabel)} en el catálogo general solicitado.${extra}`,results:[res],showTables:show,flowTrace,previousInteractionId});
+  }
+
+  // Detalle exhaustivo de compras: la tabla ya está calculada por CE y se entrega sin recontarla en lenguaje natural.
+  if(dataReq.purchaseDetail){
+    const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
+    const res=await v274ToolEventPurchaseLines({id:'v28_direct_purchases',name:'event_purchase_lines',...ea,status:'realized',detail:'standard'},state,selectedEventId);
+    const key=dataReq.exactPurchaseLines?'purchase_lines':(dataReq.groupSegmentDestination?'by_segment_destination':'by_product');
+    const show=[{tool_id:res.id,table_key:key}];if(dataReq.groupSegmentDestination)show.push({tool_id:res.id,table_key:'totals_by_segment_destination'});
+    return v281LocalResponse({title:res.title,answer:`En ${res?.facts?.event||'el evento'} constan ${v26CountPhrase(res?.facts?.purchase_line_count||0,'registro de compra','registros de compra')} correspondientes a ${v26CountPhrase(res?.facts?.product_count||0,'producto distinto','productos distintos')}, por ${v26FormatEuro(res?.facts?.total_amount||0)}.`,results:[res],showTables:show,flowTrace,previousInteractionId});
+  }
+
+  // Gráfica bancaria acotada al ciclo del evento y sus refinamientos conversacionales.
+  const chartIntent=v273ConversationRequestsCharts(userPrompt,conversationHistory),eventWindow=v281EventWindowChartContext(userPrompt,conversationHistory);
+  if(chartIntent&&eventWindow&&v273ConversationBankContext(userPrompt,conversationHistory)){
+    const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),bank=await v261EventBankTool({id:'v28_direct_bank_window',name:'event_bank',...ea,detail:'brief'},state,selectedEventId);
+    const rows=arr(bank?.tables).find(t=>t?.key==='event_window_timeline')?.rows||[],labels=v273PromptRequestsStaticPointLabels(userPrompt,conversationHistory);
+    const specs=rows.length>=2?[{title:`Movimientos bancarios entre fechas del evento · ${bank?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:'event_window_timeline',label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:labels?['Movimiento','Concepto','Saldo bancario del periodo']:[],unit:'€'}]:[];
+    const answer=!rows.length?`No hay movimientos bancarios incluidos entre ${bank?.facts?.event_start||'la fecha de inicio'} y ${bank?.facts?.event_end||'la fecha de fin'} de ${bank?.facts?.event||'este evento'}. No sustituyo ese intervalo por el histórico general.`:rows.length===1?`Entre ${bank?.facts?.event_start} y ${bank?.facts?.event_end} solo hay un movimiento bancario incluido. Te muestro el dato exacto; con un único punto no existe una evolución de línea que representar.`:`La gráfica usa exclusivamente los ${v26CountPhrase(rows.length,'movimiento','movimientos')} comprendidos entre ${bank?.facts?.event_start} y ${bank?.facts?.event_end}. Ingresos y cargos se distinguen por tipo${labels?', y cada punto incluye importe, concepto y saldo':''}.`;
+    return v281LocalResponse({title:`Banco · ${bank?.facts?.event||''}`,answer,results:[bank],showTables:rows.length<2?[{tool_id:bank.id,table_key:'event_window_timeline'}]:[],chartSpecs:specs,flowTrace,previousInteractionId});
+  }
+
+  // Resumen gráfico global: gráficos tipados, nunca la tabla KPI mixta. Banco solo si su periodo es pertinente.
+  if(v280BroadGraphicalEventRequest(userPrompt)){
+    const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
+    const dossier=await v26ToolEventDossier({id:'v28_direct_dossier',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId);
+    let bank=null;try{bank=await v261EventBankTool({id:'v28_direct_bank',name:'event_bank',...ea,detail:'brief'},state,selectedEventId);}catch(_){}
+    const specs=[
+      {title:`Economía · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'economics_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'€'},
+      {title:`Asistencia · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'attendance_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'personas'},
+      {title:`Gestión · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'management_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'elementos'}
+    ];
+    if(bank){const key=v281BroadBankKey(bank);if(key)specs.unshift({title:trim(arr(bank.tables).find(t=>t?.key===key)?.title)||`Banco · ${dossier?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:key,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:[],unit:'€'});}
+    const f=dossier?.facts||{},bankText=bank?` En banco, el impacto del periodo conciliado es ${v26FormatEuro(bank?.facts?.bank_impact||0)} y el saldo de cierre calculado ${v26FormatEuro(bank?.facts?.closing_balance||0)}.`:'';
+    return v281LocalResponse({title:`Resumen gráfico · ${f.event||''}`,answer:`${f.event||'El evento'} registra ${v26FormatEuro(f.income_total||0)} de ingresos, ${v26FormatEuro(f.purchases_realized||0)} de compras realizadas, ${v26FormatEuro(f.donations_value||0)} de producto donado, un saldo operativo de ${v26FormatEuro(f.operating_balance||0)} y una valoración de ${v26FormatEuro(f.event_valuation||0)}. La asistencia canónica es de ${v26CountPhrase(f.attendees_canonical||0,'persona','personas')}.${bankText}`,results:[dossier,...(bank?[bank]:[])],chartSpecs:specs,flowTrace,previousInteractionId});
+  }
+  return null;
+}
+
+
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, clientNowIso, clientLocalDateTime, clientTimeZone } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
@@ -7880,7 +8089,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
     user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100)
   }));
-  zuzuTracePush(flowTrace,'V27.1.5 · Arquitectura','OK',`Gemini Interactions dirige conversación y herramientas. previous_interaction_id=${trim(previousInteractionId)?'presente':'nuevo hilo'}; evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
+  const direct=await v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory:safeHistory,flowTrace,previousInteractionId:trim(previousInteractionId)});
+  if(direct)return direct;
+  zuzuTracePush(flowTrace,'V28 · Arquitectura híbrida','OK',`Las consultas estructuradas inequívocas se resuelven localmente; Gemini Interactions queda para razonamiento conversacional. previous_interaction_id=${trim(previousInteractionId)?'presente':'nuevo hilo'}; evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   return runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80)});
 
   /* Código histórico conservado temporalmente para Planificación y trazabilidad de versiones previas.
