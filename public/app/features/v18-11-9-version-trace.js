@@ -1,13 +1,13 @@
-/* ControlEvent v27_prod_1.4 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v27_prod_1.5 - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v27_prod_1.4';
-  var VERSION_TEXT = 'ControlEvent v27_prod_1.4';
-  var VERSION_FILE = 'ControlEvent_v27_prod_1.4';
-  var BUILD_ID = '20260810-V27-PROD-1-4-ZUZU-DATOS-GENERALES-COMPRAS-DETALLE';
-  var ZIP_NAME = 'CE_V27_PROD_1_3_ZUZU_BANCO_GRAFICAS_EJECUTABLES.zip';
+  var VERSION_LABEL = 'v27_prod_1.5';
+  var VERSION_TEXT = 'ControlEvent v27_prod_1.5';
+  var VERSION_FILE = 'ControlEvent_v27_prod_1.5';
+  var BUILD_ID = '20260810-V27-PROD-1-5-CANDIDATA-ESTABLE';
+  var ZIP_NAME = 'CE_V27_PROD_1_5_CANDIDATA_ESTABLE_GLOBOS_ZUZU.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;
