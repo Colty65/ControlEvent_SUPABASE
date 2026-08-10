@@ -1,8 +1,8 @@
-/* ControlEvent v27_prod_1.0 - ajustes generales: cabecera compacta, refresco gráficas, búsqueda finalizados, fotos y mapa. */
+/* ControlEvent v27_prod_1.1 - ajustes generales: cabecera compacta, refresco gráficas, búsqueda finalizados, fotos y mapa. */
 (function(){
   'use strict';
   if(window.__ceV96AppFixes) return; window.__ceV96AppFixes=true;
-  var VERSION='v27_prod_1.0';
+  var VERSION='v27_prod_1.1';
   function text(v){ return v==null?'':String(v); }
   function $(id){ return document.getElementById(id); }
   function safe(fn){ try{return fn();}catch(_){return undefined;} }

@@ -57,4 +57,4 @@ assert.equal(bank.inPeriod({executedAt:'2026-06-30T23:59:00'},period),false);
 assert.deepEqual({...bank.normalizePeriod('2026-07-01','2026-07-31')},{dateFrom:'2026-07-01',dateTo:'2026-07-31'});
 assert.throws(()=>bank.normalizePeriod('2026-08-01','2026-07-31'),/no puede ser posterior/);
 
-console.log('OK v27_prod_1.0-04: periodo inclusivo, abonos/cargos, exclusión por evento y saldo inicial/final.');
+console.log('OK v27_prod_1.1-04: periodo inclusivo, abonos/cargos, exclusión por evento y saldo inicial/final.');

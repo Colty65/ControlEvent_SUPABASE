@@ -140,4 +140,4 @@ testAttendance();
 testFrontendCanonicalAttendance();
 testPrivatePeopleContext();
 testStructuralReports();
-console.log('OK v27_prod_1.0: política de informes, asistencia 21+2=23 y contexto privado selectivo.');
+console.log('OK v27_prod_1.1: política de informes, asistencia 21+2=23 y contexto privado selectivo.');

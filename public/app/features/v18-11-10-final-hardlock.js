@@ -1,12 +1,12 @@
-/* ControlEvent v27_prod_1.0 - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v27_prod_1.1 - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v27_prod_1.0';
-  var VERSION_TEXT='ControlEvent v27_prod_1.0';
-  var VERSION_FILE='ControlEvent_v27_prod_1.0';
-  var BUILD_ID='20260809-V27-PROD-1-0-GEMINI-INTERACTIONS-AFINADO';
-  var ZIP_NAME='CE_V27_PROD_1_0_ZUZU_IDENTIDAD_SEMANTICA.zip';
+  var VERSION_LABEL='v27_prod_1.1';
+  var VERSION_TEXT='ControlEvent v27_prod_1.1';
+  var VERSION_FILE='ControlEvent_v27_prod_1.1';
+  var BUILD_ID='20260810-V27-PROD-1-1-INGRESOS-BANCO-GRAFICAS';
+  var ZIP_NAME='CE_V27_PROD_1_1_ZUZU_INTELIGENCIA_INGRESOS_BANCO_GRAFICAS.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -14,7 +14,7 @@
     return String(value||'')
       .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
       .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
-      .replace(/\bv27_prod_1.0\b/ig,VERSION_LABEL);
+      .replace(/\bv27_prod_1.1\b/ig,VERSION_LABEL);
   }
   function patchDownloadNames(){
     safe(function(){
@@ -54,7 +54,7 @@
   function setGlobals(){
     safe(function(){
       window.__ceVersionLabel=VERSION_LABEL; window.__ceVersion=VERSION_TEXT; window.VERSION=VERSION_TEXT; window.VERSION_FILE=VERSION_FILE;
-      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v27-prod-1.0'};
+      window.ControlEventVersion={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v27-prod-1.1'};
       document.title=VERSION_TEXT;
       if(document.body){ document.body.dataset.ceVersion=VERSION_TEXT; document.body.dataset.ceBuild=BUILD_ID; document.body.dataset.ceZip=ZIP_NAME; }
     });
@@ -92,7 +92,7 @@
   }
   function apply(){ installStyle(); setGlobals(); patchDownloadNames(); if(document.body){ removeVersionProof(); moveTools(); } cleanOldVisibleVersions(); patchZuzuModal(); }
   window.ControlEventVersionCheck=function(){
-    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v27-prod-1.0'};
+    var front={label:VERSION_LABEL,version:VERSION_TEXT,versionFile:VERSION_FILE,build:BUILD_ID,zip:ZIP_NAME,source:'v27-prod-1.1'};
     return fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(api){ var out={front:front,api:api,ok:!!(api&&api.version===VERSION_TEXT&&api.label===VERSION_LABEL)}; console.log('[ControlEvent version check]',out); return out; }).catch(function(error){ var out={front:front,api:null,ok:false,error:String(error&&error.message||error)}; console.warn('[ControlEvent version check]',out); return out; });
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true}); else apply();

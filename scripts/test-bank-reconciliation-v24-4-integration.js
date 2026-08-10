@@ -136,4 +136,4 @@ assert.deepEqual(data.period.dateFrom,'2026-07-02');
 assert.deepEqual(data.period.dateTo,'2026-07-04');
 
 fs.unlinkSync(temp);
-console.log('OK integración v27_prod_1.0-04: periodo persistente, abonos, desvinculación, inclusión por evento y saldos.');
+console.log('OK integración v27_prod_1.1-04: periodo persistente, abonos, desvinculación, inclusión por evento y saldos.');

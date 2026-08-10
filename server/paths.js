@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v27_prod_1.0';
+export const APP_VERSION = 'ControlEvent v27_prod_1.1';
 
-export const APP_VERSION_LABEL = 'v27_prod_1.0';
-export const APP_VERSION_FILE = 'ControlEvent_v27_prod_1.0';
-export const BUILD_ID = '20260809-V27-PROD-1-0-GEMINI-INTERACTIONS-AFINADO';
-export const ZIP_NAME = 'CE_V27_PROD_1_0_ZUZU_GEMINI_INTERACTIONS_AFINADO.zip';
+export const APP_VERSION_LABEL = 'v27_prod_1.1';
+export const APP_VERSION_FILE = 'ControlEvent_v27_prod_1.1';
+export const BUILD_ID = '20260810-V27-PROD-1-1-INGRESOS-BANCO-GRAFICAS';
+export const ZIP_NAME = 'CE_V27_PROD_1_1_ZUZU_INTELIGENCIA_INGRESOS_BANCO_GRAFICAS.zip';

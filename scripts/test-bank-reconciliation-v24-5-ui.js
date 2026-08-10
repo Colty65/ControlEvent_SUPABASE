@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const source=fs.readFileSync(new URL('../app/features/v24-cuadre-banco.js',import.meta.url),'utf8');
 
-assert.match(source,/const VERSION = 'v27_prod_1.0'/);
+assert.match(source,/const VERSION = 'v27_prod_1.1'/);
 assert.match(source,/pageSize:60/,'La pantalla debe paginar periodos largos');
 assert.match(source,/rows\.slice\(start,end\)/,'Solo se debe construir la página visible');
 assert.match(source,/new AbortController\(\)/,'Los cambios de cuenta/fechas deben cancelar recargas anteriores');
@@ -23,4 +23,4 @@ assert.equal(visible.length,20);
 assert.equal(visible[0],4981);
 assert.equal(visible.at(-1),5000);
 
-console.log('OK v27_prod_1.0 UI: CSV nativo, recargas cancelables, búsqueda diferida y 5.000 movimientos paginados.');
+console.log('OK v27_prod_1.1 UI: CSV nativo, recargas cancelables, búsqueda diferida y 5.000 movimientos paginados.');

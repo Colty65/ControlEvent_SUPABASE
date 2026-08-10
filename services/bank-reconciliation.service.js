@@ -36,7 +36,7 @@ function ticketNumber(code){ return Number(String(code || '').replace(/\D/g, '')
 function friendlyDbError(error){
   const msg = text(error?.message || error);
   if(/ce_bank_movements|ce_bank_ticket_links|ce_bank_import_batches|ce_bank_event_settings|ce_bank_event_movement_state|ce_bank_income_links|relation .* does not exist|schema cache|pgrst205|42p01/i.test(msg)){
-    const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V27_PROD_1_0_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
+    const err = new Error('El módulo Cuadre Banco todavía no está creado en Supabase. Ejecuta ControlEvent_SQL_V27_PROD_1_1_CUADRE_BANCO.sql en el SQL Editor y vuelve a abrir la ventana.');
     err.status = 503;
     err.code = 'BANK_SCHEMA_MISSING';
     return err;
@@ -631,9 +631,10 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         const linkedToOtherEvent=foreignLinks.length>0&&currentLinks.length===0;
         // Un movimiento que ya está conciliado en otro evento no puede entrar por defecto
         // en el saldo del evento actual, aunque el indicador global histórico sea true.
-        let included=stateByMovement.has(row.id)?stateByMovement.get(row.id):row.included;
+        const eventInclusionExplicit=stateByMovement.has(row.id);
+        let included=eventInclusionExplicit?stateByMovement.get(row.id):row.included;
         if(linkedToOtherEvent) included=false;
-        const reconciled=reconcileMovement({...row,included},currentLinks);
+        const reconciled=reconcileMovement({...row,included,eventInclusionExplicit},currentLinks);
         const foreignTarget=row.amount<0?Math.abs(row.amount):0;
         const foreignJustified=cents(foreignLinks.reduce((sum,link)=>sum+num(link.ticketAmount),0));
         const foreignDifference=cents(foreignTarget-foreignJustified);
@@ -644,6 +645,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
           : '';
         return {...reconciled,
           displayLinks,
+          eventInclusionExplicit,
           foreignLinks,
           linkedToOtherEvent,
           inclusionLocked:linkedToOtherEvent,
@@ -1020,7 +1022,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
       const links=movements.flatMap(row=>arr(row.links));
       return {
         ok:true,event:reconciliation.event,period:reconciliation.period,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
-        movements,links,batches:[],
+        movements,links,batches:[],balanceTimeline:arr(reconciliation.balanceTimeline),
         eventSettings:[{eventId:selectedEvent,dateFrom:reconciliation.period?.dateFrom||'',dateTo:reconciliation.period?.dateTo||''}],
         incomeLinks:movements.flatMap(row=>arr(row.incomeLinks).filter(link=>link.manual&&link.linkId).map(link=>({id:link.linkId,movementId:row.id,eventId:selectedEvent,incomeId:link.id,incomeAmountSnapshot:link.amount}))),
         movementStates:movements.map(row=>({eventId:selectedEvent,movementId:row.id,included:true}))

@@ -1,9 +1,9 @@
-/* ControlEvent v27_prod_1.0 - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v27_prod_1.1 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v27_prod_1.0';
+  var VERSION='v27_prod_1.1';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -80,7 +80,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v27_prod_1.0-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v27_prod_1.1-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -146,7 +146,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.0</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.1</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -201,7 +201,7 @@
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
+    try{ ['ControlEvent_v27_prod_1.1','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -319,21 +319,21 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuConversationKey(){ return 'ControlEvent_v27_prod_1.0_zuzu_conversation'; }
+  function zuzuConversationKey(){ return 'ControlEvent_v27_prod_1.1_zuzu_conversation'; }
   function loadZuzuConversation(){
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
     try{ var raw=sessionStorage.getItem(zuzuConversationKey()); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-8):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
   function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-8))); }catch(_){ } }
-  function zuzuContextKey(){ return 'ControlEvent_v27_prod_1.0_zuzu_context'; }
+  function zuzuContextKey(){ return 'ControlEvent_v27_prod_1.1_zuzu_context'; }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
     try{ var raw=sessionStorage.getItem(zuzuContextKey()); var parsed=raw?JSON.parse(raw):null; window.__ceZuzuConversationContextV26=(parsed&&typeof parsed==='object')?parsed:null; }catch(_){ window.__ceZuzuConversationContextV26=null; }
     return window.__ceZuzuConversationContextV26;
   }
   function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
-  function zuzuInteractionKey(){ return 'ControlEvent_v27_prod_1.0_zuzu_interaction_id'; }
+  function zuzuInteractionKey(){ return 'ControlEvent_v27_prod_1.1_zuzu_interaction_id'; }
   function loadZuzuInteractionId(){
     if(typeof window.__ceZuzuInteractionIdV261==='string' && window.__ceZuzuInteractionIdV261) return window.__ceZuzuInteractionIdV261;
     try{ window.__ceZuzuInteractionIdV261=String(sessionStorage.getItem(zuzuInteractionKey())||'').trim(); }catch(_){ window.__ceZuzuInteractionIdV261=''; }
@@ -346,7 +346,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v27_prod_1.0: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v27_prod_1.1: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
     loadZuzuInteractionId();
     setStatus('Zuzu está pensando...', 'ok');
@@ -550,16 +550,25 @@
       grid+='<line x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(w-right)+'" y2="'+y.toFixed(1)+'" stroke="#e2e8f0" stroke-width="1"/>';
       grid+='<text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val,ch.unit))+'</text>';
     }
-    var xLabels=labels.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
+    var labelStep=Math.max(1,Math.ceil(labels.length/9));
+    var xLabels=labels.map(function(label,i){if(i!==0&&i!==labels.length-1&&i%labelStep!==0)return '';var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
     var paths='',dots='',legend='';
+    var pointKinds=Array.isArray(ch.pointKinds)?ch.pointKinds:[];
+    function pointColor(kind,fallback){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#22c55e';if(k==='CARGO')return '#e11d48';return fallback;}
     series.forEach(function(sr,si){
       var vals=(sr.values||[]).map(Number),color=chartColor(si);
       var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
       var path=pts.map(function(pt,i){return (i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
       paths+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>';
-      dots+=pts.map(function(pt,i){var v=vals[i];return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+color+'" stroke="#fff" stroke-width="2"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||''))+'</title></circle><text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+color+'">'+esc(formatNumber(v,ch.unit))+'</text>';}).join('');
+      var showValueLabels=pts.length<=24;
+      var radius=pts.length>120?2.6:(pts.length>50?3.2:5);
+      dots+=pts.map(function(pt,i){var v=vals[i],pc=pointKinds.length===pts.length?pointColor(pointKinds[i],color):color;return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="'+radius+'" fill="'+pc+'" stroke="#fff" stroke-width="1.5"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||'')+(pointKinds[i]?' · '+pointKinds[i]:''))+'</title></circle>'+(showValueLabels?'<text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+pc+'">'+esc(formatNumber(v,ch.unit))+'</text>':'');}).join('');
       legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-weight:850"><i style="display:inline-block;width:22px;height:4px;border-radius:4px;background:'+color+'"></i>'+esc(sr.name||('Serie '+(si+1)))+'</span>';
     });
+    if(pointKinds.some(function(k){return String(k).toUpperCase()==='INGRESO';})||pointKinds.some(function(k){return String(k).toUpperCase()==='CARGO';})){
+      legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span>'+
+              '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
+    }
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
   }
   function stackedChartHtml(ch){

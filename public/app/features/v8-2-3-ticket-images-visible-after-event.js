@@ -1,9 +1,9 @@
-/* ControlEvent v27_prod_1.0 - Hidratación puntual de fotos TKxx al volver a un evento.
+/* ControlEvent v27_prod_1.1 - Hidratación puntual de fotos TKxx al volver a un evento.
    Objetivo: si ce_ticket_images ya está limpia, que las miniaturas aparezcan al volver al evento
    sin tener que pulsar Adjuntar ni Refrescar. Sin setInterval ni barridos continuos. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v27_prod_1.0';
+  const VERSION = 'ControlEvent v27_prod_1.1';
   const VERSION_FILE = 'ControlEvent_v8_5_prod';
   const INSTALLED = '__ceV821TicketImagesVisibleAfterEvent';
   if(window[INSTALLED]) return;
@@ -129,7 +129,7 @@
         if(res.ok && data && data.images){
           Object.entries(data.images).forEach(([k,v]) => { if(putImage(k,v,ev)) changed = true; });
         }
-      }catch(err){ console.warn('[ControlEvent v27_prod_1.0] No se pudieron traer fotos del evento.', err); }
+      }catch(err){ console.warn('[ControlEvent v27_prod_1.1] No se pudieron traer fotos del evento.', err); }
       try{ if(window.ControlEventV82TicketScopeFix && typeof window.ControlEventV82TicketScopeFix.normalizeStore === 'function') window.ControlEventV82TicketScopeFix.normalizeStore(); }catch(_){ }
       refreshVisibleSummary();
       return changed;

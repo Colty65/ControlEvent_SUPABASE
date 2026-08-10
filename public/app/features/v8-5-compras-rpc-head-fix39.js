@@ -1,4 +1,4 @@
-/* ControlEvent v27_prod_1.0 FIX39 - COMPRAS RPC + CORRECCION CONTROLADA
+/* ControlEvent v27_prod_1.1 FIX39 - COMPRAS RPC + CORRECCION CONTROLADA
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -346,7 +346,7 @@
   }
   function toast(msg){
     // v9.5.1: sin avisos flotantes negros; solo consola para depuración.
-    try{ console.info(LOG || '[ControlEvent v27_prod_1.0]', msg); }catch(_){}
+    try{ console.info(LOG || '[ControlEvent v27_prod_1.1]', msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX39: dejamos de confiar en repintados parciales legacy.

@@ -1,12 +1,12 @@
-/* ControlEvent v27_prod_1.0 - ajustes finales sobre v45.4 estable.
+/* ControlEvent v27_prod_1.1 - ajustes finales sobre v45.4 estable.
    - Edición/borrado sin saltar al principio, con marca visual discreta y destrucción animada.
    - Exportación INFOEVENTO/BACKUP con guardia antirrecursión.
    - GRAFICAS: SALDO ACTUAL, SALDO OPERATIVO y VALORACION DEL EVENTO con globos detallados y cabeceras ordenadas.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v27_prod_1.0';
-  const VERSION_FILE = 'ControlEvent_v27_prod_1.0';
+  const VERSION = 'ControlEvent v27_prod_1.1';
+  const VERSION_FILE = 'ControlEvent_v27_prod_1.1';
   const WINDOWS_BLUE = '#0078d4';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const INSTALLED = '__ceV461FinalFixes';
