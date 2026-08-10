@@ -1,10 +1,10 @@
-// ControlEvent v26_prod_1.2 · FIX13 base + FIX14 login guard
+// ControlEvent v27_prod_1.0 · FIX13 base + FIX14 login guard
 // Refuerzos: desplegable eventos completo, refresco real de INGRESOS/fotos, Vista aérea legible y estados activos.
 (function(){
   'use strict';
   if(window.__CE_V19_FIX13_APPLIED__) return;
   window.__CE_V19_FIX13_APPLIED__ = true;
-  const VERSION_TAG = 'v26_prod_1.2_FIX13';
+  const VERSION_TAG = 'v27_prod_1.0_FIX13';
   const $ = id => document.getElementById(id);
   const trim = v => String(v == null ? '' : v).trim();
   const arr = v => Array.isArray(v) ? v : [];

@@ -51,4 +51,4 @@ assert.equal(parsed.dateTo,'2026-07-29');
 assert.equal(parsed.accountId,'ES1234567890123456789012');
 assert.equal(parsed.warnings.length,0);
 assert.equal(new Set(parsed.movements.map(row=>row.sourceHash)).size,count);
-console.log(`OK v26_prod_1.2 CSV amplio: ${count} movimientos desde enero de 2024 procesados correctamente.`);
+console.log(`OK v27_prod_1.0 CSV amplio: ${count} movimientos desde enero de 2024 procesados correctamente.`);

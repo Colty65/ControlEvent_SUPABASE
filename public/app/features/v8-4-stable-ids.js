@@ -1,8 +1,8 @@
-/* ControlEvent v26_prod_1.2 - códigos estables EV/PE/TI/PR y carga sin regenerar identidades.
+/* ControlEvent v27_prod_1.0 - códigos estables EV/PE/TI/PR y carga sin regenerar identidades.
    Sin intervalos: actúa al cargar, al importar, al crear evento y antes de backup. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v26_prod_1.2';
+  const VERSION = 'ControlEvent v27_prod_1.0';
   const VERSION_FILE = 'ControlEvent_v8_5_prod';
   if(window.__ceV832StableIds) return;
   window.__ceV832StableIds = true;
@@ -140,9 +140,9 @@
         if(typeof window.ensureSheetJS === 'function') await window.ensureSheetJS();
         else if(typeof ensureSheetJS === 'function') await ensureSheetJS();
         maps = await readWorkbookCodeMaps();
-      }catch(err){ console.warn('[ControlEvent v26_prod_1.2] No se pudieron leer códigos estables del Excel antes de importar.', err); }
+      }catch(err){ console.warn('[ControlEvent v27_prod_1.0] No se pudieron leer códigos estables del Excel antes de importar.', err); }
       const ret = await old.apply(this, arguments);
-      try{ mergeCodeMaps(maps); applyVersion(); }catch(err){ console.warn('[ControlEvent v26_prod_1.2] No se pudieron aplicar códigos estables tras importar.', err); }
+      try{ mergeCodeMaps(maps); applyVersion(); }catch(err){ console.warn('[ControlEvent v27_prod_1.0] No se pudieron aplicar códigos estables tras importar.', err); }
       return ret;
     };
     wrapped.__ceV832StableIds = true;

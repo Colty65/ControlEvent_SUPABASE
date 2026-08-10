@@ -1,8 +1,8 @@
-/* ControlEvent v26_prod_1.2 - Refuerzo del desplegable Ingreso en alta de colaboradores.
+/* ControlEvent v27_prod_1.0 - Refuerzo del desplegable Ingreso en alta de colaboradores.
    No intercepta login ni menús: solo garantiza opciones en #collabSituacion. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v26_prod_1.2';
+  const VERSION = 'ControlEvent v27_prod_1.0';
   const OPTIONS = ['Banco','Bizum','Efectivo','Pendiente'];
   const SELECT_ID = 'collabSituacion';
 

@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod_1.2 - Cálculos por tienda/ticket: fotos con método tipo Documentos.
+/* ControlEvent v27_prod_1.0 - Cálculos por tienda/ticket: fotos con método tipo Documentos.
    FIX12: las miniaturas del cálculo abren visor propio con detalle completo; se evita que los visores antiguos intercepten el clic. No cambia versión. */
 (function(){
   'use strict';
@@ -185,7 +185,7 @@
     fetchingEvent=ev;
     fetchPromise=fetch('/api/ticket-images?eventId='+encodeURIComponent(ev)+'&_='+Date.now(),{cache:'no-store'})
       .then(async res=>{const json=await res.json().catch(()=>({})); if(!res.ok)throw new Error(json.error||json.message||('HTTP '+res.status)); mergeKnownImages(json.images||{}); loadedEvent=ev; return serverImages;})
-      .catch(err=>{loadedEvent=ev;mergeKnownImages({});console.warn('[ControlEvent v26_prod_1.2] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
+      .catch(err=>{loadedEvent=ev;mergeKnownImages({});console.warn('[ControlEvent v27_prod_1.0] No se pudieron cargar fotos de tickets:',err?.message||err); return serverImages;})
       .finally(()=>{fetchPromise=null;fetchingEvent='';});
     return fetchPromise;
   }
@@ -577,7 +577,7 @@
       const bkey=canonicalKey(label); busy.add(bkey); beginTombstone(label); clearStateAliases(label); await clearIndexedDbAliases(label); refreshAfterAction(label,'');
       try{
         const dataUrl=await fileToCompressedDataUrl(file);
-        await deleteServer(label).catch(err=>console.warn('[ControlEvent v26_prod_1.2] Limpieza previa TK:',err?.message||err));
+        await deleteServer(label).catch(err=>console.warn('[ControlEvent v27_prod_1.0] Limpieza previa TK:',err?.message||err));
         clearStateAliases(label); await clearIndexedDbAliases(label);
         const uploaded=await uploadServer(label,dataUrl);
         endTombstone(label); setServerImage(label,uploaded.src); clearStateAliases(label);
@@ -750,5 +750,5 @@
   document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='selectedEvent'){ Object.keys(serverImages).forEach(k=>delete serverImages[k]); loadedEvent=''; tombstones.clear(); setTimeout(()=>loadServerImages(true).then(redraw),80); } },true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-loaded','controlevent:data-loaded','controlevent:module-mounted'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,30),true));
   [0,250,1000].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v26_prod_1.2_fix937_finalized_view_thumbs_stable'};
+  window.ControlEventV17CalculosFotos={install,redraw,attachPhoto,removePhoto,loadServerImages,imageFor,serverImages,version:'v27_prod_1.0_fix937_finalized_view_thumbs_stable'};
 })();

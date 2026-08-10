@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v26-prod-1-2",
-  "version": "26.1.2",
+  "name": "controlevent-v27-prod-1-0",
+  "version": "27.1.0",
   "private": true,
   "type": "module",
   "scripts": {

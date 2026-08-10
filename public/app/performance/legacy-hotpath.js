@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod_1.2 - Optimizador conservador de rutas calientes legacy.
+/* ControlEvent v27_prod_1.0 - Optimizador conservador de rutas calientes legacy.
    Objetivo móvil: reducir recalculos repetidos dentro del mismo estado sin tocar INFOEVENTO/BACKUP.
    Cachea selectores/calculos puros y se invalida ante cambios de formulario, clicks y mutaciones legacy. */
 import { VERSION } from '../version.js';

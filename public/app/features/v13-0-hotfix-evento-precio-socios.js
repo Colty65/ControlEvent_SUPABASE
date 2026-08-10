@@ -1,10 +1,10 @@
-/* ControlEvent v26_prod_1.2 hotfix - mantenimiento EVENTOS robusto y planificación socios obligatorios.
+/* ControlEvent v27_prod_1.0 hotfix - mantenimiento EVENTOS robusto y planificación socios obligatorios.
    - Guarda todos los campos de EVENTOS con CRUD fila-a-fila, aunque el evento activo esté Finalizado.
    - Captura click/pointer/touch sobre Modificar para evitar que otros bloqueos de Finalizado lo anulen.
 */
 (function(){
   'use strict';
-  const VERSION = 'v26_prod_1.2_hotfix_evento_precio_socios_robusto';
+  const VERSION = 'v27_prod_1.0_hotfix_evento_precio_socios_robusto';
   const $ = id => document.getElementById(id);
   function st(){ return window.ControlEventApp?.state || window.state || {}; }
   function auth(){ return window.ControlEventApp?.authUser || window.authUser || {}; }

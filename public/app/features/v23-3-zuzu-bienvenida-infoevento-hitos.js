@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod_1.2 · bienvenida personalizada de Zuzu.
+/* ControlEvent v27_prod_1.0 · bienvenida personalizada de Zuzu.
    Presenta el texto inicial en modo no editable, permite escucharlo con [Leer]
    y libera el campo al terminar la locución o al pulsar la escobita. */
 (function(root){

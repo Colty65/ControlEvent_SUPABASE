@@ -1,4 +1,4 @@
-/* ControlEvent v26_prod_1.2 - RESCATE ESTABLE
+/* ControlEvent v27_prod_1.0 - RESCATE ESTABLE
    - Sin ocultación prelogin ni bienvenida experimental.
    - Sin intervalos ni renders automáticos.
    - Limpia duplicados de descarga en Documentos/Ingresos sin tocar miniaturas.
@@ -7,7 +7,7 @@
   'use strict';
   if(window.__ceV1043RescueFixes) return;
   window.__ceV1043RescueFixes = true;
-  var VERSION = 'v26_prod_1.2';
+  var VERSION = 'v27_prod_1.0';
   function $(id){ return document.getElementById(id); }
   function trim(v){ return v == null ? '' : String(v).trim(); }
   function stop(ev){ if(ev){ ev.preventDefault&&ev.preventDefault(); ev.stopPropagation&&ev.stopPropagation(); ev.stopImmediatePropagation&&ev.stopImmediatePropagation(); } return false; }
