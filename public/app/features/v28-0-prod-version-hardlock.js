@@ -12,7 +12,9 @@
   function scrubVisible(){
     publish();
     try{
-      document.querySelectorAll('.appname,.appname span,.appname-stack,.appname-stack span,[data-ce-version-label],#appVersion,.app-version,.version-badge').forEach(el=>{
+      // NUNCA tocar contenedores de cabecera con textContent: destruiría el icono, reloj y botones.
+      // Solo se normalizan nodos hoja dedicados a la versión.
+      document.querySelectorAll('[data-ce-version-label],#appVersion,.app-version,.version-badge,.ce-v104-brand-mini > span,.ce-v1045-brand-mini > span,.ce-v1047-brand-mini > span').forEach(el=>{
         const raw=String(el.textContent||'');
         if(!raw)return;
         if(/ControlEvent\s+v/i.test(raw))el.textContent=raw.replace(versionText,TEXT);

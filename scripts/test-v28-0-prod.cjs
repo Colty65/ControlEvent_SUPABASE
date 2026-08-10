@@ -33,11 +33,13 @@ test('globo de destino vuelve al comportamiento estable anterior',()=>{
   assert(!code.includes('TICKETS COMPLETOS RELACIONADOS'));
 });
 
-test('detalle TKxx filtra antes de compactar',()=>{
+test('detalle TKxx filtra antes de compactar y tolera formato con ceros',()=>{
   const s=read('services/event-ai.service.js');
-  assert(s.includes("const ticketFilter=norm(tool?.ticket)"));
-  assert(s.includes("allRows.filter(r=>norm(r?.['Ticket u otros gastos'])===ticketFilter)"));
-  assert(s.includes("ticket:{type:'string'"));
+  assert(s.includes("const ticketFilter=trim(tool?.ticket)"));
+  assert(s.includes("allRows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter))"));
+  assert(s.includes('function v281TicketKey'));
+  assert(s.includes('return`TK${m[1]}`.toUpperCase()'));
+  assert(s.includes("const ticket=trim(rows[0]?.['Ticket u otros gastos'])||requestedTicket||rawTicket"));
 });
 
 test('consultas estructuradas inequívocas tienen ruta directa sin Gemini',()=>{
@@ -82,9 +84,46 @@ test('interacciones reducen gasto sin eliminar razonamiento abierto',()=>{
 test('informe/curiosidades preconsultan fuentes en paralelo y usan una sola redacción',()=>{
   const s=read('services/event-ai.service.js');
   assert(s.includes("return'executive'"));assert(s.includes("return'analysis'"));assert(s.includes('Promise.all(defs.map'));
-  assert(s.includes("initialToolChoice=(prefetch||v281PreviousAnswerAuditRequest(userPrompt))?'none':'auto'"));
+  assert(s.includes("rawInitialInput=v281PrefetchInput(userPrompt,prefetch),initialInput=v281ConversationBridgeInput"));
 });
 
+
+test('turnos directos se puentean hacia Gemini sin perder contexto',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes('function v281ConversationNeedsLocalBridge'));
+  assert(s.includes("/^control-event-v28-direct/i"));
+  assert(s.includes('CONTEXTO LOCAL RECIENTE DE ESTA MISMA CONVERSACIÓN'));
+});
+
+test('lo determinista sigue directo, pero decidir qué es importante vuelve a Gemini',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes("v280BroadGraphicalEventRequest(userPrompt)&&/\\b(importante|relevante|clave|significativ\\w*)\\b/.test(p)"));
+  assert(s.includes("if(v280BroadGraphicalEventRequest(userPrompt)&&!/\\b(importante|relevante|clave|significativ\\w*)\\b/.test(p))"));
+  assert(s.includes('prefetch.broadGraphical&&dossier'));
+});
+
+test('etiquetas pedidas en gráfica directa se materializan también en PDF',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes('const staticPointLabels=arr(chartSpecs).some'));
+  assert(s.includes('staticPointLabels});'));
+});
+
+test('cabecera estable anterior queda intacta: icono, reloj, refrescar y salir',()=>{
+  const html=read('public/index.html'), lock=read('public/app/features/v28-0-prod-version-hardlock.js'), refresh=read('public/app/features/v45-2-role-refresh.js');
+  ['controlevent-welcome-v44.png','headerDateTime','btnLogout'].forEach(x=>assert(html.includes(x),x));
+  assert(refresh.includes('btnSoftRefresh'));
+  assert(refresh.includes("btn.textContent = 'Refrescar'"));
+  assert(!lock.includes("querySelectorAll('.appname,.appname span,.appname-stack"));
+  assert(!lock.includes("document.querySelectorAll('.appname span, .appname-stack span')"));
+  assert(html.lastIndexOf('v28-0-prod-version-hardlock.js')>html.lastIndexOf('v28-0-prod-detail-globes.js'));
+});
+
+test('semáforos no inventan criterios y gráficas explícitas tienen prioridad',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes('SEMÁFOROS: no conviertas automáticamente'));
+  assert(s.includes('const chartSpecs=arr(final?.chartSpecs).concat(autoChartSpecs)'));
+  assert(s.includes('v281PreviousAnswerAuditRequest(userPrompt)'));
+});
 test('no quedan versiones activas 1.1/1.4/1.5 en public salvo migración histórica',()=>{
   const bad=[];function walk(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,ent.name);if(ent.isDirectory()){if(ent.name==='node_modules')continue;walk(p);}else if(/\.(js|html|json|css)$/.test(ent.name)){const rel=path.relative(root,p).replace(/\\/g,'/');if(rel==='public/app/version.js')continue;const s=fs.readFileSync(p,'utf8');if(/v27_prod_1\.(1|4|5)|ControlEvent[_ ]v27_prod_1\.(1|4|5)/.test(s))bad.push(rel);}}}walk(path.join(root,'public'));assert.deepEqual(bad,[]);
 });

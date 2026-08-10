@@ -6919,7 +6919,9 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const bankContext=options?.bankContext===true;
   const staticPointLabels=options?.staticPointLabels===true||v273PromptRequestsStaticPointLabels(userPrompt);
   const autoChartSpecs=chartIntent?v27AutoChartSpecs(results,userPrompt,true,explicitCharts?5:1,{bankContext,staticPointLabels}):[];
-  const chartSpecs=bankContext?autoChartSpecs.concat(arr(final?.chartSpecs)):arr(final?.chartSpecs).concat(autoChartSpecs);
+  // Las especificaciones explícitas (incluidas las garantías deterministas de CE) tienen prioridad.
+  // Las automáticas solo completan huecos, para que una línea pedida no desaparezca por el límite de gráficas.
+  const chartSpecs=arr(final?.chartSpecs).concat(autoChartSpecs);
   const asksTablesWithCharts=/\b(tabla|tablas|listado|listados|datos en tabla|detalle tabular)\b/i.test(text(userPrompt));
   for(const ref of (chartIntent&&!asksTablesWithCharts?[]:arr(final?.showTables).slice(0,6))){
     const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; const sig=`${r.id}:${t.key}`;if(seenT.has(sig))continue;seenT.add(sig);
@@ -7402,9 +7404,9 @@ async function v274ToolMasterCatalog(tool,state,selectedEventId=''){
 async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
   const sr=v274ResolveOptionalStore(state,tool?.store),status=trim(tool?.status)||'realized';
-  const ticketFilter=norm(tool?.ticket);
+  const ticketFilter=trim(tool?.ticket);
   const allRows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:trim(tool?.detail)||'standard'});
-  const rows=ticketFilter?allRows.filter(r=>norm(r?.['Ticket u otros gastos'])===ticketFilter):allRows;
+  const rows=ticketFilter?allRows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter)):allRows;
   const groups=new Map(),segDestGroups=new Map(),segDestTotals=new Map();
   for(const r of rows){
     const key=norm(r.Producto),g=groups.get(key)||{Producto:r.Producto,Unidades:0,Importe:0,'Nº registros':0,Precios:new Set(),Tiendas:new Set()};
@@ -7489,7 +7491,7 @@ function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUse
   const localNow=trim(clientLocalDateTime).slice(0,120)||fallbackNow;
   const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid';
   const utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  return `Eres Zuzu, el asistente conversacional y analista de ControlEvent v28.0_prod. Hablas en español natural con ${display}.\n\nPRINCIPIO DE ARQUITECTURA:\n- TÚ mantienes la conversación, resuelves pronombres y elipsis a partir del historial de esta Interaction, interpretas la intención, decides qué herramientas necesitas, analizas sus resultados y redactas la respuesta.\n- ControlEvent NO interpreta por ti la conversación: solo ejecuta las herramientas que solicites y te devuelve hechos canónicos.\n- Las herramientas pueden incluir facts_schema y schema de tablas: son la definición semántica de cada cifra. No uses dos magnitudes como si significaran lo mismo solo porque su aritmética encaje.\n- El evento actualmente visible es SOLO contexto ambiental: ${activeText}. No cambies el tema hacia él si el hilo actual trata de otra persona, comparación, documento o evento.\n\nENRUTADO INTERNO DE ESTE TURNO:\n- ${v273RoutingInstruction(userPrompt,conversationHistory)||'No hay una prioridad adicional; aplica las reglas generales.'}\n\nCONTEXTO TEMPORAL FIABLE:\n- Fecha y hora local del usuario al iniciar este turno: ${localNow}. Zona horaria informada: ${tz}. Referencia UTC: ${utcNow}.\n- Si preparas un informe con fecha de emisión, usa esta fecha/hora actual. No confundas la fecha de emisión con las fechas del evento y no inventes fechas.\n\nREGLAS DE INTELIGENCIA:\n- Responde exactamente a lo que el usuario intenta saber, no a una plantilla. Integra los turnos anteriores: si antes comparaste participación y luego responsabilidades, una pregunta sobre «implicación» debe considerar lo ya aprendido y pedir más datos si los necesitas.\n- Ante preguntas abiertas, evaluativas, de anomalías, conclusiones, riesgos, matices o informes ejecutivos, INVESTIGA antes de concluir. Un resumen agregado puede servir para orientarte, pero no basta para afirmar que «todo está bien» si existen herramientas con detalle relevante. Decide tú qué herramientas consultar y encadena más de una ronda si la evidencia inicial no es suficiente.\n- PROACTIVIDAD: cuando analices un evento por primera vez, revisa las income_attention_signals que ya aporta event_dossier. Si hay señales materiales, menciónalas en ESA PRIMERA RESPUESTA con su explicación respaldada y, si hace falta detalle, consulta event_people en la misma interacción. No esperes a que el usuario te diga «mira más», «husmea» o «¿no ves nada raro?». Si aparece una casuística nueva no contemplada, investígala con las herramientas disponibles y explica qué hecho te llama la atención y qué falta para cerrarla.\n- En informes para Dirección, revisiones de riesgos o cuando el usuario pregunte qué exige actuación, no declares «sin incidencias», «impecable», «éxito operativo» o equivalente solo por tener saldo positivo o tareas cerradas. Si puede cambiar la conclusión, consulta documentación, gestión y conciliación bancaria además del dossier económico antes de cerrar el juicio.\n- En seguimientos y comparaciones, no repitas listados extensos que ya aparecieron en el turno anterior salvo que el usuario los pida: sintetiza la diferencia nueva y reutiliza el contexto de la Interaction.\n- Si una herramienta devuelve datos truncados y la conclusión depende del conjunto completo, solicita más detalle o una herramienta más adecuada antes de concluir.\n- SALIDAS MASIVAS: si el usuario pide una lista, catálogo, tabla exhaustiva, ordenación o agrupación de muchas filas, NO redactes todas las filas en prosa. Resume en una o dos frases y referencia la tabla canónica en show_tables. La tabla/CSV de ControlEvent conserva el conjunto completo aunque el contexto compacto de Gemini solo muestre una muestra.\n- FOLLOW-UPS ESTRUCTURADOS: «al lado», «ordénalo», «agrúpalo», «totaliza», «dame simplemente la tabla» y expresiones equivalentes transforman la tabla/dataset del turno anterior; conserva su ámbito y no sustituyas el conjunto por un subconjunto distinto salvo que el usuario lo pida.\n- No repitas herramientas si el historial de la Interaction ya contiene hechos suficientes y siguen siendo aplicables al hilo actual.\n- EFICIENCIA: cuando necesites varias fuentes independientes, solicítalas en la MISMA ronda siempre que sea posible. No encadenes exploraciones una a una si pueden resolverse en paralelo; una pregunta normal no debe gastar llamadas extra para volver a obtener hechos que ya están disponibles.\n- IDENTIDAD PERSONAL CANÓNICA: si el usuario nombra una o varias personas concretas, usa person_dossier para cada una. Esa herramienta integra automáticamente sus registros individuales y las parejas donde aparece. people_activity es para exploración global cuando todavía no hay sujetos concretos; no la uses para sustituir un dossier nominal.\n- Si dos herramientas personales muestran representaciones distintas, prevalece la identidad canónica y sus canonical_representations; no presentes la pareja y el individuo como identidades incompatibles ni cambies cifras entre turnos sin volver a consultar la fuente canónica.\n- Pregunta para aclarar solo cuando exista una ambigüedad real que no puedas resolver razonablemente con el historial o las herramientas.\n- Puedes opinar, destacar, comparar, detectar anomalías y recomendar basándote en datos. Una opinión debe explicar brevemente qué hechos la sustentan.\n- No inventes causas, éxitos, objetivos, conciliaciones ni relaciones no aportadas por ControlEvent.\n- No muestres SQL, nombres internos de columnas ni detalles de implementación.
+  return `Eres Zuzu, el asistente conversacional y analista de ControlEvent v28.0_prod. Hablas en español natural con ${display}.\n\nPRINCIPIO DE ARQUITECTURA:\n- TÚ mantienes la conversación, resuelves pronombres y elipsis a partir del historial de esta Interaction, interpretas la intención, decides qué herramientas necesitas, analizas sus resultados y redactas la respuesta.\n- ControlEvent NO interpreta por ti la conversación: solo ejecuta las herramientas que solicites y te devuelve hechos canónicos.\n- Las herramientas pueden incluir facts_schema y schema de tablas: son la definición semántica de cada cifra. No uses dos magnitudes como si significaran lo mismo solo porque su aritmética encaje.\n- El evento actualmente visible es SOLO contexto ambiental: ${activeText}. No cambies el tema hacia él si el hilo actual trata de otra persona, comparación, documento o evento.\n\nENRUTADO INTERNO DE ESTE TURNO:\n- ${v273RoutingInstruction(userPrompt,conversationHistory)||'No hay una prioridad adicional; aplica las reglas generales.'}\n\nCONTEXTO TEMPORAL FIABLE:\n- Fecha y hora local del usuario al iniciar este turno: ${localNow}. Zona horaria informada: ${tz}. Referencia UTC: ${utcNow}.\n- Si preparas un informe con fecha de emisión, usa esta fecha/hora actual. No confundas la fecha de emisión con las fechas del evento y no inventes fechas.\n\nREGLAS DE INTELIGENCIA:\n- Responde exactamente a lo que el usuario intenta saber, no a una plantilla. Integra los turnos anteriores: si antes comparaste participación y luego responsabilidades, una pregunta sobre «implicación» debe considerar lo ya aprendido y pedir más datos si los necesitas.\n- Ante preguntas abiertas, evaluativas, de anomalías, conclusiones, riesgos, matices o informes ejecutivos, INVESTIGA antes de concluir. Un resumen agregado puede servir para orientarte, pero no basta para afirmar que «todo está bien» si existen herramientas con detalle relevante. Decide tú qué herramientas consultar y encadena más de una ronda si la evidencia inicial no es suficiente.\n- PROACTIVIDAD: cuando analices un evento por primera vez, revisa las income_attention_signals que ya aporta event_dossier. Si hay señales materiales, menciónalas en ESA PRIMERA RESPUESTA con su explicación respaldada y, si hace falta detalle, consulta event_people en la misma interacción. No esperes a que el usuario te diga «mira más», «husmea» o «¿no ves nada raro?». Si aparece una casuística nueva no contemplada, investígala con las herramientas disponibles y explica qué hecho te llama la atención y qué falta para cerrarla.\n- En informes para Dirección, revisiones de riesgos o cuando el usuario pregunte qué exige actuación, no declares «sin incidencias», «impecable», «éxito operativo» o equivalente solo por tener saldo positivo o tareas cerradas. Si puede cambiar la conclusión, consulta documentación, gestión y conciliación bancaria además del dossier económico antes de cerrar el juicio.\n- SEMÁFOROS: no conviertas automáticamente un cero, un saldo positivo o la ausencia de registros en VERDE/ROJO. Usa un color solo si ControlEvent devuelve un estado/traffic canónico aplicable a ESE indicador, si existe un objetivo/umbral explícito en los datos o si el usuario proporciona el criterio. Si no existe criterio, indícalo como «sin umbral/criterio» y describe el hecho sin evaluarlo. Cero tareas pendientes con cero tareas totales NO demuestra finalización; cero hitos NO demuestra falta de trazabilidad; cero compras pendientes por sí solo NO certifica todo el cierre financiero/logístico.\n- En seguimientos y comparaciones, no repitas listados extensos que ya aparecieron en el turno anterior salvo que el usuario los pida: sintetiza la diferencia nueva y reutiliza el contexto de la Interaction.\n- Si una herramienta devuelve datos truncados y la conclusión depende del conjunto completo, solicita más detalle o una herramienta más adecuada antes de concluir.\n- SALIDAS MASIVAS: si el usuario pide una lista, catálogo, tabla exhaustiva, ordenación o agrupación de muchas filas, NO redactes todas las filas en prosa. Resume en una o dos frases y referencia la tabla canónica en show_tables. La tabla/CSV de ControlEvent conserva el conjunto completo aunque el contexto compacto de Gemini solo muestre una muestra.\n- FOLLOW-UPS ESTRUCTURADOS: «al lado», «ordénalo», «agrúpalo», «totaliza», «dame simplemente la tabla» y expresiones equivalentes transforman la tabla/dataset del turno anterior; conserva su ámbito y no sustituyas el conjunto por un subconjunto distinto salvo que el usuario lo pida.\n- No repitas herramientas si el historial de la Interaction ya contiene hechos suficientes y siguen siendo aplicables al hilo actual.\n- EFICIENCIA: cuando necesites varias fuentes independientes, solicítalas en la MISMA ronda siempre que sea posible. No encadenes exploraciones una a una si pueden resolverse en paralelo; una pregunta normal no debe gastar llamadas extra para volver a obtener hechos que ya están disponibles.\n- IDENTIDAD PERSONAL CANÓNICA: si el usuario nombra una o varias personas concretas, usa person_dossier para cada una. Esa herramienta integra automáticamente sus registros individuales y las parejas donde aparece. people_activity es para exploración global cuando todavía no hay sujetos concretos; no la uses para sustituir un dossier nominal.\n- Si dos herramientas personales muestran representaciones distintas, prevalece la identidad canónica y sus canonical_representations; no presentes la pareja y el individuo como identidades incompatibles ni cambies cifras entre turnos sin volver a consultar la fuente canónica.\n- Pregunta para aclarar solo cuando exista una ambigüedad real que no puedas resolver razonablemente con el historial o las herramientas.\n- Puedes opinar, destacar, comparar, detectar anomalías y recomendar basándote en datos. Una opinión debe explicar brevemente qué hechos la sustentan.\n- No inventes causas, éxitos, objetivos, conciliaciones ni relaciones no aportadas por ControlEvent.\n- No muestres SQL, nombres internos de columnas ni detalles de implementación.
 - DATOS GENERALES NO RESTRINGIDOS: los catálogos maestros de PRODUCTOS, TIENDAS, PERSONAS y EVENTOS son información consultable de ControlEvent. Si el usuario pide una lista/catálogo/tabla general o cualquier dato almacenado de esos ámbitos, usa master_catalog y entrégalo; no afirmes que no existe una herramienta para consultarlo. ACCESO/usuarios/credenciales queda expresamente fuera y nunca debe exponerse como catálogo.
 - DETALLE DE COMPRAS: event_breakdowns resume y agrega; store_purchases agrega por tienda. Si el usuario pide productos comprados uno a uno, unidades, precio, importe, ticket, tienda o responsable, usa event_purchase_lines. Nunca uses la limitación de store_purchases para concluir que ControlEvent no tiene detalle producto a producto.
 - CATÁLOGO + EVENTO: si pide todos los productos del catálogo y, al lado, qué se compró en un evento, usa master_catalog(entity=products, event/scope correspondiente). Esa herramienta conserva TODOS los productos maestros y superpone unidades/precios/importes de compra cuando existan. Si además pide exactitud registro a registro, añade event_purchase_lines.
@@ -7581,6 +7583,18 @@ function v261EmergencyConversationInput(userPrompt,conversationHistory=[]){
   return hist?`Se ha perdido el identificador técnico de la conversación anterior. Reconstruye el contexto SOLO a partir de estos últimos turnos y continúa con naturalidad; no los repitas al usuario.\n\n${hist}\n\nNUEVO MENSAJE DEL USUARIO:\n${userPrompt}`:userPrompt;
 }
 
+function v281ConversationNeedsLocalBridge(conversationHistory=[]){
+  const last=arr(conversationHistory).slice(-1)[0];return !!last&&/^control-event-v28-direct/i.test(trim(last?.provider));
+}
+function v281ConversationBridgeInput(input,userPrompt,conversationHistory=[]){
+  if(!v281ConversationNeedsLocalBridge(conversationHistory))return input;
+  const turns=arr(conversationHistory).slice(-4).map(turn=>{
+    const source=/^control-event-v28-direct/i.test(trim(turn?.provider))?'respuesta determinista de ControlEvent':'turno conversacional';
+    return `[${source}]\nUsuario: ${trim(turn?.user).slice(0,650)}\nZuzu: ${trim(turn?.assistant).slice(0,900)}\nTítulo: ${trim(turn?.title).slice(0,180)}`;
+  }).join('\n\n');
+  return `CONTEXTO LOCAL RECIENTE DE ESTA MISMA CONVERSACIÓN:\nAlgunos turnos anteriores fueron resueltos directamente por ControlEvent y por ello no existen dentro de la Interaction nativa de Gemini. Considéralos como parte real del hilo. Resuelve referencias como «ese análisis», «esa gráfica», «de esa lista» o «lo anterior» con este contexto y NO pidas al usuario que lo repita si aquí ya está claro. No repitas este bloque al usuario.\n\n${turns}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}\n\nENTRADA DE TRABAJO DEL TURNO:\n${input}`;
+}
+
 function v261ConversationMoneyValues(conversationHistory=[]){
   const vals=[];const re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)\s*(?:€|euros?)/gi;
   for(const h of arr(conversationHistory).slice(-8)){const txt=trim(h?.assistant);let m;while((m=re.exec(txt))){const n=round(v26ParseLocalizedDisplayNumber(m[0]),2);if(Number.isFinite(n))vals.push(n);}re.lastIndex=0;}
@@ -7620,7 +7634,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const cache=new Map(),allResults=[];
   const prefetch=await v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
   if(prefetch)allResults.push(...prefetch.results);
-  const initialInput=v281PrefetchInput(userPrompt,prefetch),initialToolChoice=(prefetch||v281PreviousAnswerAuditRequest(userPrompt))?'none':'auto';
+  const rawInitialInput=v281PrefetchInput(userPrompt,prefetch),initialInput=v281ConversationBridgeInput(rawInitialInput,userPrompt,conversationHistory),initialToolChoice=(prefetch||v281PreviousAnswerAuditRequest(userPrompt))?'none':'auto';
   try{payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'V28 · Gemini conversación',toolChoice:initialToolChoice});}
   catch(error){
     if(currentId&&v261PreviousIdFailure(error)){
@@ -7720,7 +7734,12 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(deliveredMaster&&(/no\s+(?:puedo|dispongo|tengo)[^.]{0,90}(?:catalog|lista\s+general|tabla\s+maestra)/.test(normalizedFinal)||/no\s+existe[^.]{0,80}herramienta/.test(normalizedFinal)))issues.push('ControlEvent sí ha entregado el catálogo maestro solicitado en este turno. No afirmes que no puedes consultarlo ni que no existe herramienta.');
   if(deliveredPurchase&&(/no\s+(?:puedo|dispongo|tengo)[^.]{0,110}(?:detalle|producto\s+a\s+producto|unidades|precio)/.test(normalizedFinal)||/store_purchases[^.]{0,120}no\s+(?:ofrece|proporciona)/.test(normalizedFinal)))issues.push('ControlEvent sí ha entregado event_purchase_lines con detalle producto a producto. No atribuyas a store_purchases una limitación del sistema completo.');
   if(chartIntent&&v273AnswerBlamesRenderer(final.answer))issues.push('No expliques al usuario la arquitectura ni delegues la gráfica en otra capa. Si se pidió una gráfica, responde como sistema completo y referencia charts de forma materializable.');
-  if(issues.length){
+  if(issues.length&&v281PreviousAnswerAuditRequest(userPrompt)){
+    // Este turno ya es una auditoría semántica de la respuesta anterior. Evitamos auditar al auditor
+    // con una segunda llamada Gemini; cualquier aviso objetivo queda registrado sin re-redacción.
+    zuzuTracePush(flowTrace,'V28 · Auditoría de la respuesta anterior','OK',`Una sola llamada de razonamiento. Avisos objetivos detectados=${issues.length}.`);
+    final.warnings=arr(final.warnings).concat(issues);
+  }else if(issues.length){
     zuzuTracePush(flowTrace,'V27.1.5 · Auditor factual','RETRY',issues.join(' '));
     const repairInput=`REVISIÓN INTERNA SILENCIOSA DEL BORRADOR. Corrige estos puntos objetivos antes de entregar la respuesta final:\n- ${issues.join('\n- ')}\n\nConserva la intención, el razonamiento y el tono. No inventes datos. MUY IMPORTANTE: esta revisión es una instrucción interna; no menciones al usuario que hubo verificación, auditoría, corrección, dato no respaldado ni este mensaje. Devuelve directamente el JSON final ya corregido.`;
     payload=await v261CallInteraction({input:repairInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'V27.1.5 · Gemini corrección factual',toolChoice:'none'});
@@ -7897,12 +7916,15 @@ function v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory=
   return event?{event,scope:'named_event'}:{scope:'active_event'};
 }
 function v281TicketToken(value){
-  const m=text(value).match(/\bTK\s*[-_ ]?0*(\d{1,8})\b/i);if(!m)return'';return`TK${String(Number(m[1]))}`;
+  // Conserva la representación escrita por el usuario (p. ej. ceros a la izquierda).
+  // La equivalencia lógica se resuelve aparte y no depende del ancho del número.
+  const m=text(value).match(/\bTK\s*[-_ ]?(\d{1,8})\b/i);if(!m)return'';return`TK${m[1]}`.toUpperCase();
 }
-function v281TicketEqual(a,b){
-  const parse=v=>{const m=norm(v).match(/^TK\s*0*(\d+)$/);return m?Number(m[1]):NaN;};
-  const x=parse(a),y=parse(b);return Number.isFinite(x)&&Number.isFinite(y)?x===y:norm(a)===norm(b);
+function v281TicketKey(value){
+  const m=norm(value).match(/^tk\s*[-_ ]?0*(\d+)$/i);
+  return m?`tk#${String(Number(m[1]))}`:norm(value);
 }
+function v281TicketEqual(a,b){return !!trim(a)&&!!trim(b)&&v281TicketKey(a)===v281TicketKey(b);}
 function v281ResolveTicketCode(state,eventId,raw){
   const wanted=trim(raw);if(!wanted)return'';
   for(const row of arr(state?.compras)){
@@ -7937,7 +7959,8 @@ function v281BroadBankKey(bankResult){
 }
 function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],results=[],showTables=[],chartSpecs=[],flowTrace=[],previousInteractionId=''}){
   const final={title,answer,warnings,showTables,chartSpecs};
-  const presentation=v26BuildPresentation(final,results,'',{wantsCharts:false,bankContext:false,staticPointLabels:false});
+  const staticPointLabels=arr(chartSpecs).some(spec=>arr(spec?.point_label_fields).map(trim).filter(Boolean).length>0);
+  const presentation=v26BuildPresentation(final,results,'',{wantsCharts:false,bankContext:false,staticPointLabels});
   const files=[];
   for(const t of presentation.tables.slice(0,8)){
     const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));
@@ -7949,6 +7972,7 @@ function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],resu
 function v281AnalysisPrefetchKind(userPrompt){
   const p=norm(userPrompt);
   if(/\b(informe\s+(?:ejecutivo|grafico|gráfico)|direcci[oó]n|semafor|cuadro\s+de\s+mando)\b/.test(p))return'executive';
+  if(v280BroadGraphicalEventRequest(userPrompt)&&/\b(importante|relevante|clave|significativ\w*)\b/.test(p))return'analysis';
   if(/\b(curios\w*|rar\w*|anomal\w*|riesg\w*|hallazg\w*|cosas?\s+relevantes?|algo\s+importante[^.]{0,60}(?:olvid\w*|falt\w*)|que\s+tal\s+(?:salio|salió)|analiza\s+(?:a\s+fondo|en\s+profundidad))\b/.test(p))return'analysis';
   return'';
 }
@@ -7961,25 +7985,39 @@ async function v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conve
     {id:'v28_prefetch_documentation',name:'event_documentation',...ea,detail:'brief'}
   ];
   if(kind==='analysis')defs.push({id:'v28_prefetch_people',name:'event_people',...ea,detail:'brief'});
-  if(kind==='executive'||/\b(banco|bancari|concili|cuadre|tesorer|liquidez|flujo\s+de\s+caja|olvid|falta)\b/.test(norm(userPrompt)))defs.push({id:'v28_prefetch_bank',name:'event_bank',...ea,detail:'brief'});
+  const broadGraphical=v280BroadGraphicalEventRequest(userPrompt);
+  if(kind==='executive'||broadGraphical||/\b(banco|bancari|concili|cuadre|tesorer|liquidez|flujo\s+de\s+caja|olvid|falta)\b/.test(norm(userPrompt)))defs.push({id:'v28_prefetch_bank',name:'event_bank',...ea,detail:'brief'});
   const results=(await Promise.all(defs.map(async d=>{try{return await v261ExecuteAgentTool(d,state,selectedEventId,flowTrace);}catch(error){zuzuTracePush(flowTrace,'v28 · Prefetch analítico','WARN',`${d.name}: ${cleanGeminiError(error)}`);return null;}}))).filter(Boolean);
   if(!results.length)return null;
   zuzuTracePush(flowTrace,'v28 · Prefetch analítico','OK',`${kind}: ${results.map(r=>r.name).join(', ')}. Las fuentes se obtienen en paralelo antes de una única redacción de Gemini.`);
-  return{kind,event:rr.nombre,results};
+  return{kind,event:rr.nombre,results,broadGraphical};
 }
+
 function v281PrefetchInput(userPrompt,prefetch){
   if(!prefetch)return userPrompt;
   const compact=prefetch.results.map(r=>v261CompactToolResult(r,'brief'));
   return `${userPrompt}\n\nINSTRUCCIÓN INTERNA DE EFICIENCIA: ControlEvent ya ha preconsultado en paralelo las fuentes canónicas necesarias. Analízalas y responde en UNA sola redacción; no solicites herramientas adicionales salvo que exista una carencia objetiva imposible de resolver con estas fuentes. No menciones este prefetch ni IDs internos.\nFUENTES CANÓNICAS PRECONSULTADAS:\n${JSON.stringify(compact)}`;
 }
 function v281ApplyPrefetchChartPolicy(final,prefetch){
-  if(!prefetch||prefetch.kind!=='executive')return final;
-  const bank=prefetch.results.find(r=>r?.name==='event_bank');if(!bank)return final;
-  const chosen=v281BroadBankKey(bank),bankKeys=new Set(['event_window_timeline','reconciliation_timeline','balance_timeline']);
-  let specs=arr(final?.chartSpecs).filter(s=>!bankKeys.has(trim(s?.table_key)));
-  if(chosen){
-    const t=arr(bank?.tables).find(x=>x?.key===chosen),exists=specs.some(s=>trim(s?.tool_id)===trim(bank.id)&&trim(s?.table_key)===chosen);
-    if(!exists)specs.unshift({title:trim(t?.title)||`Evolución bancaria · ${bank?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:chosen,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:[],unit:'€'});
+  if(!prefetch)return final;
+  let specs=arr(final?.chartSpecs).slice();
+  const bank=prefetch.results.find(r=>r?.name==='event_bank');
+  const dossier=prefetch.results.find(r=>r?.name==='event_dossier');
+  if(prefetch.broadGraphical&&dossier){
+    const typed=[
+      {title:`Economía · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'economics_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'€'},
+      {title:`Asistencia · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'attendance_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'personas'},
+      {title:`Gestión · ${dossier?.facts?.event||''}`,type:'bar',tool_id:dossier.id,table_key:'management_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'elementos'}
+    ];
+    for(const candidate of typed){if(!specs.some(s=>trim(s?.tool_id)===trim(candidate.tool_id)&&trim(s?.table_key)===candidate.table_key))specs.push(candidate);}
+  }
+  if((prefetch.kind==='executive'||prefetch.broadGraphical)&&bank){
+    const chosen=v281BroadBankKey(bank),bankKeys=new Set(['event_window_timeline','reconciliation_timeline','balance_timeline']);
+    if(prefetch.kind==='executive')specs=specs.filter(s=>!bankKeys.has(trim(s?.table_key)));
+    if(chosen){
+      const t=arr(bank?.tables).find(x=>x?.key===chosen),exists=specs.some(s=>trim(s?.tool_id)===trim(bank.id)&&trim(s?.table_key)===chosen);
+      if(!exists)specs.unshift({title:trim(t?.title)||`Evolución bancaria · ${bank?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:chosen,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:[],unit:'€'});
+    }
   }
   return{...final,chartSpecs:specs.slice(0,8)};
 }
@@ -7993,9 +8031,10 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
   // TKxx concreto: filtrar ANTES de compactar y comparar contra un total independiente si existe.
   if(v281ExactTicketRequest(userPrompt)){
     const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)return null;
-    const rawTicket=v281TicketToken(userPrompt),ticket=v281ResolveTicketCode(state,rr.id,rawTicket);
-    const purchase=await v274ToolEventPurchaseLines({id:'v28_direct_ticket',name:'event_purchase_lines',...ea,ticket,status:'realized',detail:'standard'},state,selectedEventId);
+    const rawTicket=v281TicketToken(userPrompt),requestedTicket=v281ResolveTicketCode(state,rr.id,rawTicket);
+    const purchase=await v274ToolEventPurchaseLines({id:'v28_direct_ticket',name:'event_purchase_lines',...ea,ticket:requestedTicket,status:'realized',detail:'standard'},state,selectedEventId);
     const rows=arr(purchase?.tables).find(t=>t?.key==='purchase_lines')?.rows||[],sum=v26Money(purchase?.facts?.total_amount);
+    const ticket=trim(rows[0]?.['Ticket u otros gastos'])||requestedTicket||rawTicket;
     let comparison='',warnings=[],results=[purchase];
     if(/\b(comprueba|coincid|total\s+del\s+ticket|suma)\b/.test(p)){
       try{
@@ -8041,7 +8080,7 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
   }
 
   // Resumen gráfico global: gráficos tipados, nunca la tabla KPI mixta. Banco solo si su periodo es pertinente.
-  if(v280BroadGraphicalEventRequest(userPrompt)){
+  if(v280BroadGraphicalEventRequest(userPrompt)&&!/\b(importante|relevante|clave|significativ\w*)\b/.test(p)){
     const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
     const dossier=await v26ToolEventDossier({id:'v28_direct_dossier',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId);
     let bank=null;try{bank=await v261EventBankTool({id:'v28_direct_bank',name:'event_bank',...ea,detail:'brief'},state,selectedEventId);}catch(_){}
