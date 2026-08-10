@@ -1,9 +1,9 @@
-/* ControlEvent v27_prod_1.3 - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v27_prod_1.4 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v27_prod_1.3';
+  var VERSION='v27_prod_1.4';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -80,7 +80,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v27_prod_1.3-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v27_prod_1.4-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -146,7 +146,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.3</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.4</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -201,7 +201,7 @@
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v27_prod_1.3','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
+    try{ ['ControlEvent_v27_prod_1.4','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -319,7 +319,7 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v27_prod_1.3').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v27_prod_1.4').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -358,7 +358,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v27_prod_1.3: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v27_prod_1.4: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
     loadZuzuInteractionId();
     setStatus('Zuzu está pensando...', 'ok');

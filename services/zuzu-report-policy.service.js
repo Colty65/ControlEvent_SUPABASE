@@ -1,4 +1,4 @@
-/* ControlEvent v27_prod_1.3 - Política estructural de informes Zuzu.
+/* ControlEvent v27_prod_1.4 - Política estructural de informes Zuzu.
    Centraliza alcance, profundidad, módulos y reglas de no redundancia. */
 
 function text(value){ return value == null ? '' : String(value); }

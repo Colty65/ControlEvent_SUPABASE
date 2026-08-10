@@ -1,22 +1,22 @@
-/* ControlEvent v27_prod_1.3 - versión centralizada */
-export const VERSION = 'v27_prod_1.3';
-export const VERSION_LABEL = 'v27_prod_1.3';
-export const VERSION_TEXT = 'ControlEvent v27_prod_1.3';
-export const VERSION_FILE = 'ControlEvent_v27_prod_1.3';
-export const BUILD_ID = '20260810-V27-PROD-1-3-ZUZU-BANCO-GRAFICAS-EJECUTABLES';
-export const ZIP_NAME = 'CE_V27_PROD_1_3_ZUZU_BANCO_GRAFICAS_EJECUTABLES.zip';
+/* ControlEvent v27_prod_1.4 - versión centralizada */
+export const VERSION = 'v27_prod_1.4';
+export const VERSION_LABEL = 'v27_prod_1.4';
+export const VERSION_TEXT = 'ControlEvent v27_prod_1.4';
+export const VERSION_FILE = 'ControlEvent_v27_prod_1.4';
+export const BUILD_ID = '20260810-V27-PROD-1-4-ZUZU-DATOS-GENERALES-COMPRAS-DETALLE';
+export const ZIP_NAME = 'CE_V27_PROD_1_4_ZUZU_DATOS_GENERALES_COMPRAS_DETALLE.zip';
 
 try {
-  // v27_prod_1.3: migración única de claves internas heredadas sin perder sesión/preferencias.
+  // v27_prod_1.4: migración única de claves internas heredadas sin perder sesión/preferencias.
   for (const store of [window.localStorage, window.sessionStorage]) {
     try {
       const copies = [];
-      const legacyPrefixes = ['ControlEvent_v27_prod_1.2', 'ControlEvent_v24_prod'];
+      const legacyPrefixes = ['ControlEvent_v27_prod_1.3', 'ControlEvent_v27_prod_1.2', 'ControlEvent_v24_prod'];
       for (let i = 0; i < store.length; i += 1) {
         const oldKey = store.key(i);
         const prefix = legacyPrefixes.find(p => oldKey && oldKey.startsWith(p));
         if (!prefix) continue;
-        const newKey = oldKey.replace(prefix, 'ControlEvent_v27_prod_1.3');
+        const newKey = oldKey.replace(prefix, 'ControlEvent_v27_prod_1.4');
         if (store.getItem(newKey) == null) copies.push([newKey, store.getItem(oldKey)]);
       }
       copies.forEach(([key, value]) => store.setItem(key, value));
