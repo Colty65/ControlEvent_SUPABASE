@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v27-prod-1-1",
-  "version": "27.1.1",
+  "name": "controlevent-v27-prod-1-2",
+  "version": "27.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "test:bank": "node scripts/test-bank-reconciliation-v24-4.js && node scripts/test-bank-reconciliation-v24-4-integration.js && node scripts/test-bank-reconciliation-v24-5-ui.js && node scripts/test-bank-reconciliation-v24-5-large-csv.js",
     "test:v26-fix1": "node scripts/test-v26-prod-fix1-conciliacion-backup.js",
     "test:v26-fix2": "node scripts/test-v26-prod-fix2-cuadre-banco.js",
-    "test:v26-fix3": "node scripts/test-v26-prod-fix3-controles-globos-eventos.js && node scripts/test-bank-reconciliation-v25-foreign-event.js"
+    "test:v26-fix3": "node scripts/test-v26-prod-fix3-controles-globos-eventos.js && node scripts/test-bank-reconciliation-v25-foreign-event.js",
+    "test:v27-1.2": "node scripts/test-v27-prod-1-2-zuzu-quality.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

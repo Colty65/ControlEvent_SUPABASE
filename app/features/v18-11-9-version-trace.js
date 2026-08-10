@@ -1,13 +1,13 @@
-/* ControlEvent v27_prod_1.1 - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v27_prod_1.2 - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v27_prod_1.1';
-  var VERSION_TEXT = 'ControlEvent v27_prod_1.1';
-  var VERSION_FILE = 'ControlEvent_v27_prod_1.1';
-  var BUILD_ID = '20260810-V27-PROD-1-1-INGRESOS-BANCO-GRAFICAS';
-  var ZIP_NAME = 'CE_V27_PROD_1_1_ZUZU_INTELIGENCIA_INGRESOS_BANCO_GRAFICAS.zip';
+  var VERSION_LABEL = 'v27_prod_1.2';
+  var VERSION_TEXT = 'ControlEvent v27_prod_1.2';
+  var VERSION_FILE = 'ControlEvent_v27_prod_1.2';
+  var BUILD_ID = '20260810-V27-PROD-1-2-ZUZU-FIABILIDAD-SEMANTICA';
+  var ZIP_NAME = 'CE_V27_PROD_1_2_ZUZU_FIABILIDAD_SEMANTICA.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;

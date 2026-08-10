@@ -1,4 +1,4 @@
-/* ControlEvent v27_prod_1.1 - Motor seguro de contexto para Zuzu / Analítica libre.
+/* ControlEvent v27_prod_1.2 - Motor seguro de contexto para Zuzu / Analítica libre.
    SOLO LECTURA: prepara datos completos, calculados y legibles. Zuzu NO ejecuta SQL ni toca BBDD. */
 import { analyzeZuzuReportRequest, isBroadEventReportRequest } from './zuzu-report-policy.service.js';
 import { buildCanonicalAttendance } from './zuzu-attendance.service.js';
@@ -724,7 +724,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   allSummaries.forEach(s => { add(globalIngresos, s.titulo, s.ingresosTotal); add(globalCompras, s.titulo, s.comprasReales); add(globalDonaciones, s.titulo, s.donacionesProducto); add(globalValoracion, s.titulo, s.valoracionEvento); });
 
   const context = {
-    versionContexto: 'ControlEvent EventContext v27_prod_1.1 - Zuzu contexto completo selectivo',
+    versionContexto: 'ControlEvent EventContext v27_prod_1.2 - Zuzu contexto completo selectivo',
     generatedAt: new Date().toISOString(),
     seguridad: {
       modo: 'solo lectura',
@@ -777,7 +777,7 @@ export function buildEventAiContext(state, selectedEventId = '', userPrompt = ''
   return context;
 }
 
-/* ControlEvent v27_prod_1.1 - Zuzu: módulos seguros de extracción selectiva completa.
+/* ControlEvent v27_prod_1.2 - Zuzu: módulos seguros de extracción selectiva completa.
    Esta capa NO ejecuta SQL ni expone claves internas. Solo transforma el estado ya leído por ControlEvent
    en registros legibles para humano según módulos invocados por el planificador. */
 const ZUZU_ALLOWED_MODULES = ['EVENTOS','INGRESOS','DONACIONES','COMPRAS','TICKETS','DOCUMENTOS','PRODUCTOS','TIENDAS','PERSONAS','HITOS','LG','BANCO','METEO'];
@@ -1235,7 +1235,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
   const tiendas = candidateRows(state?.tiendas, t => ({ nombre: trim(t?.nombre) }), 50, 12);
 
   return {
-    version: 'ControlEvent Zuzu Planner v27_prod_1.1',
+    version: 'ControlEvent Zuzu Planner v27_prod_1.2',
     finalidad: 'Catálogo mínimo para que Gemini decida módulos, filtros y alcance. No contiene datos operativos ni tablas completas.',
     modulosDisponibles: ZUZU_ALLOWED_MODULES,
     usuarioLogado: state?.usuarioLogado || state?.ce_acceso_usuario_logado || null,
@@ -2007,9 +2007,9 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
     .map(a => `Auditoría ${a.modulo}: fuente sin filtros ${a.registrosFuenteSinFiltros}, entregados ${a.registrosEntregados}. Revisar mapeo si no coincide.`);
   if (recoveredOperationalModules.length) advertenciasAuditoria.push(`ControlEvent recuperó sin filtros los módulos ${recoveredOperationalModules.join(', ')} porque la petición exigía toda la información de los eventos y el primer filtrado había dejado filas fuera.`);
   const context = {
-    versionContexto: 'ControlEvent Zuzu Modules v27_prod_1.1',
+    versionContexto: 'ControlEvent Zuzu Modules v27_prod_1.2',
     generatedAt: new Date().toISOString(),
-    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v27_prod_1.1: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
+    seguridad: { modo: 'solo lectura', nota: 'EXPERIMENTAL v27_prod_1.2: Zuzu puede proponer SELECTS_PROPUESTOS. ControlEvent valida que sean SELECT de solo lectura y los ejecuta literalmente mediante RPC ce_zuzu_select; los módulos oficiales se conservan como respaldo/auditoría.' },
     promptUsuario: trim(userPrompt).slice(0, 3000),
     politicaInforme: reportPolicy,
     usuarioLogado: safeState.usuarioLogado || safeState.ce_acceso_usuario_logado || null,
@@ -2027,7 +2027,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-4-AUDITORIA', regla: 'Toda respuesta de diagnóstico debe indicar eventos detectados, módulos, registros extraídos y filtros aplicados.' },
       { id: 'EXP-5-ZUZU-INDEPENDIENTE', regla: 'Si los datos entregados no alcanzan para responder lo pedido, Zuzu debe pedir a ControlEvent el módulo/eventos/detalle que falta en vez de completar por intuición.' },
       { id: 'EXP-6-USUARIO-LOGADO', regla: 'usuarioLogado contiene Identificacion/apodo y Nombre del usuario conectado. En respuestas informales usa Identificacion; en informes serios/formales usa Nombre. Si preguntan por una persona, compara también con usuarioLogado e informa si coincide.' },
-      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v27_prod_1.1 experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
+      { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v27_prod_1.2 experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
       { id: 'V23_1-ASISTENCIA-UNICA', regla: 'Toda cifra o listado de asistentes y no asistentes sale exclusivamente de asistenciaCanonica.porEvento. Numero>0 confirma; Numero=0 solo cuenta con estado explícito de asistencia/exención/invitación. Registros de ingreso son filas administrativas, no personas.' },
       { id: 'V23_1-COBERTURA-INFORME', regla: 'politicaInforme define todos los módulos exigidos por la petición. Un informe general o con detalles incluye descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia; METEO si se pide. No cerrar la respuesta si falta uno.' },
       { id: 'V25-CONCILIACION-BANCO', regla: 'BANCO es la fuente de conciliación por evento. En saldo es específico del evento; los abonos incluidos son movimientos positivos conciliados; forced_square cuenta como justificado; el saldo se calcula cronológicamente solo con movimientos incluidos.' },

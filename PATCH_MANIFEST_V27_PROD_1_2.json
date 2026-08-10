@@ -1,0 +1,15 @@
+{
+  "version": "v27_prod_1.2",
+  "build": "20260810-V27-PROD-1-2-ZUZU-FIABILIDAD-SEMANTICA",
+  "principle": "No business-data hardcoding: runtime logic is driven by formats, metadata, canonical facts, prompt semantics and conversation context.",
+  "quality_changes": [
+    "Validated multi-format date normalization with overlap/disjoint/unknown period semantics",
+    "Separated actual bank-period balance from base-zero accumulated event impact",
+    "Globally ranked chart candidates according to semantic intent",
+    "Prevented qualitative income-attention/correction tables from automatic charting",
+    "Inherited chart intent for short affirmative conversational follow-ups",
+    "Added presentation repair when the answer promises a chart but none can render",
+    "Added deterministic audit for contradictions in bank-period overlap wording"
+  ],
+  "regression_test": "scripts/test-v27-prod-1-2-zuzu-quality.cjs"
+}
