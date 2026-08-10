@@ -1,9 +1,9 @@
-/* ControlEvent v27_prod_1.2 - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v27_prod_1.3 - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v27_prod_1.2';
+  var VERSION='v27_prod_1.3';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -80,7 +80,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v27_prod_1.2-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v27_prod_1.3-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -146,7 +146,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.2</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v27_prod_1.3</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -201,7 +201,7 @@
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v27_prod_1.2','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
+    try{ ['ControlEvent_v27_prod_1.3','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -319,7 +319,7 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v27_prod_1.2').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v27_prod_1.3').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -358,7 +358,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v27_prod_1.2: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v27_prod_1.3: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
     loadZuzuInteractionId();
     setStatus('Zuzu está pensando...', 'ok');
@@ -546,7 +546,45 @@
     var legend=labels.map(function(l,i){ return '<div class="ce-ai-pie-legend"><span style="background:'+chartItemColor(ch,i)+'"></span>'+esc(l)+' · '+esc(formatNumber(values[i],ch.unit))+' '+esc(ch.unit||'')+'</div>'; }).join('');
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-pie-wrap"><div class="ce-ai-pie '+(donut?'donut':'')+'" style="background:conic-gradient('+stops+')"></div><div class="ce-ai-pie-list">'+legend+'</div></div></div>';
   }
+  function detailedLineChartHtml(ch, labels, values){
+    var pointKinds=Array.isArray(ch.pointKinds)?ch.pointKinds:[];
+    var pointLabels=Array.isArray(ch.pointLabels)?ch.pointLabels:[];
+    var pointTooltips=Array.isArray(ch.pointTooltips)?ch.pointTooltips:[];
+    var all=values.map(Number).filter(Number.isFinite);
+    if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
+    var globalMin=Math.min.apply(null,all),globalMax=Math.max.apply(null,all);
+    if(globalMin===globalMax){globalMin-=1;globalMax+=1;}else{var gm=(globalMax-globalMin)*0.12;globalMin-=gm;globalMax+=gm;}
+    var segmentSize=8,segments=[];
+    for(var start=0;start<labels.length;start+=segmentSize){segments.push({start:start,end:Math.min(labels.length,start+segmentSize)});}
+    function pointColor(kind){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#22c55e';if(k==='CARGO')return '#e11d48';return '#38bdf8';}
+    var parts=segments.map(function(seg,segIndex){
+      var labs=labels.slice(seg.start,seg.end),vals=values.slice(seg.start,seg.end).map(Number),kinds=pointKinds.slice(seg.start,seg.end),plabs=pointLabels.slice(seg.start,seg.end),tips=pointTooltips.slice(seg.start,seg.end);
+      var w=940,h=500,left=76,right=28,top=160,bottom=78,plotW=w-left-right,plotH=h-top-bottom;
+      function xFor(i){return left+(labs.length<=1?plotW/2:i*plotW/(labs.length-1));}
+      function yFor(v){return top+(globalMax-Number(v))*plotH/(globalMax-globalMin);}
+      var grid='';
+      for(var g=0;g<=4;g++){var val=globalMax-(globalMax-globalMin)*g/4,y=top+plotH*g/4;grid+='<line x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(w-right)+'" y2="'+y.toFixed(1)+'" stroke="#e2e8f0" stroke-width="1"/><text x="'+(left-10)+'" y="'+(y+5).toFixed(1)+'" text-anchor="end" font-size="13" fill="#475569">'+esc(formatNumber(val,ch.unit))+'</text>';}
+      var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
+      var path=pts.map(function(pt,i){return(i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
+      var dots=pts.map(function(pt,i){
+        var pc=pointColor(kinds[i]),lines=String(plabs[i]||'').split('\n').filter(Boolean).slice(0,3),bandY=24+(i%2)*62;
+        var label=lines.map(function(line,li){return '<tspan x="'+pt[0].toFixed(1)+'" dy="'+(li===0?'0':'15')+'">'+esc(line)+'</tspan>';}).join('');
+        var connectorY=bandY+(Math.max(1,lines.length)-1)*15+6;
+        var tip=String(tips[i]||plabs[i]||'');
+        return '<line x1="'+pt[0].toFixed(1)+'" y1="'+connectorY+'" x2="'+pt[0].toFixed(1)+'" y2="'+(pt[1]-7).toFixed(1)+'" stroke="'+pc+'" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>'+
+          '<text x="'+pt[0].toFixed(1)+'" y="'+bandY+'" text-anchor="middle" font-size="11.5" font-weight="800" fill="'+pc+'">'+label+'</text>'+
+          '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+pc+'" stroke="#fff" stroke-width="1.5"><title>'+esc(tip)+'</title></circle>';
+      }).join('');
+      var xLabels=labs.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-44)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
+      var title=segments.length>1?'<div style="font-weight:850;color:#475569;margin:10px 0 2px">Movimientos '+(seg.start+1)+'–'+seg.end+' de '+labels.length+'</div>':'';
+      return title+'<div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc((ch.title||'Gráfica de líneas')+(segments.length>1?' · tramo '+(segIndex+1):''))+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/><path d="'+path+'" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div>';
+    }).join('');
+    var legend='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
+    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer" style="font-size:13px;color:#64748b;margin-bottom:4px">Etiquetas estáticas preparadas para lectura en PDF; si hay muchos movimientos, la línea se divide en tramos manteniendo la misma escala vertical.</div>'+parts+'<div style="margin-top:4px">'+legend+'</div></div>';
+  }
   function lineChartHtml(ch, labels, values){
+    var pointLabels=Array.isArray(ch.pointLabels)?ch.pointLabels:[];
+    if(ch&&ch.staticPointLabels===true&&pointLabels.length===labels.length&&labels.length>=2) return detailedLineChartHtml(ch,labels,values);
     var series=Array.isArray(ch.series)&&ch.series.length?ch.series:[{name:ch.title||'Serie',values:values}];
     var all=[]; series.forEach(function(sr){(sr.values||[]).forEach(function(v){var n=Number(v);if(Number.isFinite(n)) all.push(n);});});
     if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
@@ -566,6 +604,7 @@
     var xLabels=labels.map(function(label,i){if(i!==0&&i!==labels.length-1&&i%labelStep!==0)return '';var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-46)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
     var paths='',dots='',legend='';
     var pointKinds=Array.isArray(ch.pointKinds)?ch.pointKinds:[];
+    var pointTooltips=Array.isArray(ch.pointTooltips)?ch.pointTooltips:[];
     function pointColor(kind,fallback){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#22c55e';if(k==='CARGO')return '#e11d48';return fallback;}
     series.forEach(function(sr,si){
       var vals=(sr.values||[]).map(Number),color=chartColor(si);
@@ -574,12 +613,11 @@
       paths+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>';
       var showValueLabels=pts.length<=24;
       var radius=pts.length>120?2.6:(pts.length>50?3.2:5);
-      dots+=pts.map(function(pt,i){var v=vals[i],pc=pointKinds.length===pts.length?pointColor(pointKinds[i],color):color;return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="'+radius+'" fill="'+pc+'" stroke="#fff" stroke-width="1.5"><title>'+esc((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||'')+(pointKinds[i]?' · '+pointKinds[i]:''))+'</title></circle>'+(showValueLabels?'<text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+pc+'">'+esc(formatNumber(v,ch.unit))+'</text>':'');}).join('');
+      dots+=pts.map(function(pt,i){var v=vals[i],pc=pointKinds.length===pts.length?pointColor(pointKinds[i],color):color;var tip=pointTooltips[i]||((sr.name||'Serie')+' · '+labels[i]+': '+formatNumber(v,ch.unit)+' '+(ch.unit||'')+(pointKinds[i]?' · '+pointKinds[i]:''));return '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="'+radius+'" fill="'+pc+'" stroke="#fff" stroke-width="1.5"><title>'+esc(tip)+'</title></circle>'+(showValueLabels?'<text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]-10).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="900" fill="'+pc+'">'+esc(formatNumber(v,ch.unit))+'</text>':'');}).join('');
       legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-weight:850"><i style="display:inline-block;width:22px;height:4px;border-radius:4px;background:'+color+'"></i>'+esc(sr.name||('Serie '+(si+1)))+'</span>';
     });
     if(pointKinds.some(function(k){return String(k).toUpperCase()==='INGRESO';})||pointKinds.some(function(k){return String(k).toUpperCase()==='CARGO';})){
-      legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span>'+
-              '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
+      legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span>'+ '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
     }
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
   }

@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v27_prod_1.2';
+export const APP_VERSION = 'ControlEvent v27_prod_1.3';
 
-export const APP_VERSION_LABEL = 'v27_prod_1.2';
-export const APP_VERSION_FILE = 'ControlEvent_v27_prod_1.2';
-export const BUILD_ID = '20260810-V27-PROD-1-2-ZUZU-FIABILIDAD-SEMANTICA';
-export const ZIP_NAME = 'CE_V27_PROD_1_2_ZUZU_FIABILIDAD_SEMANTICA.zip';
+export const APP_VERSION_LABEL = 'v27_prod_1.3';
+export const APP_VERSION_FILE = 'ControlEvent_v27_prod_1.3';
+export const BUILD_ID = '20260810-V27-PROD-1-3-ZUZU-BANCO-GRAFICAS-EJECUTABLES';
+export const ZIP_NAME = 'CE_V27_PROD_1_3_ZUZU_BANCO_GRAFICAS_EJECUTABLES.zip';

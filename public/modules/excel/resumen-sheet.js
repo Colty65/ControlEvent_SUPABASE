@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const RESUMEN_SHEET_VERSION = 'v30.7';
-const PRODUCT_VERSION = 'v27_prod_1.2';
+const PRODUCT_VERSION = 'v27_prod_1.3';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;

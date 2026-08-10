@@ -59,6 +59,8 @@ vm.createContext(sandbox);
   'semanticPromptExplicitlyRequestsCharts',
   'v272IsShortAffirmativeFollowUp',
   'v272ConversationRequestsCharts',
+  'v273ChartRefinementFollowUp',
+  'v273PromptRequestsStaticPointLabels',
   'v272AnswerClaimsChart',
   'v272DateOnly',
   'v272DateMs',

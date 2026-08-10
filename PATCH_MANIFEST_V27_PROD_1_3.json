@@ -1,0 +1,26 @@
+{
+  "version": "v27_prod_1.3",
+  "build": "20260810-V27-PROD-1-3-ZUZU-BANCO-GRAFICAS-EJECUTABLES",
+  "base": "v27_prod_1.2",
+  "principle": "No business-data hardcoding. Routing and rendering decisions are based on semantic intent, conversation context, canonical bank reconciliation data and table metadata.",
+  "changes": [
+    "Bank-event semantic router prioritizes event_bank / Cuadre Banco over general account history",
+    "event_bank now exposes reconciliation_timeline with movement, cumulative impact, bank-period balance, concept and evidence",
+    "event_bank_timeline is redirected unless historical account chronology is explicitly requested",
+    "Chart-refinement follow-ups inherit chart intent beyond simple affirmative replies",
+    "Chart turns that contain no current tool call are forced through a data-retrieval round",
+    "Canonical bank reconciliation line chart prioritizes reconciliation_timeline",
+    "Structured chart schema supports point_label_fields",
+    "Backend emits static pointLabels and pointTooltips for PDF-safe line charts",
+    "Frontend line renderer provides a segmented static-label PDF mode for dense bank series",
+    "Auditor rejects answers that delegate chart rendering to another ControlEvent layer",
+    "Storage migration preserves v27_prod_1.2 keys"
+  ],
+  "tests": {
+    "v27_prod_1.2_regression": "16/16 OK",
+    "v27_prod_1.3_bank_charts": "11/11 OK",
+    "javascript_syntax_checked_files": 23,
+    "mirrored_frontend_files_equal": true
+  },
+  "regression_test": "scripts/test-v27-prod-1-3-zuzu-bank-charts.cjs"
+}
