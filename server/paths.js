@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v27_prod_1.5';
+export const APP_VERSION = 'ControlEvent v28.0_prod';
 
-export const APP_VERSION_LABEL = 'v27_prod_1.5';
-export const APP_VERSION_FILE = 'ControlEvent_v27_prod_1.5';
-export const BUILD_ID = '20260810-V27-PROD-1-5-CANDIDATA-ESTABLE';
-export const ZIP_NAME = 'CE_V27_PROD_1_5_CANDIDATA_ESTABLE_GLOBOS_ZUZU.zip';
+export const APP_VERSION_LABEL = 'v28.0_prod';
+export const APP_VERSION_FILE = 'ControlEvent_v28.0_prod';
+export const BUILD_ID = '20260810-V28-0-PROD';
+export const ZIP_NAME = 'ControlEvent_v28.0_prod.zip';

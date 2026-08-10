@@ -1,4 +1,4 @@
-/* ControlEvent v27_prod_1.1 FIX9.3.13 · GRAFICAS con comprobación contable de TKxx: no eliminar ni ocultar globos de RESUMEN PRESUPUESTARIO. */
+/* ControlEvent v28.0_prod FIX9.3.13 · GRAFICAS con comprobación contable de TKxx: no eliminar ni ocultar globos de RESUMEN PRESUPUESTARIO. */
 (function(root){
   'use strict';
   const FLAG='__ceV26GraphSanitationFix932';

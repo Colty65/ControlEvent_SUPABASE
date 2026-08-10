@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const GRAFICAS_SHEET_VERSION = 'v30.7';
-const PRODUCT_VERSION = 'v27_prod_1.5';
+const PRODUCT_VERSION = 'v28.0_prod';
 const AUDIT_STORAGE_KEY = 'controlevent:v28.0:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;

@@ -1,4 +1,4 @@
-// ControlEvent v27_prod_1.1 - Runtime no intrusivo para formularios principales.
+// ControlEvent v28.0_prod - Runtime no intrusivo para formularios principales.
 // No sustituye acciones legacy: sólo lee formularios, valida y diagnostica.
 // v27.7: diagnóstico menos ruidoso y alineado con IDs reales de la UI.
 

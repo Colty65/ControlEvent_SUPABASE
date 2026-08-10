@@ -1,13 +1,13 @@
 {
-  "version": "v27_prod_1.1",
-  "base": "última producción estable anterior a v27_prod_1.1",
+  "version": "v28.0_prod",
+  "base": "última producción estable anterior a v28.0_prod",
   "build": "20260810-V27-PROD-1-1-INGRESOS-BANCO-GRAFICAS",
   "zip": "CE_V26_PROD_1_0_ZUZU_TOOLS.zip",
   "architecture": "Zuzu Tools: Gemini interpreta y analiza; ControlEvent ejecuta herramientas canónicas y presenta",
   "changes": [
-    "Versión de producto unificada a v27_prod_1.1 en interfaz, API, INFOEVENTO, BACKUP, PDF de Zuzu y metadatos",
-    "INFOEVENTO externo e interno usa ControlEvent_v27_prod_1.1",
-    "BACKUP de navegador y servidor usa ControlEvent_v27_prod_1.1 en nombre, creador y metadatos VERSION/VERSION_FICHERO",
+    "Versión de producto unificada a v28.0_prod en interfaz, API, INFOEVENTO, BACKUP, PDF de Zuzu y metadatos",
+    "INFOEVENTO externo e interno usa ControlEvent_v28.0_prod",
+    "BACKUP de navegador y servidor usa ControlEvent_v28.0_prod en nombre, creador y metadatos VERSION/VERSION_FICHERO",
     "Zuzu pasa a herramientas de dominio: Gemini no genera SQL en el flujo normal de consultas de datos",
     "ControlEvent calcula hechos canónicos antes de la redacción para evitar errores aritméticos como 577 frente a 607",
     "Herramientas en memoria para dossier de evento, desgloses, personas, participación, compras por tienda, socios canónicos y catálogo de eventos",

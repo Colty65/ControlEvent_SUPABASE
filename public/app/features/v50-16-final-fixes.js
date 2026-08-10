@@ -1,12 +1,12 @@
-/* ControlEvent v27_prod_1.1 - correccion puntual sobre v50.19.
+/* ControlEvent v28.0_prod - correccion puntual sobre v50.19.
    - No toca justificantes de INGRESOS ni tickets.
    - Al elegir evento, desbloquea el estado de espera y reinstala/sanea globos.
    - El boton Refres recarga en sitio conservando evento y pestana actual.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v27_prod_1.1';
-  const VERSION_FILE = 'ControlEvent_v27_prod_1.1';
+  const VERSION = 'ControlEvent v28.0_prod';
+  const VERSION_FILE = 'ControlEvent_v28.0_prod';
   const INSTALLED = '__ceV5016FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

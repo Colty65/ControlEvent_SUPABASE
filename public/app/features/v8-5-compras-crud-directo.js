@@ -1,4 +1,4 @@
-/* ControlEvent v27_prod_1.1 FIX32 - COMPRAS CRUD directo fila-a-fila
+/* ControlEvent v28.0_prod FIX32 - COMPRAS CRUD directo fila-a-fila
    Regla: las acciones de COMPRAS escriben en BBDD en ese mismo momento.
    - Añadir compra    -> POST   /api/crud/compras
    - Modificar compra -> PUT    /api/crud/compras/:id

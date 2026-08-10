@@ -1,11 +1,11 @@
-// ControlEvent v27_prod_1.1 · FIX11 + descarga reforzada FIX12
+// ControlEvent v28.0_prod · FIX11 + descarga reforzada FIX12
 // Ajustes: usuario ce_acceso en sesión, casa estándar Vista aérea, nombres de descarga y blindajes ligeros.
 (function(){
   'use strict';
   if (window.__CE_V19_FIX11_APPLIED__) return;
   window.__CE_V19_FIX11_APPLIED__ = true;
   window.__CE_V19_FIX10_APPLIED__ = true;
-  var STORAGE_USER = 'ControlEvent_v27_prod_1.1_login_user';
+  var STORAGE_USER = 'ControlEvent_v28.0_prod_login_user';
   var STORAGE_ACCESS = 'ControlEvent_ce_acceso_usuario';
   function trim(v){ return String(v == null ? '' : v).trim(); }
   function arr(v){ return Array.isArray(v) ? v : []; }

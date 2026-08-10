@@ -1,8 +1,8 @@
-/* ControlEvent v27_prod_1.1 - Control de duplicados en mantenimientos generales
+/* ControlEvent v28.0_prod - Control de duplicados en mantenimientos generales
    Evita duplicar PERSONAS, EVENTOS, TIENDAS y PRODUCTOS al añadir o modificar. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v27_prod_1.1';
+  const VERSION = 'ControlEvent v28.0_prod';
   const TABLES = {
     persona: {stateKey:'personas', label:'PERSONAS', field:'nombre', addBtn:'btnAddPersona', addInput:'newPersonaNombre', saveAction:'save-persona', editAction:'edit-persona-nombre'},
     evento: {stateKey:'eventos', label:'EVENTOS', field:'titulo', addBtn:'btnAddEvento', addInput:'newEventoTitulo', saveAction:'save-evento', editAction:'edit-evento-titulo'},
