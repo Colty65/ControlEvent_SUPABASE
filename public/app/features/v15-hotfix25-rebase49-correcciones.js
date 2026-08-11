@@ -1,4 +1,4 @@
-/* ControlEvent v28.4_prod - HOTFIX51: rebase limpio sobre HF49.
+/* ControlEvent v28.5_prod - HOTFIX51: rebase limpio sobre HF49.
    Corrige visores sin duplicar títulos, colorea AVANCE por línea y refuerza limpieza de globos. */
 (function(){
   'use strict';
