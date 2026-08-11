@@ -1,8 +1,8 @@
-/* ControlEvent v28.2_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
+/* ControlEvent v28.3_prod - ajustes finos: candidatos Ticket IA, descargas INGRESOS, recarga estable y duplicar pantalla claro. */
 (function(){
   'use strict';
   if(window.__ceV1041AppFixes) return; window.__ceV1041AppFixes=true;
-  var VERSION='v28.2_prod';
+  var VERSION='v28.3_prod';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }

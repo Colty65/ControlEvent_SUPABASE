@@ -1,0 +1,36 @@
+{
+  "version": "v28.3_prod",
+  "date": "2026-08-11",
+  "base": "v28.2_prod",
+  "scope": "Zuzu: conciliación útil, rutas deterministas, reducción de redundancia y traza plegable/PDF",
+  "changes": [
+    "Movimientos conciliados con fecha, importe, concepto, saldo y justificación canónica inmediatamente debajo de la gráfica bancaria",
+    "Ingresos en verde y cargos en rojo; se elimina la visualización ordinal sin valor informativo",
+    "Informe/reimpresión de movimientos conciliados resuelto directamente por ControlEvent sin Gemini",
+    "Follow-up sí/hazlo ejecuta la última propuesta concreta",
+    "Exclusiones bancarias mostradas con evidencia y sin deducciones personales no respaldadas",
+    "Prefetch bancario brief compactado para no reenviar cronologías extensas a Gemini",
+    "Auditor factual local en informes preconsultados para evitar una segunda llamada Gemini innecesaria",
+    "Orden canónico de productos: TIENDA > SEGMENTO > DESTINO > PRODUCTO",
+    "Traza siempre disponible en pantalla, plegada por defecto",
+    "Consumo Gemini integrado dentro de la traza",
+    "PDF sin absolutamente ningún dato de traza cuando está plegada; traza completa cuando está desplegada",
+    "Contexto causal conservado en PDFs de follow-up",
+    "Identidad v28.3_prod en frontend, backend, INFOEVENTO y BACKUP"
+  ],
+  "hardcoding": {
+    "business_entities": false,
+    "test_events": false,
+    "test_people": false,
+    "test_tickets": false,
+    "test_amounts": false,
+    "test_dates": false
+  },
+  "tests": {
+    "v28_3_specific": "23/23",
+    "v27_1_2_regression": "16/16",
+    "v27_1_3_regression": "11/11",
+    "v27_1_4_regression": "13/13",
+    "syntax_real_js": "436/436"
+  }
+}

@@ -1,11 +1,11 @@
-/* ControlEvent v28.2_prod - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v28.3_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v28.2_prod';
-  var VERSION_TEXT = 'ControlEvent v28.2_prod';
-  var VERSION_FILE = 'ControlEvent_v28.2_prod';
+  var VERSION_LABEL = 'v28.3_prod';
+  var VERSION_TEXT = 'ControlEvent v28.3_prod';
+  var VERSION_FILE = 'ControlEvent_v28.3_prod';
   var BUILD_ID = '20260810-V27-PROD-1-4-ZUZU-DATOS-GENERALES-COMPRAS-DETALLE';
   var ZIP_NAME = 'CE_V27_PROD_1_3_ZUZU_BANCO_GRAFICAS_EJECUTABLES.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;

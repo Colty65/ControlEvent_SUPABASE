@@ -1,9 +1,9 @@
-/* ControlEvent v28.2_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v28.3_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v28.2_prod';
+  var VERSION='v28.3_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -80,7 +80,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v28.2_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v28.3_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -118,7 +118,7 @@
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
       '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
       '@media(pointer:coarse){#ceGeminiLibreOverlay .ce-ai-thinking-orb,#ceGeminiLibreOverlay .ce-ai-thinking-orb:before,#ceGeminiLibreOverlay .ce-ai-thinking-orb:after,#ceGeminiLibreOverlay .ce-ai-spinner{animation:none!important}}\n';
-    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}';
+    css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-status.INFO{color:#475569}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}#ceGeminiLibreOverlay .ce-ai-bank-justified{margin-top:14px;border-top:1px solid #dbeafe;padding-top:10px}#ceGeminiLibreOverlay .ce-ai-bank-justified h4{margin:0 0 8px;color:#075985}#ceGeminiLibreOverlay .ce-ai-bank-move{border:1px solid #dbeafe;border-left:6px solid #64748b;border-radius:10px;padding:9px 10px;margin:7px 0;background:#fff}#ceGeminiLibreOverlay .ce-ai-bank-move.INGRESO{border-left-color:#22c55e;background:#f0fdf4}#ceGeminiLibreOverlay .ce-ai-bank-move.CARGO{border-left-color:#e11d48;background:#fff1f2}#ceGeminiLibreOverlay .ce-ai-bank-move-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:850}.ce-ai-bank-move-amount{font-weight:950}.ce-ai-bank-move.INGRESO .ce-ai-bank-move-amount{color:#15803d}.ce-ai-bank-move.CARGO .ce-ai-bank-move-amount{color:#be123c}.ce-ai-bank-move-concept{font-weight:800;margin-top:4px}.ce-ai-bank-move-why{margin-top:3px;color:#334155}.ce-ai-bank-move-balance{color:#475569}';
     document.head.appendChild(css);
   }
 
@@ -146,7 +146,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v28.2_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v28.3_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -157,7 +157,7 @@
 
   function zuzuPrintableCss(){
     return '<style>'+
-      '@page{size:A4;margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#fff;margin:0}.ce-print-wrap{padding:0}.ce-print-head{border:2px solid #f59e0b;border-radius:18px;padding:12px 16px;margin:0 0 14px;background:linear-gradient(90deg,#fff7ed,#fff)}.ce-print-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.ce-print-head h1{font-size:22px;margin:0 0 8px;color:#7c2d12}.ce-print-datetime{font-size:13px;font-weight:950;color:#0f172a;white-space:nowrap;text-align:right}.ce-print-meta{font-size:13px;font-weight:800;color:#475569}.ce-print-prompt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px}.ce-ai-card{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:12px;margin:0 0 12px;box-shadow:none}.ce-ai-card h3{margin:0 0 10px;color:#075985}.ce-ai-answer-card{break-inside:auto!important;page-break-inside:auto!important}.ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:400}.ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}.ce-ai-trace-item{display:block;border-top:1px dashed #bae6fd;padding:4px 0;font-size:11px}.ce-ai-table-wrap{overflow:visible}.ce-ai-table{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}.ce-ai-table th,.ce-ai-table td{border:1px solid #dbeafe;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.ce-ai-table.ce-ai-table-wide{font-size:9px}.ce-ai-table th{background:#eff6ff;color:#075985}.ce-ai-bars{display:grid;gap:7px}.ce-ai-bar-row{display:grid;grid-template-columns:190px 1fr 82px;align-items:center;gap:8px}.ce-ai-bar-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-bar-track{height:17px;background:#e2e8f0;border-radius:999px;overflow:hidden}.ce-ai-bar-fill{height:100%;border-radius:999px}.ce-ai-bar-value{font-weight:650;color:#075985;text-align:right}.ce-ai-vbars{height:260px;display:flex;align-items:flex-end;gap:10px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:30px 10px 48px;overflow:visible}.ce-ai-vbar{height:100%;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;flex:1}.ce-ai-vbar-col{width:26px;border-radius:10px 10px 0 0}.ce-ai-vbar-value{position:absolute;bottom:calc(100% + 6px);font-size:9px;font-weight:650;color:#075985;white-space:nowrap;transform:none;transform-origin:center}.ce-ai-vbar-label{position:absolute;bottom:-42px;max-width:95px;text-align:center;font-size:9px;font-weight:650;color:#334155;line-height:1.1;overflow-wrap:anywhere}.ce-ai-pie-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.ce-ai-pie{width:190px;height:190px;border-radius:50%;box-shadow:inset 0 0 0 36px rgba(255,255,255,.82),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie.donut{box-shadow:inset 0 0 0 56px rgba(255,255,255,.88),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie-list{display:grid;gap:7px;min-width:220px}.ce-ai-pie-legend{font-weight:850}.ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}.ce-ai-line-svg{width:100%;height:260px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}.ce-ai-stacked-wrap{display:grid;gap:10px}.ce-ai-stack-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}.ce-ai-stack-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-stack-track{height:22px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}.ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.16)}.ce-ai-stack-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-weight:650;color:#334155}.ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}.ce-ai-files,.ce-ai-file-btn,.ce-ai-preview,.ce-ai-files-card{display:none!important}.ce-ai-trace details{display:block}.ce-ai-trace summary{font-weight:800;margin-bottom:6px}.ce-print-onepage{font-size:10px}.ce-print-onepage .ce-print-head{padding:6px 9px;margin-bottom:7px;border-radius:12px}.ce-print-onepage .ce-print-head h1{font-size:16px;margin-bottom:2px}.ce-print-onepage .ce-print-datetime,.ce-print-onepage .ce-print-meta{font-size:9px}.ce-print-onepage .ce-print-prompt{display:none!important}.ce-print-onepage .ce-ai-card{padding:6px 8px;margin-bottom:6px;border-radius:9px;break-inside:auto;page-break-inside:auto}.ce-print-onepage .ce-ai-card h3{font-size:14px;margin-bottom:4px}.ce-print-onepage .ce-ai-answer{font-size:10px;line-height:1.18}.ce-print-onepage .ce-ai-table{font-size:8.6px}.ce-print-onepage .ce-ai-table th,.ce-print-onepage .ce-ai-table td{padding:3px 4px;line-height:1.12}@media print{button{display:none!important}.ce-ai-card{box-shadow:none!important}body.ce-print-onepage{zoom:.92}}'+
+      '@page{size:A4;margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#fff;margin:0}.ce-print-wrap{padding:0}.ce-print-head{border:2px solid #f59e0b;border-radius:18px;padding:12px 16px;margin:0 0 14px;background:linear-gradient(90deg,#fff7ed,#fff)}.ce-print-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.ce-print-head h1{font-size:22px;margin:0 0 8px;color:#7c2d12}.ce-print-datetime{font-size:13px;font-weight:950;color:#0f172a;white-space:nowrap;text-align:right}.ce-print-meta{font-size:13px;font-weight:800;color:#475569}.ce-print-prompt{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px}.ce-ai-card{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:12px;margin:0 0 12px;box-shadow:none}.ce-ai-card h3{margin:0 0 10px;color:#075985}.ce-ai-answer-card{break-inside:auto!important;page-break-inside:auto!important}.ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:400}.ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}.ce-ai-trace-item{display:block;border-top:1px dashed #bae6fd;padding:4px 0;font-size:11px}.ce-ai-table-wrap{overflow:visible}.ce-ai-table{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}.ce-ai-table th,.ce-ai-table td{border:1px solid #dbeafe;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.ce-ai-table.ce-ai-table-wide{font-size:9px}.ce-ai-table th{background:#eff6ff;color:#075985}.ce-ai-bars{display:grid;gap:7px}.ce-ai-bar-row{display:grid;grid-template-columns:190px 1fr 82px;align-items:center;gap:8px}.ce-ai-bar-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-bar-track{height:17px;background:#e2e8f0;border-radius:999px;overflow:hidden}.ce-ai-bar-fill{height:100%;border-radius:999px}.ce-ai-bar-value{font-weight:650;color:#075985;text-align:right}.ce-ai-vbars{height:260px;display:flex;align-items:flex-end;gap:10px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:30px 10px 48px;overflow:visible}.ce-ai-vbar{height:100%;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;flex:1}.ce-ai-vbar-col{width:26px;border-radius:10px 10px 0 0}.ce-ai-vbar-value{position:absolute;bottom:calc(100% + 6px);font-size:9px;font-weight:650;color:#075985;white-space:nowrap;transform:none;transform-origin:center}.ce-ai-vbar-label{position:absolute;bottom:-42px;max-width:95px;text-align:center;font-size:9px;font-weight:650;color:#334155;line-height:1.1;overflow-wrap:anywhere}.ce-ai-pie-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.ce-ai-pie{width:190px;height:190px;border-radius:50%;box-shadow:inset 0 0 0 36px rgba(255,255,255,.82),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie.donut{box-shadow:inset 0 0 0 56px rgba(255,255,255,.88),0 6px 14px rgba(15,23,42,.10)}.ce-ai-pie-list{display:grid;gap:7px;min-width:220px}.ce-ai-pie-legend{font-weight:850}.ce-ai-pie-legend span{display:inline-block;width:13px;height:13px;border-radius:999px;margin-right:8px;vertical-align:middle}.ce-ai-line-svg{width:100%;height:260px;border:1px solid #e0f2fe;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc)}.ce-ai-stacked-wrap{display:grid;gap:10px}.ce-ai-stack-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}.ce-ai-stack-label{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.12}.ce-ai-stack-track{height:22px;background:#e2e8f0;border-radius:999px;display:flex;overflow:hidden}.ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.16)}.ce-ai-stack-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-weight:650;color:#334155}.ce-ai-stack-legend span i{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:6px}.ce-ai-files,.ce-ai-file-btn,.ce-ai-preview,.ce-ai-files-card{display:none!important}.ce-ai-trace details{display:block}.ce-ai-trace summary{font-weight:800;margin-bottom:6px}.ce-ai-bank-justified{margin-top:10px;border-top:1px solid #dbeafe;padding-top:8px}.ce-ai-bank-justified h4{margin:0 0 6px;color:#075985}.ce-ai-bank-move{border:1px solid #dbeafe;border-left:5px solid #64748b;border-radius:8px;padding:6px 8px;margin:5px 0;break-inside:avoid;page-break-inside:avoid}.ce-ai-bank-move.INGRESO{border-left-color:#22c55e;background:#f0fdf4}.ce-ai-bank-move.CARGO{border-left-color:#e11d48;background:#fff1f2}.ce-ai-bank-move-head{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;font-weight:800}.ce-ai-bank-move-concept{font-size:10px;font-weight:800;margin-top:2px}.ce-ai-bank-move-why,.ce-ai-bank-move-balance{font-size:9px;color:#334155;margin-top:2px}.ce-ai-bank-chart-card{break-inside:auto!important;page-break-inside:auto!important}.ce-ai-bank-chart-card .ce-ai-line-svg{break-inside:avoid;page-break-inside:avoid}.ce-ai-bank-justified{break-inside:auto;page-break-inside:auto}.ce-print-onepage{font-size:10px}.ce-print-onepage .ce-print-head{padding:6px 9px;margin-bottom:7px;border-radius:12px}.ce-print-onepage .ce-print-head h1{font-size:16px;margin-bottom:2px}.ce-print-onepage .ce-print-datetime,.ce-print-onepage .ce-print-meta{font-size:9px}.ce-print-onepage .ce-print-prompt{display:none!important}.ce-print-onepage .ce-ai-card{padding:6px 8px;margin-bottom:6px;border-radius:9px;break-inside:auto;page-break-inside:auto}.ce-print-onepage .ce-ai-card h3{font-size:14px;margin-bottom:4px}.ce-print-onepage .ce-ai-answer{font-size:10px;line-height:1.18}.ce-print-onepage .ce-ai-table{font-size:8.6px}.ce-print-onepage .ce-ai-table th,.ce-print-onepage .ce-ai-table td{padding:3px 4px;line-height:1.12}@media print{button{display:none!important}.ce-ai-card{box-shadow:none!important}body.ce-print-onepage{zoom:.92}}'+
       '</style>';
   }
   function wantsTraceInReport(prompt){
@@ -216,13 +216,16 @@
     var scope=responseMetaLabel(data);
     var metaHtml=scope?'<div class="ce-print-meta">'+esc(scope)+'</div>':'';
     var dateHtml='<div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div>';
+    var traceExpanded=!!result.querySelector('.ce-ai-trace details[open]');
     var printable=result.cloneNode(true);
-    var includeTrace=wantsTraceInReport(prompt);
     printable.querySelectorAll('.ce-ai-files-card').forEach(function(node){ node.remove(); });
-    if(!includeTrace) printable.querySelectorAll('.ce-ai-trace').forEach(function(node){ node.remove(); });
+    // v28.3: la traza siempre existe en pantalla. El PDF respeta exactamente su estado visual:
+    // plegada = se elimina ENTERA (ni resumen, ni totales); desplegada = se exporta completa.
+    if(!traceExpanded) printable.querySelectorAll('.ce-ai-trace').forEach(function(node){ node.remove(); });
     else printable.querySelectorAll('.ce-ai-trace details').forEach(function(node){ node.setAttribute('open','open'); });
     if(!explicitTechnicalView(prompt)){
       printable.querySelectorAll('.ce-ai-card').forEach(function(card){
+        if(traceExpanded && card.classList && card.classList.contains('ce-ai-trace')) return;
         var heading=card.querySelector('h3');
         if(heading && isTechnicalHeading(heading.textContent||'')) card.remove();
       });
@@ -240,7 +243,7 @@
     window.__ceZuzuConversationV26=[];
     window.__ceZuzuConversationContextV26=null;
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
+    try{ ['ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -358,7 +361,7 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v28.2_prod').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v28.3_prod').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -397,7 +400,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v28.2_prod: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v28.3_prod: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
     loadZuzuInteractionId();
     setStatus('Zuzu está pensando...', 'ok');
@@ -447,15 +450,23 @@
     return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
+    // v28.3_prod: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
+    // Los totales Gemini forman parte de la traza: no aparecen fuera de ella.
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
-    if(!Array.isArray(trace) || !trace.length) return '';
+    if(!Array.isArray(trace)) trace=[];
     var ok=trace.filter(function(x){return String(x.status||'').toUpperCase()==='OK';}).length;
     var retry=trace.filter(function(x){return String(x.status||'').toUpperCase()==='RETRY';}).length;
     var warn=trace.filter(function(x){return String(x.status||'').toUpperCase()==='WARN';}).length;
     var ko=trace.filter(function(x){return String(x.status||'').toUpperCase()==='KO';}).length;
-    var usage=(data.meta&&data.meta.geminiUsageEstimate)||data.geminiUsageEstimate||null;
-    var usageLine='';
-    if(usage && usage.calls){ usageLine=' · '+usage.calls+' '+(Number(usage.calls)===1?'llamada':'llamadas')+' · '+formatNumber(usage.totalTokens||0)+' tokens · coste aprox. '+formatCost(usage.costEurApprox||0)+' €'; }
+    var usage=(data&&data.meta&&data.meta.geminiUsageEstimate)||data&&data.geminiUsageEstimate||null;
+    var usageBlock='';
+    if(usage){
+      var calls=Number(usage.calls||0), tokens=Number(usage.totalTokens||0), cost=Number(usage.costEurApprox||0);
+      usageBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+(calls?'OK':'INFO')+'">'+(calls?'OK':'INFO')+'</div><div><strong>Consumo Gemini</strong></div><div class="ce-ai-trace-detail">'+
+        esc(String(calls))+' '+(calls===1?'llamada':'llamadas')+' · '+esc(formatNumber(tokens))+' tokens · coste estimado '+esc(formatCost(cost))+' €.'+
+        (calls?'':' Ruta determinista de ControlEvent; sin consumo Gemini en este turno.')+
+      '</div></div>';
+    }
     var items=trace.map(function(x){
       var st=String(x.status||'INFO').toUpperCase();
       var extra='';
@@ -472,7 +483,8 @@
       return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
     }).join('');
     var statusBits=[ok+' OK']; if(retry)statusBits.push(retry+' reintento'+(retry===1?'':'s')); if(warn)statusBits.push(warn+' aviso'+(warn===1?'':'s')); statusBits.push(ko+' KO');
-    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Trazabilidad</h3><details><summary>Ver recorrido técnico: '+statusBits.join(' / ')+esc(usageLine)+'</summary>'+items+'</details></div>';
+    var overview='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status INFO">INFO</div><div><strong>Resumen técnico</strong></div><div class="ce-ai-trace-detail">'+esc(statusBits.join(' / '))+'</div></div>';
+    return '<div class="ce-ai-card ce-ai-trace"><h3>🧭 Traza de resolución</h3><details><summary>Ver traza de resolución</summary>'+overview+usageBlock+items+'</details></div>';
   }
   function renderResult(data){
     data = data || {};
@@ -486,8 +498,6 @@
     html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && visibleWarnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
-    html+=usageHtml(data);
-    html+=traceHtml(data);
     (data.charts||[]).forEach(function(ch){ if(allowTechnical || !isTechnicalHeading(ch&&ch.title)) html+=chartHtml(ch); });
     (data.tables||[]).forEach(function(tb){ if(allowTechnical || !isTechnicalHeading(tb&&tb.title)) html+=tableHtml(tb); });
     if(Array.isArray(data.files) && data.files.length){
@@ -495,6 +505,7 @@
       data.files.forEach(function(f,i){ html+='<button type="button" class="ce-ai-file-btn" data-file-index="'+i+'">⬇️ '+esc(f.filename||('archivo_'+(i+1)))+'</button><button type="button" class="ce-ai-file-btn" data-file-preview="'+i+'">👁️ Ver</button>'; });
       html+='</div><div id="ceAiFilePreview" class="ce-ai-preview" style="display:none"></div></div>';
     }
+    html+=traceHtml(data);
     var el=$('ceAiResult'); el.innerHTML=html;
     el.querySelectorAll('[data-file-index]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.fileIndex)]; downloadText(f.content||'', f.filename||'archivo.txt', f.mime||'text/plain;charset=utf-8'); }; });
     el.querySelectorAll('[data-file-preview]').forEach(function(btn){ btn.onclick=function(){ var f=data.files[Number(btn.dataset.filePreview)]; var p=$('ceAiFilePreview'); if(!p) return; p.style.display='block'; p.textContent=f.content||''; }; });
@@ -620,8 +631,19 @@
       return title+'<div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc((ch.title||'Gráfica de líneas')+(segments.length>1?' · tramo '+(segIndex+1):''))+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/><path d="'+path+'" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div>';
     }).join('');
     var legend='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer" style="font-size:13px;color:#64748b;margin-bottom:4px">Etiquetas estáticas preparadas para lectura en PDF; si hay muchos movimientos, la línea se divide en tramos manteniendo la misma escala vertical.</div>'+parts+'<div style="margin-top:4px">'+legend+'</div></div>';
+    return '<div class="ce-ai-card'+((Array.isArray(ch&&ch.justifiedMovements)&&ch.justifiedMovements.length)?' ce-ai-bank-chart-card':'')+'"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer" style="font-size:13px;color:#64748b;margin-bottom:4px">Etiquetas estáticas preparadas para lectura en PDF; si hay muchos movimientos, la línea se divide en tramos manteniendo la misma escala vertical.</div>'+parts+'<div style="margin-top:4px">'+legend+'</div>'+bankJustificationHtml(ch)+'</div>';
   }
+  function bankJustificationHtml(ch){
+    var rows=Array.isArray(ch&&ch.justifiedMovements)?ch.justifiedMovements:[];
+    if(!rows.length) return '';
+    var html=rows.map(function(r){
+      var kind=String(r.type||'').toUpperCase(); if(kind!=='INGRESO'&&kind!=='CARGO') kind='NEUTRO';
+      var n=Number(r.movement||0),amount=(n>0?'+':'')+formatNumber(n,'€')+' €';
+      return '<div class="ce-ai-bank-move '+esc(kind)+'"><div class="ce-ai-bank-move-head"><span>'+esc(r.moment||'')+'</span><span class="ce-ai-bank-move-amount">'+esc(amount)+'</span><span class="ce-ai-bank-move-balance">Saldo '+esc(formatNumber(Number(r.balance||0),'€'))+' €</span></div><div class="ce-ai-bank-move-concept">'+esc(r.concept||'Sin concepto')+'</div><div class="ce-ai-bank-move-why"><strong>Justificación:</strong> '+esc(r.justification||'Sin vínculo justificativo registrado')+'</div></div>';
+    }).join('');
+    return '<div class="ce-ai-bank-justified"><h4>Movimientos y justificación de la conciliación</h4>'+html+'</div>';
+  }
+
   function lineChartHtml(ch, labels, values){
     var pointLabels=Array.isArray(ch.pointLabels)?ch.pointLabels:[];
     if(ch&&ch.staticPointLabels===true&&pointLabels.length===labels.length&&labels.length>=2) return detailedLineChartHtml(ch,labels,values);
@@ -659,7 +681,7 @@
     if(pointKinds.some(function(k){return String(k).toUpperCase()==='INGRESO';})||pointKinds.some(function(k){return String(k).toUpperCase()==='CARGO';})){
       legend+='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span>'+ '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
     }
-    return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div></div>';
+    return '<div class="ce-ai-card'+((Array.isArray(ch&&ch.justifiedMovements)&&ch.justifiedMovements.length)?' ce-ai-bank-chart-card':'')+'"><h3>'+esc(ch.title||'Gráfica')+'</h3><div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(ch.title||'Gráfica de líneas')+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/>'+paths+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div><div style="margin-top:4px">'+legend+'</div>'+bankJustificationHtml(ch)+'</div>';
   }
   function stackedChartHtml(ch){
     var labels=(ch.labels||[]).map(String); var series=(ch.series||[]);

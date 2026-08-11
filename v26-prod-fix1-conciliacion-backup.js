@@ -1,4 +1,4 @@
-/* ControlEvent v28.2_prod - FIX3 controles bancarios, globos canónicos y restauración integral. */
+/* ControlEvent v28.3_prod - FIX3 controles bancarios, globos canónicos y restauración integral. */
 (function(){
   'use strict';
   if(window.__ceV26ProdFix1) return; window.__ceV26ProdFix1=true;
@@ -70,7 +70,7 @@
     document.head.appendChild(style);
   }
 
-  // Restauración integral de los BACKUP v28.2_prod: núcleo + banco + hitos/LG.
+  // Restauración integral de los BACKUP v28.3_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){
     if(window.XLSX) return window.XLSX;
     if(typeof window.ensureSheetJS==='function') await window.ensureSheetJS();
