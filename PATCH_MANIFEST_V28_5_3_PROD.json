@@ -1,0 +1,20 @@
+{
+  "version": "v28.5.3_prod",
+  "base": "v28.5.2_prod",
+  "date": "2026-08-11",
+  "focus": "UX de Zuzu + texto plano + coste estable",
+  "changes": [
+    "Analitica preconsultada: una llamada Gemini de texto plano, sin schema JSON ni herramientas",
+    "Fallback determinista de CE si Gemini no devuelve texto utilizable",
+    "El techo de coste no bloquea la primera llamada; solo llamadas adicionales",
+    "Mensajes internos de coste no se exponen al usuario",
+    "Detalle bancario de presentacion se resuelve a 0 Gemini",
+    "Se conservan Pte.Compra canonico, comparativas multievento y graficas deterministas",
+    "Version actualizada en app, INFOEVENTO y BACKUP"
+  ],
+  "hardcode_business_cases": false,
+  "tests": {
+    "v28_5_3_specific": "12/12",
+    "syntax_core": "59 files, 0 errors"
+  }
+}

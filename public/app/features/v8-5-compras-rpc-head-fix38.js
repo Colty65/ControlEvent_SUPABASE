@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.2_prod FIX38 - COMPRAS RPC + RECARGA DETERMINISTA tras baja
+/* ControlEvent v28.5.3_prod FIX38 - COMPRAS RPC + RECARGA DETERMINISTA tras baja
    Objetivo: que COMPRAS tenga un único camino efectivo de escritura en pantalla real.
    Se carga ANTES del CRUD raíz antiguo para interceptar primero:
      Añadir compra    -> POST /api/crud/compras
@@ -313,7 +313,7 @@
   }
   function toast(msg){
     // v9.5.1: sin avisos flotantes negros; solo consola para depuración.
-    try{ console.info(LOG || '[ControlEvent v28.5.2_prod]', msg); }catch(_){}
+    try{ console.info(LOG || '[ControlEvent v28.5.3_prod]', msg); }catch(_){}
   }
   function reloadAfterDelete(id){
     // FIX38: dejamos de confiar en repintados parciales legacy.

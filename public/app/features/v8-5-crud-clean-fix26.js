@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.2_prod FIX26 - CRUD limpio fila-a-fila
+/* ControlEvent v28.5.3_prod FIX26 - CRUD limpio fila-a-fila
    Objetivo: cortar el modelo de guardado global y hacer persistencia inmediata.
    Regla:
    - Login, render, refrescar, cambiar ventana, cambiar evento, globos y fotos en visor = lectura/local.

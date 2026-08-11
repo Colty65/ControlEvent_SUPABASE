@@ -1,5 +1,5 @@
 {
-  "version": "v28.5.2_prod",
+  "version": "v28.5.3_prod",
   "goal": "Corregir de forma canónica Pte.Compra en todas las fuentes de Zuzu sin hardcode y sin alterar la arquitectura de v28.5",
   "changes": [
     "Ticket/Otros gastos vacío se clasifica como Pte.Compra, igual que en la interfaz de ControlEvent",
@@ -16,7 +16,7 @@
     "reglas narrativas de Gemini y schemas alineados con la fórmula de la interfaz",
     "listas inequívocas de compras pendientes se resuelven directamente en CE sin Gemini",
     "rutas legacy/fallback también tratan ticket vacío como pendiente",
-    "versión v28.5.2_prod aplicada a aplicación, INFOEVENTO y BACKUP; v28.5_prod queda solo como origen de migración"
+    "versión v28.5.3_prod aplicada a aplicación, INFOEVENTO y BACKUP; v28.5_prod queda solo como origen de migración"
   ],
   "hardcode_business_data": false,
   "regressions": {

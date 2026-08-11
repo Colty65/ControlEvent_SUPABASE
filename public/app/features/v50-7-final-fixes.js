@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.2_prod - recuperacion estable sobre v50.4.
+/* ControlEvent v28.5.3_prod - recuperacion estable sobre v50.4.
    Objetivo: NO sustituir los visores que ya funcionaban.
    - Retira de la carga efectiva los visores interceptores v50.5/v50.6 desde index.html.
    - Mantiene salida limpia sin reentrada automatica.
@@ -10,8 +10,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v28.5.2_prod';
-  const VERSION_FILE = 'ControlEvent_v28.5.2_prod';
+  const VERSION = 'ControlEvent v28.5.3_prod';
+  const VERSION_FILE = 'ControlEvent_v28.5.3_prod';
   const INSTALLED = '__ceV507FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

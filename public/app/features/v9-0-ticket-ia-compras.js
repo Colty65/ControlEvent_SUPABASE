@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.2_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v28.5.3_prod - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    Disponible solo para GD. No sustituye a COMPRAS: prepara filas, usuario revisa y confirma. */
 (function(){
   'use strict';

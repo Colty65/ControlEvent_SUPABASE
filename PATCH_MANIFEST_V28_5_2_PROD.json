@@ -1,5 +1,5 @@
 {
-  "version": "v28.5.2_prod",
+  "version": "v28.5.3_prod",
   "focus": "disciplina de coste Gemini y eliminación de payload redundante",
   "changes": [
     "event_bank brief/standard entrega hechos agregados y no repite cronologías a Gemini",
@@ -13,7 +13,7 @@
     "techo económico por defecto 0.010 EUR con estimación previa a la llamada",
     "salida Gemini por defecto limitada a 1600 tokens",
     "auditor factual determinista sin tercera llamada",
-    "INFOEVENTO y BACKUP actualizados a v28.5.2_prod"
+    "INFOEVENTO y BACKUP actualizados a v28.5.3_prod"
   ],
   "cost_targets_eur": {
     "usual": "<=0.004",

@@ -6,12 +6,12 @@ const read=r=>fs.readFileSync(path.join(root,r),'utf8');
 let n=0;
 function test(name,fn){fn();n++;console.log('OK · '+name);}
 
-test('identidad central v28.5.2_prod',()=>{
+test('identidad central v28.5.3_prod',()=>{
   const v=read('public/app/version.js');
-  assert(v.includes("VERSION = 'v28.5.2_prod'"));
-  assert(v.includes("VERSION_TEXT = 'ControlEvent v28.5.2_prod'"));
-  assert(v.includes("VERSION_FILE = 'ControlEvent_v28.5.2_prod'"));
-  assert(v.includes("ZIP_NAME = 'ControlEvent_v28.5.2_prod.zip'"));
+  assert(v.includes("VERSION = 'v28.5.3_prod'"));
+  assert(v.includes("VERSION_TEXT = 'ControlEvent v28.5.3_prod'"));
+  assert(v.includes("VERSION_FILE = 'ControlEvent_v28.5.3_prod'"));
+  assert(v.includes("ZIP_NAME = 'ControlEvent_v28.5.3_prod.zip'"));
   const pkg=JSON.parse(read('package.json'));
   assert.equal(pkg.name,'controlevent-v28-5-2-prod');
   assert.equal(pkg.version,'28.5.2');
@@ -21,16 +21,16 @@ test('identidad central v28.5.2_prod',()=>{
 test('migración conserva v28.3 como origen histórico',()=>{
   const v=read('public/app/version.js');
   assert(v.includes("'ControlEvent_v28.3_prod'"));
-  assert(v.includes("oldKey.replace(prefix, 'ControlEvent_v28.5.2_prod')"));
+  assert(v.includes("oldKey.replace(prefix, 'ControlEvent_v28.5.3_prod')"));
 });
 
 test('INFOEVENTO y BACKUP externo/interno usan v28.5',()=>{
   const legacy=read('public/app/legacy/legacy-bundle-before-modules-v30.7.js');
-  assert(legacy.includes('ControlEvent_v28.5.2_prod_INFOEVENTO-'));
+  assert(legacy.includes('ControlEvent_v28.5.3_prod_INFOEVENTO-'));
   for(const rel of ['public/modules/excel/backup.js','routes/export.routes.js']){
     const s=read(rel);
-    assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5.2_prod'"),rel);
-    assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5.2_prod'"),rel);
+    assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5.3_prod'"),rel);
+    assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5.3_prod'"),rel);
   }
 });
 
@@ -112,7 +112,7 @@ test('memoria conversacional usa cápsula compacta y no encadena Interactions',(
   assert(s.includes('function v284ConversationCapsuleInput'));
   assert(s.includes('arr(conversationHistory).slice(-3)'));
   assert(s.includes('Se ignora previous_interaction_id para ahorrar contexto acumulado'));
-  assert(front.includes("var previousInteractionId=''; // v28.5.2_prod"));
+  assert(front.includes("var previousInteractionId=''; // v28.5.3_prod"));
 });
 
 test('sí/hazlo ejecuta la última propuesta estructurada sin Gemini',()=>{
@@ -134,7 +134,7 @@ test('frontend conserva pendingAction en el historial local',()=>{
 
 test('informe de movimientos conciliados es ruta directa sin Gemini',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('if(v283BankReportRequest(userPrompt,conversationHistory))'),b=s.indexOf('// v28.5.2_prod: un «sí / hazlo»',a),chunk=s.slice(a,b);
+  const a=s.indexOf('if(v283BankReportRequest(userPrompt,conversationHistory))'),b=s.indexOf('// v28.5.3_prod: un «sí / hazlo»',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   assert(chunk.includes('return v283DirectBankReport'));
   assert(!chunk.includes('v261CallInteraction'));
@@ -206,7 +206,7 @@ test('version.js app/public son idénticos',()=>{
 
 test('no se hardcodean entidades de la batería en la lógica nueva v28.5',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('// v28.5.2_prod · RUTAS DETERMINISTAS DE BAJO COSTE'),b=s.indexOf('/* Código histórico conservado',a),chunk=s.slice(a,b);
+  const a=s.indexOf('// v28.5.3_prod · RUTAS DETERMINISTAS DE BAJO COSTE'),b=s.indexOf('/* Código histórico conservado',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   for(const token of ['SySA 2026','FUNCION 2025','Pocholo','Carmelo','TK05','CUBATAS','ALMACEN']) assert(!chunk.includes(token),token);
 });
@@ -224,7 +224,7 @@ test('comparativa multievento tiene prioridad sobre gráfica de un solo evento',
 
 test('comparativa completa resuelve serie y eventos sin nombres hardcodeados',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('// v28.5.2_prod · COMPARATIVAS MULTIEVENTO DETERMINISTAS'),b=s.indexOf('async function v281TryDirectRoute',a),chunk=s.slice(a,b);
+  const a=s.indexOf('// v28.5.3_prod · COMPARATIVAS MULTIEVENTO DETERMINISTAS'),b=s.indexOf('async function v281TryDirectRoute',a),chunk=s.slice(a,b);
   assert(chunk.includes('function v285SeriesBase'));
   assert(chunk.includes('function v285ComparisonEventNames'));
   assert(chunk.includes("name:'compare_events_extended'"));
@@ -260,7 +260,7 @@ test('claro que sí cuenta como afirmación y compras materializa tabla real',()
 
 test('reclamación de tabla prometida se resuelve localmente',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('Si el usuario reclama una tabla'),b=s.indexOf('// v28.5.2_prod: presentar/repetir',a),chunk=s.slice(a,b);
+  const a=s.indexOf('Si el usuario reclama una tabla'),b=s.indexOf('// v28.5.3_prod: presentar/repetir',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   assert(chunk.includes('v282PendingProposal'));
   assert(chunk.includes('v282ExecutePendingProposal'));
@@ -364,4 +364,4 @@ test('métricas canónicas extraídas de módulos no convierten ticket vacío en
   assert(chunk.includes("'Valoracion con donaciones': round(comprasTotal + comprasPte + donacionesTotal, 2)"));
 });
 
-console.log(`OK ${n} pruebas v28.5.2_prod`);
+console.log(`OK ${n} pruebas v28.5.3_prod`);

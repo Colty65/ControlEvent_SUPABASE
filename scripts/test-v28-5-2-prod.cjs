@@ -3,15 +3,15 @@ const ROOT=path.resolve(__dirname,'..');
 const read=r=>fs.readFileSync(path.join(ROOT,r),'utf8');
 let n=0;function test(name,fn){fn();n++;console.log('OK',name)}
 
-test('identidad v28.5.2_prod',()=>{
+test('identidad v28.5.3_prod',()=>{
   const v=read('app/version.js'),pv=read('public/app/version.js'),pkg=JSON.parse(read('package.json'));
-  for(const s of [v,pv]){assert(s.includes("VERSION = 'v28.5.2_prod'"));assert(s.includes("VERSION_FILE = 'ControlEvent_v28.5.2_prod'"));assert(s.includes("'ControlEvent_v28.5.1_prod'"));}
+  for(const s of [v,pv]){assert(s.includes("VERSION = 'v28.5.3_prod'"));assert(s.includes("VERSION_FILE = 'ControlEvent_v28.5.3_prod'"));assert(s.includes("'ControlEvent_v28.5.1_prod'"));}
   assert.equal(pkg.version,'28.5.2');
 });
 
 test('INFOEVENTO y BACKUP v28.5.2',()=>{
-  assert(read('public/app/legacy/legacy-bundle-before-modules-v30.9.3.js').includes('ControlEvent_v28.5.2_prod_INFOEVENTO-'));
-  for(const rel of ['public/modules/excel/backup.js','routes/export.routes.js']){const s=read(rel);assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5.2_prod'"));assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5.2_prod'"));}
+  assert(read('public/app/legacy/legacy-bundle-before-modules-v30.9.3.js').includes('ControlEvent_v28.5.3_prod_INFOEVENTO-'));
+  for(const rel of ['public/modules/excel/backup.js','routes/export.routes.js']){const s=read(rel);assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5.3_prod'"));assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5.3_prod'"));}
 });
 
 const s=read('services/event-ai.service.js');
@@ -78,4 +78,4 @@ test('sin hardcode de casos de prueba en bloque nuevo',()=>{
   const a=s.indexOf('function v2852BankIncomeGraphRequest'),b=s.indexOf('async function v281TryDirectRoute',a),chunk=s.slice(a,b);
   for(const x of ['Cuotas y gastos corrientes 2026','746,68','INNER ENERGIA','SySA 2026','TK05'])assert(!chunk.includes(x),x);
 });
-console.log(`OK ${n} pruebas v28.5.2_prod`);
+console.log(`OK ${n} pruebas v28.5.3_prod`);

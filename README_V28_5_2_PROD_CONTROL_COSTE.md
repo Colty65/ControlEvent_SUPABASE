@@ -1,4 +1,4 @@
-# ControlEvent v28.5.2_prod — disciplina de coste Zuzu
+# ControlEvent v28.5.3_prod — disciplina de coste Zuzu
 
 Objetivo de esta versión: mantener la calidad de v28.5.1 y eliminar consumo redundante de Gemini.
 
@@ -33,7 +33,7 @@ No se han introducido nombres de eventos, personas, tiendas, TKxx, importes ni f
 
 ## Versión
 
-Identidad completa `v28.5.2_prod`, incluida aplicación, INFOEVENTO y BACKUP interior/exterior. `v28.5.1_prod` se conserva únicamente como origen de migración de claves de sesión/preferencias.
+Identidad completa `v28.5.3_prod`, incluida aplicación, INFOEVENTO y BACKUP interior/exterior. `v28.5.1_prod` se conserva únicamente como origen de migración de claves de sesión/preferencias.
 
 ## Validación de construcción
 

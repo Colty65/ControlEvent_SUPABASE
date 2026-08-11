@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.2_prod · GRAFICAS / globos exhaustivos por destino.
+/* ControlEvent v28.5.3_prod · GRAFICAS / globos exhaustivos por destino.
    Comportamiento restaurado de la versión estable anterior a petición del usuario.
    Reconstruye las filas desde state.compras del evento activo para que el detalle del globo
    no dependa de listas intermedias. Sin datos de negocio hardcodeados. */
