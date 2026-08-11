@@ -1,4 +1,4 @@
-// ControlEvent v28.3_prod · FIX18 mínimo
+// ControlEvent v28.4_prod · FIX18 mínimo
 // Solo: Vista aérea (saldo descuentos, activo único y ancho), selector eventos por fecha/color, descripción para Zuzu ya va en backend.
 (function(){
   'use strict';
@@ -33,7 +33,7 @@
   function injectCss(){
     if($('ce-v19-fix18-style')) return;
     const css = `
-      /* v28.3_prod: recuperar la versión compacta junto al icono CE de la cabecera. */
+      /* v28.4_prod: recuperar la versión compacta junto al icono CE de la cabecera. */
       .appname-stack .ce-v104-brand-mini{display:inline-flex!important;align-items:center!important;gap:8px!important;}
       .appname-stack .ce-v104-brand-mini>span{display:inline-block!important;font-size:12px!important;font-weight:900!important;color:#334155!important;white-space:nowrap!important;}
 
@@ -169,5 +169,5 @@
 
   function install(){ injectCss(); installVistaHandlers(); installRenderHook(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
-  window.ControlEventV19Fix18={version:'v28.3_prod_FIX18'};
+  window.ControlEventV19Fix18={version:'v28.4_prod_FIX18'};
 })();

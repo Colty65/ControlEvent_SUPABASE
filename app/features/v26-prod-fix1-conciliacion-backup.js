@@ -1,4 +1,4 @@
-/* ControlEvent v28.3_prod - FIX4: restauración integral y estilos del globo canónico. */
+/* ControlEvent v28.4_prod - FIX4: restauración integral y estilos del globo canónico. */
 (function(){
   'use strict';
   if(window.__ceV26ProdFix1) return; window.__ceV26ProdFix1=true;
@@ -45,7 +45,7 @@
     document.head.appendChild(style);
   }
 
-  // Restauración integral de los BACKUP v28.3_prod: núcleo + banco + hitos/LG.
+  // Restauración integral de los BACKUP v28.4_prod: núcleo + banco + hitos/LG.
   async function ensureXlsx(){
     if(window.XLSX) return window.XLSX;
     if(typeof window.ensureSheetJS==='function') await window.ensureSheetJS();

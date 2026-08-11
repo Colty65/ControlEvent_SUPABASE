@@ -1,4 +1,4 @@
-// ControlEvent v28.3_prod · FIX15
+// ControlEvent v28.4_prod · FIX15
 // Suaviza INGRESOS, corrige selección visual Vista aérea y ajuste columna SEGMENTO.
 (function(){
   'use strict';

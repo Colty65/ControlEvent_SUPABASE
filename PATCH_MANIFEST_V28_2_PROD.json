@@ -1,6 +1,6 @@
 {
-  "version": "v28.3_prod",
-  "package": "ControlEvent_v28.3_prod.zip",
+  "version": "v28.4_prod",
+  "package": "ControlEvent_v28.4_prod.zip",
   "scope": [
     "incremental_fact_memory",
     "last_pending_proposal_precedence",
