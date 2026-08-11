@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const RESUMEN_SHEET_VERSION = 'v30.7';
-const PRODUCT_VERSION = 'v28.0_prod';
+const PRODUCT_VERSION = 'v28.1_prod';
 let lastSnapshot = null;
 let lastWorksheetBuild = null;
 let installed = false;
@@ -12,7 +12,7 @@ export const meta = {
   name: 'resumen-sheet',
   version: RESUMEN_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v28.0 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
+  description: 'Módulo real para preparar, validar y escribir una hoja RESUMEN modular. En v28.1 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -516,7 +516,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneResumen(options = {}){
-  const message = 'RESUMEN standalone desactivado en v28.0: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  const message = 'RESUMEN standalone desactivado en v28.1: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
   console.warn(`[ControlEventExcel/${RESUMEN_SHEET_VERSION}] ${message}`, {options});
   return {ok:false, disabled:true, version:RESUMEN_SHEET_VERSION, module:'resumen-sheet', message, recommendedAction:'exportExcel'};
 }

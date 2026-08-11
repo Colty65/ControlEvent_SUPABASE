@@ -1,0 +1,53 @@
+{
+  "version": "v28.1_prod",
+  "version_text": "ControlEvent v28.1_prod",
+  "version_file": "ControlEvent_v28.1_prod",
+  "build_id": "20260811-V28-1-PROD",
+  "base": "v28.0_prod_EQUILIBRADA",
+  "principles": [
+    "No hardcode de eventos, personas, tiendas, tickets, importes o fechas de prueba",
+    "ControlEvent resuelve hechos deterministas; Gemini interpreta y razona",
+    "Mantener cabecera estable e identidad uniforme en INFOEVENTO/BACKUP"
+  ],
+  "functional_changes": [
+    "Intención gráfica reconoce formas como gráficamente y garantiza gráficos en el mismo turno",
+    "Follow-up gráfica de cada puede resolverse con charts canónicos sin llamada Gemini adicional",
+    "Prefetch analítico no reexpone herramientas a Gemini innecesariamente",
+    "Se ocultan IDs internos/tool_id/table_key/claves de tablas en la prosa",
+    "Línea por línea no dispara gráfica automática",
+    "Semáforos no inventan criterio y las gráficas explícitas tienen prioridad",
+    "Por destino conserva comportamiento estable anterior"
+  ],
+  "version_scope": [
+    "cabecera/título",
+    "app/version.js y public/app/version.js",
+    "server/paths.js",
+    "INFOEVENTO",
+    "BACKUP cliente y servidor",
+    "metadatos internos Excel",
+    "bundles legacy activos",
+    "nombres de descarga/exportación"
+  ],
+  "key_files": [
+    "services/event-ai.service.js",
+    "app/features/v11-3-zuzu-analitica-libre.js",
+    "public/app/features/v11-3-zuzu-analitica-libre.js",
+    "public/app/features/v28-1-prod-detail-globes.js",
+    "public/app/features/v28-1-prod-version-hardlock.js",
+    "app/version.js",
+    "public/app/version.js",
+    "server/paths.js",
+    "public/modules/excel/backup.js",
+    "routes/export.routes.js",
+    "public/index.html"
+  ],
+  "tests": {
+    "v28_1": 25,
+    "v27_1_2": 16,
+    "v27_1_3": 11,
+    "v27_1_4": 13,
+    "stability": 12,
+    "total": 77,
+    "source_js_syntax": 403
+  }
+}

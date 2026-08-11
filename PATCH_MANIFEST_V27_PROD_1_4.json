@@ -1,5 +1,5 @@
 {
-  "version": "v28.0_prod",
+  "version": "v28.1_prod",
   "build_id": "20260810-V27-PROD-1-4-ZUZU-DATOS-GENERALES-COMPRAS-DETALLE",
   "base": "v27_prod_1.3",
   "purpose": "Hacer accesibles a Zuzu los catalogos generales no restringidos y el detalle producto a producto de las compras, sin hardcode de datos de negocio.",

@@ -65,6 +65,7 @@ vm.createContext(sandbox);
   'v272DateOnly',
   'v272DateMs',
   'v272PeriodRelation',
+  'v280BankEventWindowRequest',
   'v27AutoChartSpecs',
 ].forEach(name => vm.runInContext(`${extractFunction(name)}\nthis.${name}=${name};`, sandbox));
 

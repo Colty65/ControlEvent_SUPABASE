@@ -58,6 +58,7 @@ vm.createContext(sandbox);
   'v273BankTerms',
   'v273ConversationBankContext',
   'v273ExplicitHistoricalBankRequest',
+  'v280BankEventWindowRequest',
   'v273PromptRequestsStaticPointLabels',
   'v273RoutingInstruction',
   'v273AnswerBlamesRenderer',
