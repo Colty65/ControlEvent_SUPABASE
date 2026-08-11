@@ -1,5 +1,0 @@
-ControlEvent V30.9.1
-Corrección de despliegue Vercel: package.json regenerado como JSON válido.
-El error Unexpected token import indica que Vercel recibió un package.json con código JavaScript.
-Este paquete incluye package.json y package-lock.json validados con JSON.parse.
-Se mantiene la base funcional V30.9.

@@ -1,8 +1,0 @@
-ControlEvent v16_prod
-
-Esta version se ha hecho para recuperar el comportamiento de fotos que funcionaba antes de v50.5/v50.6:
-- No se cargan v50-5-final-fixes.js ni v50-6-final-fixes.js desde index.html.
-- Las fotos de INGRESOS y TICKETS vuelven a usar los visores anteriores, con el texto/detalle asociado.
-- Se anade una capa v50.7 solo para: salida limpia, menu RO estable, botones Salir/Refrescar en movil y mantener el globo de origen al cerrar fotos.
-
-Tras subir a GitHub/Vercel, en iPad y movil conviene cerrar la app del navegador/PWA y volver a abrir para que tome la cache controlevent-shell-v50-24.

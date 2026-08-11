@@ -1,4 +1,0 @@
-{
-  "version":"v8.5_prod FIX17",
-  "purpose":"Eliminar PUT /api/state del preflight de subida de fotos para evitar perdida de INGRESOS; subida usa eventSnapshot para eventos recien creados."
-}

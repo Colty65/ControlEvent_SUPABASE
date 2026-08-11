@@ -1,8 +1,0 @@
-ControlEvent v7.2_prod
-Base: ControlEvent v16_prod + fix iOS GRAFICAS que ya funcionaba en iPhone/iPad/Android/PC.
-
-Cambios:
-- iPhone/iPadOS + evento Finalizado: visor de fotos de INGRESOS con información textual a la izquierda.
-- GRAFICAS / globos INGRESOS, SALDO ACTUAL y SALDO OPERATIVO: al cerrar foto se restaura el globo origen.
-- Versión activa normalizada a ControlEvent v7.2_prod / ControlEvent_v7_2_prod en scripts activos, cabecera, version.js, service worker/cache, INFOEVENTO/BACKUP cliente y ruta servidor.
-- Sin setInterval nuevo. El parche iOS usa eventos y restauración diferida corta al cerrar.
