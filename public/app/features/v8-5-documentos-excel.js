@@ -1,8 +1,8 @@
-/* ControlEvent v28.5.3_prod - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
+/* ControlEvent v29_prod - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
    Parche aislado: no cambia la mecanica de mantenimiento DOCXX; solo extiende Excel. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v28.5.3_prod';
+  const VERSION = 'ControlEvent v29_prod';
   const INSTALLED = '__ceV85DocumentosExcel';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

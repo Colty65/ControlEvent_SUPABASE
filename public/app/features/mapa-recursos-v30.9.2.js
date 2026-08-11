@@ -1,10 +1,10 @@
-/* ControlEvent v28.5.3_prod - Mapa de recursos
+/* ControlEvent v29_prod - Mapa de recursos
    Pantalla estable que cruza COMPRAS + DONACIONES.
    Orden: Tienda -> Pte. comprar/otros gastos -> TKxx -> Producto.
    Filtro múltiple por responsables SOCIO. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v28.5.3_prod';
+  const VERSION = 'ControlEvent v29_prod';
   const DONATION_TYPES = ['DONADO TIENDA','DONADO SOCIO','DONADO OTROS'];
   const TAB_NAME = 'mapa';
   const PANEL_ID = 'tabMapaProductos';

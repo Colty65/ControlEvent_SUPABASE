@@ -1,12 +1,12 @@
-/* ControlEvent v28.5.3_prod · hardlock final de versión visible, descargas e identidad cliente. */
+/* ControlEvent v29_prod · hardlock final de versión visible, descargas e identidad cliente. */
 (function(root){
   'use strict';
-  const LABEL='v28.5.3_prod', TEXT='ControlEvent v28.5.3_prod', FILE='ControlEvent_v28.5.3_prod', BUILD='20260811-V28-5-1-PROD', ZIP='ControlEvent_v28.5.3_prod.zip';
+  const LABEL='v29_prod', TEXT='ControlEvent v29_prod', FILE='ControlEvent_v29_prod', BUILD='20260811-V29-PROD', ZIP='ControlEvent_v29_prod.zip';
   const versionPrefix=/ControlEvent_v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   const versionText=/ControlEvent\s+v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   function normalizeName(name){const s=String(name||'');return s.replace(versionPrefix,FILE);}
   function publish(){
-    try{root.__ceVersion=TEXT;root.__ceVersionLabel=LABEL;root.__ceBuildId=BUILD;root.VERSION=TEXT;root.VERSION_FILE=FILE;root.ControlEventVersion={label:LABEL,version:TEXT,versionFile:FILE,build:BUILD,zip:ZIP,source:'v28-5-1-prod-version-hardlock.js'};root.__ceVersionInfo={version:LABEL,label:LABEL,text:TEXT,file:FILE,buildId:BUILD,zipName:ZIP};}catch(_){}
+    try{root.__ceVersion=TEXT;root.__ceVersionLabel=LABEL;root.__ceBuildId=BUILD;root.VERSION=TEXT;root.VERSION_FILE=FILE;root.ControlEventVersion={label:LABEL,version:TEXT,versionFile:FILE,build:BUILD,zip:ZIP,source:'v29-prod-version-hardlock.js'};root.__ceVersionInfo={version:LABEL,label:LABEL,text:TEXT,file:FILE,buildId:BUILD,zipName:ZIP};}catch(_){}
     try{document.title=TEXT;document.body?.setAttribute('data-ce-version',TEXT);document.body?.setAttribute('data-ce-build',BUILD);document.body?.setAttribute('data-ce-zip',ZIP);}catch(_){}
   }
   function scrubVisible(){
@@ -24,9 +24,9 @@
   }
   function hardlockDownloads(){
     try{
-      const proto=HTMLAnchorElement.prototype;if(proto.click.__ceV285VersionHardlock)return;const prev=proto.click;
+      const proto=HTMLAnchorElement.prototype;if(proto.click.__ceV29VersionHardlock)return;const prev=proto.click;
       const wrapped=function(){try{if(this.download)this.download=normalizeName(this.download);}catch(_){}return prev.apply(this,arguments);};
-      wrapped.__ceV285VersionHardlock=true;proto.click=wrapped;
+      wrapped.__ceV29VersionHardlock=true;proto.click=wrapped;
     }catch(_){}
   }
   let timer=0;const schedule=()=>{clearTimeout(timer);timer=setTimeout(scrubVisible,20);};
@@ -34,5 +34,5 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scrubVisible();hardlockDownloads();});else scrubVisible();
   try{new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true});}catch(_){}
   ['load','controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:module-mounted'].forEach(ev=>root.addEventListener(ev,()=>setTimeout(scrubVisible,30)));
-  root.ControlEventV285Version={LABEL,TEXT,FILE,BUILD,ZIP,normalizeName,scrubVisible};
+  root.ControlEventV29Version={LABEL,TEXT,FILE,BUILD,ZIP,normalizeName,scrubVisible};
 })(window);

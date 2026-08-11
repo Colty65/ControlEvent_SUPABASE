@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.3_prod - Diagnóstico de peso legacy y preparación de limpieza.
+/* ControlEvent v29_prod - Diagnóstico de peso legacy y preparación de limpieza.
    Sólo diagnóstico bajo demanda. No modifica la operativa. */
 const VERSION = 'v30.7';
 const LEGACY_BEFORE = 'legacy-bundle-before-modules-v30.7.js';

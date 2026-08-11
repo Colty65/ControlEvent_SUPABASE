@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.3_prod - MobileLite: render visible-only conservador.
+/* ControlEvent v29_prod - MobileLite: render visible-only conservador.
    Objetivo: mejorar iPad/Android sin volver al ActiveRender de v28.6.
    No cambia datos, INFOEVENTO, BACKUP ni carga inicial: sólo evita repintar pantallas ocultas. */
 import { VERSION } from '../version.js';

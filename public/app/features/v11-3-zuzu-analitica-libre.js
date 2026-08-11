@@ -1,9 +1,9 @@
-/* ControlEvent v28.5.3_prod - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v29_prod - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v28.5.3_prod';
+  var VERSION='v29_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -80,7 +80,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v28.5.3_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v29_prod-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -146,7 +146,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v28.5.3_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v29_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-prompt">'+
           '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
           '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
@@ -244,7 +244,7 @@
     window.__ceZuzuConversationContextV26=null;
     window.__ceZuzuUsageTotalV285=emptyZuzuUsageTotal();
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v28.5.3_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
+    try{ ['ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
@@ -362,7 +362,7 @@
     }
   }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v28.5.3_prod').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v29_prod').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -420,15 +420,15 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v28.5.3_prod: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
+    // v29_prod: Gemini interpreta el ámbito; el evento de pantalla es solo contexto ambiental.
     // No se bloquean preguntas globales o personales por no haber evento activo.
-    saveZuzuInteractionId(''); // v28.5.3_prod: no conservar IDs acumulativos de Interactions entre turnos.
+    saveZuzuInteractionId(''); // v29_prod: no conservar IDs acumulativos de Interactions entre turnos.
     setStatus('Zuzu está pensando...', 'ok');
     var resEl=$('ceAiResult');
     startZuzuThinking(prompt);
     try{
       var history=loadZuzuConversation().slice(-6);
-      var previousInteractionId=''; // v28.5.3_prod: memoria local compacta; no se encadena Interactions.
+      var previousInteractionId=''; // v29_prod: memoria local compacta; no se encadena Interactions.
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
@@ -472,7 +472,7 @@
     return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
-    // v28.5.3_prod: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
+    // v29_prod: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
     // Los totales Gemini forman parte de la traza: no aparecen fuera de ella.
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
     if(!Array.isArray(trace)) trace=[];
@@ -633,12 +633,15 @@
     if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
     var globalMin=Math.min.apply(null,all),globalMax=Math.max.apply(null,all);
     if(globalMin===globalMax){globalMin-=1;globalMax+=1;}else{var gm=(globalMax-globalMin)*0.12;globalMin-=gm;globalMax+=gm;}
-    var segmentSize=8,segments=[];
+    // v29_prod: globos completos y legibles. Se reparte la serie solo cuando hace falta,
+    // equilibrando los tramos para no dejar una última gráfica con uno o dos movimientos.
+    var maxPerSegment=8,segmentCount=Math.max(1,Math.ceil(labels.length/maxPerSegment)),segmentSize=Math.ceil(labels.length/segmentCount),segments=[];
     for(var start=0;start<labels.length;start+=segmentSize){segments.push({start:start,end:Math.min(labels.length,start+segmentSize)});}
-    function pointColor(kind){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#22c55e';if(k==='CARGO')return '#e11d48';return '#38bdf8';}
+    function pointColor(kind){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#16a34a';if(k==='CARGO')return '#dc2626';return '#0284c7';}
+    function paleFill(kind){var k=String(kind||'').toUpperCase();if(k==='INGRESO')return '#f0fdf4';if(k==='CARGO')return '#fef2f2';return '#f0f9ff';}
     var parts=segments.map(function(seg,segIndex){
       var labs=labels.slice(seg.start,seg.end),vals=values.slice(seg.start,seg.end).map(Number),kinds=pointKinds.slice(seg.start,seg.end),plabs=pointLabels.slice(seg.start,seg.end),tips=pointTooltips.slice(seg.start,seg.end);
-      var w=940,h=500,left=76,right=28,top=160,bottom=78,plotW=w-left-right,plotH=h-top-bottom;
+      var w=940,h=520,left=76,right=28,top=178,bottom=78,plotW=w-left-right,plotH=h-top-bottom;
       function xFor(i){return left+(labs.length<=1?plotW/2:i*plotW/(labs.length-1));}
       function yFor(v){return top+(globalMax-Number(v))*plotH/(globalMax-globalMin);}
       var grid='';
@@ -646,20 +649,22 @@
       var pts=vals.map(function(v,i){return [xFor(i),yFor(v)];});
       var path=pts.map(function(pt,i){return(i?'L':'M')+pt[0].toFixed(1)+','+pt[1].toFixed(1);}).join(' ');
       var dots=pts.map(function(pt,i){
-        var pc=pointColor(kinds[i]),lines=String(plabs[i]||'').split('\n').filter(Boolean).slice(0,3),bandY=24+(i%2)*62;
-        var label=lines.map(function(line,li){return '<tspan x="'+pt[0].toFixed(1)+'" dy="'+(li===0?'0':'15')+'">'+esc(line)+'</tspan>';}).join('');
-        var connectorY=bandY+(Math.max(1,lines.length)-1)*15+6;
+        var pc=pointColor(kinds[i]),fill=paleFill(kinds[i]),lines=String(plabs[i]||'').split('\n').filter(Boolean).slice(0,4),bandY=18+(i%2)*76;
+        var bubbleW=126,bubbleH=Math.max(31,12+lines.length*13),bubbleX=Math.max(6,Math.min(w-bubbleW-6,pt[0]-bubbleW/2));
+        var textX=bubbleX+bubbleW/2,textY=bandY+14,connectorY=bandY+bubbleH;
+        var label=lines.map(function(line,li){return '<tspan x="'+textX.toFixed(1)+'" dy="'+(li===0?'0':'13')+'">'+esc(line)+'</tspan>';}).join('');
         var tip=String(tips[i]||plabs[i]||'');
-        return '<line x1="'+pt[0].toFixed(1)+'" y1="'+connectorY+'" x2="'+pt[0].toFixed(1)+'" y2="'+(pt[1]-7).toFixed(1)+'" stroke="'+pc+'" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>'+
-          '<text x="'+pt[0].toFixed(1)+'" y="'+bandY+'" text-anchor="middle" font-size="11.5" font-weight="800" fill="'+pc+'">'+label+'</text>'+
+        return '<line x1="'+textX.toFixed(1)+'" y1="'+connectorY.toFixed(1)+'" x2="'+pt[0].toFixed(1)+'" y2="'+(pt[1]-7).toFixed(1)+'" stroke="'+pc+'" stroke-width="1.1" stroke-dasharray="3 3" opacity=".58"/>'+
+          '<rect x="'+bubbleX.toFixed(1)+'" y="'+bandY.toFixed(1)+'" width="'+bubbleW+'" height="'+bubbleH.toFixed(1)+'" rx="8" ry="8" fill="'+fill+'" stroke="'+pc+'" stroke-width="1.2" opacity=".98"/>'+
+          '<text x="'+textX.toFixed(1)+'" y="'+textY.toFixed(1)+'" text-anchor="middle" font-size="9.4" font-weight="800" fill="'+pc+'">'+label+'</text>'+
           '<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="5" fill="'+pc+'" stroke="#fff" stroke-width="1.5"><title>'+esc(tip)+'</title></circle>';
       }).join('');
-      var xLabels=labs.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-44)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
+      var xLabels=labs.map(function(label,i){var x=xFor(i);return '<text x="'+x.toFixed(1)+'" y="'+(h-44)+'" text-anchor="middle" font-size="10.5" font-weight="700" fill="#334155">'+esc(label)+'</text>';}).join('');
       var title=segments.length>1?'<div style="font-weight:850;color:#475569;margin:10px 0 2px">Movimientos '+(seg.start+1)+'–'+seg.end+' de '+labels.length+'</div>':'';
-      return title+'<div style="overflow-x:auto"><svg class="ce-ai-line-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc((ch.title||'Gráfica de líneas')+(segments.length>1?' · tramo '+(segIndex+1):''))+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/><path d="'+path+'" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div>';
+      return title+'<div style="overflow-x:auto"><svg class="ce-ai-line-svg ce-ai-bank-detailed-svg" style="height:330px" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc((ch.title||'Gráfica de líneas')+(segments.length>1?' · tramo '+(segIndex+1):''))+'">'+grid+'<line x1="'+left+'" y1="'+top+'" x2="'+left+'" y2="'+(h-bottom)+'" stroke="#64748b"/><line x1="'+left+'" y1="'+(h-bottom)+'" x2="'+(w-right)+'" y2="'+(h-bottom)+'" stroke="#64748b"/><path d="'+path+'" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>'+dots+xLabels+'<text x="18" y="'+(top+plotH/2)+'" transform="rotate(-90 18 '+(top+plotH/2)+')" text-anchor="middle" font-size="13" font-weight="800" fill="#334155">'+esc(ch.unit||'Valor')+'</text></svg></div>';
     }).join('');
-    var legend='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></i>Ingreso</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e11d48"></i>Cargo</span>';
-    return '<div class="ce-ai-card'+((Array.isArray(ch&&ch.justifiedMovements)&&ch.justifiedMovements.length)?' ce-ai-bank-chart-card':'')+'"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer" style="font-size:13px;color:#64748b;margin-bottom:4px">Etiquetas estáticas preparadas para lectura en PDF; si hay muchos movimientos, la línea se divide en tramos manteniendo la misma escala vertical.</div>'+parts+'<div style="margin-top:4px">'+legend+'</div>'+bankJustificationHtml(ch)+'</div>';
+    var legend='<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a"></i>Abono / ingreso</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:850"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626"></i>Cargo</span>';
+    return '<div class="ce-ai-card ce-ai-bank-chart-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer" style="font-size:12px;color:#64748b;margin-bottom:4px">Cada globo muestra concepto, importe, saldo resultante y justificación. Los abonos van en verde y los cargos en rojo.</div>'+parts+'<div style="margin-top:4px">'+legend+'</div>'+bankJustificationHtml(ch)+'</div>';
   }
   function bankJustificationHtml(ch){
     var rows=Array.isArray(ch&&ch.justifiedMovements)?ch.justifiedMovements:[];
