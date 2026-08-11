@@ -1,4 +1,4 @@
-/* ControlEvent v28.1_prod - Carga diferida por pantalla sin tocar operativa estable */
+/* ControlEvent v28.2_prod - Carga diferida por pantalla sin tocar operativa estable */
 import { VERSION } from '../version.js';
 
 const SCREEN_LAZY_VERSION = 'v30.7';

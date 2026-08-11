@@ -1,7 +1,7 @@
 import { registerExcelModule, ensureExcelJS, protectWorkbook } from './_excel-runtime.js';
 
 const GRAFICAS_SHEET_VERSION = 'v30.7';
-const PRODUCT_VERSION = 'v28.1_prod';
+const PRODUCT_VERSION = 'v28.2_prod';
 const AUDIT_STORAGE_KEY = 'controlevent:v28.0:graficasModularAudit';
 let installed = false;
 let lastSnapshot = null;
@@ -12,7 +12,7 @@ export const meta = {
   name: 'graficas-sheet',
   version: GRAFICAS_SHEET_VERSION,
   mode: 'modular-infoevento-audit-writer',
-  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v28.1 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
+  description: 'Módulo real para preparar y escribir una hoja GRAFICAS modular. En v28.2 mantiene el modelo modular para auditoría interna; la descarga standalone queda desactivada porque INFOEVENTO es la fuente fiable.'
 };
 
 const text = value => String(value ?? '').trim();
@@ -507,7 +507,7 @@ function sanitizeStandaloneWorkbook(workbook, worksheet){
 }
 
 export async function downloadStandaloneGraficas(options = {}){
-  const message = 'GRAFICAS standalone desactivado en v28.1: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
+  const message = 'GRAFICAS standalone desactivado en v28.2: no se genera un Excel independiente porque la fuente fiable es INFOEVENTO. Usa el botón normal de INFOEVENTO para obtener RESUMEN y GRAFICAS correctos.';
   console.warn(`[ControlEventExcel/${GRAFICAS_SHEET_VERSION}] ${message}`, {options});
   return {ok:false, disabled:true, version:GRAFICAS_SHEET_VERSION, module:'graficas-sheet', message, recommendedAction:'exportExcel'};
 }

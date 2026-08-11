@@ -1,8 +1,8 @@
-/* ControlEvent v28.1_prod - Guardia temprana del login.
+/* ControlEvent v28.2_prod - Guardia temprana del login.
    Objetivo: que ninguna capa de globos, mapa o render heredado pueda bloquear los inputs de acceso. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v28.1_prod login-input-guard';
+  const VERSION = 'ControlEvent v28.2_prod login-input-guard';
   const INPUT_IDS = new Set(['loginIdentificacion','loginClave','changeNewPassword1','changeNewPassword2']);
   const AUTH_ID = 'authOverlay';
 

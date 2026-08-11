@@ -1,10 +1,10 @@
-/* ControlEvent v28.1_prod FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
+/* ControlEvent v28.2_prod FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v28.1_prod';
+  const VERSION = 'v28.2_prod';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
