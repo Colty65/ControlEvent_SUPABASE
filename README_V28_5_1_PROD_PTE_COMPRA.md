@@ -1,4 +1,4 @@
-# ControlEvent v28.5.1_prod · corrección canónica Pte.Compra
+# ControlEvent v28.5.2_prod · corrección canónica Pte.Compra
 
 Esta revisión parte de `v28.5_prod` y es deliberadamente quirúrgica. No cambia la arquitectura conversacional ni vuelve a ampliar la libertad de Gemini. Corrige un error de clasificación en la capa de datos que hacía que Zuzu interpretase como compras realizadas registros que la propia interfaz de ControlEvent muestra como `Pte.Compra`.
 
@@ -37,7 +37,7 @@ En la gráfica económica de un evento, `Pte.Compra` aparece como indicador sepa
 
 ## Versión, INFOEVENTO y BACKUP
 
-La identidad activa es `v28.5.1_prod` en aplicación, cliente/servidor, INFOEVENTO y BACKUP interno/externo. `v28.5_prod` se conserva únicamente en la lista de migración de claves antiguas para no perder preferencias/sesión al actualizar.
+La identidad activa es `v28.5.2_prod` en aplicación, cliente/servidor, INFOEVENTO y BACKUP interno/externo. `v28.5_prod` se conserva únicamente en la lista de migración de claves antiguas para no perder preferencias/sesión al actualizar.
 
 ## Regresiones
 

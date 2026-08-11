@@ -1,9 +1,9 @@
-/* ControlEvent v28.5.1_prod - cierre de versión y descarga/Excel sin carga periódica.
+/* ControlEvent v28.5.2_prod - cierre de versión y descarga/Excel sin carga periódica.
    Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v28.5.1_prod';
+  const VERSION = 'ControlEvent v28.5.2_prod';
   const VERSION_FILE = 'ControlEvent_v8_0_prod';
   const INSTALLED = '__ceV72ProdFinalFix';
   if(window[INSTALLED]) return;

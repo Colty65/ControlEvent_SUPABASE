@@ -1,4 +1,4 @@
-/* ControlEvent v28.5.1_prod - Diagnostico de integridad de datos sin tocar operativa */
+/* ControlEvent v28.5.2_prod - Diagnostico de integridad de datos sin tocar operativa */
 const VERSION = 'v30.7';
 
 function app(){ return window.ControlEventApp || null; }

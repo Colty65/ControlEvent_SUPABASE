@@ -1,0 +1,31 @@
+{
+  "version": "v28.5.2_prod",
+  "focus": "disciplina de coste Gemini y eliminación de payload redundante",
+  "changes": [
+    "event_bank brief/standard entrega hechos agregados y no repite cronologías a Gemini",
+    "event_people brief usa agregados y evita tabla completa",
+    "prefetch brief de dossier/desgloses/documentación evita tablas redundantes",
+    "opinión general usa solo event_dossier + una llamada compacta",
+    "profundizar ingresos+banco usa event_people+event_bank + una llamada compacta",
+    "gráfica banco+ingresos es ruta determinista CE con 0 Gemini",
+    "movimientos justificados bajo gráfica solo cuando se piden explícitamente; el informe general los conserva",
+    "máximo 2 llamadas Gemini por turno",
+    "techo económico por defecto 0.010 EUR con estimación previa a la llamada",
+    "salida Gemini por defecto limitada a 1600 tokens",
+    "auditor factual determinista sin tercera llamada",
+    "INFOEVENTO y BACKUP actualizados a v28.5.2_prod"
+  ],
+  "cost_targets_eur": {
+    "usual": "<=0.004",
+    "warning": ">0.008",
+    "hard_cap": "0.010"
+  },
+  "hardcode_business_cases": false,
+  "validation": {
+    "v28_5_2_specific": "13/13",
+    "v27_1_2_quality": "16/16",
+    "v27_1_3_bank_charts": "11/11",
+    "v27_1_4_data_access": "13/13",
+    "js_syntax_checked": 406
+  }
+}

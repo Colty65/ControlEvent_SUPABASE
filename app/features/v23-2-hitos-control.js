@@ -1,9 +1,9 @@
-/* ControlEvent v28.5.1_prod · Control de Hitos y Líneas de Gestión */
+/* ControlEvent v28.5.2_prod · Control de Hitos y Líneas de Gestión */
 (function(root){
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v28.5.1_prod-hitos4-orden-permisos-zuzu';
+  const VERSION = 'v28.5.2_prod-hitos4-orden-permisos-zuzu';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {

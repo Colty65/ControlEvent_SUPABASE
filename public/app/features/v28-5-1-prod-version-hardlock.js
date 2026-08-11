@@ -1,7 +1,7 @@
-/* ControlEvent v28.5.1_prod · hardlock final de versión visible, descargas e identidad cliente. */
+/* ControlEvent v28.5.2_prod · hardlock final de versión visible, descargas e identidad cliente. */
 (function(root){
   'use strict';
-  const LABEL='v28.5.1_prod', TEXT='ControlEvent v28.5.1_prod', FILE='ControlEvent_v28.5.1_prod', BUILD='20260811-V28-5-1-PROD', ZIP='ControlEvent_v28.5.1_prod.zip';
+  const LABEL='v28.5.2_prod', TEXT='ControlEvent v28.5.2_prod', FILE='ControlEvent_v28.5.2_prod', BUILD='20260811-V28-5-1-PROD', ZIP='ControlEvent_v28.5.2_prod.zip';
   const versionPrefix=/ControlEvent_v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   const versionText=/ControlEvent\s+v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   function normalizeName(name){const s=String(name||'');return s.replace(versionPrefix,FILE);}
