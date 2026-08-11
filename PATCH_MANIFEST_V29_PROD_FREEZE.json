@@ -1,0 +1,19 @@
+{
+  "version": "v29_prod",
+  "status": "frozen",
+  "date": "2026-08-11",
+  "modified": [
+    "services/event-ai.service.js",
+    "scripts/test-v29-prod.cjs"
+  ],
+  "added": [
+    "README_V29_PROD_CONGELADA.md",
+    "PATCH_MANIFEST_V29_PROD_FREEZE.json"
+  ],
+  "scope": [
+    "detalle nominal de ingresos en gráficas",
+    "continuidad de sujeto personal en follow-ups",
+    "transformaciones deterministas tabla/gráfica/detalle",
+    "materialización de tablas prometidas y saneo de HTML crudo"
+  ]
+}

@@ -6949,7 +6949,7 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
       if(seenCharts.has(chartSig)){stats.chartDuplicates++;continue;}seenCharts.add(chartSig);
       const r=byId.get(trim(spec?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(spec?.table_key));if(!t||t?.chartable===false)continue;if(trim(t?.key)==='kpis')continue;const lf=trim(spec?.label_field),vf=trim(spec?.value_field),labelMeta=v26TableFieldMeta(t,lf),valueMeta=v26TableFieldMeta(t,vf);if(labelMeta&&v26IsChartNumericMeta(labelMeta))continue;
       const requestedSeries=arr(spec?.series_fields).map(trim).filter(Boolean);if(requestedSeries.length){const metas=requestedSeries.map(f=>v26TableFieldMeta(t,f));if(metas.some(m=>!v26IsChartNumericMeta(m)))continue;const units=[...new Set(metas.map(m=>trim(m?.unit)).filter(Boolean))];if(units.length>1)continue;const labels=[],series=requestedSeries.map(f=>({name:f,values:[]}));for(const row of arr(t.rows).slice(0,20)){if(!(lf in row))continue;labels.push(trim(row[lf])||'Sin etiqueta');requestedSeries.forEach((f,i)=>series[i].values.push(num(row[f])));}if(labels.length<2)continue;charts.push({title:trim(spec?.title)||t.title,type:'stackedBar',labels,values:[],series,unit:units[0]||trim(spec?.unit)});continue;}
-      if(!v26IsChartNumericMeta(valueMeta))continue;const labels=[],values=[],pointKinds=[],pointLabels=[],pointTooltips=[],bankRows=[];const markerField=trim(spec?.marker_field);const bankTimeline=['event_window_timeline','balance_timeline','reconciliation_timeline'].includes(trim(t?.key));const maxChartRows=bankTimeline?800:30;let pointLabelFields=arr(spec?.point_label_fields).map(trim).filter(Boolean);if(bankTimeline)pointLabelFields=['Concepto','Movimiento','Saldo bancario del periodo','Justificación'];for(const row of arr(t.rows).slice(0,maxChartRows)){if(!(lf in row)||!(vf in row))continue;const n=Number(row[vf]);if(!Number.isFinite(n))continue;labels.push(trim(row[lf])||'Sin etiqueta');values.push(n);if(markerField)pointKinds.push(trim(row?.[markerField]));if(pointLabelFields.length){pointLabels.push(v273PointLabelFromRow(t,row,pointLabelFields));pointTooltips.push(v273PointTooltipFromRow(t,row,pointLabelFields));}if(bankTimeline&&spec?.include_justified_movements===true){bankRows.push({moment:trim(row?.Momento||row?.Fecha),type:trim(row?.Tipo),movement:num(row?.Movimiento),concept:trim(row?.Concepto),balance:num(row?.['Saldo bancario del periodo']),justification:trim(row?.Justificación||row?.Evidencia)||'Sin vínculo justificativo registrado'});}}if(labels.length<2)continue;const uniq=new Set(values.map(v=>round(v,6)));if(uniq.size<=1)continue;let type=trim(spec?.type);if(!['bar','horizontalBar','pie','donut','line'].includes(type))type=labels.length>8?'horizontalBar':'bar';if((type==='pie'||type==='donut')&&labels.length<2)continue;charts.push({title:trim(spec?.title)||t.title,type,labels,values,pointKinds:pointKinds.length===labels.length?pointKinds:[],pointLabels:pointLabels.length===labels.length?pointLabels:[],pointTooltips:pointTooltips.length===labels.length?pointTooltips:[],staticPointLabels:(bankTimeline||staticPointLabels)&&pointLabels.length===labels.length,justifiedMovements:bankRows.length===labels.length?bankRows:[],unit:trim(valueMeta?.unit)||trim(spec?.unit)});
+      if(!v26IsChartNumericMeta(valueMeta))continue;const labels=[],values=[],pointKinds=[],pointLabels=[],pointTooltips=[],bankRows=[];const markerField=trim(spec?.marker_field);const bankTimeline=['event_window_timeline','balance_timeline','reconciliation_timeline'].includes(trim(t?.key));const maxChartRows=bankTimeline?800:30;let pointLabelFields=arr(spec?.point_label_fields).map(trim).filter(Boolean);if(bankTimeline)pointLabelFields=['Concepto','Movimiento','Saldo bancario del periodo','Justificación'];for(const row of arr(t.rows).slice(0,maxChartRows)){if(!(lf in row)||!(vf in row))continue;const n=Number(row[vf]);if(!Number.isFinite(n))continue;labels.push(trim(row[lf])||'Sin etiqueta');values.push(n);if(markerField)pointKinds.push(trim(row?.[markerField]));if(pointLabelFields.length){pointLabels.push(v273PointLabelFromRow(t,row,pointLabelFields));pointTooltips.push(v273PointTooltipFromRow(t,row,pointLabelFields));}if(bankTimeline&&spec?.include_justified_movements===true){bankRows.push({moment:trim(row?.Momento||row?.Fecha),type:trim(row?.Tipo),movement:num(row?.Movimiento),concept:trim(row?.Concepto),balance:num(row?.['Saldo bancario del periodo']),justification:trim(row?.Justificación||row?.Evidencia)||'Sin vínculo justificativo registrado'});}}if(labels.length<2)continue;const uniq=new Set(values.map(v=>round(v,6)));if(uniq.size<=1&&spec?.allow_equal_values!==true)continue;let type=trim(spec?.type);if(!['bar','horizontalBar','pie','donut','line'].includes(type))type=labels.length>8?'horizontalBar':'bar';if((type==='pie'||type==='donut')&&labels.length<2)continue;charts.push({title:trim(spec?.title)||t.title,type,labels,values,pointKinds:pointKinds.length===labels.length?pointKinds:[],pointLabels:pointLabels.length===labels.length?pointLabels:[],pointTooltips:pointTooltips.length===labels.length?pointTooltips:[],staticPointLabels:(bankTimeline||staticPointLabels)&&pointLabels.length===labels.length,justifiedMovements:bankRows.length===labels.length?bankRows:[],unit:trim(valueMeta?.unit)||trim(spec?.unit)});
     }
     const compare=arr(results).find(r=>r.ok&&r.name==='compare_events');if(compare&&!charts.length){const t=arr(compare.tables).find(x=>x.key==='comparison');if(t&&arr(t.rows).length>=2){for(const field of ['Ingresos','Compras realizadas','Donaciones valoradas','Saldo operativo','Valoración del evento']){const meta=v26TableFieldMeta(t,field);const values=arr(t.rows).map(x=>num(x[field]));if(new Set(values.map(v=>round(v,6))).size<=1)continue;charts.push({title:`Comparativa · ${field}`,type:'bar',labels:arr(t.rows).map(x=>trim(x.Evento)),values,unit:trim(meta?.unit)});if(charts.length>=5)break;}}}
   }
@@ -7931,6 +7931,15 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     addShowTable(purchaseResult,purchaseKey);
     if(dataAccessReq.groupSegmentDestination)addShowTable(purchaseResult,'totals_by_segment_destination');
   }
+  // v29_prod congelación: si Zuzu promete detalle/tabla de una persona, la fuente canónica
+  // se materializa físicamente. Si devolviera HTML de tabla, nunca se muestra como código crudo.
+  const personResultForPromise=allResults.slice().reverse().find(r=>r?.ok&&r?.name==='person_dossier');
+  const rawTableMarkup=v29ContainsRawTableMarkup(final.answer);
+  if(personResultForPromise&&(v29AnswerPromisesMaterializedDetail(final.answer)||rawTableMarkup)){
+    for(const key of v29PromisedPersonTables(final.answer,personResultForPromise))addShowTable(personResultForPromise,key);
+    if(rawTableMarkup)final={...final,answer:text(final.answer).replace(/<\s*table\b[\s\S]*?<\s*\/\s*table\s*>/gi,'').trim()};
+  }
+  final={...final,answer:v29SanitizeAnswerMarkup(final.answer)};
   if((dataAccessReq.tableOnly||dataAccessReq.groupSegmentDestination)&&(dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&trim(final.answer).length>700)final={...final,answer:'Aquí tienes la tabla solicitada, ordenada y totalizada según tu petición.'};
   final={...final,showTables:requiredShowTables.concat(existingShowTables.filter(x=>!requiredShowTables.some(r=>trim(r?.tool_id)===trim(x?.tool_id)&&trim(r?.table_key)===trim(x?.table_key)))).slice(0,8)};
   if(v280BankEventWindowRequest(userPrompt)){
@@ -8503,6 +8512,109 @@ async function v285DirectMultiEventComparison({userPrompt,state,selectedEventId,
   if(all)answer+='\n\nLa tabla completa conserva también cobertura documental, tickets, gestión y resumen bancario para que ningún dato comparable quede oculto.';
   return v281LocalResponse({title:`Comparativa · ${eventNames.join(' · ')}`,answer,results:[result],showTables:(all||!wantsCharts)?[{tool_id:result.id,table_key:'comparison_extended'}]:[],chartSpecs:charts,flowTrace,previousInteractionId});
 }
+
+// ============================================================================
+// v29_prod · RETOQUE FINAL / CONGELACIÓN
+// Continuidad determinista de persona + transformaciones de presentación.
+// La regla es deliberadamente conservadora: solo hereda una persona desde lo que
+// escribió el usuario y se detiene si después aparece un cambio explícito a evento.
+// ============================================================================
+function v29RecentPersonSubject(state,userPrompt,conversationHistory=[]){
+  const current=v26PersonHintsFromPrompt(userPrompt,state);if(current.length)return current[0];
+  for(const turn of arr(conversationHistory).slice(-5).reverse()){
+    const u=trim(turn?.user);if(!u)continue;
+    const people=v26PersonHintsFromPrompt(u,state);if(people.length)return people[0];
+    const events=exactEventTitlesFromPrompt(u,arr(state?.eventos)).map(x=>trim(x?.titulo)).filter(Boolean);
+    if(events.length)return''; // cambio de sujeto posterior: no arrastrar una persona antigua
+  }
+  return'';
+}
+function v29PersonPresentationIntent(userPrompt,conversationHistory=[]){
+  const p=norm(userPrompt),prior=norm(arr(conversationHistory).slice(-4).map(t=>trim(t?.user)).join(' '));
+  const wantsTable=/\b(tabla|tablas|tabular|formato\s+bonito)\b/.test(p);
+  const wantsCharts=/\b(grafic\w*|visualiz\w*|barras?)\b/.test(p);
+  const wantsDetail=/\b(no\s+me\s+has\s+dado|falta|faltan|promet\w*|detalla|detalle)\b[^.\n]{0,120}\b(particip\w*|datos|informacion|información|detalle)\b/.test(p);
+  const transformRef=/\b(estos?\s+datos|estas?\s+datos|lo\s+anterior|lo\s+mismo|esa\s+informacion|esa\s+información|ahora|vuelve|repite|pas[ao]|transforma|dame|pon|no\s+me\s+has\s+dado|falta|promet\w*)\b/.test(p);
+  if(!wantsTable&&!wantsCharts&&!wantsDetail)return null;
+  const focusText=`${prior} ${p}`;
+  let focus='participation';
+  if(/\b(ingres\w*|dinero|importe|aportaci\w*)\b/.test(focusText))focus='incomes';
+  if(/\b(donaci\w*|donado|donante)\b/.test(focusText)&&!/\bparticip\w*/.test(focusText))focus='donations';
+  if(/\b(responsab\w*|compras?\s+gestion\w*|tkxx|tickets?)\b/.test(focusText))focus='purchase_responsibility';
+  if(/\b(hitos?|\blg\b|tareas?)\b/.test(focusText))focus='tasks';
+  // En el caso típico «detalle de su participación» + «pasa estos datos a gráficas»,
+  // la gráfica numérica útil es ingresos/donaciones por evento, manteniendo el sujeto.
+  return{wantsTable,wantsCharts,wantsDetail,transformRef,focus};
+}
+function v29AggregateMoneyByEvent(rows,valueField){
+  const map=new Map();
+  for(const row of arr(rows)){
+    const event=trim(row?.Evento)||'Sin evento',value=num(row?.[valueField]);
+    map.set(event,v26Money(num(map.get(event))+value));
+  }
+  return[...map.entries()].map(([Evento,Importe])=>({Evento,Importe:v26Money(Importe)})).sort((a,b)=>num(b.Importe)-num(a.Importe)||text(a.Evento).localeCompare(text(b.Evento),'es'));
+}
+function v29PersonTableKey(dossier,focus='participation'){
+  const keys=arr(dossier?.tables).map(t=>trim(t?.key));
+  if(keys.includes(focus))return focus;
+  return keys.includes('participation')?'participation':(keys[0]||'');
+}
+async function v29DirectPersonPresentation({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId='',person=''}){
+  const intent=v29PersonPresentationIntent(userPrompt,conversationHistory);if(!intent||!person)return null;
+  // Si no es una transformación referencial y el nombre tampoco está en el prompt actual,
+  // no interceptamos: dejamos a Zuzu razonar libremente.
+  if(!intent.transformRef&&!v26PersonHintsFromPrompt(userPrompt,state).length)return null;
+  const dossier=await v26ToolPersonDossier({id:'v29_person_followup',name:'person_dossier',person,scope:'all_events',status:'all',detail:'standard'},state);
+  const results=[dossier],showTables=[],chartSpecs=[];
+  const f=dossier?.facts||{},personName=trim(f.person)||person;
+  if(intent.wantsTable||intent.wantsDetail){
+    const key=v29PersonTableKey(dossier,intent.focus);
+    if(key)showTables.push({tool_id:dossier.id,table_key:key});
+  }
+  if(intent.wantsCharts){
+    const incomeSource=arr(dossier?.tables).find(t=>t?.key==='incomes')?.rows||[];
+    const donationSource=arr(dossier?.tables).find(t=>t?.key==='donations')?.rows||[];
+    const incomeRows=v29AggregateMoneyByEvent(incomeSource,'Importe');
+    const donationRows=v29AggregateMoneyByEvent(donationSource,'Importe');
+    const tables=[];
+    if(incomeRows.length)tables.push(v26Table('income_by_event',`Ingresos vinculados a ${personName} por evento`,incomeRows,{Evento:v26TextSchema('Evento'),Importe:v26MoneySchema('Ingreso vinculado a la identidad canónica')}));
+    if(donationRows.length)tables.push(v26Table('donations_by_event',`Donaciones vinculadas a ${personName} por evento`,donationRows,{Evento:v26TextSchema('Evento'),Importe:v26MoneySchema('Valor de producto donado vinculado')}));
+    if(tables.length){
+      const chartsResult={id:'v29_person_followup_charts',name:'person_followup_charts',ok:true,title:`Gráficas personales · ${personName}`,facts:{person:personName},tables};
+      results.push(chartsResult);
+      if(incomeRows.length>=2)chartSpecs.push({title:`Ingresos de ${personName} por evento`,type:'horizontalBar',tool_id:chartsResult.id,table_key:'income_by_event',label_field:'Evento',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});
+      if(donationRows.length>=2)chartSpecs.push({title:`Donaciones de ${personName} por evento`,type:'horizontalBar',tool_id:chartsResult.id,table_key:'donations_by_event',label_field:'Evento',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});
+    }
+  }
+  const parts=[];
+  if(intent.wantsCharts)parts.push(`Mantengo el sujeto de la conversación: ${personName}. Las barras representan sus datos vinculados por evento; no las cuentas generales de esos eventos.`);
+  if(intent.wantsTable)parts.push(`La tabla se materializa directamente desde el dossier canónico de ${personName}, sin convertirla en HTML dentro del texto.`);
+  if(intent.wantsDetail&&!intent.wantsTable)parts.push(`Aquí tienes el detalle de ${intent.focus==='participation'?'su participación':intent.focus==='incomes'?'sus ingresos':intent.focus==='donations'?'sus donaciones':'los datos pedidos'}, materializado directamente desde ControlEvent.`);
+  return v281LocalResponse({title:intent.wantsCharts?`Gráficas · ${personName}`:(intent.wantsTable?`Tabla · ${personName}`:`Detalle · ${personName}`),answer:parts.join(' '),results,showTables,chartSpecs,flowTrace,previousInteractionId});
+}
+function v29ContainsRawTableMarkup(value){return /<\s*\/?\s*(?:table|thead|tbody|tr|td|th)\b/i.test(text(value));}
+function v29SanitizeAnswerMarkup(value){
+  let s=text(value);if(!/<[^>]+>/.test(s))return trim(s);
+  s=s.replace(/<\s*br\s*\/?\s*>/gi,'\n').replace(/<\s*\/\s*(?:tr|p|div)\s*>/gi,'\n').replace(/<\s*\/\s*(?:td|th)\s*>/gi,' · ').replace(/<[^>]*>/g,'');
+  return trim(s.replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n'));
+}
+function v29AnswerPromisesMaterializedDetail(answer){
+  const a=norm(answer);
+  return /\b(aqui|aquí|te\s+dejo|te\s+presento|te\s+muestro)\b[^.\n]{0,140}\b(tabla|detalle)\b/.test(a)||/\baqui\s+tienes\s+el\s+detalle\b/.test(a);
+}
+function v29PromisedPersonTables(answer,dossier){
+  if(!dossier||dossier?.name!=='person_dossier')return[];
+  const a=norm(answer),keys=[];
+  const add=k=>{if(arr(dossier?.tables).some(t=>t?.key===k)&&!keys.includes(k))keys.push(k);};
+  if(/\bparticip\w*/.test(a))add('participation');
+  if(/\bingres\w*/.test(a))add('incomes');
+  if(/\bdonaci\w*/.test(a))add('donations');
+  if(/\bresponsab\w*|compras?\b/.test(a))add('purchase_responsibility');
+  if(/\bhitos?\b|\blg\b|\btareas?\b/.test(a))add('tasks');
+  if(!keys.length)add('participation');
+  return keys.slice(0,5);
+}
+
 function v2852BankIncomeGraphRequest(userPrompt,conversationHistory=[]){
   const p=norm(userPrompt);
   if(!/\b(grafic|visualiz)\w*\b/.test(p))return false;
@@ -8512,19 +8624,34 @@ function v2852BankIncomeGraphRequest(userPrompt,conversationHistory=[]){
 }
 async function v2852DirectBankIncomeCharts({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
   const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
-  const [bank,breakdown]=await Promise.all([
+  const [bank,breakdown,people]=await Promise.all([
     v261EventBankTool({id:'v2852_direct_bank_chart',name:'event_bank',...ea,detail:'brief'},state,selectedEventId),
-    v26ToolEventBreakdowns({id:'v2852_direct_income_chart',name:'event_breakdowns',...ea,detail:'brief'},state,selectedEventId)
+    v26ToolEventBreakdowns({id:'v2852_direct_income_chart',name:'event_breakdowns',...ea,detail:'brief'},state,selectedEventId),
+    v26ToolEventPeople({id:'v29_direct_income_people',name:'event_people',...ea,detail:'standard'},state,selectedEventId)
   ]);
   const key=v281BroadBankKey(bank)||'reconciliation_timeline',bankRows=arr(bank?.tables).find(t=>t?.key===key)?.rows||[];
   const incomeRows=arr(breakdown?.tables).find(t=>t?.key==='income_methods')?.rows||[];
+  const peopleRows=arr(people?.tables).find(t=>t?.key==='people')?.rows||[];
+  const detailedRows=peopleRows.filter(r=>num(r?.['Importe total'])>0).map(r=>({
+    Ingreso:`${trim(r?.Persona)||'Sin nombre'} · ${trim(r?.['Situación / forma registrada'])||'Sin forma'}`,
+    Persona:trim(r?.Persona)||'Sin nombre','Forma registrada':trim(r?.['Situación / forma registrada'])||'Sin forma',Importe:v26Money(r?.['Importe total'])
+  })).sort((a,b)=>num(b.Importe)-num(a.Importe)||text(a.Persona).localeCompare(text(b.Persona),'es'));
+  const detailTables=[];const perBlock=8,total=detailedRows.length;
+  for(let i=0;i<total;i+=perBlock){
+    const part=detailedRows.slice(i,i+perBlock),from=i+1,to=i+part.length,keyPart=`income_detail_${Math.floor(i/perBlock)+1}`;
+    detailTables.push(v26Table(keyPart,`Ingresos por persona / pareja · ${from}–${to} de ${total}`,part,{Ingreso:v26TextSchema('Persona/pareja y forma registrada'),Persona:v26TextSchema('Persona o pareja'),'Forma registrada':v26TextSchema('Forma/estado registrado'),Importe:v26MoneySchema('Importe total del registro de ingreso')}));
+  }
+  const incomeDetail={id:'v29_direct_income_detail',name:'event_income_detail',ok:true,title:`Detalle de ingresos · ${people?.facts?.event||breakdown?.facts?.event||''}`,facts:{event:people?.facts?.event||breakdown?.facts?.event||'',income_records:detailedRows.length},tables:detailTables};
   const wantsMovementDetail=/\b(detalle|movimientos?|justificaci[oó]n|ticket|tkxx|concepto|cada\s+punto)\b/.test(norm(userPrompt));
   const specs=[];
   if(bankRows.length>=2)specs.push({title:`Conciliación bancaria · ${bank?.facts?.event||''}`,type:'line',tool_id:bank.id,table_key:key,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',include_justified_movements:wantsMovementDetail,unit:'€'});
-  if(incomeRows.length>=2)specs.push({title:`Ingresos por forma de pago · ${breakdown?.facts?.event||''}`,type:'bar',tool_id:breakdown.id,table_key:'income_methods',label_field:'Forma de pago',value_field:'Importe',series_fields:[],unit:'€'});
+  if(incomeRows.length>=2)specs.push({title:`Ingresos por forma de pago · ${breakdown?.facts?.event||''}`,type:'bar',tool_id:breakdown.id,table_key:'income_methods',label_field:'Forma de pago',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});
+  for(const t of detailTables){
+    if(arr(t?.rows).length>=2)specs.push({title:`Detalle · ${t.title}`,type:'horizontalBar',tool_id:incomeDetail.id,table_key:t.key,label_field:'Ingreso',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});
+  }
   const f=bank?.facts||{},bf=breakdown?.facts||{};
-  const answer=`Aquí tienes únicamente las dos visualizaciones solicitadas: conciliación bancaria e ingresos por forma de pago de ${f.event||bf.event||'este evento'}. El cuadre contiene ${v26CountPhrase(f.included_movement_count||0,'movimiento incluido','movimientos incluidos')}, con saldo inicial ${v26FormatEuro(f.opening_balance||0)} y saldo final ${v26FormatEuro(f.closing_balance||0)}.${wantsMovementDetail?' Debajo de la gráfica bancaria se incluye además el detalle/justificación de los movimientos porque lo has pedido expresamente.':''}`;
-  return v281LocalResponse({title:`Banco e ingresos · ${f.event||bf.event||''}`,answer,results:[bank,breakdown],chartSpecs:specs,flowTrace,previousInteractionId});
+  const answer=`Aquí tienes la conciliación bancaria y los ingresos de ${f.event||bf.event||'este evento'}. El cuadre contiene ${v26CountPhrase(f.included_movement_count||0,'movimiento incluido','movimientos incluidos')}, con saldo inicial ${v26FormatEuro(f.opening_balance||0)} y saldo final ${v26FormatEuro(f.closing_balance||0)}. Los ingresos mantienen el resumen por forma de pago y añaden el detalle nominal por persona/pareja, importe y forma registrada${total>perBlock?', repartido en bloques para que sea legible en PDF':''}.${wantsMovementDetail?' La conciliación conserva además el detalle/justificación de cada movimiento.':''}`;
+  return v281LocalResponse({title:`Banco e ingresos · ${f.event||bf.event||''}`,answer,results:[bank,breakdown,people,incomeDetail],chartSpecs:specs,flowTrace,previousInteractionId});
 }
 
 async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
@@ -8543,9 +8670,17 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
     return v2852DirectBankIncomeCharts({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
   }
 
+  // v29_prod congelación: una transformación de presentación conserva primero el SUJETO personal.
+  // Evita que «estos datos -> gráficas/tabla» convierta los eventos citados incidentalmente
+  // en una comparativa general y pierda a la persona de la conversación.
+  const personSubject=v29RecentPersonSubject(state,userPrompt,conversationHistory);
+  if(personSubject){
+    const personPresentation=await v29DirectPersonPresentation({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId,person:personSubject});
+    if(personPresentation)return personPresentation;
+  }
+
   // v29_prod: una comparativa de varios eventos tiene prioridad sobre cualquier seguimiento
-  // de una gráfica de un solo evento. Evita que "retoma la situación" termine mostrando solo
-  // el evento activo o una cronología bancaria ajena a la comparación.
+  // de una gráfica de un solo evento, SALVO la continuidad personal resuelta justo arriba.
   const comparisonEvents=v285ComparisonEventNames(state,userPrompt,conversationHistory);
   if(v285ComparisonRequest(userPrompt,conversationHistory,comparisonEvents)){
     return v285DirectMultiEventComparison({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId,eventNames:comparisonEvents});

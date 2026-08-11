@@ -77,12 +77,44 @@ test('globos bancarios se colorean y se reparten sin amontonar',()=>{
   assert(renderer.includes('Movimientos '+"'"+'+(seg.start+1)+')); // encabezado por tramo
 });
 
-test('ruta banco + ingresos mantiene solo las dos visualizaciones solicitadas',()=>{
+test('banco + ingresos conserva resumen y añade detalle nominal segmentado',()=>{
   const a=service.indexOf('async function v2852DirectBankIncomeCharts'),b=service.indexOf('async function v281TryDirectRoute',a),chunk=service.slice(a,b);
   assert(a>0&&b>a);
-  assert(chunk.includes("table_key:key"));
+  assert(chunk.includes("v26ToolEventPeople({id:'v29_direct_income_people'"));
   assert(chunk.includes("table_key:'income_methods'"));
-  assert(chunk.includes('Aquí tienes únicamente las dos visualizaciones solicitadas'));
+  assert(chunk.includes("name:'event_income_detail'"));
+  assert(chunk.includes('const perBlock=8'));
+  assert(chunk.includes("type:'horizontalBar'"));
+  assert(chunk.includes("label_field:'Ingreso'"));
+  assert(chunk.includes('persona/pareja, importe y forma registrada'));
+});
+
+test('follow-up de persona gana a comparativa incidental de eventos',()=>{
+  const routeA=service.indexOf('const personSubject=v29RecentPersonSubject'),routeB=service.indexOf('const comparisonEvents=v285ComparisonEventNames',routeA);
+  assert(routeA>0&&routeB>routeA,'la continuidad personal debe resolverse antes de la comparativa');
+  const helper=service.slice(service.indexOf('function v29RecentPersonSubject'),service.indexOf('function v2852BankIncomeGraphRequest'));
+  assert(helper.includes("exactEventTitlesFromPrompt(u,arr(state?.eventos))"));
+  assert(helper.includes("return''; // cambio de sujeto posterior"));
+  assert(helper.includes('Mantengo el sujeto de la conversación'));
+});
+
+test('transformaciones de persona a tabla o barras son locales y canónicas',()=>{
+  const helper=service.slice(service.indexOf('function v29PersonPresentationIntent'),service.indexOf('function v2852BankIncomeGraphRequest'));
+  assert(helper.includes("v26ToolPersonDossier({id:'v29_person_followup'"));
+  assert(helper.includes('const wantsDetail='));
+  assert(helper.includes('intent.wantsTable||intent.wantsDetail'));
+  assert(helper.includes("v26Table('income_by_event'"));
+  assert(helper.includes("v26Table('donations_by_event'"));
+  assert(helper.includes("showTables.push({tool_id:dossier.id,table_key:key})"));
+  assert(helper.includes("allow_equal_values:true"));
+});
+
+test('promesas de detalle y HTML crudo quedan materializados/saneados',()=>{
+  assert(service.includes('function v29ContainsRawTableMarkup'));
+  assert(service.includes('function v29SanitizeAnswerMarkup'));
+  assert(service.includes('function v29PromisedPersonTables'));
+  assert(service.includes('for(const key of v29PromisedPersonTables(final.answer,personResultForPromise))addShowTable'));
+  assert(service.includes("replace(/<\\s*table\\b[\\s\\S]*?<\\s*\\/\\s*table\\s*>/gi,''"));
 });
 
 console.log(`OK ${n} pruebas v29_prod`);
