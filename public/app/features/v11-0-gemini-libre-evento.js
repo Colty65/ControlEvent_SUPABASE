@@ -1,9 +1,9 @@
-/* ControlEvent v28.5_prod - Gemini libre de explotación del evento.
+/* ControlEvent v28.5.1_prod - Gemini libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV110GeminiLibre) return; window.__ceV110GeminiLibre=true;
-  var VERSION='v28.5_prod';
+  var VERSION='v28.5.1_prod';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }

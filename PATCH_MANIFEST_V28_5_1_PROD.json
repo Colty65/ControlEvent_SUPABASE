@@ -1,0 +1,32 @@
+{
+  "version": "v28.5.1_prod",
+  "goal": "Corregir de forma canónica Pte.Compra en todas las fuentes de Zuzu sin hardcode y sin alterar la arquitectura de v28.5",
+  "changes": [
+    "Ticket/Otros gastos vacío se clasifica como Pte.Compra, igual que en la interfaz de ControlEvent",
+    "TKxx y GASTOS CORRIENTES permanecen como compras realizadas",
+    "DONADO SOCIO/TIENDA/OTROS permanecen como donaciones",
+    "event_dossier expone compras realizadas, compras pendientes y gastos previstos por separado",
+    "event_breakdowns separa Comprado, Donado y Pte.Compra",
+    "event_purchase_lines status=pending devuelve registros pendientes y etiqueta ticket vacío como Pte.Compra",
+    "events_overview y compare_events incluyen Compras pendientes",
+    "gráficas económicas y comparativas pueden representar Pte.Compra como magnitud propia",
+    "Gastos previstos = Compras realizadas + Pte.Compra",
+    "Saldo operativo = Ingresos - Gastos previstos",
+    "Valoración del evento = Gastos previstos + valor del producto donado",
+    "reglas narrativas de Gemini y schemas alineados con la fórmula de la interfaz",
+    "listas inequívocas de compras pendientes se resuelven directamente en CE sin Gemini",
+    "rutas legacy/fallback también tratan ticket vacío como pendiente",
+    "versión v28.5.1_prod aplicada a aplicación, INFOEVENTO y BACKUP; v28.5_prod queda solo como origen de migración"
+  ],
+  "hardcode_business_data": false,
+  "regressions": {
+    "v28_5_1_specific": 43,
+    "v27_1_2": 16,
+    "v27_1_3": 11,
+    "v27_1_4": 13,
+    "total_passed": 83,
+    "javascript_syntax_files": 353,
+    "javascript_syntax_errors": 0
+  },
+  "runtime_note": "No se instaló node_modules ni se levantó el servidor completo durante la construcción; se verificaron regresiones incluidas, sintaxis e integridad del paquete."
+}

@@ -1,15 +1,15 @@
-/* ControlEvent v28.5_prod - correccion conservadora sobre v50.19.
+/* ControlEvent v28.5.1_prod - correccion conservadora sobre v50.19.
    - Retira efectos de v50.19: no fuerza seleccion de evento tras login para no dejar datos a medias.
    - Recupera globos de Resumen Presupuestario con tabla + columna final Just. del sistema v46.9.
    - Evita apertura automatica de la primera foto en moviles/iPad: solo se abre justificante al tocar la miniatura Just.
    - Dock movil Refres/Salir, uno encima de otro, abajo derecha pegado al margen.
    - Limpieza visual de PRODUCTOS sin observadores ni bucles.
-   - Version: ControlEvent v28.5_prod.
+   - Version: ControlEvent v28.5.1_prod.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v28.5_prod';
-  const VERSION_FILE = 'ControlEvent_v28.5_prod';
+  const VERSION = 'ControlEvent v28.5.1_prod';
+  const VERSION_FILE = 'ControlEvent_v28.5.1_prod';
   const INSTALLED = '__ceV5014FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

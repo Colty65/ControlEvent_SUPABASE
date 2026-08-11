@@ -1,16 +1,16 @@
-/* ControlEvent v28.5_prod - correccion puntual sobre la version anterior.
+/* ControlEvent v28.5.1_prod - correccion puntual sobre la version anterior.
    - No toca los justificantes del listado de INGRESOS, que ya funcionan en iPad/moviles.
    - RESUMEN PRESUPUESTARIO: vuelve a usar columna final "Just." y refuerza ampliar/cerrar en tactil.
    - Dock movil independiente Salir / Refres abajo derecha, pegado al margen.
    - PRODUCTOS: elimina negrita/parpadeo sin observadores permanentes.
    - Login: obliga a elegir evento tras entrar, sin restaurar automaticamente el ultimo.
-   - Version: ControlEvent v28.5_prod.
+   - Version: ControlEvent v28.5.1_prod.
 */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v28.5_prod';
-  const VERSION_FILE = 'ControlEvent_v28.5_prod';
+  const VERSION = 'ControlEvent v28.5.1_prod';
+  const VERSION_FILE = 'ControlEvent_v28.5.1_prod';
   const INSTALLED = '__ceV5013FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

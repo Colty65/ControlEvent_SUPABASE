@@ -1,4 +1,4 @@
-/* ControlEvent v28.5_prod - FIX único iPhone/iPadOS: fotos de INGRESOS en evento Finalizado por encima de globos, incluyendo GRAFICAS.
+/* ControlEvent v28.5.1_prod - FIX único iPhone/iPadOS: fotos de INGRESOS en evento Finalizado por encima de globos, incluyendo GRAFICAS.
    Alcance: solo visor iOS/iPadOS finalizado. No cambia versión, Excel, BACKUP, cache ni módulos de datos. */
 (function(){
   'use strict';

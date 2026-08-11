@@ -1,12 +1,12 @@
-/* ControlEvent v28.5_prod · hardlock final de versión visible, descargas e identidad cliente. */
+/* ControlEvent v28.5.1_prod · hardlock final de versión visible, descargas e identidad cliente. */
 (function(root){
   'use strict';
-  const LABEL='v28.5_prod', TEXT='ControlEvent v28.5_prod', FILE='ControlEvent_v28.5_prod', BUILD='20260811-V28-5-PROD', ZIP='ControlEvent_v28.5_prod.zip';
+  const LABEL='v28.5.1_prod', TEXT='ControlEvent v28.5.1_prod', FILE='ControlEvent_v28.5.1_prod', BUILD='20260811-V28-5-1-PROD', ZIP='ControlEvent_v28.5.1_prod.zip';
   const versionPrefix=/ControlEvent_v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   const versionText=/ControlEvent\s+v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   function normalizeName(name){const s=String(name||'');return s.replace(versionPrefix,FILE);}
   function publish(){
-    try{root.__ceVersion=TEXT;root.__ceVersionLabel=LABEL;root.__ceBuildId=BUILD;root.VERSION=TEXT;root.VERSION_FILE=FILE;root.ControlEventVersion={label:LABEL,version:TEXT,versionFile:FILE,build:BUILD,zip:ZIP,source:'v28-5-prod-version-hardlock.js'};root.__ceVersionInfo={version:LABEL,label:LABEL,text:TEXT,file:FILE,buildId:BUILD,zipName:ZIP};}catch(_){}
+    try{root.__ceVersion=TEXT;root.__ceVersionLabel=LABEL;root.__ceBuildId=BUILD;root.VERSION=TEXT;root.VERSION_FILE=FILE;root.ControlEventVersion={label:LABEL,version:TEXT,versionFile:FILE,build:BUILD,zip:ZIP,source:'v28-5-1-prod-version-hardlock.js'};root.__ceVersionInfo={version:LABEL,label:LABEL,text:TEXT,file:FILE,buildId:BUILD,zipName:ZIP};}catch(_){}
     try{document.title=TEXT;document.body?.setAttribute('data-ce-version',TEXT);document.body?.setAttribute('data-ce-build',BUILD);document.body?.setAttribute('data-ce-zip',ZIP);}catch(_){}
   }
   function scrubVisible(){

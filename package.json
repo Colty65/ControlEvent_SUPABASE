@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v28-5-prod",
-  "version": "28.5.0",
+  "name": "controlevent-v28-5-1-prod",
+  "version": "28.5.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
     "test:v27-1.2": "node scripts/test-v27-prod-1-2-zuzu-quality.cjs",
     "test:v27-1.3": "node scripts/test-v27-prod-1-3-zuzu-bank-charts.cjs",
     "test:v27-1.4": "node scripts/test-v27-prod-1-4-zuzu-data-access.cjs",
-    "test:v28.5": "node scripts/test-v28-5-prod.cjs"
+    "test:v28.5.1": "node scripts/test-v28-5-1-prod.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -6,37 +6,37 @@ const read=r=>fs.readFileSync(path.join(root,r),'utf8');
 let n=0;
 function test(name,fn){fn();n++;console.log('OK · '+name);}
 
-test('identidad central v28.5_prod',()=>{
+test('identidad central v28.5.1_prod',()=>{
   const v=read('public/app/version.js');
-  assert(v.includes("VERSION = 'v28.5_prod'"));
-  assert(v.includes("VERSION_TEXT = 'ControlEvent v28.5_prod'"));
-  assert(v.includes("VERSION_FILE = 'ControlEvent_v28.5_prod'"));
-  assert(v.includes("ZIP_NAME = 'ControlEvent_v28.5_prod.zip'"));
+  assert(v.includes("VERSION = 'v28.5.1_prod'"));
+  assert(v.includes("VERSION_TEXT = 'ControlEvent v28.5.1_prod'"));
+  assert(v.includes("VERSION_FILE = 'ControlEvent_v28.5.1_prod'"));
+  assert(v.includes("ZIP_NAME = 'ControlEvent_v28.5.1_prod.zip'"));
   const pkg=JSON.parse(read('package.json'));
-  assert.equal(pkg.name,'controlevent-v28-5-prod');
-  assert.equal(pkg.version,'28.5.0');
-  assert(pkg.scripts['test:v28.5'].includes('test-v28-5-prod.cjs'));
+  assert.equal(pkg.name,'controlevent-v28-5-1-prod');
+  assert.equal(pkg.version,'28.5.1');
+  assert(pkg.scripts['test:v28.5.1'].includes('test-v28-5-1-prod.cjs'));
 });
 
 test('migración conserva v28.3 como origen histórico',()=>{
   const v=read('public/app/version.js');
   assert(v.includes("'ControlEvent_v28.3_prod'"));
-  assert(v.includes("oldKey.replace(prefix, 'ControlEvent_v28.5_prod')"));
+  assert(v.includes("oldKey.replace(prefix, 'ControlEvent_v28.5.1_prod')"));
 });
 
 test('INFOEVENTO y BACKUP externo/interno usan v28.5',()=>{
   const legacy=read('public/app/legacy/legacy-bundle-before-modules-v30.7.js');
-  assert(legacy.includes('ControlEvent_v28.5_prod_INFOEVENTO-'));
+  assert(legacy.includes('ControlEvent_v28.5.1_prod_INFOEVENTO-'));
   for(const rel of ['public/modules/excel/backup.js','routes/export.routes.js']){
     const s=read(rel);
-    assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5_prod'"),rel);
-    assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5_prod'"),rel);
+    assert(s.includes("BACKUP_VERSION = 'ControlEvent v28.5.1_prod'"),rel);
+    assert(s.includes("BACKUP_VERSION_FILE = 'ControlEvent_v28.5.1_prod'"),rel);
   }
 });
 
 test('hardlock final no destruye cabecera',()=>{
-  const html=read('public/index.html'),lock=read('public/app/features/v28-5-prod-version-hardlock.js');
-  assert(html.lastIndexOf('v28-5-prod-version-hardlock.js')>html.lastIndexOf('v28-5-prod-detail-globes.js'));
+  const html=read('public/index.html'),lock=read('public/app/features/v28-5-1-prod-version-hardlock.js');
+  assert(html.lastIndexOf('v28-5-1-prod-version-hardlock.js')>html.lastIndexOf('v28-5-1-prod-detail-globes.js'));
   ['headerDateTime','btnLogout'].forEach(x=>assert(html.includes(x),x));
   assert(lock.includes('NUNCA tocar contenedores de cabecera con textContent'));
   assert(lock.includes('__ceV285VersionHardlock'));
@@ -44,7 +44,7 @@ test('hardlock final no destruye cabecera',()=>{
 });
 
 test('Por destino conserva la lógica estable anterior',()=>{
-  const s=read('public/app/features/v28-5-prod-detail-globes.js');
+  const s=read('public/app/features/v28-5-1-prod-detail-globes.js');
   assert(s.includes('ControlEventV280RestoredGraphDetails'));
   assert(s.includes("const subset=all.filter(r=>norm(r.destino)===norm(destination)&&r.kind===k)"));
   assert(!s.includes('expandCompletePurchasedTickets'));
@@ -112,7 +112,7 @@ test('memoria conversacional usa cápsula compacta y no encadena Interactions',(
   assert(s.includes('function v284ConversationCapsuleInput'));
   assert(s.includes('arr(conversationHistory).slice(-3)'));
   assert(s.includes('Se ignora previous_interaction_id para ahorrar contexto acumulado'));
-  assert(front.includes("var previousInteractionId=''; // v28.5_prod"));
+  assert(front.includes("var previousInteractionId=''; // v28.5.1_prod"));
 });
 
 test('sí/hazlo ejecuta la última propuesta estructurada sin Gemini',()=>{
@@ -134,7 +134,7 @@ test('frontend conserva pendingAction en el historial local',()=>{
 
 test('informe de movimientos conciliados es ruta directa sin Gemini',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('if(v283BankReportRequest(userPrompt,conversationHistory))'),b=s.indexOf('// v28.5_prod: un «sí / hazlo»',a),chunk=s.slice(a,b);
+  const a=s.indexOf('if(v283BankReportRequest(userPrompt,conversationHistory))'),b=s.indexOf('// v28.5.1_prod: un «sí / hazlo»',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   assert(chunk.includes('return v283DirectBankReport'));
   assert(!chunk.includes('v261CallInteraction'));
@@ -206,7 +206,7 @@ test('version.js app/public son idénticos',()=>{
 
 test('no se hardcodean entidades de la batería en la lógica nueva v28.5',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('// v28.5_prod · RUTAS DETERMINISTAS DE BAJO COSTE'),b=s.indexOf('/* Código histórico conservado',a),chunk=s.slice(a,b);
+  const a=s.indexOf('// v28.5.1_prod · RUTAS DETERMINISTAS DE BAJO COSTE'),b=s.indexOf('/* Código histórico conservado',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   for(const token of ['SySA 2026','FUNCION 2025','Pocholo','Carmelo','TK05','CUBATAS','ALMACEN']) assert(!chunk.includes(token),token);
 });
@@ -224,7 +224,7 @@ test('comparativa multievento tiene prioridad sobre gráfica de un solo evento',
 
 test('comparativa completa resuelve serie y eventos sin nombres hardcodeados',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('// v28.5_prod · COMPARATIVAS MULTIEVENTO DETERMINISTAS'),b=s.indexOf('async function v281TryDirectRoute',a),chunk=s.slice(a,b);
+  const a=s.indexOf('// v28.5.1_prod · COMPARATIVAS MULTIEVENTO DETERMINISTAS'),b=s.indexOf('async function v281TryDirectRoute',a),chunk=s.slice(a,b);
   assert(chunk.includes('function v285SeriesBase'));
   assert(chunk.includes('function v285ComparisonEventNames'));
   assert(chunk.includes("name:'compare_events_extended'"));
@@ -260,11 +260,108 @@ test('claro que sí cuenta como afirmación y compras materializa tabla real',()
 
 test('reclamación de tabla prometida se resuelve localmente',()=>{
   const s=read('services/event-ai.service.js');
-  const a=s.indexOf('Si el usuario reclama una tabla'),b=s.indexOf('// v28.5_prod: presentar/repetir',a),chunk=s.slice(a,b);
+  const a=s.indexOf('Si el usuario reclama una tabla'),b=s.indexOf('// v28.5.1_prod: presentar/repetir',a),chunk=s.slice(a,b);
   assert(a>0&&b>a);
   assert(chunk.includes('v282PendingProposal'));
   assert(chunk.includes('v282ExecutePendingProposal'));
   assert(!chunk.includes('v261CallInteraction'));
 });
 
-console.log(`OK ${n} pruebas v28.5_prod`);
+
+
+test('Pte.Compra canónico: ticket vacío es pendiente en IA y contexto',()=>{
+  for(const rel of ['services/event-ai.service.js','services/event-context.service.js']){
+    const s=read(rel);
+    assert(s.includes("function isPendingTicket(value) { const raw = trim(value); return !raw || /PTE\\.?\\s*COMPRA|PENDIENTE/i.test(raw); }"),rel);
+  }
+});
+
+test('clasificación canónica mantiene DONADO, GASTOS CORRIENTES/TK y Pte.Compra separados',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('function v274PurchaseClass'),b=s.indexOf('function v274ResolveOptionalStore',a),chunk=s.slice(a,b);
+  assert(chunk.includes("if(isDonationTicket(tt))return'DONACION'"));
+  assert(chunk.includes("if(isPendingTicket(tt))return'PENDIENTE'"));
+  assert(chunk.includes("return'REALIZADA'"));
+  const ui=read('public/app/legacy/legacy-bundle-before-modules-v28.10.js');
+  assert(ui.includes("String(c.ticketDonacion || '').trim() === ''"));
+  assert(ui.includes("tk !== 'GASTOS CORRIENTES'"));
+});
+
+test('detalle Pte.Compra etiqueta el ticket vacío y lo devuelve en status pending',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('function v274PurchaseRowsForEvent'),b=s.indexOf('async function v274ToolMasterCatalog',a),chunk=s.slice(a,b);
+  assert(chunk.includes("purchaseClass==='PENDIENTE'?(rawTicket||'Pte.Compra'):rawTicket"));
+  assert(chunk.includes("if(wanted==='pending')return kind==='PENDIENTE'"));
+});
+
+test('dossier entrega realizadas, Pte.Compra, gastos previstos y valoración UI',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('async function v26ToolEventDossier'),b=s.indexOf('async function v26ToolEventBreakdowns',a),chunk=s.slice(a,b);
+  assert(chunk.includes('purchases_pending:v26Money(summary?.comprasPendientes)'));
+  assert(chunk.includes('purchases_planned:v26Money(num(summary?.comprasReales)+num(summary?.comprasPendientes))'));
+  assert(chunk.includes("valuation_formula:'Valoración del evento = gastos previstos (compras realizadas + Pte.Compra) + valor del producto donado'"));
+  assert(chunk.includes("...(Math.abs(num(facts.purchases_pending))>0.004?[{Indicador:'Pte.Compra',Valor:facts.purchases_pending}]:[])"));
+});
+
+test('comparativas incluyen Pte.Compra y valoración con gasto previsto',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('function v285MetricSchema'),b=s.indexOf('function v285ComparisonGoodBadText',a),chunk=s.slice(a,b);
+  assert(chunk.includes("'Compras pendientes':v26MoneySchema('Compras pendientes')"));
+  assert(chunk.includes("'Valoración del evento':v26MoneySchema('Gastos previstos (compras realizadas + Pte.Compra) + donaciones valoradas')"));
+  assert(chunk.includes("['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas'"));
+});
+
+test('lista de pendientes se resuelve directamente sin Gemini',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('function v274DataAccessRequirement'),b=s.indexOf('function v261AgentTools',a),req=s.slice(a,b);
+  assert(req.includes("purchaseStatus=/\\b(pte\\.?\\s*compra|pendientes?\\s+de\\s+compra|compras?\\s+pendientes?)\\b/.test(p)?'pending'"));
+  const r1=s.indexOf('// Detalle exhaustivo de compras:'),r2=s.indexOf('// Refinamiento de una gráfica bancaria',r1),route=s.slice(r1,r2);
+  assert(route.includes("status:dataReq.purchaseStatus||'realized'"));
+  assert(!route.includes('v261CallInteraction'));
+});
+
+test('migración reconoce v28.5_prod como origen inmediato',()=>{
+  const v=read('public/app/version.js');
+  assert(v.includes("legacyPrefixes = ['ControlEvent_v28.5_prod','ControlEvent_v28.4_prod'"));
+});
+
+test('corrección Pte.Compra no hardcodea evento, importe, tienda ni producto de la prueba real',()=>{
+  const s=read('services/event-ai.service.js');
+  const anchors=['function isPendingTicket','function v274PurchaseRowsForEvent','function v274DataAccessRequirement'];
+  const chunks=anchors.map((x,i)=>{const a=s.indexOf(x);return s.slice(a,a+6000)}).join('\n');
+  for(const token of ['Cuotas y gastos corrientes 2026','746,68','746.68','INNER ENERGIA','Gastos BASURA','Gastos AGUA']) assert(!chunks.includes(token),token);
+});
+
+
+test('reglas narrativas de Gemini reciben Pte.Compra y fórmula de valoración de la UI',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes('VALORACIÓN DEL EVENTO = GASTOS PREVISTOS (COMPRAS REALIZADAS + Pte.Compra) + VALOR DEL PRODUCTO DONADO'));
+  assert(s.includes('un registro de compra con Ticket/Otros gastos vacío es Pte.Compra'));
+  assert(!s.includes('Nunca uses saldo + donaciones ni añadas Pte.Compra a la valoración'));
+  assert(!s.includes('Valoración del evento = Compras realizadas + Valor del producto donado'));
+});
+
+test('rutas legacy de informe también clasifican ticket vacío como Pte.Compra',()=>{
+  const s=read('services/event-ai.service.js');
+  const a=s.indexOf('function directEventReportIfApplicable'),b=s.indexOf('function directOperationalRankingResultIfApplicable',a),report=s.slice(a,b);
+  assert(report.includes("return !t||/pte\\.?\\s*compra|pendiente/i.test(t)"));
+  const c=s.indexOf('function directOperationalRankingResultIfApplicable'),d=s.indexOf('function ',c+20),rank=s.slice(c,d>c?d:c+8000);
+  assert(rank.includes("return !t || /PTE|PENDIENT/i.test(norm(t))"));
+});
+
+test('schemas de overview y compare describen valoración incluyendo Pte.Compra',()=>{
+  const s=read('services/event-ai.service.js');
+  assert(s.includes("'Valoración del evento':v26MoneySchema('Gastos previstos (compras realizadas + Pte.Compra) + producto donado')"));
+  assert(s.includes("'Valoración del evento':v26MoneySchema('Gastos previstos (compras realizadas + Pte.Compra) + valor del producto donado')"));
+});
+
+
+test('métricas canónicas extraídas de módulos no convierten ticket vacío en realizada',()=>{
+  const s=read('services/event-context.service.js');
+  const a=s.indexOf('function zuzuCanonicalMetricsFromModules'),chunk=s.slice(a,a+9000);
+  assert(chunk.includes("return !t || /pte\\.?\\s*compra|pendiente/i.test(t)"));
+  assert(chunk.includes("return !!t && !/pte\\.?\\s*compra|pendiente/i.test(t)"));
+  assert(chunk.includes("'Valoracion con donaciones': round(comprasTotal + comprasPte + donacionesTotal, 2)"));
+});
+
+console.log(`OK ${n} pruebas v28.5.1_prod`);

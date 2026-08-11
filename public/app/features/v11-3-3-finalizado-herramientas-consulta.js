@@ -1,4 +1,4 @@
-/* ControlEvent v28.5_prod - herramientas de consulta/maestros disponibles aunque el evento activo esté Finalizado.
+/* ControlEvent v28.5.1_prod - herramientas de consulta/maestros disponibles aunque el evento activo esté Finalizado.
    No desbloquea edición de datos del evento finalizado: solo Zuzu, BACKUP/Excel, Importación/descarga y mantenimientos generales. */
 (function(){
   'use strict';
