@@ -450,7 +450,7 @@
       if(returnedContext&&typeof returnedContext==='object'){ window.__ceZuzuConversationContextV26=returnedContext; saveZuzuConversationContext(); }
       if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
       var pendingAction=(data.meta&&data.meta.pendingAction&&typeof data.meta.pendingAction==='object')?data.meta.pendingAction:null;
-      var fullAnswer=String(data.answer||''); window.__ceZuzuConversationV26.push({user:prompt,assistant:fullAnswer.slice(0,1200),assistantTail:fullAnswer.slice(-1000),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext,pendingAction:pendingAction});
+      var fullAnswer=String(data.answer||''); window.__ceZuzuConversationV26.push({user:prompt,assistant:fullAnswer.slice(0,1200),assistantTail:fullAnswer.slice(-1000),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null});
       if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
       saveZuzuConversation();
       recordZuzuUsage(data);

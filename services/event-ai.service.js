@@ -6278,7 +6278,7 @@ async function v26ToolEventDossier(tool,state,selectedEventId){
   const att=arr(buildCanonicalAttendance(state,[rr.id])?.porEvento)[0]||{};
   let hitosCount=0,lgCount=0,lgCompleted=0,lgPending=0;
   try{
-    const hs=await listAllHitosState();
+    const hs=(Array.isArray(state?.hitos)&&Array.isArray(state?.lgs))?{hitos:state.hitos,lgs:state.lgs}:await listAllHitosState();
     const hitos=arr(hs?.hitos).filter(x=>trim(x?.eventId)===rr.id);
     const lgs=arr(hs?.lgs).filter(x=>trim(x?.eventId)===rr.id);
     hitosCount=hitos.length;lgCount=lgs.length;lgCompleted=lgs.filter(x=>x?.cumplida===true).length;lgPending=Math.max(0,lgCount-lgCompleted);
@@ -7241,7 +7241,10 @@ function v261InteractionModel(){
 function v261EventManagementTool(tool,state,selectedEventId=''){
   return (async()=>{
     const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
-    const hs=await listAllHitosState();
+    // En tests/estado ya precargado reutilizamos Hitos/LG sin otra lectura; en producción
+    // conservamos la fuente persistente habitual.
+    const hasStateManagement=Array.isArray(state?.hitos)||Array.isArray(state?.lgs);
+    const hs=hasStateManagement?{hitos:arr(state?.hitos),lgs:arr(state?.lgs)}:await listAllHitosState();
     const people=byId(state?.personas),eventId=rr.id;
     const hitos=arr(hs?.hitos).filter(x=>trim(x?.eventId)===eventId);
     const lgs=arr(hs?.lgs).filter(x=>trim(x?.eventId)===eventId);
@@ -7822,6 +7825,13 @@ function v283DeterministicSafetyRepair(final,results,conversationHistory=[]){
     const n=norm(chunk);
     if(!hasBenchmark&&/\b(supera(?:ndo)?\s+(?:las\s+)?expectativas|por\s+encima\s+de\s+lo\s+esperado|rentabilidad\s+(?:excelente|sobresaliente))\b/.test(n))return false;
     if(/valoraci[oó]n[^.]{0,120}(?:saldo[^.]{0,40}(?:donaci|producto)|(?:donaci|producto)[^.]{0,40}saldo)/i.test(chunk))return false;
+    // Afirmaciones universales se contrastan contra contadores canónicos. Si hay una sola
+    // excepción, la frase se elimina: CE no permite que Gemini diga «todos/ninguno/100 %»
+    // contradiciendo sus propios datos.
+    const bank=arr(results).find(r=>r?.ok&&r?.name==='event_bank')?.facts||{};
+    const dossier=arr(results).find(r=>r?.ok&&r?.name==='event_dossier')?.facts||{};
+    if(num(bank.unlinked_movement_count)>0&&/\b(?:todos?|cada\s+uno|100\s*%)\b[^.]{0,100}\b(?:justificad|conciliad|cuadrad|vinculad)\w*\b|\b(?:ningun|ningún|cero)\b[^.]{0,80}\b(?:sin\s+(?:justific|vincul)|pendiente)\w*/.test(n))return false;
+    if(num(dossier.lg_pending)>0&&/\b(?:todas?|100\s*%)\b[^.]{0,100}\b(?:tareas?|lg)\b[^.]{0,80}\b(?:complet|cumpl|realiz)\w*|\b(?:no\s+hay|ningun|ningún|cero)\b[^.]{0,60}\b(?:tareas?|lg)\b[^.]{0,40}\bpendient/.test(n))return false;
     return true;
   });
   const repaired=safe.join('\n\n').trim();
@@ -8194,7 +8204,7 @@ function v281BroadBankKey(bankResult){
   }
   return'';
 }
-function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],results=[],showTables=[],chartSpecs=[],flowTrace=[],previousInteractionId='',traceDirect=true}){
+function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],results=[],showTables=[],chartSpecs=[],flowTrace=[],previousInteractionId='',traceDirect=true,resultContext=null}){
   const final={title,answer,warnings,showTables,chartSpecs};
   const staticPointLabels=arr(chartSpecs).some(spec=>arr(spec?.point_label_fields).map(trim).filter(Boolean).length>0);
   const presentation=v26BuildPresentation(final,results,'',{wantsCharts:false,bankContext:false,staticPointLabels});
@@ -8208,7 +8218,7 @@ function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],resu
   zuzuTracePush(flowTrace,'v28.5 · Datos y presentación','OK',`Fuentes=${inventory||'ninguna'}; datasets=${ps.sourceResults||results.length}; tablas fuente=${ps.sourceTables||0}; filas fuente=${ps.sourceRows||0}; tablas renderizadas=${presentation.tables.length}; filas renderizadas=${ps.renderedTableRows||0}; gráficas renderizadas=${presentation.charts.length}; secciones materializadas=${presentation.tables.length+presentation.charts.length}; descartes por deduplicación=${(ps.tableDuplicates||0)+(ps.chartDuplicates||0)}.`);
   if(traceDirect)zuzuTracePush(flowTrace,'v28.5 · Ruta directa','OK','Gemini no es necesario para esta petición determinista; se reutilizan hechos canónicos y el coste Gemini de este turno es 0.');
   const pendingAction=v284PendingActionFromAnswer(answer);
-  return{ok:true,rejected:false,title,answer,warnings:arr(warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'control-event-v28-direct',model:'calculo-local-oficial',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v29_prod',architecture:'Ruta determinista para consultas estructuradas inequívocas; Gemini reservado para razonamiento abierto',interactionId:'',pendingAction,tools:[...new Set(results.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,warnings:arr(warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'control-event-v28-direct',model:'calculo-local-oficial',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v29_prod',architecture:'Ruta determinista para consultas estructuradas inequívocas; Gemini reservado para razonamiento abierto',interactionId:'',pendingAction,resultContext:(resultContext&&typeof resultContext==='object')?resultContext:null,tools:[...new Set(results.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 function v281AnalysisPrefetchKind(userPrompt){
   const p=norm(userPrompt);
@@ -8216,7 +8226,7 @@ function v281AnalysisPrefetchKind(userPrompt){
   if(/\b(profundiza|profundizar|analiza|an[aá]lisis|detalle|detalla)\b/.test(p)&&/\bingresos?\b/.test(p)&&/\b(banco|bancari|concili|cuadre)\b/.test(p))return'income_bank';
   if(/\b(opini[oó]n|que\s+te\s+parece|qué\s+te\s+parece|como\s+lo\s+ves|cómo\s+lo\s+ves|valoraci[oó]n\s+general)\b/.test(p))return'opinion';
   if(v280BroadGraphicalEventRequest(userPrompt)&&/\b(importante|relevante|clave|significativ\w*)\b/.test(p))return'analysis';
-  if(/\b(curios\w*|rar\w*|anomal\w*|riesg\w*|hallazg\w*|cosas?\s+relevantes?|algo\s+importante[^.]{0,60}(?:olvid\w*|falt\w*)|que\s+tal\s+(?:salio|salió)|analiza\s+(?:a\s+fondo|en\s+profundidad))\b/.test(p))return'analysis';
+  if(/\b(curios\w*|rar\w*|anomal\w*|riesg\w*|hallazg\w*|cosas?\s+relevantes?|algo\s+importante[^.]{0,60}(?:olvid\w*|falt\w*)|que\s+tal\s+(?:salio|salió)|analiza(?:\s+(?:a\s+fondo|en\s+profundidad|este\s+evento|el\s+evento))?|que\s+cosas?\s+te\s+parecen|qué\s+cosas?\s+te\s+parecen|que\s+mejorarias|qué\s+mejorar[ií]as)\b/.test(p))return'analysis';
   return'';
 }
 async function v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
@@ -8248,8 +8258,15 @@ async function v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conve
     {id:'v284_prefetch_dossier',name:'event_dossier',...ea,detail:'brief'},
     {id:'v284_prefetch_breakdowns',name:'event_breakdowns',...ea,detail:'brief'}
   ];
-  if(!broadGraphical&&kind==='analysis')defs.push({id:'v284_prefetch_people',name:'event_people',...ea,detail:'brief'});
-  if(!broadGraphical&&!['opinion','income_bank'].includes(kind)&&(kind==='executive'||/\b(banco|bancari|concili|cuadre|tesorer|liquidez|flujo\s+de\s+caja)\b/.test(p)))defs.push({id:'v284_prefetch_bank',name:'event_bank',...ea,detail:'brief'});
+  if(!broadGraphical&&kind==='analysis'){
+    defs.push({id:'v284_prefetch_people',name:'event_people',...ea,detail:'brief'});
+    // Un análisis general debe poder detectar problemas de cierre, tareas y conciliación sin
+    // obligar a una segunda pregunta. Las fuentes se obtienen localmente en paralelo y Gemini
+    // recibe después una única cápsula compacta.
+    defs.push({id:'v29_prefetch_analysis_management',name:'event_management',...ea,detail:'brief'});
+    defs.push({id:'v29_prefetch_analysis_bank',name:'event_bank',...ea,detail:'brief'});
+  }
+  if(!broadGraphical&&!['opinion','income_bank','analysis'].includes(kind)&&(kind==='executive'||/\b(banco|bancari|concili|cuadre|tesorer|liquidez|flujo\s+de\s+caja)\b/.test(p)))defs.push({id:'v284_prefetch_bank',name:'event_bank',...ea,detail:'brief'});
   // Documentación solo entra si forma parte explícita del encargo; no se paga por ella en
   // cualquier análisis general para luego volver a consultarla en un seguimiento.
   if(kind==='executive'||/\b(document|justificant|fototicket|adjunt|evidencia)\b/.test(p))defs.push({id:'v282_prefetch_documentation',name:'event_documentation',...ea,detail:'brief'});
@@ -8275,7 +8292,7 @@ function v281PrefetchInput(userPrompt,prefetch){
 // CE obtiene hechos canónicos -> una sola llamada Gemini SIN herramientas ni JSON -> CE presenta.
 // Si Gemini falla, CE conserva la respuesta útil con hechos canónicos y nunca muestra un error técnico al usuario.
 function v2853PlainAnalystSystemInstruction(kind='analysis'){
-  const role=kind==='executive'?'un analista ejecutivo y financiero':kind==='opinion'?'un analista que emite una opinión fundada':kind==='income_bank'?'un analista de ingresos y conciliación bancaria':'un analista de gestión de eventos';
+  const role=kind==='executive'?'un analista ejecutivo y financiero':kind==='opinion'?'un analista que emite una opinión fundada':kind==='income_bank'?'un analista de ingresos y conciliación bancaria':kind==='person'?'un analista de trayectoria y participación de personas':'un analista de gestión de eventos';
   return `Eres Zuzu, ${role} dentro de ControlEvent. Responde SOLO con texto final en español, listo para mostrar al usuario. No devuelvas JSON, código, claves internas, IDs, nombres de tablas ni instrucciones para el renderizador. Los datos recibidos son hechos canónicos ya calculados por ControlEvent: no inventes cifras ni causas, no recalcules importes salvo operaciones evidentes, y distingue hechos de inferencias. Si un motivo no consta, dilo. Mantén separados los conceptos: saldo operativo del evento, saldo bancario de la cuenta e impacto de los movimientos NO son la misma magnitud; no uses uno como prueba del otro. Sé útil y concreto; normalmente 2-6 párrafos breves. No prometas tablas o gráficas: ControlEvent las materializa aparte si se han pedido.`;
 }
 function v2853PlainAnalystInput(userPrompt,prefetch,conversationHistory=[]){
@@ -8327,6 +8344,12 @@ async function v2853RunPrefetchedAnalyst({userPrompt,state,selectedEventId,conve
   if(prefetch.broadGraphical&&dossier)specs=v281CanonicalOverviewChartSpecs(dossier,bank,{includeBank:true});
   if(prefetch.kind==='executive'&&/\b(grafic|gráfico|grafico|visualiz|cuadro\s+de\s+mando)\w*/.test(norm(userPrompt))&&dossier)specs=v281CanonicalOverviewChartSpecs(dossier,bank,{includeBank:true});
   const title=prefetch.kind==='executive'?`Informe ejecutivo · ${prefetch.event}`:prefetch.kind==='opinion'?`Opinión de Zuzu · ${prefetch.event}`:prefetch.kind==='income_bank'?`Ingresos y banco · ${prefetch.event}`:`Análisis · ${prefetch.event}`;
+  const repaired=v283DeterministicSafetyRepair({answer,warnings:[]},prefetch.results,conversationHistory);
+  answer=trim(repaired.answer);
+  const bankFacts=prefetch.results.find(r=>r?.name==='event_bank')?.facts||{};
+  if(num(bankFacts.unlinked_movement_count)>0&&!/\bmovimientos?\b[^.]{0,100}\bsin\s+v[ií]nculo\s+justificativo/.test(norm(answer))){
+    answer+=`\n\nControlEvent registra ${v26CountPhrase(bankFacts.unlinked_movement_count,'movimiento incluido sin vínculo justificativo','movimientos incluidos sin vínculo justificativo')}; conviene revisarlo antes de dar la conciliación por completamente justificada.`;
+  }
   const result=v281LocalResponse({title,answer,results:prefetch.results,chartSpecs:specs,flowTrace,previousInteractionId:'',traceDirect:false});
   const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);
   zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Turno analítico: ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €. Objetivo: 0 € para consultas estructuradas; <=0,004 € si requiere redacción/razonamiento; 0,010 € es referencia interna, nunca un bloqueo visible.`);
@@ -8886,11 +8909,467 @@ async function v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,con
   return result;
 }
 
+
+// ============================================================================
+// v29_prod · PLANIFICADOR TRANSACCIONAL ESTRICTO
+// Objetivo: una pregunta estructurada se traduce primero a dominios/filtros/orden/
+// límite/presentación. CE ejecuta TODAS las subpeticiones. Gemini solo interviene
+// si queda una opinión o razonamiento genuino después de obtener los datos.
+// ============================================================================
+function v29WordBoundaryContains(blob,value){
+  const k=norm(value);if(!k)return false;
+  const esc=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+  return new RegExp(`(?:^|[^a-z0-9ñ])${esc}(?:$|[^a-z0-9ñ])`,'i').test(blob);
+}
+function v29OrderedCatalogMentions(state,prompt){
+  const raw=norm(prompt),out=[];
+  const push=(kind,name)=>{
+    const k=norm(name);if(!k||k.length<2)return;
+    let index=raw.indexOf(k);if(index<0)return;
+    if(!out.some(x=>x.kind===kind&&norm(x.name)===k))out.push({kind,name:trim(name),index});
+  };
+  arr(state?.tiendas).forEach(x=>push('store',x?.nombre));
+  arr(state?.personas).forEach(x=>push('person',x?.nombre));
+  arr(state?.productos).forEach(x=>push('product',x?.nombre));
+  return out.sort((a,b)=>a.index-b.index||b.name.length-a.name.length);
+}
+function v29NearestMention(prompt,mentions,domainPattern,kind=''){
+  const raw=norm(prompt),m=domainPattern.exec(raw);domainPattern.lastIndex=0;
+  const anchor=m?m.index:0,candidates=arr(mentions).filter(x=>!kind||x.kind===kind);
+  if(!candidates.length)return'';
+  const scored=candidates.map(x=>{
+    const after=x.index>=anchor,dist=Math.abs(x.index-anchor);
+    return{x,score:(after?0:5000)+dist};
+  }).sort((a,b)=>a.score-b.score);
+  return trim(scored[0]?.x?.name);
+}
+function v29DimensionMentions(state,prompt){
+  const p=norm(prompt),segments=[],destinations=[];
+  const add=(list,value)=>{const v=trim(value);if(v&&v29WordBoundaryContains(p,v)&&!list.some(x=>norm(x)===norm(v)))list.push(v);};
+  arr(state?.productos).forEach(prod=>{add(segments,prod?.segmento);add(destinations,prod?.destino);});
+  return{segments,destinations};
+}
+function v29ProductSearchTerm(state,prompt){
+  const p=norm(prompt),stop=new Set(['producto','productos','normal','pack','botella','lata','unidad','unidades','para','donde','cuanto','precio','importe']);
+  const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)))],scores=[];
+  for(const token of tokens){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,token))hits++;}if(hits)scores.push({token,hits,len:token.length});}
+  return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len)[0]?.token||'';
+}
+function v29SortDirection(prompt){
+  const p=norm(prompt);
+  if(/\b(menor\s+a\s+mayor|menos\s+a\s+m[aá]s|ascendente|creciente)\b/.test(p))return'asc';
+  if(/\b(mayor\s+a\s+menor|m[aá]s\s+a\s+menos|descendente|decreciente|ranking|top)\b/.test(p))return'desc';
+  if(/\bordenad\w*\s+por\s+(?:importe|valor|coste|precio)\b/.test(p))return'desc';
+  return'';
+}
+function v29RequestedLimit(prompt){
+  const p=norm(prompt),words={un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20};
+  let m=p.match(/\btop\s*(\d{1,3})\b/),n=m?Number(m[1]):0;
+  if(!n){m=p.match(/\b(?:solamente|solo|unicamente|los|las|primeros?|primeras?|mayores?)\s+(\d{1,3})\s+(?:tiendas?|donantes?|productos?|personas?|registros?|movimientos?|tareas?)\b/);if(m)n=Number(m[1]);}
+  if(!n){m=p.match(/\b(\d{1,3})\s+(?:tiendas?|donantes?|productos?|personas?|registros?|movimientos?|tareas?)\b/);if(m)n=Number(m[1]);}
+  const wordAlt=Object.keys(words).join('|');
+  if(!n){m=p.match(new RegExp(`\\b(?:solamente|solo|unicamente|los|las|primeros?|primeras?|mayores?)\\s+(${wordAlt})\\s+(?:tiendas?|donantes?|productos?|personas?|registros?|movimientos?|tareas?)\\b`));if(m)n=words[m[1]]||0;}
+  if(!n){m=p.match(new RegExp(`\\b(${wordAlt})\\s+(?:tiendas?|donantes?|productos?|personas?|registros?|movimientos?|tareas?)\\b`));if(m)n=words[m[1]]||0;}
+  return Number.isFinite(n)&&n>0?Math.min(200,n):0;
+}
+function v29StructuredTransformCue(prompt){
+  const p=norm(prompt);
+  return /\b(orden(?:a|ame|amelo|ámelo|alas?|arlas?|alo)|mayor\s+a\s+menor|menor\s+a\s+mayor|tabla|tabula|gr[aá]fic\w*|visualiz\w*|solo|solamente|unicamente|únicamente|top\s*\d+|primeros?|primeras?|filtra|agrupa|totaliza|mismos?\s+datos|esos?\s+datos|estas?\s+datos|lo\s+anterior|ahora)\b/.test(p);
+}
+function v29LastResultContext(history=[]){
+  for(const turn of arr(history).slice().reverse()){
+    const ctx=turn?.resultContext;
+    if(ctx&&typeof ctx==='object'&&trim(ctx?.domain))return ctx;
+  }
+  return null;
+}
+function v29ExplicitDomains(prompt){
+  const p=norm(prompt),domains=[];
+  const add=d=>{if(!domains.includes(d))domains.push(d);};
+  const noDon=/\b(?:no\s+(?:quiero|incluyas?|muestres?|metas?)\s+(?:las?\s+)?donaciones?|sin\s+donaciones?)\b/.test(p);
+  const documentation=/\b(documentos?|docxx|doc\s*\d+|justificantes?|fototickets?|adjuntos?|evidencias?)\b/.test(p);
+  const incomeLike=/\b(ingreso|ingresos|recaudaci[oó]n|cobro|cobros|pagaron|pagado|forma\s+de\s+pago)\b/.test(p);
+  // «Banco» puede ser simplemente una forma de ingreso. Solo abre el dominio Banco cuando
+  // existe semántica bancaria propia (saldo, movimientos, cuadre, conciliación, cuenta...).
+  const bankSpecific=/\b(bancari\w*|conciliaci[oó]n|cuadre|movimientos?\s+bancarios?|saldo\s+bancario|cuenta\s+bancaria|periodo\s+bancario|per[ií]odo\s+bancario)\b/.test(p)
+    ||(/\bbanco\b/.test(p)&&!incomeLike&&/\b(saldo|movimientos?|cuadre|concili|cuenta|periodo|per[ií]odo|justificaci[oó]n|tkxx)\b/.test(p));
+  if(bankSpecific)add('bank');
+  if(/\b(asistencia|asistentes?|asistieron|asisti[oó]|asiste|acudieron|acudi[oó]|presentes?|no\s+asistieron|ausentes?)\b/.test(p))add('attendance');
+  if(/\b(hitos?|\blg\b|tareas?|lineas?\s+de\s+gesti[oó]n)\b/.test(p))add('management');
+  if(documentation)add('documents');
+  if(!noDon&&/\b(donaci[oó]n|donaciones|donante|donantes|donado|donados|don[oó]|donaron|donaba|donaban)\b/.test(p))add('donations');
+  if(/\b(compra|compras|comprado|comprados|compramos|compraron|compre|compraste|gasto|gastos)\b/.test(p)&&!/\b(?:fototicket|ticket)\s+de\s+compra\b/.test(p))add('purchases');
+  if(incomeLike&&!/\bjustificantes?\s+de\s+ingresos?\b/.test(p))add('incomes');
+  if(/\b(saldo\s+operativo|saldo\s+actual|valoraci[oó]n\s+del\s+evento|precio\s+(?:del\s+)?evento|precio\s+por\s+socio|estado\s+del\s+evento|fecha\s+inicio|fecha\s+fin)\b/.test(p))add('metrics');
+  return domains;
+}
+function v29StructuredPlan(state,prompt,history=[]){
+  const p=norm(prompt),mentions=v29OrderedCatalogMentions(state,prompt),dims=v29DimensionMentions(state,prompt),productTerm=v29ProductSearchTerm(state,prompt);
+  let domains=v29ExplicitDomains(prompt),inherited=null;
+  const explicitCurrent=domains.length>0;
+  if(!explicitCurrent&&v29StructuredTransformCue(prompt)){
+    inherited=v29LastResultContext(history);
+    if(inherited?.domain==='multi')domains=arr(inherited?.tasks).map(x=>trim(x?.domain)).filter(Boolean);
+    else if(inherited?.domain)domains=[trim(inherited.domain)];
+  }
+  if(!domains.length)return null;
+  const attendanceUnpaid=/\b(asisti[oó]|asistieron|asistente[s]?)\b[^.]{0,50}\b(no\s+pag[oó]|sin\s+pagar|cuota\s+0|cero\s+euros)\b|\bqui[eé]n\s+asisti[oó]\s+pero\s+no\s+pag[oó]\b/.test(p);
+  if(attendanceUnpaid)domains=domains.filter(d=>d!=='incomes');
+  const entityMention=mentions.length>0;
+  const structuredCue=/\b(lista|listado|ranking|top|detalle|detallad|cada|por\s+tienda|por\s+donante|por\s+producto|por\s+responsable|por\s+ticket|forma\s+de\s+pago|banco|efectivo|bizum|pendiente|gr[aá]fic\w*|tabla|quien|quién|quienes|quiénes|todos?|todas?|solo|solamente|sin\s+resumir)\b/.test(p);
+  const kpiWords=[/\bingresos?\b/,/\bcompras?\s+realizadas?\b/,/\bcompras?\s+pendientes?\b/,/\bdonaciones?\b/,/\bsaldo\s+(?:actual|operativo)\b/,/\bvaloraci[oó]n\b/].filter(re=>re.test(p)).length;
+  const metricOnly=kpiWords>=2&&!structuredCue&&!entityMention&&!dims.segments.length&&!dims.destinations.length&&!/\b(depender|opini[oó]n|analiza|que\s+te\s+parece|qué\s+te\s+parece)\b/.test(p);
+  if(metricOnly)domains=['metrics'];
+  const sort=v29SortDirection(prompt)||(inherited?.sort||''),limit=v29RequestedLimit(prompt)||(inherited?.limit||0);
+  const wantsChart=/\bgr[aá]fic\w*|visualiz\w*|barras?|tarta|queso|donut|pie\b/.test(p);
+  const wantsTable=/\btabla|lista|listado|detalle|detallad|cada|todos?|todas?|ranking|top|dame|muestra|sin\s+resumir\b/.test(p);
+  const full=/\b(todo\s+el\s+detalle|detalle\s+completo|sin\s+resumir|exhaustiv\w*|todo\s+lo\s+disponible)\b/.test(p);
+  const wantsOpinion=/\b(opini[oó]n|que\s+te\s+parece|qué\s+te\s+parece|analiza|an[aá]lisis|dependimos|dependencia|mejorar[ií]as?|comenta|valoraci[oó]n\s+general)\b/.test(p);
+  const domainPattern={
+    donations:/\b(donaci[oó]n|donaciones|donantes?|donado|donados|don[oó]|donaron|donaba|donaban)\b/g,
+    purchases:/\b(compra|compras|comprado|comprados|compramos|compraron|compre|compraste|gasto|gastos)\b/g,
+    incomes:/\b(ingreso|ingresos|recaudaci[oó]n|cobros?|pagaron|pagado)\b/g,
+    attendance:/\b(asistencia|asistentes?|asistieron|asisti[oó]|asiste|acudieron|acudi[oó]|presentes?)\b/g,
+    management:/\b(hitos?|\blg\b|tareas?)\b/g
+  };
+  const tasks=domains.map(domain=>{
+    const prior=domain==='multi'?null:(inherited?.domain===domain?inherited:arr(inherited?.tasks).find(x=>x?.domain===domain));
+    const task={domain,sort,limit,wantsChart,wantsTable,full,filters:{...(prior?.filters||{})}};
+    if(domain==='donations'){
+      const stores=mentions.filter(x=>x.kind==='store'),people=mentions.filter(x=>x.kind==='person'),all=[...stores,...people];
+      task.filters.donor=v29NearestMention(prompt,all,domainPattern.donations,'')||task.filters.donor||'';
+      task.filters.product=trim(mentions.find(x=>x.kind==='product')?.name)||productTerm||task.filters.product||'';
+      task.filters.segment=dims.segments[0]||task.filters.segment||'';
+      task.filters.destination=dims.destinations[0]||task.filters.destination||'';
+      task.includeProducts=/\b(?:que|qué)\s+don[oó]\s+cada\s+uno|\bproductos?\s+(?:de|donad)/.test(p);
+      task.group=/\b(productos?|que\s+don[oó]|qué\s+don[oó])\b/.test(p)&&task.filters.donor?'products':'donors';
+    }else if(domain==='purchases'){
+      task.filters.store=v29NearestMention(prompt,mentions,domainPattern.purchases,'store')||task.filters.store||'';
+      task.filters.responsible=v29NearestMention(prompt,mentions,domainPattern.purchases,'person')||task.filters.responsible||'';
+      task.filters.product=trim(mentions.find(x=>x.kind==='product')?.name)||productTerm||task.filters.product||'';
+      task.filters.segment=dims.segments[0]||task.filters.segment||'';
+      task.filters.destination=dims.destinations[0]||task.filters.destination||'';
+      if(/\b(tiendas?|proveedores?)\b/.test(p))task.group='store';
+      else if(/\bresponsables?\b/.test(p))task.group='responsible';
+      else if(/\bproductos?\b/.test(p)&&!task.filters.store)task.group='product';
+      else if(/\b(?:tickets?|tkxx)\b/.test(p))task.group='ticket';
+      else task.group=task.filters.store||task.filters.product||task.filters.segment||task.filters.destination||full?'lines':'store';
+    }else if(domain==='incomes'){
+      task.group=/\b(banco|efectivo|bizum|pendiente|forma\s+de\s+pago|forma)\b/.test(p)?'method':(/\b(rango|socios?|no\s+socios?)\b/.test(p)?'range':'person');
+      task.filters.person=v29NearestMention(prompt,mentions,domainPattern.incomes,'person')||task.filters.person||'';
+    }else if(domain==='attendance'){
+      task.mode=attendanceUnpaid?'unpaid':(/\b(no\s+asistieron|no\s+asisti[oó]|ausentes?|socios?\s+que\s+no)\b/.test(p)?'absent':'attending');
+      task.filters.range=/\bno\s+socios?\b/.test(p)?'NO SOCIO':(/\bsocios?\b/.test(p)?'SOCIO':task.filters.range||'');
+      task.withPayment=attendanceUnpaid||/\b(pagaron|pag[oó]|pagado|cuota|importe|ingreso|ingresos)\b/.test(p);
+    }else if(domain==='documents'){
+      task.kinds=[];
+      if(/\bdocumentos?|docxx|doc\s*\d+\b/.test(p))task.kinds.push('documents');
+      if(/\bjustificantes?\s+de\s+ingresos?|justificantes?\b/.test(p))task.kinds.push('income_receipts');
+      if(/\bfototickets?|tickets?\s+de\s+compra\b/.test(p))task.kinds.push('purchase_tickets');
+      if(/\b(faltan|sin\s+evidencia|evidencia\s+faltante)\b/.test(p))task.kinds.push('missing_evidence');
+      if(!task.kinds.length)task.kinds=['documents'];
+    }else if(domain==='management'){
+      task.filters.responsible=v29NearestMention(prompt,mentions,domainPattern.management,'person')||task.filters.responsible||'';
+      const asksPending=/\bpendientes?\b/.test(p),asksDone=/\b(cumplidas?|realizadas?|completadas?)\b/.test(p);task.filters.status=asksPending&&asksDone?'':(asksPending?'Pendiente':(asksDone?'Cumplida':task.filters.status||''));
+      task.kinds=/\bhitos?\b/.test(p)&&!/\b(?:lg|tareas?)\b/.test(p)?['hitos']:(/\b(?:lg|tareas?)\b/.test(p)&&!/\bhitos?\b/.test(p)?['tasks']:['hitos','tasks']);
+    }else if(domain==='bank'){
+      task.mode=/\b(tkxx|tickets?\s+justific|justifican?|abonos?|cargos?)\b/.test(p)?'links':((wantsChart||/\bmovimientos?\b/.test(p))?'movements':(/\bsaldo\s+bancario\s+final|saldo\s+final\s+bancario\b/.test(p)?'balance':'summary'));
+    }else if(domain==='metrics'){
+      task.metrics=[];
+      if(/\bingresos?\b/.test(p)&&!domains.includes('incomes'))task.metrics.push('income');
+      if(/\bcompras?\s+realizadas?|gastos?\s+realizados?\b/.test(p)&&!domains.includes('purchases'))task.metrics.push('purchases_realized');
+      if(/\bcompras?\s+pendientes?|pte\.?\s*compra\b/.test(p)&&!domains.includes('purchases'))task.metrics.push('purchases_pending');
+      if(/\bdonaciones?\b/.test(p)&&!domains.includes('donations'))task.metrics.push('donations');
+      if(/\bsaldo\s+actual\b/.test(p))task.metrics.push('current_balance');
+      if(/\bsaldo\s+operativo|\bsaldo\b/.test(p)&&!/\bsaldo\s+bancario\b/.test(p))task.metrics.push('operating_balance');
+      if(/\bvaloraci[oó]n\b/.test(p))task.metrics.push('valuation');
+      if(/\basistencia|asistentes\b/.test(p)&&!domains.includes('attendance'))task.metrics.push('attendance');
+      if(/\bprecio\b/.test(p))task.metrics.push('price');
+      if(!task.metrics.length&&prior?.metrics)task.metrics=arr(prior.metrics);
+    }
+    return task;
+  });
+  const applicable=!!inherited||domains.length>1||metricOnly||structuredCue||entityMention||!!productTerm||dims.segments.length||dims.destinations.length||domains.some(d=>['attendance','incomes','documents','management','bank'].includes(d));
+  return applicable?{domains,tasks,sort,limit,wantsChart,wantsTable,full,wantsOpinion,inherited,explicitCurrent,prompt}:null;
+}
+function v29ApplySortLimit(rows,sort='',limit=0,valueField=''){
+  let out=arr(rows).slice();
+  if(valueField&&sort==='desc')out.sort((a,b)=>num(b?.[valueField])-num(a?.[valueField])||text(a?.[Object.keys(a)[0]]).localeCompare(text(b?.[Object.keys(b)[0]]),'es'));
+  else if(valueField&&sort==='asc')out.sort((a,b)=>num(a?.[valueField])-num(b?.[valueField])||text(a?.[Object.keys(a)[0]]).localeCompare(text(b?.[Object.keys(b)[0]]),'es'));
+  if(limit>0)out=out.slice(0,limit);
+  return out;
+}
+function v29LocalTableResult(id,name,title,key,rows,schema,facts={}){
+  return{id,name,ok:true,title,facts,tables:[v26Table(key,title,rows,schema)]};
+}
+function v29GroupMoney(rows,keyField,valueField='Importe',extraBuilder=null){
+  const map=new Map();
+  for(const r of arr(rows)){
+    const key=trim(r?.[keyField])||`Sin ${keyField.toLowerCase()}`,g=map.get(key)||{[keyField]:key,'Nº registros':0,Importe:0,Unidades:0};
+    g['Nº registros']+=1;g.Importe+=num(r?.[valueField]);g.Unidades+=num(r?.Unidades);
+    if(extraBuilder)extraBuilder(g,r);map.set(key,g);
+  }
+  return[...map.values()].map(x=>({...x,Importe:v26Money(x.Importe),Unidades:round(x.Unidades,3)}));
+}
+async function v29ExecuteDonationTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
+  const src=await v29ToolEventDonationLines({id:'v29_plan_donation_source',name:'event_donation_lines',...ea,donor:trim(task?.filters?.donor),detail:'full'},state,selectedEventId);
+  let lines=arr(src?.tables).find(t=>t?.key==='donation_lines')?.rows||[];
+  const seg=trim(task?.filters?.segment),dest=trim(task?.filters?.destination),product=trim(task?.filters?.product);
+  if(product)lines=lines.filter(r=>norm(r?.Producto).includes(norm(product)));
+  if(seg)lines=lines.filter(r=>norm(r?.Segmento)===norm(seg));
+  if(dest)lines=lines.filter(r=>norm(r?.Destino)===norm(dest));
+  const donorMap=new Map(),prodMap=new Map();
+  for(const r of lines){
+    const dk=trim(r?.Donante)||'Sin donante',dg=donorMap.get(dk)||{Donante:dk,'Tipo donante':trim(r?.['Tipo donante'])||'Otro','Nº registros':0,'Productos distintos':new Set(),Unidades:0,Valor:0};
+    dg['Nº registros']++;dg['Productos distintos'].add(trim(r?.Producto));dg.Unidades+=num(r?.Unidades);dg.Valor+=num(r?.Valor);donorMap.set(dk,dg);
+    const pk=`${norm(dk)}|${norm(r?.Producto)}`,pg=prodMap.get(pk)||{Donante:dk,Producto:trim(r?.Producto)||'Sin producto',Segmento:trim(r?.Segmento),Destino:trim(r?.Destino),Unidades:0,Valor:0,'Nº registros':0};
+    pg.Unidades+=num(r?.Unidades);pg.Valor+=num(r?.Valor);pg['Nº registros']++;prodMap.set(pk,pg);
+  }
+  let donors=[...donorMap.values()].map(x=>({Donante:x.Donante,'Tipo donante':x['Tipo donante'],'Nº registros':x['Nº registros'],'Productos distintos':x['Productos distintos'].size,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)}));
+  donors=v29ApplySortLimit(donors,task.sort||'desc',task.limit,'Valor');
+  const allowedDonors=new Set(donors.map(r=>norm(r.Donante)));
+  let products=[...prodMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)}));
+  if(task.limit&&task.group==='donors')products=products.filter(r=>allowedDonors.has(norm(r.Donante)));
+  products=v29ApplySortLimit(products,task.sort||'desc',task.group==='products'?task.limit:0,'Valor');
+  lines=v29ApplySortLimit(lines,task.sort||'desc',task.group==='lines'?task.limit:0,'Valor');
+  const total=v26Money(lines.reduce((a,r)=>a+num(r?.Valor),0)),facts={event:src?.facts?.event||'',donor:trim(task?.filters?.donor),segment:seg,destination:dest,records:lines.length,donors:donorMap.size,total_value:total};
+  const tables=[];
+  if(task.group==='products'||task?.filters?.donor){
+    tables.push(v26Table('donor_products','Donaciones por donante y producto',products,{Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')}));
+    if(task.full||/\b(detalle|cada|registro|sin\s+resumir)\b/.test(norm(userPrompt)))tables.push(v26Table('donation_lines','Registros de donación',lines,{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema(),Valor:v26MoneySchema(),Responsable:v26TextSchema(),Tienda:v26TextSchema()}));
+  }else{
+    tables.push(v26Table('donors','Donantes',donors,{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()}));
+    if(task.includeProducts)tables.push(v26Table('donor_products','Qué donó cada donante seleccionado',products,{Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')}));
+  }
+  const local={id:'v29_plan_donations',name:'event_donation_lines',ok:true,title:`Donaciones · ${facts.event}`,facts,tables:tables.filter(t=>t.rows.length)};
+  const show=tables.filter(t=>t.rows.length).map(t=>({tool_id:local.id,table_key:t.key}));
+  const chartTable=tables.find(t=>t.key==='donors')||tables.find(t=>t.key==='donor_products'),chartSpecs=task.wantsChart&&chartTable?.rows?.length>=2?[{title:chartTable.key==='donors'?`Donantes · ${facts.event}`:`Productos donados · ${facts.donor||facts.event}`,type:'horizontalBar',tool_id:local.id,table_key:chartTable.key,label_field:chartTable.key==='donors'?'Donante':'Producto',value_field:'Valor',series_fields:[],unit:'€',allow_equal_values:true}]:[];
+  const filterText=[facts.donor&&`donante ${facts.donor}`,product&&`producto ${product}`,seg&&`segmento ${seg}`,dest&&`destino ${dest}`].filter(Boolean).join(', ');
+  const answer=`${facts.event}: ${v26CountPhrase(lines.length,'registro de donación','registros de donación')}${filterText?` para ${filterText}`:''}, por ${v26FormatEuro(total)}.${task.limit?` Se muestran los ${Math.min(task.limit,(task.group==='products'?products:donors).length)} primeros según el criterio solicitado.`:''}`;
+  return{results:[local],showTables:task.wantsChart&&!task.wantsTable?[]:show,chartSpecs,answer,resultContext:{domain:'donations',event:facts.event,filters:{donor:facts.donor,product,segment:seg,destination:dest},group:task.group,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecutePurchaseTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
+  const src=await v274ToolEventPurchaseLines({id:'v29_plan_purchase_source',name:'event_purchase_lines',...ea,store:trim(task?.filters?.store),status:'realized',detail:'full'},state,selectedEventId);
+  let lines=arr(src?.tables).find(t=>t?.key==='purchase_lines')?.rows||[];
+  const seg=trim(task?.filters?.segment),dest=trim(task?.filters?.destination),resp=trim(task?.filters?.responsible),product=trim(task?.filters?.product);
+  if(product)lines=lines.filter(r=>norm(r?.Producto).includes(norm(product)));
+  if(seg)lines=lines.filter(r=>norm(r?.Segmento)===norm(seg));
+  if(dest)lines=lines.filter(r=>norm(r?.Destino)===norm(dest));
+  if(resp)lines=lines.filter(r=>nameMatches(r?.Responsable,resp));
+  const publicLines=lines.map(r=>({Producto:trim(r?.Producto),Segmento:trim(r?.Segmento),Destino:trim(r?.Destino),Unidades:round(r?.Unidades,3),Precio:v26Money(r?.Precio),Importe:v26Money(r?.Importe),'Ticket u otros gastos':trim(r?.['Ticket u otros gastos']),Tienda:trim(r?.Tienda),Responsable:trim(r?.Responsable),Tipo:trim(r?.Tipo)}));
+  let tableRows=[],key='purchase_lines',schema={},labelField='Producto';
+  if(task.group==='store'||task.group==='responsible'||task.group==='product'||task.group==='ticket'){
+    const dim={store:'Tienda',responsible:'Responsable',product:'Producto',ticket:'Ticket u otros gastos'}[task.group];
+    tableRows=v29GroupMoney(publicLines,dim,'Importe');
+    tableRows=v29ApplySortLimit(tableRows,task.sort||'desc',task.limit,'Importe');key='ranking';labelField=dim;
+    schema={[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Importe:v26MoneySchema()};
+    if(/\bnombre\s+e\s+importe\b/.test(norm(userPrompt))&&dim==='Tienda'){tableRows=tableRows.map(r=>({Tienda:r.Tienda,Importe:r.Importe}));schema={Tienda:v26TextSchema(),Importe:v26MoneySchema()};}
+  }else{
+    tableRows=v29ApplySortLimit(publicLines,task.sort,task.limit,'Importe');schema={Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema(),Importe:v26MoneySchema(),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Tipo:v26StatusSchema()};
+  }
+  const total=v26Money(lines.reduce((a,r)=>a+num(r?.Importe),0)),event=src?.facts?.event||'';
+  const local=v29LocalTableResult('v29_plan_purchases','event_purchase_lines',`Compras · ${event}`,key,tableRows,schema,{event,records:lines.length,total_amount:total,store:trim(task?.filters?.store),segment:seg,destination:dest,responsible:resp});
+  const show=tableRows.length?[{tool_id:local.id,table_key:key}]:[];
+  const chartSpecs=task.wantsChart&&tableRows.length>=2?[{title:`Compras${task.group==='store'?' por tienda':task.group==='responsible'?' por responsable':task.group==='product'?' por producto':dest?` para ${dest}`:''} · ${event}`,type:'horizontalBar',tool_id:local.id,table_key:key,label_field:labelField,value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
+  const filters=[task?.filters?.store&&`tienda ${task.filters.store}`,resp&&`responsable ${resp}`,product&&`producto ${product}`,seg&&`segmento ${seg}`,dest&&`destino ${dest}`].filter(Boolean).join(', ');
+  const strictTwoCols=task.group==='store'&&/\b(?:solo|solamente|unicamente|nada\s+mas)\b/.test(norm(userPrompt))&&/\bnombre\b/.test(norm(userPrompt))&&/\bimporte\b/.test(norm(userPrompt));
+  const strictAnswer=strictTwoCols?tableRows.map((r,i)=>`${i+1}. ${r.Tienda}: ${v26FormatEuro(r.Importe)}`).join('\n'):'';
+  return{results:[local],showTables:strictTwoCols?[]:(task.wantsChart&&!task.wantsTable?[]:show),chartSpecs,answer:strictAnswer||`${event}: ${v26CountPhrase(lines.length,'registro de compra','registros de compra')}${filters?` para ${filters}`:''}, por ${v26FormatEuro(total)}.${task.limit?` Se aplica límite ${task.limit}.`:''}`,resultContext:{domain:'purchases',event,filters:{store:trim(task?.filters?.store),responsible:resp,product,segment:seg,destination:dest},group:task.group,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteIncomeTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v26ToolEventPeople({id:'v29_plan_income_source',name:'event_people',...ea,detail:'full'},state,selectedEventId);
+  let rows=arr(src?.tables).find(t=>t?.key==='people')?.rows||[];
+  const person=trim(task?.filters?.person);if(person)rows=rows.filter(r=>nameMatches(r?.Persona,person));
+  const event=src?.facts?.event||'',total=v26Money(rows.reduce((a,r)=>a+num(r?.['Importe total']),0));
+  let tableRows,key='people',schema,labelField='Persona';
+  if(task.group==='method'||task.group==='range'){
+    const dim=task.group==='method'?'Situación / forma registrada':'Rango',map=new Map();
+    for(const r of rows){const k=trim(r?.[dim])||`Sin ${dim.toLowerCase()}`,g=map.get(k)||{[dim]:k,'Nº registros':0,'Personas registradas':0,Importe:0};g['Nº registros']++;g['Personas registradas']+=num(r?.Número);g.Importe+=num(r?.['Importe total']);map.set(k,g);}
+    tableRows=[...map.values()].map(x=>({...x,'Personas registradas':round(x['Personas registradas'],3),Importe:v26Money(x.Importe)}));
+    if(task.group==='method'){
+      const pp=norm(userPrompt),requested=[['Banco',/\bbanco\b/],['Efectivo',/\befectivo\b/],['Bizum',/\bbizum\b/],['Pendiente',/\bpendientes?\b/]].filter(([,re])=>re.test(pp)).map(([name])=>name);
+      if(requested.length){const existing=new Map(tableRows.map(r=>[norm(r[dim]),r]));tableRows=requested.map(name=>existing.get(norm(name))||{[dim]:name,'Nº registros':0,'Personas registradas':0,Importe:0});}
+    }
+    tableRows=v29ApplySortLimit(tableRows,task.sort||'',task.limit,'Importe');key='income_group';labelField=dim;
+    schema={[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),'Personas registradas':v26CountSchema('personas'),Importe:v26MoneySchema()};
+  }else{
+    tableRows=rows.map(r=>({Persona:trim(r?.Persona),Rango:trim(r?.Rango),Número:round(r?.Número,3),'Situación / forma registrada':trim(r?.['Situación / forma registrada']),'Importe obligatorio':v26Money(r?.['Importe obligatorio']),'Ajuste voluntario':v26Money(r?.['Importe voluntario']),'Importe total':v26Money(r?.['Importe total'])}));
+    tableRows=v29ApplySortLimit(tableRows,task.sort,task.limit,'Importe total');
+    schema={Persona:v26TextSchema(),Rango:v26TextSchema(),Número:v26CountSchema('personas'),'Situación / forma registrada':v26TextSchema(),'Importe obligatorio':v26MoneySchema(),'Ajuste voluntario':v26MoneySchema(),'Importe total':v26MoneySchema()};
+  }
+  const local=v29LocalTableResult('v29_plan_incomes','event_people',`Ingresos · ${event}`,key,tableRows,schema,{event,records:rows.length,income_total:total});
+  const chartSpecs=task.wantsChart&&tableRows.length>=2?[{title:`Ingresos por ${labelField} · ${event}`,type:'horizontalBar',tool_id:local.id,table_key:key,label_field:labelField,value_field:task.group==='person'?'Importe total':'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
+  return{results:[local],showTables:task.wantsChart&&!task.wantsTable?[]:(tableRows.length?[{tool_id:local.id,table_key:key}]:[]),chartSpecs,answer:`${event}: ${v26CountPhrase(rows.length,'registro de ingreso','registros de ingreso')} por ${v26FormatEuro(total)}.`,resultContext:{domain:'incomes',event,filters:{person},group:task.group,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteAttendanceTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)throw new Error(rr.error);
+  const att=arr(buildCanonicalAttendance(state,[rr.id])?.porEvento)[0]||{},people=await v26ToolEventPeople({id:'v29_plan_attendance_people',name:'event_people',...ea,detail:'full'},state,selectedEventId),peopleRows=arr(people?.tables).find(t=>t?.key==='people')?.rows||[];
+  let base=[];
+  if(task.mode==='absent')base=arr(att?.sociosNoAsistentes).map(x=>({...x,rango:'SOCIO'}));
+  else base=[...arr(att?.sociosAsistentes).map(x=>({...x,rango:'SOCIO'})),...arr(att?.noSociosAsistentes).map(x=>({...x,rango:'NO SOCIO'}))];
+  if(task?.filters?.range)base=base.filter(x=>norm(x.rango)===norm(task.filters.range));
+  let rows=base.map(a=>{const m=v29AttendanceIncomeMatch(a,peopleRows),r=m.row||{},row={Asistente:trim(a?.nombre),Rango:a.rango,Personas:num(a?.personas)||1};if(task.withPayment){row['Registro económico']=trim(r?.Persona)||'Sin registro económico';row['Situación / forma registrada']=trim(r?.['Situación / forma registrada']);row['Importe total registrado']=v26Money(r?.['Importe total']||0);row.Observación=m.shared?'Importe de registro compartido de pareja; no atribuir íntegramente a un solo miembro.':(!m.row?'Asistente canónico sin registro económico localizado.':'');}return row;});
+  if(task.mode==='unpaid')rows=rows.filter(r=>num(r?.['Importe total registrado'])<=0.004);
+  rows=v29ApplySortLimit(rows,task.sort,task.limit,task.withPayment?'Importe total registrado':'Personas');
+  const schema=task.withPayment?{Asistente:v26TextSchema(),Rango:v26TextSchema(),Personas:v26CountSchema('personas'),'Registro económico':v26TextSchema(),'Situación / forma registrada':v26TextSchema(),'Importe total registrado':v26MoneySchema(),Observación:v26TextSchema()}:{Asistente:v26TextSchema(),Rango:v26TextSchema(),Personas:v26CountSchema('personas')};
+  const local=v29LocalTableResult('v29_plan_attendance','event_people',task.mode==='absent'?`Socios no asistentes · ${rr.nombre}`:task.mode==='unpaid'?`Asistentes sin cuota pagada · ${rr.nombre}`:`Asistentes · ${rr.nombre}`,'attendance',rows,schema,{event:rr.nombre,total:rows.reduce((a,r)=>a+num(r.Personas),0),mode:task.mode,criterion:trim(att?.criterio)});
+  const totalPeople=rows.reduce((a,r)=>a+num(r.Personas),0);
+  return{results:[local],showTables:rows.length?[{tool_id:local.id,table_key:'attendance'}]:[],chartSpecs:[],answer:`${rr.nombre}: ${v26CountPhrase(totalPeople,'persona','personas')} en el conjunto solicitado según asistencia canónica.${task.mode==='unpaid'?' El cruce con ingresos se hace después de determinar asistencia; una cuota 0 no convierte a nadie en no asistente.':''}`,resultContext:{domain:'attendance',event:rr.nombre,filters:{range:task?.filters?.range||''},mode:task.mode,withPayment:task.withPayment,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteDocumentTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v26ToolEventDocumentation({id:'v29_plan_documents_source',name:'event_documentation',...ea,detail:'full'},state,selectedEventId),event=src?.facts?.event||'',tables=[];
+  for(const kind of arr(task.kinds)){
+    const t=arr(src?.tables).find(x=>x?.key===kind);if(!t)continue;
+    if(kind==='documents'){let rows=arr(t.rows).map(r=>({Documento:trim(r?.Documento),Fecha:trim(r?.Fecha),Descripción:trim(r?.Descripción),Adjunto:trim(r?.Adjunto)}));if(/\bfecha\s+y\s+descripci[oó]n\b/.test(norm(userPrompt)))rows=rows.map(r=>({Documento:r.Documento,Fecha:r.Fecha,Descripción:r.Descripción}));tables.push(v26Table('documents',`Documentos del evento · ${event}`,rows,{Documento:v26TextSchema(),Fecha:v26DateSchema(),Descripción:v26TextSchema(),...(rows[0]&&'Adjunto'in rows[0]?{Adjunto:v26StatusSchema()}:{})}));}
+    else if(kind==='income_receipts'){const rows=arr(t.rows).map(r=>({Persona:trim(r?.Persona),'Forma/estado':trim(r?.['Forma/estado']),Justificante:trim(r?.Justificante)}));tables.push(v26Table('income_receipts','Justificantes de ingresos',rows,{Persona:v26TextSchema(),'Forma/estado':v26TextSchema(),Justificante:v26StatusSchema()}));}
+    else if(kind==='purchase_tickets'){tables.push(v26Table('purchase_tickets','Tickets/fototickets de compra',arr(t.rows).map(r=>({TKxx:trim(r?.TKxx),Ticket:trim(r?.Ticket),'Registros de compra':num(r?.['Registros de compra']),Importe:v26Money(r?.Importe)})),{TKxx:v26TextSchema(),Ticket:v26StatusSchema(),'Registros de compra':v26CountSchema('registros'),Importe:v26MoneySchema()}));}
+    else if(kind==='missing_evidence'){const rows=arr(t.rows).map(r=>({Tipo:trim(r?.Tipo),Detalle:trim(r?.Detalle),Falta:trim(r?.Falta)}));tables.push(v26Table('missing_evidence','Elementos sin evidencia documental',rows,{Tipo:v26TextSchema(),Detalle:v26TextSchema(),Falta:v26StatusSchema()}));}
+  }
+  const local={id:'v29_plan_documents',name:'event_documentation',ok:true,title:`Documentación · ${event}`,facts:{event,...(src?.facts||{})},tables:tables.filter(t=>t.rows.length)};
+  const counts=local.tables.map(t=>`${t.rows.length} ${t.key==='documents'?'documentos':t.key==='income_receipts'?'registros de justificante':t.key==='purchase_tickets'?'tickets':'elementos sin evidencia'}`).join(', ');
+  return{results:[local],showTables:local.tables.map(t=>({tool_id:local.id,table_key:t.key})),chartSpecs:[],answer:`${event}: ${counts||'no hay registros para el tipo documental solicitado'}. Se muestra únicamente el ámbito documental pedido.`,resultContext:{domain:'documents',event,kinds:arr(task.kinds),sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteManagementTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v261EventManagementTool({id:'v29_plan_management_source',name:'event_management',...ea,detail:'full'},state,selectedEventId),event=src?.facts?.event||'',tables=[];
+  if(arr(task.kinds).includes('hitos')){const t=arr(src?.tables).find(x=>x?.key==='hitos');if(t){let rows=arr(t.rows);const resp=trim(task?.filters?.responsible);if(resp)rows=rows.filter(r=>nameMatches(r?.Responsable,resp));tables.push(v26Table('hitos',`Hitos · ${event}`,rows,{Hito:v26TextSchema(),Descripción:v26TextSchema(),Responsable:v26TextSchema(),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),'Tareas LG':v26CountSchema('tareas')}));}}
+  if(arr(task.kinds).includes('tasks')){const t=arr(src?.tables).find(x=>x?.key==='tasks');if(t){let rows=arr(t.rows),resp=trim(task?.filters?.responsible),status=trim(task?.filters?.status);if(resp)rows=rows.filter(r=>nameMatches(r?.Responsable,resp));if(status)rows=rows.filter(r=>norm(r?.Estado)===norm(status));rows=v29ApplySortLimit(rows,task.sort,task.limit,'');tables.push(v26Table('tasks',`Tareas LG${status?` ${status.toLowerCase()}s`:''}${resp?` · ${resp}`:''} · ${event}`,rows,{Hito:v26TextSchema(),Tarea:v26TextSchema(),Responsable:v26TextSchema(),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),Estado:v26StatusSchema(),Notas:v26TextSchema()}));}}
+  const local={id:'v29_plan_management',name:'event_management',ok:true,title:`Gestión · ${event}`,facts:{event,...(src?.facts||{})},tables:tables.filter(t=>t.rows.length)};
+  const taskTable=tables.find(t=>t.key==='tasks'),hitoTable=tables.find(t=>t.key==='hitos'),resp=trim(task?.filters?.responsible),status=trim(task?.filters?.status);
+  const taskCount=taskTable?taskTable.rows.length:0,hitoCount=hitoTable?hitoTable.rows.length:0,doneCount=taskTable?taskTable.rows.filter(r=>norm(r?.Estado)==='cumplida').length:0,pendingCount=taskTable?taskTable.rows.filter(r=>norm(r?.Estado)==='pendiente').length:0;
+  const statusBreakdown=!status&&taskTable?` Cumplidas: ${doneCount}; pendientes: ${pendingCount}.`:'';
+  let countText='';
+  if(hitoTable&&taskTable)countText=`${v26CountPhrase(hitoCount,'hito','hitos')} y ${v26CountPhrase(taskCount,status==='Pendiente'?'tarea LG pendiente':'tarea LG',status==='Pendiente'?'tareas LG pendientes':'tareas LG')}`;
+  else if(hitoTable)countText=v26CountPhrase(hitoCount,'hito','hitos');
+  else countText=v26CountPhrase(taskCount,status==='Pendiente'?'tarea pendiente':status==='Cumplida'?'tarea cumplida':'elemento de gestión',status==='Pendiente'?'tareas pendientes':status==='Cumplida'?'tareas cumplidas':'elementos de gestión');
+  return{results:[local],showTables:local.tables.map(t=>({tool_id:local.id,table_key:t.key})),chartSpecs:[],answer:`${event}: ${countText}${resp?` para ${resp}`:''}.${statusBreakdown}${status==='Pendiente'&&taskCount===0?' No se muestran tareas cumplidas porque no fueron solicitadas.':''}`,resultContext:{domain:'management',event,filters:{responsible:resp,status},kinds:arr(task.kinds),sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteMetricTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v26ToolEventDossier({id:'v29_plan_metrics_source',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId),f=src?.facts||{},metrics=arr(task.metrics).length?arr(task.metrics):['income','purchases_realized','purchases_pending','donations','operating_balance','valuation'],rows=[];
+  const add=(Dato,Valor)=>rows.push({Dato,Valor});
+  for(const m of metrics){
+    if(m==='income')add('Ingresos',v26FormatEuro(f.income_total||0));
+    else if(m==='purchases_realized')add('Compras realizadas',v26FormatEuro(f.purchases_realized||0));
+    else if(m==='purchases_pending')add('Compras pendientes',v26FormatEuro(f.purchases_pending||0));
+    else if(m==='donations')add('Donaciones valoradas',v26FormatEuro(f.donations_value||0));
+    else if(m==='current_balance')add('Saldo actual',v26FormatEuro(num(f.income_total)-num(f.purchases_realized)));
+    else if(m==='operating_balance')add('Saldo operativo',v26FormatEuro(f.operating_balance||0));
+    else if(m==='valuation')add('Valoración del evento',v26FormatEuro(f.event_valuation||0));
+    else if(m==='attendance')add('Asistentes canónicos',String(num(f.attendees_canonical||0)));
+    else if(m==='price')add('Precio por socio',v26FormatEuro(f.price||0));
+  }
+  const local=v29LocalTableResult('v29_plan_metrics','event_dossier',`Datos solicitados · ${f.event||''}`,'metrics',rows,{Dato:v26TextSchema(),Valor:v26TextSchema()},{event:f.event});
+  return{results:[local],showTables:rows.length>1?[{tool_id:local.id,table_key:'metrics'}]:[],chartSpecs:[],answer:`${f.event||'Evento'}: ${rows.map(r=>`${r.Dato.toLowerCase()} ${r.Valor}`).join('; ')}.`,resultContext:{domain:'metrics',event:f.event,metrics,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecuteBankTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v261EventBankTool({id:'v29_plan_bank_source',name:'event_bank',...ea,detail:'full'},state,selectedEventId),f=src?.facts||{},tables=[],charts=[];
+  if(task.mode==='links'){
+    const t=arr(src?.tables).find(x=>x?.key==='reconciliation_timeline')||arr(src?.tables).find(x=>x?.key==='event_window_timeline');
+    const pp=norm(userPrompt),onlyCharges=/\b(cargos?|tkxx|tickets?)\b/.test(pp)&&!/\babonos?|ingresos?\s+vinculad/.test(pp),onlyIncome=/\babonos?\b/.test(pp)&&!/\bcargos?|tkxx|tickets?\b/.test(pp);
+    let rows=arr(t?.rows);if(onlyCharges)rows=rows.filter(r=>norm(r?.Tipo)==='cargo');if(onlyIncome)rows=rows.filter(r=>norm(r?.Tipo)==='ingreso');
+    rows=rows.map(r=>({Momento:trim(r?.Momento||r?.Fecha),Tipo:trim(r?.Tipo),Movimiento:v26Money(r?.Movimiento),Concepto:trim(r?.Concepto),Justificación:trim(r?.Justificación)||'Sin vínculo justificativo registrado'}));
+    tables.push(v26Table('bank_links',`Justificación de movimientos bancarios · ${f.event||''}`,rows,{Momento:v26TextSchema(),Tipo:v26StatusSchema(),Movimiento:v26MoneySchema(),Concepto:v26TextSchema(),Justificación:v26TextSchema()}));
+  }else if(task.mode==='movements'){
+    const t=arr(src?.tables).find(x=>x?.key==='reconciliation_timeline')||arr(src?.tables).find(x=>x?.key==='event_window_timeline');
+    const rows=arr(t?.rows).map(r=>({Momento:trim(r?.Momento||r?.Fecha),Tipo:trim(r?.Tipo),Movimiento:v26Money(r?.Movimiento),Concepto:trim(r?.Concepto),'Saldo bancario':v26Money(r?.['Saldo bancario del periodo']),Justificación:trim(r?.Justificación||r?.Evidencia)||'Sin vínculo justificativo registrado'}));
+    tables.push(v26Table('bank_movements',`Movimientos bancarios incluidos · ${f.event||''}`,v29ApplySortLimit(rows,task.sort,task.limit,'Movimiento'),{Momento:v26TextSchema(),Tipo:v26StatusSchema(),Movimiento:v26MoneySchema(),Concepto:v26TextSchema(),'Saldo bancario':v26MoneySchema(),Justificación:v26TextSchema()}));
+    if(task.wantsChart&&rows.length>=2)charts.push({title:`Evolución bancaria · ${f.event||''}`,type:'line',tool_id:'v29_plan_bank',table_key:'bank_movements',label_field:'Momento',value_field:'Saldo bancario',series_fields:[],marker_field:'Tipo',point_label_fields:['Movimiento','Concepto','Saldo bancario','Justificación'],unit:'€'});
+  }else{
+    const rows=[{Dato:'Saldo bancario inicial',Valor:v26FormatEuro(f.opening_balance||0)},{Dato:'Saldo bancario final',Valor:v26FormatEuro(f.closing_balance||0)},{Dato:'Impacto movimientos incluidos',Valor:v26FormatEuro(f.bank_impact||0)},{Dato:'Movimientos incluidos',Valor:String(num(f.included_movement_count||0))},{Dato:'Movimientos sin vínculo justificativo',Valor:String(num(f.unlinked_movement_count||0))}];
+    tables.push(v26Table('bank_summary',`Resumen bancario · ${f.event||''}`,rows,{Dato:v26TextSchema(),Valor:v26TextSchema()}));
+  }
+  const local={id:'v29_plan_bank',name:'event_bank',ok:true,title:`Banco · ${f.event||''}`,facts:f,tables:tables.filter(t=>t.rows.length)};
+  return{results:[local],showTables:local.tables.map(t=>({tool_id:local.id,table_key:t.key})),chartSpecs:charts,answer:`${f.event||'Evento'}: ${v26CountPhrase(f.included_movement_count||0,'movimiento bancario incluido','movimientos bancarios incluidos')}; saldo bancario final ${v26FormatEuro(f.closing_balance||0)}; impacto ${v26FormatEuro(f.bank_impact||0)}.${num(f.unlinked_movement_count)>0?` Hay ${f.unlinked_movement_count} movimientos incluidos sin vínculo justificativo registrado.`:''}`,resultContext:{domain:'bank',event:f.event,mode:task.mode,sort:task.sort,limit:task.limit}};
+}
+async function v29ExecutePersonContextTransform(ctx,{userPrompt,state,selectedEventId,conversationHistory,flowTrace}){
+  const person=trim(ctx?.subject);if(!person)return null;
+  const dossier=await v26ToolPersonDossier({id:'v29_plan_person_context',name:'person_dossier',person,scope:'all_events',status:'all',detail:'standard'},state);
+  const p=norm(userPrompt),results=[dossier],showTables=[],chartSpecs=[];
+  if(/\btabla|detalle|datos\b/.test(p)){const key=arr(dossier?.tables).find(t=>t?.key==='participation')?'participation':trim(dossier?.tables?.[0]?.key);if(key)showTables.push({tool_id:dossier.id,table_key:key});}
+  if(/\bgr[aá]fic\w*|visualiz\w*\b/.test(p)){
+    const incomes=v29AggregateMoneyByEvent(arr(dossier?.tables).find(t=>t?.key==='incomes')?.rows||[],'Importe'),donations=v29AggregateMoneyByEvent(arr(dossier?.tables).find(t=>t?.key==='donations')?.rows||[],'Importe'),tabs=[];
+    if(incomes.length)tabs.push(v26Table('income_by_event',`Ingresos vinculados a ${person} por evento`,incomes,{Evento:v26TextSchema(),Importe:v26MoneySchema()}));
+    if(donations.length)tabs.push(v26Table('donations_by_event',`Donaciones vinculadas a ${person} por evento`,donations,{Evento:v26TextSchema(),Importe:v26MoneySchema()}));
+    if(tabs.length){const r={id:'v29_plan_person_charts',name:'person_dossier',ok:true,title:`Gráficas · ${person}`,facts:{person},tables:tabs};results.push(r);if(incomes.length>=2)chartSpecs.push({title:`Ingresos de ${person} por evento`,type:'horizontalBar',tool_id:r.id,table_key:'income_by_event',label_field:'Evento',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});if(donations.length>=2)chartSpecs.push({title:`Donaciones de ${person} por evento`,type:'horizontalBar',tool_id:r.id,table_key:'donations_by_event',label_field:'Evento',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});}
+  }
+  return{results,showTables,chartSpecs,answer:`Mantengo el sujeto de la conversación: ${person}. La transformación se aplica a sus datos canónicos, no a los eventos mencionados incidentalmente.`,resultContext:{domain:'person',subject:person,focus:ctx?.focus||'participation'}};
+}
+async function v29ExecuteStructuredPlan(plan,{userPrompt,state,selectedEventId,conversationHistory,flowTrace}){
+  const run=async task=>{
+    if(task.domain==='donations')return v29ExecuteDonationTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='purchases')return v29ExecutePurchaseTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='incomes')return v29ExecuteIncomeTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='attendance')return v29ExecuteAttendanceTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='documents')return v29ExecuteDocumentTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='management')return v29ExecuteManagementTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='metrics')return v29ExecuteMetricTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    if(task.domain==='bank')return v29ExecuteBankTask(task,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+    return null;
+  };
+  // Las subpeticiones son lecturas independientes: se ejecutan en paralelo y se conserva
+  // el orden semántico del plan al materializar la respuesta.
+  return (await Promise.all(arr(plan?.tasks).map(run))).filter(Boolean);
+}
+function v29CoverageLabels(plan,outputs){
+  const done=new Set(outputs.map(x=>trim(x?.resultContext?.domain)));return arr(plan?.domains).filter(d=>!done.has(d));
+}
+function v29DeterministicDifferenceExplanation(plan,outputs){
+  const domains=new Set(arr(plan?.domains));if(!domains.has('bank')||!domains.has('metrics'))return'';
+  const p=norm(plan?.prompt);if(!/\b(diferencia|explica|expl[ií]came|por\s+que|por\s+qué)\b/.test(p))return'';
+  return 'El saldo operativo pertenece a la economía del evento (ingresos menos gastos previstos según ControlEvent). El saldo bancario final pertenece a la cuenta bancaria tras los movimientos incluidos en el periodo conciliado. Tienen bases distintas y no deben tratarse como la misma magnitud.';
+}
+async function v29DirectStructuredPlannerQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const lastCtx=v29LastResultContext(conversationHistory);
+  if(!v29ExplicitDomains(userPrompt).length&&lastCtx?.domain==='person'&&v29StructuredTransformCue(userPrompt)){
+    const out=await v29ExecutePersonContextTransform(lastCtx,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});if(!out)return null;
+    return v281LocalResponse({title:`${/\bgr[aá]fic/.test(norm(userPrompt))?'Gráficas':'Datos'} · ${lastCtx.subject}`,answer:out.answer,results:out.results,showTables:out.showTables,chartSpecs:out.chartSpecs,flowTrace,previousInteractionId,resultContext:out.resultContext});
+  }
+  const plan=v29StructuredPlan(state,userPrompt,conversationHistory);if(!plan)return null;
+  const outputs=await v29ExecuteStructuredPlan(plan,{userPrompt,state,selectedEventId,conversationHistory,flowTrace});if(!outputs.length)return null;
+  const missing=v29CoverageLabels(plan,outputs),results=outputs.flatMap(x=>arr(x.results)),showTables=outputs.flatMap(x=>arr(x.showTables)),chartSpecs=outputs.flatMap(x=>arr(x.chartSpecs)),warnings=[];
+  if(missing.length){warnings.push(`ControlEvent no pudo materializar estas partes solicitadas: ${missing.join(', ')}.`);zuzuTracePush(flowTrace,'v29 · Cobertura de petición','WARN',`Faltan dominios: ${missing.join(', ')}`);}
+  else zuzuTracePush(flowTrace,'v29 · Cobertura de petición','OK',`${outputs.length}/${plan.domains.length} dominios solicitados materializados: ${plan.domains.join(', ')}.`);
+  let answer=outputs.map(x=>trim(x.answer)).filter(Boolean).join('\n\n');
+  const diff=v29DeterministicDifferenceExplanation(plan,outputs);if(diff)answer+=`\n\n${diff}`;
+  const resultCtx=outputs.length===1?outputs[0].resultContext:{domain:'multi',tasks:outputs.map(x=>x.resultContext),event:outputs.map(x=>trim(x?.resultContext?.event)).find(Boolean)||'',sort:plan.sort,limit:plan.limit};
+  let result=v281LocalResponse({title:outputs.length>1?'Respuesta completa de ControlEvent':trim(results[0]?.title)||'Respuesta de ControlEvent',answer,warnings,results,showTables,chartSpecs,flowTrace,previousInteractionId,traceDirect:!plan.wantsOpinion,resultContext:resultCtx});
+  if(plan.wantsOpinion){
+    let dossier=null;try{const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);dossier=await v26ToolEventDossier({id:'v29_plan_opinion_dossier',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId);}catch(_){}
+    const analystResults=[...results,...(dossier?[dossier]:[])],prefetch={kind:'opinion',event:trim(dossier?.facts?.event)||trim(resultCtx?.event)||'evento actual',results:analystResults,broadGraphical:false};
+    let opinion='';try{opinion=(await v2853CallPlainAnalyst({userPrompt,prefetch,conversationHistory,flowTrace})).answer;}catch(_){opinion='';}
+    if(opinion){
+      const repaired=v283DeterministicSafetyRepair({answer:opinion,warnings:[]},analystResults,conversationHistory);result.answer=`${answer}\n\n${trim(repaired.answer)}`;
+    }
+    const usage=summarizeGeminiUsageFromTrace(flowTrace);result.provider='control-event-v29-transactional+plain-analyst';result.model='gemini-plain-analyst';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional -> CE ejecuta todo -> 1 Gemini solo para opinión',resultContext:resultCtx,debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);
+    zuzuTracePush(flowTrace,'v29 · Disciplina de coste','OK',`Datos y transformaciones resueltos por CE; opinión con ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${num(usage.costEurApprox).toFixed(6)} €.`);
+  }
+  return result;
+}
+async function v29DirectPersonNarrativeQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
+  const p=norm(userPrompt),people=v26PersonHintsFromPrompt(userPrompt,state);
+  if(!people.length||!/\b(hablame|háblame|cuentame|cuéntame|dime\s+sobre|informaci[oó]n\s+(?:de|sobre)|que\s+sabes\s+de|qué\s+sabes\s+de)\b/.test(p))return null;
+  if(v29ExplicitDomains(userPrompt).length)return null;
+  const person=people[0],dossier=await v26ToolPersonDossier({id:'v29_person_narrative',name:'person_dossier',person,scope:'all_events',status:'all',detail:'standard'},state);
+  const prefetch={kind:'person',event:`Persona: ${person}`,results:[dossier],broadGraphical:false};
+  let answer='',model='';try{const r=await v2853CallPlainAnalyst({userPrompt,prefetch,conversationHistory,flowTrace});answer=r.answer;model=r.model;}catch(_){answer=`ControlEvent ha recuperado el dossier canónico de ${person}.`;}
+  const repaired=v283DeterministicSafetyRepair({answer,warnings:[]},[dossier],conversationHistory),result=v281LocalResponse({title:`${person}`,answer:repaired.answer,results:[dossier],flowTrace,traceDirect:false,resultContext:{domain:'person',subject:person,focus:'participation'}});
+  const usage=summarizeGeminiUsageFromTrace(flowTrace);result.provider='gemini-plain-person-v29';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,resultContext:{domain:'person',subject:person,focus:'participation'},architecture:'Dossier personal CE -> 1 Gemini texto plano',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);return result;
+}
+
 async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
   const p=norm(userPrompt),dataReq=v274DataAccessRequirement(userPrompt,conversationHistory);
   if(dataReq.accessRestricted&&/\b(catalogo|catálogo|lista|tabla|todos|todas)\b/.test(p)){
     return v281LocalResponse({title:'Información restringida',answer:'Los catálogos de negocio no restringidos sí son consultables, pero ACCESO, usuarios de acceso, credenciales, contraseñas y tokens quedan fuera de las herramientas de Zuzu.',flowTrace,previousInteractionId});
   }
+
+  // v29_prod · el planificador transaccional estricto tiene prioridad sobre rutas
+  // históricas de primera coincidencia. Una pregunta compuesta debe completar TODAS
+  // sus partes antes de considerar Gemini.
+  const strictPlanned=await v29DirectStructuredPlannerQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
+  if(strictPlanned)return strictPlanned;
+  const personNarrative=await v29DirectPersonNarrativeQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+  if(personNarrative)return personNarrative;
 
   const compound=await v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
   if(compound)return compound;
@@ -9081,7 +9560,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
   const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
-    user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null
+    user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
   const direct=await v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory:safeHistory,flowTrace,previousInteractionId:''});
   if(direct)return direct;
