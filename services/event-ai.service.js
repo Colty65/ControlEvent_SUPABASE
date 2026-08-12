@@ -6363,7 +6363,7 @@ async function v29ToolEventDonationLines(tool,state,selectedEventId=''){
   return{id:tool.id,name:tool.name,ok:true,title:`Detalle de donaciones · ${rr.nombre}`,facts:{event:rr.nombre,donor:donor||'',donation_record_count:rows.length,donor_count:byDonor.length,product_count:new Set(rows.map(r=>norm(r.Producto)).filter(Boolean)).size,total_value:total,detail_semantics:'Cada registro DONADO SOCIO/TIENDA/OTROS conserva el donante literal humanizado. donor_ref P: se resuelve contra PERSONAS y T: contra TIENDAS.'},provenance:'ControlEvent · ce_compras DONADO + catálogos humanizados',tables:[
     v26Table('donors',`Donantes · ${rr.nombre}`,byDonor,{Donante:v26TextSchema('Persona, tienda u otra entidad donante'),'Tipo donante':v26TextSchema('Persona/Tienda/Otro'),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Valor:v26MoneySchema('Valor total donado')}),
     v26Table('donor_products',`Donaciones por donante y producto · ${rr.nombre}`,byDonorProduct,{Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')}),
-    v26Table('donation_lines',`Registros de donación · ${rr.nombre}`,rows,{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema(),Creado:v26DateSchema(),Actualizado:v26DateSchema()}),
+    v26Table('donation_lines',`Registros de donación · ${rr.nombre}`,rows.map(r=>({Donante:r.Donante,'Tipo donante':r['Tipo donante'],'Tipo de donación':r['Tipo de donación'],Producto:r.Producto,Segmento:r.Segmento,Destino:r.Destino,Unidades:r.Unidades,Precio:r.Precio,Valor:r.Valor,Responsable:r.Responsable,Tienda:r.Tienda})),{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema()}),
     v26Table('donations_by_segment_destination',`Donaciones por Segmento/Destino · ${rr.nombre}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})
   ].filter(t=>t.rows.length)};
 }
@@ -7555,10 +7555,10 @@ function v274DataAccessRequirement(prompt='',history=[]){
   const exactPurchaseLines=/\b(registro|linea|línea|ticket|tkxx|responsable|cada\s+compra|pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p);
   const purchaseStatus=/\b(pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p)?'pending':(/\b(todas?\s+las\s+compras|compras?\s+realizadas?\s+y\s+pendientes?)\b/.test(p)?'all':'realized');
   const donationCue=/\b(donaci[oó]n|donaciones|donado|donados|donante|donantes)\b/.test(p);
-  const donationDetail=donationCue&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fica|grafica)\b/.test(p)||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
+  const donationDetail=donationCue&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fic\w*)\b/.test(p)||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
   const donorRanking=donationCue&&/\b(lista|listado|ranking|top|donantes|quien|quién|quienes|quiénes|mayor|menor|m[aá]s|menos)\b/.test(p);
   const donationExactLines=donationCue&&(/\b(detalle|detallad|cada|producto|productos|unidades|precio|valor|importe)\b/.test(p)||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
-  const purchaseStructured=/\b(compra|compras|comprado|comprados|gasto|gastos)\b/.test(p)&&/\b(lista|listado|ranking|top|detalle|detallad|cada|tienda|tiendas|responsable|responsables|producto|productos|ticket|tkxx|gr[aá]fica|grafica|quien|quién|quienes|quiénes)\b/.test(p);
+  const purchaseStructured=/\b(compra|compras|comprado|comprados|gasto|gastos)\b/.test(p)&&/\b(lista|listado|ranking|top|detalle|detallad|cada|tienda|tiendas|responsable|responsables|producto|productos|ticket|tkxx|gr[aá]fic\w*|quien|quién|quienes|quiénes)\b/.test(p);
   return{catalogEntity,purchaseDetail,accessRestricted,catalogWithEvent,followUpTransform,groupSegmentDestination,tableOnly,exactPurchaseLines,purchaseStatus,donationDetail,donorRanking,donationExactLines,purchaseStructured};
 }
 function v261AgentTools(){
@@ -8232,7 +8232,11 @@ async function v281PrefetchEventAnalysis({userPrompt,state,selectedEventId,conve
   // v29_prod: cada tipo de razonamiento recibe el MÍNIMO conjunto de fuentes.
   // Opinión general = dossier; ingresos+banco = people+bank; informe gráfico = dossier+bank.
   let defs;
-  if(kind==='opinion')defs=[{id:'v2852_prefetch_dossier',name:'event_dossier',...ea,detail:'brief'}];
+  if(kind==='opinion'){
+    defs=[{id:'v2852_prefetch_dossier',name:'event_dossier',...ea,detail:'brief'}];
+    if(/\b(banco|bancari|concili|cuadre|tesorer|saldo\s+bancari)\b/.test(p))defs.push({id:'v29_prefetch_opinion_bank',name:'event_bank',...ea,detail:'brief'});
+    if(/\b(compra|compras|donaci[oó]n|donaciones|donantes?|tiendas?|productos?)\b/.test(p))defs.push({id:'v29_prefetch_opinion_breakdowns',name:'event_breakdowns',...ea,detail:'brief'});
+  }
   else if(kind==='income_bank')defs=[
     {id:'v2852_prefetch_people',name:'event_people',...ea,detail:'brief'},
     {id:'v2852_prefetch_bank',name:'event_bank',...ea,detail:'brief'}
@@ -8272,7 +8276,7 @@ function v281PrefetchInput(userPrompt,prefetch){
 // Si Gemini falla, CE conserva la respuesta útil con hechos canónicos y nunca muestra un error técnico al usuario.
 function v2853PlainAnalystSystemInstruction(kind='analysis'){
   const role=kind==='executive'?'un analista ejecutivo y financiero':kind==='opinion'?'un analista que emite una opinión fundada':kind==='income_bank'?'un analista de ingresos y conciliación bancaria':'un analista de gestión de eventos';
-  return `Eres Zuzu, ${role} dentro de ControlEvent. Responde SOLO con texto final en español, listo para mostrar al usuario. No devuelvas JSON, código, claves internas, IDs, nombres de tablas ni instrucciones para el renderizador. Los datos recibidos son hechos canónicos ya calculados por ControlEvent: no inventes cifras ni causas, no recalcules importes salvo operaciones evidentes, y distingue hechos de inferencias. Si un motivo no consta, dilo. Sé útil y concreto; normalmente 2-6 párrafos breves. No prometas tablas o gráficas: ControlEvent las materializa aparte si se han pedido.`;
+  return `Eres Zuzu, ${role} dentro de ControlEvent. Responde SOLO con texto final en español, listo para mostrar al usuario. No devuelvas JSON, código, claves internas, IDs, nombres de tablas ni instrucciones para el renderizador. Los datos recibidos son hechos canónicos ya calculados por ControlEvent: no inventes cifras ni causas, no recalcules importes salvo operaciones evidentes, y distingue hechos de inferencias. Si un motivo no consta, dilo. Mantén separados los conceptos: saldo operativo del evento, saldo bancario de la cuenta e impacto de los movimientos NO son la misma magnitud; no uses uno como prueba del otro. Sé útil y concreto; normalmente 2-6 párrafos breves. No prometas tablas o gráficas: ControlEvent las materializa aparte si se han pedido.`;
 }
 function v2853PlainAnalystInput(userPrompt,prefetch,conversationHistory=[]){
   const compact=prefetch?.results?.map(r=>v261CompactToolResult(r,'brief'))||[];
@@ -8745,29 +8749,67 @@ async function v29DirectDonationQuery({userPrompt,state,selectedEventId,conversa
 }
 async function v29DirectPurchaseEntityQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId='',dataReq={}}){
   const p=norm(userPrompt);if(!/\b(compra|compras|comprado|comprados|gasto|gastos)\b/.test(p))return null;
+  if(v281TicketToken(userPrompt))return null;
   const mentions=v29CatalogEntityMentions(state,userPrompt),store=mentions.stores[0]||'',person=mentions.people[0]||'';if(!dataReq.purchaseStructured&&!store&&!person)return null;
   const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
   const res=await v274ToolEventPurchaseLines({id:'v29_direct_purchase_entities',name:'event_purchase_lines',...ea,store,status:dataReq.purchaseStatus||'realized',detail:'full'},state,selectedEventId);
-  let rows=arr(res?.tables).find(t=>t?.key==='purchase_lines')?.rows||[];if(person)rows=rows.filter(r=>nameMatches(r?.Responsable,person));
-  const dim=/\bresponsable|responsables\b/.test(p)?'Responsable':/\btienda|tiendas|proveedor|proveedores\b/.test(p)?'Tienda':/\bproducto|productos\b/.test(p)?'Producto':/\bticket|tkxx\b/.test(p)?'Ticket u otros gastos':'';
+  const sourceRows=arr(res?.tables).find(t=>t?.key==='purchase_lines')?.rows||[];
+  let rows=sourceRows.slice();if(person)rows=rows.filter(r=>nameMatches(r?.Responsable,person));
+  const asksStoreGrouping=/\b(por\s+tienda|tiendas|proveedores?|ranking[^.]{0,30}tienda|lista[^.]{0,30}tiendas)\b/.test(p);
+  const asksResponsibleGrouping=/\b(por\s+responsable|responsables|ranking[^.]{0,30}responsable)\b/.test(p);
+  const asksProductGrouping=/\b(por\s+producto|productos|ranking[^.]{0,30}producto)\b/.test(p);
+  const asksTicketGrouping=/\b(por\s+ticket|tickets|tkxx|ranking[^.]{0,30}ticket)\b/.test(p);
+  const dim=asksResponsibleGrouping?'Responsable':asksStoreGrouping?'Tienda':asksProductGrouping?'Producto':asksTicketGrouping?'Ticket u otros gastos':'';
+  const desc=/\b(mayor[^.]{0,30}menor|m[aá]s[^.]{0,30}menos|descendente|decreciente|ranking|top)\b/.test(p),asc=/\b(menor[^.]{0,30}mayor|menos[^.]{0,30}m[aá]s|ascendente|creciente)\b/.test(p);
+  if(desc)rows.sort((a,b)=>num(b?.Importe)-num(a?.Importe)||text(a?.Producto).localeCompare(text(b?.Producto),'es'));else if(asc)rows.sort((a,b)=>num(a?.Importe)-num(b?.Importe)||text(a?.Producto).localeCompare(text(b?.Producto),'es'));
   const agg=new Map();if(dim){for(const r of rows){const k=trim(r?.[dim])||`Sin ${dim.toLowerCase()}`,g=agg.get(k)||{[dim]:k,'Nº registros':0,Unidades:0,Importe:0};g['Nº registros']+=1;g.Unidades+=num(r?.Unidades);g.Importe+=num(r?.Importe);agg.set(k,g);}}
-  const ranking=[...agg.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Importe:v26Money(x.Importe)})).sort((a,b)=>num(b.Importe)-num(a.Importe));
-  const sourceTable=arr(res?.tables).find(t=>t?.key==='purchase_lines'),local={id:'v29_direct_purchase_entity_tables',name:'event_purchase_lines',ok:true,title:res.title,facts:{...res.facts,purchase_line_count:rows.length,total_amount:v26Money(rows.reduce((a,r)=>a+num(r.Importe),0)),store:store||'',responsible:person||''},tables:[...(ranking.length?[v26Table('ranking',`Compras por ${dim}`,ranking,{[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Importe:v26MoneySchema()})]:[]),v26Table('purchase_lines',`Detalle de compras · ${res?.facts?.event||''}`,rows,sourceTable?.schema||{})]};
-  const show=[];if(ranking.length)show.push({tool_id:local.id,table_key:'ranking'});show.push({tool_id:local.id,table_key:'purchase_lines'});
-  const chartSpecs=/\b(grafica|gráfica|grafico|gráfico|ranking|top)\b/.test(p)&&ranking.length>=2?[{title:`Compras por ${dim} · ${res?.facts?.event||''}`,type:'horizontalBar',tool_id:local.id,table_key:'ranking',label_field:dim,value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
-  const filter=[store?`tienda ${store}`:'',person?`responsable ${person}`:''].filter(Boolean).join(' y '),answer=rows.length?`En ${res?.facts?.event||'el evento'} constan ${v26CountPhrase(rows.length,'registro de compra','registros de compra')}${filter?` para ${filter}`:''}, por ${v26FormatEuro(local.facts.total_amount)}. Se entrega el detalle disponible en la primera respuesta${ranking.length?` y su agrupación por ${dim.toLowerCase()}`:''}.`:`No constan compras${filter?` para ${filter}`:''} en ${res?.facts?.event||'el evento'} con los datos actuales.`;
+  let ranking=[...agg.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Importe:v26Money(x.Importe)}));
+  ranking.sort((a,b)=>(asc?num(a.Importe)-num(b.Importe):num(b.Importe)-num(a.Importe))||text(a?.[dim]).localeCompare(text(b?.[dim]),'es'));
+  const publicRows=rows.map(r=>({Producto:trim(r?.Producto),Segmento:trim(r?.Segmento),Destino:trim(r?.Destino),Unidades:num(r?.Unidades),Precio:v26Money(r?.Precio),Importe:v26Money(r?.Importe),'Ticket u otros gastos':trim(r?.['Ticket u otros gastos']),Tienda:trim(r?.Tienda),Responsable:trim(r?.Responsable),Tipo:trim(r?.Tipo)}));
+  const publicSchema={Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Importe:v26MoneySchema('Importe del registro'),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Tipo:v26StatusSchema()};
+  const tables=[];if(ranking.length)tables.push(v26Table('ranking',`Compras por ${dim}`,ranking,{[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Importe:v26MoneySchema()}));
+  tables.push(v26Table('purchase_lines_public',`Detalle de compras · ${res?.facts?.event||''}`,publicRows,publicSchema));
+  const local={id:'v29_direct_purchase_entity_tables',name:'event_purchase_lines',ok:true,title:res.title,facts:{...res.facts,purchase_line_count:rows.length,total_amount:v26Money(rows.reduce((a,r)=>a+num(r.Importe),0)),store:store||'',responsible:person||''},tables};
+  const explicitDetail=/\b(detalle|detallad|cada\s+compra|producto\s+a\s+producto|producto\s+por\s+producto|unidades?|precio|ticket|tkxx|responsable)\b/.test(p)||!!store||!!person;
+  const aggregateOnly=!!dim&&!explicitDetail;
+  const show=[];if(ranking.length)show.push({tool_id:local.id,table_key:'ranking'});if(!aggregateOnly)show.push({tool_id:local.id,table_key:'purchase_lines_public'});
+  if(!show.length)show.push({tool_id:local.id,table_key:'purchase_lines_public'});
+  const chartSpecs=/\b(gr[aá]fic\w*|ranking|top)\b/.test(p)&&ranking.length>=2?[{title:`Compras por ${dim} · ${res?.facts?.event||''}`,type:'horizontalBar',tool_id:local.id,table_key:'ranking',label_field:dim,value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
+  const filter=[store?`tienda ${store}`:'',person?`responsable ${person}`:''].filter(Boolean).join(' y '),answer=rows.length?`En ${res?.facts?.event||'el evento'} constan ${v26CountPhrase(rows.length,'registro de compra','registros de compra')}${filter?` para ${filter}`:''}, por ${v26FormatEuro(local.facts.total_amount)}. ${aggregateOnly?`Se muestra la agrupación solicitada por ${dim.toLowerCase()} sin volcar datos técnicos innecesarios.`:`Se entrega el detalle de negocio disponible en la primera respuesta, sin IDs internos ni metadatos técnicos.`}`:`No constan compras${filter?` para ${filter}`:''} en ${res?.facts?.event||'el evento'} con los datos actuales.`;
   return v281LocalResponse({title:filter?`Compras · ${filter} · ${res?.facts?.event||''}`:res.title,answer,results:[local],showTables:show,chartSpecs,flowTrace,previousInteractionId});
 }
 
+function v29AttendanceIncomeMatch(attendee,peopleRows){
+  const name=trim(attendee?.nombre||attendee?.name),exact=arr(peopleRows).find(r=>norm(r?.Persona)===norm(name));
+  if(exact)return{row:exact,shared:false};
+  const nk=norm(name),shared=arr(peopleRows).find(r=>trim(r?.Persona).split(/\s+y\s+/i).map(norm).includes(nk));
+  return shared?{row:shared,shared:true}:{row:null,shared:false};
+}
+async function v29DirectAttendanceQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const p=norm(userPrompt);if(!/\b(asistencia|asistentes?|asistieron|acudieron|presentes?)\b/.test(p))return null;
+  const structured=/\b(lista|listado|detalle|detallad|quien|quién|quienes|quiénes|dame|muestra|pagaron|pagado|pago|pag[oó]|importe|ingreso|ingresos|cuota|socios?|no\s+socios?)\b/.test(p);if(!structured)return null;
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)return null;
+  const att=arr(buildCanonicalAttendance(state,[rr.id])?.porEvento)[0]||{},people=await v26ToolEventPeople({id:'v29_direct_attendance_people',name:'event_people',...ea,detail:'full'},state,selectedEventId),peopleRows=arr(people?.tables).find(t=>t?.key==='people')?.rows||[];
+  const wantsNoSocio=/\bno\s+socios?\b/.test(p),wantsSocio=/\bsocios?\b/.test(p)&&!wantsNoSocio,wantsPayment=/\b(pagaron|pagado|pago|pag[oó]|importe|ingreso|ingresos|cuota|cobr)\b/.test(p);
+  let attendees=[...arr(att?.sociosAsistentes).map(x=>({...x,rango:'SOCIO'})),...arr(att?.noSociosAsistentes).map(x=>({...x,rango:'NO SOCIO'}))];
+  if(wantsNoSocio)attendees=attendees.filter(x=>x.rango==='NO SOCIO');else if(wantsSocio)attendees=attendees.filter(x=>x.rango==='SOCIO');
+  const rows=attendees.map(a=>{const m=v29AttendanceIncomeMatch(a,peopleRows),r=m.row||{},base={Asistente:trim(a?.nombre),Rango:a.rango,Personas:num(a?.personas)||1};if(!wantsPayment)return base;return{...base,'Registro de ingreso':trim(r?.Persona)||'Sin registro económico','Situación / forma registrada':trim(r?.['Situación / forma registrada'])||'','Importe obligatorio':v26Money(r?.['Importe obligatorio']||0),'Ajuste voluntario':v26Money(r?.['Importe voluntario']||0),'Importe total registrado':v26Money(r?.['Importe total']||0),Observación:m.shared?'Importe perteneciente a un registro compartido de pareja; no atribuirlo íntegramente a un solo miembro.':(!m.row?'Asistente canónico sin registro económico localizado.':'')};});
+  const schema=wantsPayment?{Asistente:v26TextSchema('Persona o pareja asistente según asistencia canónica'),Rango:v26TextSchema(),Personas:v26CountSchema('personas','Personas asistentes según criterio canónico'),'Registro de ingreso':v26TextSchema('Entidad exacta del registro económico'),'Situación / forma registrada':v26TextSchema(),'Importe obligatorio':v26MoneySchema(),'Ajuste voluntario':v26MoneySchema(),'Importe total registrado':v26MoneySchema(),Observación:v26TextSchema()}: {Asistente:v26TextSchema(),Rango:v26TextSchema(),Personas:v26CountSchema('personas','Personas asistentes según criterio canónico')};
+  const local={id:'v29_direct_attendance_table',name:'event_people',ok:true,title:`Asistencia · ${rr.nombre}`,facts:{event:rr.nombre,attendees_canonical:num(att?.totalAsistentesPersonas),members_attending:num(att?.sociosAsistentesPersonas),nonmembers_attending:num(att?.noSociosAsistentesPersonas),criterion:trim(att?.criterio)},tables:[v26Table('attendance_people',wantsPayment?`Asistentes e ingresos · ${rr.nombre}`:`Asistentes · ${rr.nombre}`,rows,schema)]};
+  const shownPeople=rows.reduce((a,r)=>a+num(r.Personas),0),answer=`En ${rr.nombre} constan ${shownPeople} ${shownPeople===1?'persona asistente':'personas asistentes'}${wantsNoSocio?' no socias':wantsSocio?' socias':''} según la asistencia canónica de ControlEvent.${wantsPayment?' El importe se cruza con el registro económico sin usar el campo Número como sustituto de la asistencia; una pareja exenta con Número 0 sigue contando por sus integrantes si la situación confirma asistencia.':''}`;
+  return v281LocalResponse({title:wantsPayment?`Asistentes e ingresos · ${rr.nombre}`:`Asistentes · ${rr.nombre}`,answer,results:[local],showTables:[{tool_id:local.id,table_key:'attendance_people'}],flowTrace,previousInteractionId});
+}
+
+
 async function v29DirectIncomeQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
   const p=norm(userPrompt);if(!/\b(ingreso|ingresos|cobro|cobros|recaudaci[oó]n|pagado|pagaron)\b/.test(p)||/\b(banco|bancari|concili|cuadre)\b/.test(p))return null;
-  const structured=/\b(lista|listado|ranking|top|detalle|detallad|cada|persona|personas|pareja|parejas|forma|banco|efectivo|bizum|pendiente|socios?|no\s+socios?|gr[aá]fica|grafica|quien|quién|quienes|quiénes)\b/.test(p);if(!structured)return null;
+  const structured=/\b(lista|listado|ranking|top|detalle|detallad|cada|persona|personas|pareja|parejas|forma|banco|efectivo|bizum|pendiente|socios?|no\s+socios?|gr[aá]fic\w*|quien|quién|quienes|quiénes)\b/.test(p);if(!structured)return null;
   const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),res=await v26ToolEventPeople({id:'v29_direct_incomes',name:'event_people',...ea,detail:'full'},state,selectedEventId),rows=arr(res?.tables).find(t=>t?.key==='people')?.rows||[];
   let dim=/\b(forma|banco|efectivo|bizum|pendiente)\b/.test(p)?'Situación / forma registrada':/\brango|socios?|no\s+socios?\b/.test(p)?'Rango':'Persona';
   const agg=new Map();for(const r of rows){const k=trim(r?.[dim])||`Sin ${dim.toLowerCase()}`,g=agg.get(k)||{[dim]:k,'Nº registros':0,'Número personas':0,Importe:0};g['Nº registros']+=1;g['Número personas']+=num(r?.Número);g.Importe+=num(r?.['Importe total']);agg.set(k,g);}
   const ranking=[...agg.values()].map(x=>({...x,'Número personas':round(x['Número personas'],3),Importe:v26Money(x.Importe)})).sort((a,b)=>num(b.Importe)-num(a.Importe)||text(a?.[dim]).localeCompare(text(b?.[dim]),'es'));
   const local={id:'v29_direct_income_tables',name:'event_people',ok:true,title:res.title,facts:{...res.facts},tables:[v26Table('ranking',`Ingresos por ${dim}`,ranking,{[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),'Número personas':v26CountSchema('personas'),Importe:v26MoneySchema()}),...arr(res.tables)]};
-  const chartSpecs=/\b(grafica|gráfica|grafico|gráfico|ranking|top)\b/.test(p)&&ranking.length>=2?[{title:`Ingresos por ${dim} · ${res?.facts?.event||''}`,type:'horizontalBar',tool_id:local.id,table_key:'ranking',label_field:dim,value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
+  const chartSpecs=/\b(gr[aá]fic\w*|ranking|top)\b/.test(p)&&ranking.length>=2?[{title:`Ingresos por ${dim} · ${res?.facts?.event||''}`,type:'horizontalBar',tool_id:local.id,table_key:'ranking',label_field:dim,value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true}]:[];
   return v281LocalResponse({title:`Ingresos · ${res?.facts?.event||''}`,answer:`En ${res?.facts?.event||'el evento'} constan ${v26CountPhrase(rows.length,'registro de ingreso','registros de ingreso')} por ${v26FormatEuro(res?.facts?.income_total||0)}. Se entrega el detalle por persona/pareja y la agrupación por ${dim.toLowerCase()} en esta misma respuesta.`,results:[local],showTables:[{tool_id:local.id,table_key:'ranking'},{tool_id:local.id,table_key:'people'}],chartSpecs,flowTrace,previousInteractionId});
 }
 async function v29DirectDocumentationQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
@@ -8787,7 +8829,7 @@ async function v29DirectManagementQuery({userPrompt,state,selectedEventId,conver
 async function v29DirectMetricQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
   const p=norm(userPrompt);if(/\b(opini[oó]n|analiza|an[aá]lisis|informe|explica|por\s+qu[eé]|raro|anomalia|anomalía|conclusi[oó]n|compara|comparativa|historia|cr[oó]nica)\b/.test(p)||/\b(banco|bancari|concili|cuadre)\b/.test(p))return null;
   const metricCue=/\b(cuanto|cuánto|cuantos|cuántos|total|importe|saldo|valoraci[oó]n|precio|fecha|estado|asistencia|asistentes|ingresos?|compras?|gastos?|donaciones?)\b/.test(p);if(!metricCue)return null;
-  if(/\b(lista|listado|ranking|top|detalle|detallad|cada|persona|personas|tienda|tiendas|donante|donantes|producto|productos|responsable|responsables|ticket|documento|hito|tarea|gr[aá]fica|grafica)\b/.test(p))return null;
+  if(/\b(lista|listado|ranking|top|detalle|detallad|cada|persona|personas|tienda|tiendas|donante|donantes|producto|productos|responsable|responsables|ticket|documento|hito|tarea|gr[aá]fic\w*)\b/.test(p))return null;
   const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),res=await v26ToolEventDossier({id:'v29_direct_metrics',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId),f=res?.facts||{},parts=[],rows=[];
   const add=(label,value,textValue)=>{rows.push({Dato:label,Valor:value});parts.push(`${label.toLowerCase()} ${textValue??value}`);};
   if(/\bingresos?|recaudaci[oó]n|cobros?\b/.test(p))add('Ingresos',v26FormatEuro(f.income_total||0));
@@ -8804,17 +8846,62 @@ async function v29DirectMetricQuery({userPrompt,state,selectedEventId,conversati
   return v281LocalResponse({title:`${f.event||'Evento'} · datos solicitados`,answer:`${f.event||'El evento'}: ${parts.join('; ')}.`,results:[local],showTables:rows.length>1?[{tool_id:local.id,table_key:'requested_metrics'}]:[],flowTrace,previousInteractionId});
 }
 
+
+function v29CompoundIntent(userPrompt){
+  const p=norm(userPrompt),wants={
+    purchases:/\b(compra|compras|gasto|gastos)\b/.test(p),
+    donations:/\b(donaci[oó]n|donaciones|donantes?|donado|donados)\b/.test(p),
+    bank:/\b(banco|bancari|concili|cuadre)\b/.test(p),
+    incomes:/\b(ingreso|ingresos|recaudaci[oó]n|cobros?)\b/.test(p),
+    attendance:/\b(asistencia|asistentes?|asistieron)\b/.test(p)
+  };
+  const count=Object.values(wants).filter(Boolean).length,wantsCharts=/\bgr[aá]fic\w*|visualiz\w*\b/.test(p),wantsOpinion=/\b(opini[oó]n|comentario|comenta|que\s+te\s+parece|qué\s+te\s+parece|como\s+fue|cómo\s+fue|como\s+salio|cómo\s+salió|valoraci[oó]n\s+general|analiza|an[aá]lisis)\b/.test(p);
+  return{...wants,count,wantsCharts,wantsOpinion,applicable:count>=2&&(wantsCharts||wantsOpinion)};
+}
+async function v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const plan=v29CompoundIntent(userPrompt);if(!plan.applicable)return null;
+  const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),rr=v26ResolveEvent(state,selectedEventId,ea.event,ea.scope);if(!rr.ok)return null;
+  const jobs=[],labels=[];
+  if(plan.purchases||plan.donations){labels.push('breakdowns');jobs.push(v26ToolEventBreakdowns({id:'v29_compound_breakdowns',name:'event_breakdowns',...ea,detail:'standard'},state,selectedEventId));}
+  labels.push('dossier');jobs.push(v26ToolEventDossier({id:'v29_compound_dossier',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId));
+  if(plan.bank){labels.push('bank');jobs.push(v261EventBankTool({id:'v29_compound_bank',name:'event_bank',...ea,detail:'standard'},state,selectedEventId));}
+  if(plan.incomes||plan.attendance){labels.push('people');jobs.push(v26ToolEventPeople({id:'v29_compound_people',name:'event_people',...ea,detail:'standard'},state,selectedEventId));}
+  const settled=await Promise.allSettled(jobs),by={};settled.forEach((r,i)=>{if(r.status==='fulfilled')by[labels[i]]=r.value;else zuzuTracePush(flowTrace,'v29 · Plan compuesto','WARN',`${labels[i]}: ${cleanGeminiError(r.reason)}`);});
+  const results=Object.values(by).filter(Boolean);if(!results.length)return null;
+  const specs=[];
+  if(plan.wantsCharts&&plan.purchases&&by.breakdowns&&arr(by.breakdowns.tables).find(t=>t?.key==='stores')?.rows?.length)specs.push({title:`Compras por tienda · ${rr.nombre}`,type:'horizontalBar',tool_id:by.breakdowns.id,table_key:'stores',label_field:'Tienda',value_field:'Importe',series_fields:[],unit:'€',allow_equal_values:true});
+  if(plan.wantsCharts&&plan.donations&&by.breakdowns&&arr(by.breakdowns.tables).find(t=>t?.key==='donors')?.rows?.length)specs.push({title:`Donaciones por donante · ${rr.nombre}`,type:'horizontalBar',tool_id:by.breakdowns.id,table_key:'donors',label_field:'Donante',value_field:'Valor',series_fields:[],unit:'€',allow_equal_values:true});
+  if(plan.wantsCharts&&plan.incomes&&by.breakdowns&&arr(by.breakdowns.tables).find(t=>t?.key==='income_methods')?.rows?.length)specs.push({title:`Ingresos por forma de pago · ${rr.nombre}`,type:'bar',tool_id:by.breakdowns.id,table_key:'income_methods',label_field:'Forma de pago',value_field:'Importe',series_fields:[],unit:'€'});
+  if(plan.wantsCharts&&plan.attendance&&by.dossier&&arr(by.dossier.tables).find(t=>t?.key==='attendance_chart')?.rows?.length)specs.push({title:`Asistencia · ${rr.nombre}`,type:'bar',tool_id:by.dossier.id,table_key:'attendance_chart',label_field:'Indicador',value_field:'Valor',series_fields:[],unit:'personas'});
+  if(plan.wantsCharts&&plan.bank&&by.bank){const key=arr(by.bank.tables).find(t=>t?.key==='reconciliation_timeline')?.rows?.length?'reconciliation_timeline':v281BroadBankKey(by.bank);if(key)specs.push({title:`Cuadre bancario · ${rr.nombre}`,type:'line',tool_id:by.bank.id,table_key:key,label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:[],include_justified_movements:true,unit:'€'});}
+  let answer='';let model='';
+  if(plan.wantsOpinion){
+    const analystResults=[by.dossier,by.breakdowns,by.bank].filter(Boolean),prefetch={kind:'opinion',event:rr.nombre,results:analystResults,broadGraphical:false};
+    try{const r=await v2853CallPlainAnalyst({userPrompt,prefetch,conversationHistory,flowTrace});answer=r.answer;model=r.model;}catch(error){answer=v2853FallbackAnswer(prefetch);zuzuTracePush(flowTrace,'v29 · Respaldo CE','OK','La redacción analítica falló; CE devuelve hechos canónicos y mantiene las gráficas solicitadas.');}
+  }else{
+    const f=by.dossier?.facts||{};const bits=[];if(plan.purchases)bits.push(`compras ${v26FormatEuro(f.purchases_realized||0)}`);if(plan.donations)bits.push(`donaciones ${v26FormatEuro(f.donations_value||0)}`);if(plan.incomes)bits.push(`ingresos ${v26FormatEuro(f.income_total||0)}`);if(plan.attendance)bits.push(`asistencia ${num(f.attendees_canonical||0)} personas`);answer=`${rr.nombre}: ${bits.join('; ')}. Se han materializado en una sola respuesta todas las gráficas solicitadas con datos canónicos de ControlEvent.`;
+  }
+  const result=v281LocalResponse({title:plan.wantsOpinion?`Análisis y gráficas · ${rr.nombre}`:`Gráficas · ${rr.nombre}`,answer,results,chartSpecs:specs,flowTrace,previousInteractionId,traceDirect:!plan.wantsOpinion});
+  if(plan.wantsOpinion){const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Petición compuesta: datos/gráficas resueltos localmente; solo la opinión usa Gemini. ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €.`);result.provider='control-event-v29-compound+gemini';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional compuesto: CE ejecuta módulos/gráficas; Gemini solo redacta la parte analítica',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);}
+  return result;
+}
+
 async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
   const p=norm(userPrompt),dataReq=v274DataAccessRequirement(userPrompt,conversationHistory);
   if(dataReq.accessRestricted&&/\b(catalogo|catálogo|lista|tabla|todos|todas)\b/.test(p)){
     return v281LocalResponse({title:'Información restringida',answer:'Los catálogos de negocio no restringidos sí son consultables, pero ACCESO, usuarios de acceso, credenciales, contraseñas y tokens quedan fuera de las herramientas de Zuzu.',flowTrace,previousInteractionId});
   }
 
+  const compound=await v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
+  if(compound)return compound;
+
   const directDonation=await v29DirectDonationQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId,dataReq});
   if(directDonation)return directDonation;
   const directPurchaseEntity=await v29DirectPurchaseEntityQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId,dataReq});
   if(directPurchaseEntity)return directPurchaseEntity;
 
+  const directAttendance=await v29DirectAttendanceQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
+  if(directAttendance)return directAttendance;
   const directIncome=await v29DirectIncomeQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
   if(directIncome)return directIncome;
   const directDocumentation=await v29DirectDocumentationQuery({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
@@ -8892,7 +8979,9 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
     const purchase=await v274ToolEventPurchaseLines({id:'v28_direct_ticket',name:'event_purchase_lines',...ea,ticket:requestedTicket,status:'realized',detail:'standard'},state,selectedEventId);
     const rows=arr(purchase?.tables).find(t=>t?.key==='purchase_lines')?.rows||[],sum=v26Money(purchase?.facts?.total_amount);
     const ticket=trim(rows[0]?.['Ticket u otros gastos'])||requestedTicket||rawTicket;
-    let comparison='',warnings=[],results=[purchase];
+    const visibleRows=rows.map(r=>({Producto:trim(r?.Producto),Segmento:trim(r?.Segmento),Destino:trim(r?.Destino),Unidades:num(r?.Unidades),Precio:v26Money(r?.Precio),Importe:v26Money(r?.Importe),'Ticket u otros gastos':trim(r?.['Ticket u otros gastos']),Tienda:trim(r?.Tienda),Responsable:trim(r?.Responsable),Tipo:trim(r?.Tipo)}));
+    const visiblePurchase={id:'v29_direct_ticket_public',name:'event_purchase_lines',ok:true,title:purchase.title,facts:{...purchase.facts},tables:[v26Table('purchase_lines_public',`Detalle de ${ticket} · ${rr.nombre}`,visibleRows,{Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema(),Importe:v26MoneySchema(),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Tipo:v26StatusSchema()})]};
+    let comparison='',warnings=[],results=[visiblePurchase];
     if(/\b(comprueba|coincid|total\s+del\s+ticket|suma)\b/.test(p)){
       try{
         const bank=await v261EventBankTool({id:'v28_direct_ticket_bank',name:'event_bank',...ea,detail:'brief'},state,selectedEventId);results.push(bank);
@@ -8901,7 +8990,7 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
         else comparison=' La suma de los registros está calculada, pero no hay un total independiente de ese ticket en el Cuadre Banco con el que verificarla; no se afirma una coincidencia que no esté demostrada.';
       }catch(_){comparison=' La suma de los registros está calculada, pero no se ha obtenido un total independiente con el que verificarla; no se afirma una coincidencia no demostrada.';}
     }
-    return v281LocalResponse({title:`Detalle de ${ticket} · ${rr.nombre}`,answer:rows.length?`${ticket} contiene ${v26CountPhrase(rows.length,'registro de compra','registros de compra')} y la suma de esos registros es ${v26FormatEuro(sum)}.${comparison}`:`No hay registros de compra para ${ticket} en ${rr.nombre}.`,warnings,results,showTables:rows.length?[{tool_id:purchase.id,table_key:'purchase_lines'}]:[],flowTrace,previousInteractionId});
+    return v281LocalResponse({title:`Detalle de ${ticket} · ${rr.nombre}`,answer:rows.length?`${ticket} contiene ${v26CountPhrase(rows.length,'registro de compra','registros de compra')} y la suma de esos registros es ${v26FormatEuro(sum)}.${comparison}`:`No hay registros de compra para ${ticket} en ${rr.nombre}.`,warnings,results,showTables:rows.length?[{tool_id:visiblePurchase.id,table_key:'purchase_lines_public'}]:[],flowTrace,previousInteractionId});
   }
 
   // Catálogos maestros y cruce catálogo + evento: CE ya posee la tabla final; no se paga a Gemini para volver a describirla.
@@ -12303,5 +12392,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v272IsShortAffirmativeFollowUp,
   v272ConversationRequestsCharts,
   v272AnswerClaimsChart,
-  v27AutoChartSpecs
+  v27AutoChartSpecs,
+  v29DirectAttendanceQuery,
+  v29DirectPurchaseEntityQuery,
+  v29DirectDonationQuery,
+  v29CompoundIntent
 });
