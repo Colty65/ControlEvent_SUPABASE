@@ -8925,7 +8925,12 @@ function v29OrderedCatalogMentions(state,prompt){
   const raw=norm(prompt),out=[];
   const push=(kind,name)=>{
     const k=norm(name);if(!k||k.length<2)return;
-    let index=raw.indexOf(k);if(index<0)return;
+    // v29.1: una entidad de catálogo solo cuenta si aparece como término completo.
+    // Evita falsos positivos como producto "Sal" dentro de "saldo operativo".
+    const esc=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+    const match=new RegExp(`(?:^|[^a-z0-9ñ])(${esc})(?=$|[^a-z0-9ñ])`,'i').exec(raw);
+    if(!match)return;
+    const index=match.index+(match[0].length-match[1].length);
     if(!out.some(x=>x.kind===kind&&norm(x.name)===k))out.push({kind,name:trim(name),index});
   };
   arr(state?.tiendas).forEach(x=>push('store',x?.nombre));
@@ -8950,10 +8955,29 @@ function v29DimensionMentions(state,prompt){
   return{segments,destinations};
 }
 function v29ProductSearchTerm(state,prompt){
-  const p=norm(prompt),stop=new Set(['producto','productos','normal','pack','botella','lata','unidad','unidades','para','donde','cuanto','precio','importe']);
+  const p=norm(prompt),stop=new Set([
+    'producto','productos','articulo','articulos','normal','pack','botella','lata','unidad','unidades','para','donde','cuanto','precio','importe','valor',
+    'compra','compras','comprado','comprados','compramos','gasto','gastos','donacion','donaciones','donante','donantes','donado','donados',
+    'ingreso','ingresos','asistente','asistentes','asistencia','socio','socios','persona','personas','tienda','tiendas','responsable','responsables',
+    'ranking','lista','listado','detalle','ordenadas','ordenados','ordenar','mayor','menor','evento','eventos','saldo','operativo','bancario','final',
+    'banco','efectivo','bizum','pendiente','pendientes','segmento','destino','todos','todas','cada','quien','quienes','dame','dime','hazme','ahora'
+  ]);
+  // Los nombres de SEGMENTO/DESTINO son dimensiones, no productos, salvo que el usuario
+  // diga explícitamente "producto/artículo X". Así BEBIDA, CUBATAS o APERITIVO no
+  // se convierten accidentalmente en un filtro de producto.
+  const explicitProductCue=/\b(producto|productos|articulo|articulos)\b/.test(p);
+  if(!explicitProductCue){
+    arr(state?.productos).forEach(prod=>{
+      [prod?.segmento,prod?.destino].forEach(v=>norm(v).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
+    });
+  }
   const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)))],scores=[];
   for(const token of tokens){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,token))hits++;}if(hits)scores.push({token,hits,len:token.length});}
   return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len)[0]?.token||'';
+}
+function v29PreferredProductMention(mentions,dims,prompt){
+  const p=norm(prompt),explicit=/\b(producto|productos|articulo|articulos)\b/.test(p),blocked=new Set([...arr(dims?.segments),...arr(dims?.destinations)].map(norm));
+  return arr(mentions).find(x=>x?.kind==='product'&&(explicit||!blocked.has(norm(x?.name))))?.name||'';
 }
 function v29SortDirection(prompt){
   const p=norm(prompt);
@@ -9038,7 +9062,7 @@ function v29StructuredPlan(state,prompt,history=[]){
     if(domain==='donations'){
       const stores=mentions.filter(x=>x.kind==='store'),people=mentions.filter(x=>x.kind==='person'),all=[...stores,...people];
       task.filters.donor=v29NearestMention(prompt,all,domainPattern.donations,'')||task.filters.donor||'';
-      task.filters.product=trim(mentions.find(x=>x.kind==='product')?.name)||productTerm||task.filters.product||'';
+      task.filters.product=trim(v29PreferredProductMention(mentions,dims,prompt))||productTerm||task.filters.product||'';
       task.filters.segment=dims.segments[0]||task.filters.segment||'';
       task.filters.destination=dims.destinations[0]||task.filters.destination||'';
       task.includeProducts=/\b(?:que|qué)\s+don[oó]\s+cada\s+uno|\bproductos?\s+(?:de|donad)/.test(p);
@@ -9046,7 +9070,7 @@ function v29StructuredPlan(state,prompt,history=[]){
     }else if(domain==='purchases'){
       task.filters.store=v29NearestMention(prompt,mentions,domainPattern.purchases,'store')||task.filters.store||'';
       task.filters.responsible=v29NearestMention(prompt,mentions,domainPattern.purchases,'person')||task.filters.responsible||'';
-      task.filters.product=trim(mentions.find(x=>x.kind==='product')?.name)||productTerm||task.filters.product||'';
+      task.filters.product=trim(v29PreferredProductMention(mentions,dims,prompt))||productTerm||task.filters.product||'';
       task.filters.segment=dims.segments[0]||task.filters.segment||'';
       task.filters.destination=dims.destinations[0]||task.filters.destination||'';
       if(/\b(tiendas?|proveedores?)\b/.test(p))task.group='store';
@@ -9186,14 +9210,24 @@ async function v29ExecuteIncomeTask(task,{userPrompt,state,selectedEventId,conve
   let tableRows,key='people',schema,labelField='Persona';
   if(task.group==='method'||task.group==='range'){
     const dim=task.group==='method'?'Situación / forma registrada':'Rango',map=new Map();
-    for(const r of rows){const k=trim(r?.[dim])||`Sin ${dim.toLowerCase()}`,g=map.get(k)||{[dim]:k,'Nº registros':0,'Personas registradas':0,Importe:0};g['Nº registros']++;g['Personas registradas']+=num(r?.Número);g.Importe+=num(r?.['Importe total']);map.set(k,g);}
-    tableRows=[...map.values()].map(x=>({...x,'Personas registradas':round(x['Personas registradas'],3),Importe:v26Money(x.Importe)}));
+    for(const r of rows){
+      const k=trim(r?.[dim])||`Sin ${dim.toLowerCase()}`;
+      const g=map.get(k)||{[dim]:k,'Nº registros':0,'Número acumulado':0,Importe:0};
+      g['Nº registros']++;g['Número acumulado']+=num(r?.Número);g.Importe+=num(r?.['Importe total']);map.set(k,g);
+    }
+    tableRows=[...map.values()].map(x=>({...x,'Número acumulado':round(x['Número acumulado'],3),Importe:v26Money(x.Importe)}));
     if(task.group==='method'){
       const pp=norm(userPrompt),requested=[['Banco',/\bbanco\b/],['Efectivo',/\befectivo\b/],['Bizum',/\bbizum\b/],['Pendiente',/\bpendientes?\b/]].filter(([,re])=>re.test(pp)).map(([name])=>name);
-      if(requested.length){const existing=new Map(tableRows.map(r=>[norm(r[dim]),r]));tableRows=requested.map(name=>existing.get(norm(name))||{[dim]:name,'Nº registros':0,'Personas registradas':0,Importe:0});}
+      if(requested.length){const existing=new Map(tableRows.map(r=>[norm(r[dim]),r]));tableRows=requested.map(name=>existing.get(norm(name))||{[dim]:name,'Nº registros':0,'Número acumulado':0,Importe:0});}
+      // La consulta por forma de pago pide importes/registro. El campo Número puede representar
+      // unidades o agrupaciones del ingreso y no equivale necesariamente a asistentes; se omite
+      // para no mostrarlo como "personas".
+      tableRows=tableRows.map(r=>({[dim]:r[dim],'Nº registros':r['Nº registros'],Importe:r.Importe}));
+      schema={[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Importe:v26MoneySchema()};
+    }else{
+      schema={[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),'Número acumulado':v26CountSchema('unidades registradas'),Importe:v26MoneySchema()};
     }
     tableRows=v29ApplySortLimit(tableRows,task.sort||'',task.limit,'Importe');key='income_group';labelField=dim;
-    schema={[dim]:v26TextSchema(),'Nº registros':v26CountSchema('registros'),'Personas registradas':v26CountSchema('personas'),Importe:v26MoneySchema()};
   }else{
     tableRows=rows.map(r=>({Persona:trim(r?.Persona),Rango:trim(r?.Rango),Número:round(r?.Número,3),'Situación / forma registrada':trim(r?.['Situación / forma registrada']),'Importe obligatorio':v26Money(r?.['Importe obligatorio']),'Ajuste voluntario':v26Money(r?.['Importe voluntario']),'Importe total':v26Money(r?.['Importe total'])}));
     tableRows=v29ApplySortLimit(tableRows,task.sort,task.limit,'Importe total');
@@ -12875,5 +12909,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v29DirectAttendanceQuery,
   v29DirectPurchaseEntityQuery,
   v29DirectDonationQuery,
-  v29CompoundIntent
+  v29CompoundIntent,
+  v29StructuredPlan,
+  v29ExplicitDomains,
+  v29OrderedCatalogMentions,
+  v29ProductSearchTerm
 });
