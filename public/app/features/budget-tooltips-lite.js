@@ -347,7 +347,7 @@
     if(!src) return {className:'ce-budget-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
     const title=`Justificante de ingreso · ${p.nombre}`;
     const file=`ING-${safeDownloadPart(selectedEventObj().titulo||selectedEventObj().descripcion||'Evento','Evento')}-${safeDownloadPart(p.nombre,'Colaborador')}.jpg`;
-    return {className:'ce-budget-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-person-name="${esc(p.nombre)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
+    return {className:'ce-budget-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-ce-budget-income-receipt="1" data-id="${esc(item.id || '')}" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-person-name="${esc(p.nombre)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
   }
 
   function incomeTipForRow(row){
@@ -741,6 +741,13 @@
       #ceBudgetLiteTooltipV307 .ce-budget-thumb-cell{width:62px!important;min-width:62px!important;text-align:center!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;padding:0!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;vertical-align:middle!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb img{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;object-fit:cover!important;display:block!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb[data-ce-budget-income-receipt="1"]{cursor:zoom-in!important;pointer-events:auto!important;}
+      #ceBudgetLiteTooltipV307 .ce-budget-stable-thumb[data-ce-budget-income-receipt="1"] img{pointer-events:none!important;}
+      #ceV29BudgetIncomePhoto{position:fixed!important;inset:0!important;z-index:10000150!important;background:rgba(2,6,23,.86)!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;}
+      #ceV29BudgetIncomePhoto .ce-v29-budget-income-photo-card{width:min(1380px,98vw)!important;max-height:96vh!important;background:#fff!important;border-radius:16px!important;padding:12px!important;display:flex!important;flex-direction:column!important;gap:10px!important;box-shadow:0 24px 90px rgba(0,0,0,.48)!important;}
+      #ceV29BudgetIncomePhoto .ce-v29-budget-income-photo-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;font-size:17px!important;color:#0f172a!important;}
+      #ceV29BudgetIncomePhoto .ce-v29-budget-income-photo-head button{min-width:88px!important;min-height:40px!important;border:1px solid #0f172a!important;border-radius:9px!important;background:#fff!important;color:#0f172a!important;font-weight:900!important;cursor:pointer!important;}
+      #ceV29BudgetIncomePhoto img{display:block!important;max-width:96vw!important;max-height:86vh!important;object-fit:contain!important;align-self:center!important;background:#f8fafc!important;border-radius:10px!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-ticket-thumb-empty{display:inline-flex!important;width:48px!important;height:48px!important;align-items:center!important;justify-content:center!important;color:#94a3b8!important;font-weight:800!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-ticket-subtotal td{background:#f8fafc!important;font-weight:900!important;}
       #ceBudgetLiteTooltipV307 .ce-budget-store-total td{background:#eef6ff!important;font-weight:950!important;}
@@ -763,6 +770,42 @@
     hideLegacyBudgetTooltips();
     try{ event.stopImmediatePropagation(); }catch(_){ }
   },true));
+
+  // v29_prod 2026-08-13: apertura directa de justificantes de INGRESOS desde el globo de RESUMEN.
+  // Estas miniaturas las crea este mismo modulo como .ce-budget-stable-thumb. No son TKxx.
+  // El manejador se registra en WINDOW/CAPTURE antes de los hotfix posteriores para evitar que
+  // otro visor de tickets consuma la pulsacion.
+  function openBudgetIncomeReceipt(event){
+    const btn = event.target?.closest?.(`#${TOOLTIP_ID} .ce-budget-stable-thumb[data-ce-budget-income-receipt="1"]`);
+    if(!btn) return false;
+    const id = norm(btn.dataset?.id || '');
+    const img = btn.querySelector?.('img');
+    const src = norm(btn.dataset?.imageSrc || img?.currentSrc || img?.src || '');
+    try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
+
+    // Visor canonico de justificantes: aporta los datos del ingreso y preserva el globo origen.
+    const api = window.ControlEventV469 || window.ControlEventV467 || window.ControlEventV465;
+    if(id && api && typeof api.showReceiptModal === 'function'){
+      try{ api.showReceiptModal(id, event); return true; }catch(error){ console.warn('[v29_prod] visor justificante Resumen', error); }
+    }
+
+    // Fallback autonomo: nunca dejar una miniatura visible sin accion por falta del API anterior.
+    if(src){
+      try{ document.getElementById('ceV29BudgetIncomePhoto')?.remove(); }catch(_){ }
+      const ov = document.createElement('div');
+      ov.id = 'ceV29BudgetIncomePhoto';
+      ov.setAttribute('role','dialog');
+      ov.setAttribute('aria-modal','true');
+      const title = norm(btn.dataset?.photoTitle || 'Justificante de ingreso');
+      ov.innerHTML = `<div class="ce-v29-budget-income-photo-card"><div class="ce-v29-budget-income-photo-head"><strong>${esc(title)}</strong><button type="button" data-close="1">Cerrar</button></div><img src="${esc(src)}" alt="${esc(title)}"></div>`;
+      document.body.appendChild(ov);
+      const close = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } try{ ov.remove(); }catch(_){ } return false; };
+      ov.addEventListener('click', ev => { if(ev.target === ov || ev.target?.closest?.('[data-close]')) close(ev); }, true);
+      return true;
+    }
+    return true;
+  }
+  window.addEventListener('click', event => { openBudgetIncomeReceipt(event); }, {capture:true, passive:false});
 
   document.addEventListener('pointerdown', event => {
     try{ rememberMobileBudgetTapStart(event); }catch(_){ }
