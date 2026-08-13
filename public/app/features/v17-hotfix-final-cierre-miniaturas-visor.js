@@ -319,7 +319,11 @@
   function handleClick(ev){
     if(ev.target?.closest?.('.ce-v17-rowdetail-close,.ce-v17-rowdetail-head button,[aria-label="Cerrar"]')) return closeRowDetail(ev);
     if(ev.target?.closest?.('[data-ce-v17-ticket-close],[data-ce-v104-close],[data-ce-v103-close],[data-ce-v102-close],[data-ce-v101-close],[data-ce-v100-close],[data-ce-v96-close],.ce-v40-modal-close')) return closeTicketViewers(ev);
-    const ticketTarget=ev.target?.closest?.('#summaryTiendaTicket [data-ce-view-ticket-image="1"],#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*="ticket-images"],#summaryTiendaTicket img[src^="data:image/"],#ceBudgetLiteTooltipV307 [data-ce-g92-photo="1"]');
+    // En el globo de RESUMEN hay dos clases de miniatura: tickets y justificantes de ingreso.
+    // Solo los tickets deben entrar en el visor contable de TKxx; los justificantes se dejan
+    // al visor genérico de fotos (v3-0-photo-viewers.js). Antes se capturaban todos los
+    // data-ce-g92-photo y, al no existir TKxx en un ingreso, la pulsación terminaba sin abrir nada.
+    const ticketTarget=ev.target?.closest?.('#summaryTiendaTicket [data-ce-view-ticket-image="1"],#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img[src*="ticket-images"],#summaryTiendaTicket img[src^="data:image/"],#ceBudgetLiteTooltipV307 [data-ce-view-ticket-image="1"]');
     if(ticketTarget) return openTicketViewerFromThumb(ticketTarget,ev);
   }
   function handleKey(ev){

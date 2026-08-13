@@ -372,6 +372,15 @@
       const src = modalIngreso.currentSrc || modalIngreso.src || '';
       if(src) return {src, title:'Justificante de ingreso'};
     }
+    // Justificantes de ingreso dentro de los globos del Resumen presupuestario.
+    // Tienen data-ce-g92-photo pero no TKxx: deben abrirse como foto normal, no como ticket.
+    const budgetReceipt = target?.closest?.('#ceBudgetLiteTooltipV307 [data-ce-g92-photo="1"]:not([data-ce-view-ticket-image="1"])');
+    if(budgetReceipt){
+      const img = budgetReceipt.querySelector?.('img');
+      const src = budgetReceipt.dataset?.imageSrc || img?.currentSrc || img?.src || '';
+      const title = budgetReceipt.dataset?.photoTitle || budgetReceipt.getAttribute?.('aria-label') || 'Justificante de ingreso';
+      if(src) return {src, title};
+    }
     const ticketImg = target?.closest?.('#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 img.ticket-thumb,#ceTicketModalV234 img,#ceTicketImageModalV225 img');
     if(ticketImg){
       const src = ticketImg.currentSrc || ticketImg.src || '';
@@ -392,7 +401,9 @@
   function handlePhotoEvent(event){
     if(handleModalEvent(event) === false) return false;
     if(Date.now() < suppressOpenUntil) return undefined;
-    const accountingTicket=event.target?.closest?.('#summaryTiendaTicket [data-ce-view-ticket-image="1"],#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 [data-ce-g92-photo="1"]');
+    // En RESUMEN solo derivamos al visor contable los thumbs que realmente son TKxx.
+    // Los justificantes de ingreso continúan debajo y los resuelve resolvePhotoTarget().
+    const accountingTicket=event.target?.closest?.('#summaryTiendaTicket [data-ce-view-ticket-image="1"],#summaryTiendaTicket .ce-v17-doc-thumb-btn,#summaryTiendaTicket img.ce-v17-doc-thumb,#summaryTiendaTicket img.ticket-thumb,#ceBudgetLiteTooltipV307 [data-ce-view-ticket-image="1"]');
     if(accountingTicket){
       const opener=window.ControlEventV17Fix10?.openTicketViewerFromThumb;
       if(typeof opener==='function') return opener(accountingTicket,event);
