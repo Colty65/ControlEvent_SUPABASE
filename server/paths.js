@@ -16,5 +16,5 @@ export const APP_VERSION = 'ControlEvent v30_prod';
 
 export const APP_VERSION_LABEL = 'v30_prod';
 export const APP_VERSION_FILE = 'ControlEvent_v30_prod';
-export const BUILD_ID = '20260813-V30-PROD';
+export const BUILD_ID = '20260813-V30-PROD-ID2';
 export const ZIP_NAME = 'ControlEvent_v30_prod.zip';

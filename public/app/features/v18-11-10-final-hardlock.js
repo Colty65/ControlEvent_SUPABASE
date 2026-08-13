@@ -5,7 +5,7 @@
   var VERSION_LABEL='v30_prod';
   var VERSION_TEXT='ControlEvent v30_prod';
   var VERSION_FILE='ControlEvent_v30_prod';
-  var BUILD_ID='20260813-V30-PROD';
+  var BUILD_ID='20260813-V30-PROD-ID2';
   var ZIP_NAME='ControlEvent_v30_prod.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
