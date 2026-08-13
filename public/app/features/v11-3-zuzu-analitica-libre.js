@@ -121,7 +121,8 @@
     css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-status.INFO{color:#475569}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}#ceGeminiLibreOverlay .ce-ai-bank-justified{margin-top:14px;border-top:1px solid #dbeafe;padding-top:10px}#ceGeminiLibreOverlay .ce-ai-bank-justified h4{margin:0 0 8px;color:#075985}#ceGeminiLibreOverlay .ce-ai-bank-move{border:1px solid #dbeafe;border-left:6px solid #64748b;border-radius:10px;padding:9px 10px;margin:7px 0;background:#fff}#ceGeminiLibreOverlay .ce-ai-bank-move.INGRESO{border-left-color:#22c55e;background:#f0fdf4}#ceGeminiLibreOverlay .ce-ai-bank-move.CARGO{border-left-color:#e11d48;background:#fff1f2}#ceGeminiLibreOverlay .ce-ai-bank-move-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:850}.ce-ai-bank-move-amount{font-weight:950}.ce-ai-bank-move.INGRESO .ce-ai-bank-move-amount{color:#15803d}.ce-ai-bank-move.CARGO .ce-ai-bank-move-amount{color:#be123c}.ce-ai-bank-move-concept{font-weight:800;margin-top:4px}.ce-ai-bank-move-why{margin-top:3px;color:#334155}.ce-ai-bank-move-balance{color:#475569}';
     css.textContent += '\n'+
       '#ceGeminiLibreOverlay .ce-ai-mode-strip{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:1px solid #e2e8f0;font-weight:900;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-new{background:#eff6ff;color:#1d4ed8}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-conversation{background:#f0fdf4;color:#166534}#ceGeminiLibreOverlay .ce-ai-mode-pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 11px;background:#fff;border:1px solid currentColor;font-size:13px;letter-spacing:.02em}#ceGeminiLibreOverlay .ce-ai-mode-help{font-size:12px;font-weight:800;color:#475569;flex:1;min-width:260px}#ceGeminiLibreOverlay .ce-ai-conversation-card{border-color:#a7f3d0;background:linear-gradient(180deg,#f0fdf4,#fff)}#ceGeminiLibreOverlay .ce-ai-conversation-turn{border-top:1px dashed #bbf7d0;padding:8px 0}#ceGeminiLibreOverlay .ce-ai-conversation-turn:first-child{border-top:0;padding-top:0}#ceGeminiLibreOverlay .ce-ai-conversation-user{font-weight:900;color:#14532d}#ceGeminiLibreOverlay .ce-ai-conversation-zuzu{margin:5px 0 0 14px;color:#475569;white-space:pre-wrap;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-resume-note{font-size:12px;color:#475569;font-weight:800;margin-bottom:9px}\n'+
-      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-mode-strip{padding:8px 12px;gap:7px}#ceGeminiLibreOverlay .ce-ai-mode-help{min-width:100%;font-size:11px}}';
+      '#ceGeminiLibreOverlay .ce-ai-prompt-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(240px,1fr);gap:14px;align-items:stretch}#ceGeminiLibreOverlay .ce-ai-prompt-main{min-width:0;display:flex;flex-direction:column}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-width:0;min-height:164px;max-height:190px;border:1px solid #86efac;border-radius:14px;background:linear-gradient(180deg,#f0fdf4,#ffffff);display:flex;flex-direction:column;overflow:hidden}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #bbf7d0;color:#166534;font-size:12px;font-weight:950;background:rgba(240,253,244,.92)}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;background:#fff;border:1px solid #86efac;color:#166534;font-size:11px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-body{flex:1;overflow:auto;padding:6px 9px;scrollbar-width:thin}#ceGeminiLibreOverlay .ce-ai-conversation-rail-empty{padding:16px 8px;text-align:center;color:#64748b;font-size:11px;font-weight:800;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn{padding:7px 0;border-top:1px dashed #bbf7d0;font-size:11px;line-height:1.25;color:#334155}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn:first-child{border-top:0;padding-top:2px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turnno{font-weight:950;color:#166534;margin-bottom:3px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line{margin-top:2px;overflow-wrap:anywhere}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line b{color:#14532d}\n'+
+      '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-mode-strip{padding:8px 12px;gap:7px}#ceGeminiLibreOverlay .ce-ai-mode-help{min-width:100%;font-size:11px}#ceGeminiLibreOverlay .ce-ai-prompt-grid{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-height:118px;max-height:160px}}';
     document.head.appendChild(css);
   }
 
@@ -152,8 +153,16 @@
         '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v30_prod</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-mode-strip is-new" id="ceAiConversationMode"></div>'+
         '<div class="ce-ai-prompt">'+
-          '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
-          '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+          '<div class="ce-ai-prompt-grid">'+
+            '<div class="ce-ai-prompt-main">'+
+              '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
+              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+            '</div>'+
+            '<aside class="ce-ai-conversation-rail" aria-label="Rastro de la conversación">'+
+              '<div class="ce-ai-conversation-rail-head"><span>💬 Rastro de conversación</span><span class="ce-ai-conversation-rail-count" id="ceAiConversationRailCount">0</span></div>'+
+              '<div class="ce-ai-conversation-rail-body" id="ceAiConversationRailBody"></div>'+
+            '</aside>'+
+          '</div>'+
         '</div>'+
         '<div class="ce-ai-result" id="ceAiResult"></div>'+ 
       '</div></div>';
@@ -193,6 +202,25 @@
     var proposal=proposalTail(raw); if(proposal) return proposal;
     return raw.length>980?raw.slice(0,470)+' … '+raw.slice(-470):raw;
   }
+  function conversationTrailExcerpt(value){
+    var cleanText=String(value||'').replace(/\s+/g,' ').trim();
+    return cleanText.length>100?cleanText.slice(0,100)+'…':cleanText;
+  }
+  function conversationTrailBodyHtml(){
+    var hist=loadZuzuConversation().slice(-8);
+    if(!hist.length) return '<div class="ce-ai-conversation-rail-empty">Sin conversación todavía.<br>La primera respuesta abrirá el hilo.</div>';
+    return hist.map(function(turn,idx){
+      var q=conversationTrailExcerpt(turn&&turn.user||'');
+      var a=conversationTrailExcerpt(turn&&turn.assistant||'');
+      return '<div class="ce-ai-conversation-rail-turn"><div class="ce-ai-conversation-rail-turnno">Turno '+(idx+1)+'</div><div class="ce-ai-conversation-rail-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-conversation-rail-line"><b>R:</b> '+esc(a||'—')+'</div></div>';
+    }).join('');
+  }
+  function updateConversationTrail(){
+    var body=$('ceAiConversationRailBody'),count=$('ceAiConversationRailCount');
+    var hist=loadZuzuConversation().slice(-8);
+    if(count) count.textContent=String(hist.length);
+    if(body){ body.innerHTML=conversationTrailBodyHtml(); body.scrollTop=body.scrollHeight; }
+  }
   function activeConversationModel(currentPrompt){
     var hist=loadZuzuConversation().slice(-8);
     if(!hist.length) return {turns:[],isConversation:false,currentIndex:-1};
@@ -226,13 +254,7 @@
   function conversationResumeHtml(){
     var hist=loadZuzuConversation().slice(-8);
     if(!hist.length) return '<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>';
-    var html='<div class="ce-ai-card ce-ai-conversation-card ce-ai-conversation-screen-only"><h3>💬 Conversación abierta · '+hist.length+' turnos guardados</h3><div class="ce-ai-resume-note">Puedes continuar este mismo hilo. Si quieres empezar de cero, pulsa 🧹.</div>';
-    hist.forEach(function(turn){
-      html+='<div class="ce-ai-conversation-turn"><div class="ce-ai-conversation-user">Usuario: '+esc(String(turn.user||''))+'</div>';
-      var excerpt=conversationAssistantExcerpt(turn); if(excerpt) html+='<div class="ce-ai-conversation-zuzu"><strong>Zuzu:</strong> '+esc(excerpt)+'</div>';
-      html+='</div>';
-    });
-    return html+'</div>';
+    return '<div class="ce-ai-card ce-ai-conversation-card ce-ai-conversation-screen-only"><h3>💬 Conversación abierta · '+hist.length+' turnos guardados</h3><div class="ce-ai-answer">El rastro resumido del hilo está visible a la derecha del prompt. Puedes continuar preguntando o pulsar 🧹 para empezar de cero.</div></div>';
   }
   function updateConversationMode(){
     var node=$('ceAiConversationMode'); if(!node) return;
@@ -247,6 +269,7 @@
   }
   function restoreConversationScreen(){
     updateConversationMode();
+    updateConversationTrail();
     var r=$('ceAiResult'); if(r){ r.innerHTML=conversationResumeHtml(); r.setAttribute('data-ce-resume-only','1'); }
     window.__ceLastZuzuResult=null;
   }
@@ -306,6 +329,7 @@
     try{ ['ControlEvent_v30_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.removeAttribute('data-ce-resume-only'); r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     updateConversationMode();
+    updateConversationTrail();
     var titleNode=$('ceAiEventTitle'); if(titleNode) titleNode.innerHTML=eventTitleHtml();
     setStatus('', '');
     try{ if(p) p.focus(); }catch(_){ }
@@ -574,6 +598,7 @@
       if(window.__ceZuzuConversationV26.length>8) window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-8);
       saveZuzuConversation();
       updateConversationMode();
+      updateConversationTrail();
       if(!data.meta||typeof data.meta!=='object')data.meta={}; data.meta.routerShadowPending=true;
       recordZuzuUsage(data);
       await finishZuzuThinkingFast();
@@ -657,7 +682,6 @@
     var cls=data.rejected?' ce-ai-rejected':'';
     var promptText=trim(data.__prompt||(($('ceAiPrompt')||{}).value)||'');
     var allowTechnical=explicitTechnicalView(promptText);
-    html+=screenConversationContextHtml(promptText);
     html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+esc(data.answer||'')+'</div></div>';
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected || data.showWarnings === true || data.provider === 'gemini-rest-json-fallback') && visibleWarnings.length){ html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>'; }
