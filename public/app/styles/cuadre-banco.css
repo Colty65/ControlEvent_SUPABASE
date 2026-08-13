@@ -1937,3 +1937,49 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-balance-stack{display:flex!important;flex-direction:column!important;overflow-y:auto!important}
   #ceBankOverlay .ce-bank-balance-pane.zoom{order:-1!important;min-height:310px!important}
 }
+
+/* v30_prod FIX9.1.5 · ZOOM evento puro + gráficos realmente a todo el ancho */
+#ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout{
+  width:calc(100vw - 8px)!important;
+  height:calc(100dvh - 8px)!important;
+  max-height:calc(100dvh - 8px)!important;
+}
+#ceBankOverlay .ce-bank-balance-chart-overlay{padding:4px!important}
+#ceBankOverlay .ce-bank-balance-stack{
+  grid-template-rows:auto auto!important;
+  align-content:start!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding:0 3px 5px!important;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane{
+  width:100%!important;
+  max-width:none!important;
+  padding-left:2px!important;
+  padding-right:2px!important;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane-head{
+  margin-left:7px!important;
+  margin-right:7px!important;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  overflow:visible!important;
+}
+#ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  max-width:none!important;
+  min-height:0!important;
+  overflow:visible!important;
+}
+@media (max-width:1180px){
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout{border-radius:0!important}
+  #ceBankOverlay .ce-bank-balance-stack{overflow-y:auto!important;overflow-x:hidden!important}
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot{overflow:visible!important}
+  #ceBankOverlay .ce-bank-balance-stack .ce-bank-balance-pane .ce-bank-balance-plot svg{width:100%!important;height:auto!important}
+}
+

@@ -687,16 +687,15 @@
     const highlight=shade&&Number.isFinite(shadeStart)&&Number.isFinite(shadeEnd)
       ?`<rect class="ce-bank-balance-highlight" x="${Math.max(left,x(Math.min(shadeStart,shadeEnd))).toFixed(2)}" y="${top}" width="${Math.max(6,Math.min(left+plotW,x(Math.max(shadeStart,shadeEnd)))-Math.max(left,x(Math.min(shadeStart,shadeEnd)))).toFixed(2)}" height="${plotH.toFixed(2)}"></rect>`:'';
     const movementPoints=series.filter(point=>point.movement);
-    // Solo los movimientos REALMENTE incluidos en este evento son interactivos. Los demás
-    // siguen formando la línea para mantener el saldo bancario real, pero no tienen punto,
-    // no activan el inspector y nunca pueden mostrar justificantes en la cabecera.
+    // El zoom recibe ya una serie EXCLUSIVA del evento. Como segunda barrera, únicamente los
+    // movimientos En saldo del evento pueden ser interactivos o abrir el inspector/justificantes.
     const interactivePoints=showEventPoints?movementPoints.filter(point=>eventIds.has(String(point.movement.id))):[];
     const eventPoints=interactivePoints.map(point=>{
       const amount=num(point.movement.amount);
       return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.5" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     return {html,meta:{id,width,height,left,right,top,bottom,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point}))}};
   }
   function resetBalanceInspector(){
@@ -771,10 +770,20 @@
       // En táctil el punto de lectura se desplaza por encima del dedo para no tapar la curva.
       const yOffset=pointerType==='touch'?72:pointerType==='pen'?42:0;
       const tx=clientX,ty=clientY-yOffset;
+      // getScreenCTM respeta el viewBox, preserveAspectRatio, el escalado real del navegador y
+      // cualquier desplazamiento del contenedor. Evita el desfase de PC/iPad que obligaba a mover
+      // el cursor mucho más a izquierda/derecha que el punto visible.
+      const ctm=svg.getScreenCTM?.();
       let best=null,bestDistance=Infinity;
       for(const item of points){
-        const px=rect.left+(item.cx/meta.width)*rect.width;
-        const py=rect.top+(item.cy/meta.height)*rect.height;
+        let px,py;
+        if(ctm){
+          px=item.cx*ctm.a+item.cy*ctm.c+ctm.e;
+          py=item.cx*ctm.b+item.cy*ctm.d+ctm.f;
+        }else{
+          px=rect.left+(item.cx/meta.width)*rect.width;
+          py=rect.top+(item.cy/meta.height)*rect.height;
+        }
         const distance=Math.hypot(px-tx,py-ty);
         if(distance<bestDistance){bestDistance=distance;best=item;}
       }
@@ -854,9 +863,10 @@
     const minTime=Math.min(...allTimes),maxTime=Math.max(...allTimes);
     const eventStart=includedRows.length?Math.min(...includedRows.map(row=>parseMoment(row.executedAt))):minTime;
     const eventEnd=includedRows.length?Math.max(...includedRows.map(row=>parseMoment(row.executedAt))):maxTime;
-    let zoomSeries=series.filter(point=>point.time>=eventStart&&point.time<=eventEnd);
-    if(!zoomSeries.length) zoomSeries=series.filter(point=>point.movement&&eventIds.has(String(point.movement.id)));
-    if(!zoomSeries.length) zoomSeries=series.slice(-Math.min(20,series.length));
+    // ZOOM = exclusivamente los movimientos En saldo del evento. El histórico superior conserva
+    // la cronología bancaria completa, pero ningún movimiento ajeno vuelve a colarse en la línea
+    // del zoom, en sus puntos, en el inspector ni en sus justificantes.
+    const zoomSeries=series.filter(point=>point.movement&&eventIds.has(String(point.movement.id)));
     const firstValue=series[0].balance,lastValue=series[series.length-1].balance,variation=lastValue-firstValue;
     const firstMovement=series.find(point=>point.movement)?.movement;
     const lastMovement=[...series].reverse().find(point=>point.movement)?.movement;
@@ -865,14 +875,16 @@
     // El viewBox se adapta al espacio real. En PC aprovechamos prácticamente todo el ancho;
     // en móvil evitamos el antiguo SVG fijo de 720 px que obligaba a arrastrar la gráfica.
     const vw=Math.max(360,Math.round(window.innerWidth||document.documentElement.clientWidth||1200));
-    const chartWidth=Math.max(360,Math.min(1900,vw-24));
+    const vh=Math.max(480,Math.round(window.innerHeight||document.documentElement.clientHeight||800));
+    const chartWidth=Math.max(360,Math.min(3200,vw-20));
     const phone=vw<=760;
     const landscapePhone=phone&&window.matchMedia?.('(orientation: landscape)')?.matches;
-    const zoomHeight=landscapePhone?300:(phone?350:310);
-    const historyHeight=phone?235:285;
+    const shortWideScreen=!phone&&vh<900;
+    const zoomHeight=landscapePhone?300:(phone?350:(shortWideScreen?245:310));
+    const historyHeight=phone?235:(shortWideScreen?205:285);
     const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom completo del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,showEventPoints:true});
     const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)} · La franja amarilla identifica el intervalo En saldo del evento`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false});
-    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Los movimientos ajenos al evento solo forman la línea: nunca llevan punto ni activan la cabecera.</small></footer></section>`;
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.</small></footer></section>`;
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden','false');
     overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='zoom'?zoomPane.meta:historyPane.meta));

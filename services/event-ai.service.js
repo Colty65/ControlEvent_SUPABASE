@@ -1399,11 +1399,37 @@ function excludedFromAttendanceName(name) {
 function canonicalNameKey(name) {
   return norm(name).replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
-function isCanonicalPairName(name) {
-  return /\s+y\s+/i.test(trim(name));
-}
 function splitCanonicalPairName(name) {
-  return trim(name).split(/\s+y\s+/i).map(x => trim(x)).filter(Boolean);
+  const raw = trim(name);
+  if (!raw) return [];
+  const separators = [];
+  let depth = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(' || ch === '[' || ch === '{') { depth++; continue; }
+    if (ch === ')' || ch === ']' || ch === '}') { depth = Math.max(0, depth - 1); continue; }
+    if (depth !== 0 || !/\s/.test(ch)) continue;
+    const rest = raw.slice(i);
+    const match = rest.match(/^\s+y\s+/i);
+    if (match) { separators.push({ index: i, length: match[0].length }); i += match[0].length - 1; }
+  }
+  if (!separators.length) return [raw];
+  const parts = [];
+  let start = 0;
+  for (const sep of separators) {
+    const part = trim(raw.slice(start, sep.index));
+    if (part) parts.push(part);
+    start = sep.index + sep.length;
+  }
+  const tail = trim(raw.slice(start));
+  if (tail) parts.push(tail);
+  return parts;
+}
+function isCanonicalPairName(name) {
+  // Solo una «y» de nivel superior separa miembros de una pareja. Textos descriptivos como
+  // «Personas colaboradoras Tardeo (Copas y más)» o «Luisa (Carmelo y Lucia)» son UNA entidad,
+  // no una pareja. Esto evita que palabras corrientes como «más» se conviertan en una persona.
+  return splitCanonicalPairName(name).length >= 2;
 }
 function canonicalPersonNumber(row, fallback = 1) {
   const n = num(row?.Numero ?? row?.numero ?? row?.['Número'] ?? row?.número ?? row?.num ?? row?.personas ?? row?.cantidad);
@@ -5331,8 +5357,8 @@ function semanticCanonicalSocioRows(rows){
     return !/^z[_\s-]*dev\b/.test(n)&&!/^grupo\b/.test(n)&&!/^pe[ñn]a\b/.test(n)&&!/^personas\b/.test(n);
   });
   const key=v=>norm(v).replace(/[^a-z0-9ñ]+/g,' ').replace(/\s+/g,' ').trim();
-  const isPair=v=>/\s+y\s+/i.test(trim(v));
-  const parts=v=>trim(v).split(/\s+y\s+/i).map(trim).filter(Boolean);
+  const isPair=v=>isCanonicalPairName(v);
+  const parts=v=>splitCanonicalPairName(v);
   const pairs=clean.filter(x=>isPair(x.name)).map(x=>({...x,parts:parts(x.name),size:Math.max(2,parts(x.name).length||2)}));
   const out=[]; const seen=new Set();
   for(const p of pairs){const k=key(p.name);if(!seen.has(k)){seen.add(k);out.push({'Socio canónico':p.name,'Personas':p.size});}}
@@ -6167,7 +6193,7 @@ function v26ConversationContextFromRun(userPrompt,plan,results,previousContext={
   return{...prev,focus:focus||prev.focus,lastIntent:trim(plan?.intent)||prev.lastIntent,selectedEventId:trim(selectedEventId)||prev.selectedEventId,turn};
 }
 
-function v26PairParts(name){return trim(name).split(/\s+y\s+/i).map(trim).filter(Boolean);}
+function v26PairParts(name){return splitCanonicalPairName(name).filter(Boolean);}
 
 // v30_prod · identidad canónica compartida por TODAS las herramientas personales.
 // Una consulta por una persona atómica (p. ej. «Curvas») debe resolver siempre las mismas
@@ -7971,7 +7997,7 @@ async function v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conv
 function v30PersonGroundingInput(userPrompt,grounding){
   if(!grounding?.compact)return userPrompt;
   const review=grounding.recheck?'ESTE TURNO ES UNA REVISIÓN/CORRECCIÓN: usa estos hechos frescos y no la conclusión memorizada del turno anterior.':'';
-  return `MENSAJE DEL USUARIO:\n${userPrompt}\n\nCANONICAL_PERSON_GROUNDING (preconsultado por ControlEvent en este mismo turno; fuente canónica, no lo repitas como bloque):\n- Sujeto que debes conservar: ${grounding.subject}\n- Ámbito: ${grounding.scope}${grounding.event?` · ${grounding.event}`:''}\n- IMPORTANTE: una pareja/entidad compartida NO sustituye a la persona individual para compras, Hitos o LG. direct_representations = responsabilidad individual; shared_representations = contexto compartido de participación/ingresos/donaciones.\n${review}\n${JSON.stringify(grounding.compact)}\n\nSi este grounding basta para responder, NO pidas canonical_socios ni vuelvas a pedir person_dossier. Si necesitas otra dimensión realmente distinta, solicita solo la herramienta imprescindible.`;
+  return `MENSAJE DEL USUARIO:\n${userPrompt}\n\nCANONICAL_PERSON_GROUNDING (preconsultado por ControlEvent en este mismo turno; fuente canónica, no lo repitas como bloque):\n- Sujeto que debes conservar: ${grounding.subject}\n- Ámbito: ${grounding.scope}${grounding.event?` · ${grounding.event}`:''}\n- CONTINUIDAD OBLIGATORIA: si el mensaje actual es elíptico (por ejemplo «dime más», «revisa mi responsabilidad» o «busca solo eso») y NO nombra otra persona, este sujeto tiene prioridad sobre nombres incidentales o entidades descriptivas aparecidas en el historial. No interpretes palabras comunes del mensaje como nombres de persona.\n- IMPORTANTE: una pareja/entidad compartida NO sustituye a la persona individual para compras, Hitos o LG. direct_representations = responsabilidad individual; shared_representations = contexto compartido de participación/ingresos/donaciones.\n${review}\n${JSON.stringify(grounding.compact)}\n\nSi este grounding basta para responder, NO pidas canonical_socios ni vuelvas a pedir person_dossier. Si necesitas otra dimensión realmente distinta, solicita solo la herramienta imprescindible.`;
 }
 
 
