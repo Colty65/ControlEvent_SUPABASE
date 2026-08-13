@@ -6,7 +6,7 @@
   window.__ceV17Fix25WelcomeElArrastre = true;
 
   const STYLE_ID = 'ceV17Fix25WelcomeElArrastreStyle';
-  const ASSET = './assets/icons/penya-el-arrastre-welcome.png';
+  const ASSET = './assets/icons/penya-el-arrastre-welcome-v29.jpg';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
   const safe = (fn, fb) => { try{ const out = fn(); return out === undefined ? fb : out; }catch(_){ return fb; } };

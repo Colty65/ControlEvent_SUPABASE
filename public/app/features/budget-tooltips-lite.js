@@ -347,7 +347,7 @@
     if(!src) return {className:'ce-budget-thumb-cell',html:'<span class="ce-budget-ticket-thumb-empty">—</span>'};
     const title=`Justificante de ingreso · ${p.nombre}`;
     const file=`ING-${safeDownloadPart(selectedEventObj().titulo||selectedEventObj().descripcion||'Evento','Evento')}-${safeDownloadPart(p.nombre,'Colaborador')}.jpg`;
-    return {className:'ce-budget-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-g92-photo="1" data-ce-budget-income-receipt="1" data-id="${esc(item.id || '')}" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-person-name="${esc(p.nombre)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
+    return {className:'ce-budget-thumb-cell',html:`<button type="button" class="ce-budget-stable-thumb" data-ce-budget-income-receipt="1" data-ce-photo-kind="income-receipt" data-id="${esc(item.id || '')}" data-image-src="${esc(src)}" data-photo-title="${esc(title)}" data-download-name="${esc(file)}" data-person-name="${esc(p.nombre)}" aria-label="Ver ${esc(title)}"><img src="${esc(src)}" alt="${esc(title)}" loading="eager" decoding="async" width="48" height="48"></button>`};
   }
 
   function incomeTipForRow(row){
@@ -775,22 +775,37 @@
   // Estas miniaturas las crea este mismo modulo como .ce-budget-stable-thumb. No son TKxx.
   // El manejador se registra en WINDOW/CAPTURE antes de los hotfix posteriores para evitar que
   // otro visor de tickets consuma la pulsacion.
+  let lastBudgetReceiptOpenAt = 0;
+  let lastBudgetReceiptOpenId = '';
+  function closeBudgetIncomeReceipt(event){
+    const ov = document.getElementById('ceV29BudgetIncomePhoto');
+    if(!ov) return false;
+    try{ event?.preventDefault?.(); event?.stopPropagation?.(); event?.stopImmediatePropagation?.(); }catch(_){ }
+    try{ ov.remove(); }catch(_){ }
+    return true;
+  }
   function openBudgetIncomeReceipt(event){
     const btn = event.target?.closest?.(`#${TOOLTIP_ID} .ce-budget-stable-thumb[data-ce-budget-income-receipt="1"]`);
     if(!btn) return false;
     const id = norm(btn.dataset?.id || '');
     const img = btn.querySelector?.('img');
     const src = norm(btn.dataset?.imageSrc || img?.currentSrc || img?.src || '');
+    const nowOpen = Date.now();
+
+    // pointerup/touchend suelen generar despues un click sintetico. Consumimos el duplicado
+    // para que nunca se abra/cierre dos veces el mismo justificante.
+    if(id && id === lastBudgetReceiptOpenId && (nowOpen - lastBudgetReceiptOpenAt) < 650 && document.getElementById('ceV29BudgetIncomePhoto')){
+      try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
+      return true;
+    }
     try{ event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); }catch(_){ }
 
-    // Visor canonico de justificantes: aporta los datos del ingreso y preserva el globo origen.
-    const api = window.ControlEventV469 || window.ControlEventV467 || window.ControlEventV465;
-    if(id && api && typeof api.showReceiptModal === 'function'){
-      try{ api.showReceiptModal(id, event); return true; }catch(error){ console.warn('[v29_prod] visor justificante Resumen', error); }
-    }
-
-    // Fallback autonomo: nunca dejar una miniatura visible sin accion por falta del API anterior.
+    // La miniatura visible ya contiene la URL/dato real que se esta mostrando. Se usa esa misma
+    // fuente para el visor grande: asi no dependemos de caches legacy ni de que otro modulo encuentre
+    // de nuevo el justificante por id.
     if(src){
+      lastBudgetReceiptOpenAt = nowOpen;
+      lastBudgetReceiptOpenId = id || src.slice(0,96);
       try{ document.getElementById('ceV29BudgetIncomePhoto')?.remove(); }catch(_){ }
       const ov = document.createElement('div');
       ov.id = 'ceV29BudgetIncomePhoto';
@@ -799,13 +814,22 @@
       const title = norm(btn.dataset?.photoTitle || 'Justificante de ingreso');
       ov.innerHTML = `<div class="ce-v29-budget-income-photo-card"><div class="ce-v29-budget-income-photo-head"><strong>${esc(title)}</strong><button type="button" data-close="1">Cerrar</button></div><img src="${esc(src)}" alt="${esc(title)}"></div>`;
       document.body.appendChild(ov);
-      const close = ev => { try{ ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.(); }catch(_){ } try{ ov.remove(); }catch(_){ } return false; };
-      ov.addEventListener('click', ev => { if(ev.target === ov || ev.target?.closest?.('[data-close]')) close(ev); }, true);
+      ov.addEventListener('click', ev => { if(ev.target === ov || ev.target?.closest?.('[data-close]')) closeBudgetIncomeReceipt(ev); }, true);
+      try{ ov.querySelector('[data-close]')?.focus({preventScroll:true}); }catch(_){ }
       return true;
+    }
+
+    // Fallback solo si por alguna razon el DOM perdiera la URL de la miniatura.
+    const api = window.ControlEventV469 || window.ControlEventV467 || window.ControlEventV465;
+    if(id && api && typeof api.showReceiptModal === 'function'){
+      try{ api.showReceiptModal(id, event); return true; }catch(error){ console.warn('[v29_prod] visor justificante Resumen', error); }
     }
     return true;
   }
+  window.addEventListener('pointerup', event => { openBudgetIncomeReceipt(event); }, {capture:true, passive:false});
   window.addEventListener('click', event => { openBudgetIncomeReceipt(event); }, {capture:true, passive:false});
+  if(!window.PointerEvent) window.addEventListener('touchend', event => { openBudgetIncomeReceipt(event); }, {capture:true, passive:false});
+  document.addEventListener('keydown', event => { if(event.key === 'Escape') closeBudgetIncomeReceipt(event); }, true);
 
   document.addEventListener('pointerdown', event => {
     try{ rememberMobileBudgetTapStart(event); }catch(_){ }

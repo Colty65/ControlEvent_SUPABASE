@@ -17,7 +17,7 @@
       #noEventMessage{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:56vh!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;transition:none!important;animation:none!important;}
       #noEventMessage.hidden,body.ce-v17-has-event #noEventMessage,body.ce-v17-event-switching #noEventMessage,body.ce-v17-fix25-has-event #noEventMessage{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;max-height:0!important;min-height:0!important;overflow:hidden!important;}
       #noEventMessage>*{display:none!important;visibility:hidden!important;opacity:0!important;max-height:0!important;overflow:hidden!important;}
-      #noEventMessage::before{content:""!important;display:block!important;width:clamp(210px,38vw,340px)!important;height:clamp(160px,29vw,258px)!important;max-width:76vw!important;max-height:42vh!important;background:url('./assets/icons/penya-el-arrastre-welcome.png') center/contain no-repeat!important;border-radius:0!important;filter:none!important;transform:none!important;transition:none!important;animation:none!important;}
+      #noEventMessage::before{content:""!important;display:block!important;width:clamp(210px,38vw,340px)!important;height:clamp(160px,29vw,258px)!important;max-width:76vw!important;max-height:42vh!important;background:url('./assets/icons/penya-el-arrastre-welcome-v29.jpg') center/contain no-repeat!important;border-radius:0!important;filter:none!important;transform:none!important;transition:none!important;animation:none!important;}
     `;
     document.head.appendChild(st);
   }

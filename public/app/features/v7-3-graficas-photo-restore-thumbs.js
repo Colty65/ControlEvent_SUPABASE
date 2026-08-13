@@ -365,6 +365,10 @@
     const close=target?.closest?.('[data-ce-g92-close-tip]');if(close){consume(event);closeTip();return true;}
     const viewerClose=target?.closest?.('[data-ce-g92-close-viewer]');if(viewerClose||target?.id==='ceV26GraphMedia'){consume(event);closeViewer(true);return true;}
     const download=target?.closest?.('[data-ce-g92-download]');if(download){consume(event);downloadImage(download.dataset.imageSrc,download.dataset.downloadName);return true;}
+    // Los justificantes de INGRESOS del globo de RESUMEN no son TKxx. Este modulo se carga
+    // antes que budget-tooltips-lite y antes los interceptaba como si fueran tickets, consumiendo
+    // el evento antes de que llegara a su visor. Se dejan pasar expresamente.
+    if(target?.closest?.('#ceBudgetLiteTooltipV307 [data-ce-budget-income-receipt="1"]')) return false;
     const thumb=target?.closest?.('[data-ce-g92-photo="1"]');if(thumb){
       const accountingTicket=thumb.closest?.('#summaryTiendaTicket,#ceBudgetLiteTooltipV307');
       const graphTicket=thumb.closest?.('#ceV26GraphTip')&&text(thumb.dataset.ticketCode);
