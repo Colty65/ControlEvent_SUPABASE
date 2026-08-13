@@ -1,0 +1,1639 @@
+{
+  "version": "v30_prod-router-shadow-1",
+  "description": "Banco de 100 casos de enrutamiento Zuzu: 55 consultas independientes + 15 conversaciones de 3 turnos (45 mensajes). No consulta datos ni valida la respuesta factual; valida la decisión de tubería/contexto.",
+  "cases": [
+    {
+      "id": "S001",
+      "kind": "standalone",
+      "prompt": "Háblame de Colty",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_OVERVIEW",
+        "operation": "SUMMARY",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S002",
+      "kind": "standalone",
+      "prompt": "¿Cuánto dinero ha ingresado Colty en todos los eventos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_INCOMES",
+        "operation": "TOTAL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S003",
+      "kind": "standalone",
+      "prompt": "¿Qué compras tiene Colty bajo su responsabilidad?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S004",
+      "kind": "standalone",
+      "prompt": "Dime las donaciones vinculadas a Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_DONATIONS",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S005",
+      "kind": "standalone",
+      "prompt": "¿Qué hitos y tareas LG tiene Colty?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_MANAGEMENT",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S006",
+      "kind": "standalone",
+      "prompt": "¿En qué eventos ha participado Colty?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PARTICIPATION",
+        "operation": "LIST",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S007",
+      "kind": "standalone",
+      "prompt": "Compara la actividad de Colty y Esther.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PEOPLE_COMPARE",
+        "operation": "COMPARE",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S008",
+      "kind": "standalone",
+      "prompt": "¿Quién es la persona con más compras bajo su responsabilidad?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PEOPLE_ACTIVITY",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S009",
+      "kind": "standalone",
+      "prompt": "Ordéname las personas por ingresos aportados, de mayor a menor.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PEOPLE_ACTIVITY",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S010",
+      "kind": "standalone",
+      "prompt": "Hazme un resumen completo de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_OVERVIEW",
+        "operation": "SUMMARY",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S011",
+      "kind": "standalone",
+      "prompt": "Dime todas las compras de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S012",
+      "kind": "standalone",
+      "prompt": "¿Qué queda pendiente de compra en SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S013",
+      "kind": "standalone",
+      "prompt": "Lista los TK de SySA 2026 con su importe.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S014",
+      "kind": "standalone",
+      "prompt": "¿Qué donaciones tuvo SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DONATIONS",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S015",
+      "kind": "standalone",
+      "prompt": "¿Quiénes fueron los donantes de SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DONATIONS",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S016",
+      "kind": "standalone",
+      "prompt": "Dame la lista de asistentes de SySA 2026 uno por uno.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S017",
+      "kind": "standalone",
+      "prompt": "¿Qué socios de SySA 2026 no han pagado?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S018",
+      "kind": "standalone",
+      "prompt": "¿Cuánto se ingresó en SySA 2026 y de quién?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S019",
+      "kind": "standalone",
+      "prompt": "¿Quién aparece exento de pago en SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S020",
+      "kind": "standalone",
+      "prompt": "Enséñame los documentos de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S021",
+      "kind": "standalone",
+      "prompt": "¿Qué justificantes de ingreso tiene SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S022",
+      "kind": "standalone",
+      "prompt": "Dime los fototickets y justificantes de compra de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S023",
+      "kind": "standalone",
+      "prompt": "¿Cuáles son los hitos de SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S024",
+      "kind": "standalone",
+      "prompt": "¿Quién es responsable de cada tarea LG de SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S025",
+      "kind": "standalone",
+      "prompt": "Desglosa SySA 2026 por SEGMENTO.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_BREAKDOWN",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S026",
+      "kind": "standalone",
+      "prompt": "Desglosa SySA 2026 por DESTINO.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_BREAKDOWN",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S027",
+      "kind": "standalone",
+      "prompt": "¿Qué productos se utilizaron en SySA 2026 y cuántas unidades?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_BREAKDOWN",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S028",
+      "kind": "standalone",
+      "prompt": "Agrupa las compras de SySA 2026 por tienda.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_BREAKDOWN",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S029",
+      "kind": "standalone",
+      "prompt": "¿Cuánto hemos comprado en Mercadona en todos los eventos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "STORE_PURCHASES",
+        "operation": "TOTAL",
+        "subject": {
+          "value": "Mercadona"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S030",
+      "kind": "standalone",
+      "prompt": "¿Qué saldo dejó SySA 2026 en la cuenta?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "BANK",
+        "operation": "TOTAL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S031",
+      "kind": "standalone",
+      "prompt": "Lista los movimientos bancarios de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "BANK",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S032",
+      "kind": "standalone",
+      "prompt": "¿Qué movimientos del banco de SySA 2026 están sin justificar?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "BANK",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S033",
+      "kind": "standalone",
+      "prompt": "Hazme una gráfica de la evolución del saldo durante SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "BANK",
+        "operation": "GRAPH",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S034",
+      "kind": "standalone",
+      "prompt": "Compara SySA 2025 con SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "COMPARE_EVENTS",
+        "operation": "COMPARE"
+      }
+    },
+    {
+      "id": "S035",
+      "kind": "standalone",
+      "prompt": "Compara la III Jornada Solidaria vs ELA - DIC24 con la IV Jornada Solidaria vs ELA - DIC25.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "COMPARE_EVENTS",
+        "operation": "COMPARE"
+      }
+    },
+    {
+      "id": "S036",
+      "kind": "standalone",
+      "prompt": "¿Cuál es el evento en el que más hemos gastado?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S037",
+      "kind": "standalone",
+      "prompt": "¿Qué evento ha tenido más ingresos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S038",
+      "kind": "standalone",
+      "prompt": "¿En qué evento salió mejor el coste por persona?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S039",
+      "kind": "standalone",
+      "prompt": "Dame el catálogo de eventos registrados.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "CATALOG",
+        "operation": "LIST",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S040",
+      "kind": "standalone",
+      "prompt": "Dame el listado maestro de personas.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "CATALOG",
+        "operation": "LIST",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S041",
+      "kind": "standalone",
+      "prompt": "Enséñame el catálogo de productos.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "CATALOG",
+        "operation": "LIST",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S042",
+      "kind": "standalone",
+      "prompt": "¿Qué tiendas tenemos dadas de alta?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "CATALOG",
+        "operation": "LIST",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S043",
+      "kind": "standalone",
+      "prompt": "¿Qué tiempo hará en este evento?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "WEATHER",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "ACTIVE_EVENT"
+        }
+      }
+    },
+    {
+      "id": "S044",
+      "kind": "standalone",
+      "prompt": "Dime la previsión meteorológica para SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "WEATHER",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S045",
+      "kind": "standalone",
+      "prompt": "¿Qué fechas tiene SySA 2026 y cuál es su situación?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_OVERVIEW",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S046",
+      "kind": "standalone",
+      "prompt": "Busca el TK21 de SySA 2026 y dime qué contiene.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "SEARCH",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S047",
+      "kind": "standalone",
+      "prompt": "Detállame el TK05 de SySA 2026, líneas e importe total.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S048",
+      "kind": "standalone",
+      "prompt": "¿Qué compramos en Mercadona para SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "STORE_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Mercadona"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S049",
+      "kind": "standalone",
+      "prompt": "¿Cuánto ha comprado Pocholo en todos los eventos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PURCHASES",
+        "operation": "TOTAL",
+        "subject": {
+          "value": "Pocholo"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S050",
+      "kind": "standalone",
+      "prompt": "¿Qué donaciones aparecen vinculadas a Pocholo?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_DONATIONS",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Pocholo"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "S051",
+      "kind": "standalone",
+      "prompt": "En SySA 2026, ¿quién tiene Número igual a 0 en asistencia?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S052",
+      "kind": "standalone",
+      "prompt": "Separa en SySA 2026 los ingresos obligatorios de los voluntarios.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S053",
+      "kind": "standalone",
+      "prompt": "Compara en SySA 2026 las compras realizadas con lo pendiente de compra.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "COMPARE",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S054",
+      "kind": "standalone",
+      "prompt": "Dime las dependencias entre hitos y LG de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "S055",
+      "kind": "standalone",
+      "prompt": "Muéstrame en una tabla las compras bajo responsabilidad de Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PURCHASES",
+        "operation": "TABLE",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C01-T1",
+      "kind": "conversation",
+      "conversation": "C01",
+      "turn": 1,
+      "prompt": "Háblame de Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_OVERVIEW",
+        "operation": "SUMMARY",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C01-T2",
+      "kind": "conversation",
+      "conversation": "C01",
+      "turn": 2,
+      "prompt": "Pero dime más cosas.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_OVERVIEW",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C01-T3",
+      "kind": "conversation",
+      "conversation": "C01",
+      "turn": 3,
+      "prompt": "¿Y sus compras?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C02-T1",
+      "kind": "conversation",
+      "conversation": "C02",
+      "turn": 1,
+      "prompt": "Dime las compras de Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C02-T2",
+      "kind": "conversation",
+      "conversation": "C02",
+      "turn": 2,
+      "prompt": "Revisa bien mi responsabilidad en compras.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_PURCHASES",
+        "operation": "REVIEW",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C02-T3",
+      "kind": "conversation",
+      "conversation": "C02",
+      "turn": 3,
+      "prompt": "Pero busca solo Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS",
+          "value": true
+        }
+      }
+    },
+    {
+      "id": "C03-T1",
+      "kind": "conversation",
+      "conversation": "C03",
+      "turn": 1,
+      "prompt": "¿Qué ingresos tiene Colty?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_INCOMES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C03-T2",
+      "kind": "conversation",
+      "conversation": "C03",
+      "turn": 2,
+      "prompt": "¿Y Esther?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_INCOMES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Esther"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C03-T3",
+      "kind": "conversation",
+      "conversation": "C03",
+      "turn": 3,
+      "prompt": "Compáralos.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PEOPLE_COMPARE",
+        "operation": "COMPARE",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C04-T1",
+      "kind": "conversation",
+      "conversation": "C04",
+      "turn": 1,
+      "prompt": "Háblame de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_OVERVIEW",
+        "operation": "SUMMARY",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C04-T2",
+      "kind": "conversation",
+      "conversation": "C04",
+      "turn": 2,
+      "prompt": "¿Y las compras?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PURCHASES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C04-T3",
+      "kind": "conversation",
+      "conversation": "C04",
+      "turn": 3,
+      "prompt": "¿Quién fue responsable de ellas?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PURCHASES",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C05-T1",
+      "kind": "conversation",
+      "conversation": "C05",
+      "turn": 1,
+      "prompt": "¿Qué compró Colty en SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C05-T2",
+      "kind": "conversation",
+      "conversation": "C05",
+      "turn": 2,
+      "prompt": "¿Y en SySA 2025?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2025"
+        }
+      }
+    },
+    {
+      "id": "C05-T3",
+      "kind": "conversation",
+      "conversation": "C05",
+      "turn": 3,
+      "prompt": "Vuelve a SySA 2026 y dime los TK.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_PURCHASES",
+        "operation": "LIST",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C06-T1",
+      "kind": "conversation",
+      "conversation": "C06",
+      "turn": 1,
+      "prompt": "Dime cómo quedó el banco en SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "BANK",
+        "operation": "SUMMARY",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C06-T2",
+      "kind": "conversation",
+      "conversation": "C06",
+      "turn": 2,
+      "prompt": "¿Qué cargos hubo?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "BANK",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C06-T3",
+      "kind": "conversation",
+      "conversation": "C06",
+      "turn": 3,
+      "prompt": "Justifícame el segundo.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "BANK",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C07-T1",
+      "kind": "conversation",
+      "conversation": "C07",
+      "turn": 1,
+      "prompt": "Enséñame la documentación de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C07-T2",
+      "kind": "conversation",
+      "conversation": "C07",
+      "turn": 2,
+      "prompt": "Solo los justificantes de ingreso.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C07-T3",
+      "kind": "conversation",
+      "conversation": "C07",
+      "turn": 3,
+      "prompt": "Y ahora los de compra.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_DOCUMENTATION",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C08-T1",
+      "kind": "conversation",
+      "conversation": "C08",
+      "turn": 1,
+      "prompt": "¿Quién asistió a SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C08-T2",
+      "kind": "conversation",
+      "conversation": "C08",
+      "turn": 2,
+      "prompt": "¿Quién de ellos no pagó?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C08-T3",
+      "kind": "conversation",
+      "conversation": "C08",
+      "turn": 3,
+      "prompt": "¿Y cuáles estaban exentos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PEOPLE_INCOMES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C09-T1",
+      "kind": "conversation",
+      "conversation": "C09",
+      "turn": 1,
+      "prompt": "Dame el estado de compras de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_PURCHASES",
+        "operation": "SUMMARY",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C09-T2",
+      "kind": "conversation",
+      "conversation": "C09",
+      "turn": 2,
+      "prompt": "Solo lo pendiente.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PURCHASES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        },
+        "filters": {
+          "purchase_status": "PENDING"
+        }
+      }
+    },
+    {
+      "id": "C09-T3",
+      "kind": "conversation",
+      "conversation": "C09",
+      "turn": 3,
+      "prompt": "Ahora solo lo ya realizado.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_PURCHASES",
+        "operation": "LIST",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        },
+        "filters": {
+          "purchase_status": "REALIZED"
+        }
+      }
+    },
+    {
+      "id": "C10-T1",
+      "kind": "conversation",
+      "conversation": "C10",
+      "turn": 1,
+      "prompt": "Dime los hitos y LG de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C10-T2",
+      "kind": "conversation",
+      "conversation": "C10",
+      "turn": 2,
+      "prompt": "Quédate solo con los que lleva Colty.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        },
+        "filters": {
+          "exact_subject": true
+        }
+      }
+    },
+    {
+      "id": "C10-T3",
+      "kind": "conversation",
+      "conversation": "C10",
+      "turn": 3,
+      "prompt": "¿Y qué fechas tienen?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENT_MANAGEMENT",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C11-T1",
+      "kind": "conversation",
+      "conversation": "C11",
+      "turn": 1,
+      "prompt": "Compara SySA 2025 y SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "COMPARE_EVENTS",
+        "operation": "COMPARE"
+      }
+    },
+    {
+      "id": "C11-T2",
+      "kind": "conversation",
+      "conversation": "C11",
+      "turn": 2,
+      "prompt": "Ahora compara solo las compras.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "COMPARE_EVENTS",
+        "operation": "COMPARE"
+      }
+    },
+    {
+      "id": "C11-T3",
+      "kind": "conversation",
+      "conversation": "C11",
+      "turn": 3,
+      "prompt": "Y después la asistencia.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "COMPARE_EVENTS",
+        "operation": "COMPARE"
+      }
+    },
+    {
+      "id": "C12-T1",
+      "kind": "conversation",
+      "conversation": "C12",
+      "turn": 1,
+      "prompt": "¿Qué compramos en Mercadona para SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "STORE_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Mercadona"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C12-T2",
+      "kind": "conversation",
+      "conversation": "C12",
+      "turn": 2,
+      "prompt": "¿Y en Carrefour?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "STORE_PURCHASES",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Carrefour"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C12-T3",
+      "kind": "conversation",
+      "conversation": "C12",
+      "turn": 3,
+      "prompt": "Compárame ambas tiendas.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "STORE_PURCHASES",
+        "operation": "COMPARE",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C13-T1",
+      "kind": "conversation",
+      "conversation": "C13",
+      "turn": 1,
+      "prompt": "¿Qué tiempo hará en SySA 2026?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "WEATHER",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C13-T2",
+      "kind": "conversation",
+      "conversation": "C13",
+      "turn": 2,
+      "prompt": "¿Y el sábado?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "WEATHER",
+        "operation": "DETAIL",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C13-T3",
+      "kind": "conversation",
+      "conversation": "C13",
+      "turn": 3,
+      "prompt": "Ponme una gráfica de temperaturas.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "WEATHER",
+        "operation": "GRAPH",
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C14-T1",
+      "kind": "conversation",
+      "conversation": "C14",
+      "turn": 1,
+      "prompt": "¿En qué evento gastamos más?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C14-T2",
+      "kind": "conversation",
+      "conversation": "C14",
+      "turn": 2,
+      "prompt": "¿Y en cuál menos?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C14-T3",
+      "kind": "conversation",
+      "conversation": "C14",
+      "turn": 3,
+      "prompt": "Mira ahora solo las jornadas solidarias.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "EVENTS_ANALYSIS",
+        "operation": "RANKING",
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C15-T1",
+      "kind": "conversation",
+      "conversation": "C15",
+      "turn": 1,
+      "prompt": "¿Qué responsabilidades de gestión tiene Colty?",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "TRANSACTIONAL",
+        "route": "PERSON_MANAGEMENT",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "ALL_EVENTS"
+        }
+      }
+    },
+    {
+      "id": "C15-T2",
+      "kind": "conversation",
+      "conversation": "C15",
+      "turn": 2,
+      "prompt": "Solo las de SySA 2026.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_MANAGEMENT",
+        "operation": "DETAIL",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    },
+    {
+      "id": "C15-T3",
+      "kind": "conversation",
+      "conversation": "C15",
+      "turn": 3,
+      "prompt": "¿Seguro? Revísalo bien.",
+      "screenEventTitle": "SySA 2026",
+      "expected": {
+        "mode": "CONVERSATION",
+        "route": "PERSON_MANAGEMENT",
+        "operation": "REVIEW",
+        "subject": {
+          "value": "Colty"
+        },
+        "event": {
+          "scope": "NAMED_EVENT",
+          "value": "SySA 2026"
+        }
+      }
+    }
+  ]
+}
