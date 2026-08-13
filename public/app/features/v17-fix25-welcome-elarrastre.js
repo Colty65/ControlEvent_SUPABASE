@@ -1,4 +1,4 @@
-/* ControlEvent v29_prod FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
+/* ControlEvent v30_prod FIX25 - logo Peña El Arrastre en pantalla de bienvenida post-login.
    No refresca datos ni toca cálculos: solo pinta el logo si no hay evento elegido y lo oculta antes de cargar GRAFICAS. */
 (function(){
   'use strict';
@@ -6,7 +6,7 @@
   window.__ceV17Fix25WelcomeElArrastre = true;
 
   const STYLE_ID = 'ceV17Fix25WelcomeElArrastreStyle';
-  const ASSET = './assets/icons/penya-el-arrastre-welcome-v29.jpg';
+  const ASSET = './assets/icons/penya-el-arrastre-welcome-v30.jpg';
   const $ = id => document.getElementById(id);
   const norm = v => String(v == null ? '' : v).trim();
   const safe = (fn, fb) => { try{ const out = fn(); return out === undefined ? fb : out; }catch(_){ return fb; } };
@@ -190,7 +190,7 @@
   setTimeout(syncWelcome, 900);
 
   window.ControlEventV17Fix25WelcomeElArrastre = {
-    version:'v29_prod_fix25_welcome_elarrastre',
+    version:'v30_prod_fix25_welcome_elarrastre',
     install,
     sync:syncWelcome,
     show:showWelcome,

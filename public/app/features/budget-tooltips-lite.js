@@ -1,4 +1,4 @@
-/* ControlEvent v29_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
+/* ControlEvent v30_prod - Globos ligeros para RESUMEN PRESUPUESTARIO.
    Corrige la instalación del visor, abre sin esperar a sanitizados tardíos y
    bloquea restos de globos heredados que tapaban pulsaciones en iPad/Android.
    FIX26: solo en móviles tipo teléfono, exige doble pulsación rápida para abrir el globo. */
@@ -6,7 +6,7 @@
   'use strict';
   if(window.__ceBudgetTipsStableOwnerV25) return;
   window.__ceBudgetTipsStableOwnerV25 = true;
-  const VERSION = 'ControlEvent v29_prod';
+  const VERSION = 'ControlEvent v30_prod';
   const TOOLTIP_ID = 'ceBudgetLiteTooltipV307';
   const LEGACY_TIP_ATTRS = [
     'title','data-tip','data-ce-tip','data-v181-tip','data-ce-tip-v196','data-ce-tip-v1952',
@@ -771,7 +771,7 @@
     try{ event.stopImmediatePropagation(); }catch(_){ }
   },true));
 
-  // v29_prod 2026-08-13: apertura directa de justificantes de INGRESOS desde el globo de RESUMEN.
+  // v30_prod 2026-08-13: apertura directa de justificantes de INGRESOS desde el globo de RESUMEN.
   // Estas miniaturas las crea este mismo modulo como .ce-budget-stable-thumb. No son TKxx.
   // El manejador se registra en WINDOW/CAPTURE antes de los hotfix posteriores para evitar que
   // otro visor de tickets consuma la pulsacion.
@@ -822,7 +822,7 @@
     // Fallback solo si por alguna razon el DOM perdiera la URL de la miniatura.
     const api = window.ControlEventV469 || window.ControlEventV467 || window.ControlEventV465;
     if(id && api && typeof api.showReceiptModal === 'function'){
-      try{ api.showReceiptModal(id, event); return true; }catch(error){ console.warn('[v29_prod] visor justificante Resumen', error); }
+      try{ api.showReceiptModal(id, event); return true; }catch(error){ console.warn('[v30_prod] visor justificante Resumen', error); }
     }
     return true;
   }

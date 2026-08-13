@@ -1,13 +1,13 @@
-/* ControlEvent v29_prod - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v30_prod - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v29_prod';
-  var VERSION_TEXT = 'ControlEvent v29_prod';
-  var VERSION_FILE = 'ControlEvent_v29_prod';
-  var BUILD_ID = '20260811-V29-PROD';
-  var ZIP_NAME = 'ControlEvent_v29_prod.zip';
+  var VERSION_LABEL = 'v30_prod';
+  var VERSION_TEXT = 'ControlEvent v30_prod';
+  var VERSION_FILE = 'ControlEvent_v30_prod';
+  var BUILD_ID = '20260813-V30-PROD';
+  var ZIP_NAME = 'ControlEvent_v30_prod.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;
