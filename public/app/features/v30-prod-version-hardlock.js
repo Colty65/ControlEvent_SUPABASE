@@ -1,7 +1,7 @@
 /* ControlEvent v30_prod · hardlock final de versión visible, descargas e identidad cliente. */
 (function(root){
   'use strict';
-  const LABEL='v30_prod', TEXT='ControlEvent v30_prod', FILE='ControlEvent_v30_prod', BUILD='20260813-V30-PROD-ID2', ZIP='ControlEvent_v30_prod.zip';
+  const LABEL='v30_prod', TEXT='ControlEvent v30_prod', FILE='ControlEvent_v30_prod', BUILD='20260813-V30-PROD-ID3', ZIP='ControlEvent_v30_prod.zip';
   const versionPrefix=/ControlEvent_v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   const versionText=/ControlEvent\s+v(?:\d+(?:[._-]\d+)*(?:_prod(?:_\d+)*)?|\d+_prod(?:_\d+)*)/ig;
   function normalizeName(name){const s=String(name||'');return s.replace(versionPrefix,FILE);}

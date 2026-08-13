@@ -4921,7 +4921,22 @@ function v273ChartRefinementFollowUp(userPrompt){
   return /\b(punto(?:s)?|marcador(?:es)?|etiqueta(?:s)?|rotulo(?:s)?|leyenda|eje(?:s)?|color(?:es)?|linea|curva|tooltip|importe|concepto|saldo|valor(?:es)?|encima|debajo|pdf|raton|cursor|pint(?:a|ar|ado|ada))\b/.test(p)
     && /\b(pon|poner|muestra|mostrar|incluye|incluir|anade|añade|quita|elimina|cambia|haz|quiero|necesito|encima|debajo|cada|por que|porque|pinta|pintar)\b/.test(p);
 }
+function v30CurrentTurnRequestsTablesOnly(userPrompt=''){
+  const p=norm(userPrompt);
+  if(!p)return false;
+  const wantsTable=/\b(dame|muestra|pon|presenta|quiero|necesito|haz|formato)\b[^.\n]{0,120}\b(tabla|tablas|listado|listados)\b/.test(p)
+    || /\b(tablas?)\s+(?:prometidas|completas|bonitas|claras|adjuntas)\b/.test(p);
+  const wantsNewChart=/\b(dame|muestra|pon|presenta|quiero|necesito|haz)\b[^.\n]{0,120}\bgr[aá]fic\w*/.test(p);
+  return wantsTable&&!wantsNewChart;
+}
+function v30WantsSingleChart(userPrompt=''){
+  const p=norm(userPrompt);if(!p||v30CurrentTurnRequestsTablesOnly(userPrompt))return false;
+  return /\b(?:una|1)\s+gr[aá]fic\w*/.test(p)&&!/\b(todas|varias|graficas|gráficas|comparativa\s+grafica|comparativa\s+gráfica)\b/.test(p);
+}
 function v273ConversationRequestsCharts(userPrompt, conversationHistory=[]){
+  // Un follow-up puede mencionar «las gráficas» solo como antecedente y pedir AHORA tablas.
+  // El formato solicitado en el turno actual manda sobre la referencia histórica.
+  if(v30CurrentTurnRequestsTablesOnly(userPrompt))return false;
   if(semanticPromptExplicitlyRequestsCharts(userPrompt))return true;
   const recent=arr(conversationHistory).slice(-4).reverse();
   const prior=recent.map(x=>`${trim(x?.user)} ${trim(x?.assistant)} ${trim(x?.title)}`).join(' ');
@@ -6451,14 +6466,46 @@ async function v26ToolPersonDossier(tool,state,selectedEventId=''){
   purchaseRows.sort((a,b)=>text(b.Evento).localeCompare(text(a.Evento),'es')||text(a.TKxx).localeCompare(text(b.TKxx),'es',{numeric:true})||text(a.Producto).localeCompare(text(b.Producto),'es'));
   const donationRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&isDonationTicket(ticketText(c))&&ids.has(trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,''));return{Evento:trim(ev?.titulo),Donante:trim(h.people.get(pid)?.nombre)||r.nombre,Tipo:ticketText(c),Importe:valueOfLine(c)};});
   let hitos=[],lgs=[];try{const localHitos=arr(state?.hitos),localLgs=arr(state?.lgs);const hs=(localHitos.length||localLgs.length)?{hitos:localHitos,lgs:localLgs}:await listAllHitosState();const isOperationalOwner=x=>operationalIds.has(trim(x?.responsableId||x?.responsable_id))||operationalNameKeys.has(canonicalNameKey(x?.responsableNombre||x?.responsable_nombre));hitos=arr(hs?.hitos).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));lgs=arr(hs?.lgs).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));}catch(_){ }
-  const taskRows=[...hitos.map(x=>({Tipo:'HITO',Evento:trim(eventMap.get(trim(x?.eventId))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.nombreHito||x?.descripcion),Estado:''})),...lgs.map(x=>({Tipo:'LG',Evento:trim(eventMap.get(trim(x?.eventId))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.descripcion),Estado:x?.cumplida?'Cumplida':'Pendiente'}))];
+  const taskRows=[...hitos.map(x=>({Tipo:'HITO',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.nombreHito||x?.descripcion),Estado:''})),...lgs.map(x=>({Tipo:'LG',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.descripcion),Estado:x?.cumplida?'Cumplida':'Pendiente'}))];
   const uniqueEvents=new Set([...participation.map(x=>x.Evento),...purchaseRows.map(x=>x.Evento),...donationRows.map(x=>x.Evento),...taskRows.map(x=>x.Evento)].filter(Boolean));
   const purchaseRefs=semanticUnique(purchaseRows.map(x=>trim(x.TKxx)).filter(Boolean));const purchaseByEventMap=new Map();for(const row of purchaseRows){const key=trim(row.Evento)||'Sin evento',g=purchaseByEventMap.get(key)||{event:key,records:0,total:0,tickets:[]};g.records+=1;g.total+=num(row.Importe);if(trim(row.TKxx)&&!g.tickets.includes(trim(row.TKxx)))g.tickets.push(trim(row.TKxx));purchaseByEventMap.set(key,g);}const purchaseByEvent=[...purchaseByEventMap.values()].map(g=>({event:g.event,records:g.records,total:v26Money(g.total),ticket_count:g.tickets.length,tickets:g.tickets})).sort((a,b)=>num(b.total)-num(a.total)||text(a.event).localeCompare(text(b.event),'es'));
+  // v30_prod ID3 · tablas de PRESENTACIÓN agregadas por evento.
+  // Los detalles masivos siguen disponibles para auditoría/tablas exhaustivas, pero nunca se
+  // grafican fila a fila: una línea de producto no equivale a un total de evento.
+  const eventAgg=new Map();
+  const aggFor=eventName=>{const key=trim(eventName)||'Sin evento';if(!eventAgg.has(key))eventAgg.set(key,{Evento:key,participation:0,income:0,purchase:0,purchaseRecords:0,tickets:new Set(),donations:0,donationRecords:0,hitos:0,lg:0});return eventAgg.get(key);};
+  for(const row of participation){const g=aggFor(row.Evento);g.participation=Math.max(g.participation,num(row.Número));}
+  for(const row of incomes){const g=aggFor(row.Evento);g.income+=num(row.Importe);}
+  for(const row of purchaseRows){const g=aggFor(row.Evento);g.purchase+=num(row.Importe);g.purchaseRecords+=1;if(trim(row.TKxx))g.tickets.add(trim(row.TKxx));}
+  for(const row of donationRows){const g=aggFor(row.Evento);g.donations+=num(row.Importe);g.donationRecords+=1;}
+  for(const row of taskRows){const g=aggFor(row.Evento);if(trim(row.Tipo)==='HITO')g.hitos+=1;else if(trim(row.Tipo)==='LG')g.lg+=1;}
+  const eventAggRows=[...eventAgg.values()].sort((a,b)=>num(b.purchase)-num(a.purchase)||num(b.income)-num(a.income)||text(a.Evento).localeCompare(text(b.Evento),'es'));
+  const summaryByEvent=eventAggRows.map(g=>({Evento:g.Evento,'Participación registrada':round(g.participation,3),'Ingresos vinculados':v26Money(g.income),'Compras bajo responsabilidad':v26Money(g.purchase),'TK distintos':g.tickets.size,'Donaciones vinculadas':v26Money(g.donations),Hitos:g.hitos,LG:g.lg}));
+  const participationByEvent=eventAggRows.filter(g=>g.participation>0).map(g=>({Evento:g.Evento,Personas:round(g.participation,3)}));
+  const incomeByEvent=eventAggRows.filter(g=>Math.abs(g.income)>0.00001).map(g=>({Evento:g.Evento,Importe:v26Money(g.income)})).sort((a,b)=>num(b.Importe)-num(a.Importe));
+  const purchaseByEventRows=eventAggRows.filter(g=>g.purchaseRecords>0).map(g=>({Evento:g.Evento,'Registros de compra':g.purchaseRecords,'TK distintos':g.tickets.size,TKxx:[...g.tickets].join(', '),Importe:v26Money(g.purchase)})).sort((a,b)=>num(b.Importe)-num(a.Importe));
+  const donationsByEvent=eventAggRows.filter(g=>g.donationRecords>0).map(g=>({Evento:g.Evento,'Registros de donación':g.donationRecords,Importe:v26Money(g.donations)})).sort((a,b)=>num(b.Importe)-num(a.Importe));
+  const managementByEvent=eventAggRows.filter(g=>g.hitos||g.lg).map(g=>({Evento:g.Evento,Hitos:g.hitos,LG:g.lg,'Total gestión':g.hitos+g.lg})).sort((a,b)=>num(b['Total gestión'])-num(a['Total gestión'])||text(a.Evento).localeCompare(text(b.Evento),'es'));
   const directRepresentations=arr(r.members).filter(x=>x?.kind==='direct').map(x=>trim(x?.nombre)).filter(Boolean);const sharedRepresentations=arr(r.members).filter(x=>x?.kind==='composite').map(x=>trim(x?.nombre)).filter(Boolean);
   const facts={person:r.nombre,query:trim(tool.person),scope,scope_event:trim(scopeEvent?.nombre),identity_key:r.identity_key||canonicalNameKey(r.nombre),identity_kind:r.identity_kind||'person',subject_identity:r.identity_kind==='registered_pair'?'registered_pair':'atomic_person',matched_entities:r.names,canonical_representations:r.names,direct_representations:directRepresentations,shared_representations:sharedRepresentations,composite_expansion:r.expanded,identity_semantics:r.identity_kind==='registered_pair'?'La consulta nombra explícitamente una pareja/entidad registrada. No se incorporan responsabilidades operativas individuales de sus miembros.':'La persona individual sigue siendo el sujeto. Los registros de pareja se enlazan solo como contexto compartido para participación/ingresos/donaciones; NO sustituyen a la persona en compras, Hitos o LG.',operational_responsibility_semantics:'Compras, Hitos y tareas LG se atribuyen solo a la identidad que figura realmente como responsable; una pareja compartida no convierte automáticamente a sus dos miembros en responsables.',event_count:uniqueEvents.size,direct_event_count:directEvents.size,composite_event_count:compositeEvents.size,income_linked_total:v26Money(linkedIncome),income_direct_total:v26Money(directIncome),income_composite_total:v26Money(compositeIncome),income_semantics:r.expanded?'income_linked_total incluye registros individuales y registros de pareja/entidad compuesta; no atribuir todo el importe exclusivamente a una sola persona.':'Todos los ingresos enlazados corresponden a la entidad resuelta.',shared_pair_warning:trim(r.shared_pair_warning),purchase_responsibility_total:v26Money(purchaseRows.reduce((a,x)=>a+num(x.Importe),0)),purchase_responsibility_records:purchaseRows.length,purchase_responsibility_lines:purchaseRows.length,purchase_responsibility_ticket_count:purchaseRefs.length,purchase_responsibility_tickets:purchaseRefs,purchase_responsibility_by_event:purchaseByEvent,donations_value:v26Money(donationRows.reduce((a,x)=>a+num(x.Importe),0)),donation_records:donationRows.length,donation_lines:donationRows.length,hitos_count:hitos.length,lg_count:lgs.length,negative_voluntary_adjustments:negatives};
   const facts_schema={person:v26TextSchema('Persona o pareja que sigue siendo el sujeto de la consulta'),scope:v26TextSchema('Ámbito solicitado por Gemini'),scope_event:v26TextSchema('Evento concreto cuando el dossier está acotado'),identity_key:v26TextSchema('Clave estable de identidad dentro de esta respuesta'),subject_identity:v26TextSchema('Distingue persona individual de pareja registrada'),canonical_representations:v26TextSchema('Todas las representaciones vinculadas para contexto social/registral'),direct_representations:v26TextSchema('Representaciones individuales/directas'),shared_representations:v26TextSchema('Representaciones de pareja compartidas; no sustituyen la identidad operativa'),event_count:v26CountSchema('eventos','Número de eventos únicos vinculados dentro del ámbito'),direct_event_count:v26CountSchema('eventos','Eventos mediante registro individual/directo'),composite_event_count:v26CountSchema('eventos','Eventos mediante registro de pareja/entidad compuesta'),income_linked_total:v26MoneySchema('Ingresos vinculados a todas las representaciones; los registros de pareja son compartidos'),income_direct_total:v26MoneySchema('Ingresos de registros individuales/directos'),income_composite_total:v26MoneySchema('Ingresos de registros de pareja/entidad compuesta'),purchase_responsibility_total:v26MoneySchema('Importe de compras realizadas atribuidas DIRECTAMENTE a la identidad operativa consultada'),purchase_responsibility_records:v26CountSchema('registros','Registros de compra realizada con esa identidad como responsable real'),purchase_responsibility_ticket_count:v26CountSchema('referencias','Número de TKxx/otros identificadores distintos bajo responsabilidad directa'),donations_value:v26MoneySchema('Valor de donaciones vinculadas como donante; puede incluir representación compartida'),donation_records:v26CountSchema('registros','Registros de donación vinculados'),hitos_count:v26CountSchema('hitos','Hitos con la identidad operativa como responsable real'),lg_count:v26CountSchema('tareas','Tareas LG con la identidad operativa como responsable real')};
   const schemaP={Evento:v26TextSchema('Evento'),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),'Registrado como':v26TextSchema('Entidad exacta encontrada'),'Estado ingreso':v26StatusSchema(),Número:v26CountSchema('personas','Número del registro')};const schemaI={Evento:v26TextSchema('Evento'),'Registrado como':v26TextSchema('Entidad exacta encontrada'),Importe:v26MoneySchema('Ingreso enlazado al registro'),'Importe obligatorio':v26MoneySchema('Parte obligatoria'),'Importe voluntario':v26MoneySchema('Parte voluntaria o ajuste')};
-  return{id:tool.id,name:tool.name,ok:true,title:`Dossier personal · ${r.nombre}${scopeEvent?` · ${scopeEvent.nombre}`:''}`,facts,facts_schema,provenance:'ControlEvent · hechos canónicos',tables:[v26Table('participation',`Participación vinculada a ${r.nombre}`,participation,schemaP),v26Table('incomes',`Ingresos vinculados a ${r.nombre}`,incomes,schemaI),v26Table('purchase_responsibility',`Compras bajo responsabilidad vinculada a ${r.nombre}`,purchaseRows,{Evento:v26TextSchema(),Responsable:v26TextSchema(),TKxx:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario del registro'),Importe:v26MoneySchema()}),v26Table('donations',`Donaciones vinculadas a ${r.nombre}`,donationRows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26TextSchema(),Importe:v26MoneySchema()}),v26Table('tasks',`Hitos y LG vinculados a ${r.nombre}`,taskRows,{Tipo:v26TextSchema(),Evento:v26TextSchema(),Responsable:v26TextSchema(),Descripción:v26TextSchema(),Estado:v26StatusSchema()})].filter(t=>t.rows.length)};
+  const presentationTables=[
+    v26Table('summary_by_event',`Resumen de ${r.nombre} por evento`,summaryByEvent,{Evento:v26TextSchema('Evento'),'Participación registrada':v26CountSchema('personas','Máximo Número registrado para la identidad vinculada en el evento; no sustituye la asistencia canónica'),'Ingresos vinculados':v26MoneySchema('Ingresos vinculados a la identidad social/registral'),'Compras bajo responsabilidad':v26MoneySchema('Compras bajo responsabilidad operativa directa'),'TK distintos':v26CountSchema('TK','Referencias de ticket distintas bajo responsabilidad directa'),'Donaciones vinculadas':v26MoneySchema('Producto donado vinculado'),Hitos:v26CountSchema('hitos','Hitos bajo responsabilidad directa'),LG:v26CountSchema('tareas','Tareas LG bajo responsabilidad directa')}),
+    v26Table('participation_by_event',`Participación vinculada a ${r.nombre} por evento`,participationByEvent,{Evento:v26TextSchema(),Personas:v26CountSchema('personas','Número registrado; no sustituye asistencia canónica')}),
+    v26Table('income_by_event',`Ingresos vinculados a ${r.nombre} por evento`,incomeByEvent,{Evento:v26TextSchema(),Importe:v26MoneySchema('Ingresos vinculados')}),
+    v26Table('purchase_by_event',`Compras bajo responsabilidad de ${r.nombre} por evento`,purchaseByEventRows,{Evento:v26TextSchema(),'Registros de compra':v26CountSchema('registros','Líneas de compra bajo responsabilidad directa'),'TK distintos':v26CountSchema('TK','Tickets distintos bajo responsabilidad directa'),TKxx:v26TextSchema('Referencias TKxx completas del evento'),Importe:v26MoneySchema('Importe total bajo responsabilidad directa')}),
+    v26Table('donations_by_event',`Donaciones vinculadas a ${r.nombre} por evento`,donationsByEvent,{Evento:v26TextSchema(),'Registros de donación':v26CountSchema('registros','Registros de donación vinculados'),Importe:v26MoneySchema('Valor donado vinculado')}),
+    v26Table('management_by_event',`Hitos y LG de ${r.nombre} por evento`,managementByEvent,{Evento:v26TextSchema(),Hitos:v26CountSchema('hitos','Hitos bajo responsabilidad directa'),LG:v26CountSchema('tareas','Tareas LG bajo responsabilidad directa'),'Total gestión':v26CountSchema('elementos','Hitos + LG')})
+  ].filter(t=>t.rows.length);
+  const detailTables=[
+    {...v26Table('participation',`Detalle de participación vinculada a ${r.nombre}`,participation,schemaP),chartable:false},
+    {...v26Table('incomes',`Detalle de ingresos vinculados a ${r.nombre}`,incomes,schemaI),chartable:false},
+    {...v26Table('purchase_responsibility',`Detalle de compras bajo responsabilidad de ${r.nombre}`,purchaseRows,{Evento:v26TextSchema(),Responsable:v26TextSchema(),TKxx:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario del registro'),Importe:v26MoneySchema()}),chartable:false},
+    {...v26Table('donations',`Detalle de donaciones vinculadas a ${r.nombre}`,donationRows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26TextSchema(),Importe:v26MoneySchema()}),chartable:false},
+    {...v26Table('tasks',`Detalle de Hitos y LG vinculados a ${r.nombre}`,taskRows,{Tipo:v26TextSchema(),Evento:v26TextSchema(),Responsable:v26TextSchema(),Descripción:v26TextSchema(),Estado:v26StatusSchema()}),chartable:false}
+  ].filter(t=>t.rows.length);
+  return{id:tool.id,name:tool.name,ok:true,title:`Dossier personal · ${r.nombre}${scopeEvent?` · ${scopeEvent.nombre}`:''}`,facts,facts_schema,provenance:'ControlEvent · hechos canónicos',tables:presentationTables.concat(detailTables)};
 }
 async function v26ToolStorePurchases(tool,state,selectedEventId=''){
   const r=semanticResolveEntity(state,'store',tool.store); if(!r.ok)throw new Error(r.ambiguous?`La tienda «${tool.store}» es ambigua: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`No encuentro la tienda «${tool.store}».`);
@@ -6929,7 +6976,7 @@ function v27AutoChartSpecs(results,userPrompt='',forceCharts=false,maxSpecs=5,op
   const eventWindowFocused=v280BankEventWindowRequest(userPrompt);
   const preferredKeys=bankFocused
     ? (eventWindowFocused?['event_window_timeline','reconciliation_timeline','balance_timeline','economics_chart','attendance_chart','management_chart','documentation_chart','stores','destinations','segments','products','comparison','weather']:['reconciliation_timeline','event_window_timeline','balance_timeline','economics_chart','attendance_chart','management_chart','documentation_chart','stores','destinations','segments','products','comparison','weather'])
-    : ['economics_chart','attendance_chart','management_chart','documentation_chart','stores','destinations','segments','products','comparison','weather','event_window_timeline','reconciliation_timeline','balance_timeline'];
+    : ['purchase_by_event','income_by_event','donations_by_event','management_by_event','participation_by_event','summary_by_event','economics_chart','attendance_chart','management_chart','documentation_chart','stores','destinations','segments','products','comparison','weather','event_window_timeline','reconciliation_timeline','balance_timeline'];
   // Orden global por utilidad semántica. No dependemos del orden accidental en que las
   // herramientas hayan terminado: una petición bancaria puede priorizar su cronología aunque
   // el dossier se haya ejecutado antes; una petición general hace justo lo contrario.
@@ -6979,10 +7026,12 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const stats={sourceResults:arr(results).length,sourceTables:arr(results).reduce((n,r)=>n+arr(r?.tables).length,0),sourceRows:arr(results).reduce((n,r)=>n+arr(r?.tables).reduce((m,t)=>m+arr(t?.rows).length,0),0),tableCandidates:0,tableDuplicates:0,chartCandidates:0,chartDuplicates:0,renderedTableRows:0};
   const explicitCharts=semanticPromptExplicitlyRequestsCharts(userPrompt);
   const inferredCharts=options?.wantsCharts===true;
-  const chartIntent=explicitCharts||inferredCharts;
+  const chartIntent=(explicitCharts||inferredCharts)&&!v30CurrentTurnRequestsTablesOnly(userPrompt);
   const bankContext=options?.bankContext===true;
   const staticPointLabels=options?.staticPointLabels===true||v273PromptRequestsStaticPointLabels(userPrompt);
-  const autoChartSpecs=chartIntent?v27AutoChartSpecs(results,userPrompt,true,explicitCharts?5:1,{bankContext,staticPointLabels}):[];
+  const singleChart=v30WantsSingleChart(userPrompt);
+  const requestedChartLimit=singleChart?1:(explicitCharts?5:1);
+  const autoChartSpecs=chartIntent?v27AutoChartSpecs(results,userPrompt,true,requestedChartLimit,{bankContext,staticPointLabels}):[];
   // Las especificaciones explícitas (incluidas las garantías deterministas de CE) tienen prioridad.
   // Las automáticas solo completan huecos, para que una línea pedida no desaparezca por el límite de gráficas.
   const chartSpecs=arr(final?.chartSpecs).concat(autoChartSpecs);
@@ -6995,7 +7044,7 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const wantsCharts=chartIntent || arr(final?.chartSpecs).length>0;
   if(wantsCharts){
     const seenCharts=new Set();
-    const chartLimit=arr(final?.chartSpecs).length>5?Math.min(12,arr(final?.chartSpecs).length):5;
+    const chartLimit=singleChart?1:(arr(final?.chartSpecs).length>5?Math.min(12,arr(final?.chartSpecs).length):5);
     for(const spec of chartSpecs.slice(0,12)){
       if(charts.length>=chartLimit)break;
       stats.chartCandidates++;
@@ -7625,7 +7674,7 @@ function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUse
 - PRINCIPIO DE DISPONIBILIDAD: si un dato de negocio está almacenado y no pertenece a un ámbito restringido, debes intentar obtenerlo con la herramienta adecuada antes de responder que no puedes darlo.
 
 PROCEDENCIA Y GRADO DE CERTEZA:\n- Los resultados de herramientas de ControlEvent son HECHOS CANÓNICOS de la aplicación.\n- Lo que el usuario te explique o corrija durante la conversación es CONTEXTO APORTADO POR EL USUARIO: úsalo para interpretar y continuar, pero no lo conviertas en una regla general, política interna o dato persistente salvo que una herramienta lo confirme.\n- Lo que deduzcas a partir de hechos es una INFERENCIA. Exprésala con naturalidad como interpretación («esto sugiere...», «con estos datos...»), no como hecho almacenado.\n- Una HIPÓTESIS causal («quizá se compensó con...», «podría deberse a...») debe presentarse como posibilidad y debes decir si ControlEvent NO contiene un vínculo que la demuestre. No uses «la explicación más probable» salvo que los hechos aporten evidencia comparativa suficiente. Coincidencia de importes, nombres, fechas o proveedores no demuestra causalidad.\n- No conviertas una inferencia o una aclaración del usuario en «política interna», «acuerdo oficial» o regla persistente si una herramienta no lo confirma.\n- Si rehaces un informe a partir de una aclaración del usuario, atribuye esa interpretación de forma natural («según lo que me acabas de aclarar...») cuando sea relevante.\n\nHECHOS CANÓNICOS DE CONTROLEVENT:\n- Saldo operativo y valoración son conceptos distintos.\n- VALORACIÓN DEL EVENTO = GASTOS PREVISTOS (COMPRAS REALIZADAS + Pte.Compra) + VALOR DEL PRODUCTO DONADO. Nunca uses saldo + donaciones ni omitas Pte.Compra cuando exista.\n- Donaciones de producto no son salida de caja.\n- Compras pendientes no son compras realizadas. En ControlEvent, un registro de compra con Ticket/Otros gastos vacío es Pte.Compra; TKxx y GASTOS CORRIENTES son compras realizadas; DONADO SOCIO/TIENDA/OTROS son donaciones.\n- Una persona puede aparecer dentro de una pareja; la herramienta personal resuelve esa relación y distingue importes individuales de los de la entidad compuesta.\n- Dinero: formato español y siempre dos decimales, p. ej. 1.234,56 €. Recuentos, personas, eventos, unidades, años, fechas y porcentajes NO son euros.\n- SEMÁNTICA DE INGRESOS: income_members es ingreso REAL de filas SOCIO después de sus ajustes; income_mandatory es el componente obligatorio teórico de filas SOCIO antes de ajustes; income_voluntary suma aportaciones/ajustes voluntarios de todos los registros y puede incluir no socios y negativos. Nunca atribuyas una diferencia entre estos agregados a una persona o rango por mera resta: consulta event_people.\n- REGLA DE CUOTA SOCIO: Importe obligatorio = Número × precio del evento. Número 2 suele representar una pareja completa, 1 una persona y 0 elimina la cuota obligatoria. Número 0 NO significa automáticamente que no asistieron: la asistencia canónica puede confirmarse por la situación registrada (Banco/Efectivo/Bizum/Exento/etc.).\n- EXENCIONES: si un SOCIO/pareja aparece con asistencia confirmada, Número 0 e importe total 0, trátalo como una exención o cuota cero, no como un error matemático. Cuando la misma entidad aporta en ese evento producto donado por un valor igual o superior a su cuota estándar completa, ControlEvent considera ese patrón coherente con una exención por aportación en especie. Si solo existe un historial fuerte de donaciones pero no una aportación suficiente en ese evento, preséntalo como patrón compatible, no como causa demostrada.\n- PRECIOS CONVENIDOS: un Importe voluntario negativo en un SOCIO es el mecanismo operativo de ControlEvent para rebajar la cuota estándar calculada. Se utiliza para precios convenidos por asistencia parcial u otras circunstancias de conveniencia. Señala el ajuste desde la primera revisión; si no existe nota/contexto que concrete la causa, di que el patrón es compatible con un precio convenido y no inventes el motivo exacto.\n- DEVOLUCIONES/CORRECCIONES: los apuntes negativos realizados mediante entidades técnicas z_DEV (por ejemplo una entidad de corrección de ingresos) reducen ingresos previamente registrados y pueden representar devoluciones. Si existe evidencia que vincula la corrección a una persona/pareja, explica «pagó y posteriormente se devolvieron X € mediante un apunte corrector». Si no existe ese vínculo, señala la corrección pero NO atribuyas el beneficiario por simple coincidencia de importes.\n- Si una fila tiene importe total 0 y la situación dice Banco/Efectivo/Bizum, no redactes «pagó 0 € por Banco»: di «situación/forma registrada: Banco» o equivalente.\n- Una igualdad aritmética no autoriza por sí sola a reclasificar un ingreso, una donación o un pago entre categorías. Para explicar una discrepancia, exige coincidencia semántica o detalle por registro.\n\nREDACCIÓN Y VOZ:\n- Escribe como una IA moderna: directa, fluida, contextual y con capacidad de síntesis. Evita repetir «el evento», «esa persona» u otras muletillas.\n- Evita entusiasmo artificial («éxito rotundo», «genial») salvo que el usuario lo pida o los datos lo justifiquen claramente.\n- En prosa prefiere «registros de compra» en vez de «líneas de compra», y «tareas LG» en vez de «líneas de gestión», porque algunos sintetizadores pronuncian mal «líneas».\n- No repitas una respuesta anterior cuando el usuario pide que expliques «a qué te refieres»: desarrolla el punto concreto que causó la pregunta.\n- No cierres cada turno con una coletilla fija ni con «pregúntame lo que quieras»; conversa con naturalidad y termina cuando la respuesta esté completa.\n- Antes de entregar el JSON final, relee silenciosamente la respuesta: corrige erratas, concordancias, palabras duplicadas y signos de puntuación extraños sin alterar los hechos.\n- Las señales internas de validación, auditoría o autocorrección de ControlEvent son invisibles para el usuario. Nunca digas «ControlEvent ha identificado un dato no respaldado», «gracias por la verificación», «procedo a corregir» ni describas una revisión interna salvo que el usuario pregunte explícitamente por la traza. Entrega directamente la respuesta ya corregida.\n\nPRESENTACIÓN:\n- answer es la respuesta principal y debe poder entenderse por sí sola.\n- Elige tablas solo si aportan valor. show_tables NO es una función ni una herramienta: es un campo del JSON final. Rellénalo con tool_id = id de la llamada de herramienta y table_key = key de la tabla devuelta.\n- charts TAMPOCO es una función/herramienta: es un campo del JSON final que ControlEvent renderiza realmente. NUNCA digas que no puedes generar gráficas, ni intentes llamar a show_tables o charts como funciones. Para crear una gráfica: solicita los datos necesarios mediante herramientas reales y después rellena charts con referencias a sus tablas.\n- Si el usuario pide una gráfica en un turno de seguimiento, vuelve a solicitar en ESE MISMO TURNO las herramientas de datos necesarias para la visualización, aunque recuerdes los valores de turnos anteriores: el renderizador necesita tool_id y table_key del resultado actual.\n- Las tablas economics_chart, attendance_chart, management_chart y documentation_chart están preparadas expresamente para gráficas; event_breakdowns ofrece además stores, donors, destinations, segments y products.\n- DONANTES: si el usuario pide lista, ranking, gráfica o detalle de donantes, debes dar LOS DONANTES reales, incluidas tiendas y personas. Usa event_donation_lines; no sustituyas esa petición por destino/segmento. Si pregunta por un donante concreto como una tienda (p. ej. «EL PESCA»), filtra por ese donante y devuelve sus registros/productos, unidades y valor en la primera respuesta.\n- COMPRAS: si el usuario pide lista/ranking/detalle por tienda, responsable, producto o ticket, entrega esa dimensión y el detalle disponible en la primera respuesta. No obligues al usuario a preguntar de nuevo para obtener una tabla que ControlEvent ya tiene.\n- Puedes proponer gráficas aunque el usuario no diga literalmente «gráfica» si ayudan de verdad. Evita gráficas constantes o de una sola categoría.\n- Si el usuario pide una respuesta eminentemente gráfica, DEBES devolver al menos una especificación válida en charts y, si hay datos para ello, varias gráficas útiles con una síntesis breve. No describas una gráfica hipotética: pide datos y genera la especificación para que ControlEvent la dibuje.\n- Una petición de gráfica es una ORDEN DE EJECUCIÓN, no una invitación a preguntar cómo hacerla. Elige la representación razonable y genérala directamente. Si el usuario especifica tipo, variables o marcadores, respétalos. No preguntes «¿quieres que la genere?» después de haber recibido ya la petición.\n- Nunca expongas IDs de llamada/herramienta, tool_id, table_key, claves internas de tabla ni nombres técnicos como reconciliation_timeline/event_window_timeline. Habla por el título humano de la tabla o gráfica.\n- Para una petición genérica de «datos más importantes», «resumen gráfico» o equivalente, prioriza event_dossier y sus tablas economics_chart, attendance_chart y management_chart. No añadas una cronología bancaria salvo que el usuario pregunte por banco, saldo bancario, conciliación, movimientos o evolución temporal.
-- Para conciliación/Cuadre Banco y movimientos bancarios de un evento usa PRIMERO event_bank. Su tabla reconciliation_timeline está preparada para gráfica: Momento frente a Saldo bancario del periodo, con Tipo como marker_field. Usa event_bank_timeline solo si la petición es realmente una cronología histórica alternativa o si event_bank no aporta serie suficiente.\n- Para analizar el IMPACTO/VARIACIÓN de los movimientos usa Impacto bancario acumulado, que parte de 0. Nunca llames «saldo» a esa variación base 0 ni la confundas con el saldo operativo del evento. Los marcadores INGRESO se muestran en verde y CARGO en rojo.\n- Si el usuario pide etiquetas visibles en PDF sobre cada punto, usa point_label_fields=["Movimiento","Concepto","Saldo bancario del periodo"]. No prometas tooltips como sustituto porque el PDF no tiene hover.\n- Nunca respondas que «tu función es preparar la especificación», que «ControlEvent debería dibujarla» o que «no puedes pintar la gráfica». La respuesta es del sistema completo: o entregas una gráfica materializable en charts o explicas una limitación real sin culpar a otra capa.\n- En event_bank_timeline, el payload que ves puede recortar filas para ahorrar tokens, pero rendering_complete=true significa que el renderizador de ControlEvent conserva la tabla completa. NO rechaces una gráfica por ver truncated=true en esa tabla; referencia la tabla y ControlEvent dibujará todos los puntos disponibles.\n- No escribas tablas Markdown dentro de answer. Si una tabla aporta valor, usa show_tables; answer debe ser prosa limpia para pantalla, PDF y voz.\n- No digas «ControlEvent ha recuperado los datos» como sustituto de una respuesta.\n\nDevuelve el resultado final usando el JSON estructurado solicitado por la API.`;
+- Para conciliación/Cuadre Banco y movimientos bancarios de un evento usa PRIMERO event_bank. Su tabla reconciliation_timeline está preparada para gráfica: Momento frente a Saldo bancario del periodo, con Tipo como marker_field. Usa event_bank_timeline solo si la petición es realmente una cronología histórica alternativa o si event_bank no aporta serie suficiente.\n- Para analizar el IMPACTO/VARIACIÓN de los movimientos usa Impacto bancario acumulado, que parte de 0. Nunca llames «saldo» a esa variación base 0 ni la confundas con el saldo operativo del evento. Los marcadores INGRESO se muestran en verde y CARGO en rojo.\n- Si el usuario pide etiquetas visibles en PDF sobre cada punto, usa point_label_fields=["Movimiento","Concepto","Saldo bancario del periodo"]. No prometas tooltips como sustituto porque el PDF no tiene hover.\n- Nunca respondas que «tu función es preparar la especificación», que «ControlEvent debería dibujarla» o que «no puedes pintar la gráfica». La respuesta es del sistema completo: o entregas una gráfica materializable en charts o explicas una limitación real sin culpar a otra capa.\n- En event_bank_timeline, el payload que ves puede recortar filas para ahorrar tokens, pero rendering_complete=true significa que el renderizador de ControlEvent conserva la tabla completa. NO rechaces una gráfica por ver truncated=true en esa tabla; referencia la tabla y ControlEvent dibujará todos los puntos disponibles.\n- PRESENTACIÓN VERIFICABLE: no digas «aquí tienes las tablas», «tablas adjuntas», «te muestro la gráfica» o equivalente si no has referenciado una fuente materializable mediante show_tables/chart_specs. Si prometes una salida visual, debe existir físicamente en la respuesta.\n- FOLLOW-UP DE FORMATO: si el turno actual pide «dame las tablas», aunque mencione «las gráficas» como antecedente, la intención ACTUAL es tabla, no gráfica. No heredes el formato anterior contra una petición explícita.\n- PERSON_DOSSIER Y GRÁFICAS: para representar una persona por evento usa las tablas agregadas *_by_event. Nunca grafiques purchase_responsibility fila a fila ni uses Unidades de productos como si fueran el importe/responsabilidad total del evento. Si el usuario pide «una gráfica», entrega UNA gráfica materializable, no un panel automático de varias.\n- No escribas tablas Markdown dentro de answer. Si una tabla aporta valor, usa show_tables; answer debe ser prosa limpia para pantalla, PDF y voz.\n- No digas «ControlEvent ha recuperado los datos» como sustituto de una respuesta.\n\nDevuelve el resultado final usando el JSON estructurado solicitado por la API.`;
 }
 
 function v261UsageSmall(payload,model=''){
@@ -7881,7 +7930,7 @@ function v30PersonalRecheckRequested(userPrompt=''){
 }
 function v30LikelyPersonalFollowUp(userPrompt=''){
   const p=norm(userPrompt);
-  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|ingresos?|participacion|participación|eventos?|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame)\b/.test(p);
+  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame)\b/.test(p);
 }
 function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],subject='',explicitSubject=false){
   const direct=v281EventNameInText(state,userPrompt);if(direct)return direct;
@@ -7925,6 +7974,42 @@ function v30PersonGroundingInput(userPrompt,grounding){
   return `MENSAJE DEL USUARIO:\n${userPrompt}\n\nCANONICAL_PERSON_GROUNDING (preconsultado por ControlEvent en este mismo turno; fuente canónica, no lo repitas como bloque):\n- Sujeto que debes conservar: ${grounding.subject}\n- Ámbito: ${grounding.scope}${grounding.event?` · ${grounding.event}`:''}\n- IMPORTANTE: una pareja/entidad compartida NO sustituye a la persona individual para compras, Hitos o LG. direct_representations = responsabilidad individual; shared_representations = contexto compartido de participación/ingresos/donaciones.\n${review}\n${JSON.stringify(grounding.compact)}\n\nSi este grounding basta para responder, NO pidas canonical_socios ni vuelvas a pedir person_dossier. Si necesitas otra dimensión realmente distinta, solicita solo la herramienta imprescindible.`;
 }
 
+
+function v30PersonRequestedTableKeys(userPrompt='',dossier=null,answer=''){
+  if(!dossier||dossier?.name!=='person_dossier')return[];
+  const p=norm(userPrompt),a=norm(answer),combined=`${p} ${a}`,keys=[];
+  const has=k=>arr(dossier?.tables).some(t=>trim(t?.key)===k&&arr(t?.rows).length);
+  const add=k=>{if(has(k)&&!keys.includes(k))keys.push(k);};
+  const explicitTables=v30CurrentTurnRequestsTablesOnly(userPrompt)||/\b(tabla|tablas|listado|listados)\b/.test(p);
+  if(!explicitTables)return[];
+  const broad=/\b(prometid\w*|complet\w*|bonit\w*|clar\w*|con\s+los\s+datos|informacion|información|todo|toda)\b/.test(p)||(!/\b(particip\w*|ingres\w*|donaci\w*|compras?|responsab\w*|hitos?|tareas?|lg)\b/.test(p)&&explicitTables);
+  if(broad){add('summary_by_event');add('purchase_by_event');add('income_by_event');add('donations_by_event');add('management_by_event');return keys.slice(0,5);}
+  if(/\b(responsab\w*|compras?|tickets?|tkxx)\b/.test(combined))add('purchase_by_event');
+  if(/\bingres\w*/.test(combined))add('income_by_event');
+  if(/\bdonaci\w*/.test(combined))add('donations_by_event');
+  if(/\bparticip\w*/.test(combined))add('participation_by_event');
+  if(/\b(hitos?|tareas?|lg|gestion|gestión)\b/.test(combined))add('management_by_event');
+  if(explicitTables&&!keys.length)add('summary_by_event');
+  return keys.slice(0,5);
+}
+function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
+  if(!dossier||dossier?.name!=='person_dossier'||!v273ConversationRequestsCharts(userPrompt,[]))return[];
+  const p=norm(userPrompt),person=trim(dossier?.facts?.person)||'la persona',specs=[];
+  const has=k=>arr(dossier?.tables).some(t=>trim(t?.key)===k&&arr(t?.rows).length>=2);
+  const add=(key,title,valueField,type='horizontalBar',unit='€')=>{if(has(key)&&!specs.some(x=>x.table_key===key))specs.push({title,type,tool_id:trim(dossier.id),table_key:key,label_field:'Evento',value_field:valueField,series_fields:[],unit});};
+  if(/\b(responsab\w*|compras?|tickets?|tkxx)\b/.test(p))add('purchase_by_event',`Compras bajo responsabilidad de ${person} por evento`,'Importe');
+  else if(/\bingres\w*/.test(p))add('income_by_event',`Ingresos vinculados a ${person} por evento`,'Importe');
+  else if(/\bdonaci\w*/.test(p))add('donations_by_event',`Donaciones vinculadas a ${person} por evento`,'Importe');
+  else if(/\bparticip\w*/.test(p))add('participation_by_event',`Participación vinculada a ${person} por evento`,'Personas','horizontalBar','personas');
+  else if(/\b(hitos?|tareas?|lg|gestion|gestión)\b/.test(p))add('management_by_event',`Gestión de ${person} por evento`,'Total gestión','horizontalBar','elementos');
+  else add('purchase_by_event',`Compras bajo responsabilidad de ${person} por evento`,'Importe');
+  if(!v30WantsSingleChart(userPrompt)&&/\b(graficas|gráficas|varias|todas)\b/.test(p)){
+    add('income_by_event',`Ingresos vinculados a ${person} por evento`,'Importe');
+    add('donations_by_event',`Donaciones vinculadas a ${person} por evento`,'Importe');
+    add('management_by_event',`Gestión de ${person} por evento`,'Total gestión','horizontalBar','elementos');
+  }
+  return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
+}
 
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone}){
   // Compatibilidad de regresión v1.4: V27.1.4 · Garantía de cobertura; la lógica vigente es V27.1.5.
@@ -8046,6 +8131,18 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(personResultForPromise&&(v29AnswerPromisesMaterializedDetail(final.answer)||rawTableMarkup)){
     for(const key of v29PromisedPersonTables(final.answer,personResultForPromise))addShowTable(personResultForPromise,key);
     if(rawTableMarkup)final={...final,answer:text(final.answer).replace(/<\s*table\b[\s\S]*?<\s*\/\s*table\s*>/gi,'').trim()};
+  }
+  // v30_prod ID3 · los follow-ups de formato materializan de forma determinista la MISMA fuente
+  // personal que ya mantiene el hilo. «Dame las tablas prometidas» no puede terminar con prosa vacía,
+  // y «una gráfica» no puede convertirse en cuatro gráficos de líneas de producto.
+  if(personResultForPromise){
+    for(const key of v30PersonRequestedTableKeys(userPrompt,personResultForPromise,final.answer))addShowTable(personResultForPromise,key);
+    if(v30CurrentTurnRequestsTablesOnly(userPrompt)){
+      final={...final,chartSpecs:[]};
+    }else if(chartIntent){
+      const personCharts=v30PersonDeterministicChartSpecs(userPrompt,personResultForPromise);
+      if(personCharts.length)final={...final,chartSpecs:personCharts};
+    }
   }
   final={...final,answer:v29SanitizeAnswerMarkup(final.answer)};
   if((dataAccessReq.tableOnly||dataAccessReq.groupSegmentDestination)&&(dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&trim(final.answer).length>700)final={...final,answer:'Aquí tienes la tabla solicitada, ordenada y totalizada según tu petición.'};
@@ -8728,18 +8825,23 @@ function v29SanitizeAnswerMarkup(value){
 }
 function v29AnswerPromisesMaterializedDetail(answer){
   const a=norm(answer);
-  return /\b(aqui|aquí|te\s+dejo|te\s+presento|te\s+muestro)\b[^.\n]{0,140}\b(tabla|detalle)\b/.test(a)||/\baqui\s+tienes\s+el\s+detalle\b/.test(a);
+  return /\b(aqui|aquí|te\s+dejo|te\s+presento|te\s+muestro)\b[^.\n]{0,180}\b(tabla|tablas|detalle)\b/.test(a)
+    || /\baqui\s+tienes\s+el\s+detalle\b/.test(a)
+    || /\b(puedes\s+ver|veras|verás|adjunt[ao]s?|a\s+continuacion|a\s+continuación)\b[^.\n]{0,180}\b(tabla|tablas)\b/.test(a)
+    || /\b(tabla|tablas)\s+adjunt[ao]s?\b/.test(a);
 }
 function v29PromisedPersonTables(answer,dossier){
   if(!dossier||dossier?.name!=='person_dossier')return[];
   const a=norm(answer),keys=[];
   const add=k=>{if(arr(dossier?.tables).some(t=>t?.key===k)&&!keys.includes(k))keys.push(k);};
-  if(/\bparticip\w*/.test(a))add('participation');
-  if(/\bingres\w*/.test(a))add('incomes');
-  if(/\bdonaci\w*/.test(a))add('donations');
-  if(/\bresponsab\w*|compras?\b/.test(a))add('purchase_responsibility');
-  if(/\bhitos?\b|\blg\b|\btareas?\b/.test(a))add('tasks');
-  if(!keys.length)add('participation');
+  // Para presentación general priorizamos agregados por evento; los detalles fila a fila
+  // se reservan para cuando el usuario los pida expresamente.
+  if(/\bparticip\w*/.test(a))add('participation_by_event');
+  if(/\bingres\w*/.test(a))add('income_by_event');
+  if(/\bdonaci\w*/.test(a))add('donations_by_event');
+  if(/\bresponsab\w*|compras?\b/.test(a))add('purchase_by_event');
+  if(/\bhitos?\b|\blg\b|\btareas?\b/.test(a))add('management_by_event');
+  if(!keys.length)add('summary_by_event');
   return keys.slice(0,5);
 }
 
@@ -12942,6 +13044,11 @@ export const __zuzuStructuralTesting = Object.freeze({
   v272ConversationRequestsCharts,
   v272AnswerClaimsChart,
   v27AutoChartSpecs,
+  v273ConversationRequestsCharts,
+  v30CurrentTurnRequestsTablesOnly,
+  v30WantsSingleChart,
+  v30PersonRequestedTableKeys,
+  v30PersonDeterministicChartSpecs,
   v29DirectAttendanceQuery,
   v29DirectPurchaseEntityQuery,
   v29DirectDonationQuery,
