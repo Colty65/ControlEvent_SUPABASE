@@ -454,9 +454,13 @@
       pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
     }
     restoreConversationScreen();
+    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-opened'));}catch(_){try{window.dispatchEvent(new Event('controlevent:zuzu-opened'));}catch(__){ }}
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
+  function closeModal(){
+    closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove();
+    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{manual:true}}));}catch(_){try{window.dispatchEvent(new Event('controlevent:zuzu-closed'));}catch(__){ }}
+  }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();

@@ -7722,10 +7722,26 @@ function v307StructuredDomainFromText(value=''){
   if(purchase&&!donation)return'purchase';
   return'';
 }
+function v307DomainFromResultContext(ctx){
+  const d=norm(ctx?.domain);if(!d)return'';
+  if(['purchase','purchases','compras'].includes(d))return'purchase';
+  if(['donation','donations','donaciones'].includes(d))return'donation';
+  return'';
+}
+function v307ImmediateStructuredDomain(history=[]){
+  const turn=arr(history).slice(-1)[0];if(!turn)return'';
+  const rc=v307DomainFromResultContext(turn?.resultContext);if(rc)return rc;
+  const title=v307StructuredDomainFromText(turn?.title);if(title)return title;
+  return v307StructuredDomainFromText(turn?.user);
+}
 function v307NearestStructuredDomain(history=[]){
+  // La memoria estructurada se hereda SOLO de metadatos del turno o de lo que pidió el usuario.
+  // Nunca de la prosa de Zuzu: una frase general como «hubo donaciones» no convierte el turno
+  // siguiente en una consulta de donaciones.
   for(const turn of arr(history).slice().reverse()){
+    const rc=v307DomainFromResultContext(turn?.resultContext);if(rc)return rc;
+    const title=v307StructuredDomainFromText(turn?.title);if(title)return title;
     const u=v307StructuredDomainFromText(turn?.user);if(u)return u;
-    const a=v307StructuredDomainFromText(turn?.assistant);if(a)return a;
   }
   return'';
 }
@@ -7742,9 +7758,12 @@ function v307CurrentStructuredDomain(userPrompt='',history=[],dataReq={},results
     if(trim(r?.name)==='event_purchase_lines')return'purchase';
     if(trim(r?.name)==='event_donation_lines')return'donation';
   }
-  if(dataReq?.donationExactLines||dataReq?.donationDetail)return'donation';
-  if(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.exactPurchaseLines)return'purchase';
-  if(dataReq?.structuredDetailFollowUp)return v307NearestStructuredDomain(history);
+  // Las banderas de detalle no pueden CREAR un dominio. Solo permiten ampliar el dominio
+  // estructurado inmediatamente anterior. Así «revísalo» tras un resumen general no dispara
+  // una fuente incidental mencionada en la redacción previa.
+  const immediate=v307ImmediateStructuredDomain(history);
+  if(immediate==='donation'&&(dataReq?.donationExactLines||dataReq?.donationDetail||dataReq?.structuredDetailFollowUp))return'donation';
+  if(immediate==='purchase'&&(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.exactPurchaseLines||dataReq?.structuredDetailFollowUp))return'purchase';
   return'';
 }
 function v274DataAccessRequirement(prompt='',history=[]){
@@ -7762,8 +7781,9 @@ function v274DataAccessRequirement(prompt='',history=[]){
   const tableOnly=/\b(simplemente|solo|únicamente|unicamente)\b[^.\n]{0,25}\btabla\b/.test(p)||/^\s*(?:dame|pon|muestra)?\s*(?:simplemente|solo)?\s*la\s+tabla\b/.test(p);
   const inferCatalog=value=>{if(!catalogCue(value))return'';if(productWord(value)||/\balmacen|almacén\b/.test(value))return'products';if(/\b(tienda|tiendas|proveedor|proveedores)\b/.test(value))return'stores';if(/\b(persona|personas|socio|socios|colaborador|colaboradores)\b/.test(value))return'people';if(/\b(evento|eventos)\b/.test(value))return'events';return'';};
   let catalogEntity=inferCatalog(p);if(!catalogEntity&&followUpTransform)catalogEntity=inferCatalog(hist);
-  const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle)\b/.test(p)
-    || /\b(una\s+por\s+una|uno\s+por\s+uno|vuelve\s+a\s+(?:sac|mostr|dec)\w*|lista\s+real|revis\w*|no\s+cuadr\w*|falt\w*|incomplet\w*)\b/.test(p);
+  const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle|nombres?)\b/.test(p)
+    || /\b(una\s+por\s+una|uno\s+por\s+uno|vuelve\s+a\s+(?:sac|mostr|dec)\w*|lista\s+real|revis\w*|no\s+cuadr\w*|falt\w*|incomplet\w*)\b/.test(p)
+    || /^(?:perdona|perd[oó]n|oye|eh|vale)?\s*(?:dime|dame)?\s*(?:qui[eé]n|qui[eé]nes|cu[aá]l|cu[aá]les)\b/.test(p);
   const directPurchase=purchaseCue(p);
   let purchaseDetail=!metaCorrection&&directPurchase;
   if(!purchaseDetail&&!metaCorrection&&directDomain!=='donation'&&(followUpTransform||structuredDetailFollowUp)&&nearestDomain==='purchase')purchaseDetail=true;
@@ -8004,10 +8024,10 @@ function v307DonorFromContext(userPrompt,state,history=[],existingDonation=null)
   // Solo heredamos sujeto desde el turno de DONACIONES más cercano. Nunca saltamos por encima
   // de un turno de compras para rescatar una persona antigua.
   for(const turn of arr(history).slice().reverse()){
-    const domain=v307StructuredDomainFromText(`${trim(turn?.user)} ${trim(turn?.assistant)}`);
+    const domain=v307DomainFromResultContext(turn?.resultContext)||v307StructuredDomainFromText(turn?.user)||v307StructuredDomainFromText(turn?.title);
     if(!domain)continue;
     if(domain!=='donation')return'';
-    return v306PairAwarePersonHint(turn?.user,state);
+    return trim(turn?.resultContext?.filters?.donor)||trim(turn?.resultContext?.subject)||v306PairAwarePersonHint(turn?.user,state);
   }
   return'';
 }
@@ -8016,7 +8036,7 @@ function v306PurchaseFiltersFromContext(userPrompt,state,history=[]){
   const contexts=[norm(userPrompt)];
   // Un follow-up elíptico puede heredar Segmento/Destino, pero solo del último turno de compras.
   for(const turn of arr(history).slice().reverse()){
-    const domain=v307StructuredDomainFromText(`${trim(turn?.user)} ${trim(turn?.assistant)}`);if(!domain)continue;
+    const domain=v307DomainFromResultContext(turn?.resultContext)||v307StructuredDomainFromText(turn?.user)||v307StructuredDomainFromText(turn?.title);if(!domain)continue;
     if(domain==='purchase')contexts.push(norm(turn?.user));
     break;
   }
@@ -8063,13 +8083,28 @@ function v306VoiceCanonicalStructuredAnswer(userPrompt,history=[],results=[],dat
   const table=(r,key)=>arr(r?.tables).find(t=>trim(t?.key)===key);
   const domain=v307CurrentStructuredDomain(userPrompt,history,dataReq,results);
   if(domain==='donation'){
-    const r=latest('event_donation_lines'),rows=arr(table(r,'donor_products')?.rows);
-    if(r&&rows.length&&rows.length<=80){
+    const r=latest('event_donation_lines');
+    const donorRows=arr(table(r,'donors')?.rows),productRows=arr(table(r,'donor_products')?.rows);
+    if(r&&(donorRows.length||productRows.length)){
       const f=r.facts||{},event=trim(f.event)||'este evento';
-      const donors=[...new Set(rows.map(x=>trim(x?.Donante)).filter(Boolean))];
-      const who=trim(f.donor)||(donors.length===1?donors[0]:'los donantes consultados');
-      const detail=rows.map(x=>`${trim(x?.Producto)||'Producto'}, ${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}, ${v26FormatEuro(num(x?.Valor))}`).join('; ');
-      return{title:`Donaciones · ${event}`,answer:`He consultado de nuevo la fuente completa. En ${event}, ${who} tiene${donors.length===1||trim(f.donor)?'':'n'} ${rows.length} producto${rows.length===1?'':'s'} donado${rows.length===1?'':'s'} por un valor total de ${v26FormatEuro(num(f.total_value))}. Son: ${detail}.`,warnings:[],showTables:[],chartSpecs:[]};
+      const asksWho=/\b(?:qui[eé]n|qui[eé]nes|donantes?|nombres?\s+de\s+(?:los\s+)?donantes?)\b/.test(p)
+        && !/\b(?:producto|productos|qu[eé]\s+donaron|cosas?\s+que\s+donaron|uno\s+por\s+uno|una\s+por\s+una)\b/.test(p);
+      const asksProducts=/\b(?:producto|productos|qu[eé]\s+donaron|cosas?\s+que\s+donaron|detalle|detallad|cada|uno\s+por\s+uno|una\s+por\s+una|lista\s+real|unidades?|valor\s+de\s+cada)\b/.test(p);
+      const donorNames=donorRows.map(x=>trim(x?.Donante)).filter(Boolean);
+      if(asksWho){
+        const detail=donorRows.map(x=>`${trim(x?.Donante)||'Donante'}, ${v26FormatEuro(num(x?.Valor))}`).join('; ');
+        return{title:`Donantes · ${event}`,answer:`En ${event} constan ${donorRows.length} donante${donorRows.length===1?'':'s'} por un valor total de ${v26FormatEuro(num(f.total_value))}: ${detail}.`,warnings:[],showTables:[],chartSpecs:[]};
+      }
+      if(asksProducts&&productRows.length&&productRows.length<=80){
+        const detail=productRows.map(x=>`${trim(x?.Producto)||'Producto'}, ${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}, ${v26FormatEuro(num(x?.Valor))}`).join('; ');
+        const subject=trim(f.donor)||(donorNames.length===1?donorNames[0]:'los donantes del evento');
+        return{title:`Donaciones · ${event}`,answer:`En ${event}, ${subject} registra${donorNames.length===1||trim(f.donor)?'':'n'} ${productRows.length} producto${productRows.length===1?'':'s'} donado${productRows.length===1?'':'s'}, por un valor total de ${v26FormatEuro(num(f.total_value))}. ${detail}.`,warnings:[],showTables:[],chartSpecs:[]};
+      }
+      // «Dime las donaciones» es una petición de resumen, no una orden de leer decenas de
+      // productos. Se verbalizan total y donantes; el detalle queda disponible si se solicita.
+      const names=donorRows.slice(0,8).map(x=>trim(x?.Donante)).filter(Boolean);
+      const extra=donorRows.length>8?` y ${donorRows.length-8} más`:'';
+      return{title:`Donaciones · ${event}`,answer:`En ${event} constan ${num(f.donation_record_count)} registros de donación, ${donorRows.length} donante${donorRows.length===1?'':'s'} y un valor total de ${v26FormatEuro(num(f.total_value))}.${names.length?` Los donantes son ${names.join(', ')}${extra}.`:''}`,warnings:[],showTables:[],chartSpecs:[]};
     }
   }
   if(domain==='purchase'){
@@ -8518,6 +8553,28 @@ function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
   return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
 }
 
+function v307InteractionResultContext(userPrompt,results=[],history=[]){
+  if(v307MetaCorrectionCue(userPrompt))return{domain:'meta'};
+  const successful=arr(results).filter(r=>r?.ok);
+  const mapped={
+    event_purchase_lines:'purchases',event_donation_lines:'donations',event_bank:'bank',event_people:'attendance',
+    event_documentation:'documents',event_management:'management',person_dossier:'person',event_dossier:'event',event_breakdowns:'event',master_catalog:'catalog'
+  };
+  for(const r of successful.slice().reverse()){
+    const domain=mapped[trim(r?.name)];if(!domain)continue;
+    const out={domain};
+    const event=trim(r?.facts?.event);if(event)out.event=event;
+    if(domain==='person'){out.subject=trim(r?.facts?.person)||trim(r?.facts?.query)||'';}
+    if(domain==='donations'&&trim(r?.facts?.donor))out.filters={donor:trim(r.facts.donor)};
+    if(domain==='purchases')out.filters={segment:trim(r?.facts?.segment),destination:trim(r?.facts?.destination),product:trim(r?.facts?.product),store:trim(r?.facts?.store)};
+    return out;
+  }
+  const immediate=arr(history).slice(-1)[0]?.resultContext;
+  // Los turnos conversacionales muy breves («vale», «perdona», «y quiénes fueron los…»)
+  // mantienen el referente estructurado, pero nunca lo deducen de la prosa de Zuzu.
+  if(immediate&&typeof immediate==='object'&&trim(immediate.domain)&&trim(userPrompt).length<=120)return{...immediate,inherited:true};
+  return null;
+}
 function v307CanonicalEventReferenceInput(userPrompt,state,eventName=''){
   const event=trim(eventName)||v281EventNameInText(state,userPrompt);if(!event)return userPrompt;
   return `${userPrompt}\n\nCANONICAL_EVENT_REFERENCE (resolución nominal de ControlEvent, no es una respuesta ni una ruta): el texto del usuario coincide, ignorando mayúsculas y acentos, con el evento existente «${event}». No digas que ese evento no existe ni pidas que lo escriban con otra capitalización; si necesitas datos, solicita la herramienta correspondiente usando ese título canónico.`;
@@ -8784,8 +8841,9 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'WARN':turnCost>0.015?'WARN':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
   const finalStatus=trim(payload?.status)||'completed';
   const completedInteractionId=finalStatus==='completed'?currentId:'';
+  const resultContext=v307InteractionResultContext(userPrompt,allResults,conversationHistory);
   if(completedInteractionId)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK',`Interaction completada y guardable para el siguiente turno: ${completedInteractionId.slice(0,40)}…`);
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v1-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini mantiene el hilo nativo y decide la respuesta/herramientas; ControlEvent aporta grounding canónico compacto cuando hace falta preservar identidad o verificar una corrección, ejecuta cálculos, verifica y presenta',interactionId:completedInteractionId,resetInteractionId,pendingAction,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v1-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini mantiene el hilo nativo y decide la respuesta/herramientas; ControlEvent aporta grounding canónico compacto cuando hace falta preservar identidad o verificar una corrección, ejecuta cálculos, verifica y presenta',interactionId:completedInteractionId,resetInteractionId,pendingAction,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){

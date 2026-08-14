@@ -158,6 +158,15 @@
     // no volver al problema de que Zuzu se interrumpa con el eco de su propia locución.
     return /\b(zuzu|susu|suzu|oye|ey|escucha|espera|esperate|para|para un momento|un momento|un segundo|no espera|no no|perdona|perdon|disculpa|mejor|una cosa)\b/.test(wakeNorm(value));
   }
+  function explicitInterruptIsClearlyHuman(value,echoScore){
+    var n=wakeNorm(value);if(!explicitInterruptCue(n))return false;
+    var spoken=wakeNorm(state.currentSpokenChunk||'');
+    var cues=['perdona','perdon','disculpa','espera','esperate','oye','escucha','zuzu','susu','suzu','mejor','una cosa','un momento','un segundo'];
+    var cue=cues.find(function(x){return n.indexOf(x)>=0;});
+    // Si la palabra de corte no está en lo que Zuzu está pronunciando, el primer interim basta.
+    if(cue&&spoken.indexOf(cue)<0)return true;
+    return Number(echoScore||0)<0.48;
+  }
   function naturalInterruptCandidate(value,confidence,echoScore){
     // Interrupción natural sin palabra clave. Seguimos siendo prudentes con el eco,
     // pero no esperamos a que el reconocedor cierre la frase: dos resultados provisionales
@@ -181,11 +190,12 @@
     else state.interruptProbeHits=1;
     state.interruptProbeText=key;state.interruptProbeAt=now;
     var tokens=contentTokens(value),conf=Number(confidence||0),echo=Number(echoScore||0);
-    return state.interruptProbeHits>=2||(tokens.length>=4&&(!conf||conf>=0.58)&&echo<0.16);
+    return (tokens.length>=2&&(!conf||conf>=0.46)&&echo<0.12)||state.interruptProbeHits>=2||(tokens.length>=4&&(!conf||conf>=0.58)&&echo<0.18);
   }
   function voiceAliasNormalize(value){
     var out=clean(value);if(!out)return out;
     out=out
+      .replace(/\b(20)\s*[\/-]\s*(\d{2})\b/g,'$1$2')
       .replace(/\b(?:santiago\s+y\s+santa\s+ana|santiago\s+santa\s+ana|sisa|s\s+y\s+s\s+a|ese\s+y\s+ese\s+a)\b/gi,'SySA')
       .replace(/\bversus\b/gi,'vs');
     if(/\b(jornada|visita|evento|edici[oó]n|funci[oó]n)\b/i.test(out)){
@@ -381,7 +391,7 @@
       // la síntesis y después se limpia su cola. No esperamos al resultado final del STT.
       // Una palabra explícita de interrupción corta con un único resultado provisional siempre
       // que no coincida claramente con lo que la propia Zuzu está pronunciando.
-      var explicit=explicitInterruptCue(text),explicitHuman=explicit&&echoScore<0.62;
+      var explicit=explicitInterruptCue(text),explicitHuman=explicit&&explicitInterruptIsClearlyHuman(text,echoScore);
       var naturalHuman=confirmedNaturalInterrupt(text,confidence,echoScore);
       var confOk=!confidence||Number(confidence)>=0.36;
       var finalHuman=isFinal&&contentTokens(text).length>=2&&echoScore<0.38&&confOk;
@@ -469,15 +479,23 @@
     b.textContent=state.recordingActive?'⏺ Guardar voz':'⬇ Grabación';
     b.title=state.recordingActive?'Finalizar la conversación oral y descargar la grabación':'Descargar la última grabación oral disponible';
   }
+  function restartAmbientRecognizerAfterClose(){
+    if(!state.ambientEnabled)return;
+    state.recognitionMode='ambient';state.wantListening=true;state.recognitionStarting=false;state.ambientHeard='';
+    var old=state.recognition;state.recognition=null;
+    try{if(old)old.abort();}catch(_){try{if(old)old.stop();}catch(__){ }}
+    updateWakeBadge();
+    setTimeout(function(){if(state.ambientEnabled&&!state.conversationMode){state.wantListening=true;startRecognitionEngine();}},140);
+  }
   function parkVoiceConversationForManualClose(){
-    if(!state.conversationMode)return;
+    var hadVoiceSession=!!(state.conversationMode||state.conversationParked||state.recordingActive);
     // Cerrar la ventana NO finaliza la sesión oral ni la grabación. Se aparca el diálogo y
-    // vuelve inmediatamente al modo ambiental; el próximo «Hola Zuzu» reabre la ventana y
-    // continúa sobre el mismo historial/grabación.
+    // se reconstruye el reconocedor en modo ambiental para no depender de una instancia STT
+    // que hubiera quedado asociada al modal/conversación anterior.
     clearTimeout(state.silenceTimer);state.silenceTimer=null;stopSpeaking(false);resetVoiceUtterance();state.ambientHeard='';
-    state.conversationMode=false;state.conversationParked=true;state.recognitionMode='ambient';state.queuedUtterance='';
+    state.conversationMode=false;state.conversationParked=hadVoiceSession;state.recognitionMode='ambient';state.queuedUtterance='';
     state.wantListening=state.ambientEnabled;updateWakeBadge();
-    if(state.ambientEnabled)startRecognitionEngine();
+    if(state.ambientEnabled)restartAmbientRecognizerAfterClose();
   }
   function finishVoiceConversationState(reason){
     state.conversationMode=false;state.conversationParked=false;state.recognitionMode='ambient';state.requestInFlight=false;state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
@@ -512,6 +530,19 @@
   }
   function bestRecognitionAlternative(result){
     if(!result||!result.length)return{text:'',confidence:0};
+    // Mientras Zuzu habla, una alternativa que contenga una orden humana inequívoca de corte
+    // tiene prioridad sobre otra alternativa que se parezca más a nombres del catálogo/eco.
+    if(state.speaking){
+      var interruptBest=null;
+      for(var j=0;j<Math.min(result.length,5);j++){
+        var interruptRaw=clean(result[j]&&result[j].transcript);if(!interruptRaw)continue;
+        var interruptText=voiceAliasNormalize(interruptRaw),interruptConf=Number(result[j]&&result[j].confidence)||0;
+        if(explicitInterruptCue(interruptText)&&explicitInterruptIsClearlyHuman(interruptText,maxOwnVoiceSimilarity(interruptText))){
+          if(!interruptBest||interruptConf>interruptBest.confidence)interruptBest={text:interruptText,confidence:interruptConf,score:2};
+        }
+      }
+      if(interruptBest)return interruptBest;
+    }
     var best={text:clean(result[0]&&result[0].transcript),confidence:Number(result[0]&&result[0].confidence)||0,score:-1};
     for(var i=0;i<Math.min(result.length,5);i++){
       var raw=clean(result[i]&&result[i].transcript);if(!raw)continue;
@@ -916,22 +947,20 @@
     var stopGen=Number(state.speechGeneration||0)+1;state.speechGeneration=stopGen;
     state.stopRequested=true;state.speaking=false;state.paused=false;state.engine='';
     state.speechChunks=[];state.speechIndex=0;state.currentSpokenChunk='';
-    try{if(state.currentUtterance)state.currentUtterance.volume=0;}catch(_){ }
+    try{
+      if(state.currentUtterance){state.currentUtterance.volume=0;state.currentUtterance.onend=null;state.currentUtterance.onerror=null;}
+    }catch(_){ }
     var synth=supportsDeviceSpeech()?window.speechSynthesis:null;
     if(synth){
+      // NO reanudamos tras cancel(): en Chromium resume() demasiado pronto puede liberar otra
+      // porción del utterance que ya estaba bufferizada. El siguiente startDeviceSpeech() hará
+      // resume() cuando exista una locución nueva legítima.
       try{synth.pause();}catch(_){ }
       try{synth.cancel();}catch(_){ }
-      // Segundo vaciado únicamente si no ha comenzado una nueva locución después del corte.
-      setTimeout(function(){
+      [0,70,180].forEach(function(ms){setTimeout(function(){
         if(Number(state.speechGeneration||0)!==stopGen||state.speaking)return;
         try{synth.cancel();}catch(_){ }
-        try{if(synth.paused)synth.resume();}catch(_){ }
-      },0);
-      setTimeout(function(){
-        if(Number(state.speechGeneration||0)!==stopGen||state.speaking)return;
-        try{synth.cancel();}catch(_){ }
-        try{if(synth.paused)synth.resume();}catch(_){ }
-      },55);
+      },ms);});
     }
     state.currentUtterance=null;state.speechEchoUntil=Date.now()+520;
     updateSpeechButtons();
@@ -1171,8 +1200,17 @@
       if(!state.conversationMode) stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus(state.conversationMode?'Te escucho.':'Campo limpio.','');
     }
     if(target&&target.closest&&target.closest('#ceAiDownloadResult')&&state.conversationMode){endVoiceConversation('pdf');}
-    if(target&&target.closest&&target.closest('#ceAiClose')){if(state.conversationMode)parkVoiceConversationForManualClose();else stopSpeaking(false);}
+    // El cierre del modal emite controlevent:zuzu-closed desde el propio módulo de Zuzu.
+    // Centralizamos allí el aparcado/rearme ambiental para evitar dos reinicios del STT por el mismo clic.
   },true);
+
+  window.addEventListener('controlevent:zuzu-closed',function(){
+    // Señal explícita del modal: el MutationObserver queda solo como respaldo.
+    parkVoiceConversationForManualClose();
+  });
+  window.addEventListener('controlevent:zuzu-opened',function(){
+    setTimeout(function(){injectPanel();},30);
+  });
 
   function install(){
     injectStyle();injectPanel();injectWakeBadge();state.ambientEnabled=safeGet(STORAGE.ambientWake,'1')!=='0';
