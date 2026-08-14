@@ -280,7 +280,7 @@ export function applyZuzuRouterGuardrails(decision,input){
   const personRoute=/^PERSON_/.test(d.route||'');
   const filterContinuation=/^(?:dame\s+)?(?:solo|incluye|excluye|ahora\s+solo|ahora\s+sin|tambien|también|sin\s+contar)\b/i.test(msgN);
   const continuationCue=/^(?:y\b|pero\b|dime\s+mas|dime\s+más|dame\b|continua|continúa|lo\s+mismo|ahora\b|solo\b|incluye\b|excluye\b|revisa\b|comprueba\b|seguro\b|entonces\b)/i.test(msgN);
-  const ceDomainSignal=/\b(eventos?|sysa|compras?|tickets?|tk|ingresos?|donaciones?|hitos?|tareas?|lg|lgs|banco|movimientos?|saldo|asistentes?|socios?|tiendas?|proveedores?|documentos?|graficas?|gráficas?|tablas?|responsabilidad|directos|compartidos)\b/i.test(msgN);
+  const ceDomainSignal=/\b(eventos?|sysa|compras?|tickets?|tk|ingresos?|donaciones?|donantes?|donante|hitos?|tareas?|lg|lgs|banco|movimientos?|mvtos?|saldo|asistentes?|socios?|tiendas?|proveedores?|documentos?|graficas?|gráficas?|tablas?|responsabilidad|directos|compartidos)\b/i.test(msgN);
 
   // Los filtros cortos no pueden convertirse en sujetos nuevos.
   if(filterContinuation && /^PERSON_/.test(d.route||'')){
