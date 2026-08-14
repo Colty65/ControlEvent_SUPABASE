@@ -103,30 +103,24 @@
     var st = document.createElement('style');
     st.id = STYLE_ID;
     st.textContent = '\n'+
-      '#'+PANEL_ID+'{margin-top:10px;border:1px solid #fdba74;background:linear-gradient(180deg,#fff7ed,#fff);border-radius:14px;padding:10px 11px;display:grid;gap:8px;color:#0f172a}\n'+
-      '#'+PANEL_ID+' .ce-voz3-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}\n'+
-      '#'+PANEL_ID+' .ce-voz3-btn{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:11px;padding:8px 11px;font-weight:850;cursor:pointer;min-height:38px;line-height:1}\n'+
-      '#'+PANEL_ID+' .ce-voz3-btn:hover{background:#f8fafc}\n'+
-      '#'+PANEL_ID+' .ce-voz3-btn:disabled{opacity:.45;cursor:not-allowed}\n'+
-      '#'+PANEL_ID+' .ce-voz3-mic{border-color:#fb923c;background:#fff7ed;color:#9a3412;min-width:126px}\n'+
-      '#'+PANEL_ID+' .ce-voz3-mic.is-listening{background:#dc2626;color:#fff;border-color:#b91c1c;box-shadow:0 0 0 5px rgba(220,38,38,.14);animation:ceVoz3Pulse 1.25s infinite}\n'+
-      '#'+PANEL_ID+' .ce-voz3-status{font-size:12px;font-weight:800;color:#475569;flex:1 1 190px;min-width:140px}\n'+
-      '#'+PANEL_ID+' .ce-voz3-status.ok{color:#15803d}\n'+
-      '#'+PANEL_ID+' .ce-voz3-status.err{color:#b91c1c}\n'+
-      '#'+PANEL_ID+' .ce-voz3-auto{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:850;white-space:nowrap}\n'+
-      '#'+PANEL_ID+' .ce-voz3-auto input{width:17px;height:17px;accent-color:#f97316}\n'+
-      '#'+PANEL_ID+' .ce-voz3-label{font-size:11px;font-weight:900;color:#64748b}\n'+
-      '#'+PANEL_ID+' select{border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:7px 8px;max-width:270px;font-weight:750;color:#0f172a}\n'+
-      '#'+PANEL_ID+' .ce-voz3-note{font-size:11px;color:#64748b;line-height:1.3}\n'+
-      '#'+PANEL_ID+' .ce-voz3-engine{font-size:10px;font-weight:850;color:#0f766e;background:#ecfeff;border:1px solid #a5f3fc;border-radius:999px;padding:3px 7px}\n'+
-      '#'+PANEL_ID+' .ce-voz3-voice-choice{min-width:210px;max-width:360px}\n'+
+      '#'+PANEL_ID+'{display:inline-flex;align-items:center;gap:4px;flex:1 1 560px;min-width:300px;flex-wrap:wrap;margin:0;padding:0;border:0;background:transparent;color:#0f172a}\n'+
+      '#'+PANEL_ID+' .ce-voz3-btn{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:8px;padding:5px 7px;font-size:10px;font-weight:850;cursor:pointer;min-height:30px;line-height:1;white-space:nowrap}\n'+
+      '#'+PANEL_ID+' .ce-voz3-btn:hover{background:#f8fafc}#'+PANEL_ID+' .ce-voz3-btn:disabled{opacity:.42;cursor:not-allowed}\n'+
+      '#'+PANEL_ID+' .ce-voz3-mic{border-color:#fb923c;background:#fff7ed;color:#9a3412;min-width:76px}\n'+
+      '#'+PANEL_ID+' .ce-voz3-mic.is-listening{background:#dc2626;color:#fff;border-color:#b91c1c;box-shadow:0 0 0 4px rgba(220,38,38,.12);animation:ceVoz3Pulse 1.25s infinite}\n'+
+      '#'+PANEL_ID+' .ce-voz3-auto{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:900;white-space:nowrap;border:1px solid #fed7aa;background:#fff7ed;border-radius:8px;padding:4px 6px;min-height:30px;box-sizing:border-box}\n'+
+      '#'+PANEL_ID+' .ce-voz3-auto input{width:14px;height:14px;accent-color:#f97316;margin:0}\n'+
+      '#'+PANEL_ID+' select{border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:4px 5px;font-size:9px;font-weight:800;color:#0f172a;min-height:30px;max-width:160px}\n'+
+      '#'+PANEL_ID+' .ce-voz3-voice-choice{width:145px;max-width:180px}\n'+
       '#'+PANEL_ID+' .ce-voz3-help{border-color:#bae6fd;background:#f0f9ff;color:#075985}\n'+
-      '.ce-voz3-help-layer{position:fixed;inset:0;z-index:100005;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:18px}\n'+
-      '.ce-voz3-help-card{width:min(620px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:20px;color:#0f172a}\n'+
-      '.ce-voz3-help-card h3{margin:0 0 10px;font-size:20px}.ce-voz3-help-card p{line-height:1.5;margin:8px 0}.ce-voz3-help-card ol{padding-left:22px;line-height:1.55}.ce-voz3-help-card button{margin-top:12px;border:0;border-radius:10px;padding:9px 14px;background:#0f172a;color:#fff;font-weight:850;cursor:pointer}\n'+
-      '@keyframes ceVoz3Pulse{0%,100%{box-shadow:0 0 0 4px rgba(220,38,38,.12)}50%{box-shadow:0 0 0 9px rgba(220,38,38,.04)}}\n'+
-      '#ceGeminiLibreOverlay #ceAiResult{flex:1 1 240px;min-height:170px;overflow:auto;-webkit-overflow-scrolling:touch}\n'+
-      '@media(max-width:760px){#'+PANEL_ID+'{padding:9px;max-height:36vh;overflow:auto;-webkit-overflow-scrolling:touch;flex:0 1 auto}#ceGeminiLibreOverlay .ce-ai-modal{overflow:hidden}#ceGeminiLibreOverlay .ce-ai-prompt{flex:0 0 auto}#ceGeminiLibreOverlay #ceAiResult{flex:1 1 210px;min-height:180px}#'+PANEL_ID+' .ce-voz3-row{align-items:stretch}#'+PANEL_ID+' .ce-voz3-btn{flex:1 1 auto}#'+PANEL_ID+' .ce-voz3-status{flex-basis:100%}#'+PANEL_ID+' select{max-width:100%;flex:1 1 170px}}\n';
+      '#'+PANEL_ID+' .ce-voz3-status{font-size:9px;font-weight:800;color:#475569;flex:1 1 120px;max-width:210px;min-width:95px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n'+
+      '#'+PANEL_ID+' .ce-voz3-status.ok{color:#15803d}#'+PANEL_ID+' .ce-voz3-status.err{color:#b91c1c}\n'+
+      '#'+PANEL_ID+' .ce-voz3-engine{font-size:8px;font-weight:900;color:#0f766e;background:#ecfeff;border:1px solid #a5f3fc;border-radius:999px;padding:3px 5px;white-space:nowrap}\n'+
+      '.ce-voz3-help-layer{position:fixed;inset:0;z-index:100005;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;padding:18px}.ce-voz3-help-card{width:min(620px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:20px;color:#0f172a}.ce-voz3-help-card h3{margin:0 0 10px;font-size:20px}.ce-voz3-help-card p{line-height:1.5;margin:8px 0}.ce-voz3-help-card ol{padding-left:22px;line-height:1.55}.ce-voz3-help-card button{margin-top:12px;border:0;border-radius:10px;padding:9px 14px;background:#0f172a;color:#fff;font-weight:850;cursor:pointer}\n'+
+      '@keyframes ceVoz3Pulse{0%,100%{box-shadow:0 0 0 3px rgba(220,38,38,.12)}50%{box-shadow:0 0 0 7px rgba(220,38,38,.04)}}\n'+
+      '#ceGeminiLibreOverlay #ceAiResult{flex:1 1 300px;min-height:230px;overflow:auto;-webkit-overflow-scrolling:touch}\n'+
+      '@media(max-width:980px){#'+PANEL_ID+'{flex-basis:100%;min-width:0}#'+PANEL_ID+' .ce-voz3-status{max-width:none}}\n'+
+      '@media(max-width:760px){#'+PANEL_ID+'{gap:3px}#'+PANEL_ID+' .ce-voz3-btn{font-size:9px;padding:5px 6px}#'+PANEL_ID+' select{max-width:135px}#'+PANEL_ID+' .ce-voz3-voice-choice{width:120px}#ceGeminiLibreOverlay .ce-ai-modal{overflow:hidden}#ceGeminiLibreOverlay .ce-ai-prompt{flex:0 0 auto}#ceGeminiLibreOverlay #ceAiResult{flex:1 1 220px;min-height:190px}}\n';
     document.head.appendChild(st);
   }
 
@@ -668,39 +662,27 @@
     if(mode!=='male') mode='female';
     return ''+
       '<div id="'+PANEL_ID+'" role="group" aria-label="Controles de voz de Zuzu">'+
-        '<div class="ce-voz3-row">'+
-          '<button type="button" id="ceVoz3Mic" class="ce-voz3-btn ce-voz3-mic" aria-pressed="false"'+(recognitionOk?'':' disabled')+'>🎙️ Hablar</button>'+
-          '<span id="ceVoz3Status" class="ce-voz3-status">'+(recognitionOk?'Micrófono preparado.':'Usa el micrófono del teclado para dictar en este navegador.')+'</span>'+
-          '<label class="ce-voz3-auto"><input id="ceVoz3AutoRead" type="checkbox" '+(auto?'checked':'')+'> Leer respuesta automáticamente</label>'+
-        '</div>'+
-        '<div class="ce-voz3-row">'+
-          '<button type="button" id="ceVoz3Read" class="ce-voz3-btn">🔊 Leer</button>'+
-          '<button type="button" id="ceVoz3Preview" class="ce-voz3-btn">▶ Probar voz</button>'+
-          '<button type="button" id="ceVoz3Pause" class="ce-voz3-btn" disabled>⏸ Pausa</button>'+
-          '<button type="button" id="ceVoz3Resume" class="ce-voz3-btn" disabled>▶ Continuar</button>'+
-          '<button type="button" id="ceVoz3Stop" class="ce-voz3-btn" disabled>⏹ Detener</button>'+
-        '</div>'+
-        '<div class="ce-voz3-row">'+
-          '<span class="ce-voz3-label">Perfil</span>'+
-          '<select id="ceVoz3VoiceMode" aria-label="Perfil de voz de Zuzu">'+
-            '<option value="female"'+(mode==='female'?' selected':'')+'>Femenina recomendada</option>'+
-            '<option value="male"'+(mode==='male'?' selected':'')+'>Masculina recomendada</option>'+
-          '</select>'+
-          '<span class="ce-voz3-label">Voz instalada</span>'+
-          '<select id="ceVoz3VoiceChoice" class="ce-voz3-voice-choice" aria-label="Voz concreta de Zuzu"><option value="auto">Buscando voces…</option></select>'+
-        '</div>'+
-        '<div class="ce-voz3-row">'+
-          '<span class="ce-voz3-label">Velocidad</span>'+
-          '<select id="ceVoz3Rate" aria-label="Velocidad de lectura">'+
-            '<option value="0.82"'+(rate==='0.82'?' selected':'')+'>Lenta</option>'+
-            '<option value="0.92"'+(rate==='0.92'||rate==='0.96'?' selected':'')+'>Natural</option>'+
-            '<option value="1.06"'+(rate==='1.06'||rate==='1.12'?' selected':'')+'>Rápida</option>'+
-          '</select>'+
-          '<button type="button" id="ceVoz3Refresh" class="ce-voz3-btn">↻ Buscar voces</button>'+
-          '<button type="button" id="ceVoz3Help" class="ce-voz3-btn ce-voz3-help">ⓘ Mejorar voz gratis</button>'+
-          '<span id="ceVoz3Engine" class="ce-voz3-engine">Voz local · 0 €</span>'+
-        '</div>'+
-        '<div class="ce-voz3-note">Los importes, porcentajes, fechas, temperaturas, unidades y tickets se convierten a lenguaje hablado. <span id="ceVoz3Disclosure">No usa Azure ni OpenAI.</span></div>'+
+        '<button type="button" id="ceVoz3Mic" class="ce-voz3-btn ce-voz3-mic" aria-pressed="false" title="Hablar / dictar la pregunta"'+(recognitionOk?'':' disabled')+'>🎙 Hablar</button>'+
+        '<label class="ce-voz3-auto" title="Leer automáticamente cada respuesta"><input id="ceVoz3AutoRead" type="checkbox" '+(auto?'checked':'')+'> Auto</label>'+
+        '<button type="button" id="ceVoz3Read" class="ce-voz3-btn" title="Leer la respuesta">🔊 Leer</button>'+
+        '<button type="button" id="ceVoz3Preview" class="ce-voz3-btn" title="Probar la voz elegida">▶ Prueba</button>'+
+        '<button type="button" id="ceVoz3Pause" class="ce-voz3-btn" title="Pausar lectura" disabled>⏸</button>'+
+        '<button type="button" id="ceVoz3Resume" class="ce-voz3-btn" title="Continuar lectura" disabled>▶</button>'+
+        '<button type="button" id="ceVoz3Stop" class="ce-voz3-btn" title="Detener lectura" disabled>■</button>'+
+        '<select id="ceVoz3VoiceMode" aria-label="Perfil de voz de Zuzu" title="Perfil de voz">'+
+          '<option value="female"'+(mode==='female'?' selected':'')+'>♀ Femenina</option>'+
+          '<option value="male"'+(mode==='male'?' selected':'')+'>♂ Masculina</option>'+
+        '</select>'+
+        '<select id="ceVoz3VoiceChoice" class="ce-voz3-voice-choice" aria-label="Voz concreta de Zuzu" title="Voz instalada"><option value="auto">Voz…</option></select>'+
+        '<select id="ceVoz3Rate" aria-label="Velocidad de lectura" title="Velocidad">'+
+          '<option value="0.82"'+(rate==='0.82'?' selected':'')+'>0,82×</option>'+
+          '<option value="0.92"'+(rate==='0.92'||rate==='0.96'?' selected':'')+'>0,92×</option>'+
+          '<option value="1.06"'+(rate==='1.06'||rate==='1.12'?' selected':'')+'>1,06×</option>'+
+        '</select>'+
+        '<button type="button" id="ceVoz3Refresh" class="ce-voz3-btn" title="Buscar voces instaladas">↻ Voz</button>'+
+        '<button type="button" id="ceVoz3Help" class="ce-voz3-btn ce-voz3-help" title="Ayuda para mejorar la voz">ⓘ</button>'+
+        '<span id="ceVoz3Engine" class="ce-voz3-engine">Voz local · 0 €</span>'+
+        '<span id="ceVoz3Status" class="ce-voz3-status" title="Estado de voz">'+(recognitionOk?'Mic preparado':'Usa el micro del teclado')+'</span>'+
       '</div>';
   }
 
@@ -743,9 +725,10 @@
     var overlay=$('ceGeminiLibreOverlay');
     if(!overlay||$(PANEL_ID)) return false;
     injectStyle();
-    var prompt=q('.ce-ai-prompt',overlay),toolbar=q('.ce-ai-toolbar',overlay);
+    var prompt=q('.ce-ai-prompt',overlay),toolbar=q('.ce-ai-toolbar',overlay),pdf=$('ceAiDownloadResult');
     if(!prompt||!toolbar) return false;
-    toolbar.insertAdjacentHTML('afterend',panelHtml()); bindPanel(); return true;
+    if(pdf) pdf.insertAdjacentHTML('afterend',panelHtml()); else toolbar.insertAdjacentHTML('beforeend',panelHtml());
+    bindPanel(); return true;
   }
   function cleanupWhenClosed(){
     if($('ceGeminiLibreOverlay')) return;

@@ -56,14 +56,14 @@ const PIPELINE_HELP = [
   ['PERSON_MANAGEMENT','Hitos/LG/tareas/responsabilidades de gestión de una persona.'],
   ['PEOPLE_ACTIVITY','Ranking/búsqueda global de implicación o actividad de personas.'],
   ['PEOPLE_COMPARE','Comparación directa entre dos o más personas.'],
-  ['EVENT_OVERVIEW','Resumen/dossier general de un evento.'],
+  ['EVENT_OVERVIEW','Resumen/dossier general de un evento, KPIs y resultado/saldo operativo del evento cuando NO se habla de banco o cuenta.'],
   ['EVENT_BREAKDOWN','Desglose de evento por producto/segmento/destino/tienda u otra dimensión económica.'],
   ['EVENT_PURCHASES','Compras del evento; productos, responsables, tickets, pendientes o detalle.'],
   ['EVENT_DONATIONS','Donaciones/donantes/productos donados del evento.'],
-  ['EVENT_PEOPLE_INCOMES','Asistencia, socios, colaboradores, pagos e ingresos del evento.'],
+  ['EVENT_PEOPLE_INCOMES','Asistencia, socios, colaboradores, pagos e ingresos propios de un evento.'],
   ['EVENT_DOCUMENTATION','Documentos, fototickets y justificantes del evento.'],
   ['EVENT_MANAGEMENT','Hitos, LG, tareas, fechas, dependencias y responsables del evento.'],
-  ['BANK','Cuadre/conciliación, movimientos, saldo, evolución y justificación bancaria.'],
+  ['BANK','Cuadre/conciliación, movimientos, saldo bancario o de cuenta, evolución y justificación bancaria. No usar para saldo operativo del evento sin mención bancaria.'],
   ['STORE_PURCHASES','Compras de una tienda/proveedor concreto en uno o varios eventos.'],
   ['CATALOG','Catálogo/listado maestro de productos, tiendas, personas o eventos.'],
   ['EVENTS_ANALYSIS','Análisis global de muchos/todos los eventos, máximos, mínimos, tendencias o condiciones.'],
@@ -152,6 +152,10 @@ REGLA DE SESIÓN INNEGOCIABLE:
 - Una expresión dentro de paréntesis o un nombre de entidad compuesto NO debe trocearse para inventar personas. Ejemplo: «Personas colaboradoras Tardeo (Copas y más)» es una entidad completa; «más» no es una persona.
 - «show_tables», «charts», «gráfica», «tabla» son PRESENTACIÓN/operación, nunca herramientas ni tuberías por sí mismas: conserva la tubería de datos correcta y usa operation=GRAPH/TABLE.
 - El evento de pantalla es solo contexto ambiental. Usa ACTIVE_EVENT únicamente si el usuario realmente se refiere a «este evento/el evento actual» o el hilo ya lo fijó. Para una persona global sin evento nombrado usa ALL_EVENTS.
+- REGLA CRÍTICA DE ÁMBITO PERSONAL: si el usuario nombra una PERSONA y no nombra ningún evento ni dice «este evento/el actual/aquí», una ruta PERSON_* debe llevar event.scope=ALL_EVENTS, event.value vacío y event.source=NONE. Nunca copies el evento de pantalla por comodidad.
+- REGLA CRÍTICA PERSONA vs EVENTO: títulos como «SySA 2026», «SySA 2025», «IV Jornada Solidaria vs ELA - DIC25» son EVENTOS, no personas. «¿Qué ingresos tuvo SySA 2026?» => EVENT_PEOPLE_INCOMES. «¿Quién asistió a SySA 2026?» => EVENT_PEOPLE_INCOMES. No uses PERSON_INCOMES ni PERSON_PARTICIPATION para esas preguntas.
+- SALDOS: «¿Qué saldo dejó SySA 2026?» sin palabras banco/cuenta/conciliación/cuadre significa saldo OPERATIVO del evento => EVENT_OVERVIEW + TOTAL. Solo usa BANK si la pregunta habla explícitamente de banco, cuenta, movimientos, conciliación, cuadre o saldo bancario.
+- OPERACIONES: TOTAL=importe/cantidad total; LIST=qué/cuáles/quiénes o enumeración; DETAIL=detalla/desglosa un elemento o pide detalle exhaustivo; SEARCH=localizar una referencia concreta; REVIEW=revisar/verificar; SUMMARY=resumen general. «¿Qué tickets justifican los cargos bancarios...?» es BANK + LIST/DETAIL, no SEARCH genérico.
 - Si el usuario dice «solo Colty» después de hablar de compras de Colty, la ruta sigue siendo PERSON_PURCHASES y exact_subject=true.
 - Si dice «revisa mi responsabilidad en compras» dentro de un hilo sobre Colty, «mi» mantiene el sujeto Colty salvo que el usuario cambie explícitamente de sujeto.
 
@@ -226,6 +230,73 @@ function normalizeDecision(raw,mode){
   };
 }
 
+
+function normMatch(value){
+  return clean(value,600).toLocaleLowerCase('es-ES').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function messageMentions(message,value){
+  const a=normMatch(message),b=normMatch(value);
+  return !!(a&&b&&a.includes(b));
+}
+export function applyZuzuRouterGuardrails(decision,input){
+  const d=decision&&typeof decision==='object'?decision:null;
+  if(!d) return d;
+  const msg=clean(input?.message,3000);
+  const msgN=normMatch(msg);
+  const screenTitle=clean(input?.screen_event?.title,180);
+  const deicticEvent=/\b(este evento|el evento actual|evento actual|en este evento|aqui|aquí)\b/i.test(msg);
+  const personRoute=/^PERSON_/.test(d.route||'');
+
+  // El evento visible en pantalla nunca debe contaminar una consulta personal global.
+  if(personRoute && d.subject?.type==='PERSON' && d.subject?.source==='EXPLICIT' && d.event?.source==='SCREEN' && !deicticEvent && !messageMentions(msg,screenTitle)){
+    d.event={scope:'ALL_EVENTS',value:'',source:'NONE'};
+    if(d.inheritance) d.inheritance.event=false;
+    d.reason=clean((d.reason?d.reason+' ':'')+'CE corrige ámbito: persona explícita sin evento nombrado => todos los eventos.',180);
+  }
+
+  // Combinaciones imposibles: una ruta PERSON_* no puede tratar un EVENT como persona.
+  if(personRoute && d.subject?.type==='EVENT'){
+    const map={
+      PERSON_OVERVIEW:'EVENT_OVERVIEW',
+      PERSON_PARTICIPATION:'EVENT_PEOPLE_INCOMES',
+      PERSON_PURCHASES:'EVENT_PURCHASES',
+      PERSON_INCOMES:'EVENT_PEOPLE_INCOMES',
+      PERSON_DONATIONS:'EVENT_DONATIONS',
+      PERSON_MANAGEMENT:'EVENT_MANAGEMENT'
+    };
+    if(map[d.route]){
+      d.route=map[d.route];
+      const eventValue=clean(d.event?.value||d.subject?.value,180);
+      d.event={scope:'NAMED_EVENT',value:eventValue,source:'EXPLICIT'};
+      d.reason=clean('CE valida tipo: el sujeto es un EVENTO, por lo que la consulta se enruta a '+d.route+'.',180);
+    }
+  }
+
+  // «Quién asistió a EVENTO» es una consulta del evento, no participación histórica de una persona.
+  if(d.route==='PERSON_PARTICIPATION' && d.event?.value && /\b(quien|quienes|asistio|asistieron|asistentes)\b/i.test(msgN)){
+    d.route='EVENT_PEOPLE_INCOMES'; d.operation='LIST';
+    d.reason=clean('CE valida semántica: se pide la lista de asistentes de un evento.',180);
+  }
+
+  // «Ingresos de EVENTO» pertenece a la tubería de personas/ingresos del evento.
+  if(d.route==='PERSON_INCOMES' && d.event?.value && (d.subject?.value===d.event?.value || d.subject?.type==='EVENT')){
+    d.route='EVENT_PEOPLE_INCOMES';
+    d.reason=clean('CE valida semántica: se preguntan ingresos de un evento, no de una persona.',180);
+  }
+
+  // Diferencia saldo operativo de saldo bancario.
+  if(d.route==='BANK' && /\bsaldo\b/i.test(msgN) && !/\b(banco|bancario|bancaria|cuenta|conciliacion|cuadre|movimiento|extracto)\b/i.test(msgN)){
+    d.route='EVENT_OVERVIEW'; d.operation='TOTAL';
+    d.reason=clean('CE valida semántica: «saldo» sin referencia bancaria se interpreta como saldo operativo del evento.',180);
+  }
+
+  // Si pregunta qué/cuáles tickets justifican cargos, el resultado esperado es una lista/detalle de tickets.
+  if(d.route==='BANK' && /\b(ticket|tickets|tk\d*)\b/i.test(msgN) && /\b(cargo|cargos|justifica|justifican|justificado|justificados)\b/i.test(msgN)){
+    d.operation='LIST';
+  }
+  return d;
+}
+
 export async function classifyZuzuShadow({prompt,selectedEventId,selectedEventTitle,conversationHistory,conversationContext,usuarioLogado,user,authUser,ce_acceso}={}){
   const userPrompt=clean(prompt,3000);
   const history=compactRouterHistory(conversationHistory);
@@ -258,8 +329,11 @@ export async function classifyZuzuShadow({prompt,selectedEventId,selectedEventTi
     if(!res.ok) return {ok:false,shadow:true,mode,model,usage,error:clean(payload?.error?.message||`Gemini Router HTTP ${res.status}`,400)};
     const parsed=parseJsonText(outputText(payload));
     if(!parsed) return {ok:false,shadow:true,mode,model,usage,error:'Gemini Router no devolvió JSON legible.'};
-    const decision=normalizeDecision(parsed,mode);
-    return {ok:true,shadow:true,model,usage,decision,generatedAt:new Date().toISOString()};
+    const rawDecision=normalizeDecision(parsed,mode);
+    const rawDecisionSnapshot=JSON.parse(JSON.stringify(rawDecision));
+    const decision=applyZuzuRouterGuardrails(rawDecision,input);
+    const guardrailApplied=JSON.stringify(rawDecisionSnapshot)!==JSON.stringify(decision);
+    return {ok:true,shadow:true,model,usage,decision,rawDecision:rawDecisionSnapshot,guardrailApplied,generatedAt:new Date().toISOString()};
   }catch(error){
     const msg=error?.name==='AbortError'?`Router sombra agotó ${Math.round(timeoutMs/1000)} s sin afectar a la respuesta principal.`:clean(error?.message||error,400);
     return {ok:false,shadow:true,mode,model,error:msg,usage:{calls:0,promptTokens:0,candidateTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsd:0,costEurApprox:0}};

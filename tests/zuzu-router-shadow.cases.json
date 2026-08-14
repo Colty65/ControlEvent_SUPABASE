@@ -1,5 +1,5 @@
 {
-  "version": "v30_prod-router-shadow-1",
+  "version": "v30_prod-router-shadow-3-regression-19pdf",
   "description": "Banco de 100 casos de enrutamiento Zuzu: 55 consultas independientes + 15 conversaciones de 3 turnos (45 mensajes). No consulta datos ni valida la respuesta factual; valida la decisión de tubería/contexto.",
   "cases": [
     {
@@ -22,7 +22,7 @@
     {
       "id": "S002",
       "kind": "standalone",
-      "prompt": "¿Cuánto dinero ha ingresado Colty en todos los eventos?",
+      "prompt": "¿Cuánto ha ingresado Colty?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
@@ -44,7 +44,7 @@
       "expected": {
         "mode": "TRANSACTIONAL",
         "route": "PERSON_PURCHASES",
-        "operation": "DETAIL",
+        "operation": "LIST",
         "subject": {
           "value": "Colty"
         },
@@ -56,12 +56,12 @@
     {
       "id": "S004",
       "kind": "standalone",
-      "prompt": "Dime las donaciones vinculadas a Colty.",
+      "prompt": "¿Qué donaciones tiene vinculadas Colty?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
         "route": "PERSON_DONATIONS",
-        "operation": "DETAIL",
+        "operation": "LIST",
         "subject": {
           "value": "Colty"
         },
@@ -78,7 +78,7 @@
       "expected": {
         "mode": "TRANSACTIONAL",
         "route": "PERSON_MANAGEMENT",
-        "operation": "DETAIL",
+        "operation": "LIST",
         "subject": {
           "value": "Colty"
         },
@@ -239,7 +239,7 @@
     {
       "id": "S016",
       "kind": "standalone",
-      "prompt": "Dame la lista de asistentes de SySA 2026 uno por uno.",
+      "prompt": "¿Quién asistió a SySA 2026?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
@@ -269,12 +269,12 @@
     {
       "id": "S018",
       "kind": "standalone",
-      "prompt": "¿Cuánto se ingresó en SySA 2026 y de quién?",
+      "prompt": "¿Qué ingresos tuvo SySA 2026?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
         "route": "EVENT_PEOPLE_INCOMES",
-        "operation": "DETAIL",
+        "operation": "SUMMARY",
         "event": {
           "scope": "NAMED_EVENT",
           "value": "SySA 2026"
@@ -466,7 +466,7 @@
     {
       "id": "S031",
       "kind": "standalone",
-      "prompt": "Lista los movimientos bancarios de SySA 2026.",
+      "prompt": "¿Qué movimientos bancarios corresponden a SySA 2026?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
@@ -481,7 +481,7 @@
     {
       "id": "S032",
       "kind": "standalone",
-      "prompt": "¿Qué movimientos del banco de SySA 2026 están sin justificar?",
+      "prompt": "¿Qué tickets justifican los cargos bancarios de SySA 2026?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
@@ -533,7 +533,7 @@
     {
       "id": "S036",
       "kind": "standalone",
-      "prompt": "¿Cuál es el evento en el que más hemos gastado?",
+      "prompt": "¿Cuál ha sido el evento más caro?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
@@ -660,12 +660,12 @@
     {
       "id": "S045",
       "kind": "standalone",
-      "prompt": "¿Qué fechas tiene SySA 2026 y cuál es su situación?",
+      "prompt": "¿Qué saldo dejó SySA 2026?",
       "screenEventTitle": "SySA 2026",
       "expected": {
         "mode": "TRANSACTIONAL",
         "route": "EVENT_OVERVIEW",
-        "operation": "DETAIL",
+        "operation": "TOTAL",
         "event": {
           "scope": "NAMED_EVENT",
           "value": "SySA 2026"
