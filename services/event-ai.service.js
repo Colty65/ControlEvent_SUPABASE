@@ -1642,8 +1642,8 @@ function donorNeedlesFromContext(prompt, context) {
       || /\b(jornada|solidaria|ela|cuotas|ingresos|gastos|extraordinarios|corrientes|dic\d{2}|20\d{2})\b/.test(nq)
       || eventNames.some(ev => ev === nq || ev.includes(nq) || nq.includes(ev));
     if (isEventQuote) return;
-    // Si el usuario escribe donaciones de "Carmelo" o donado por "Pocholo y Celes", esa cita es el filtro humano.
-    // No se amplía con la tabla PERSONAS porque nombres como "Luisa (Carmelo y Lucia)" ensucian el título y desvían el filtro.
+    // Si el usuario escribe un donante concreto, esa cita es el filtro humano y no debe ampliarse con nombres incidentales.
+    // No se amplía con la tabla PERSONAS porque representaciones compuestas pueden ensuciar el título y desviar el filtro.
     names.push(q);
   });
   const explicitDe = rawPrompt.match(/\b(?:de|del|por|donante|donantes?)\s+([A-ZÁÉÍÓÚÑ][^,;.()]{2,80}?)(?=\s+\(|\s+en\s+el\s+evento|\s+en\s+evento|\s+que\b|\s+y\s+qu[eé]\b|$)/);
@@ -7709,14 +7709,54 @@ async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
     v26Table('totals_by_segment_destination',`Totales por Segmento/Destino · ${rr.nombre}`,totalsBySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Nº registros':v26CountSchema('registros'),Importe:v26MoneySchema('Importe total')})
   ].filter(t=>t.rows.length)};
 }
+// v1.0_exp · continuidad estructurada genérica.
+// No fija personas, eventos, productos ni donantes concretos: decide únicamente qué familia de
+// datos está pidiendo el turno ACTUAL y, si el mensaje es elíptico, hereda solo la familia del
+// turno inmediatamente relevante. Esto evita que una revisión de compras reactive una donación
+// antigua solo porque ambas aparecieron algunos turnos atrás.
+function v307StructuredDomainFromText(value=''){
+  const p=norm(value);if(!p)return'';
+  const donation=/\b(donaci[oó]n|donaciones|donad\w*|donante|donantes)\b/.test(p);
+  const purchase=/\b(compras?|comprad\w*|adquirid\w*|bebidas?|cubatas?|tickets?|tkxx|pte\.?\s*compra|pendientes?\s+de\s+compra)\b/.test(p);
+  if(donation&&!purchase)return'donation';
+  if(purchase&&!donation)return'purchase';
+  return'';
+}
+function v307NearestStructuredDomain(history=[]){
+  for(const turn of arr(history).slice().reverse()){
+    const u=v307StructuredDomainFromText(turn?.user);if(u)return u;
+    const a=v307StructuredDomainFromText(turn?.assistant);if(a)return a;
+  }
+  return'';
+}
+function v307MetaCorrectionCue(value=''){
+  const p=norm(value);if(!p)return false;
+  return /\b(por\s+que\s+(?:metes|sacas|mencionas|traes)|no\s+(?:te\s+)?(?:estoy\s+)?preguntando|yo\s+no\s+(?:te\s+)?he\s+pedido|no\s+he\s+pedido|que\s+no\s+(?:te\s+)?he\s+pedido|deja\s+de\s+(?:meter|sacar|mencionar|traer)|no\s+viene\s+a\s+cuento|no\s+quiero\s+que\s+(?:me\s+)?hables?\s+de|erre\s+que\s+erre)\b/.test(p);
+}
+function v307CurrentStructuredDomain(userPrompt='',history=[],dataReq={},results=[]){
+  if(v307MetaCorrectionCue(userPrompt))return'';
+  const direct=v307StructuredDomainFromText(userPrompt);if(direct)return direct;
+  // La herramienta elegida por la IA en ESTE turno pesa más que cualquier recuerdo antiguo.
+  for(const r of arr(results).slice().reverse()){
+    if(!r?.ok)continue;
+    if(trim(r?.name)==='event_purchase_lines')return'purchase';
+    if(trim(r?.name)==='event_donation_lines')return'donation';
+  }
+  if(dataReq?.donationExactLines||dataReq?.donationDetail)return'donation';
+  if(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.exactPurchaseLines)return'purchase';
+  if(dataReq?.structuredDetailFollowUp)return v307NearestStructuredDomain(history);
+  return'';
+}
 function v274DataAccessRequirement(prompt='',history=[]){
   const p=norm(prompt),hist=norm(arr(history).slice(-4).map(x=>`${x?.user||''} ${x?.assistant||''}`).join(' ')),blob=`${hist} ${p}`;
+  const nearestDomain=v307NearestStructuredDomain(history),directDomain=v307StructuredDomainFromText(prompt),metaCorrection=v307MetaCorrectionCue(prompt);
   const productWord=value=>/\b(prod(?:uct|cut)o?s?|art[ií]culos?)\b/.test(value);
   const catalogCue=value=>/\b(catalogo|catálogo|tabla\s+general|tabla\s+maestra|lista\s+general|listado\s+general|todas\s+las\s+tiendas|todas\s+las\s+personas|todos\s+los\s+eventos)\b/.test(value)
-    || (/\btodos\s+los\s+prod(?:uct|cut)os?\b/.test(value)&&!/\b(?:comprad\w*|compras?|adquirid\w*)\b/.test(value));
+    || (/\btodos\s+los\s+prod(?:uct|cut)os?\b/.test(value)&&! /\b(?:comprad\w*|compras?|adquirid\w*)\b/.test(value));
   const purchaseCue=value=>/\b(producto\s+a\s+producto|producto\s+por\s+producto|cada\s+prod(?:uct|cut)o|todos\s+los\s+prod(?:uct|cut)os?\s+comprad\w*|detalle\s+(?:de\s+)?(?:cada\s+)?compra|unidades?[^.]{0,70}precio[^.]{0,70}importe|precio[^.]{0,70}unidades?[^.]{0,70}importe)\b/.test(value)
     || (/\b(compras?|comprad\w*)\b/.test(value)&&/\b(unidades?|precio|importe|ticket|tkxx|responsable|tienda)\b/.test(value)&&/\b(todo|todos|detalle|lista|listado|cada)\b/.test(value))
-    || (/\b(relaci[oó]n|lista|listado|detalle|dame|muestra|cu[aá]les?)\b[^.\n]{0,100}\b(pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(value));
+    || (/\b(relaci[oó]n|lista|listado|detalle|dame|muestra|cu[aá]les?)\b[^.\n]{0,100}\b(pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(value))
+    || /\b(bebidas?|cubatas?)\b/.test(value);
   const followUpTransform=/\b(al\s+lado|orden(?:a|alo|arlo|e|ame|ámelo)|agrup(?:a|alo|ame|ado)|totaliz(?:a|as|alo|ame)|simplemente\s+la\s+tabla|solo\s+la\s+tabla|misma\s+tabla|anterior|a-z|segmento\s*\/\s*destino)\b/.test(p);
   const groupSegmentDestination=/\b(segmento\s*\/\s*destino|segmento[^.\n]{0,30}destino|destino[^.\n]{0,30}segmento)\b/.test(p)||(followUpTransform&&/\bsegmento\s*\/\s*destino\b/.test(hist));
   const tableOnly=/\b(simplemente|solo|únicamente|unicamente)\b[^.\n]{0,25}\btabla\b/.test(p)||/^\s*(?:dame|pon|muestra)?\s*(?:simplemente|solo)?\s*la\s+tabla\b/.test(p);
@@ -7724,19 +7764,21 @@ function v274DataAccessRequirement(prompt='',history=[]){
   let catalogEntity=inferCatalog(p);if(!catalogEntity&&followUpTransform)catalogEntity=inferCatalog(hist);
   const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle)\b/.test(p)
     || /\b(una\s+por\s+una|uno\s+por\s+uno|vuelve\s+a\s+(?:sac|mostr|dec)\w*|lista\s+real|revis\w*|no\s+cuadr\w*|falt\w*|incomplet\w*)\b/.test(p);
-  let purchaseDetail=purchaseCue(p);if(!purchaseDetail&&(followUpTransform||structuredDetailFollowUp))purchaseDetail=purchaseCue(hist)||/\bcompras?\b[^.\n]{0,140}\b(unidades?|precio|importe|productos?|lista|detalle)\b/.test(hist)||/\bproductos?\b[^.\n]{0,120}\b(comprad\w*|cubatas?|bebidas?)\b/.test(hist);
+  const directPurchase=purchaseCue(p);
+  let purchaseDetail=!metaCorrection&&directPurchase;
+  if(!purchaseDetail&&!metaCorrection&&directDomain!=='donation'&&(followUpTransform||structuredDetailFollowUp)&&nearestDomain==='purchase')purchaseDetail=true;
   const accessRestricted=/\b(acceso|accesos|usuarios?\s+de\s+acceso|credenciales?|contraseñas?|password|token)\b/.test(p)||(/\busuarios?\b/.test(p)&&/\b(lista|listado|tabla|catalogo|catálogo|todos|todas|dame|muestra|ver)\b/.test(p));
   const catalogWithEvent=catalogEntity==='products'&&(/\b(evento|jornada|celebracion|celebración)\b/.test(p)||(followUpTransform&&/\b(evento|jornada|celebracion|celebración)\b/.test(hist)));
-  const exactPurchaseLines=/\b(registro|linea|línea|ticket|tkxx|responsable|cada\s+compra|pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p);
+  const exactPurchaseLines=!metaCorrection&&/\b(registro|linea|línea|ticket|tkxx|responsable|cada\s+compra|pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p);
   const purchaseStatus=/\b(pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p)?'pending':(/\b(todas?\s+las\s+compras|compras?\s+realizadas?\s+y\s+pendientes?)\b/.test(p)?'all':'realized');
-  const donationCue=/\b(donaci[oó]n|donaciones|donado|donados|donante|donantes)\b/.test(p);
-  const donationRecent=/\b(donaci[oó]n|donaciones|donado|donados|donante|donantes)\b/.test(hist);
-  const donationContinuation=!donationCue&&donationRecent&&structuredDetailFollowUp;
-  const donationDetail=(donationCue||donationContinuation)&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fic\w*)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
-  const donorRanking=donationCue&&/\b(lista|listado|ranking|top|donantes|quien|quién|quienes|quiénes|mayor|menor|m[aá]s|menos)\b/.test(p);
-  const donationExactLines=(donationCue||donationContinuation)&&(/\b(detalle|detallad|cada|producto|productos|unidades|precio|valor|importe|lista\s+real)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
-  const purchaseStructured=/\b(compra|compras|comprado|comprados|gasto|gastos)\b/.test(p)&&/\b(lista|listado|ranking|top|detalle|detallad|cada|tienda|tiendas|responsable|responsables|producto|productos|ticket|tkxx|gr[aá]fic\w*|quien|quién|quienes|quiénes)\b/.test(p);
-  return{catalogEntity,purchaseDetail,accessRestricted,catalogWithEvent,followUpTransform,structuredDetailFollowUp,groupSegmentDestination,tableOnly,exactPurchaseLines,purchaseStatus,donationDetail,donorRanking,donationExactLines,purchaseStructured};
+  const donationCue=/\b(donaci[oó]n|donaciones|donado|donados|donad\w*|donante|donantes)\b/.test(p);
+  const donationContinuation=!metaCorrection&&!donationCue&&directDomain!=='purchase'&&nearestDomain==='donation'&&structuredDetailFollowUp;
+  const donationActive=!metaCorrection&&(donationCue||donationContinuation);
+  const donationDetail=donationActive&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fic\w*)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
+  const donorRanking=donationActive&&donationCue&&/\b(lista|listado|ranking|top|donantes|quien|quién|quienes|quiénes|mayor|menor|m[aá]s|menos)\b/.test(p);
+  const donationExactLines=donationActive&&(/\b(detalle|detallad|cada|producto|productos|unidades|precio|valor|importe|lista\s+real)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
+  const purchaseStructured=!metaCorrection&&/\b(compra|compras|comprado|comprados|gasto|gastos|bebidas?|cubatas?)\b/.test(p)&&/\b(lista|listado|ranking|top|detalle|detallad|cada|tienda|tiendas|responsable|responsables|producto|productos|ticket|tkxx|gr[aá]fic\w*|quien|quién|quienes|quiénes|cantidad|precio|importe)\b/.test(p);
+  return{catalogEntity,purchaseDetail,accessRestricted,catalogWithEvent,followUpTransform,structuredDetailFollowUp,groupSegmentDestination,tableOnly,exactPurchaseLines,purchaseStatus,donationDetail,donorRanking,donationExactLines,purchaseStructured,nearestStructuredDomain:nearestDomain,metaCorrection};
 }
 function v261AgentTools(){
   const eventArg={type:'string',description:'Nombre/título del evento. Omítelo cuando la conversación se refiera claramente al evento actualmente seleccionado.'};
@@ -7936,67 +7978,74 @@ function v306ReviewCue(value=''){
 function v306RecentUserBlob(userPrompt='',history=[],turns=5){
   return [trim(userPrompt),...arr(history).slice(-turns).map(x=>trim(x?.user))].filter(Boolean).join(' · ');
 }
-function v306RecentDomain(history=[],re){
-  return arr(history).slice(-5).reverse().some(x=>re.test(norm(x?.user))||re.test(norm(x?.assistant)));
-}
 function v306VoiceEffectiveToolDetail(name,requestedDetail,userPrompt,history=[],dataReq={}){
   if(trim(requestedDetail)==='full')return'full';
   if(name==='event_donation_lines'){
-    const recent=v306RecentDomain(history,/\b(donaci[oó]n|donaciones|donad\w*|donante|donantes)\b/);
-    if(dataReq?.donationExactLines||dataReq?.structuredDetailFollowUp||(v306ReviewCue(userPrompt)&&recent))return'full';
+    if(dataReq?.donationExactLines||dataReq?.donationDetail||(dataReq?.structuredDetailFollowUp&&dataReq?.nearestStructuredDomain==='donation')||v306ReviewCue(userPrompt))return'full';
   }
   if(name==='event_purchase_lines'){
-    const recent=v306RecentDomain(history,/\b(compra|compras|comprad\w*|bebidas?|cubatas?|producto|productos)\b/);
     const listCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|producto|productos|bebidas?|cubatas?)\b/.test(norm(userPrompt));
-    if(dataReq?.purchaseDetail||dataReq?.structuredDetailFollowUp||(recent&&listCue)||(v306ReviewCue(userPrompt)&&recent))return'full';
+    if(dataReq?.purchaseDetail||dataReq?.purchaseStructured||(dataReq?.structuredDetailFollowUp&&dataReq?.nearestStructuredDomain==='purchase')||listCue||v306ReviewCue(userPrompt))return'full';
   }
   return'brief';
 }
-function v306PersonFromCurrentOrHistory(userPrompt,state,history=[]){
-  for(const value of [userPrompt,...arr(history).slice(-5).reverse().map(x=>x?.user)]){
-    const hints=arr(v26PersonHintsFromPrompt(value,state));
-    if(hints.length===1)return trim(hints[0]);
-    if(hints.length>1){
-      // Si existe una pareja canónica escrita literalmente, preferirla a dos nombres sueltos.
-      const blob=canonicalNameKey(value);
-      const pair=hints.find(h=>isCanonicalPairName(h)&&blob.includes(canonicalNameKey(h)));
-      if(pair)return trim(pair);
-    }
+function v306PairAwarePersonHint(value,state){
+  const hints=arr(v26PersonHintsFromPrompt(value,state));
+  if(hints.length===1)return trim(hints[0]);
+  if(hints.length>1){
+    const blob=canonicalNameKey(value),pair=hints.find(h=>isCanonicalPairName(h)&&blob.includes(canonicalNameKey(h)));
+    if(pair)return trim(pair);
+  }
+  return'';
+}
+function v307DonorFromContext(userPrompt,state,history=[],existingDonation=null){
+  const direct=v306PairAwarePersonHint(userPrompt,state);if(direct)return direct;
+  const existing=trim(existingDonation?.facts?.donor);if(existing)return existing;
+  // Solo heredamos sujeto desde el turno de DONACIONES más cercano. Nunca saltamos por encima
+  // de un turno de compras para rescatar una persona antigua.
+  for(const turn of arr(history).slice().reverse()){
+    const domain=v307StructuredDomainFromText(`${trim(turn?.user)} ${trim(turn?.assistant)}`);
+    if(!domain)continue;
+    if(domain!=='donation')return'';
+    return v306PairAwarePersonHint(turn?.user,state);
   }
   return'';
 }
 function v306PurchaseFiltersFromContext(userPrompt,state,history=[]){
-  const values=(field)=>[...new Set(arr(state?.productos).map(x=>trim(x?.[field])).filter(Boolean))]
-    .sort((a,b)=>norm(b).length-norm(a).length);
-  const contexts=[userPrompt,...arr(history).slice(-5).reverse().map(x=>x?.user)].map(norm).filter(Boolean);
-  const pick=field=>{
-    const candidates=values(field);
-    for(const blob of contexts){const hit=candidates.find(v=>{const k=norm(v);return k.length>=3&&blob.includes(k);});if(hit)return hit;}
-    return'';
-  };
+  const values=(field)=>[...new Set(arr(state?.productos).map(x=>trim(x?.[field])).filter(Boolean))].sort((a,b)=>norm(b).length-norm(a).length);
+  const contexts=[norm(userPrompt)];
+  // Un follow-up elíptico puede heredar Segmento/Destino, pero solo del último turno de compras.
+  for(const turn of arr(history).slice().reverse()){
+    const domain=v307StructuredDomainFromText(`${trim(turn?.user)} ${trim(turn?.assistant)}`);if(!domain)continue;
+    if(domain==='purchase')contexts.push(norm(turn?.user));
+    break;
+  }
+  const pick=field=>{const candidates=values(field);for(const blob of contexts){const hit=candidates.find(v=>{const k=norm(v);return k.length>=3&&blob.includes(k);});if(hit)return hit;}return'';};
   return{segment:pick('segmento'),destination:pick('destino')};
 }
 async function v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq,allResults,flowTrace}){
-  const has=name=>arr(allResults).some(r=>r?.ok&&r?.name===name);
-  // Garantía pos-interpretación: si la IA respondió de memoria a «lista real / vuelve a sacarla»
-  // pero no volvió a consultar la fuente, CE refresca localmente la fuente sin una llamada IA extra.
-  if((dataReq?.donationExactLines||((dataReq?.donationDetail||dataReq?.structuredDetailFollowUp)&&v306ReviewCue(userPrompt)))&&!has('event_donation_lines')){
+  const domain=v307CurrentStructuredDomain(userPrompt,conversationHistory,dataReq,allResults);
+  if(!domain)return;
+  const existingDonation=arr(allResults).slice().reverse().find(r=>r?.ok&&r?.name==='event_donation_lines');
+  if(domain==='donation'&&(dataReq?.donationExactLines||dataReq?.donationDetail||v306ReviewCue(userPrompt))&&!existingDonation){
     const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,true);
-    const donor=v306PersonFromCurrentOrHistory(userPrompt,state,conversationHistory);
+    const donor=v307DonorFromContext(userPrompt,state,conversationHistory,existingDonation);
     if(event){
       try{
         const result=await v29ToolEventDonationLines({id:'v306_voice_donation_guard',name:'event_donation_lines',event,scope:'named_event',donor,detail:'full'},state,selectedEventId);
         allResults.push(result);
-        zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','OK',`Se refresca la lista canónica de donaciones${donor?` de ${donor}`:''} en ${event} sin otra llamada IA.`);
+        zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','OK',`Se refresca la fuente canónica de donaciones${donor?` para el sujeto solicitado`:''} en ${event} sin otra llamada IA.`);
       }catch(error){zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','WARN',cleanGeminiError(error));}
     }
+    return;
   }
-  const recentPurchase=v306RecentDomain(conversationHistory,/\b(compra|compras|bebidas?|cubatas?|producto|productos)\b/);
+  if(domain!=='purchase')return;
   const purchaseListCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(norm(userPrompt));
+  if(!(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.structuredDetailFollowUp||purchaseListCue||v306ReviewCue(userPrompt)))return;
   const filters=v306PurchaseFiltersFromContext(userPrompt,state,conversationHistory);
   const existingPurchase=arr(allResults).slice().reverse().find(r=>r?.ok&&r?.name==='event_purchase_lines');
   const filterMismatch=!!existingPurchase&&((filters.segment&&norm(existingPurchase?.facts?.segment)!==norm(filters.segment))||(filters.destination&&norm(existingPurchase?.facts?.destination)!==norm(filters.destination)));
-  const needsPurchaseRefresh=(dataReq?.purchaseDetail||recentPurchase)&&(dataReq?.structuredDetailFollowUp||purchaseListCue)&&(!existingPurchase||filterMismatch||((filters.segment||filters.destination)&&!trim(existingPurchase?.facts?.segment)&&!trim(existingPurchase?.facts?.destination)));
+  const needsPurchaseRefresh=!existingPurchase||filterMismatch||((filters.segment||filters.destination)&&!trim(existingPurchase?.facts?.segment)&&!trim(existingPurchase?.facts?.destination));
   if(needsPurchaseRefresh){
     const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,true);
     if(event){
@@ -8009,10 +8058,11 @@ async function v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventI
   }
 }
 function v306VoiceCanonicalStructuredAnswer(userPrompt,history=[],results=[],dataReq={}){
-  const p=norm(userPrompt),blob=norm(v306RecentUserBlob(userPrompt,history,4));
+  const p=norm(userPrompt),blob=norm(v306RecentUserBlob(userPrompt,history,2));
   const latest=name=>arr(results).slice().reverse().find(r=>r?.ok&&r?.name===name);
   const table=(r,key)=>arr(r?.tables).find(t=>trim(t?.key)===key);
-  if(dataReq?.donationExactLines||((dataReq?.donationDetail||dataReq?.structuredDetailFollowUp)&&v306ReviewCue(userPrompt))){
+  const domain=v307CurrentStructuredDomain(userPrompt,history,dataReq,results);
+  if(domain==='donation'){
     const r=latest('event_donation_lines'),rows=arr(table(r,'donor_products')?.rows);
     if(r&&rows.length&&rows.length<=80){
       const f=r.facts||{},event=trim(f.event)||'este evento';
@@ -8022,22 +8072,15 @@ function v306VoiceCanonicalStructuredAnswer(userPrompt,history=[],results=[],dat
       return{title:`Donaciones · ${event}`,answer:`He consultado de nuevo la fuente completa. En ${event}, ${who} tiene${donors.length===1||trim(f.donor)?'':'n'} ${rows.length} producto${rows.length===1?'':'s'} donado${rows.length===1?'':'s'} por un valor total de ${v26FormatEuro(num(f.total_value))}. Son: ${detail}.`,warnings:[],showTables:[],chartSpecs:[]};
     }
   }
-  const purchaseRecent=v306RecentDomain(history,/\b(compra|compras|comprad\w*|bebidas?|cubatas?|producto|productos)\b/);
-  const purchaseListCue=(dataReq?.purchaseDetail||purchaseRecent)&&(/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(p)||dataReq?.structuredDetailFollowUp);
-  if(purchaseListCue){
+  if(domain==='purchase'){
+    const purchaseListCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(p)||dataReq?.structuredDetailFollowUp||v306ReviewCue(userPrompt);
     const r=latest('event_purchase_lines'),rows=arr(table(r,'by_product')?.rows);
-    if(r&&rows.length&&rows.length<=80){
+    if(purchaseListCue&&r&&rows.length&&rows.length<=80){
       const f=r.facts||{},event=trim(f.event)||'este evento';
       const wantsQty=/\b(cantidad|cantidades|unidad|unidades|una\s+por\s+una|uno\s+por\s+uno)\b/.test(blob);
       const wantsPrice=/\b(precio|precios)\b/.test(blob);
       const wantsAmount=/\b(importe|importes|sumatorio|total)\b/.test(blob);
-      const detail=rows.map(x=>{
-        const parts=[trim(x?.Producto)||'Producto'];
-        if(wantsQty)parts.push(`${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}`);
-        if(wantsPrice&&trim(x?.['Precios registrados']))parts.push(`precio ${trim(x['Precios registrados'])}`);
-        if(wantsAmount)parts.push(`importe ${v26FormatEuro(num(x?.Importe))}`);
-        return parts.join(', ');
-      }).join('; ');
+      const detail=rows.map(x=>{const parts=[trim(x?.Producto)||'Producto'];if(wantsQty)parts.push(`${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}`);if(wantsPrice&&trim(x?.['Precios registrados']))parts.push(`precio ${trim(x['Precios registrados'])}`);if(wantsAmount)parts.push(`importe ${v26FormatEuro(num(x?.Importe))}`);return parts.join(', ');}).join('; ');
       const filters=[trim(f.segment)&&`segmento ${trim(f.segment)}`,trim(f.destination)&&`destino ${trim(f.destination)}`,trim(f.product)&&`producto ${trim(f.product)}`].filter(Boolean).join(', ');
       return{title:`Compras · ${event}`,answer:`He consultado el detalle real de compras${filters?` para ${filters}`:''} en ${event}. Son ${rows.length} producto${rows.length===1?'':'s'}: ${detail}. El importe total de este conjunto es ${v26FormatEuro(num(f.total_amount))}.`,warnings:[],showTables:[],chartSpecs:[]};
     }
@@ -8326,6 +8369,9 @@ function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],s
   return'';
 }
 async function v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
+  // Si el usuario menciona un nombre solo para quejarse de que se ha introducido sin venir a cuento,
+  // ese nombre es metaconversacional y NO debe disparar un dossier personal ni aumentar coste.
+  if(v307MetaCorrectionCue(userPrompt))return null;
   const explicit=v26PersonHintsFromPrompt(userPrompt,state);
   if(explicit.length>1)return null; // comparativas: Gemini decide cada dossier de forma explícita.
   const explicitSubject=explicit.length===1;
@@ -8472,6 +8518,10 @@ function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
   return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
 }
 
+function v307CanonicalEventReferenceInput(userPrompt,state,eventName=''){
+  const event=trim(eventName)||v281EventNameInText(state,userPrompt);if(!event)return userPrompt;
+  return `${userPrompt}\n\nCANONICAL_EVENT_REFERENCE (resolución nominal de ControlEvent, no es una respuesta ni una ruta): el texto del usuario coincide, ignorando mayúsculas y acentos, con el evento existente «${event}». No digas que ese evento no existe ni pidas que lo escriban con otra capitalización; si necesitas datos, solicita la herramienta correspondiente usando ese título canónico.`;
+}
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone}){
   // Compatibilidad de regresión v1.4: V27.1.4 · Garantía de cobertura; la lógica vigente es V27.1.5.
   const requestedChartIntent=v273ConversationRequestsCharts(userPrompt,conversationHistory);
@@ -8526,6 +8576,8 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   let groundedUserInput=v30PersonGroundingInput(userPrompt,personalGrounding);
   groundedUserInput=v304EventStatusGroundingInput(groundedUserInput,eventStatusGrounding);
   groundedUserInput=v304BankGroundingInput(groundedUserInput,bankFollowUpGrounding);
+  const canonicalEventReference=v281EventNameInText(state,userPrompt);
+  if(canonicalEventReference){groundedUserInput=v307CanonicalEventReferenceInput(groundedUserInput,state,canonicalEventReference);zuzuTracePush(flowTrace,'v1.0_exp · Referencia nominal canónica','OK',`El nombre escrito por el usuario se resuelve a «${canonicalEventReference}» ignorando mayúsculas y acentos; la IA conserva libertad para decidir qué herramienta necesita.`);}
   const initialInput=hasNativeThread?groundedUserInput:v284ConversationCapsuleInput(groundedUserInput,userPrompt,conversationHistory,conversationDigest);
   if(hasNativeThread)zuzuTracePush(flowTrace,'v30 · Memoria Gemini nativa','OK',`Continuación con previous_interaction_id=${currentId.slice(0,40)}…; Gemini recupera el historial del servidor.`);
   else if(arr(conversationHistory).length)zuzuTracePush(flowTrace,'v30 · Recuperación de contexto','OK','No hay Interaction nativa utilizable; se aporta una cápsula local de los últimos turnos para reconstruir el hilo sin pedir al usuario que repita nada.');
@@ -11529,7 +11581,7 @@ function planExplicitItemLines(block) {
     const m = s.match(/^\s*[•\-\*]\s*(.+)$/);
     if (m) { out.push(m[1]); return; }
     // Soporta líneas sin guion: "Anchoas: 1", "Rollo papel secamanos: 1", "1 kg de chorizo"
-    // y líneas con donante delante: "Pocholo y Celes: Anchoas: 1".
+    // y líneas con donante delante: "Donante X: Producto Y: 1".
     if (/^[A-ZÁÉÍÓÚÑ0-9][^:\n]{1,140}:\s*(?:\d|un|una|uno)/i.test(s)
       || /^[^:\n]{2,90}:\s*[^:\n]{2,160}:\s*(?:\d|un|una|uno)/i.test(s)
       || /^\d+(?:[,.]\d+)?\s*(?:ud\.?|unidades|kg\.?|kilos?|l\.?|litros?|botellas?|latas?|rollos?|sacos?|packs?|paquetes?|barriles?|botellines?)?\s+\D{2,}/i.test(s)) out.push(s);
