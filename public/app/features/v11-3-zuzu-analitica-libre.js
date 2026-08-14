@@ -7,6 +7,7 @@
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
+  function withoutGeminiLabel(v){ return text(v).replace(/gemini(?:[-_. ]?2\.5[-_. ]?flash)?/gi,'IA'); }
   function esc(v){ return text(v).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];}); }
   function safe(fn,fb){ try{ var v=fn(); return v===undefined?fb:v; }catch(_){ return fb; } }
   function st(){ return safe(function(){ return (typeof state!=='undefined'&&state)||window.state||{}; }, window.state||{}); }
@@ -170,7 +171,8 @@
       '#ceGeminiLibreOverlay .ce-ai-line-svg{width:100%;height:320px;border:1px solid #e0f2fe;border-radius:16px;background:linear-gradient(180deg,#fff,#f8fafc)}#ceGeminiLibreOverlay .ce-ai-stacked-wrap{display:grid;gap:14px}#ceGeminiLibreOverlay .ce-ai-stack-row{display:grid;grid-template-columns:minmax(160px,280px) 1fr;gap:12px;align-items:center}#ceGeminiLibreOverlay .ce-ai-stack-label{font-weight:650;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.15;font-size:13px}#ceGeminiLibreOverlay .ce-ai-stack-body{min-width:0}#ceGeminiLibreOverlay .ce-ai-stack-track{height:24px;background:#e8eef6;border-radius:999px;display:flex;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(15,23,42,.04)}#ceGeminiLibreOverlay .ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.18)}#ceGeminiLibreOverlay .ce-ai-stack-values{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:5px;font-size:11px;font-weight:750;color:#334155}#ceGeminiLibreOverlay .ce-ai-stack-values span{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-stack-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-weight:650;color:#334155;font-size:13px}#ceGeminiLibreOverlay .ce-ai-stack-legend span i{display:inline-block;width:10px;height:10px;border-radius:999px;margin-right:6px}\n'+
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
       '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-loading,#ceGeminiLibreOverlay .ce-ai-thinking,#ceGeminiLibreOverlay .ce-ai-progress,#ceGeminiLibreOverlay .ce-ai-wait-signal,#ceGeminiLibreOverlay .ce-ai-wait-copy{display:none!important}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;gap:8px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head>span:first-child{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{margin-left:auto}\n';
+      '#ceGeminiLibreOverlay .ce-ai-loading,#ceGeminiLibreOverlay .ce-ai-thinking,#ceGeminiLibreOverlay .ce-ai-progress,#ceGeminiLibreOverlay .ce-ai-wait-signal,#ceGeminiLibreOverlay .ce-ai-wait-copy{display:none!important}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;gap:8px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head>span:first-child{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{margin-left:auto}#ceAiDownloadResult{pointer-events:auto!important;opacity:1!important;cursor:pointer!important}\n'+
+      '#ceAiPdfPicker{position:fixed;inset:0;z-index:100080;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px}#ceAiPdfPicker .ce-ai-pdf-picker-card{width:min(920px,96vw);max-height:min(780px,92vh);background:#fff;border:2px solid #f59e0b;border-radius:20px;box-shadow:0 26px 80px rgba(15,23,42,.38);display:flex;flex-direction:column;overflow:hidden}#ceAiPdfPicker .ce-ai-pdf-picker-head{padding:14px 16px;background:linear-gradient(90deg,#fff7ed,#fff);border-bottom:1px solid #fed7aa}#ceAiPdfPicker .ce-ai-pdf-picker-head h3{margin:0 0 5px;color:#7c2d12}#ceAiPdfPicker .ce-ai-pdf-picker-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc}#ceAiPdfPicker button{border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;padding:7px 10px;font-weight:850;cursor:pointer}#ceAiPdfPicker .ce-ai-pdf-picker-list{flex:1;min-height:160px;overflow:auto;padding:8px 12px}#ceAiPdfPicker .ce-ai-pdf-turn{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:flex-start;padding:9px 4px;border-bottom:1px solid #e2e8f0;cursor:pointer}#ceAiPdfPicker .ce-ai-pdf-turn-title{font-weight:950;color:#7c2d12;margin-bottom:3px}#ceAiPdfPicker .ce-ai-pdf-turn-line{font-size:12px;line-height:1.3;color:#334155;margin-top:2px}#ceAiPdfPicker .ce-ai-pdf-turn-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}#ceAiPdfPicker .ce-ai-pdf-badge{font-size:10px;font-weight:850;padding:2px 6px;border-radius:999px;background:#eff6ff;color:#075985;border:1px solid #bae6fd}#ceAiPdfPicker .ce-ai-pdf-picker-foot{display:flex;justify-content:flex-end;gap:8px;padding:11px 12px;border-top:1px solid #e2e8f0;background:#fff}#ceAiPdfPicker .ce-ai-pdf-primary{background:#f97316!important;color:#fff!important;border-color:#f97316!important}\n';
     css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-status.INFO{color:#475569}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}#ceGeminiLibreOverlay .ce-ai-bank-justified{margin-top:14px;border-top:1px solid #dbeafe;padding-top:10px}#ceGeminiLibreOverlay .ce-ai-bank-justified h4{margin:0 0 8px;color:#075985}#ceGeminiLibreOverlay .ce-ai-bank-move{border:1px solid #dbeafe;border-left:6px solid #64748b;border-radius:10px;padding:9px 10px;margin:7px 0;background:#fff}#ceGeminiLibreOverlay .ce-ai-bank-move.INGRESO{border-left-color:#22c55e;background:#f0fdf4}#ceGeminiLibreOverlay .ce-ai-bank-move.CARGO{border-left-color:#e11d48;background:#fff1f2}#ceGeminiLibreOverlay .ce-ai-bank-move-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:850}.ce-ai-bank-move-amount{font-weight:950}.ce-ai-bank-move.INGRESO .ce-ai-bank-move-amount{color:#15803d}.ce-ai-bank-move.CARGO .ce-ai-bank-move-amount{color:#be123c}.ce-ai-bank-move-concept{font-weight:800;margin-top:4px}.ce-ai-bank-move-why{margin-top:3px;color:#334155}.ce-ai-bank-move-balance{color:#475569}';
     css.textContent += '\n'+
       '#ceGeminiLibreOverlay .ce-ai-mode-strip{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:1px solid #e2e8f0;font-weight:900;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-new{background:#eff6ff;color:#1d4ed8}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-conversation{background:#f0fdf4;color:#166534}#ceGeminiLibreOverlay .ce-ai-mode-pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 11px;background:#fff;border:1px solid currentColor;font-size:13px;letter-spacing:.02em}#ceGeminiLibreOverlay .ce-ai-mode-help{font-size:12px;font-weight:800;color:#475569;flex:1;min-width:260px}#ceGeminiLibreOverlay .ce-ai-conversation-card{border-color:#a7f3d0;background:linear-gradient(180deg,#f0fdf4,#fff)}#ceGeminiLibreOverlay .ce-ai-conversation-turn{border-top:1px dashed #bbf7d0;padding:8px 0}#ceGeminiLibreOverlay .ce-ai-conversation-turn:first-child{border-top:0;padding-top:0}#ceGeminiLibreOverlay .ce-ai-conversation-user{font-weight:900;color:#14532d}#ceGeminiLibreOverlay .ce-ai-conversation-zuzu{margin:5px 0 0 14px;color:#475569;white-space:pre-wrap;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-resume-note{font-size:12px;color:#475569;font-weight:800;margin-bottom:9px}\n'+
@@ -248,7 +250,7 @@
   }
   function conversationAssistantExcerpt(turn){
     turn=turn||{};
-    var head=String(turn.assistant||'').trim(),tail=String(turn.assistantTail||'').trim();
+    var head=withoutGeminiLabel(String(turn.assistant||'').trim()),tail=withoutGeminiLabel(String(turn.assistantTail||'').trim());
     var raw=head;
     if(tail && tail!==head){ raw=head?head.slice(0,520)+' … '+tail.slice(-520):tail; }
     if(!raw) return '';
@@ -264,7 +266,7 @@
     if(!hist.length) return '<div class="ce-ai-conversation-rail-empty">Sin conversación todavía.<br>La primera respuesta abrirá el hilo.</div>';
     return hist.map(function(turn,idx){
       var q=conversationTrailExcerpt(turn&&turn.user||'');
-      var a=conversationTrailExcerpt(turn&&turn.assistant||'');
+      var a=withoutGeminiLabel(conversationTrailExcerpt(turn&&turn.assistant||''));
       return '<div class="ce-ai-conversation-rail-turn"><div class="ce-ai-conversation-rail-turnno">Turno '+(base+idx+1)+'</div><div class="ce-ai-conversation-rail-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-conversation-rail-line"><b>R:</b> '+esc(a||'—')+'</div></div>';
     }).join('');
   }
@@ -314,10 +316,10 @@
     var turns=loadZuzuConversation().length;
     if(!turns){
       node.className='ce-ai-mode-strip is-new';
-      node.innerHTML='<span class="ce-ai-mode-pill">🔵 CONSULTA NUEVA · GEMINI</span><span class="ce-ai-mode-help">Arquitectura nueva activa: Gemini interpreta y ControlEvent ejecuta/verifica los datos canónicos.</span>';
+      node.innerHTML='<span class="ce-ai-mode-pill">🔵 CONSULTA NUEVA</span>';
     }else{
       node.className='ce-ai-mode-strip is-conversation';
-      node.innerHTML='<span class="ce-ai-mode-pill">🟢 CONVERSACIÓN GEMINI · Turno '+turns+'</span><span class="ce-ai-mode-help">Gemini mantiene el hilo nativo; ControlEvent aporta herramientas, cálculos y presentación canónica. Pulsa 🧹 para empezar de cero.</span>';
+      node.innerHTML='<span class="ce-ai-mode-pill">🟢 CONVERSACIÓN / TURNO '+turns+'</span><span class="ce-ai-mode-help"><strong>Pulsa 🧹 para empezar de cero.</strong></span>';
     }
   }
   function restoreConversationScreen(){
@@ -330,11 +332,11 @@
 
   function archivedTurnHtml(turn){
     turn=turn||{};
-    if(trim(turn.archiveHtml||'')) return String(turn.archiveHtml);
-    var answer=String(turn.assistant||'').trim();
+    if(trim(turn.archiveHtml||'')) return withoutGeminiLabel(String(turn.archiveHtml));
+    var answer=withoutGeminiLabel(String(turn.assistant||'').trim());
     return '<div class="ce-ai-card ce-ai-answer-card"><h3>Respuesta de Zuzu</h3><div class="ce-ai-answer">'+answerDisplayHtml(answer||'Sin respuesta archivada para este turno.')+'</div></div>';
   }
-  function archivedTraceHtml(turn){ return trim(turn&&turn.archiveTraceHtml||'')||''; }
+  function archivedTraceHtml(turn){ return withoutGeminiLabel(trim(turn&&turn.archiveTraceHtml||'')||''); }
   // En pantalla la traza sigue plegada. Al imprimirla se abren sus <details> para que
   // el PDF capture realmente pasos, consultas, selector/router y diagnóstico.
   function printableArchivedTraceHtml(turn){
@@ -444,7 +446,13 @@
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
-    $('ceAiDownloadResult').onclick=printZuzuPdf;
+    var pdfBtn=$('ceAiDownloadResult');
+    if(pdfBtn){
+      pdfBtn.disabled=false;
+      pdfBtn.removeAttribute('disabled');
+      pdfBtn.setAttribute('aria-disabled','false');
+      pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
+    }
     restoreConversationScreen();
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
@@ -624,7 +632,9 @@
         }
       }
       data.__prompt = prompt;
-      data.answer=ensureZuzuUserPreface(data.answer||'');
+      data.answer=withoutGeminiLabel(ensureZuzuUserPreface(data.answer||''));
+      if(data.title) data.title=withoutGeminiLabel(data.title);
+      if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);
       if((!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);
       var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
       if(data.meta&&data.meta.resetInteractionId===true) saveZuzuInteractionId('');
@@ -648,6 +658,12 @@
       stopZuzuThinking();
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'', data.rejected?'err':'');
+      try{
+        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId}}));
+        if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
+          setTimeout(function(){ try{window.ControlEventV22Voz4.maybeAutoRead();}catch(_){ } },80);
+        }
+      }catch(_){ }
       // Router sombra conservado como herramienta de diagnóstico/regresión, pero fuera del flujo normal de producción.
     }catch(err){
       stopZuzuThinking();
@@ -660,7 +676,7 @@
     if(!usage || !(Number(usage.calls||0)>0)) return '';
     var tokens=formatNumber(usage.totalTokens||0);
     var cost=formatCost(usage.costEurApprox||0);
-    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo Gemini</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
+    return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo IA</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
     // v1.0_exp: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
@@ -675,33 +691,33 @@
     var usageBlock='';
     if(usage){
       var calls=Number(usage.calls||0), tokens=Number(usage.totalTokens||0), cost=Number(usage.costEurApprox||0);
-      usageBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+(calls?'OK':'INFO')+'">'+(calls?'OK':'INFO')+'</div><div><strong>Consumo Gemini</strong></div><div class="ce-ai-trace-detail">'+
+      usageBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+(calls?'OK':'INFO')+'">'+(calls?'OK':'INFO')+'</div><div><strong>Consumo IA</strong></div><div class="ce-ai-trace-detail">'+
         esc(String(calls))+' '+(calls===1?'llamada':'llamadas')+' · '+esc(formatNumber(tokens))+' tokens · coste estimado '+esc(formatCost(cost))+' €.'+
-        (calls?'':' Sin consumo Gemini en este turno.')+
+        (calls?'':' Sin consumo IA en este turno.')+
       '</div></div>';
     }
     var grand=(data&&data.meta&&data.meta.geminiConversationTotal)||loadZuzuUsageTotal();
     var grandBlock='';
     if(grand){
       grandBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status INFO">TOTAL</div><div><strong>Total general de la conversación Zuzu</strong></div><div class="ce-ai-trace-detail">'+
-        esc(String(Number(grand.turns||0)))+' turnos · '+esc(String(Number(grand.calls||0)))+' '+(Number(grand.calls||0)===1?'llamada':'llamadas')+' Gemini · '+esc(formatNumber(Number(grand.totalTokens||0)))+' tokens · <strong>coste estimado '+esc(formatCost(Number(grand.costEurApprox||0)))+' €</strong>.</div></div>';
+        esc(String(Number(grand.turns||0)))+' turnos · '+esc(String(Number(grand.calls||0)))+' '+(Number(grand.calls||0)===1?'llamada':'llamadas')+' IA · '+esc(formatNumber(Number(grand.totalTokens||0)))+' tokens · <strong>coste estimado '+esc(formatCost(Number(grand.costEurApprox||0)))+' €</strong>.</div></div>';
     }
     var shadow=(data&&data.meta&&data.meta.routerShadow)||null,shadowPending=!!(data&&data.meta&&data.meta.routerShadowPending),shadowBlock='';
     if(shadowPending){
-      shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status INFO">DIAG</div><div><strong>Router Gemini · diagnóstico en sombra</strong></div><div class="ce-ai-trace-detail">Clasificación diagnóstica pendiente. El Router SOMBRA no forma parte del flujo de producción; la arquitectura activa es Gemini → herramientas ControlEvent → Gemini.</div></div>';
+      shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status INFO">DIAG</div><div><strong>Router IA · diagnóstico en sombra</strong></div><div class="ce-ai-trace-detail">Clasificación diagnóstica pendiente. El Router SOMBRA no forma parte del flujo de producción; la arquitectura activa es IA → herramientas ControlEvent → IA.</div></div>';
     }else if(shadow){
       if(shadow.ok&&shadow.decision){
         var d=shadow.decision||{},subject=d.subject&&d.subject.value?(' · sujeto='+d.subject.value):'',event=d.event&&d.event.value?(' · evento='+d.event.value):'',conf=Number(d.confidence||0),guard='';
-        if(shadow.guardrailApplied&&shadow.rawDecision){ var rd=shadow.rawDecision||{},rsubject=rd.subject&&rd.subject.value?(' · sujeto='+rd.subject.value):'',revent=rd.event&&rd.event.value?(' · evento='+rd.event.value):''; guard='<div class="ce-ai-trace-detail" style="margin-top:4px;color:#9a3412"><strong>🛡️ Guardrail CE:</strong> Gemini propuso '+esc(rd.route||'UNKNOWN')+esc(rsubject)+esc(revent)+' · '+esc(rd.operation||'OTHER')+' → CE valida '+esc(d.route||'UNKNOWN')+esc(subject)+esc(event)+' · '+esc(d.operation||'OTHER')+'.</div>'; }
-        shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status OK">DIAG</div><div><strong>Router Gemini · diagnóstico '+esc(d.mode||'')+'</strong></div><div class="ce-ai-trace-detail">TUBERÍA='+esc(d.route||'UNKNOWN')+esc(subject)+esc(event)+' · operación='+esc(d.operation||'OTHER')+' · confianza='+esc((conf*100).toFixed(0))+'%. '+esc(d.reason||'')+' <strong>Solo auditoría histórica: no manda en la respuesta. La arquitectura activa es Gemini → herramientas CE → Gemini.</strong></div>'+guard+'</div>';
+        if(shadow.guardrailApplied&&shadow.rawDecision){ var rd=shadow.rawDecision||{},rsubject=rd.subject&&rd.subject.value?(' · sujeto='+rd.subject.value):'',revent=rd.event&&rd.event.value?(' · evento='+rd.event.value):''; guard='<div class="ce-ai-trace-detail" style="margin-top:4px;color:#9a3412"><strong>🛡️ Guardrail CE:</strong> IA propuso '+esc(rd.route||'UNKNOWN')+esc(rsubject)+esc(revent)+' · '+esc(rd.operation||'OTHER')+' → CE valida '+esc(d.route||'UNKNOWN')+esc(subject)+esc(event)+' · '+esc(d.operation||'OTHER')+'.</div>'; }
+        shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status OK">DIAG</div><div><strong>Router IA · diagnóstico '+esc(d.mode||'')+'</strong></div><div class="ce-ai-trace-detail">TUBERÍA='+esc(d.route||'UNKNOWN')+esc(subject)+esc(event)+' · operación='+esc(d.operation||'OTHER')+' · confianza='+esc((conf*100).toFixed(0))+'%. '+esc(withoutGeminiLabel(d.reason||''))+' <strong>Solo auditoría histórica: no manda en la respuesta. La arquitectura activa es IA → herramientas CE → IA.</strong></div>'+guard+'</div>';
       }else{
-        shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status WARN">DIAG</div><div><strong>Router Gemini · diagnóstico no disponible</strong></div><div class="ce-ai-trace-detail">'+esc(shadow.error||'No se pudo clasificar este turno.')+' La arquitectura activa de Zuzu no se ha visto afectada.</div></div>';
+        shadowBlock='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status WARN">DIAG</div><div><strong>Router IA · diagnóstico no disponible</strong></div><div class="ce-ai-trace-detail">'+esc(withoutGeminiLabel(shadow.error||'No se pudo clasificar este turno.'))+' La arquitectura activa de Zuzu no se ha visto afectada.</div></div>';
       }
     }
     var items=trace.map(function(x){
       var st=String(x.status||'INFO').toUpperCase();
       var extra='';
-      if(x.model) extra+=' Modelo: '+x.model+'.';
+      if(x.model) extra+=' Modelo: '+withoutGeminiLabel(x.model)+'.';
       if(x.usage && (x.usage.totalTokens||x.usage.promptTokens)){
         extra+=' Tokens: '+(x.usage.totalTokens||'?')+' total';
         if(x.usage.promptTokens) extra+=' ('+x.usage.promptTokens+' in';
@@ -711,7 +727,7 @@
         if(x.usage.costEurApprox!==undefined) extra+=' · coste aprox. '+formatCost(x.usage.costEurApprox)+' €';
         extra+='.';
       }
-      return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(x.step||'Paso')+'</strong></div><div class="ce-ai-trace-detail">'+esc((x.detail||'')+extra)+'</div></div>';
+      return '<div class="ce-ai-trace-item"><div class="ce-ai-trace-status '+esc(st)+'">'+esc(st)+'</div><div><strong>'+esc(withoutGeminiLabel(x.step||'Paso'))+'</strong></div><div class="ce-ai-trace-detail">'+esc(withoutGeminiLabel((x.detail||'')+extra))+'</div></div>';
     }).join('');
     var statusBits=[ok+' OK']; if(retry)statusBits.push(retry+' reintento'+(retry===1?'':'s')); if(warn)statusBits.push(warn+' aviso'+(warn===1?'':'s')); statusBits.push(ko+' KO');
     var overview='<div class="ce-ai-trace-item"><div class="ce-ai-trace-status INFO">INFO</div><div><strong>Resumen técnico</strong></div><div class="ce-ai-trace-detail">'+esc(statusBits.join(' / '))+'</div></div>';

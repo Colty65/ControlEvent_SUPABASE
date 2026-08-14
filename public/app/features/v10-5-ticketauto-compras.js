@@ -264,11 +264,11 @@
     if(!u){ box.innerHTML=''; box.style.display='none'; return; }
     var prompt=Number(u.promptTokens||0), output=Number(u.outputTokens||u.billableOutputTokens||0), total=Number(u.totalTokens||0);
     var eur=Number(u.costEurApprox||0), usd=Number(u.costUsd||0);
-    var model=htmlEscape(data.modelo||u.model||'Gemini');
+    var model='IA';
     box.style.display='';
-    box.innerHTML='<details><summary>💶 Traza Gemini · coste estimado '+formatGeminiCost(eur)+' €</summary>'+
+    box.innerHTML='<details><summary>💶 Traza IA · coste estimado '+formatGeminiCost(eur)+' €</summary>'+
       '<div class="ce-ai-cost-main"><span>Modelo <b>'+model+'</b></span><span>Entrada <b>'+prompt.toLocaleString('es-ES')+'</b> tokens</span><span>Salida facturable <b>'+output.toLocaleString('es-ES')+'</b> tokens</span><span>Total <b>'+total.toLocaleString('es-ES')+'</b> tokens</span><span>Coste estimado <b>'+formatGeminiCost(eur)+' €</b></span></div>'+
-      '<small>Cálculo de ControlEvent a partir de los tokens devueltos por Gemini y las tarifas contractuales configuradas. Equivalente estimado: $'+usd.toFixed(6)+'.</small></details>';
+      '<small>Cálculo de ControlEvent a partir de los tokens devueltos por la IA y las tarifas contractuales configuradas. Equivalente estimado: $'+usd.toFixed(6)+'.</small></details>';
   }
   function fillSelects(){
     var tienda=$('ceAiTienda'), resp=$('ceAiResponsable');
@@ -773,10 +773,10 @@
       return prefix+'el proveedor IA devuelve límite/cuota/saldo no disponible ahora. Detalle técnico: '+m.slice(0,260);
     }
     if(/api key|API key|401|403|invalid|permission|PERMISSION_DENIED/i.test(m)){
-      return prefix+'la clave IA no es válida, no está habilitada o no tiene permisos. Para Gemini usa GEMINI_API_KEY; también se acepta OPENIA_API_KEY.';
+      return prefix+'la clave IA no es válida, no está habilitada o no tiene permisos. Revisa la clave IA configurada en el servidor.';
     }
     if(/model|not found|404/i.test(m)){
-      return prefix+'modelo IA no disponible. El servidor probará modelos Gemini alternativos si están configurados.';
+      return prefix+'modelo IA no disponible. El servidor probará modelos IA alternativos si están configurados.';
     }
     return prefix+(m || 'Error desconocido al analizar con la IA.');
   }

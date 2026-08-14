@@ -675,9 +675,9 @@
         '</select>'+
         '<select id="ceVoz3VoiceChoice" class="ce-voz3-voice-choice" aria-label="Voz concreta de Zuzu" title="Voz instalada"><option value="auto">Voz…</option></select>'+
         '<select id="ceVoz3Rate" aria-label="Velocidad de lectura" title="Velocidad">'+
-          '<option value="0.82"'+(rate==='0.82'?' selected':'')+'>0,82×</option>'+
-          '<option value="0.92"'+(rate==='0.92'||rate==='0.96'?' selected':'')+'>0,92×</option>'+
-          '<option value="1.06"'+(rate==='1.06'||rate==='1.12'?' selected':'')+'>1,06×</option>'+
+          '<option value="0.82"'+(rate==='0.82'?' selected':'')+'>Lento</option>'+
+          '<option value="0.92"'+(rate==='0.92'||rate==='0.96'?' selected':'')+'>Normal</option>'+
+          '<option value="1.06"'+(rate==='1.06'||rate==='1.12'?' selected':'')+'>Rápido</option>'+
         '</select>'+
         '<button type="button" id="ceVoz3Refresh" class="ce-voz3-btn" title="Buscar voces instaladas">↻ Voz</button>'+
         '<button type="button" id="ceVoz3Help" class="ce-voz3-btn ce-voz3-help" title="Ayuda para mejorar la voz">ⓘ</button>'+
@@ -706,6 +706,10 @@
       state.statusObserver.observe(status,{childList:true,subtree:true,characterData:true,attributes:true});
     }
   }
+  document.addEventListener('ce:zuzu-response-rendered',function(){
+    setTimeout(function(){ try{ maybeAutoRead(); }catch(_){ } },80);
+  });
+
   function bindPanel(){
     var mic=$('ceVoz3Mic'); if(mic) mic.addEventListener('click',toggleListening);
     var read=$('ceVoz3Read'); if(read) read.addEventListener('click',speakResponse);
@@ -790,6 +794,7 @@
     prepareSpeechText:prepareSpeechText,
     supportsRecognition:supportsRecognition,
     supportsDeviceSpeech:supportsDeviceSpeech,
+    maybeAutoRead:maybeAutoRead,
     refreshVoices:loadLocalVoices,
     selectedDeviceVoice:selectedDeviceVoice
   };
