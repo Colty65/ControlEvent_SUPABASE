@@ -69,7 +69,8 @@
     lastRecordingBlob: null,
     lastRecordingMime: '',
     recordingStartedAt: 0,
-    autoArmTried: false
+    autoArmTried: false,
+    incompleteHoldCount: 0
   };
 
   function $(id){ return document.getElementById(id); }
@@ -296,7 +297,7 @@
     });
     document.body.appendChild(b);updateWakeBadge();
   }
-  function resetVoiceUtterance(){state.voiceSegments=[];state.voiceInterim='';clearTimeout(state.silenceTimer);state.silenceTimer=null;}
+  function resetVoiceUtterance(){state.voiceSegments=[];state.voiceInterim='';state.incompleteHoldCount=0;clearTimeout(state.silenceTimer);state.silenceTimer=null;}
   function appendVoiceFinal(text){
     text=clean(text);if(!text)return;var key=normalizedTranscript(text);if(!key)return;
     var last=state.voiceSegments.length?state.voiceSegments[state.voiceSegments.length-1]:null;
@@ -312,14 +313,29 @@
     try{if(window.ControlEventV113ZuzuAnalitica&&typeof window.ControlEventV113ZuzuAnalitica.open==='function')window.ControlEventV113ZuzuAnalitica.open();}catch(_){ }
     setTimeout(function(){injectPanel();if(done)done();},110);
   }
-  function scheduleVoiceSubmission(){
+  function likelyIncompleteVoiceUtterance(value){
+    var n=wakeNorm(value);if(!n)return false;
+    // El silencio de dos segundos sigue siendo la regla. Solo damos una oportunidad extra
+    // cuando el reconocedor deja una frase gramaticalmente colgada (p. ej. «eh, dame la»),
+    // porque enviarla a Zuzu consume un turno caro y obliga al usuario a repetirla.
+    if(/\b(?:dame|dime|busca|buscame|háblame|hablame|cuentame|cuéntame|muestra|saca|quiero|necesito)\s+(?:el|la|los|las|un|una|de|del|a|al|sobre)?$/.test(n))return true;
+    if(/\b(?:de|del|la|el|los|las|un|una|y|pero|porque|que|para|con|sin|sobre|entre|a|al)$/.test(n)&&n.split(' ').length>=3)return true;
+    return false;
+  }
+  function scheduleVoiceSubmission(delay){
     clearTimeout(state.silenceTimer);
     state.silenceTimer=setTimeout(function(){
       var text=currentVoiceUtterance();
       if(!clean(text))return;
+      if(likelyIncompleteVoiceUtterance(text)&&state.incompleteHoldCount<1){
+        state.incompleteHoldCount+=1;
+        setVoiceStatus('Parece que la frase ha quedado a medias. Sigo escuchando un momento…','ok');
+        scheduleVoiceSubmission(1800);
+        return;
+      }
       resetVoiceUtterance();
       submitVoiceUtterance(text);
-    },2000);
+    },Number(delay)||2000);
   }
   function submitVoiceUtterance(text){
     text=voiceAliasNormalize(text);if(!text)return;
@@ -363,6 +379,7 @@
     }else if(echoTail&&echoScore>=0.28){
       return;
     }
+    state.incompleteHoldCount=0;
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
     var full=currentVoiceUtterance();showVoicePrompt(full);scheduleVoiceSubmission();
   }

@@ -7673,9 +7673,13 @@ async function v274ToolMasterCatalog(tool,state,selectedEventId=''){
 async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
   const sr=v274ResolveOptionalStore(state,tool?.store),status=trim(tool?.status)||'realized';
-  const ticketFilter=trim(tool?.ticket);
+  const ticketFilter=trim(tool?.ticket),segmentFilter=trim(tool?.segment),destinationFilter=trim(tool?.destination),productFilter=trim(tool?.product);
   const allRows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:trim(tool?.detail)||'standard'});
-  const rows=ticketFilter?allRows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter)):allRows;
+  let rows=allRows;
+  if(ticketFilter)rows=rows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter));
+  if(segmentFilter)rows=rows.filter(r=>nameMatches(r?.Segmento,segmentFilter));
+  if(destinationFilter)rows=rows.filter(r=>nameMatches(r?.Destino,destinationFilter));
+  if(productFilter)rows=rows.filter(r=>nameMatches(r?.Producto,productFilter));
   const groups=new Map(),storeSegDestGroups=new Map(),segDestGroups=new Map(),segDestTotals=new Map();
   for(const r of rows){
     const key=norm(r.Producto),g=groups.get(key)||{Producto:r.Producto,Unidades:0,Importe:0,'Nº registros':0,Precios:new Set(),Tiendas:new Set()};
@@ -7697,7 +7701,7 @@ async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const totalsBySegmentDestination=[...segDestTotals.values()].map(g=>({Segmento:g.Segmento,Destino:g.Destino,'Productos distintos':g.Productos.size,'Unidades':round(g.Unidades,3),'Nº registros':g.Registros,Importe:v26Money(g.Importe)}))
     .sort((a,b)=>trim(a.Segmento).localeCompare(trim(b.Segmento),'es',{sensitivity:'base'})||trim(a.Destino).localeCompare(trim(b.Destino),'es',{sensitivity:'base'}));
   const total=v26Money(rows.reduce((a,r)=>a+num(r.Importe),0));
-  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,status,store:sr.nombre||'',ticket:trim(tool?.ticket)||'',purchase_line_count:rows.length,product_count:summary.length,total_amount:total,detail_semantics:'purchase_lines conserva cada registro real producto a producto. by_product agrega por producto. by_segment_destination agrega producto dentro de Segmento/Destino y totals_by_segment_destination totaliza cada grupo sin depender de redacción generativa.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
+  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,status,store:sr.nombre||'',ticket:ticketFilter,segment:segmentFilter,destination:destinationFilter,product:productFilter,purchase_line_count:rows.length,product_count:summary.length,total_amount:total,detail_semantics:'purchase_lines conserva cada registro real producto a producto. by_product agrega por producto. by_segment_destination agrega producto dentro de Segmento/Destino y totals_by_segment_destination totaliza cada grupo sin depender de redacción generativa.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
     v26Table('purchase_lines',`Compras producto a producto · ${rr.nombre}`,rows,{Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario registrado'),Importe:v26MoneySchema('Importe del registro'),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26StatusSchema(),'ID compra':v26TextSchema(),'ID producto':v26TextSchema(),'ID tienda':v26TextSchema(),'ID responsable':v26TextSchema(),Creado:v26DateSchema(),Actualizado:v26DateSchema()}),
     v26Table('by_store_segment_destination_product',`Compras por Tienda/Segmento/Destino/Producto · ${rr.nombre}`,byStoreSegmentDestinationProduct,{Tienda:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros')}),
     v26Table('by_product',`Compras agrupadas por producto · ${rr.nombre}`,summary,{Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema()}),
@@ -7718,17 +7722,21 @@ function v274DataAccessRequirement(prompt='',history=[]){
   const tableOnly=/\b(simplemente|solo|únicamente|unicamente)\b[^.\n]{0,25}\btabla\b/.test(p)||/^\s*(?:dame|pon|muestra)?\s*(?:simplemente|solo)?\s*la\s+tabla\b/.test(p);
   const inferCatalog=value=>{if(!catalogCue(value))return'';if(productWord(value)||/\balmacen|almacén\b/.test(value))return'products';if(/\b(tienda|tiendas|proveedor|proveedores)\b/.test(value))return'stores';if(/\b(persona|personas|socio|socios|colaborador|colaboradores)\b/.test(value))return'people';if(/\b(evento|eventos)\b/.test(value))return'events';return'';};
   let catalogEntity=inferCatalog(p);if(!catalogEntity&&followUpTransform)catalogEntity=inferCatalog(hist);
-  let purchaseDetail=purchaseCue(p);if(!purchaseDetail&&followUpTransform)purchaseDetail=purchaseCue(hist)||/\bcompras?\b[^.\n]{0,100}\b(unidades?|precio|importe|productos?)\b/.test(hist);
+  const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle)\b/.test(p)
+    || /\b(una\s+por\s+una|uno\s+por\s+uno|vuelve\s+a\s+(?:sac|mostr|dec)\w*|lista\s+real|revis\w*|no\s+cuadr\w*|falt\w*|incomplet\w*)\b/.test(p);
+  let purchaseDetail=purchaseCue(p);if(!purchaseDetail&&(followUpTransform||structuredDetailFollowUp))purchaseDetail=purchaseCue(hist)||/\bcompras?\b[^.\n]{0,140}\b(unidades?|precio|importe|productos?|lista|detalle)\b/.test(hist)||/\bproductos?\b[^.\n]{0,120}\b(comprad\w*|cubatas?|bebidas?)\b/.test(hist);
   const accessRestricted=/\b(acceso|accesos|usuarios?\s+de\s+acceso|credenciales?|contraseñas?|password|token)\b/.test(p)||(/\busuarios?\b/.test(p)&&/\b(lista|listado|tabla|catalogo|catálogo|todos|todas|dame|muestra|ver)\b/.test(p));
   const catalogWithEvent=catalogEntity==='products'&&(/\b(evento|jornada|celebracion|celebración)\b/.test(p)||(followUpTransform&&/\b(evento|jornada|celebracion|celebración)\b/.test(hist)));
   const exactPurchaseLines=/\b(registro|linea|línea|ticket|tkxx|responsable|cada\s+compra|pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p);
   const purchaseStatus=/\b(pte\.?\s*compra|pendientes?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p)?'pending':(/\b(todas?\s+las\s+compras|compras?\s+realizadas?\s+y\s+pendientes?)\b/.test(p)?'all':'realized');
   const donationCue=/\b(donaci[oó]n|donaciones|donado|donados|donante|donantes)\b/.test(p);
-  const donationDetail=donationCue&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fic\w*)\b/.test(p)||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
+  const donationRecent=/\b(donaci[oó]n|donaciones|donado|donados|donante|donantes)\b/.test(hist);
+  const donationContinuation=!donationCue&&donationRecent&&structuredDetailFollowUp;
+  const donationDetail=(donationCue||donationContinuation)&&(/\b(lista|listado|ranking|top|detalle|detallad|cada|todos|todas|quien|quién|quienes|quiénes|producto|productos|valor|importe|unidades|gr[aá]fic\w*)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
   const donorRanking=donationCue&&/\b(lista|listado|ranking|top|donantes|quien|quién|quienes|quiénes|mayor|menor|m[aá]s|menos)\b/.test(p);
-  const donationExactLines=donationCue&&(/\b(detalle|detallad|cada|producto|productos|unidades|precio|valor|importe)\b/.test(p)||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
+  const donationExactLines=(donationCue||donationContinuation)&&(/\b(detalle|detallad|cada|producto|productos|unidades|precio|valor|importe|lista\s+real)\b/.test(p)||donationContinuation||/\bdonaci(?:o|ó)n(?:es)?\s+(?:de|del|por)\s+/.test(p));
   const purchaseStructured=/\b(compra|compras|comprado|comprados|gasto|gastos)\b/.test(p)&&/\b(lista|listado|ranking|top|detalle|detallad|cada|tienda|tiendas|responsable|responsables|producto|productos|ticket|tkxx|gr[aá]fic\w*|quien|quién|quienes|quiénes)\b/.test(p);
-  return{catalogEntity,purchaseDetail,accessRestricted,catalogWithEvent,followUpTransform,groupSegmentDestination,tableOnly,exactPurchaseLines,purchaseStatus,donationDetail,donorRanking,donationExactLines,purchaseStructured};
+  return{catalogEntity,purchaseDetail,accessRestricted,catalogWithEvent,followUpTransform,structuredDetailFollowUp,groupSegmentDestination,tableOnly,exactPurchaseLines,purchaseStatus,donationDetail,donorRanking,donationExactLines,purchaseStructured};
 }
 function v261AgentTools(){
   const eventArg={type:'string',description:'Nombre/título del evento. Omítelo cuando la conversación se refiera claramente al evento actualmente seleccionado.'};
@@ -7738,7 +7746,7 @@ function v261AgentTools(){
     {type:'function',name:'event_dossier',description:'Obtiene el panorama canónico agregado de un evento: fechas, estado, ingresos, compras realizadas y pendientes, producto donado, saldo, valoración, asistencia y conteos de gestión. Es un buen punto de partida, pero no sustituye el detalle cuando necesites investigar anomalías, causas o matices.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_breakdowns',description:'Desglosa un evento por tienda, destino, segmento, producto y forma de pago. Separa comprado, donado y pendiente. Úsala para explicar en qué se gastó el dinero o qué recursos hubo.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'master_catalog',description:'Lee catálogos generales NO restringidos de ControlEvent: products, stores, people o events. Para products puede superponer, sin eliminar productos del catálogo, las compras de un evento y/o tienda. Nunca expone ACCESO/usuarios/credenciales.',parameters:{type:'object',properties:{entity:{type:'string',enum:['products','stores','people','events']},query:{type:'string',description:'Filtro textual opcional sobre el catálogo.'},event:eventArg,scope:{type:'string',enum:['active_event','named_event']},store:{type:'string',description:'Filtro opcional de tienda solo para superponer compras sobre products.'},purchase_status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['entity']}},
-    {type:'function',name:'event_purchase_lines',description:'Detalle exhaustivo de compras de un evento producto a producto. Devuelve cada registro con unidades, precio, importe, ticket/otros gastos, tienda, responsable, segmento/destino y una tabla agrupada por producto. Puede filtrar un TKxx concreto ANTES de compactar datos, para no perder líneas del ticket. Úsala cuando el usuario pida todos los productos comprados o detalle por producto; store_purchases es solo agregado y NO sustituye esta herramienta.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},ticket:{type:'string',description:'TKxx u otro identificador exacto de ticket/gasto opcional. Si se informa, el filtrado se aplica antes de entregar las filas.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
+    {type:'function',name:'event_purchase_lines',description:'Detalle exhaustivo de compras de un evento producto a producto. Devuelve cada registro con unidades, precio, importe, ticket/otros gastos, tienda, responsable, segmento/destino y una tabla agrupada por producto. Puede filtrar ANTES de compactar por tienda, TKxx, segmento, destino o producto. Cuando el usuario pida una lista oral concreta como «bebidas para cubatas», aplica segment/destination para que la fuente entregue exactamente ese subconjunto y no una muestra general. Úsala cuando el usuario pida todos los productos comprados o detalle por producto; store_purchases es solo agregado y NO sustituye esta herramienta.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},ticket:{type:'string',description:'TKxx u otro identificador exacto de ticket/gasto opcional. Si se informa, el filtrado se aplica antes de entregar las filas.'},segment:{type:'string',description:'Segmento opcional, p. ej. BEBIDA o COMIDA. Se filtra antes de compactar.'},destination:{type:'string',description:'Destino opcional, p. ej. CUBATAS, COMIDA o APERITIVO. Se filtra antes de compactar.'},product:{type:'string',description:'Producto opcional para acotar la lista antes de compactar.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
     {type:'function',name:'event_donation_lines',description:'Detalle exhaustivo de donaciones de producto de un evento. Devuelve cada registro DONADO con donante humanizado (persona, tienda u otra entidad), producto, unidades, precio, valor, tipo de donación, responsable, segmento y destino; además agrega por donante y por donante/producto. Úsala SIEMPRE para listas, rankings, gráficas o detalle de donantes y para preguntas del tipo «qué donó EL PESCA». event_breakdowns es agregado y no sustituye este detalle.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,donor:{type:'string',description:'Donante opcional: persona, tienda u otra entidad tal como la nombra el usuario.'},detail:detailArg},required:['scope']}},
     {type:'function',name:'event_people',description:'Obtiene participantes/colaboradores e ingresos de un evento con criterio de asistencia canónica. Incluye número, forma/estado, importe obligatorio, voluntario y total por registro; úsala cuando necesites inspeccionar matices, ajustes o posibles anomalías de ingresos.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_documentation',description:'Comprueba evidencias documentales de un evento: justificantes de ingresos, fototickets de compra y documentos/adjuntos. No equivale a conciliación bancaria.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
@@ -7858,7 +7866,7 @@ function v261ParseFinal(payload){
 
 function v261CompactToolResult(result,detail='standard'){
   const name=trim(result?.name),largeStructured=['master_catalog','event_purchase_lines','event_donation_lines'].includes(name);
-  const genericLimit=largeStructured?(detail==='full'?24:detail==='brief'?4:8):(detail==='full'?40:detail==='brief'?4:12);
+  const genericLimit=largeStructured?(detail==='full'?80:detail==='brief'?4:8):(detail==='full'?40:detail==='brief'?4:12);
   const tableLimit=t=>{
     const key=trim(t?.key);
     // Dossier/desgloses: los facts ya contienen KPIs, top y señales. Las tablas completas
@@ -7915,6 +7923,126 @@ function v261CompactToolResult(result,detail='standard'){
     return{key:t.key,title:t.title,schema:t.schema,rows:arr(t.rows).slice(0,limit),row_count:rowCount,truncated:rowCount>limit,rendering_complete:true};
   }).filter(Boolean);
   return{id:trim(result?.id),name,ok:result?.ok!==false,title:trim(result?.title),facts:result?.facts||{},tables};
+}
+
+
+// v1.0_exp · voz canónica FIX4. La conversación oral puede ser libre, pero cuando el usuario
+// pide una lista exacta (productos, cantidades, precios, importes) no conviene comprimir la
+// fuente hasta convertirla en una muestra. Estas ayudas conservan el lenguaje natural y usan
+// las filas reales de CE para evitar omisiones/alucinaciones en follow-ups orales.
+function v306ReviewCue(value=''){
+  return /\b(revis\w*|comprueb\w*|verific\w*|segur\w*|no\s+cuadr\w*|lista\s+real|vuelve\s+a\s+(?:sac|mostr|dec)\w*|falt\w*|incomplet\w*|nada\s+m[aá]s)\b/.test(norm(value));
+}
+function v306RecentUserBlob(userPrompt='',history=[],turns=5){
+  return [trim(userPrompt),...arr(history).slice(-turns).map(x=>trim(x?.user))].filter(Boolean).join(' · ');
+}
+function v306RecentDomain(history=[],re){
+  return arr(history).slice(-5).reverse().some(x=>re.test(norm(x?.user))||re.test(norm(x?.assistant)));
+}
+function v306VoiceEffectiveToolDetail(name,requestedDetail,userPrompt,history=[],dataReq={}){
+  if(trim(requestedDetail)==='full')return'full';
+  if(name==='event_donation_lines'){
+    const recent=v306RecentDomain(history,/\b(donaci[oó]n|donaciones|donad\w*|donante|donantes)\b/);
+    if(dataReq?.donationExactLines||dataReq?.structuredDetailFollowUp||(v306ReviewCue(userPrompt)&&recent))return'full';
+  }
+  if(name==='event_purchase_lines'){
+    const recent=v306RecentDomain(history,/\b(compra|compras|comprad\w*|bebidas?|cubatas?|producto|productos)\b/);
+    const listCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|producto|productos|bebidas?|cubatas?)\b/.test(norm(userPrompt));
+    if(dataReq?.purchaseDetail||dataReq?.structuredDetailFollowUp||(recent&&listCue)||(v306ReviewCue(userPrompt)&&recent))return'full';
+  }
+  return'brief';
+}
+function v306PersonFromCurrentOrHistory(userPrompt,state,history=[]){
+  for(const value of [userPrompt,...arr(history).slice(-5).reverse().map(x=>x?.user)]){
+    const hints=arr(v26PersonHintsFromPrompt(value,state));
+    if(hints.length===1)return trim(hints[0]);
+    if(hints.length>1){
+      // Si existe una pareja canónica escrita literalmente, preferirla a dos nombres sueltos.
+      const blob=canonicalNameKey(value);
+      const pair=hints.find(h=>isCanonicalPairName(h)&&blob.includes(canonicalNameKey(h)));
+      if(pair)return trim(pair);
+    }
+  }
+  return'';
+}
+function v306PurchaseFiltersFromContext(userPrompt,state,history=[]){
+  const values=(field)=>[...new Set(arr(state?.productos).map(x=>trim(x?.[field])).filter(Boolean))]
+    .sort((a,b)=>norm(b).length-norm(a).length);
+  const contexts=[userPrompt,...arr(history).slice(-5).reverse().map(x=>x?.user)].map(norm).filter(Boolean);
+  const pick=field=>{
+    const candidates=values(field);
+    for(const blob of contexts){const hit=candidates.find(v=>{const k=norm(v);return k.length>=3&&blob.includes(k);});if(hit)return hit;}
+    return'';
+  };
+  return{segment:pick('segmento'),destination:pick('destino')};
+}
+async function v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq,allResults,flowTrace}){
+  const has=name=>arr(allResults).some(r=>r?.ok&&r?.name===name);
+  // Garantía pos-interpretación: si la IA respondió de memoria a «lista real / vuelve a sacarla»
+  // pero no volvió a consultar la fuente, CE refresca localmente la fuente sin una llamada IA extra.
+  if((dataReq?.donationExactLines||((dataReq?.donationDetail||dataReq?.structuredDetailFollowUp)&&v306ReviewCue(userPrompt)))&&!has('event_donation_lines')){
+    const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,true);
+    const donor=v306PersonFromCurrentOrHistory(userPrompt,state,conversationHistory);
+    if(event){
+      try{
+        const result=await v29ToolEventDonationLines({id:'v306_voice_donation_guard',name:'event_donation_lines',event,scope:'named_event',donor,detail:'full'},state,selectedEventId);
+        allResults.push(result);
+        zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','OK',`Se refresca la lista canónica de donaciones${donor?` de ${donor}`:''} en ${event} sin otra llamada IA.`);
+      }catch(error){zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','WARN',cleanGeminiError(error));}
+    }
+  }
+  const recentPurchase=v306RecentDomain(conversationHistory,/\b(compra|compras|bebidas?|cubatas?|producto|productos)\b/);
+  const purchaseListCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(norm(userPrompt));
+  const filters=v306PurchaseFiltersFromContext(userPrompt,state,conversationHistory);
+  const existingPurchase=arr(allResults).slice().reverse().find(r=>r?.ok&&r?.name==='event_purchase_lines');
+  const filterMismatch=!!existingPurchase&&((filters.segment&&norm(existingPurchase?.facts?.segment)!==norm(filters.segment))||(filters.destination&&norm(existingPurchase?.facts?.destination)!==norm(filters.destination)));
+  const needsPurchaseRefresh=(dataReq?.purchaseDetail||recentPurchase)&&(dataReq?.structuredDetailFollowUp||purchaseListCue)&&(!existingPurchase||filterMismatch||((filters.segment||filters.destination)&&!trim(existingPurchase?.facts?.segment)&&!trim(existingPurchase?.facts?.destination)));
+  if(needsPurchaseRefresh){
+    const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,true);
+    if(event){
+      try{
+        const result=await v274ToolEventPurchaseLines({id:'v306_voice_purchase_guard',name:'event_purchase_lines',event,scope:'named_event',status:'realized',detail:'full',...filters},state,selectedEventId);
+        allResults.push(result);
+        zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','OK',`Se refresca el detalle de compras de ${event}${filters.segment?` · segmento=${filters.segment}`:''}${filters.destination?` · destino=${filters.destination}`:''} sin otra llamada IA.`);
+      }catch(error){zuzuTracePush(flowTrace,'v1.0_exp · Garantía de detalle oral','WARN',cleanGeminiError(error));}
+    }
+  }
+}
+function v306VoiceCanonicalStructuredAnswer(userPrompt,history=[],results=[],dataReq={}){
+  const p=norm(userPrompt),blob=norm(v306RecentUserBlob(userPrompt,history,4));
+  const latest=name=>arr(results).slice().reverse().find(r=>r?.ok&&r?.name===name);
+  const table=(r,key)=>arr(r?.tables).find(t=>trim(t?.key)===key);
+  if(dataReq?.donationExactLines||((dataReq?.donationDetail||dataReq?.structuredDetailFollowUp)&&v306ReviewCue(userPrompt))){
+    const r=latest('event_donation_lines'),rows=arr(table(r,'donor_products')?.rows);
+    if(r&&rows.length&&rows.length<=80){
+      const f=r.facts||{},event=trim(f.event)||'este evento';
+      const donors=[...new Set(rows.map(x=>trim(x?.Donante)).filter(Boolean))];
+      const who=trim(f.donor)||(donors.length===1?donors[0]:'los donantes consultados');
+      const detail=rows.map(x=>`${trim(x?.Producto)||'Producto'}, ${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}, ${v26FormatEuro(num(x?.Valor))}`).join('; ');
+      return{title:`Donaciones · ${event}`,answer:`He consultado de nuevo la fuente completa. En ${event}, ${who} tiene${donors.length===1||trim(f.donor)?'':'n'} ${rows.length} producto${rows.length===1?'':'s'} donado${rows.length===1?'':'s'} por un valor total de ${v26FormatEuro(num(f.total_value))}. Son: ${detail}.`,warnings:[],showTables:[],chartSpecs:[]};
+    }
+  }
+  const purchaseRecent=v306RecentDomain(history,/\b(compra|compras|comprad\w*|bebidas?|cubatas?|producto|productos)\b/);
+  const purchaseListCue=(dataReq?.purchaseDetail||purchaseRecent)&&(/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(p)||dataReq?.structuredDetailFollowUp);
+  if(purchaseListCue){
+    const r=latest('event_purchase_lines'),rows=arr(table(r,'by_product')?.rows);
+    if(r&&rows.length&&rows.length<=80){
+      const f=r.facts||{},event=trim(f.event)||'este evento';
+      const wantsQty=/\b(cantidad|cantidades|unidad|unidades|una\s+por\s+una|uno\s+por\s+uno)\b/.test(blob);
+      const wantsPrice=/\b(precio|precios)\b/.test(blob);
+      const wantsAmount=/\b(importe|importes|sumatorio|total)\b/.test(blob);
+      const detail=rows.map(x=>{
+        const parts=[trim(x?.Producto)||'Producto'];
+        if(wantsQty)parts.push(`${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}`);
+        if(wantsPrice&&trim(x?.['Precios registrados']))parts.push(`precio ${trim(x['Precios registrados'])}`);
+        if(wantsAmount)parts.push(`importe ${v26FormatEuro(num(x?.Importe))}`);
+        return parts.join(', ');
+      }).join('; ');
+      const filters=[trim(f.segment)&&`segmento ${trim(f.segment)}`,trim(f.destination)&&`destino ${trim(f.destination)}`,trim(f.product)&&`producto ${trim(f.product)}`].filter(Boolean).join(', ');
+      return{title:`Compras · ${event}`,answer:`He consultado el detalle real de compras${filters?` para ${filters}`:''} en ${event}. Son ${rows.length} producto${rows.length===1?'':'s'}: ${detail}. El importe total de este conjunto es ${v26FormatEuro(num(f.total_amount))}.`,warnings:[],showTables:[],chartSpecs:[]};
+    }
+  }
+  return null;
 }
 
 // v1.0_exp · cierre canónico tras herramientas. Si la IA ya eligió y ejecutó la fuente
@@ -8383,9 +8511,11 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   // Un follow-up bancario/gráfico no debe arrastrar el dossier de una persona nombrada varios turnos atrás.
   // Solo se conserva grounding personal en banco si el mensaje ACTUAL nombra explícitamente a una persona.
   const explicitPersonThisTurn=arr(v26PersonHintsFromPrompt(userPrompt,state)).length>0;
-  const suppressStalePersonGrounding=bankContext&&!explicitPersonThisTurn;
+  const explicitEventThisTurn=!!v281EventNameInText(state,userPrompt);
+  const personalReferenceThisTurn=/\b(?:[ée]l|ella|su|sus|socio|socia|persona|pareja|qu[eé]\s+hizo|de\s+[ée]l|de\s+ella)\b/.test(norm(userPrompt));
+  const suppressStalePersonGrounding=(bankContext||(explicitEventThisTurn&&!personalReferenceThisTurn))&&!explicitPersonThisTurn;
   const personalGrounding=suppressStalePersonGrounding?null:await v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
-  if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v1.0_exp · Aislamiento de contexto gráfico','OK','El turno bancario ignora grounding personal heredado de turnos anteriores; solo se materializará la fuente bancaria solicitada.');
+  if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v1.0_exp · Aislamiento de contexto','OK',bankContext?'El turno bancario ignora grounding personal heredado de turnos anteriores; solo se materializará la fuente bancaria solicitada.':'El turno nombra explícitamente un evento y no una persona; se ignora el grounding personal heredado para evitar arrastres y coste innecesario.');
   if(personalGrounding?.result)allResults.push(personalGrounding.result);
   const eventStatusGrounding=await v304PrefetchEventStatus({userPrompt,state,flowTrace});
   if(eventStatusGrounding?.result)allResults.push(eventStatusGrounding.result);
@@ -8425,7 +8555,8 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
         let full=cache.get(key);if(!full){full=await v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);cache.set(key,full);}else{full={...full,id:trim(call.id),name:trim(call.name)};}
         full={...full,id:trim(call.id),name:trim(call.name)};allResults.push(full);
         const requestedDetail=trim(args?.detail)||'standard';
-        const compact=v261CompactToolResult(full,voiceConversation&&requestedDetail!=='full'?'brief':requestedDetail);
+        const effectiveDetail=voiceConversation?v306VoiceEffectiveToolDetail(trim(call.name),requestedDetail,userPrompt,conversationHistory,dataAccessReq):requestedDetail;
+        const compact=v261CompactToolResult(full,effectiveDetail);
         zuzuTracePush(flowTrace,`V27.1.5 · Tool ${trim(call.name)}`,'OK',`${trim(full?.title)||'Resultado'}; tablas=${arr(full?.tables).length}.`);
         return{type:'function_result',name:trim(call.name),call_id:trim(call.id),result:compact};
       }catch(error){
@@ -8436,6 +8567,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`V27.1.5 · Gemini tras herramientas ${cycle}`});
     currentId=trim(payload?.id)||currentId;
   }
+  if(voiceConversation)await v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq:dataAccessReq,allResults,flowTrace});
   let canonicalClosure=null;
   if(v261FunctionCalls(payload).length){
     canonicalClosure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
@@ -8480,6 +8612,10 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       final={...final,chartSpecs:[...arr(final?.chartSpecs),{title:trim(deliveredBankTimeline?.title)||`Evolución bancaria · ${trim(deliveredBankForChart?.facts?.event)||''}`,type:'line',tool_id:trim(deliveredBankForChart.id),table_key:'reconciliation_timeline',label_field:'Momento',value_field:'Saldo bancario del periodo',series_fields:[],marker_field:'Tipo',point_label_fields:['Movimiento','Concepto','Saldo bancario del periodo'],include_justified_movements:asksJustification,unit:'€'}]};
       zuzuTracePush(flowTrace,'v1.0_exp · Garantía gráfica bancaria','OK',`Cronología bancaria materializable: ${arr(deliveredBankTimeline?.rows).length} movimientos${asksJustification?' con justificantes':''}.`);
     }
+  }
+  if(voiceConversation){
+    const voiceCanonical=v306VoiceCanonicalStructuredAnswer(userPrompt,conversationHistory,allResults,dataAccessReq);
+    if(voiceCanonical){final={...final,...voiceCanonical};zuzuTracePush(flowTrace,'v1.0_exp · Respuesta oral canónica','OK','La lista estructurada se verbaliza directamente desde las filas canónicas completas de ControlEvent para evitar omisiones o datos inventados.');}
   }
   const issues=v261ObjectiveIssues(final,allResults,conversationHistory);
   const normalizedFinal=norm(final.answer);
@@ -13576,6 +13712,12 @@ export const __zuzuStructuralTesting = Object.freeze({
   v273ConversationRequestsCharts,
   v273ConversationBankContext,
   v305CanonicalClosureFromResults,
+  v274DataAccessRequirement,
+  v261CompactToolResult,
+  v306ReviewCue,
+  v306VoiceEffectiveToolDetail,
+  v306PurchaseFiltersFromContext,
+  v306VoiceCanonicalStructuredAnswer,
   v30CurrentTurnRequestsTablesOnly,
   v30WantsSingleChart,
   v30PersonRequestedTableKeys,
