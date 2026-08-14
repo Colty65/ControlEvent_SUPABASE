@@ -270,6 +270,15 @@ function recentSpecificEventForYear(input,year){
   for(let i=p.length-1;i>=0;i--){ for(const v of [p[i]?.result_event,p[i]?.prior_event]){ const c=clean(v,180); if(c&&(!y||c.includes(y))&&looksEventLikeValue(c)&&!/^[12]\d{3}$/.test(c)) return c; } }
   const screen=clean(input?.screen_event?.title,180); return screen&&(!y||screen.includes(y))?screen:'';
 }
+function recentEventFromHistory(input){
+  const p=priorTurns(input);
+  for(let i=p.length-1;i>=0;i--){for(const v of [p[i]?.result_event,p[i]?.prior_event]){const c=clean(v,180);if(c&&looksEventLikeValue(c)&&!/^[12]\d{3}$/.test(c))return c;}}
+  return clean(input?.screen_event?.title,180);
+}
+function resetRouterToUnknown(d,reason='CE mantiene la frase como conversación general y evita heredar una ruta transaccional antigua.'){
+  d.route='UNKNOWN';d.subject={type:'NONE',value:'',source:'NONE'};d.event={scope:'UNRESOLVED',value:'',source:'NONE'};d.operation='OTHER';
+  d.inheritance={subject:false,event:false,route:false,topic:false};d.confidence=Math.min(d.confidence||0.8,0.8);d.reason=clean(reason,180);return d;
+}
 export function applyZuzuRouterGuardrails(decision,input){
   const d=decision&&typeof decision==='object'?decision:null;
   if(!d) return d;
@@ -281,6 +290,30 @@ export function applyZuzuRouterGuardrails(decision,input){
   const filterContinuation=/^(?:dame\s+)?(?:solo|incluye|excluye|ahora\s+solo|ahora\s+sin|tambien|también|sin\s+contar)\b/i.test(msgN);
   const continuationCue=/^(?:y\b|pero\b|dime\s+mas|dime\s+más|dame\b|continua|continúa|lo\s+mismo|ahora\b|solo\b|incluye\b|excluye\b|revisa\b|comprueba\b|seguro\b|entonces\b)/i.test(msgN);
   const ceDomainSignal=/\b(eventos?|sysa|compras?|tickets?|tk|ingresos?|donaciones?|donantes?|donante|hitos?|tareas?|lg|lgs|banco|movimientos?|mvtos?|saldo|asistentes?|socios?|tiendas?|proveedores?|documentos?|graficas?|gráficas?|tablas?|responsabilidad|directos|compartidos)\b/i.test(msgN);
+
+  // Saludos, agradecimientos y acuses breves no son órdenes ni deben disparar una propuesta antigua.
+  const genericConversational=/^(?:hola|buenas|buenos\s+dias|buenos\s+días|buenas\s+tardes|buenas\s+noches|gracias|muchas\s+gracias|perfecto|correcto|vale|ok|de\s+acuerdo|cuentame\s+otra\s+cosa|cuéntame\s+otra\s+cosa)[.!… ]*$/i.test(msgN);
+  if(genericConversational&&!ceDomainSignal)return resetRouterToUnknown(d,'CE detecta saludo, agradecimiento o acuse breve: no hereda sujeto, evento ni tubería transaccional.');
+
+  // Una referencia explícita a un evento sin un dominio concreto («vuelve a SySA 2026»,
+  // «háblame de SySA 2025») es EVENT_OVERVIEW, aunque Gemini arrastre una persona/ruta vieja.
+  const explicitEventValue=clean(d.event?.value,180);
+  if(explicitEventValue&&messageMentions(msg,explicitEventValue)&&/\b(hablame|háblame|vuelve\s+a|resumen|informacion|información|cuentame|cuéntame)\b/i.test(msg)&&!/(compras?|donaciones?|ingresos?|banco|movim|asist|hitos?|tareas?|documentos?)/i.test(msgN)){
+    d.route='EVENT_OVERVIEW';d.subject={type:'NONE',value:'',source:'NONE'};d.event={scope:'NAMED_EVENT',value:explicitEventValue,source:'EXPLICIT'};d.operation='SUMMARY';
+    d.inheritance={subject:false,event:false,route:false,topic:false};d.reason=clean('CE valida cambio explícito de evento: se abre el resumen del evento y se descarta cualquier sujeto personal heredado.',180);
+  }
+
+  // «sus compras» después de hablar de un evento se refiere al evento, no al usuario logado.
+  const loggedName=clean(input?.logged_user?.nombre||input?.logged_user?.identificacion,120),recentEvent=recentEventFromHistory(input);
+  if(/^PERSON_PURCHASES$/.test(d.route||'')&&recentEvent&&/\b(?:sus|las)\s+compras\b|^dame\s+sus\s+compras$/i.test(msgN)&&(!d.subject?.value||!messageMentions(msg,d.subject.value)||normMatch(d.subject.value)===normMatch(loggedName))){
+    d.route='EVENT_PURCHASES';d.subject={type:'NONE',value:'',source:'NONE'};d.event={scope:'INHERITED',value:recentEvent,source:'INHERITED'};d.operation='LIST';
+    if(d.inheritance){d.inheritance.subject=false;d.inheritance.event=true;d.inheritance.route=false;d.inheritance.topic=true;}d.reason=clean('CE resuelve el posesivo contra el evento inmediatamente anterior; no inventa al usuario logado como sujeto.',180);
+  }
+
+  // En rutas de EVENTO no se conserva un sujeto personal que no esté nombrado en el mensaje.
+  if(/^EVENT_/.test(d.route||'')&&d.subject?.type==='PERSON'&&d.subject?.value&&!messageMentions(msg,d.subject.value)){
+    d.subject={type:'NONE',value:'',source:'NONE'};if(d.inheritance)d.inheritance.subject=false;
+  }
 
   // Los filtros cortos no pueden convertirse en sujetos nuevos.
   if(filterContinuation && /^PERSON_/.test(d.route||'')){
@@ -368,7 +401,7 @@ export function applyZuzuRouterGuardrails(decision,input){
   if(d.route==='STORE_PURCHASES' && d.operation==='RANKING' && !(d.subject?.type==='STORE'&&d.subject?.source==='EXPLICIT'&&d.subject?.value)){
     d.route='EVENT_BREAKDOWN'; d.subject={type:'NONE',value:'',source:'NONE'}; d.reason=clean('CE valida semántica: ranking de tiendas del evento => EVENT_BREAKDOWN.',180);
   }
-  if(d.mode==='CONVERSATION' && msgN.split(/\s+/).filter(Boolean).length>=4 && !ceDomainSignal && !continuationCue){
+  if(d.mode==='CONVERSATION' && msgN.split(/\s+/).filter(Boolean).length>=3 && !ceDomainSignal && !/\bcompar\w*\b/.test(msgN) && !continuationCue){
     d.route='UNKNOWN'; d.subject={type:'NONE',value:'',source:'NONE'}; d.event={scope:'UNRESOLVED',value:'',source:'NONE'}; d.operation='OTHER';
     d.inheritance={subject:false,event:false,route:false,topic:false}; d.confidence=Math.min(d.confidence||0.5,0.65); d.reason='CE detecta un mensaje ajeno al dominio y no hereda por inercia el contexto anterior.';
   }

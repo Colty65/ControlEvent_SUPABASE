@@ -8490,7 +8490,7 @@ function v281LocalResponse({title='Respuesta de Zuzu',answer='',warnings=[],resu
   const ps=presentation.stats||{};
   const inventory=results.map(r=>`${trim(r?.name)||'fuente'}[${arr(r?.tables).map(t=>`${trim(t?.key)||'tabla'}:${arr(t?.rows).length}`).join(', ')||'sin tablas'}]`).join(' | ');
   zuzuTracePush(flowTrace,'v28.5 · Datos y presentación','OK',`Fuentes=${inventory||'ninguna'}; datasets=${ps.sourceResults||results.length}; tablas fuente=${ps.sourceTables||0}; filas fuente=${ps.sourceRows||0}; tablas renderizadas=${presentation.tables.length}; filas renderizadas=${ps.renderedTableRows||0}; gráficas renderizadas=${presentation.charts.length}; secciones materializadas=${presentation.tables.length+presentation.charts.length}; descartes por deduplicación=${(ps.tableDuplicates||0)+(ps.chartDuplicates||0)}.`);
-  if(traceDirect)zuzuTracePush(flowTrace,'v28.5 · Ruta directa','OK','Gemini no es necesario para esta petición determinista; se reutilizan hechos canónicos y el coste Gemini de este turno es 0.');
+  if(traceDirect)zuzuTracePush(flowTrace,'v1.0_exp · ROUTER CE ACTIVO','OK',`Ruta determinista aplicada${resultContext?.domain?`: ${trim(resultContext.domain)}`:''}. Gemini de respuesta no es necesario; ControlEvent materializa los datos canónicos. El Router Gemini en SOMBRA, si aparece arriba, es solo diagnóstico y no manda en esta respuesta.`);
   const pendingAction=v284PendingActionFromAnswer(answer);
   // Si este turno determinista interrumpe una cadena Gemini nativa, se invalida esa
   // cadena para que el próximo turno abierto reconstruya el hilo con el historial local,
@@ -8700,9 +8700,16 @@ function v281ApplyPrefetchChartPolicy(final,prefetch){
 function v282AffirmativeFollowUp(userPrompt){
   const p=norm(userPrompt).replace(/[.!?]+$/g,'').trim();
   if(!p||p.length>180)return false;
-  return /^(?:si|sí|claro que si|claro que sí|por supuesto|desde luego|vale|ok|de acuerdo|adelante|hazlo|hazlo por favor|perfecto|correcto)(?:\b|,)/.test(p)
+  return /^(?:si|sí|claro que si|claro que sí|por supuesto|desde luego|adelante|hazlo|hazlo por favor)(?:\b|,)/.test(p)
     || /\b(?:si|sí|claro que si|claro que sí)\b[^.]{0,80}\b(?:hazlo|adelante|consultalo|consúltalo|revisalo|revísalo|detallalo|detállalo|muestralo|muéstralo)\b/.test(p)
     || /^(?:hazlo|adelante|consultalo|consúltalo|revisalo|revísalo|detallalo|detállalo)$/i.test(p);
+}
+function v282ImmediatePendingProposal(conversationHistory=[]){
+  const turn=arr(conversationHistory).slice(-1)[0];
+  if(!turn)return null;
+  if(turn?.pendingAction&&typeof turn.pendingAction==='object'&&trim(turn.pendingAction.action))return{...turn.pendingAction,turn};
+  const parsed=v284PendingActionFromAnswer(`${trim(turn?.assistant)} ${trim(turn?.assistantTail)}`);
+  return parsed?{...parsed,turn}:null;
 }
 function v282PendingProposal(conversationHistory=[]){
   for(const turn of arr(conversationHistory).slice(-5).reverse()){
@@ -8815,11 +8822,22 @@ function v285ComparisonEventNames(state,userPrompt,conversationHistory=[]){
   }
   return explicit.slice(0,6);
 }
+function v285LastComparisonContext(conversationHistory=[]){
+  const ctx=arr(conversationHistory).slice(-1)[0]?.resultContext;
+  if(!ctx||typeof ctx!=='object')return null;
+  if(ctx.domain==='comparison'||ctx.domain==='compare_events'||ctx.domain==='multi_event_comparison')return ctx;
+  return null;
+}
 function v285ComparisonRequest(userPrompt,conversationHistory=[],eventNames=[]){
   if(arr(eventNames).length<2)return false;
-  const p=norm(userPrompt),history=norm(arr(conversationHistory).slice(-4).map(h=>`${trim(h?.user)} ${trim(h?.assistant)} ${trim(h?.title)}`).join(' '));
-  if(/\b(compar\w*|serie|entre\s+eventos|eventos\s+y\s+todos|todos\s+sus\s+datos|todo\s+tipo\s+de\s+dato|grafic\w*|queso|tarta|pie|donut|datos\s+anteriores|estos\s+datos|retoma)\b/.test(p))return true;
-  return /\bcompar\w*\b/.test(history)&&/\b(esos|estos|anteriores|grafic\w*|datos)\b/.test(p);
+  const p=norm(userPrompt); // Solo manda una comparación explícita o la continuidad inmediata de una comparación
+  const explicitCompare=/\b(compar\w*|comparativa|frente\s+a|versus|vs\.?|entre\s+eventos)\b/.test(p);
+  if(explicitCompare)return true;
+  const namedNow=(text(userPrompt).match(/\bSySA\s+20\d{2}\b/gi)||[]).length;
+  if(namedNow>=2&&/\b(tabla|grafic\w*|visualiz\w*|datos?|resumen)\b/.test(p))return true;
+  const lastCmp=v285LastComparisonContext(conversationHistory);
+  if(lastCmp&&/\b(tabla|grafic\w*|visualiz\w*|estos?\s+datos|esas?\s+comparaci\w*|final|lo\s+mismo|repite|retoma)\b/.test(p))return true;
+  return false;
 }
 function v285ComparisonWantsAll(userPrompt,conversationHistory=[]){
   const p=norm(userPrompt);return /\b(todos?\s+(?:sus\s+)?datos|todo\s+tipo\s+de\s+dato|toda\s+la\s+info|informacion\s+completa|información\s+completa|ingresos.*compras.*donaciones|tickets?.*justificant|documentos?.*concili)\b/.test(p);
@@ -8863,6 +8881,19 @@ function v285ComparisonChartSpecs(result,userPrompt){
   const base=pie?['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Valoración del evento','Asistentes canónicos']:(all?['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Asistentes canónicos','Precio por socio','Tickets de compra','Documentos','Movimientos conciliados','Impacto bancario']:['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Asistentes canónicos','Precio por socio']);
   return base.map(field=>({title:`Comparativa · ${field}`,type:pie?'pie':'bar',tool_id:result.id,table_key:key,label_field:'Evento',value_field:field,series_fields:[],unit:trim(v26TableFieldMeta(arr(result.tables)[0],field)?.unit)}));
 }
+function v285ComparisonVerticalTable(result,userPrompt){
+  const rows=arr(result?.tables).find(t=>t?.key==='comparison_extended')?.rows||[];
+  if(rows.length<2)return null;
+  const purchaseFocus=/\b(compr\w*|gastos?)\b/.test(norm(userPrompt))&&!v285ComparisonWantsAll(userPrompt);
+  const fields=purchaseFocus?['Compras realizadas','Compras pendientes']:(v285ComparisonWantsAll(userPrompt)?['Estado','Fecha inicio','Fecha fin','Precio por socio','Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Asistentes canónicos','Socios asistentes','No socios asistentes','Hitos','Tareas LG','Tareas LG pendientes','Registros de ingreso','Ingresos con justificante','Tickets de compra','Tickets con imagen','Documentos','Documentos con adjunto','Movimientos conciliados','Impacto bancario','Saldo bancario inicial','Saldo bancario final','Periodo bancario']:['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Asistentes canónicos']);
+  const eventCols=rows.map(r=>trim(r?.Evento)).filter(Boolean);
+  const isMoney=new Set(['Precio por socio','Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Impacto bancario','Saldo bancario inicial','Saldo bancario final']);
+  const isCount=new Set(['Asistentes canónicos','Socios asistentes','No socios asistentes','Hitos','Tareas LG','Tareas LG pendientes','Registros de ingreso','Ingresos con justificante','Tickets de compra','Tickets con imagen','Documentos','Documentos con adjunto','Movimientos conciliados']);
+  const format=(field,value)=>isMoney.has(field)?v26FormatEuro(value):(isCount.has(field)?String(num(value)):trim(value));
+  const out=fields.map(field=>{const o={Indicador:field};rows.forEach(r=>{o[trim(r.Evento)]=format(field,r?.[field]);});if(rows.length===2&&(isMoney.has(field)||isCount.has(field))){const a=num(rows[0]?.[field]),b=num(rows[1]?.[field]),d=a-b;o['Diferencia']=isMoney.has(field)?v26FormatEuro(d):String(d);}else o['Diferencia']='';return o;});
+  const schema={Indicador:v26TextSchema()};eventCols.forEach(e=>schema[e]=v26TextSchema());schema.Diferencia=v26TextSchema();
+  return v26Table('comparison_vertical',purchaseFocus?'Comparativa de compras':'Comparativa de indicadores',out,schema);
+}
 function v285ComparisonGoodBadText(rows){
   const metrics=['Saldo operativo','Valoración del evento','Ingresos','Asistentes canónicos','Donaciones valoradas'];
   const maxima=Object.fromEntries(metrics.map(m=>[m,Math.max(...rows.map(r=>num(r[m])))])),minima=Object.fromEntries(metrics.map(m=>[m,Math.min(...rows.map(r=>num(r[m])))]));
@@ -8870,13 +8901,14 @@ function v285ComparisonGoodBadText(rows){
 }
 async function v285DirectMultiEventComparison({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId='',eventNames=[]}){
   const result=await v285ExtendedComparison({eventNames,state,selectedEventId,flowTrace});
-  const rows=arr(result?.tables?.[0]?.rows),wantsCharts=v285ComparisonWantsCharts(userPrompt),all=v285ComparisonWantsAll(userPrompt),goodBad=v285ComparisonGoodBad(userPrompt);
+  const vertical=v285ComparisonVerticalTable(result,userPrompt);if(vertical)result.tables.push(vertical);
+  const rows=arr(result?.tables).find(t=>t?.key==='comparison_extended')?.rows||[],wantsCharts=v285ComparisonWantsCharts(userPrompt),all=v285ComparisonWantsAll(userPrompt),goodBad=v285ComparisonGoodBad(userPrompt),purchaseFocus=/\b(compr\w*|gastos?)\b/.test(norm(userPrompt))&&!all;
   const charts=wantsCharts?v285ComparisonChartSpecs(result,userPrompt):[];
-  let answer=`Comparativa de ${eventNames.join(', ')}. Todos los datos se calculan por separado para cada evento. La información bancaria que aparece en esta comparativa es un resumen por evento (periodo, movimientos conciliados, impacto y saldos); no se mezclan movimientos individuales de eventos distintos.`;
+  let answer=purchaseFocus?`Comparativa de compras de ${eventNames.join(' y ')}. Se muestran las compras realizadas y pendientes de cada evento en una tabla compacta, sin mezclar datos ajenos a la comparación solicitada.`:`Comparativa de ${eventNames.join(', ')}. Todos los datos se calculan por separado para cada evento. La tabla se presenta en formato vertical para que sea legible también en PDF.`;
   if(goodBad)answer+=`\n\n${v285ComparisonGoodBadText(rows)}`;
   if(wantsCharts)answer+=`\n\nSe han generado ${charts.length} gráficas homogéneas con los mismos indicadores para todos los eventos.`;
   if(all)answer+='\n\nLa tabla completa conserva también cobertura documental, tickets, gestión y resumen bancario para que ningún dato comparable quede oculto.';
-  return v281LocalResponse({title:`Comparativa · ${eventNames.join(' · ')}`,answer,results:[result],showTables:(all||!wantsCharts)?[{tool_id:result.id,table_key:'comparison_extended'}]:[],chartSpecs:charts,flowTrace,previousInteractionId});
+  return v281LocalResponse({title:`Comparativa · ${eventNames.join(' · ')}`,answer,results:[result],showTables:(all||!wantsCharts)?[{tool_id:result.id,table_key:vertical?'comparison_vertical':'comparison_extended'}]:[],chartSpecs:charts,flowTrace,previousInteractionId,resultContext:{domain:'comparison',eventNames:[...eventNames],event:eventNames[0]||'',focus:/\b(compr\w*|gastos?)\b/.test(norm(userPrompt))?'purchases':'events'}});
 }
 
 // ============================================================================
@@ -9149,7 +9181,8 @@ async function v29DirectMetricQuery({userPrompt,state,selectedEventId,conversati
   if(/\bestado|situaci[oó]n\b/.test(p))add('Estado',trim(f.status)||'Sin estado');
   if(/\bfecha\b/.test(p)){add('Fecha inicio',trim(f.start)||'');add('Fecha fin',trim(f.end)||'');}
   if(!rows.length)return null;const local={id:'v29_direct_metric_table',name:'event_dossier',ok:true,title:res.title,facts:f,tables:[v26Table('requested_metrics',`Datos solicitados · ${f.event||''}`,rows,{Dato:v26TextSchema(),Valor:v26TextSchema()})]};
-  return v281LocalResponse({title:`${f.event||'Evento'} · datos solicitados`,answer:`${f.event||'El evento'}: ${parts.join('; ')}.`,results:[local],showTables:rows.length>1?[{tool_id:local.id,table_key:'requested_metrics'}]:[],flowTrace,previousInteractionId});
+  const metricDomains=[];if(/\bcompras?|gastos?\b/.test(p))metricDomains.push('purchases');if(/\bdonaciones?|donado\b/.test(p))metricDomains.push('donations');if(/\bingresos?|recaudaci[oó]n|cobros?\b/.test(p))metricDomains.push('incomes');if(/\basistencia|asistentes\b/.test(p))metricDomains.push('attendance');const ctxDomain=metricDomains.length===1?metricDomains[0]:'metrics';
+  return v281LocalResponse({title:`${f.event||'Evento'} · datos solicitados`,answer:`${f.event||'El evento'}: ${parts.join('; ')}.`,results:[local],showTables:rows.length>1?[{tool_id:local.id,table_key:'requested_metrics'}]:[],flowTrace,previousInteractionId,resultContext:{domain:ctxDomain,event:trim(f.event)||trim(ea.event)||'',group:'metric',metrics:rows.map(r=>trim(r?.Dato)).filter(Boolean)}});
 }
 
 
@@ -9253,14 +9286,17 @@ function v29ProductSearchTerm(state,prompt){
     arr(state?.productos).forEach(prod=>{
       [prod?.segmento,prod?.destino].forEach(v=>norm(v).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
     });
+    // Los tokens del nombre del evento tampoco son productos. Evita que «SySA 2026»
+    // se convierta en filtros como producto=2026 o producto=SySA.
+    arr(state?.eventos).forEach(ev=>norm(ev?.titulo||ev?.nombre).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
   }
-  const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)))],scores=[];
+  const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)&&!/^(?:19|20)\d{2}$/.test(x)))],scores=[];
   for(const token of tokens){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,token))hits++;}if(hits)scores.push({token,hits,len:token.length});}
   return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len)[0]?.token||'';
 }
 function v29PreferredProductMention(mentions,dims,prompt){
   const p=norm(prompt),explicit=/\b(producto|productos|articulo|articulos)\b/.test(p),blocked=new Set([...arr(dims?.segments),...arr(dims?.destinations)].map(norm));
-  return arr(mentions).find(x=>x?.kind==='product'&&(explicit||!blocked.has(norm(x?.name))))?.name||'';
+  return arr(mentions).find(x=>x?.kind==='product'&&!/^(?:19|20)\d{2}$/.test(norm(x?.name))&&(explicit||!blocked.has(norm(x?.name))))?.name||'';
 }
 function v29SortDirection(prompt){
   const p=norm(prompt);
@@ -9319,11 +9355,14 @@ function v29StructuredPlan(state,prompt,history=[]){
     if(inherited?.domain==='multi')domains=arr(inherited?.tasks).map(x=>trim(x?.domain)).filter(Boolean);
     else if(inherited?.domain)domains=[trim(inherited.domain)];
   }
+  const immediateCtx=v29LastResultContext(history);
+  const bankJustificationGraph=/\bgr[aá]fic\w*|representa\w*|visualiz\w*/.test(p)&&/\bjustific\w*/.test(p)&&(domains.includes('bank')||immediateCtx?.domain==='bank');
+  if(bankJustificationGraph){domains=domains.filter(d=>d!=='documents');if(!domains.includes('bank'))domains.unshift('bank');inherited=immediateCtx?.domain==='bank'?immediateCtx:inherited;}
   if(!domains.length)return null;
   const attendanceUnpaid=/\b(asisti[oó]|asistieron|asistente[s]?)\b[^.]{0,50}\b(no\s+pag[oó]|sin\s+pagar|cuota\s+0|cero\s+euros)\b|\bqui[eé]n\s+asisti[oó]\s+pero\s+no\s+pag[oó]\b/.test(p);
   if(attendanceUnpaid)domains=domains.filter(d=>d!=='incomes');
   const entityMention=mentions.length>0;
-  const structuredCue=/\b(lista|listado|ranking|top|detalle|detallad|cada|por\s+tienda|por\s+donante|por\s+producto|por\s+responsable|por\s+ticket|forma\s+de\s+pago|banco|efectivo|bizum|pendiente|gr[aá]fic\w*|tabla|quien|quién|quienes|quiénes|todos?|todas?|solo|solamente|sin\s+resumir)\b/.test(p);
+  const structuredCue=/\b(lista|listado|ranking|top|detalle|detallad|cada|por\s+tienda|por\s+donante|por\s+producto|por\s+responsable|por\s+ticket|por\s+segmento|por\s+destino|segmento\s*(?:y|\/)\s*destino|destino\s*(?:y|\/)\s*segmento|forma\s+de\s+pago|banco|efectivo|bizum|pendiente|gr[aá]fic\w*|tabla|quien|quién|quienes|quiénes|todos?|todas?|solo|solamente|sin\s+resumir)\b/.test(p);
   const kpiWords=[/\bingresos?\b/,/\bcompras?\s+realizadas?\b/,/\bcompras?\s+pendientes?\b/,/\bdonaciones?\b/,/\bsaldo\s+(?:actual|operativo)\b/,/\bvaloraci[oó]n\b/].filter(re=>re.test(p)).length;
   const metricOnly=kpiWords>=2&&!structuredCue&&!entityMention&&!dims.segments.length&&!dims.destinations.length&&!/\b(depender|opini[oó]n|analiza|que\s+te\s+parece|qué\s+te\s+parece)\b/.test(p);
   if(metricOnly)domains=['metrics'];
@@ -9366,6 +9405,7 @@ function v29StructuredPlan(state,prompt,history=[]){
       else if(groupByBoth)task.group='segment_destination';
       else if(groupBySegment)task.group='segment';
       else if(groupByDestination)task.group='destination';
+      else if(trim(prior?.group))task.group=trim(prior.group);
       else task.group=task.filters.store||task.filters.product||task.filters.segment||task.filters.destination||full?'lines':'store';
     }else if(domain==='incomes'){
       task.group=/\b(banco|efectivo|bizum|pendiente|forma\s+de\s+pago|forma)\b/.test(p)?'method':(/\b(rango|socios?|no\s+socios?)\b/.test(p)?'range':'person');
@@ -9782,7 +9822,7 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
   // v1.0_exp: un «sí / hazlo» ejecuta la ÚLTIMA propuesta concreta de Zuzu.
   // No reconstruye la intención amplia de varios turnos atrás ni vuelve a cargar el dossier completo.
   if(v282AffirmativeFollowUp(userPrompt)){
-    const pending=v282PendingProposal(conversationHistory);
+    const pending=v282ImmediatePendingProposal(conversationHistory);
     if(pending){
       const done=await v282ExecutePendingProposal({pending,userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
       if(done)return done;
@@ -13239,5 +13279,8 @@ export const __zuzuStructuralTesting = Object.freeze({
   v29StructuredPlan,
   v29ExplicitDomains,
   v29OrderedCatalogMentions,
-  v29ProductSearchTerm
+  v29ProductSearchTerm,
+  v285ComparisonEventNames,
+  v285ComparisonRequest,
+  v282AffirmativeFollowUp
 });
