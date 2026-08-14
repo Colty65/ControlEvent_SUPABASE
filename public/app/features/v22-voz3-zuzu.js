@@ -58,6 +58,9 @@
     requestInFlight: false,
     queuedUtterance: '',
     lastSpokenText: '',
+    currentSpokenChunk: '',
+    recentSpokenChunks: [],
+    speechEchoUntil: 0,
     wakeStartedAt: 0,
     recorderStream: null,
     mediaRecorder: null,
@@ -111,11 +114,53 @@
     var aa=wakeNorm(a).split(' ').filter(function(x){return x.length>2;}),bb=wakeNorm(b).split(' ').filter(function(x){return x.length>2;});
     if(!aa.length||!bb.length)return 0;var set=new Set(bb),hit=0;aa.forEach(function(x){if(set.has(x))hit++;});return hit/aa.length;
   }
+  function contentTokens(value){
+    var stop={el:1,la:1,los:1,las:1,un:1,una:1,unos:1,unas:1,de:1,del:1,al:1,y:1,o:1,que:1,como:1,por:1,para:1,con:1,sin:1,es:1,son:1,ha:1,he:1};
+    return wakeNorm(value).split(' ').filter(function(x){return x.length>2&&!stop[x];});
+  }
+  function tokenNear(a,b){
+    if(a===b)return true;
+    if(!a||!b)return false;
+    if(a.length>=4&&b.length>=4&&(a.indexOf(b)===0||b.indexOf(a)===0))return true;
+    return a.length>=4&&b.length>=4&&editDistance(a,b)<=1;
+  }
+  function fuzzyTokenCoverage(a,b){
+    var aa=contentTokens(a),bb=contentTokens(b);if(!aa.length||!bb.length)return 0;
+    var hit=0;aa.forEach(function(x){if(bb.some(function(y){return tokenNear(x,y);})){hit++;}});
+    return hit/aa.length;
+  }
+  function maxOwnVoiceSimilarity(value){
+    var candidates=[];
+    if(state.currentSpokenChunk)candidates.push(state.currentSpokenChunk);
+    (state.recentSpokenChunks||[]).slice(-3).forEach(function(x){if(x)candidates.push(x);});
+    if(state.lastSpokenText)candidates.push(state.lastSpokenText);
+    var best=0,n=wakeNorm(value);
+    candidates.forEach(function(spoken){
+      var s=wakeNorm(spoken);if(!s)return;
+      if(s.indexOf(n)>=0||n.indexOf(s)>=0)best=Math.max(best,0.99);
+      best=Math.max(best,wordOverlapRatio(n,s),fuzzyTokenCoverage(n,s));
+    });
+    return best;
+  }
   function isLikelyOwnVoice(value){
-    if(!state.speaking||!state.lastSpokenText)return false;
-    var n=wakeNorm(value);if(n.length<4)return false;
-    var spoken=wakeNorm(state.lastSpokenText);
-    return spoken.indexOf(n)>=0||wordOverlapRatio(n,spoken)>=0.72;
+    if((!state.speaking&&Date.now()>Number(state.speechEchoUntil||0))||!state.lastSpokenText)return false;
+    var n=wakeNorm(value);if(n.length<3)return true;
+    return maxOwnVoiceSimilarity(n)>=0.46;
+  }
+  function explicitInterruptCue(value){
+    return /\b(zuzu|susu|suzu|oye|ey|espera|esperate|para|para un momento|no espera|no no|perdona|perdon|una cosa)\b/.test(wakeNorm(value));
+  }
+  function voiceAliasNormalize(value){
+    var out=clean(value);if(!out)return out;
+    out=out
+      .replace(/\b(?:santiago\s+y\s+santa\s+ana|santiago\s+santa\s+ana|sisa|s\s+y\s+s\s+a|ese\s+y\s+ese\s+a)\b/gi,'SySA')
+      .replace(/\bversus\b/gi,'vs');
+    if(/\b(jornada|visita|evento|edici[oó]n|funci[oó]n)\b/i.test(out)){
+      var ord=[['d[eé]cima','X'],['novena','IX'],['octava','VIII'],['s[eé]ptima','VII'],['sexta','VI'],['quinta','V'],['cuarta','IV'],['tercera','III'],['segunda','II'],['primera','I']];
+      ord.forEach(function(pair){out=out.replace(new RegExp('\\b'+pair[0]+'\\b','gi'),pair[1]);});
+      out=out.replace(/\bYii\b/gi,'III').replace(/\bjornada\s+solidaridad\b/gi,'Jornada Solidaria');
+    }
+    return clean(out);
   }
   function appendFinalTranscript(text){
     text=clean(text); if(!text) return;
@@ -263,7 +308,7 @@
     },2000);
   }
   function submitVoiceUtterance(text){
-    text=clean(text);if(!text)return;
+    text=voiceAliasNormalize(text);if(!text)return;
     if(goodbyeMatch(text)){endVoiceConversation('goodbye');return;}
     if(state.requestInFlight){state.queuedUtterance=text;setVoiceStatus('Te he escuchado. Respondo a eso en cuanto termine el turno actual.','ok');return;}
     openZuzuForVoice(function(){
@@ -280,15 +325,35 @@
       appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Hola. Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();
     });
   }
-  function processConversationSpeech(text,isFinal){
-    text=clean(text);if(!text)return;
+  function processConversationSpeech(text,isFinal,confidence){
+    text=voiceAliasNormalize(text);if(!text)return;
+    var echoScore=maxOwnVoiceSimilarity(text),echoTail=Date.now()<=Number(state.speechEchoUntil||0);
     if(isLikelyOwnVoice(text))return;
-    if(state.speaking){stopSpeaking(false);setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();}
+    if(state.speaking){
+      // Los resultados provisionales son la principal fuente de auto-interrupciones:
+      // no cortamos a Zuzu hasta tener una frase final claramente distinta de lo que está diciendo.
+      if(!isFinal){
+        if(explicitInterruptCue(text)&&echoScore<0.25){
+          stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
+          state.voiceInterim=text;showVoicePrompt(text);
+        }
+        return;
+      }
+      // Para cortar una locución sin palabra de interrupción exigimos una frase final
+      // suficientemente distinta, con contenido real y una confianza razonable. Así un eco
+      // deformado por el altavoz no convierte a Zuzu en su propia interlocutora.
+      var confOk=!confidence||Number(confidence)>=0.40;
+      var userLike=explicitInterruptCue(text)||(contentTokens(text).length>=3&&echoScore<0.30&&confOk);
+      if(!userLike)return;
+      stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
+    }else if(echoTail&&echoScore>=0.28){
+      return;
+    }
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
     var full=currentVoiceUtterance();showVoicePrompt(full);scheduleVoiceSubmission();
   }
   function processAmbientSpeech(text){
-    text=clean(text);if(!text||isLikelyOwnVoice(text))return;
+    text=voiceAliasNormalize(text);if(!text||isLikelyOwnVoice(text))return;
     state.ambientHeard=joinText(state.ambientHeard,text).slice(-180);
     var match=wakeMatch(state.ambientHeard);
     if(match.matched){
@@ -305,6 +370,9 @@
   function ensureRecorderStream(){
     if(state.recorderStream&&state.recorderStream.active)return Promise.resolve(state.recorderStream);
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return Promise.resolve(null);
+    // La grabación conserva también la voz de Zuzu que sale por altavoces; por eso aquí no
+    // activamos echoCancellation. La supresión del eco para el diálogo se hace sobre las
+    // transcripciones, no destruyendo el audio que el usuario quiere descargar.
     return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}}).then(function(stream){state.recorderStream=stream;return stream;}).catch(function(){return null;});
   }
   function startSessionRecording(){
@@ -364,20 +432,69 @@
     }
   }
 
+  function appVoiceState(){
+    try{return window.state||window.ControlEventApp&&window.ControlEventApp.state||{};}catch(_){return{};}
+  }
+  function entityHintScore(value){
+    var n=wakeNorm(voiceAliasNormalize(value));if(!n)return 0;
+    var st=appVoiceState(),rows=[];
+    (Array.isArray(st.eventos)?st.eventos:[]).forEach(function(x){if(x&&x.titulo)rows.push(x.titulo);});
+    (Array.isArray(st.personas)?st.personas:[]).forEach(function(x){if(x&&x.nombre)rows.push(x.nombre);});
+    var nt=contentTokens(n),best=0;
+    rows.slice(0,500).forEach(function(label){
+      var l=wakeNorm(label),lt=contentTokens(l);if(!lt.length)return;
+      var hit=0;nt.forEach(function(x){if(lt.some(function(y){return tokenNear(x,y);})){hit++;}});
+      if(hit)best=Math.max(best,hit/Math.max(1,Math.min(nt.length,lt.length)));
+    });
+    return Math.min(1,best);
+  }
+  function bestRecognitionAlternative(result){
+    if(!result||!result.length)return{text:'',confidence:0};
+    var best={text:clean(result[0]&&result[0].transcript),confidence:Number(result[0]&&result[0].confidence)||0,score:-1};
+    for(var i=0;i<Math.min(result.length,5);i++){
+      var raw=clean(result[i]&&result[i].transcript);if(!raw)continue;
+      var normalized=voiceAliasNormalize(raw),conf=Number(result[i]&&result[i].confidence)||0;
+      var score=conf*0.35+entityHintScore(normalized)*0.65;
+      if(score>best.score)best={text:normalized,confidence:conf,score:score};
+    }
+    best.text=voiceAliasNormalize(best.text);
+    return best;
+  }
+  function spokenLabelVariants(label){
+    var raw=clean(label),out=[raw];if(!raw)return[];
+    if(/\bsysa\b/i.test(raw))out=out.concat(['Santiago y Santa Ana','Santiago y Santa Ana '+(raw.match(/\b20\d{2}\b/)||[''])[0],'Sisa '+(raw.match(/\b20\d{2}\b/)||[''])[0],'S y S A '+(raw.match(/\b20\d{2}\b/)||[''])[0]]);
+    var romanWords={I:'primera',II:'segunda',III:'tercera',IV:'cuarta',V:'quinta',VI:'sexta',VII:'séptima',VIII:'octava',IX:'novena',X:'décima'};
+    var m=raw.match(/^\s*(X|IX|VIII|VII|VI|V|IV|III|II|I)\b/i);
+    if(m&&romanWords[m[1].toUpperCase()])out.push(raw.replace(m[0],romanWords[m[1].toUpperCase()]+' '));
+    return out.map(clean).filter(Boolean);
+  }
+  function installRecognitionGrammar(rec){
+    try{
+      var G=window.SpeechGrammarList||window.webkitSpeechGrammarList;if(!G)return;
+      var st=appVoiceState(),labels=['SySA','Santiago y Santa Ana','Sisa','S y S A','ese y ese a'];
+      (Array.isArray(st.eventos)?st.eventos:[]).slice(0,80).forEach(function(x){if(x&&x.titulo)labels=labels.concat(spokenLabelVariants(x.titulo));});
+      (Array.isArray(st.personas)?st.personas:[]).slice(0,120).forEach(function(x){if(x&&x.nombre)labels=labels.concat(spokenLabelVariants(x.nombre));});
+      labels=labels.map(function(x){return x.replace(/[;=|<>]/g,' ').replace(/\s+/g,' ').trim();}).filter(Boolean);
+      if(!labels.length)return;
+      var grammar='#JSGF V1.0; grammar controlevent; public <entidad> = '+labels.join(' | ')+' ;';
+      var list=new G();list.addFromString(grammar,1);rec.grammars=list;
+    }catch(_){}
+  }
+
   function buildRecognition(){
     var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(!Ctor) return null;
     var rec = new Ctor();
-    rec.lang = 'es-ES';rec.continuous = true;rec.interimResults = true;rec.maxAlternatives = 1;
+    rec.lang = 'es-ES';rec.continuous = true;rec.interimResults = true;rec.maxAlternatives = 5;installRecognitionGrammar(rec);
     rec.onstart = function(){
       state.recognitionStarting=false;setMicUi(true);updateWakeBadge();
       setVoiceStatus(state.conversationMode?'Te escucho. Habla con naturalidad; enviaré al detectar dos segundos de silencio.':state.recognitionMode==='manual'?'Escuchando dictado.':'Escucha ambiental activa: di «Hola Zuzu».','ok');
     };
     rec.onresult = function(ev){
       for(var i=ev.resultIndex;i<ev.results.length;i++){
-        var text=clean(ev.results[i]&&ev.results[i][0]&&ev.results[i][0].transcript);if(!text)continue;
+        var picked=bestRecognitionAlternative(ev.results[i]),text=clean(picked.text);if(!text)continue;
         var isFinal=!!ev.results[i].isFinal;
-        if(state.conversationMode)processConversationSpeech(text,isFinal);
+        if(state.conversationMode)processConversationSpeech(text,isFinal,picked.confidence);
         else if(state.recognitionMode==='manual'){
           if(isFinal)appendFinalTranscript(text);else state.voiceInterim=text;updatePrompt(isFinal?'':text);
         }else processAmbientSpeech(text);
@@ -734,7 +851,7 @@
     state.stopRequested=true;
     state.currentUtterance=null;
     if(supportsDeviceSpeech()){ try{ window.speechSynthesis.cancel(); }catch(_){ } }
-    state.speaking=false; state.paused=false; state.engine=''; state.speechChunks=[]; state.speechIndex=0;
+    state.speaking=false; state.paused=false; state.engine=''; state.speechChunks=[]; state.speechIndex=0;state.speechEchoUntil=Date.now()+700;
     updateSpeechButtons();
     setTimeout(function(){state.stopRequested=false;},80);
     if(showMessage!==false) setVoiceStatus('Lectura detenida.','');
@@ -750,7 +867,11 @@
     if(state.speechIndex>=state.speechChunks.length){
       state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
     }
-    var utter=new SpeechSynthesisUtterance(state.speechChunks[state.speechIndex]);
+    var spokenChunk=state.speechChunks[state.speechIndex];
+    state.currentSpokenChunk=spokenChunk;
+    state.recentSpokenChunks=(state.recentSpokenChunks||[]).concat([spokenChunk]).slice(-4);
+    state.speechEchoUntil=Date.now()+500;
+    var utter=new SpeechSynthesisUtterance(spokenChunk);
     var voice=selectedDeviceVoice();
     utter.lang=(voice&&voice.lang)||'es-ES'; utter.rate=selectedRate(); utter.pitch=1; utter.volume=1;
     if(voice) utter.voice=voice;
@@ -760,6 +881,7 @@
       setVoiceStatus('Zuzu está leyendo con '+(voice?clean(voice.name):'la voz del dispositivo')+'…','ok');
     };
     utter.onend=function(){
+      state.speechEchoUntil=Date.now()+900;
       if(!state.speaking||state.engine!=='local'||state.stopRequested) return;
       state.currentUtterance=null; state.speechIndex++;
       setTimeout(speakDeviceNext,45);

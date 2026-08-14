@@ -4858,8 +4858,28 @@ REGLAS DE PLANIFICACION:
 
 Devuelve JSON estricto con action, clarification, intent, scope_summary, queries, wants_charts y rationale.`;
 }
-function semanticCleanToken(value) {
-  return norm(value).replace(/\b(el|la|los|las|un|una|unos|unas|tienda|establecimiento)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+function semanticSpokenEntityNorm(value, type = '') {
+  let out = norm(value);
+  if (type === 'event') {
+    out = out
+      .replace(/\b(?:santiago\s+y\s+santa\s+ana|santiago\s+santa\s+ana|sisa|s\s+y\s+s\s+a|ese\s+y\s+ese\s+a|ese\s+ye\s+ese\s+a)\b/g, 'sysa')
+      .replace(/\bversus\b/g, 'vs')
+      .replace(/\bjornada\s+solidaridad\b/g, 'jornada solidaria')
+      .replace(/\byii\b/g, 'iii');
+    const ordinals = [
+      ['decima','x'],['novena','ix'],['octava','viii'],['septima','vii'],['sexta','vi'],
+      ['quinta','v'],['cuarta','iv'],['tercera','iii'],['segunda','ii'],['primera','i']
+    ];
+    for (const [spoken, roman] of ordinals) out = out.replace(new RegExp(`\\b${spoken}\\b`, 'g'), roman);
+  }
+  return out;
+}
+function semanticCleanToken(value, type = '') {
+  return semanticSpokenEntityNorm(value, type)
+    .replace(/\b(el|la|los|las|un|una|unos|unas|tienda|establecimiento)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 function semanticCatalogRows(state, type) {
   if (type === 'event') return arr(state?.eventos).map(x => ({ id: trim(x?.id), nombre: trim(x?.titulo) })).filter(x => x.id && x.nombre);
@@ -4868,20 +4888,66 @@ function semanticCatalogRows(state, type) {
   if (type === 'person' || type === 'responsible' || type === 'donor') return arr(state?.personas).map(x => ({ id: trim(x?.id), nombre: trim(x?.nombre) })).filter(x => x.id && x.nombre);
   return [];
 }
-function semanticEntityScore(needle, candidate) {
-  const a = semanticCleanToken(needle), b = semanticCleanToken(candidate);
+function semanticEditDistance(a, b) {
+  const x = trim(a), y = trim(b);
+  if (x === y) return 0;
+  if (!x.length) return y.length;
+  if (!y.length) return x.length;
+  let prev = Array.from({ length: y.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= x.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= y.length; j++) {
+      cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[y.length];
+}
+function semanticTokenNear(a, b) {
+  if (a === b) return 1;
+  const maxLen = Math.max(a.length, b.length);
+  if (!maxLen) return 0;
+  const d = semanticEditDistance(a, b);
+  if (d === 1 && maxLen >= 4) return 0.90;
+  if (d === 2 && maxLen >= 7) return 0.78;
+  if (maxLen >= 5 && (a.startsWith(b) || b.startsWith(a))) return Math.min(0.88, Math.min(a.length,b.length) / maxLen + 0.12);
+  return 0;
+}
+function semanticEntityScore(needle, candidate, type = '') {
+  const a = semanticCleanToken(needle, type), b = semanticCleanToken(candidate, type);
   if (!a || !b) return 0;
   if (a === b) return 1;
-  if (b.endsWith(` ${a}`) || b.startsWith(`${a} `) || b.includes(` ${a} `)) return 0.94;
-  if (a.includes(b) || b.includes(a)) return Math.min(0.92, 0.72 + Math.min(a.length,b.length) / Math.max(a.length,b.length) * 0.18);
-  const at = a.split(' ').filter(Boolean), bt = new Set(b.split(' ').filter(Boolean));
-  const overlap = at.filter(t => bt.has(t)).length;
-  if (overlap && overlap === at.length) return 0.82 + Math.min(0.08, overlap * 0.02);
+  if (b.endsWith(` ${a}`) || b.startsWith(`${a} `) || b.includes(` ${a} `)) return 0.96;
+  if (a.includes(b) || b.includes(a)) return Math.min(0.94, 0.74 + Math.min(a.length,b.length) / Math.max(a.length,b.length) * 0.18);
+
+  const at = a.split(' ').filter(Boolean), bt = b.split(' ').filter(Boolean);
+  const roman = new Set(['i','ii','iii','iv','v','vi','vii','viii','ix','x']);
+  const aRoman = at.find(t => roman.has(t)), bRoman = bt.find(t => roman.has(t));
+  const aYear = at.find(t => /^(?:19|20)\d{2}$/.test(t)), bYear = bt.find(t => /^(?:19|20)\d{2}$/.test(t));
+
+  // Un año o numeral romano explícito distinto es información fuerte: no lo "corrijas"
+  // por similitud fonética hacia otro evento.
+  if (aYear && bYear && aYear !== bYear) return 0.64;
+  if (aRoman && bRoman && aRoman !== bRoman) return 0.68;
+
+  let sum = 0, exact = 0;
+  for (const token of at) {
+    let best = 0;
+    for (const candidateToken of bt) best = Math.max(best, semanticTokenNear(token, candidateToken));
+    sum += best;
+    if (best === 1) exact++;
+  }
+  const fuzzyCoverage = sum / Math.max(1, at.length);
+  if (exact === at.length) return 0.91;
+  if (fuzzyCoverage >= 0.96) return 0.93;
+  if (fuzzyCoverage >= 0.84) return 0.88;
+  if (at.length >= 2 && fuzzyCoverage >= 0.72) return 0.80;
+  if (at.length === 1 && fuzzyCoverage >= 0.88) return 0.88;
   return 0;
 }
 function semanticResolveEntity(state, type, value) {
   const rows = semanticCatalogRows(state, type);
-  const scored = rows.map(row => ({ ...row, score: semanticEntityScore(value, row.nombre) })).filter(x => x.score >= 0.72).sort((a,b) => b.score - a.score || a.nombre.localeCompare(b.nombre,'es'));
+  const scored = rows.map(row => ({ ...row, score: semanticEntityScore(value, row.nombre, type) })).filter(x => x.score >= 0.72).sort((a,b) => b.score - a.score || a.nombre.localeCompare(b.nombre,'es'));
   if (!scored.length) return { ok: false, ambiguous: false, value: trim(value), type, candidates: [] };
   const top = scored[0];
   const near = scored.filter(x => top.score - x.score <= 0.035);
@@ -6230,7 +6296,7 @@ function v262CanonicalPeopleIndex(state){
 }
 function v262ResolveAtomicPerson(state,value){
   const idx=v262CanonicalPeopleIndex(state),needle=trim(value);if(!needle)return{ok:false,ambiguous:false,value:needle,type:'person',candidates:[]};
-  const scored=[...idx.atoms.values()].map(rec=>({rec,score:semanticEntityScore(needle,rec.display)})).filter(x=>x.score>=0.72).sort((a,b)=>b.score-a.score||a.rec.display.localeCompare(b.rec.display,'es'));
+  const scored=[...idx.atoms.values()].map(rec=>({rec,score:semanticEntityScore(needle,rec.display,'person')})).filter(x=>x.score>=0.72).sort((a,b)=>b.score-a.score||a.rec.display.localeCompare(b.rec.display,'es'));
   if(!scored.length)return{ok:false,ambiguous:false,value:needle,type:'person',candidates:[]};
   const top=scored[0],near=scored.filter(x=>top.score-x.score<=0.035);
   if(near.length>1&&top.score<0.995)return{ok:false,ambiguous:true,value:needle,type:'person',candidates:near.slice(0,5).map(x=>({id:[...x.rec.standaloneIds][0]||[...x.rec.compositeIds][0]||'',nombre:x.rec.display,score:x.score}))};
@@ -7708,7 +7774,7 @@ function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUse
   const localNow=trim(clientLocalDateTime).slice(0,120)||fallbackNow;
   const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid';
   const utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  const voiceRules=voiceConversation?`\n\nMODO CONVERSACIÓN ORAL ACTIVO:\n- Estás hablando, no redactando un informe. Responde como una persona en una conversación: frases cortas, naturales, cálidas y directas.\n- NO uses tablas, Markdown, listas con guiones, enumeraciones largas, encabezados, nombres técnicos de datasets ni expresiones como «te muestro la tabla» o «consulta la gráfica».\n- Si hay muchos datos, cuenta lo esencial en lenguaje oral y agrupa: total, dos o tres ejemplos relevantes y la conclusión. El detalle queda en ControlEvent y solo lo amplías si el usuario lo pide.\n- No leas una gráfica ni una tabla celda por celda. Interpreta sus datos y cuéntalos en lenguaje natural.\n- Evita terminar cada respuesta con una oferta mecánica. Si una pregunta breve admite una respuesta breve, contesta en dos a cinco frases.\n- El usuario puede interrumpirte y cambiar de tema; conserva el referente de la conversación y responde al nuevo mensaje sin reprochar la interrupción.\n- Si el usuario saluda, contesta el saludo con naturalidad antes de entrar en datos.\n`:'';
+  const voiceRules=voiceConversation?`\n\nMODO CONVERSACIÓN ORAL ACTIVO:\n- Estás hablando, no redactando un informe. Responde como una persona en una conversación: frases cortas, naturales, cálidas y directas.\n- NO uses tablas, Markdown, listas con guiones, enumeraciones largas, encabezados, nombres técnicos de datasets ni expresiones como «te muestro la tabla» o «consulta la gráfica».\n- Si hay muchos datos, cuenta lo esencial en lenguaje oral y agrupa: total, dos o tres ejemplos relevantes y la conclusión. El detalle queda en ControlEvent y solo lo amplías si el usuario lo pide.\n- No leas una gráfica ni una tabla celda por celda. Interpreta sus datos y cuéntalos en lenguaje natural.\n- Evita terminar cada respuesta con una oferta mecánica. Si una pregunta breve admite una respuesta breve, contesta en dos a cinco frases.\n- El usuario puede interrumpirte y cambiar de tema; conserva el referente de la conversación y responde al nuevo mensaje sin reprochar la interrupción.\n- Si el usuario saluda, contesta el saludo con naturalidad antes de entrar en datos.\n- La voz puede deformar nombres propios, siglas y ordinales: usa el catálogo canónico y las correcciones del usuario para recuperar el referente, preguntando solo si quedan dos candidatos plausibles.\n- Si necesitas consultar una herramienta, hazlo en este mismo turno; no prometas una consulta futura ni pidas que el usuario diga «hazlo».\n`:'';
   if(voiceConversation){
     return `Eres Zuzu, asistente conversacional de ControlEvent v1.0_exp. Hablas en español natural con ${display}.
 
@@ -7717,6 +7783,9 @@ MODO ORAL:
 - Nunca redactes tablas, Markdown, listas largas, encabezados, código, nombres de datasets ni instrucciones visuales. No digas «te muestro la tabla/gráfica». Si hay muchos datos, resume el total, los 2 o 3 puntos útiles y una conclusión.
 - No leas gráficos ni tablas: interpreta sus datos y cuéntalos. El usuario puede interrumpirte; acepta el nuevo mensaje y sigue el hilo sin reproches.
 - Si te saluda, saluda. Si pregunta algo sencillo, no conviertas la respuesta en un informe.
+- La transcripción de voz puede deformar nombres propios, siglas y números romanos. Antes de decir «no encuentro», contrasta el nombre oído con los catálogos canónicos. Trata «Santiago y Santa Ana», «Sisa», «S y S A» o «ese y ese a» como formas habladas posibles de «SySA»; y «primera/segunda/tercera/cuarta...» como I/II/III/IV... cuando formen parte del nombre de un evento.
+- Si una corrección oral modifica una letra o palabra del mensaje anterior («la G es una C», «i latina», «he dicho Cordo»), aplícala al referente anterior y conserva el hilo. Si existe un candidato canónico claramente dominante, úsalo; si hay dos candidatos realmente plausibles, pregunta cuál.
+- No prometas trabajo para después. Si dices que vas a revisar documentos, banco, personas, compras o cualquier otra fuente, solicita la herramienta necesaria EN ESTE MISMO TURNO y responde con el resultado disponible. No termines con «déjame revisar», «dame un momento» o «voy a consultarlo» esperando otro mensaje del usuario.
 
 DATOS Y HERRAMIENTAS:
 - Mantén el hilo con previous_interaction_id. Si ControlEvent aporta una memoria compacta tras una compactación, úsala como parte real de la conversación, sin recitarla.
@@ -13489,6 +13558,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v26BuildPresentation,
   v26FallbackFromTools,
   v26ResolvePersonFamily,
+  semanticResolveEntity,
+  semanticEntityScore,
+  semanticSpokenEntityNorm,
   v26ComparisonEventNamesFromPrompt,
   v26SemanticAudit,
   v26FormatNarrativeMoney,
