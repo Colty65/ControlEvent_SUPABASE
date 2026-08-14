@@ -2,14 +2,14 @@ import { registerExcelModule, ensureExcelJS as ensureRuntimeExcelJS } from './_e
 
 export const meta = {
   name: 'backup',
-  appVersion: 'v30_prod',
+  appVersion: 'v1.0_exp',
   version: 'v33.7',
   mode: 'server-backup-download-with-client-fallback',
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v30_prod';
-const BACKUP_VERSION_FILE = 'ControlEvent_v30_prod';
+const BACKUP_VERSION = 'ControlEvent v1.0_exp';
+const BACKUP_VERSION_FILE = 'ControlEvent_v1.0_exp';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 

@@ -1,4 +1,4 @@
-/* ControlEvent v30_prod - parche quirurgico PC / EVENTO Finalizado.
+/* ControlEvent v1.0_exp - parche quirurgico PC / EVENTO Finalizado.
    Alcance:
    - Solo actua en entorno PC (hover + puntero fino, no iPad/iPhone/Android).
    - Solo actua cuando el evento seleccionado esta FINALIZADO.
@@ -9,8 +9,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v30_prod';
-  const VERSION_FILE = 'ControlEvent_v30_prod';
+  const VERSION = 'ControlEvent v1.0_exp';
+  const VERSION_FILE = 'ControlEvent_v1.0_exp';
   const INSTALLED = '__ceV401PcPhotoFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

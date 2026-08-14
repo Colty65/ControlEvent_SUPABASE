@@ -1,4 +1,4 @@
-# Zuzu Router SOMBRA · v30_prod
+# Zuzu Router SOMBRA · v1.0_exp
 
 Esta primera fase **no cambia la respuesta actual de Zuzu**.
 

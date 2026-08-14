@@ -1,12 +1,12 @@
-/* ControlEvent v30_prod - justificantes de ingresos corregidos y retorno al globo origen.
+/* ControlEvent v1.0_exp - justificantes de ingresos corregidos y retorno al globo origen.
    - INGRESOS: adjuntar/eliminar justificante con controles compactos y miniatura clicable.
    - Resumen presupuestario y GRAFICAS: miniatura del justificante en globos de ingresos.
    - Los globos no se cierran al usar su propia ruleta/ascensor.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30_prod';
-  const VERSION_FILE = 'ControlEvent_v30_prod';
+  const VERSION = 'ControlEvent v1.0_exp';
+  const VERSION_FILE = 'ControlEvent_v1.0_exp';
   const INSTALLED = '__ceV467FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

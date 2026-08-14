@@ -1,4 +1,4 @@
-/* ControlEvent v30_prod · banco automático del Router Zuzu en SOMBRA.
+/* ControlEvent v1.0_exp · banco automático del Router Zuzu en SOMBRA.
    Por defecto hace 100 clasificaciones Gemini sin tocar datos de ControlEvent.
    --dry-run valida únicamente el banco local y NO llama a Gemini.
    --cascade hace que cada turno conversacional herede la decisión REAL del turno anterior;

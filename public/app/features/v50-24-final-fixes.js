@@ -1,12 +1,12 @@
-/* ControlEvent v30_prod - emergencia contra bloqueo de login por v50.23.
+/* ControlEvent v1.0_exp - emergencia contra bloqueo de login por v50.23.
    - No usa MutationObserver global ni bucles permanentes.
    - Mantiene login escribible.
    - Refres/Refrescar se marca en verde Excel durante la actualización.
    - Versión unificada solo con aplicaciones puntuales, sin observador infinito. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v30_prod';
-  const VERSION_FILE = 'ControlEvent_v30_prod';
+  const VERSION = 'ControlEvent v1.0_exp';
+  const VERSION_FILE = 'ControlEvent_v1.0_exp';
   const INSTALLED = '__ceV5024FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;
@@ -72,9 +72,8 @@
 
   function replaceVersionFilePrefixV300(text){
     const out = String(text || '')
-      .replace(/ControlEvent_v\d+(?:_\d+){1,3}(?:_prod)+(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\.xlsx(?:$|\?|\b)|$)/ig, VERSION_FILE)
-      .replace(/ControlEvent_v\d+(?:_\d+){1,3}(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\.xlsx(?:$|\?|\b)|$)/ig, VERSION_FILE);
-    return out.replace(new RegExp(`${escapeRegExpV300(VERSION_FILE)}(?:_prod)+(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\\.xlsx(?:$|\\?|\\b)|$)`, 'ig'), VERSION_FILE);
+      .replace(/ControlEvent_v\d+(?:[._-]\d+)*(?:_(?:prod|exp)(?:_\d+)*)?(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\.xlsx(?:$|\?|\b)|$)/ig, VERSION_FILE);
+    return out.replace(new RegExp(`${escapeRegExpV300(VERSION_FILE)}(?:_(?:prod|exp))+(?=_(?:INFOEVENTO|BACKUP|descarga_datos)(?=[_.-])|\\.xlsx(?:$|\\?|\\b)|$)`, 'ig'), VERSION_FILE);
   }
 
   function replaceVersionText(text){
