@@ -62,6 +62,8 @@
     currentSpokenChunk: '',
     recentSpokenChunks: [],
     speechEchoUntil: 0,
+    echoGuardUntil: 0,
+    lastSpeechEndedAt: 0,
     wakeStartedAt: 0,
     recorderStream: null,
     mediaRecorder: null,
@@ -149,9 +151,19 @@
     return best;
   }
   function isLikelyOwnVoice(value){
-    if((!state.speaking&&Date.now()>Number(state.speechEchoUntil||0))||!state.lastSpokenText)return false;
-    var n=wakeNorm(value);if(n.length<3)return true;
-    return maxOwnVoiceSimilarity(n)>=0.46;
+    if(!state.lastSpokenText)return false;
+    var n=wakeNorm(value);if(n.length<3)return !!state.speaking;
+    var now=Date.now(),score=maxOwnVoiceSimilarity(n),endedAt=Number(state.lastSpeechEndedAt||0);
+    // Mientras Zuzu habla, cualquier texto muy parecido a su propia locución se trata como eco.
+    if(state.speaking)return score>=0.34;
+    // Los resultados finales del Web Speech API pueden llegar bastante después de terminar el audio.
+    // Mantenemos una cuarentena corta para el eco del altavoz, especialmente con volumen alto.
+    if(now<=Number(state.echoGuardUntil||0))return score>=0.26;
+    if(now<=Number(state.speechEchoUntil||0))return score>=0.36;
+    // Incluso si el resultado final llega tarde, una repetición casi literal de lo que Zuzu acaba
+    // de decir no puede convertirse en una nueva pregunta. La ventana es temporal y genérica.
+    if(endedAt&&now-endedAt<=10000&&score>=0.72)return true;
+    return false;
   }
   function explicitInterruptCue(value){
     // Palabras de barge-in muy reconocibles. Se mantienen deliberadamente concretas para
@@ -367,6 +379,12 @@
   }
   function submitVoiceUtterance(text){
     text=voiceAliasNormalize(text);if(!text)return;
+    // Última barrera antibucle: algunos motores STT entregan como resultado final, con retraso,
+    // una frase que acaba de salir por los altavoces. Nunca la enviamos como nueva pregunta.
+    var endedAt=Number(state.lastSpeechEndedAt||0),ownScore=maxOwnVoiceSimilarity(text);
+    if(endedAt&&Date.now()-endedAt<=12000&&ownScore>=0.78){
+      resetVoiceUtterance();setVoiceStatus('Te escucho.','ok');return;
+    }
     if(goodbyeMatch(text)){endVoiceConversation('goodbye');return;}
     if(state.requestInFlight){state.queuedUtterance=text;setVoiceStatus('Te he escuchado. Respondo a eso en cuanto termine el turno actual.','ok');return;}
     openZuzuForVoice(function(){
@@ -387,28 +405,22 @@
     text=voiceAliasNormalize(text);if(!text)return;
     var echoScore=maxOwnVoiceSimilarity(text),echoTail=Date.now()<=Number(state.speechEchoUntil||0);
     if(state.speaking){
-      // BARGE-IN real: en cuanto hay evidencia suficiente de voz humana se SILENCIA primero
-      // la síntesis y después se limpia su cola. No esperamos al resultado final del STT.
-      // Una palabra explícita de interrupción corta con un único resultado provisional siempre
-      // que no coincida claramente con lo que la propia Zuzu está pronunciando.
+      // Con altavoces altos no hay una señal acústica fiable que permita distinguir una frase
+      // humana cualquiera del propio TTS usando Web Speech. Por estabilidad, durante la locución
+      // SOLO abrimos el turno cuando aparece una orden explícita de interrupción. Esas órdenes
+      // cortan desde el primer resultado provisional; todo lo demás se descarta y nunca se acumula.
       var explicit=explicitInterruptCue(text),explicitHuman=explicit&&explicitInterruptIsClearlyHuman(text,echoScore);
-      var naturalHuman=confirmedNaturalInterrupt(text,confidence,echoScore);
-      var confOk=!confidence||Number(confidence)>=0.36;
-      var finalHuman=isFinal&&contentTokens(text).length>=2&&echoScore<0.38&&confOk;
-      if(explicitHuman||naturalHuman||finalHuman){
-        stopSpeaking(false);resetInterruptProbe();state.speechEchoUntil=Date.now()+520;
-        setVoiceStatus('Te escucho. Habla; cuando calles dos segundos te respondo.','ok');resetVoiceUtterance();
-        state.voiceInterim=text;showVoicePrompt(text);
-      }else{
-        // Si se parece a nuestra propia locución, lo descartamos sin contaminar el turno.
-        if(isLikelyOwnVoice(text))return;
-        if(!isFinal)return;
-        return;
-      }
+      if(!explicitHuman)return;
+      stopSpeaking(false);resetInterruptProbe();
+      state.speechEchoUntil=Date.now()+900;state.echoGuardUntil=Date.now()+1500;
+      setVoiceStatus('Te escucho. Habla; cuando calles dos segundos te respondo.','ok');resetVoiceUtterance();
+      state.voiceInterim=text;showVoicePrompt(text);
     }else{
       resetInterruptProbe();
+      // Los resultados finales del eco pueden aparecer 1-3 s después de terminar la locución.
+      // No se convierten en turno aunque lleguen como "final".
       if(isLikelyOwnVoice(text))return;
-      if(echoTail&&echoScore>=0.28)return;
+      if(echoTail&&echoScore>=0.24)return;
     }
     state.incompleteHoldCount=0;
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
@@ -962,7 +974,7 @@
         try{synth.cancel();}catch(_){ }
       },ms);});
     }
-    state.currentUtterance=null;state.speechEchoUntil=Date.now()+520;
+    state.currentUtterance=null;state.lastSpeechEndedAt=Date.now();state.speechEchoUntil=Date.now()+1000;state.echoGuardUntil=Date.now()+1800;
     updateSpeechButtons();
     setTimeout(function(){if(Number(state.speechGeneration||0)===stopGen)state.stopRequested=false;},520);
     if(showMessage!==false) setVoiceStatus('Lectura detenida.','');
@@ -979,7 +991,9 @@
     if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
     if(!state.speaking||state.engine!=='local'||state.paused) return;
     if(state.speechIndex>=state.speechChunks.length){
-      state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
+      state.speaking=false; state.paused=false; state.currentUtterance=null;
+      state.lastSpeechEndedAt=Date.now();state.speechEchoUntil=Date.now()+1400;state.echoGuardUntil=Date.now()+3600;
+      updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
     }
     var spokenChunk=state.speechChunks[state.speechIndex];
     state.currentSpokenChunk=spokenChunk;
@@ -996,7 +1010,7 @@
       setVoiceStatus('Zuzu está leyendo con '+(voice?clean(voice.name):'la voz del dispositivo')+'…','ok');
     };
     utter.onend=function(){
-      state.speechEchoUntil=Date.now()+700;
+      state.speechEchoUntil=Date.now()+1000;
       if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
       if(!state.speaking||state.engine!=='local'||state.stopRequested) return;
       state.currentUtterance=null; state.speechIndex++;
@@ -1020,7 +1034,7 @@
     loadLocalVoices(false);
     var generation=Number(state.speechGeneration||0)+1;state.speechGeneration=generation;
     try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();}catch(_){ }
-    state.engine='local'; state.lastSpokenText=clean(text); state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
+    state.engine='local'; state.lastSpokenText=clean(text); state.lastSpeechEndedAt=0; state.echoGuardUntil=0; state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
     resetInterruptProbe();updateSpeechButtons();
     speakDeviceNext(generation);
   }
