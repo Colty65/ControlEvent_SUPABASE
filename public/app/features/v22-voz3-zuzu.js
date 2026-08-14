@@ -743,18 +743,18 @@
     if(runButton){
       if(state.submitBypass){
         state.submitBypass=false;
-        stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+        stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('','');
       }else if(state.wantListening || state.recognitionStarting){
         ev.preventDefault(); ev.stopPropagation();
         try{ev.stopImmediatePropagation();}catch(_){}
         setVoiceStatus('Cerrando el micrófono antes de enviar…','');
         stopListeningAndWait(850).then(function(){
           state.submitBypass=true;
-          setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+          setVoiceStatus('','');
           runButton.click();
         });
       }else{
-        stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('Pregunta enviada. Esperando la respuesta de Zuzu…','');
+        stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('','');
       }
     }
     if(target&&target.closest&&target.closest('#ceAiClear')){

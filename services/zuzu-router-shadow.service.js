@@ -89,7 +89,9 @@ function compactRouterHistory(conversationHistory=[]){
       prior_route:clean(shadow?.route,60),
       prior_subject:clean(shadow?.subject?.value || shadow?.subject_value,120),
       prior_event:clean(shadow?.event?.value || shadow?.event_value,160),
-      prior_scope:clean(shadow?.event?.scope || shadow?.event_scope,40)
+      prior_scope:clean(shadow?.event?.scope || shadow?.event_scope,40),
+      result_subject:clean(turn?.resultContext?.person||turn?.resultContext?.persona||turn?.resultContext?.subject||'',120),
+      result_event:clean(turn?.resultContext?.event||turn?.resultContext?.evento||turn?.resultContext?.eventName||'',160)
     };
   });
 }
@@ -158,6 +160,11 @@ REGLA DE SESIÓN INNEGOCIABLE:
 - OPERACIONES: TOTAL=importe/cantidad total; LIST=qué/cuáles/quiénes o enumeración; DETAIL=detalla/desglosa un elemento o pide detalle exhaustivo; SEARCH=localizar una referencia concreta; REVIEW=revisar/verificar; SUMMARY=resumen general. «¿Qué tickets justifican los cargos bancarios...?» es BANK + LIST/DETAIL, no SEARCH genérico.
 - Si el usuario dice «solo Colty» después de hablar de compras de Colty, la ruta sigue siendo PERSON_PURCHASES y exact_subject=true.
 - Si dice «revisa mi responsabilidad en compras» dentro de un hilo sobre Colty, «mi» mantiene el sujeto Colty salvo que el usuario cambie explícitamente de sujeto.
+- FILTROS DE CONTINUACIÓN: «solo los directos», «incluye también los compartidos», «excluye los compartidos», «ahora solo SySA», «solo las de 2026» cambian FILTRO/ÁMBITO, no deben inventar un sujeto nuevo. Conserva el sujeto y la tubería del turno inmediatamente anterior salvo cambio explícito real.
+- «SySA» o un año como «2026» no son personas. Si aparecen como filtro dentro de PERSON_*, conserva la persona anterior y úsalo para concretar el evento/año.
+- Si operation=COMPARE y hay dos eventos explícitos/heredados, usa COMPARE_EVENTS.
+- «¿Qué tienda concentra más compras?» sin nombrar una tienda concreta es un desglose/ranking del evento => EVENT_BREAKDOWN. STORE_PURCHASES se reserva para una tienda/proveedor concreto.
+- Un mensaje claramente ajeno a ControlEvent y que tampoco sea una continuación lingüística real (p. ej. «toma paloma pastillas de goma») debe ser UNKNOWN; no arrastres por inercia la tubería previa.
 
 TUBERÍAS DISPONIBLES:
 ${catalog}
@@ -238,6 +245,31 @@ function messageMentions(message,value){
   const a=normMatch(message),b=normMatch(value);
   return !!(a&&b&&a.includes(b));
 }
+function looksEventLikeValue(value){ const n=normMatch(value); return /^(?:sysa\b|.*\b20\d{2}\b|.*\bjornada\b|.*\bevento\b|.*\bcuotas\b|.*\bingresos y gastos\b)/i.test(n); }
+function priorTurns(input){ return arr(input?.prior_turns); }
+function recentPersonFromHistory(input){
+  const p=priorTurns(input);
+  for(let i=p.length-1;i>=0;i--){
+    const resultSubject=clean(p[i]?.result_subject,120);
+    if(resultSubject&&!looksEventLikeValue(resultSubject)&&!/^(none|all|unknown)$/i.test(resultSubject))return resultSubject;
+    // En un filtro corto manda el sujeto REAL del turno inmediatamente anterior, aunque el
+    // Router sombra anterior hubiese arrastrado por error un prior_subject más viejo.
+    const combined=`${clean(p[i]?.user,420)} ${clean(p[i]?.assistant_tail,360)}`;
+    const patterns=[
+      /\b(?:actividad|dossier|compras|ingresos|responsabilidad|datos|registros|tareas)\s+(?:de|del)\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ-]{2,30})\b/,
+      /\b(?:para|sobre|sin\s+contar\s+a|de)\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ-]{2,30})\b/
+    ];
+    for(const re of patterns){const m=combined.match(re);if(m&&m[1]&&!looksEventLikeValue(m[1])&&!/^(control|evento|datos|tabla)$/i.test(m[1]))return m[1];}
+    const priorSubject=clean(p[i]?.prior_subject,120);
+    if(priorSubject&&!looksEventLikeValue(priorSubject)&&!/^(none|all|unknown)$/i.test(priorSubject))return priorSubject;
+  }
+  return '';
+}
+function recentSpecificEventForYear(input,year){
+  const y=String(year||'').trim(),p=priorTurns(input);
+  for(let i=p.length-1;i>=0;i--){ for(const v of [p[i]?.result_event,p[i]?.prior_event]){ const c=clean(v,180); if(c&&(!y||c.includes(y))&&looksEventLikeValue(c)&&!/^[12]\d{3}$/.test(c)) return c; } }
+  const screen=clean(input?.screen_event?.title,180); return screen&&(!y||screen.includes(y))?screen:'';
+}
 export function applyZuzuRouterGuardrails(decision,input){
   const d=decision&&typeof decision==='object'?decision:null;
   if(!d) return d;
@@ -246,9 +278,44 @@ export function applyZuzuRouterGuardrails(decision,input){
   const screenTitle=clean(input?.screen_event?.title,180);
   const deicticEvent=/\b(este evento|el evento actual|evento actual|en este evento|aqui|aquí)\b/i.test(msg);
   const personRoute=/^PERSON_/.test(d.route||'');
+  const filterContinuation=/^(?:dame\s+)?(?:solo|incluye|excluye|ahora\s+solo|ahora\s+sin|tambien|también|sin\s+contar)\b/i.test(msgN);
+  const continuationCue=/^(?:y\b|pero\b|dime\s+mas|dime\s+más|dame\b|continua|continúa|lo\s+mismo|ahora\b|solo\b|incluye\b|excluye\b|revisa\b|comprueba\b|seguro\b|entonces\b)/i.test(msgN);
+  const ceDomainSignal=/\b(eventos?|sysa|compras?|tickets?|tk|ingresos?|donaciones?|hitos?|tareas?|lg|lgs|banco|movimientos?|saldo|asistentes?|socios?|tiendas?|proveedores?|documentos?|graficas?|gráficas?|tablas?|responsabilidad|directos|compartidos)\b/i.test(msgN);
+
+  // Los filtros cortos no pueden convertirse en sujetos nuevos.
+  if(filterContinuation && /^PERSON_/.test(d.route||'')){
+    const recentPerson=recentPersonFromHistory(input);
+    const currentSubject=clean(d.subject?.value,120);
+    const currentExplicitlyNamed=currentSubject&&messageMentions(msg,currentSubject);
+    if(recentPerson && !currentExplicitlyNamed && (d.subject?.type!=='PERSON' || looksEventLikeValue(currentSubject) || !currentSubject || normMatch(currentSubject)!==normMatch(recentPerson))){
+      d.subject={type:'PERSON',value:recentPerson,source:'INHERITED'};
+      if(d.inheritance)d.inheritance.subject=true;
+      d.reason=clean((d.reason?d.reason+' ':'')+'CE conserva la persona real del turno inmediatamente anterior; el mensaje actual es un filtro sin sujeto nuevo explícito.',180);
+    }
+  }
+
+  // Una ruta personal no puede llevar como evento el propio nombre de la persona.
+  if(/^PERSON_/.test(d.route||'') && d.subject?.type==='PERSON' && normMatch(d.event?.value) && normMatch(d.event?.value)===normMatch(d.subject?.value)){
+    d.event={scope:'ALL_EVENTS',value:'',source:'NONE'};
+    if(d.inheritance)d.inheritance.event=false;
+    d.reason=clean('CE elimina un evento imposible que coincidía con el nombre de la persona.',180);
+  }
+
+  // Si Gemini dejó solo un año, recupera el evento específico reciente de ese año cuando exista.
+  if(/^PERSON_/.test(d.route||'') && /^20\d{2}$/.test(clean(d.event?.value,20))){
+    const ev=recentSpecificEventForYear(input,d.event.value);
+    if(ev){d.event={scope:'NAMED_EVENT',value:ev,source:'INHERITED'};if(d.inheritance)d.inheritance.event=true;}
+  }
+
+  // «Ahora solo SySA» conserva la persona y concreta el SySA reciente.
+  if(/^PERSON_/.test(d.route||'') && /\bsolo\s+sysa\b/i.test(msgN)){
+    const rp=recentPersonFromHistory(input),ym=(msgN.match(/\b20\d{2}\b/)||[])[0]||'',ev=recentSpecificEventForYear(input,ym);
+    if(rp)d.subject={type:'PERSON',value:rp,source:'INHERITED'};
+    if(ev)d.event={scope:'NAMED_EVENT',value:ev,source:'INHERITED'};
+  }
 
   // El evento visible en pantalla nunca debe contaminar una consulta personal global.
-  if(personRoute && d.subject?.type==='PERSON' && d.subject?.source==='EXPLICIT' && d.event?.source==='SCREEN' && !deicticEvent && !messageMentions(msg,screenTitle)){
+  if(personRoute && d.subject?.type==='PERSON' && d.event?.source==='SCREEN' && !deicticEvent && !messageMentions(msg,screenTitle)){
     d.event={scope:'ALL_EVENTS',value:'',source:'NONE'};
     if(d.inheritance) d.inheritance.event=false;
     d.reason=clean((d.reason?d.reason+' ':'')+'CE corrige ámbito: persona explícita sin evento nombrado => todos los eventos.',180);
@@ -293,6 +360,17 @@ export function applyZuzuRouterGuardrails(decision,input){
   // Si pregunta qué/cuáles tickets justifican cargos, el resultado esperado es una lista/detalle de tickets.
   if(d.route==='BANK' && /\b(ticket|tickets|tk\d*)\b/i.test(msgN) && /\b(cargo|cargos|justifica|justifican|justificado|justificados)\b/i.test(msgN)){
     d.operation='LIST';
+  }
+
+  if(d.operation==='COMPARE' && /,/.test(clean(d.event?.value,220)) && d.route==='EVENTS_ANALYSIS'){
+    d.route='COMPARE_EVENTS'; d.reason=clean('CE valida operación: comparar dos eventos usa COMPARE_EVENTS.',180);
+  }
+  if(d.route==='STORE_PURCHASES' && d.operation==='RANKING' && !(d.subject?.type==='STORE'&&d.subject?.source==='EXPLICIT'&&d.subject?.value)){
+    d.route='EVENT_BREAKDOWN'; d.subject={type:'NONE',value:'',source:'NONE'}; d.reason=clean('CE valida semántica: ranking de tiendas del evento => EVENT_BREAKDOWN.',180);
+  }
+  if(d.mode==='CONVERSATION' && msgN.split(/\s+/).filter(Boolean).length>=4 && !ceDomainSignal && !continuationCue){
+    d.route='UNKNOWN'; d.subject={type:'NONE',value:'',source:'NONE'}; d.event={scope:'UNRESOLVED',value:'',source:'NONE'}; d.operation='OTHER';
+    d.inheritance={subject:false,event:false,route:false,topic:false}; d.confidence=Math.min(d.confidence||0.5,0.65); d.reason='CE detecta un mensaje ajeno al dominio y no hereda por inercia el contexto anterior.';
   }
   return d;
 }
