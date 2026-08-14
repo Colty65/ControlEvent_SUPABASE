@@ -9950,18 +9950,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
 
-  // v1.0_exp FIX: las peticiones estructuradas inequívocas (tabla/listado/gráfica,
-  // asistencia, banco, compras, donaciones, comparativas, etc.) se materializan primero
-  // con datos canónicos de CE. Gemini conserva el turno para preguntas abiertas, pero
-  // ya no puede «prometer» una tabla/gráfica que físicamente no existe.
-  try{
-    const direct=await v281TryDirectRoute({userPrompt,state,selectedEventId,conversationHistory:safeHistory,flowTrace,previousInteractionId:trim(previousInteractionId)});
-    if(direct)return direct;
-  }catch(error){
-    zuzuTracePush(flowTrace,'v1.0_exp · Ruta determinista previa','WARN',`La ruta estructurada no pudo cerrarse y se delega la interpretación a Gemini: ${cleanGeminiError(error)}`);
-  }
-
-  zuzuTracePush(flowTrace,'v1.0_exp · Arquitectura conversacional','OK',`Gemini mantiene el hilo para las peticiones abiertas o ambiguas. Las salidas estructuradas inequívocas se materializan previamente con datos canónicos de ControlEvent. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
+  // v1.0_exp · CORTE A ARQUITECTURA NUEVA.
+  // Todos los turnos de Zuzu pasan primero por Gemini: interpreta el hilo y decide qué
+  // herramientas necesita. ControlEvent NO hereda una ruta semántica previa; se limita a
+  // ejecutar/validar herramientas, cálculos y a materializar físicamente tablas/gráficas.
+  // Esto evita errores como «Ahora háblame de SySA 2025» heredando PURCHASES del turno anterior.
+  zuzuTracePush(flowTrace,'v1.0_exp · ARQUITECTURA NUEVA ACTIVA','OK',`Gemini interpreta todos los turnos y mantiene el hilo nativo; ControlEvent ejecuta herramientas y materializa datos canónicos. No existe una ruta semántica determinista previa que pueda arrastrar el dominio anterior. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
     return await runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80)});
   }catch(error){
@@ -9970,7 +9964,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       const ea=v281EventToolArgs(state,selectedEventId,userPrompt,safeHistory,true);
       const dossier=await v26ToolEventDossier({id:'v2853_fallback_dossier',name:'event_dossier',...ea,detail:'brief'},state,selectedEventId);
       const f=dossier?.facts||{};
-      return v281LocalResponse({title:`Datos disponibles · ${f.event||''}`,answer:`No he podido completar la interpretación adicional de Zuzu en este turno, pero los datos canónicos de ${f.event||'este evento'} siguen disponibles: ingresos ${v26FormatEuro(f.income_total||0)}, compras realizadas ${v26FormatEuro(f.purchases_realized||0)}${num(f.purchases_pending)>0?`, Pte.Compra ${v26FormatEuro(f.purchases_pending)}`:''}, saldo operativo ${v26FormatEuro(f.operating_balance||0)} y valoración ${v26FormatEuro(f.event_valuation||0)}.`,results:[dossier],flowTrace,previousInteractionId:''});
+      const fallback=v281LocalResponse({title:`Datos disponibles · ${f.event||''}`,answer:`No he podido completar la interpretación adicional de Zuzu en este turno, pero los datos canónicos de ${f.event||'este evento'} siguen disponibles: ingresos ${v26FormatEuro(f.income_total||0)}, compras realizadas ${v26FormatEuro(f.purchases_realized||0)}${num(f.purchases_pending)>0?`, Pte.Compra ${v26FormatEuro(f.purchases_pending)}`:''}, saldo operativo ${v26FormatEuro(f.operating_balance||0)} y valoración ${v26FormatEuro(f.event_valuation||0)}.`,results:[dossier],flowTrace,previousInteractionId:'',traceDirect:false}); fallback.provider='control-event-safe-fallback'; fallback.meta={...(fallback.meta||{}),architecture:'Respaldo canónico de emergencia; sin enrutado semántico determinista'}; return fallback;
     }catch(_){
       return{ok:true,rejected:false,title:'Zuzu no pudo completar el análisis',answer:'No he podido completar la interpretación adicional en este turno. Prueba a repetir la pregunta o a concretar el aspecto del evento que quieres revisar.',warnings:[],charts:[],tables:[],files:[],provider:'control-event-safe-fallback',model:'',meta:{version:'v1.0_exp',geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
     }

@@ -1,13 +1,12 @@
 # Zuzu Router SOMBRA · v1.0_exp
 
-Esta primera fase **no cambia la respuesta actual de Zuzu**.
+La fase SOMBRA ya ha cumplido su función de validación. **La producción v1.0_exp usa ya la arquitectura nueva Gemini → herramientas ControlEvent → Gemini → presentación canónica.**
 
 ## Producción
 
-Después de que `/api/event-ai/analyze` haya terminado y la respuesta ya esté pintada, la UI llama a `/api/event-ai/router-shadow`.
-El Router Gemini solo devuelve una clasificación estructurada de la pregunta (tubería, sujeto, evento, operación, filtros y herencias). No consulta Supabase ni ejecuta las herramientas de Zuzu y su decisión no interviene en la respuesta vigente.
+La UI de producción **ya no llama automáticamente** a `/api/event-ai/router-shadow`. El clasificador SOMBRA y su endpoint se conservan únicamente para diagnósticos/regresiones manuales.
 
-La traza de Zuzu muestra el bloque `SOMBRA · Router Gemini` para poder comparar durante uso real lo que habría decidido la arquitectura nueva.
+En producción, cada turno entra en Gemini con el hilo nativo (`previous_interaction_id`); Gemini decide herramientas, ControlEvent ejecuta y verifica datos canónicos y la respuesta vuelve a Gemini antes de que CE materialice tablas/gráficas. No existe una ruta semántica determinista previa que herede por inercia compras, donaciones, banco, etc. al cambiar el usuario de asunto o de evento.
 
 ## Banco de 100 mensajes
 
