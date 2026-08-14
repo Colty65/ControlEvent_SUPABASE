@@ -553,6 +553,15 @@
       return {turnId:String(turn&&turn.turnId||''),user:String(turn&&turn.user||'').slice(0,700),assistant:String(turn&&turn.assistant||'').slice(0,1200),assistantTail:String(turn&&turn.assistantTail||'').slice(-1000),title:String(turn&&turn.title||'').slice(0,160),provider:String(turn&&turn.provider||'').slice(0,80),intent:String(turn&&turn.intent||'').slice(0,120),tools:Array.isArray(turn&&turn.tools)?turn.tools.slice(0,6):[],selectedEventId:String(turn&&turn.selectedEventId||'').slice(0,120),conversationContext:(turn&&turn.conversationContext&&typeof turn.conversationContext==='object')?turn.conversationContext:null,pendingAction:(turn&&turn.pendingAction&&typeof turn.pendingAction==='object')?turn.pendingAction:null,resultContext:(turn&&turn.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null,routerShadow:(turn&&turn.routerShadow&&typeof turn.routerShadow==='object')?turn.routerShadow:null};
     });
   }
+  function conversationDigestForApi(){
+    var hist=loadZuzuConversation().slice(-40);
+    return hist.map(function(turn,idx){
+      var u=trim(turn&&turn.user||'').replace(/\s+/g,' ').slice(0,220);
+      var a=trim(turn&&turn.assistant||'').replace(/\s+/g,' ').slice(0,300);
+      var t=trim(turn&&turn.title||'').replace(/\s+/g,' ').slice(0,100);
+      return 'T'+(idx+1)+' · U: '+u+(t?' · '+t:'')+(a?' · Z: '+a:'');
+    }).join('\n').slice(-14000);
+  }
   function archiveMetaForData(data){ return {charts:Array.isArray(data&&data.charts)?data.charts.length:0,tables:Array.isArray(data&&data.tables)?data.tables.length:0,files:Array.isArray(data&&data.files)?data.files.length:0}; }
   function resultCoreHtml(data,options){
     data=data||{};options=options||{};
@@ -612,12 +621,15 @@
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
     var resEl=$('ceAiResult');
+    var voiceConversation=!!(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.isConversationalMode==='function'&&window.ControlEventV22Voz4.isConversationalMode());
+    var conversationTurnNumber=loadZuzuConversation().length+1;
+    try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-started',{detail:{prompt:prompt,voiceConversation:voiceConversation,turnNumber:conversationTurnNumber}}));}catch(_){ }
     startZuzuThinking(prompt);
     try{
       var history=conversationHistoryForApi();
       var previousInteractionId=loadZuzuInteractionId();
       var conversationContext=loadZuzuConversationContext();
-      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -635,7 +647,8 @@
       data.answer=withoutGeminiLabel(ensureZuzuUserPreface(data.answer||''));
       if(data.title) data.title=withoutGeminiLabel(data.title);
       if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);
-      if((!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);
+      if(!voiceConversation&&(!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);
+      if(voiceConversation){data.charts=[];data.tables=[];data.files=[];}
       var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
       if(data.meta&&data.meta.resetInteractionId===true) saveZuzuInteractionId('');
       if(returnedInteractionId) saveZuzuInteractionId(returnedInteractionId);
@@ -659,7 +672,7 @@
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'', data.rejected?'err':'');
       try{
-        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId}}));
+        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),title:String(data.title||'')}}));
         if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
           setTimeout(function(){ try{window.ControlEventV22Voz4.maybeAutoRead();}catch(_){ } },80);
         }
@@ -669,6 +682,7 @@
       stopZuzuThinking();
       resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
       setStatus('Error', 'err');
+      try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-error',{detail:{message:String(err&&err.message||err||'Error')}}));}catch(_){ }
     }
   }
   function usageHtml(data){
@@ -948,5 +962,5 @@
   document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);
-  window.ControlEventV113ZuzuAnalitica={open:openModal, install:tick};
+  window.ControlEventV113ZuzuAnalitica={open:openModal,close:closeModal,install:tick,submitVoicePrompt:function(text){openModal();setTimeout(function(){var p=$('ceAiPrompt');if(p){p.value=String(text||'').trim();p.dispatchEvent(new Event('input',{bubbles:true}));}var b=$('ceAiRun');if(b)b.click();},90);}};
 })();
